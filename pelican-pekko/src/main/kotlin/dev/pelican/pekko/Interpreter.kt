@@ -352,8 +352,26 @@ private fun readBody(
             if (declaredLength.isPresent && declaredLength.asLong > api.maxBodyBytes) {
                 return CompletableFuture.failedStage(PayloadTooLarge(api.maxBodyBytes))
             }
-            req.entity()
-                .toStrict(api.strictBodyTimeoutMillis, api.maxBodyBytes, system)
+
+            // Two ways to read it, and which one matters more than it looks.
+            //
+            // `toStrict(timeout, maxBytes, system)` enforces the limit by
+            // materialising a limiting stage in front of the entity, and that
+            // costs about six microseconds a request — an order of magnitude
+            // more than everything else this interpreter does put together.
+            //
+            // It is only needed when nobody has said how long the body is. A
+            // declared Content-Length was checked above, and HTTP/1.1 reads
+            // exactly that many bytes off the connection, so the entity cannot
+            // arrive larger than the number already refused. Chunked requests
+            // declare nothing, and those still get the limiting stage.
+            val strict =
+                if (declaredLength.isPresent) {
+                    req.entity().toStrict(api.strictBodyTimeoutMillis, system)
+                } else {
+                    req.entity().toStrict(api.strictBodyTimeoutMillis, api.maxBodyBytes, system)
+                }
+            strict
                 .exceptionally { t ->
                     // The backstop, for a chunked request that declared no length.
                     // Pekko signals it with an EntityStreamException; core has its

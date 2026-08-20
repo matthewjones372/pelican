@@ -8,6 +8,7 @@ import dev.pelican.default
 import dev.pelican.div
 import dev.pelican.endpoint
 import dev.pelican.jackson.JacksonCodecs
+import dev.pelican.jsonBody
 import dev.pelican.pathParam
 import dev.pelican.pekko.handledNow
 import dev.pelican.pekko.toRoute
@@ -18,6 +19,7 @@ import org.apache.pekko.http.javadsl.model.ContentTypes
 import org.apache.pekko.http.javadsl.model.HttpEntities
 import org.apache.pekko.http.javadsl.model.HttpRequest
 import org.apache.pekko.http.javadsl.model.HttpResponse
+import org.apache.pekko.http.javadsl.model.MediaTypes
 import org.apache.pekko.http.javadsl.model.StatusCodes
 import org.apache.pekko.http.javadsl.server.Directives
 import org.apache.pekko.http.javadsl.server.PathMatchers
@@ -159,6 +161,68 @@ class PekkoOverheadBenchmark {
             route.function(system)
         }
 
+    // ------------------------------------------------------- a body to read
+    //
+    // The GET cases above never materialise anything: the request has no
+    // entity and the response is strict. Reading a body is where Pekko's
+    // streams actually turn — `toStrict` on this backend — so the comparison
+    // is incomplete without it.
+
+    data class NewItem(val name: String)
+
+    private val newItem = jsonBody<NewItem>()
+
+    private val createItem = endpoint(newItem) {
+        post("items")
+        json<Item>(status = 201)
+    }
+
+    private val describedPost: Function<HttpRequest, java.util.concurrent.CompletionStage<HttpResponse>> = Api(
+        endpoints = listOf(createItem handledNow { body -> Item(1, body.name) }),
+        codecs = JacksonCodecs,
+    ).toRoute(system).function(system)
+
+    private val handWrittenPost: Function<HttpRequest, java.util.concurrent.CompletionStage<HttpResponse>> = run {
+        val mapper = ObjectMapper().registerKotlinModule()
+        val route: Route = Directives.post {
+            Directives.path("items") {
+                Directives.extractStrictEntity(java.time.Duration.ofSeconds(10)) { strict ->
+                    val body = mapper.readValue(strict.data.utf8String(), NewItem::class.java)
+                    Directives.complete(
+                        HttpResponse.create()
+                            .withStatus(StatusCodes.CREATED)
+                            .withEntity(
+                                HttpEntities.create(
+                                    ContentTypes.APPLICATION_JSON,
+                                    mapper.writeValueAsString(Item(1, body.name)),
+                                ),
+                            ),
+                    )
+                }
+            }
+        }
+        route.function(system)
+    }
+
+    private fun post(handler: Function<HttpRequest, java.util.concurrent.CompletionStage<HttpResponse>>): Int =
+        handler.apply(
+            HttpRequest.POST("/items").withEntity(
+                HttpEntities.create(ContentTypes.APPLICATION_JSON, """{"name":"anvil"}"""),
+            ),
+        ).toCompletableFuture().join().status().intValue()
+
+    private fun measurePost(
+        handler: Function<HttpRequest, java.util.concurrent.CompletionStage<HttpResponse>>,
+        requests: Int,
+    ): Double {
+        var sink = 0
+        val start = System.nanoTime()
+        repeat(requests) { sink += post(handler) }
+        val elapsed = System.nanoTime() - start
+        check(sink == requests * 201) { "a request failed: $sink" }
+        return elapsed.toDouble() / requests
+    }
+
     @AfterAll
     fun stop() {
         system.terminate()
@@ -228,6 +292,26 @@ class PekkoOverheadBenchmark {
         val matcherOnly = mutableListOf<Double>()
         repeat(9) { matcherOnly += measure(handWrittenMatcherOnly, 50_000) }
         println("pekko matchers %6.0f ns/op  (PathMatchers, query read directly)".format(median(matcherOnly)))
+
+        // The materialising path: a body that has to be read before anything
+        // can be decoded.
+        repeat(100_000) { post(describedPost) }
+        repeat(100_000) { post(handWrittenPost) }
+        val rawPost = mutableListOf<Double>()
+        val pelicanPost = mutableListOf<Double>()
+        repeat(9) {
+            rawPost += measurePost(handWrittenPost, 20_000)
+            pelicanPost += measurePost(describedPost, 20_000)
+        }
+        println("-- POST with a JSON body (toStrict materialises)")
+        println("pekko raw    %8.0f ns/op".format(median(rawPost)))
+        println("pelican      %8.0f ns/op".format(median(pelicanPost)))
+        println(
+            "difference   %8.0f ns/op  %.2fx".format(
+                median(pelicanPost) - median(rawPost),
+                median(pelicanPost) / median(rawPost),
+            ),
+        )
 
         println("-- bytes allocated per request")
         println("pekko matchers %4d B".format(bytesPerRequest(handWrittenMatcherOnly)))

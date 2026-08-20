@@ -29,6 +29,9 @@ dependencies {
     // pom and JUnit 4 is `test`, so all of them are named here: TestRouteResult
     // reports a failure through `org.junit.Assert`, which has to be on the
     // classpath even though nothing in this repository is a JUnit 4 test.
+    // A codec for the body-limit test; the module itself needs none.
+    testImplementation(project(":pelican-jackson"))
+
     testImplementation("org.apache.pekko:pekko-http-testkit_$scalaBinary:$pekkoHttpVersion")
     testImplementation("org.apache.pekko:pekko-stream-testkit_$scalaBinary")
     testImplementation("org.apache.pekko:pekko-testkit_$scalaBinary")

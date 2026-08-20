@@ -638,6 +638,15 @@ number on its own would leave the wrong impression.
 seals every route with `Route.function(system)`, so none of them pays for a
 socket.
 
+Reading a body is the other half of the story, and the one where Pekko's
+streams actually turn: `toStrict` materialises. A POST with a JSON body costs
+~11µs on this backend whoever writes the route — two orders of magnitude more
+than the routing above — and the interpreter is about a microsecond *under* a
+hand-written `extractStrictEntity`, because it asks Pekko for the cheaper of
+two reads when the request declared its length. See
+[`ChunkedBodyLimitTest`](pelican-pekko/src/test/kotlin/dev/pelican/pekko/ChunkedBodyLimitTest.kt)
+for why the other read still exists.
+
 For scale: a loopback socket round trip is tens of microseconds and a database
 call is milliseconds, so on a realistic endpoint this is a fraction of a
 percent. It does not grow with the endpoint either — the cost is the
