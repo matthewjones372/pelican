@@ -1338,10 +1338,58 @@ delivery-timing assertions `InMemoryTransport.exchange` hands back the response
 with its entity unconsumed — the back-pressure test in `InMemoryContractTest`
 is the socket test, minus the socket.
 
+## What the build checks
+
+Four gates beyond the tests, each of which exists because a claim in this
+document would otherwise be unverified.
+
+**detekt**, on the type-resolving `detektMain`/`detektTest` tasks rather than
+the plain one, with the deviations in `config/detekt/detekt.yml`. That file is
+written as a list of decisions: the rules turned off for wildcard imports and
+filenames are the same two `.editorconfig` disables, made for the same reason;
+HTTP status codes are exempt from `MagicNumber` because this library hands them
+to you as integers, and a private `NOT_FOUND` beside a public parameter taking
+`404` would read as though the two were different things.
+
+Three rules are off because the tool is wrong rather than the code. detekt
+1.23.8 is built against an older frontend and, on Kotlin 2.4, reads
+`val (a, b) = expr ?: return null` as unreachable, and calls the `suspend` on
+`respondFailure` redundant — removing it does not compile. Each is recorded
+where it is disabled, with what happened when it was believed. detekt also
+cannot read a JDK 25 version string, so the Java 25 CI job skips it; the 21 and
+23 jobs lint the same code.
+
+**FunctionalStyleTest** holds the line detekt could not. `ForbiddenMethodCall`
+was banning `mutableListOf` and friends, matched 28 sites under Kotlin 2.2, and
+silently matched zero after the bump — it resolves `java.util.UUID.randomUUID`
+against the new metadata but not the stdlib's top-level functions. A rule that
+stops firing without saying so is worse than no rule, so the claim moved to a
+test that reads the sources. It is a ratchet, not a ban: sixteen files
+accumulate into a mutable collection and hand back something immutable, which
+is what a builder is, and each is listed with why. What it stops is the next
+file quietly starting.
+
+**Kover**, aggregated across modules rather than per-module — a line in
+`pelican-core` is exercised by the tests in `pelican-pekko` as often as by its
+own — with a floor of 80% wired into `check`. It sits at 86% line, 71% branch.
+
+**OpenApiSpecQualityTest** reads the emitted documents back with
+swagger-parser, an implementation that did not write them: `$ref`s resolved,
+3.1 conformance, every path keeping its operations and responses, every
+security requirement naming a scheme the document defines. A generator marking
+its own homework is the failure mode it rules out, and it caught a wrong
+assumption the first time it ran.
+
+Two smaller things. The Pekko route tests run through Pekko's own route
+testkit, behind a JUnit 5 extension in `PekkoRouteTestKit` — the testkit drives
+its `ActorSystem` from a JUnit 4 `@Rule`, which Jupiter does not run. And
+`OverheadBenchmark` measures what the interpreter costs against a hand-written
+http4k route; see [What it costs](../README.md#what-it-costs).
+
 ## Run it
 
 ```bash
-./gradlew build                     # 572 tests across all modules
+./gradlew build                     # 573 tests across all modules
 ./gradlew :example:run              # server on :8080, on Pekko
 ./gradlew :example:runHttp4k        # the same service on :8080, on http4k
 ./gradlew :example:runBackends      # the small example on all three backends at once

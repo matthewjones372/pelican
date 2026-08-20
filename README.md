@@ -53,7 +53,7 @@ streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
 [What the compiler catches](#what-the-compiler-catches) ·
 [Describing endpoints](#describing-endpoints) · [Running a server](#running-a-server) ·
 [Testing](#testing) · [A generated Kotlin client](#a-generated-kotlin-client) ·
-[Backends](#backends) · [Modules](#modules) ·
+[Backends](#backends) · [What it costs](#what-it-costs) · [Modules](#modules) ·
 [Running the examples](#running-the-examples) · [Known limits](#known-limits)
 
 The reference manual, with the reasoning behind each design decision, is
@@ -600,6 +600,49 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 ---
 
+# What it costs
+
+A description has to be interpreted, and that is not free. What it costs is
+measured rather than argued about:
+[`OverheadBenchmark`](example/src/test/kotlin/example/OverheadBenchmark.kt)
+serves one endpoint twice — once described with Pelican and interpreted onto
+http4k, once written directly against http4k's own routing — and compares them.
+Both decode a path parameter and an optional query parameter, and both encode
+the same object with the same Jackson mapper, so what is left in the difference
+is the interpreter.
+
+| against | per request |
+|---|---|
+| http4k written the ordinary way | **0-35ns, 112 bytes** |
+| http4k with the response hand-tuned | ~150ns, ~400 bytes |
+
+Two baselines, because one would flatter. An http4k `Response` is immutable, so
+the idiomatic `Response(status).header(...).body(...)` copies it at each step —
+three responses and two header lists where one of each will do. Pelican builds
+it in one construction, which is worth about 300 bytes a request and is most of
+why the first row is what it is. The second row is the honest comparison
+against someone who has done the same thing by hand.
+
+For scale: a loopback socket round trip is tens of microseconds and a database
+call is milliseconds, so on a realistic endpoint this is a fraction of a
+percent. It does not grow with the endpoint either — the cost is the
+per-request bag of decoded values, the `Params` around it and the response, and
+none of those scale with how many inputs are declared or how big the payload
+is. An endpoint that decodes nothing pays much the same as one that decodes
+two, which on the smaller absolute numbers of an empty endpoint reads as a
+larger ratio.
+
+```bash
+./gradlew :example:test -Dbenchmark=true --tests "*OverheadBenchmark*"
+```
+
+It is not JMH: one JVM, no forks, no blackholes. Treat the ratio as sound and
+the absolute numbers as indicative. It runs only when asked for, and turns the
+coverage agent off for itself — measuring through instrumentation reports the
+agent rather than the library, which cost an afternoon to notice.
+
+---
+
 # Modules
 
 Fourteen modules; you take four or five. The layering is enforced by tests
@@ -629,7 +672,7 @@ library. The full breakdown is in
 # Running the examples
 
 ```bash
-./gradlew build                          # all modules, 572 tests
+./gradlew build                          # all modules, 573 tests
 ./gradlew :example:runReadmeExample      # the service above, on :8080
 ./gradlew :example:run                   # the fuller orders API (streaming, SSE, raw bodies)
 ./gradlew :example:runBackends           # all three backends at once, on :8080-:8082
