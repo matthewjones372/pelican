@@ -129,9 +129,12 @@ private fun contentTypeOf(mediaType: String): ContentType {
     val sub = mediaType.substring(slash + 1).substringBefore(';').trim()
     return when {
         main == "application" && sub == "octet-stream" -> ContentTypes.APPLICATION_OCTET_STREAM
+
         main == "application" && sub == "json" -> ContentTypes.APPLICATION_JSON
+
         main == "text" -> MediaTypes.customWithFixedCharset(main, sub, HttpCharsets.UTF_8, HashMap(), false)
             .toContentType()
+
         else -> ContentTypes.create(MediaTypes.customBinary(main, sub, /* compressible = */ true))
     }
 }
@@ -153,8 +156,11 @@ internal fun errorResponse(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? 
     val rendered = renderError(raw, api?.exposeInternalErrors ?: false)
 
     rendered.unexpected?.let { failure ->
+        // An unexpected failure always carries a reference; that is what
+        // renderError produced it for.
+        val reference = checkNotNull(rendered.reference) { "an unexpected failure with no reference" }
         val hook = api?.onServerError
-        if (hook != null) hook(rendered.reference!!, endpoint, failure)
+        if (hook != null) hook(reference, endpoint, failure)
         else log.error("Unhandled failure in {} [ref {}]", endpoint ?: "?", rendered.reference, failure)
     }
 

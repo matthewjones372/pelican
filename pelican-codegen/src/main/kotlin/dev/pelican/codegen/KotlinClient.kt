@@ -84,7 +84,7 @@ fun ApiSpec.kotlinClient(
     clientName: String = defaultClientName(title),
     baseUrl: String? = servers.firstOrNull(),
     includeHidden: Boolean = false,
-): String = KotlinClientEmitter(this, packageName, clientName, baseUrl ?: "", includeHidden).emit()
+): String = KotlinClientEmitter(this, packageName, clientName, baseUrl.orEmpty(), includeHidden).emit()
 
 /**
  * Writes the client into [sourceRoot], under the directories [packageName]
@@ -309,16 +309,24 @@ private class KotlinClientEmitter(
             }
 
             out is ByteStreamOutput -> "response.body()"
+
             out is TextOutput -> "response.body()"
+
             out is EmptyOutput -> null
+
             out is JsonOutput<*> -> decodeExpression(out.type, "response.body()")
+
             else -> null
         }
 
         when {
             produced == null && declared != null -> append("return Outcome.Ok(Unit)")
-            produced == null -> Unit // 204: there is nothing to hand back
+
+            produced == null -> Unit
+
+            // 204: there is nothing to hand back
             declared != null -> append("return Outcome.Ok($produced)")
+
             else -> append("return $produced")
         }
     }.trimEnd()
@@ -328,6 +336,13 @@ private class KotlinClientEmitter(
     /** What the method declares, and the `request(...)` call that fills it in. */
     private class Call(val parameters: String, val request: String)
 
+    // Assembles one client method from one description: the parameter list,
+    // the naming that keeps it collision-free, the body, and the call. The
+    // branches are the body kinds, and each one both names a parameter and
+    // says how the request is built from it — pulling them out would mean
+    // passing this function's naming state along with them, which is a worse
+    // shape than the length.
+    @Suppress("CyclomaticComplexMethod")
     private fun call(ep: Endpoint<*, *>): Call {
         val taken = mutableSetOf<String>()
         val pathNames = LinkedHashMap<PathParam<*>, String>()
@@ -450,10 +465,14 @@ private class KotlinClientEmitter(
 
     private fun successType(out: Output<*>): String = when (out) {
         is JsonOutput<*> -> typeFor(out.type)
+
         is TextOutput -> "String"
+
         is EmptyOutput -> "Unit"
+
         // Opaque bytes stay opaque: the caller reads the stream, and closes it.
         is ByteStreamOutput -> "InputStream"
+
         else -> if (isStream(out)) "Streamed<${typeFor(elementType(out))}>" else "Unit"
     }
 
@@ -568,7 +587,7 @@ private fun escapeTemplate(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$")
 
 private fun banner(title: String): String =
-    "// " + "-".repeat((72 - title.length).coerceAtLeast(3)) + " $title"
+    "// " + "-".repeat((BANNER_WIDTH - title.length).coerceAtLeast(MIN_BANNER_RULE)) + " $title"
 
 private fun resource(name: String): String =
     KotlinClientEmitter::class.java.getResourceAsStream(name)
@@ -597,3 +616,9 @@ private val IMPORTS = """
     import java.util.UUID
     import kotlin.reflect.typeOf
 """.trimIndent()
+
+/** The column the generated banner comments rule out to. */
+private const val BANNER_WIDTH = 72
+
+/** A banner for a very long title still gets a rule, even a short one. */
+private const val MIN_BANNER_RULE = 3

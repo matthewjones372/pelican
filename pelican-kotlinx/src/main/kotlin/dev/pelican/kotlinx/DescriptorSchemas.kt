@@ -34,10 +34,15 @@ internal class DescriptorSchemas(private val components: SchemaComponents) {
 
     private fun build(desc: SerialDescriptor): JsonObj = when (desc.kind) {
         PrimitiveKind.STRING, PrimitiveKind.CHAR -> prim("string")
+
         PrimitiveKind.BOOLEAN -> prim("boolean")
+
         PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT -> prim("integer", "int32")
+
         PrimitiveKind.LONG -> prim("integer", "int64")
+
         PrimitiveKind.FLOAT -> prim("number", "float")
+
         PrimitiveKind.DOUBLE -> prim("number", "double")
 
         // Inlined rather than hoisted, which is what swagger-core does for the

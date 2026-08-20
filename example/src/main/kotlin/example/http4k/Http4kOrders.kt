@@ -125,7 +125,7 @@ fun ordersApi(): Api = Api(
 /** `./gradlew :example:runHttp4k` — the same service, on the other backend. */
 fun main(args: Array<String>) {
     // `./gradlew :example:runHttp4k --args=8081` when 8080 is taken.
-    val port = args.firstOrNull()?.toInt() ?: 8080
+    val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
     val server = ordersApi().startWithDocs(port = port, docs = Docs(docsPath = "/api-docs"))
     println(
         """
@@ -146,3 +146,6 @@ fun main(args: Array<String>) {
     Runtime.getRuntime().addShutdownHook(Thread { server.stop() })
     server.block()
 }
+
+/** What every example binds to unless told otherwise; `--args=8081` moves it. */
+private const val DEFAULT_PORT = 8080

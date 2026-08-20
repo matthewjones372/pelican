@@ -1,6 +1,9 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.*
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeSameInstanceAs
 import org.junit.jupiter.api.Test
 
 /**
@@ -30,10 +33,10 @@ class DeclaredFailuresTest {
             json<Widget>() orFail missing
         }
 
-        assertEquals(1, ep.errors.size)
-        assertEquals(404, ep.errors.single().status)
-        assertEquals("No widget with that id", ep.errors.single().description)
-        assertEquals(typeOfProblem(), ep.errors.single().type)
+        ep.errors.size shouldBe 1
+        ep.errors.single().status shouldBe 404
+        ep.errors.single().description shouldBe "No widget with that id"
+        ep.errors.single().type shouldBe typeOfProblem()
     }
 
     @Test
@@ -43,7 +46,7 @@ class DeclaredFailuresTest {
             json<Widget>() orFail errorJson<Problem>(404, "No widget with that id")
         }
 
-        assertEquals(1, ep.errors.size)
+        ep.errors.size shouldBe 1
     }
 
     @Test
@@ -53,7 +56,7 @@ class DeclaredFailuresTest {
             json<Widget>().orFail(missing, forbidden)
         }
 
-        assertEquals(listOf(404, 403), ep.errors.map { it.status })
+        ep.errors.map { it.status } shouldBe listOf(404, 403)
     }
 
     @Test
@@ -67,24 +70,24 @@ class DeclaredFailuresTest {
         // Documented, so the spec is unchanged from before `orFail` existed —
         // but the output is a plain JsonOutput, so the handler is the total
         // one and the 404 is still whatever the handler throws.
-        assertEquals(1, ep.errors.size)
-        assertTrue(ep.output is JsonOutput<*>)
+        ep.errors.size shouldBe 1
+        (ep.output is JsonOutput<*>) shouldBe true
     }
 
     @Test
     fun `two failures cannot share a status on one output`() {
-        val clash = assertThrows(IllegalArgumentException::class.java) {
+        val clash = shouldThrow<IllegalArgumentException> {
             endpoint(widgetId) {
                 get("widgets" / widgetId)
                 json<Widget>().orFail(missing, errorJson<Problem>(404, "Also not found"))
             }
         }
-        assertTrue(clash.message!!.contains("404"), clash.message)
+        withClue(clash.message) { clash.message!!.contains("404") shouldBe true }
     }
 
     @Test
     fun `orFail does not stack`() {
-        assertThrows(IllegalArgumentException::class.java) {
+        shouldThrow<IllegalArgumentException> {
             endpoint(widgetId) {
                 get("widgets" / widgetId)
                 (json<Widget>() orFail missing) orFail forbidden
@@ -99,17 +102,17 @@ class DeclaredFailuresTest {
             json<Widget>(status = 201) orFail missing
         }
 
-        assertEquals(201, ep.output.status)
-        assertEquals("application/json", ep.output.mediaType)
-        assertEquals(typeOfWidget(), ep.output.payloadType)
+        ep.output.status shouldBe 201
+        ep.output.mediaType shouldBe "application/json"
+        ep.output.payloadType shouldBe typeOfWidget()
     }
 
     @Test
     fun `the failure names itself, so the same type can carry two statuses`() {
         val (declared, error) = missing(Problem("gone")).let { it as Outcome.Err }
-        assertSame(missing, declared)
-        assertEquals(Problem("gone"), error)
-        assertEquals(403, (forbidden(Problem("gone")) as Outcome.Err).declared.status)
+        declared shouldBeSameInstanceAs missing
+        error shouldBe Problem("gone")
+        (forbidden(Problem("gone")) as Outcome.Err).declared.status shouldBe 403
     }
 
     sealed interface Trouble {
@@ -130,10 +133,10 @@ class DeclaredFailuresTest {
             json<Widget>().orFail(gone, denied)
         }
 
-        assertEquals(listOf(404, 403), ep.errors.map { it.status })
+        ep.errors.map { it.status } shouldBe listOf(404, 403)
 
         val answer: Outcome<Trouble, Widget> = gone(Trouble.Missing(7))
-        assertEquals(Trouble.Missing(7), (answer as Outcome.Err).error)
+        (answer as Outcome.Err).error shouldBe Trouble.Missing(7)
     }
 
     private fun typeOfProblem() = kotlin.reflect.typeOf<Problem>()

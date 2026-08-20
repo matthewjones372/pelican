@@ -52,7 +52,7 @@ fun Api.toRoute(system: ClassicActorSystemProvider): Route {
         routeFor(it, this, codecs.getValue(it), handlers.getValue(it), cors, system)
     } + listOfNotNull(cors?.let(::preflightRoute))
     require(routes.isNotEmpty()) { "This API has no endpoints." }
-    return Directives.concat(routes.first(), *routes.drop(1).toTypedArray())
+    return routes.reduce { left, right -> Directives.concat(left, right) }
 }
 
 /**
@@ -113,7 +113,7 @@ private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = Endpo
     failures = (output as? FallibleOutput<*, *>)
         ?.failures
         ?.associateTo(java.util.IdentityHashMap()) { it to codecs.codec<Any?>(it.type) }
-        ?: emptyMap(),
+        .orEmpty(),
 )
 
 /**
@@ -173,65 +173,91 @@ private fun matchPath(spec: PathSpec, req: HttpRequest): Map<PathParam<*>, Strin
 }
 
 @Suppress("UNCHECKED_CAST")
-private fun invoke(
-    se: ServerEndpoint,
-    api: Api,
-    codecs: EndpointCodecs,
-    handler: (Params) -> CompletionStage<Any?>,
+/**
+ * Everything decodable before the body arrives, written into the request's own
+ * value bag.
+ *
+ * The three rules are the same one written three times over — present, decode
+ * it; absent and required, refuse; absent and optional, take the declared
+ * default — and they are spelled out per input kind because what "present"
+ * means differs: a query parameter and a header are Pekko `Optional`s, a
+ * cookie is a lookup in a map core parsed.
+ */
+private fun decodePlainInputs(
+    ep: Endpoint<*, *>,
     req: HttpRequest,
     captures: Map<PathParam<*>, String>,
-    system: ClassicActorSystemProvider,
-): CompletionStage<HttpResponse> {
-    val ep = se.endpoint
-    val values = LinkedHashMap<ParamKey<*>, Any?>()
+    into: MutableMap<ParamKey<*>, Any?>,
+) = with(into) {
+    val query = req.uri.query()
 
-    // Built before decoding, so a filter or a failing decode can still put a
-    // header on the way out.
-    val params = Params(values, req, ep)
+    captures.forEach { (param, raw) -> put(param, param.codec.decode(param.name, raw)) }
 
-    // ---- plain inputs: path, query, headers -------------------------------
-    try {
-        captures.forEach { (param, raw) -> values[param] = param.codec.decode(param.name, raw) }
-
-        val query = req.uri.query()
-        for (q in ep.queries) {
-            val raw = query.get(q.name)
-            values[q] = when {
+    ep.queries.forEach { q ->
+        val raw = query.get(q.name)
+        put(
+            q,
+            when {
                 raw.isPresent -> q.codec.decode(q.name, raw.get())
                 q.required -> throw ApiException(400, "Missing required query parameter '${q.name}'")
                 else -> q.default
-            }
-        }
+            },
+        )
+    }
 
-        for (h in ep.headerParams) {
-            val raw = req.getHeader(h.name)
-            values[h] = when {
+    ep.headerParams.forEach { h ->
+        val raw = req.getHeader(h.name)
+        put(
+            h,
+            when {
                 raw.isPresent -> h.codec.decode(h.name, raw.get().value())
                 h.required -> throw ApiException(400, "Missing required header '${h.name}'")
                 else -> h.default
-            }
-        }
+            },
+        )
+    }
 
-        // Parsed by core, from the header, rather than by Pekko's own `Cookie`
-        // model — so a cookie decodes to the same value on all three backends.
-        // See `Cookies`.
+    // Parsed by core, from the header, rather than by Pekko's own `Cookie`
+    // model — so a cookie decodes to the same value on all three backends.
+    // See `Cookies`. Skipped when nothing declared one.
+    if (ep.cookieParams.isNotEmpty()) {
         val cookies = Cookies.parse(
             req.getHeaders().filter { it.name().equals("Cookie", ignoreCase = true) }.map { it.value() },
         )
-        for (c in ep.cookieParams) {
+        ep.cookieParams.forEach { c ->
             val raw = cookies[c.name]
-            values[c] = when {
-                raw != null -> c.codec.decode(c.name, raw)
-                c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
-                else -> c.default
-            }
+            put(
+                c,
+                when {
+                    raw != null -> c.codec.decode(c.name, raw)
+                    c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
+                    else -> c.default
+                },
+            )
         }
-    } catch (t: Throwable) {
-        return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params))
     }
+}
 
-    // ---- body -------------------------------------------------------------
-    val bodyReady: CompletionStage<Unit> = when (val body = ep.bodyInput) {
+/**
+ * The body, read the way its declaration says to: not at all, as a stream
+ * handed over unconsumed, as a multipart envelope parsed off the blocking-IO
+ * pool, or as a strict payload for a codec.
+ *
+ * Decoded values go into [values], and the stage says when they are there. A
+ * refusal — oversize, undecodable — is the stage failing rather than a
+ * response built here: the caller turns any failure into the same response
+ * through core's `renderError`, so there is one place that decides what a
+ * failure looks like.
+ */
+private fun readBody(
+    ep: Endpoint<*, *>,
+    api: Api,
+    codecs: EndpointCodecs,
+    req: HttpRequest,
+    values: MutableMap<ParamKey<*>, Any?>,
+    system: ClassicActorSystemProvider,
+): CompletionStage<Unit> {
+    return when (val body = ep.bodyInput) {
         null -> CompletableFuture.completedStage(Unit)
 
         is RawBody -> {
@@ -276,9 +302,7 @@ private fun invoke(
             // backends all do this, and all answer 413.
             val declaredLength = req.entity().contentLengthOption
             if (declaredLength.isPresent && declaredLength.asLong > api.maxBodyBytes) {
-                return CompletableFuture.completedStage(
-                    errorResponse(PayloadTooLarge(api.maxBodyBytes), api, ep).withHeaders(params),
-                )
+                return CompletableFuture.failedStage(PayloadTooLarge(api.maxBodyBytes))
             }
             req.entity()
                 .toStrict(api.strictBodyTimeoutMillis, api.maxBodyBytes, system)
@@ -305,6 +329,32 @@ private fun invoke(
                 }
         }
     }
+}
+
+private fun invoke(
+    se: ServerEndpoint,
+    api: Api,
+    codecs: EndpointCodecs,
+    handler: (Params) -> CompletionStage<Any?>,
+    req: HttpRequest,
+    captures: Map<PathParam<*>, String>,
+    system: ClassicActorSystemProvider,
+): CompletionStage<HttpResponse> {
+    val ep = se.endpoint
+    val values = LinkedHashMap<ParamKey<*>, Any?>()
+
+    // Built before decoding, so a filter or a failing decode can still put a
+    // header on the way out.
+    val params = Params(values, req, ep)
+
+    // ---- plain inputs: path, query, headers, cookies ----------------------
+    try {
+        decodePlainInputs(ep, req, captures, values)
+    } catch (t: Throwable) {
+        return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params))
+    }
+
+    val bodyReady = readBody(ep, api, codecs, req, values, system)
 
     return bodyReady
         .thenCompose { handler(params) }

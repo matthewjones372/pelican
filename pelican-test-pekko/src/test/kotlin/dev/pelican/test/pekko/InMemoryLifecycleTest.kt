@@ -8,7 +8,8 @@ import dev.pelican.test.ApiClient
 import dev.pelican.test.RequestSpec
 import dev.pelican.test.ResponseSpec
 import dev.pelican.test.Transport
-import org.junit.jupiter.api.Assertions.*
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
@@ -29,7 +30,7 @@ class InMemoryLifecycleTest {
     @Test
     fun `requests run with no server bound`() {
         pingApi().inMemory("lifecycle-serves").use { app ->
-            assertEquals("pong", app.call(ping, Unit))
+            app.call(ping, Unit) shouldBe "pong"
         }
     }
 
@@ -43,12 +44,11 @@ class InMemoryLifecycleTest {
         val app = pingApi().inMemory("lifecycle-closes")
         val system = (app.transport as InMemoryTransport).system
 
-        assertFalse(system.getWhenTerminated().toCompletableFuture().isDone)
+        system.getWhenTerminated().toCompletableFuture().isDone shouldBe false
         app.close()
-        assertTrue(
-            system.getWhenTerminated().toCompletableFuture().isDone,
-            "close() returned before the system had terminated",
-        )
+        withClue("close() returned before the system had terminated") {
+            system.getWhenTerminated().toCompletableFuture().isDone shouldBe true
+        }
     }
 
     /** A borrowed system outlives the client that used it. */
@@ -58,9 +58,9 @@ class InMemoryLifecycleTest {
         val system = (owner.transport as InMemoryTransport).system
         try {
             pingApi().inMemory(system).use { borrower ->
-                assertEquals("pong", borrower.call(ping, Unit))
+                borrower.call(ping, Unit) shouldBe "pong"
             }
-            assertFalse(system.getWhenTerminated().toCompletableFuture().isDone)
+            system.getWhenTerminated().toCompletableFuture().isDone shouldBe false
         } finally {
             owner.close()
         }

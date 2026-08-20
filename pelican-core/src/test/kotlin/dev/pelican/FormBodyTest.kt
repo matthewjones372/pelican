@@ -1,9 +1,13 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
@@ -79,32 +83,27 @@ class FormBodyTest {
 
     @Test
     fun `each field becomes the JSON type its schema declares`() {
-        assertEquals(
-            """{"user":"ada","remember":true,"visits":3}""",
-            codec.decodeFromString("user=ada&remember=true&visits=3"),
-        )
+        codec.decodeFromString("user=ada&remember=true&visits=3") shouldBe
+            """{"user":"ada","remember":true,"visits":3}"""
     }
 
     @Test
     fun `what a browser posts for a checkbox is the boolean the schema asked for`() {
         // `on` is what an HTML checkbox sends, and the same spellings a query
         // parameter accepts are accepted here — one codec, one answer.
-        assertEquals("""{"remember":true}""", codec.decodeFromString("remember=on"))
-        assertEquals("""{"remember":false}""", codec.decodeFromString("remember=0"))
+        codec.decodeFromString("remember=on") shouldBe """{"remember":true}"""
+        codec.decodeFromString("remember=0") shouldBe """{"remember":false}"""
     }
 
     @Test
     fun `a repeated field becomes the array its schema declares`() {
-        assertEquals(
-            """{"tags":["red","green"]}""",
-            codec.decodeFromString("tags=red&tags=green"),
-        )
+        codec.decodeFromString("tags=red&tags=green") shouldBe """{"tags":["red","green"]}"""
     }
 
     @Test
     fun `values are percent-decoded, and a plus is a space`() {
-        assertEquals("""{"user":"ada lovelace"}""", codec.decodeFromString("user=ada+lovelace"))
-        assertEquals("""{"user":"a&b"}""", codec.decodeFromString("user=a%26b"))
+        codec.decodeFromString("user=ada+lovelace") shouldBe """{"user":"ada lovelace"}"""
+        codec.decodeFromString("user=a%26b") shouldBe """{"user":"a&b"}"""
     }
 
     @Test
@@ -112,49 +111,44 @@ class FormBodyTest {
         // A browser sends the name of the button that was clicked, and a CSRF
         // token a filter has already dealt with. Refusing those would make an
         // ordinary HTML form impossible to point at an endpoint.
-        assertEquals(
-            """{"user":"ada"}""",
-            codec.decodeFromString("user=ada&_csrf=deadbeef&submit=Sign+in"),
-        )
+        codec.decodeFromString("user=ada&_csrf=deadbeef&submit=Sign+in") shouldBe """{"user":"ada"}"""
     }
 
     @Test
     fun `an empty value for a non-string field is absence, not a decode failure`() {
         // An untouched number input submits "", which is not a number. Leaving
         // the property out is what lets the type's own default apply.
-        assertEquals("""{"user":""}""", codec.decodeFromString("user=&visits="))
+        codec.decodeFromString("user=&visits=") shouldBe """{"user":""}"""
     }
 
     @Test
     fun `a value that will not decode is the same 400 a query parameter would give`() {
-        val failure = assertThrows<DecodeFailure> { codec.decodeFromString("visits=lots") }
+        val failure = shouldThrow<DecodeFailure> { codec.decodeFromString("visits=lots") }
 
-        assertEquals("visits", failure.paramName)
-        assertEquals("lots", failure.raw)
+        failure.paramName shouldBe "visits"
+        failure.raw shouldBe "lots"
     }
 
     @Test
     fun `encoding is the same trip backwards`() {
-        assertEquals(
-            "user=ada&remember=true&visits=3&tags=red&tags=green",
-            codec.encodeToString("""{"user":"ada","remember":true,"visits":3,"tags":["red","green"]}"""),
-        )
+        codec.encodeToString("""{"user":"ada","remember":true,"visits":3,"tags":["red","green"]}""") shouldBe
+            "user=ada&remember=true&visits=3&tags=red&tags=green"
     }
 
     @Test
     fun `encoding leaves out a null rather than sending the word`() {
-        assertEquals("user=ada", codec.encodeToString("""{"user":"ada","visits":null}"""))
+        codec.encodeToString("""{"user":"ada","visits":null}""") shouldBe "user=ada"
     }
 
     @Test
     fun `encoding percent-encodes what a form field cannot carry literally`() {
-        assertEquals("user=a%26b", codec.encodeToString("""{"user":"a&b"}"""))
+        codec.encodeToString("""{"user":"a&b"}""") shouldBe "user=a%26b"
     }
 
     @Test
     fun `a shape a form cannot carry fails when the codec is resolved, not on a request`() {
-        val failure = assertThrows<IllegalStateException> { Schemas.formCodec<String>(typeOf<Nested>()) }
+        val failure = shouldThrow<IllegalStateException> { Schemas.formCodec<String>(typeOf<Nested>()) }
 
-        assertTrue("cannot have type 'object'" in (failure.message ?: ""), failure.message)
+        withClue(failure.message) { (failure.message ?: "") shouldContain "cannot have type 'object'" }
     }
 }

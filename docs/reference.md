@@ -49,6 +49,12 @@ The layering is load-bearing, not decorative, and each edge is a test:
   kotest's matchers to everyone who already had their own. Both are now
   somewhere else, and this test is what stops them coming back.
 
+  The repository's own tests are written with kotest's matchers — that is a
+  test-scope dependency of each module and never an exported one, which is why
+  this claim is asked of `runtimeClasspath` rather than of `Class.forName`:
+  kotest is on the test classpath here by construction, and what a consumer
+  gets is the part worth holding.
+
 ## Three backends
 
 The backend is a choice about handlers. Descriptions do not change, and neither
@@ -1335,7 +1341,7 @@ is the socket test, minus the socket.
 ## Run it
 
 ```bash
-./gradlew build                     # 601 tests across all modules
+./gradlew build                     # 572 tests across all modules
 ./gradlew :example:run              # server on :8080, on Pekko
 ./gradlew :example:runHttp4k        # the same service on :8080, on http4k
 ./gradlew :example:runBackends      # the small example on all three backends at once

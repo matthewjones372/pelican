@@ -1,7 +1,11 @@
 package dev.pelican.openapi
 
 import dev.pelican.*
-import org.junit.jupiter.api.Assertions.*
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -69,22 +73,22 @@ class OpenApi31Test {
 
     @Test
     fun `the document declares OpenAPI 3_1_0`() {
-        assertEquals("3.1.0", (doc() / "openapi").str())
+        (doc() / "openapi").str() shouldBe "3.1.0"
     }
 
     @Test
     fun `a nullable property is a type union rather than the 3_0 nullable keyword`() {
         val part = doc() / "components" / "schemas" / "Part" / "properties"
-        assertEquals(listOf("string", "null"), (part / "note" / "type").strings())
-        assertNull(part / "note" / "nullable")
+        (part / "note" / "type").strings() shouldBe listOf("string", "null")
+        (part / "note" / "nullable").shouldBeNull()
     }
 
     @Test
     fun `a nullable reference is an anyOf, which is the one nullability 3_0 could not state`() {
         val parent = doc() / "components" / "schemas" / "Part" / "properties" / "parent"
         val branches = (parent / "anyOf").arr()
-        assertEquals("#/components/schemas/Part", (branches[0] / "\$ref").str())
-        assertEquals("null", (branches[1] / "type").str())
+        (branches[0] / "\$ref").str() shouldBe "#/components/schemas/Part"
+        (branches[1] / "type").str() shouldBe "null"
     }
 
     @Test
@@ -93,8 +97,8 @@ class OpenApi31Test {
         val quantity = schema.arr().single { (it / "name").str() == "quantity" }
         // 3.0 spelled this `minimum: 0, exclusiveMinimum: true`, so a `minimum`
         // beside it would mean the 3.0 pair had been emitted after all.
-        assertEquals(JsonNum(0), quantity / "schema" / "exclusiveMinimum")
-        assertNull(quantity / "schema" / "minimum")
+        quantity / "schema" / "exclusiveMinimum" shouldBe JsonNum(0)
+        (quantity / "schema" / "minimum").shouldBeNull()
     }
 
     @Test
@@ -102,20 +106,20 @@ class OpenApi31Test {
         val document = doc()
         val request = document / "paths" / "/parts/blueprint" / "post" / "requestBody" /
             "content" / "application/octet-stream" / "schema"
-        assertEquals("application/octet-stream", (request / "contentMediaType").str())
+        (request / "contentMediaType").str() shouldBe "application/octet-stream"
 
         // The response names what it actually streams, which `format: binary`
         // had no way to say.
         val response = document / "paths" / "/parts/blueprint" / "post" / "responses" / "200" /
             "content" / "image/png" / "schema"
-        assertEquals("image/png", (response / "contentMediaType").str())
+        (response / "contentMediaType").str() shouldBe "image/png"
     }
 
     @Test
     fun `no 3_0-only keyword survives anywhere in the document`() {
         val rendered = doc().render()
         listOf("nullable", "\"format\":\"binary\"").forEach {
-            assertFalse(it in rendered, "$it is 3.0's, and this document claims 3.1:\n$rendered")
+            withClue("$it is 3.0's, and this document claims 3.1:\n$rendered") { rendered shouldNotContain it }
         }
     }
 }

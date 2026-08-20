@@ -2,9 +2,10 @@ package dev.pelican.http4k
 
 import dev.pelican.Api
 import dev.pelican.jackson.JacksonCodecs
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.http4k.core.Method
 import org.http4k.core.Request
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -35,16 +36,16 @@ class StreamingTest {
         val produced = AtomicInteger()
         val response = handlerCounting(produced)(Request(Method.GET, "/items/stream?limit=5"))
 
-        assertEquals(0, produced.get(), "the handler ran, but nothing should have been produced yet")
+        withClue("the handler ran, but nothing should have been produced yet") { produced.get() shouldBe 0 }
 
         val stream = response.body.stream
         val first = readFrame(stream)
 
-        assertEquals("""{"id":1,"name":"item-1"}""" + "\n", first)
-        assertEquals(1, produced.get(), "reading one frame should have produced exactly one element")
+        first shouldBe """{"id":1,"name":"item-1"}""" + "\n"
+        withClue("reading one frame should have produced exactly one element") { produced.get() shouldBe 1 }
 
         readFrame(stream)
-        assertEquals(2, produced.get())
+        produced.get() shouldBe 2
     }
 
     @Test
@@ -52,8 +53,8 @@ class StreamingTest {
         val produced = AtomicInteger()
         val response = handlerCounting(produced)(Request(Method.GET, "/items/stream?limit=5"))
 
-        assertEquals(5, response.bodyString().lines().count { it.isNotBlank() })
-        assertEquals(5, produced.get())
+        response.bodyString().lines().count { it.isNotBlank() } shouldBe 5
+        produced.get() shouldBe 5
     }
 
     /**

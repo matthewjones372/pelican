@@ -1,6 +1,7 @@
 package dev.pelican.pekko
 
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
@@ -14,9 +15,8 @@ class NoOpenApiDependencyTest {
     @Test
     fun `the openapi module is genuinely absent from this module's classpath`() {
         val loaded = runCatching { Class.forName("dev.pelican.openapi.OpenApiKt") }
-        assertTrue(
-            loaded.isFailure,
-            "pelican-pekko must not see pelican-openapi; docs live in pelican-pekko-docs",
-        )
+        withClue("pelican-pekko must not see pelican-openapi; docs live in pelican-pekko-docs") {
+            loaded.isFailure shouldBe true
+        }
     }
 }

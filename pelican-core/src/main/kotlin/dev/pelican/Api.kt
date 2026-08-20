@@ -119,7 +119,7 @@ class Api(
      * endpoint that genuinely takes a large document, or take the body as a
      * `rawBody()` stream and never hold it whole.
      */
-    val maxBodyBytes: Long = 8L * 1024 * 1024,
+    val maxBodyBytes: Long = DEFAULT_MAX_BODY_BYTES,
 
     /**
      * Runs around every handler, outermost first: authentication, rate limits,
@@ -194,3 +194,6 @@ class Api(
         security = security,
     )
 }
+
+/** The default body ceiling: eight megabytes. See [Api.maxBodyBytes] for why there is one at all. */
+private const val DEFAULT_MAX_BODY_BYTES: Long = 8L * 1024L * 1024L

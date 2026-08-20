@@ -6,9 +6,10 @@
 package dev.pelican.codegen
 
 import dev.pelican.*
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import kotlin.io.path.readText
@@ -181,129 +182,122 @@ class KotlinClientTest {
 
     @Test
     fun `it declares the package it was asked for and is named after the title`() {
-        assertTrue("package com.example.widgets" in client, client.take(600))
-        assertTrue("class WidgetShopClient(" in client)
-        assertTrue("""private const val DEFAULT_BASE_URL = "https://widgets.example.com"""" in client)
+        withClue(client.take(600)) { ("package com.example.widgets" in client) shouldBe true }
+        client shouldContain "class WidgetShopClient("
+        client shouldContain """private const val DEFAULT_BASE_URL = "https://widgets.example.com""""
     }
 
     @Test
     fun `it needs pelican-core and nothing else`() {
         val imports = client.lines().filter { it.startsWith("import ") }.toSet()
-        assertEquals(
-            setOf(
-                "import dev.pelican.BodyCodec",
-                "import dev.pelican.Codecs",
-                "import dev.pelican.UploadedFile",
-                "import dev.pelican.formCodec",
-            ),
-            imports.filterNot { it.startsWith("import java") || it.startsWith("import kotlin") }.toSet(),
+        imports.filterNot { it.startsWith("import java") || it.startsWith("import kotlin") }.toSet() shouldBe setOf(
+            "import dev.pelican.BodyCodec",
+            "import dev.pelican.Codecs",
+            "import dev.pelican.UploadedFile",
+            "import dev.pelican.formCodec",
         )
     }
 
     @Test
     fun `a method is named by its operationId, and falls back to the derived name`() {
-        assertTrue("fun getWidget(" in client)
+        client shouldContain "fun getWidget("
         // The same string the OpenAPI document uses as its operationId.
-        assertTrue("fun getWidgetsByWidgetIdHistory(" in client)
+        client shouldContain "fun getWidgetsByWidgetIdHistory("
     }
 
     // ------------------------------------------------------------ requests
 
     @Test
     fun `path parameters are positional and percent-encoded`() {
-        assertTrue("""request("GET", "/widgets/${'$'}{segment(widgetId)}")""" in client, client)
+        withClue(client) { ("""request("GET", "/widgets/${'$'}{segment(widgetId)}")""" in client) shouldBe true }
     }
 
     @Test
     fun `query parameters and headers are named parameters with defaults`() {
         // A header name is not a legal Kotlin identifier, so it is camel-cased —
         // mechanically, keeping every part, and mapped back on the way out.
-        assertTrue(
-            "fun streamWidgets(page: Int? = null, colour: WidgetColour? = null, xTraceId: String? = null)" in client,
-            client,
-        )
-        assertTrue("""query = listOf("page" to page, "colour" to colour)""" in client)
-        assertTrue("""headerParams = listOf("X-Trace-Id" to xTraceId)""" in client)
+        withClue(client) {
+            client shouldContain
+                "fun streamWidgets(page: Int? = null, colour: WidgetColour? = null, xTraceId: String? = null)"
+        }
+        client shouldContain """query = listOf("page" to page, "colour" to colour)"""
+        client shouldContain """headerParams = listOf("X-Trace-Id" to xTraceId)"""
     }
 
     @Test
     fun `a required parameter has no default, and comes before the optional ones`() {
-        assertTrue("fun createWidget(body: NewWidget, xApiKey: String)" in client, client)
-        assertTrue("""headerParams = listOf("X-Api-Key" to xApiKey)""" in client)
+        withClue(client) { ("fun createWidget(body: NewWidget, xApiKey: String)" in client) shouldBe true }
+        client shouldContain """headerParams = listOf("X-Api-Key" to xApiKey)"""
     }
 
     @Test
     fun `a json body goes through the codec, a raw body through the stream`() {
-        assertTrue(
-            "body = HttpRequest.BodyPublishers.ofString(newWidgetCodec.encodeToString(body)), " +
-                "contentType = \"application/json\"" in client,
-            client,
-        )
-        assertTrue("fun uploadWidget(body: InputStream): InputStream {" in client)
-        assertTrue("body = HttpRequest.BodyPublishers.ofInputStream { body }" in client)
+        withClue(client) {
+            ("body = HttpRequest.BodyPublishers.ofString(newWidgetCodec.encodeToString(body)), " +
+                "contentType = \"application/json\"" in client) shouldBe true
+        }
+        client shouldContain "fun uploadWidget(body: InputStream): InputStream {"
+        client shouldContain "body = HttpRequest.BodyPublishers.ofInputStream { body }"
     }
 
     @Test
     fun `a cookie parameter is a named parameter, and cookies travel as one header`() {
-        assertTrue("fun themed(theme: String? = null)" in client, client)
-        assertTrue("""cookies = listOf("theme" to theme)""" in client, client)
+        withClue(client) { ("fun themed(theme: String? = null)" in client) shouldBe true }
+        withClue(client) { ("""cookies = listOf("theme" to theme)""" in client) shouldBe true }
     }
 
     @Test
     fun `a form body goes through a codec that reads the published schema`() {
-        assertTrue("fun signInWidget(body: NewWidget)" in client, client)
-        assertTrue(
-            "body = HttpRequest.BodyPublishers.ofString(newWidgetFormCodec.encodeToString(body)), " +
-                "contentType = \"application/x-www-form-urlencoded\"" in client,
-            client,
-        )
-        assertTrue(
-            "private val newWidgetFormCodec: BodyCodec<NewWidget> = codecs.formCodec(typeOf<NewWidget>())" in client,
-            client,
-        )
+        withClue(client) { ("fun signInWidget(body: NewWidget)" in client) shouldBe true }
+        withClue(client) {
+            ("body = HttpRequest.BodyPublishers.ofString(newWidgetFormCodec.encodeToString(body)), " +
+                "contentType = \"application/x-www-form-urlencoded\"" in client) shouldBe true
+        }
+        withClue(client) {
+            client shouldContain
+                "private val newWidgetFormCodec: BodyCodec<NewWidget> = codecs.formCodec(typeOf<NewWidget>())"
+        }
     }
 
     @Test
     fun `multipart parts are parameters, and the file part is the type a handler receives`() {
-        assertTrue("fun importWidgets(label: String, attachment: UploadedFile)" in client, client)
-        assertTrue(
-            """multipart = multipart(fields = listOf("label" to label), """ +
-                """files = listOf("attachment" to attachment))""" in client,
-            client,
-        )
+        withClue(client) { ("fun importWidgets(label: String, attachment: UploadedFile)" in client) shouldBe true }
+        withClue(client) {
+            ("""multipart = multipart(fields = listOf("label" to label), """ +
+                """files = listOf("attachment" to attachment))""" in client) shouldBe true
+        }
     }
 
     // ------------------------------------------------------------ responses
 
     @Test
     fun `each streaming shape gets the reader that frames it`() {
-        assertTrue("ndjsonFrames(body.bufferedReader())" in client)
-        assertTrue("sseFrames(body.bufferedReader())" in client)
-        assertTrue("jsonArrayFrames(body.reader())" in client)
-        assertTrue("fun listWidgets(page: Int? = null): Streamed<Widget> {" in client)
+        client shouldContain "ndjsonFrames(body.bufferedReader())"
+        client shouldContain "sseFrames(body.bufferedReader())"
+        client shouldContain "jsonArrayFrames(body.reader())"
+        client shouldContain "fun listWidgets(page: Int? = null): Streamed<Widget> {"
     }
 
     @Test
     fun `an empty response returns nothing and opaque bytes return the stream`() {
-        assertTrue("fun deleteWidget(widgetId: Long) {" in client, client)
-        assertTrue("fun uploadWidget(body: InputStream): InputStream {" in client)
+        withClue(client) { ("fun deleteWidget(widgetId: Long) {" in client) shouldBe true }
+        client shouldContain "fun uploadWidget(body: InputStream): InputStream {"
     }
 
     @Test
     fun `a codec is resolved once per payload type, when the client is built`() {
-        assertTrue(
-            "private val widgetCodec: BodyCodec<Widget> = codecs.codec(typeOf<Widget>())" in client,
-            client,
-        )
-        assertEquals(1, Regex("private val widgetCodec").findAll(client).count())
+        withClue(client) {
+            client shouldContain "private val widgetCodec: BodyCodec<Widget> = codecs.codec(typeOf<Widget>())"
+        }
+        Regex("private val widgetCodec").findAll(client).count() shouldBe 1
     }
 
     // ------------------------------------------------------------ failures
 
     @Test
     fun `declared failures become a sealed type, one member per status`() {
-        assertTrue(
-            """
+        withClue(client) {
+            ("""
             sealed interface CreateWidgetFailure {
                 val status: Int
 
@@ -317,34 +311,32 @@ class KotlinClientTest {
                     override val status: Int get() = 403
                 }
             }
-            """.trimIndent() in client,
-            client,
-        )
+            """.trimIndent() in client) shouldBe true
+        }
     }
 
     @Test
     fun `a fallible call returns an Outcome, and reads the failure that arrived`() {
-        assertTrue("fun getWidget(widgetId: Long): Outcome<GetWidgetFailure, Widget> {" in client)
-        assertTrue(
-            "404 -> return Outcome.Err(GetWidgetFailure.NotFound(" +
-                "problemCodec.decodeFromString(response.body())))" in client,
-            client,
-        )
-        assertTrue("return Outcome.Ok(widgetCodec.decodeFromString(response.body()))" in client)
+        client shouldContain "fun getWidget(widgetId: Long): Outcome<GetWidgetFailure, Widget> {"
+        withClue(client) {
+            ("404 -> return Outcome.Err(GetWidgetFailure.NotFound(" +
+                "problemCodec.decodeFromString(response.body())))" in client) shouldBe true
+        }
+        client shouldContain "return Outcome.Ok(widgetCodec.decodeFromString(response.body()))"
     }
 
     @Test
     fun `an endpoint with no declared failures returns the value and throws otherwise`() {
-        assertFalse("DeleteWidgetFailure" in client)
-        assertTrue("""if (!response.succeeded()) failed("DELETE", "/widgets/{widgetId}", response)""" in client)
+        client shouldNotContain "DeleteWidgetFailure"
+        client shouldContain """if (!response.succeeded()) failed("DELETE", "/widgets/{widgetId}", response)"""
     }
 
     // ------------------------------------------------------------ payloads
 
     @Test
     fun `a named schema becomes a data class, with optional properties defaulted`() {
-        assertTrue(
-            """
+        withClue(client) {
+            ("""
             data class Widget(
                 val id: Long,
                 val name: String,
@@ -353,9 +345,8 @@ class KotlinClientTest {
                 val colour: WidgetColour,
                 val parent: Widget? = null,
             )
-            """.trimIndent() in client,
-            client,
-        )
+            """.trimIndent() in client) shouldBe true
+        }
     }
 
     @Test
@@ -363,24 +354,24 @@ class KotlinClientTest {
         // `note` is required, so nothing but the union `["string", "null"]` can
         // have made it nullable — and it is a String, not the `Any?` a
         // generator still looking for `nullable: true` would fall back to.
-        assertTrue("val note: String?," in client, client)
+        withClue(client) { ("val note: String?," in client) shouldBe true }
         // `parent` likewise: the anyOf has to resolve to the branch that is not
         // null, or the property would be typed `Any?` and say nothing.
-        assertTrue("val parent: Widget? = null," in client, client)
+        withClue(client) { ("val parent: Widget? = null," in client) shouldBe true }
     }
 
     @Test
     fun `an enum is declared once and reused wherever the same constants appear`() {
-        assertEquals(1, Regex("enum class ").findAll(client).count(), client)
-        assertTrue("enum class WidgetColour { RED, GREEN }" in client)
+        withClue(client) { Regex("enum class ").findAll(client).count() shouldBe 1 }
+        client shouldContain "enum class WidgetColour { RED, GREEN }"
     }
 
     // ------------------------------------------------------------ hidden
 
     @Test
     fun `a hidden endpoint is left out, as it is left out of the document`() {
-        assertFalse("rebuild" in client, "a hidden endpoint reached the generated client")
-        assertTrue("rebuild" in spec().kotlinClient("com.example.widgets", includeHidden = true))
+        withClue("a hidden endpoint reached the generated client") { ("rebuild" in client) shouldBe false }
+        spec().kotlinClient("com.example.widgets", includeHidden = true) shouldContain "rebuild"
     }
 
     // ------------------------------------------------------------ layering
@@ -388,14 +379,14 @@ class KotlinClientTest {
     @Test
     fun `the client name and base url can be chosen`() {
         val custom = spec().kotlinClient("x", clientName = "Widgets", baseUrl = "")
-        assertTrue("class Widgets(" in custom)
-        assertTrue("private const val DEFAULT_BASE_URL = \"\"" in custom)
+        custom shouldContain "class Widgets("
+        custom shouldContain "private const val DEFAULT_BASE_URL = \"\""
     }
 
     @Test
     fun `neither pekko nor a codec module is on this module's classpath`() {
-        assertTrue(runCatching { Class.forName("org.apache.pekko.http.javadsl.server.Directives") }.isFailure)
-        assertTrue(runCatching { Class.forName("com.fasterxml.jackson.databind.ObjectMapper") }.isFailure)
+        runCatching { Class.forName("org.apache.pekko.http.javadsl.server.Directives") }.isFailure shouldBe true
+        runCatching { Class.forName("com.fasterxml.jackson.databind.ObjectMapper") }.isFailure shouldBe true
     }
 
     @Test
@@ -404,15 +395,12 @@ class KotlinClientTest {
         try {
             val written = spec().writeKotlinClient(root, packageName = "com.example.widgets")
 
-            assertEquals(
-                root.resolve("com/example/widgets/WidgetShopClient.kt"),
-                written,
-            )
-            assertEquals(client, written.readText())
+            written shouldBe root.resolve("com/example/widgets/WidgetShopClient.kt")
+            written.readText() shouldBe client
 
             // Regenerating replaces it in place: there is nothing to move after.
             val again = spec().writeKotlinClient(root, packageName = "com.example.widgets")
-            assertEquals(written, again)
+            again shouldBe written
         } finally {
             root.toFile().deleteRecursively()
         }
@@ -422,6 +410,6 @@ class KotlinClientTest {
     fun `the generated file is stable`() {
         // Same spec, same bytes. A generator that reordered its output would
         // make every regeneration a diff nobody can review.
-        assertEquals(client, spec().kotlinClient("com.example.widgets"))
+        spec().kotlinClient("com.example.widgets") shouldBe client
     }
 }

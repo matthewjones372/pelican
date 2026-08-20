@@ -7,8 +7,8 @@ import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.test.RequestSpec
 import dev.pelican.test.apiClient
 import dev.pelican.test.pekko.inMemory
+import io.kotest.matchers.shouldBe
 import org.http4k.core.Request
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import dev.pelican.http4k.handledNow as handledOnHttp4k
 import dev.pelican.http4k.handledWith as handledWithOnHttp4k
@@ -58,7 +58,7 @@ class MethodMismatchTest {
             // the service being complete.
             covers = emptyList(),
         ).inMemory("greetings-method-mismatch").use {
-            assertEquals(404, it.transport.send(postToHello).status)
+            it.transport.send(postToHello).status shouldBe 404
         }
     }
 
@@ -72,7 +72,7 @@ class MethodMismatchTest {
             covers = emptyList(),
         ).toHttpHandler()
 
-        assertEquals(405, handler(Request(org.http4k.core.Method.POST, "/hello/ada")).status.code)
+        handler(Request(org.http4k.core.Method.POST, "/hello/ada")).status.code shouldBe 405
     }
 
     @Test
@@ -87,7 +87,7 @@ class MethodMismatchTest {
 
         try {
             apiClient(server.baseUrl, JacksonCodecs).use {
-                assertEquals(404, it.transport.send(postToHello).status)
+                it.transport.send(postToHello).status shouldBe 404
             }
         } finally {
             server.stop()

@@ -10,9 +10,13 @@ import dev.pelican.pekko.docs.startWithDocs
 import dev.pelican.pekko.handledNow
 import dev.pelican.pekko.handledOrFail
 import dev.pelican.pekko.start
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import java.net.URI
@@ -71,32 +75,32 @@ class OrdersApiTest {
     @Test
     fun `returns a json object for a known user`() {
         val res = get("/users/1")
-        assertEquals(200, res.statusCode())
+        res.statusCode() shouldBe 200
         val obj = Json.parseToJsonElement(res.body()).jsonObject
-        assertEquals(1, obj["id"]!!.jsonPrimitive.int)
-        assertEquals("Ada Lovelace", obj["name"]!!.jsonPrimitive.content)
-        assertTrue(res.headers().firstValue("content-type").get().startsWith("application/json"))
+        obj["id"]!!.jsonPrimitive.int shouldBe 1
+        obj["name"]!!.jsonPrimitive.content shouldBe "Ada Lovelace"
+        res.headers().firstValue("content-type").get().startsWith("application/json") shouldBe true
     }
 
     @Test
     fun `notFound from a handler becomes a 404 with a json body`() {
         val res = get("/users/999")
-        assertEquals(404, res.statusCode())
+        res.statusCode() shouldBe 404
         val obj = Json.parseToJsonElement(res.body()).jsonObject
-        assertEquals(404, obj["status"]!!.jsonPrimitive.int)
-        assertEquals("No user 999", obj["error"]!!.jsonPrimitive.content)
+        obj["status"]!!.jsonPrimitive.int shouldBe 404
+        obj["error"]!!.jsonPrimitive.content shouldBe "No user 999"
     }
 
     @Test
     fun `an undecodable path parameter is a 400, not a 500`() {
         val res = get("/users/not-a-number")
-        assertEquals(400, res.statusCode())
-        assertTrue(res.body().contains("Invalid parameter"), res.body())
+        res.statusCode() shouldBe 400
+        withClue(res.body()) { res.body().contains("Invalid parameter") shouldBe true }
     }
 
     @Test
     fun `an unknown path is a 404`() {
-        assertEquals(404, get("/nope").statusCode())
+        get("/nope").statusCode() shouldBe 404
     }
 
     // ------------------------------------------------------------- ndjson
@@ -104,47 +108,44 @@ class OrdersApiTest {
     @Test
     fun `streams ndjson with one json document per line`() {
         val res = get("/users/1/orders?limit=7")
-        assertEquals(200, res.statusCode())
-        assertEquals(
-            "application/x-ndjson",
-            res.headers().firstValue("content-type").get().substringBefore(';'),
-        )
+        res.statusCode() shouldBe 200
+        res.headers().firstValue("content-type").get().substringBefore(';') shouldBe "application/x-ndjson"
 
         val lines = res.body().trim().lines()
-        assertEquals(7, lines.size)
+        lines.size shouldBe 7
         lines.forEach { line ->
             val o = Json.parseToJsonElement(line).jsonObject
-            assertEquals(1, o["userId"]!!.jsonPrimitive.int)
-            assertTrue(o.containsKey("item"))
+            o["userId"]!!.jsonPrimitive.int shouldBe 1
+            o.containsKey("item") shouldBe true
         }
     }
 
     @Test
     fun `query parameter defaults are applied when absent`() {
         val lines = get("/users/1/orders").body().trim().lines()
-        assertEquals(25, lines.size) // limit.default(25)
+        lines.size shouldBe 25 // limit.default(25)
     }
 
     @Test
     fun `an enum query parameter filters and is case-insensitive`() {
         val lines = get("/users/1/orders?limit=10&status=shipped").body().trim().lines()
-        assertEquals(10, lines.size)
+        lines.size shouldBe 10
         lines.forEach {
-            assertEquals("SHIPPED", Json.parseToJsonElement(it).jsonObject["status"]!!.jsonPrimitive.content)
+            Json.parseToJsonElement(it).jsonObject["status"]!!.jsonPrimitive.content shouldBe "SHIPPED"
         }
     }
 
     @Test
     fun `a bad enum value is rejected with a helpful 400`() {
         val res = get("/users/1/orders?status=BANANA")
-        assertEquals(400, res.statusCode())
-        assertTrue(res.body().contains("PENDING"), res.body())
+        res.statusCode() shouldBe 400
+        withClue(res.body()) { res.body().contains("PENDING") shouldBe true }
     }
 
     @Test
     fun `optional headers are simply null when absent`() {
-        assertEquals(200, get("/users/1/orders?limit=1").statusCode())
-        assertEquals(200, get("/users/1/orders?limit=1", "X-Trace-Id" to "abc").statusCode())
+        get("/users/1/orders?limit=1").statusCode() shouldBe 200
+        get("/users/1/orders?limit=1", "X-Trace-Id" to "abc").statusCode() shouldBe 200
     }
 
     // ------------------------------------------------------------- bodies
@@ -156,38 +157,38 @@ class OrdersApiTest {
             """{"item":"anvil","quantity":3}""",
             "X-Api-Key" to "let-me-in",
         )
-        assertEquals(201, res.statusCode())
+        res.statusCode() shouldBe 201
         val o = Json.parseToJsonElement(res.body()).jsonObject
-        assertEquals("anvil", o["item"]!!.jsonPrimitive.content)
-        assertEquals(3, o["quantity"]!!.jsonPrimitive.int)
-        assertEquals("PENDING", o["status"]!!.jsonPrimitive.content)
+        o["item"]!!.jsonPrimitive.content shouldBe "anvil"
+        o["quantity"]!!.jsonPrimitive.int shouldBe 3
+        o["status"]!!.jsonPrimitive.content shouldBe "PENDING"
     }
 
     @Test
     fun `a missing required header is a 400 before the handler runs`() {
         val res = post("/users/1/orders", """{"item":"anvil"}""")
-        assertEquals(400, res.statusCode())
-        assertTrue(res.body().contains("X-Api-Key"), res.body())
+        res.statusCode() shouldBe 400
+        withClue(res.body()) { res.body().contains("X-Api-Key") shouldBe true }
     }
 
     @Test
     fun `a handler can reject with 401`() {
         val res = post("/users/1/orders", """{"item":"anvil"}""", "X-Api-Key" to "wrong")
-        assertEquals(401, res.statusCode())
+        res.statusCode() shouldBe 401
     }
 
     @Test
     fun `malformed json is a 400`() {
         val res = post("/users/1/orders", """{"item":}""", "X-Api-Key" to "let-me-in")
-        assertEquals(400, res.statusCode())
-        assertTrue(res.body().contains("Malformed request body"), res.body())
+        res.statusCode() shouldBe 400
+        withClue(res.body()) { res.body().contains("Malformed request body") shouldBe true }
     }
 
     @Test
     fun `defaulted body fields work`() {
         val res = post("/users/1/orders", """{"item":"rope"}""", "X-Api-Key" to "let-me-in")
-        assertEquals(201, res.statusCode())
-        assertEquals(1, Json.parseToJsonElement(res.body()).jsonObject["quantity"]!!.jsonPrimitive.int)
+        res.statusCode() shouldBe 201
+        Json.parseToJsonElement(res.body()).jsonObject["quantity"]!!.jsonPrimitive.int shouldBe 1
     }
 
     @Test
@@ -197,17 +198,17 @@ class OrdersApiTest {
             .header("X-Api-Key", "let-me-in")
             .build()
         val res = client.send(req, HttpResponse.BodyHandlers.ofString())
-        assertEquals(204, res.statusCode())
-        assertEquals("", res.body())
+        res.statusCode() shouldBe 204
+        res.body() shouldBe ""
     }
 
     @Test
     fun `a request byte stream can be piped straight to the response`() {
         val payload = "x".repeat(200_000)
         val res = post("/echo", payload)
-        assertEquals(200, res.statusCode())
-        assertEquals(payload.length, res.body().length)
-        assertEquals(payload, res.body())
+        res.statusCode() shouldBe 200
+        res.body().length shouldBe payload.length
+        res.body() shouldBe payload
     }
 
     // ------------------------------------------------------------- json array
@@ -215,18 +216,15 @@ class OrdersApiTest {
     @Test
     fun `a json array output is one well-formed array`() {
         val res = get("/users/1/orders/list?limit=3")
-        assertEquals(200, res.statusCode())
-        assertEquals(
-            "application/json",
-            res.headers().firstValue("content-type").get().substringBefore(';'),
-        )
+        res.statusCode() shouldBe 200
+        res.headers().firstValue("content-type").get().substringBefore(';') shouldBe "application/json"
 
         val body = res.body()
-        assertTrue(body.startsWith("[") && body.endsWith("]"), body)
+        withClue(body) { (body.startsWith("[") && body.endsWith("]")) shouldBe true }
 
         val items = Json.parseToJsonElement(body).jsonArray
-        assertEquals(3, items.size)
-        items.forEach { assertEquals(1, it.jsonObject["userId"]!!.jsonPrimitive.int) }
+        items.size shouldBe 3
+        items.forEach { it.jsonObject["userId"]!!.jsonPrimitive.int shouldBe 1 }
     }
 
     @Test
@@ -237,7 +235,7 @@ class OrdersApiTest {
         val req = HttpRequest.newBuilder(URI.create(url("/users/1/orders/list?limit=8"))).GET().build()
         val start = System.nanoTime()
         val res = client.send(req, HttpResponse.BodyHandlers.ofInputStream())
-        assertEquals(200, res.statusCode())
+        res.statusCode() shouldBe 200
 
         var firstElementAt = -1L
         val body = StringBuilder()
@@ -254,12 +252,11 @@ class OrdersApiTest {
         val totalMs = (System.nanoTime() - start) / 1_000_000
         val firstMs = (firstElementAt - start) / 1_000_000
 
-        assertEquals(8, Json.parseToJsonElement(body.toString()).jsonArray.size)
-        assertTrue(totalMs >= 250, "stream finished suspiciously fast: ${totalMs}ms")
-        assertTrue(
-            firstMs < totalMs / 2,
-            "first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed",
-        )
+        Json.parseToJsonElement(body.toString()).jsonArray.size shouldBe 8
+        withClue("stream finished suspiciously fast: ${totalMs}ms") { (totalMs >= 250) shouldBe true }
+        withClue("first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
+            (firstMs < totalMs / 2) shouldBe true
+        }
     }
 
     @Test
@@ -270,11 +267,8 @@ class OrdersApiTest {
             .jsonObject["content"]!!.jsonObject["application/json"]!!
             .jsonObject["schema"]!!.jsonObject
 
-        assertEquals("array", schema["type"]!!.jsonPrimitive.content)
-        assertEquals(
-            "#/components/schemas/Order",
-            schema["items"]!!.jsonObject["\$ref"]!!.jsonPrimitive.content,
-        )
+        schema["type"]!!.jsonPrimitive.content shouldBe "array"
+        schema["items"]!!.jsonObject["\$ref"]!!.jsonPrimitive.content shouldBe "#/components/schemas/Order"
     }
 
     // ------------------------------------------------------------- sse + backpressure
@@ -282,17 +276,16 @@ class OrdersApiTest {
     @Test
     fun `server-sent events use the sse framing and event name`() {
         val res = get("/users/1/orders/watch?limit=3")
-        assertEquals(200, res.statusCode())
-        assertTrue(
-            res.headers().firstValue("content-type").get().startsWith("text/event-stream"),
-            res.headers().firstValue("content-type").toString(),
-        )
+        res.statusCode() shouldBe 200
+        withClue(res.headers().firstValue("content-type").toString()) {
+            res.headers().firstValue("content-type").get().startsWith("text/event-stream") shouldBe true
+        }
         val frames = res.body().split("\n\n").filter { it.isNotBlank() }
-        assertEquals(3, frames.size)
+        frames.size shouldBe 3
         frames.forEach { frame ->
-            assertTrue(frame.contains("event: order"), frame)
+            withClue(frame) { frame.contains("event: order") shouldBe true }
             val data = frame.lines().first { it.startsWith("data: ") }.removePrefix("data: ")
-            assertTrue(Json.parseToJsonElement(data).jsonObject.containsKey("seq"))
+            Json.parseToJsonElement(data).jsonObject.containsKey("seq") shouldBe true
         }
     }
 
@@ -304,7 +297,7 @@ class OrdersApiTest {
         val req = HttpRequest.newBuilder(URI.create(url("/users/1/orders/watch?limit=8"))).GET().build()
         val start = System.nanoTime()
         val res = client.send(req, HttpResponse.BodyHandlers.ofInputStream())
-        assertEquals(200, res.statusCode())
+        res.statusCode() shouldBe 200
 
         var firstFrameAt = -1L
         var frames = 0
@@ -320,12 +313,11 @@ class OrdersApiTest {
         val totalMs = (System.nanoTime() - start) / 1_000_000
         val firstMs = (firstFrameAt - start) / 1_000_000
 
-        assertEquals(8, frames)
-        assertTrue(totalMs >= 600, "stream finished suspiciously fast: ${totalMs}ms")
-        assertTrue(
-            firstMs < totalMs / 2,
-            "first frame at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed",
-        )
+        frames shouldBe 8
+        withClue("stream finished suspiciously fast: ${totalMs}ms") { (totalMs >= 600) shouldBe true }
+        withClue("first frame at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
+            (firstMs < totalMs / 2) shouldBe true
+        }
     }
 
     // ------------------------------------------------------------- openapi
@@ -333,59 +325,59 @@ class OrdersApiTest {
     @Test
     fun `serves a coherent openapi document`() {
         val res = get("/openapi.json")
-        assertEquals(200, res.statusCode())
+        res.statusCode() shouldBe 200
         val doc = Json.parseToJsonElement(res.body()).jsonObject
 
-        assertEquals("3.1.0", doc["openapi"]!!.jsonPrimitive.content)
-        assertEquals("Orders", doc["info"]!!.jsonObject["title"]!!.jsonPrimitive.content)
+        doc["openapi"]!!.jsonPrimitive.content shouldBe "3.1.0"
+        doc["info"]!!.jsonObject["title"]!!.jsonPrimitive.content shouldBe "Orders"
 
         val paths = doc["paths"]!!.jsonObject
-        assertTrue(paths.containsKey("/users/{userId}"), paths.keys.toString())
-        assertTrue(paths.containsKey("/users/{userId}/orders"), paths.keys.toString())
-        assertTrue(paths.containsKey("/users/{userId}/orders/{orderId}"), paths.keys.toString())
+        withClue(paths.keys.toString()) { paths.containsKey("/users/{userId}") shouldBe true }
+        withClue(paths.keys.toString()) { paths.containsKey("/users/{userId}/orders") shouldBe true }
+        withClue(paths.keys.toString()) { paths.containsKey("/users/{userId}/orders/{orderId}") shouldBe true }
 
         // GET and POST on the same template are merged into one path item.
         val ordersItem = paths["/users/{userId}/orders"]!!.jsonObject
-        assertTrue(ordersItem.containsKey("get"))
-        assertTrue(ordersItem.containsKey("post"))
+        ordersItem.containsKey("get") shouldBe true
+        ordersItem.containsKey("post") shouldBe true
 
         // The streaming endpoint advertises its real media type.
         val streamOk = ordersItem["get"]!!.jsonObject["responses"]!!.jsonObject["200"]!!.jsonObject
-        assertTrue(streamOk["content"]!!.jsonObject.containsKey("application/x-ndjson"))
+        streamOk["content"]!!.jsonObject.containsKey("application/x-ndjson") shouldBe true
 
         // Parameters carry their location, requiredness and schema.
         val params = ordersItem["get"]!!.jsonObject["parameters"]!!.jsonArray.map { it.jsonObject }
         val limitParam = params.first { it["name"]!!.jsonPrimitive.content == "limit" }
-        assertEquals("query", limitParam["in"]!!.jsonPrimitive.content)
-        assertFalse(limitParam["required"]!!.jsonPrimitive.boolean)
-        assertEquals("integer", limitParam["schema"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+        limitParam["in"]!!.jsonPrimitive.content shouldBe "query"
+        limitParam["required"]!!.jsonPrimitive.boolean shouldBe false
+        limitParam["schema"]!!.jsonObject["type"]!!.jsonPrimitive.content shouldBe "integer"
 
         val userIdParam = params.first { it["name"]!!.jsonPrimitive.content == "userId" }
-        assertEquals("path", userIdParam["in"]!!.jsonPrimitive.content)
-        assertTrue(userIdParam["required"]!!.jsonPrimitive.boolean)
-        assertEquals("int64", userIdParam["schema"]!!.jsonObject["format"]!!.jsonPrimitive.content)
+        userIdParam["in"]!!.jsonPrimitive.content shouldBe "path"
+        userIdParam["required"]!!.jsonPrimitive.boolean shouldBe true
+        userIdParam["schema"]!!.jsonObject["format"]!!.jsonPrimitive.content shouldBe "int64"
 
         val statusParam = params.first { it["name"]!!.jsonPrimitive.content == "status" }
         val enumValues = statusParam["schema"]!!.jsonObject["enum"]!!.jsonArray.map { it.jsonPrimitive.content }
-        assertEquals(listOf("PENDING", "SHIPPED", "DELIVERED", "CANCELLED"), enumValues)
+        enumValues shouldBe listOf("PENDING", "SHIPPED", "DELIVERED", "CANCELLED")
 
         // Model types are hoisted into components and referenced.
         val schemas = doc["components"]!!.jsonObject["schemas"]!!.jsonObject
-        assertTrue(schemas.containsKey("Order"), schemas.keys.toString())
-        assertTrue(schemas.containsKey("User"), schemas.keys.toString())
-        assertTrue(schemas.containsKey("CreateOrder"), schemas.keys.toString())
+        withClue(schemas.keys.toString()) { schemas.containsKey("Order") shouldBe true }
+        withClue(schemas.keys.toString()) { schemas.containsKey("User") shouldBe true }
+        withClue(schemas.keys.toString()) { schemas.containsKey("CreateOrder") shouldBe true }
 
         val orderSchema = schemas["Order"]!!.jsonObject
         val required = orderSchema["required"]!!.jsonArray.map { it.jsonPrimitive.content }
-        assertTrue(required.contains("id"))
+        required shouldContain "id"
         // quantity has a default in CreateOrder, so it must be optional there
         val createRequired = schemas["CreateOrder"]!!.jsonObject["required"]!!.jsonArray
             .map { it.jsonPrimitive.content }
-        assertEquals(listOf("item"), createRequired)
+        createRequired shouldBe listOf("item")
 
         val streamRef = streamOk["content"]!!.jsonObject["application/x-ndjson"]!!
             .jsonObject["schema"]!!.jsonObject["\$ref"]!!.jsonPrimitive.content
-        assertEquals("#/components/schemas/Order", streamRef)
+        streamRef shouldBe "#/components/schemas/Order"
     }
 
     @Test
@@ -393,28 +385,27 @@ class OrdersApiTest {
         val doc = Json.parseToJsonElement(ordersSpec().openApiJson()).jsonObject
         val getUserOp = doc["paths"]!!.jsonObject["/users/{userId}"]!!.jsonObject["get"]!!.jsonObject
         val responses = getUserOp["responses"]!!.jsonObject
-        assertTrue(responses.containsKey("200"))
-        assertTrue(responses.containsKey("404"))
-        assertEquals("No user with that id", responses["404"]!!.jsonObject["description"]!!.jsonPrimitive.content)
+        responses.containsKey("200") shouldBe true
+        responses.containsKey("404") shouldBe true
+        responses["404"]!!.jsonObject["description"]!!.jsonPrimitive.content shouldBe "No user with that id"
     }
 
     @Test
     fun `serves a swagger ui page at the configured path`() {
         val res = get("/api-docs")
-        assertEquals(200, res.statusCode())
-        assertTrue(
-            res.headers().firstValue("content-type").get().startsWith("text/html"),
-            res.headers().firstValue("content-type").toString(),
-        )
+        res.statusCode() shouldBe 200
+        withClue(res.headers().firstValue("content-type").toString()) {
+            res.headers().firstValue("content-type").get().startsWith("text/html") shouldBe true
+        }
 
         val body = res.body()
-        assertTrue(body.contains("swagger-ui"), body.take(200))
+        withClue(body.take(200)) { body.contains("swagger-ui") shouldBe true }
         // Pointed at the served document rather than a copy of it.
-        assertTrue(body.contains("url: '/openapi.json'"), body)
-        assertTrue(body.contains("Orders — API reference"), body)
+        withClue(body) { body.contains("url: '/openapi.json'") shouldBe true }
+        withClue(body) { body.contains("Orders — API reference") shouldBe true }
 
         // The default path is gone, not merely duplicated.
-        assertEquals(404, get("/docs").statusCode())
+        get("/docs").statusCode() shouldBe 404
     }
 
     // ------------------------------------------------------------- hidden
@@ -422,14 +413,14 @@ class OrdersApiTest {
     @Test
     fun `a hidden endpoint is served but not documented`() {
         val res = post("/internal/reindex", "", "X-Api-Key" to "let-me-in")
-        assertEquals(202, res.statusCode())
+        res.statusCode() shouldBe 202
 
         // Hidden hides the description, not the door: the credential still counts.
-        assertEquals(401, post("/internal/reindex", "", "X-Api-Key" to "nope").statusCode())
+        post("/internal/reindex", "", "X-Api-Key" to "nope").statusCode() shouldBe 401
 
         val doc = Json.parseToJsonElement(get("/openapi.json").body()).jsonObject
         val paths = doc["paths"]!!.jsonObject
-        assertFalse(paths.containsKey("/internal/reindex"), paths.keys.toString())
+        withClue(paths.keys.toString()) { paths.containsKey("/internal/reindex") shouldBe false }
     }
 }
 
@@ -477,27 +468,24 @@ class SwaggerUiOAuthTest {
     fun `the page authorizes as the configured client and serves its own redirect target`() {
         serve(DocsOAuth(clientId = "docs-ui", scopes = listOf("orders:read"))) { base ->
             val page = fetch("$base/api-docs").body()
-            assertTrue(page.contains("initOAuth"), page)
-            assertTrue(page.contains(""""clientId":"docs-ui""""), page)
-            assertTrue(page.contains(""""usePkceWithAuthorizationCodeGrant":true"""), page)
+            withClue(page) { page.contains("initOAuth") shouldBe true }
+            withClue(page) { page.contains(""""clientId":"docs-ui"""") shouldBe true }
+            withClue(page) { page.contains(""""usePkceWithAuthorizationCodeGrant":true""") shouldBe true }
             // Resolved against the origin the reader is on, not a configured host.
-            assertTrue(
-                page.contains("""oauth2RedirectUrl: window.location.origin + "/api-docs/oauth2-redirect.html""""),
-                page,
-            )
+            withClue(page) {
+                page shouldContain """oauth2RedirectUrl: window.location.origin + "/api-docs/oauth2-redirect.html""""
+            }
 
             val redirect = fetch("$base/api-docs/oauth2-redirect.html")
-            assertEquals(200, redirect.statusCode())
-            assertTrue(redirect.headers().firstValue("content-type").get().startsWith("text/html"))
-            assertTrue(redirect.body().contains("swaggerUIRedirectOauth2"), redirect.body())
+            redirect.statusCode() shouldBe 200
+            redirect.headers().firstValue("content-type").get().startsWith("text/html") shouldBe true
+            withClue(redirect.body()) { redirect.body().contains("swaggerUIRedirectOauth2") shouldBe true }
 
             // The requirement itself reaches the document, padlock and all.
             val doc = Json.parseToJsonElement(fetch("$base/openapi.json").body()).jsonObject
             val schemes = doc["components"]!!.jsonObject["securitySchemes"]!!.jsonObject
-            assertTrue(schemes.containsKey("oauth2"), schemes.keys.toString())
-            assertTrue(
-                schemes["oauth2"]!!.jsonObject["flows"]!!.jsonObject.containsKey("authorizationCode"),
-            )
+            withClue(schemes.keys.toString()) { schemes.containsKey("oauth2") shouldBe true }
+            schemes["oauth2"]!!.jsonObject["flows"]!!.jsonObject.containsKey("authorizationCode") shouldBe true
         }
     }
 
@@ -505,8 +493,8 @@ class SwaggerUiOAuthTest {
     fun `without docsOAuth there is no redirect page and no initOAuth`() {
         serve(null) { base ->
             val page = fetch("$base/api-docs").body()
-            assertFalse(page.contains("initOAuth"), page)
-            assertEquals(404, fetch("$base/api-docs/oauth2-redirect.html").statusCode())
+            withClue(page) { page.contains("initOAuth") shouldBe false }
+            fetch("$base/api-docs/oauth2-redirect.html").statusCode() shouldBe 404
         }
     }
 }
@@ -547,26 +535,26 @@ class SwaggerUiTest {
     fun `with a spec endpoint, the page fetches it by url`() {
         serve(openApi = "/openapi.json", docs = "/api-docs") { base ->
             val body = fetch("$base/api-docs").body()
-            assertTrue(body.contains("url: '/openapi.json'"), body)
-            assertFalse(body.contains("spec: {"), "the document should not also be inlined")
-            assertEquals(200, fetch("$base/openapi.json").statusCode())
+            withClue(body) { body.contains("url: '/openapi.json'") shouldBe true }
+            withClue("the document should not also be inlined") { body.contains("spec: {") shouldBe false }
+            fetch("$base/openapi.json").statusCode() shouldBe 200
         }
     }
 
     @Test
     fun `without a spec endpoint, the document is embedded in the page`() {
         serve(openApi = null, docs = "/api-docs") { base ->
-            assertEquals(404, fetch("$base/openapi.json").statusCode())
+            fetch("$base/openapi.json").statusCode() shouldBe 404
 
             val body = fetch("$base/api-docs").body()
-            assertFalse(body.contains("url: '"), "nothing left to fetch, so nothing should be fetched")
-            assertTrue(body.contains("spec: {"), body.take(400))
+            withClue("nothing left to fetch, so nothing should be fetched") { body.contains("url: '") shouldBe false }
+            withClue(body.take(400)) { body.contains("spec: {") shouldBe true }
 
             // Embedded whole, not truncated to something Swagger UI cannot read.
             val spec = body.substringAfter("spec: ").substringBefore(", dom_id")
             val doc = Json.parseToJsonElement(spec).jsonObject
-            assertEquals("3.1.0", doc["openapi"]!!.jsonPrimitive.content)
-            assertTrue(doc["paths"]!!.jsonObject.containsKey("/users/{userId}"))
+            doc["openapi"]!!.jsonPrimitive.content shouldBe "3.1.0"
+            doc["paths"]!!.jsonObject.containsKey("/users/{userId}") shouldBe true
         }
     }
 
@@ -589,8 +577,8 @@ class SwaggerUiTest {
         try {
             val body = fetch("${server.baseUrl}/api-docs").body()
             // The literal sequence must not survive into the page.
-            assertFalse(body.contains("</script><script>alert"), body)
-            assertTrue(body.contains("<\\/script>"), body.substringAfter("spec: ").take(400))
+            withClue(body) { body.contains("</script><script>alert") shouldBe false }
+            withClue(body.substringAfter("spec: ").take(400)) { body.contains("<\\/script>") shouldBe true }
         } finally {
             server.stop().toCompletableFuture().join()
         }
@@ -611,8 +599,8 @@ class RouteSpecificityTest {
                 HttpRequest.newBuilder(URI.create("${server.baseUrl}/users/1/orders/watch?limit=1")).GET().build(),
                 HttpResponse.BodyHandlers.ofString(),
             )
-            assertEquals(200, sse.statusCode())
-            assertTrue(sse.headers().firstValue("content-type").get().startsWith("text/event-stream"))
+            sse.statusCode() shouldBe 200
+            sse.headers().firstValue("content-type").get().startsWith("text/event-stream") shouldBe true
 
             // The capture still works for anything else.
             val del = client.send(
@@ -620,7 +608,7 @@ class RouteSpecificityTest {
                     .DELETE().header("X-Api-Key", "let-me-in").build(),
                 HttpResponse.BodyHandlers.ofString(),
             )
-            assertEquals(204, del.statusCode())
+            del.statusCode() shouldBe 204
         } finally {
             server.stop().toCompletableFuture().join()
         }
@@ -637,8 +625,8 @@ class TypedInputsTest {
                 HttpRequest.newBuilder(URI.create("${server.baseUrl}/search?limit=3&status=SHIPPED")).GET().build(),
                 HttpResponse.BodyHandlers.ofString(),
             )
-            assertEquals(200, res.statusCode())
-            assertEquals(3, res.body().trim().lines().size)
+            res.statusCode() shouldBe 200
+            res.body().trim().lines().size shouldBe 3
         } finally {
             server.stop().toCompletableFuture().join()
         }
@@ -647,47 +635,47 @@ class TypedInputsTest {
     @Test
     fun `declaring a path parameter that is not in the path fails at construction`() {
         val stray = pathParam<Long>("stray")
-        val e = assertThrows(IllegalStateException::class.java) {
+        val e = shouldThrow<IllegalStateException> {
             endpoint(stray) {
                 get("things")
                 json<User>()
             }
         }
-        assertTrue(e.message!!.contains("declares path parameter 'stray'"), e.message)
+        withClue(e.message) { e.message!!.contains("declares path parameter 'stray'") shouldBe true }
     }
 
     @Test
     fun `capturing a path parameter nobody declared fails at construction`() {
         val ignored = pathParam<Long>("ignored")
         val other = queryParam<Int>("other")
-        val e = assertThrows(IllegalStateException::class.java) {
+        val e = shouldThrow<IllegalStateException> {
             endpoint(other) {
                 get("things" / ignored)
                 json<User>()
             }
         }
-        assertTrue(e.message!!.contains("never declares it as an input"), e.message)
+        withClue(e.message) { e.message!!.contains("never declares it as an input") shouldBe true }
     }
 
     @Test
     fun `a duplicated path parameter name fails at construction`() {
         val a = pathParam<Long>("dup")
         val b = pathParam<Long>("dup")
-        val e = assertThrows(IllegalStateException::class.java) {
+        val e = shouldThrow<IllegalStateException> {
             endpoint(a, b) {
                 get("things" / a / b)
                 json<User>()
             }
         }
-        assertTrue(e.message!!.contains("more than once"), e.message)
+        withClue(e.message) { e.message!!.contains("more than once") shouldBe true }
     }
 
     @Test
     fun `typed inputs register themselves for decoding and documentation`() {
         // streamOrders never calls query() or header() — endpoint(...) did it.
-        assertEquals(listOf("limit", "status"), streamOrders.queries.map { it.name })
-        assertEquals(listOf("X-Trace-Id"), streamOrders.headerParams.map { it.name })
-        assertEquals(listOf("userId"), streamOrders.pathSpec.captures.map { it.name })
+        streamOrders.queries.map { it.name } shouldBe listOf("limit", "status")
+        streamOrders.headerParams.map { it.name } shouldBe listOf("X-Trace-Id")
+        streamOrders.pathSpec.captures.map { it.name } shouldBe listOf("userId")
     }
 }
 
@@ -720,8 +708,8 @@ class WrapperCodecTest {
                 HttpRequest.newBuilder(URI.create("${server.baseUrl}/accounts/77")).GET().build(),
                 HttpResponse.BodyHandlers.ofString(),
             )
-            assertEquals(200, res.statusCode())
-            assertEquals(77, Json.parseToJsonElement(res.body()).jsonObject["id"]!!.jsonPrimitive.int)
+            res.statusCode() shouldBe 200
+            Json.parseToJsonElement(res.body()).jsonObject["id"]!!.jsonPrimitive.int shouldBe 77
         } finally {
             server.stop().toCompletableFuture().join()
         }
@@ -731,7 +719,7 @@ class WrapperCodecTest {
         ).jsonObject["paths"]!!.jsonObject["/accounts/{accountId}"]!!.jsonObject["get"]!!
             .jsonObject["parameters"]!!.jsonArray.first().jsonObject["schema"]!!.jsonObject
 
-        assertEquals("integer", schema["type"]!!.jsonPrimitive.content)
-        assertEquals("int64", schema["format"]!!.jsonPrimitive.content)
+        schema["type"]!!.jsonPrimitive.content shouldBe "integer"
+        schema["format"]!!.jsonPrimitive.content shouldBe "int64"
     }
 }

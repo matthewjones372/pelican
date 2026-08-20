@@ -7,24 +7,18 @@ import dev.pelican.endpoint
 import dev.pelican.headerParam
 import dev.pelican.optional
 import dev.pelican.pathParam
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.actor.typed.javadsl.Behaviors
-import org.apache.pekko.http.javadsl.Http
-import org.apache.pekko.http.javadsl.ServerBinding
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.shouldBe
 import org.apache.pekko.http.javadsl.model.HttpMethods
+import org.apache.pekko.http.javadsl.model.HttpRequest
 import org.apache.pekko.http.javadsl.server.Directives
 import org.apache.pekko.http.javadsl.server.Route
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Test
+import org.apache.pekko.http.javadsl.testkit.TestRoute
+import org.apache.pekko.http.javadsl.testkit.TestRouteResult
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.extension.RegisterExtension
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 
 /**
  * A Pelican route is a Pekko `Route`, and a service that has one usually has
@@ -38,9 +32,22 @@ import java.net.http.HttpResponse
  * that keeps true, asserted with the route concatenated in both orders —
  * Pelican first and Pelican last — because "it works if you put it last" is not
  * a property anybody wants to have to remember.
+ *
+ * Run through Pekko's own route testkit rather than over a socket. Everything
+ * asked here is decided by the routing tree — which route matches, which
+ * rejects, what the rejection turns into — and `TestRoute.run` seals the route
+ * exactly as a bound server does. What a socket would add is chunk framing and
+ * connection handling, which the streaming tests and the example module's
+ * bound-server tests cover; repeating it here bought two ports and a client.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ConcatenatedRoutesTest {
+
+    companion object {
+        @JvmField
+        @RegisterExtension
+        val pekko = PekkoRouteTestKit("pelican-concat-test")
+    }
 
     private val allowed = "https://app.example.com"
 
@@ -77,85 +84,59 @@ class ConcatenatedRoutesTest {
         },
     )
 
-    // One system for the class; each ordering gets its own binding on its own port.
-    private val system = ActorSystem.create(Behaviors.empty<Void>(), "pelican-concat-test")
-
-    private val bindings: Map<String, ServerBinding> = mapOf(
-        "pelican first" to bind(Directives.concat(api.toRoute(system), ownRoutes)),
-        "pelican last" to bind(Directives.concat(ownRoutes, api.toRoute(system))),
-    )
-
-    private fun bind(route: Route): ServerBinding =
-        Http.get(system).newServerAt("127.0.0.1", 0).bind(route).toCompletableFuture().join()
-
     @Suppress("unused") // @MethodSource
-    private fun orderings(): List<Array<Any>> = bindings.map { (name, binding) -> arrayOf(name, binding) }
-
-    @AfterAll
-    fun stop() {
-        bindings.values.forEach { it.unbind().toCompletableFuture().join() }
-        system.terminate()
-        system.whenTerminated.toCompletableFuture().join()
-    }
+    private fun orderings(): List<Array<Any>> = listOf(
+        arrayOf("pelican first", Directives.concat(api.toRoute(pekko.system()), ownRoutes)),
+        arrayOf("pelican last", Directives.concat(ownRoutes, api.toRoute(pekko.system()))),
+    )
 
     // ------------------------------------------------------------------ probe
 
-    private class Answer(val status: Int, val body: String, val headers: HttpResponse<String>) {
-        fun header(name: String): String? = headers.headers().firstValue(name).orElse(null)
-    }
+    private fun TestRoute.get(path: String, vararg headers: Pair<String, String>): TestRouteResult =
+        run(headers.fold(HttpRequest.GET(path)) { req, (n, v) -> req.addHeader(rawHeader(n, v)) })
 
-    private fun ServerBinding.send(
-        method: String,
-        path: String,
-        vararg headers: Pair<String, String>,
-    ): Answer {
-        val request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:${localAddress().port}$path"))
-            .method(method, HttpRequest.BodyPublishers.noBody())
-            .apply { headers.forEach { (n, v) -> header(n, v) } }
-            .build()
-        val res = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString())
-        return Answer(res.statusCode(), res.body(), res)
-    }
+    private fun TestRoute.preflight(path: String, method: String, origin: String = allowed): TestRouteResult =
+        run(
+            HttpRequest.OPTIONS(path)
+                .addHeader(rawHeader("Origin", origin))
+                .addHeader(rawHeader("Access-Control-Request-Method", method)),
+        )
 
-    private fun ServerBinding.preflight(path: String, method: String, origin: String = allowed): Answer =
-        send("OPTIONS", path, "Origin" to origin, "Access-Control-Request-Method" to method)
+    private fun rawHeader(name: String, value: String) =
+        org.apache.pekko.http.javadsl.model.HttpHeader.parse(name, value)
 
-    // ------------------------------------------------------------------ claims
+    /** Null when the header is absent, which is what several claims here are. */
+    private fun TestRouteResult.headerOrNull(name: String): String? =
+        response().getHeader(name).map { it.value() }.orElse(null)
+
+    private fun Route.test(): TestRoute = pekko.testRoute(this)
+
+    // ----------------------------------------------------------------- claims
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("orderings")
-    fun `the endpoints are served, with the CORS headers, alongside routes of your own`(
-        name: String,
-        server: ServerBinding,
-    ) {
-        val res = server.send("GET", "/hello/matt", "Origin" to allowed)
+    fun `the endpoints are served, with the CORS headers, alongside routes of your own`(name: String, route: Route) {
+        val res = route.test().get("/hello/matt", "Origin" to allowed)
 
-        assertEquals(200, res.status)
-        assertEquals("Hello, matt!", res.body)
-        assertEquals(allowed, res.header("Access-Control-Allow-Origin"))
+        res.assertStatusCode(200).assertEntity("Hello, matt!")
+        res.headerOrNull("Access-Control-Allow-Origin") shouldBe allowed
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("orderings")
-    fun `your own route still answers`(name: String, server: ServerBinding) {
-        val res = server.send("GET", "/custom")
-
-        assertEquals(200, res.status)
-        assertEquals("mine", res.body)
+    fun `your own route still answers`(name: String, route: Route) {
+        route.test().get("/custom").assertStatusCode(200).assertEntity("mine")
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("orderings")
-    fun `a preflight for a described path is answered from the description`(
-        name: String,
-        server: ServerBinding,
-    ) {
-        val res = server.preflight("/notes", method = "POST")
+    fun `a preflight for a described path is answered from the description`(name: String, route: Route) {
+        val res = route.test().preflight("/notes", method = "POST")
 
-        assertEquals(204, res.status)
-        assertEquals(allowed, res.header("Access-Control-Allow-Origin"))
-        assertEquals("POST", res.header("Access-Control-Allow-Methods"))
-        assertEquals("X-Trace-Id", res.header("Access-Control-Allow-Headers"))
+        res.assertStatusCode(204)
+        res.headerOrNull("Access-Control-Allow-Origin") shouldBe allowed
+        res.headerOrNull("Access-Control-Allow-Methods") shouldBe "POST"
+        res.headerOrNull("Access-Control-Allow-Headers") shouldBe "X-Trace-Id"
     }
 
     /**
@@ -165,24 +146,17 @@ class ConcatenatedRoutesTest {
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("orderings")
-    fun `an OPTIONS for a path Pelican does not describe falls through to your route`(
-        name: String,
-        server: ServerBinding,
-    ) {
-        val res = server.preflight("/custom", method = "GET")
+    fun `an OPTIONS for a path Pelican does not describe falls through to your route`(name: String, route: Route) {
+        val res = route.test().preflight("/custom", method = "GET")
 
-        assertEquals(200, res.status)
-        assertEquals("mine, too", res.body)
-        assertNull(res.header("Access-Control-Allow-Origin"))
+        res.assertStatusCode(200).assertEntity("mine, too")
+        res.headerOrNull("Access-Control-Allow-Origin").shouldBeNull()
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("orderings")
-    fun `a path nobody describes is still a 404, not a preflight and not a 405`(
-        name: String,
-        server: ServerBinding,
-    ) {
-        assertEquals(404, server.send("GET", "/nothing/here").status)
-        assertEquals(404, server.preflight("/nothing/here", method = "GET").status)
+    fun `a path nobody describes is still a 404, not a preflight and not a 405`(name: String, route: Route) {
+        route.test().get("/nothing/here").assertStatusCode(404)
+        route.test().preflight("/nothing/here", method = "GET").assertStatusCode(404)
     }
 }

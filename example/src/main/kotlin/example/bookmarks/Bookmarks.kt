@@ -180,7 +180,7 @@ fun bookmarksApi(): Api = Api(
 val bookmarksDocs = Docs(docsPath = "/api-docs")
 
 fun main(args: Array<String>) {
-    val port = args.firstOrNull()?.toInt() ?: 8080
+    val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
     val server = bookmarksApi().startWithDocs(port = port, docs = bookmarksDocs)
     println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
     Runtime.getRuntime().addShutdownHook(Thread { server.stop().toCompletableFuture().join() })
@@ -201,3 +201,6 @@ fun bookmarksSpec(): ApiSpec = ApiSpec(
 )
 
 fun writeSpec() = println(bookmarksSpec().openApiJson())
+
+/** What every example binds to unless told otherwise; `--args=8081` moves it. */
+private const val DEFAULT_PORT = 8080

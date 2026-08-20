@@ -17,6 +17,7 @@ class ErrorSpec @PublishedApi internal constructor(
  * handler, and mentions no server library. Interpreters turn it into a route,
  * an OpenAPI operation, or a client call.
  */
+@Suppress("LongParameterList") // A description record: every parameter is a facet of the description.
 class Endpoint<I, R> internal constructor(
     val inputs: Inputs<I>,
     val method: Method,
@@ -54,6 +55,7 @@ class Endpoint<I, R> internal constructor(
 }
 
 /** Receiver for the [endpoint] DSL. */
+@Suppress("TooManyFunctions") // One function per input and output kind — that list is the DSL.
 class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     var summary: String? = null
     var description: String? = null
@@ -81,7 +83,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     /** The typed failures declared here, so [orFail] does not document them twice. */
     @PublishedApi
     internal val declaredFailures = mutableListOf<ErrorOutput<*>>()
-    internal var securityRequirements: MutableList<SecurityRequirement>? = null
+    internal var securityRequirements: List<SecurityRequirement>? = null
 
     init {
         // Inputs listed on endpoint(...) register themselves, so each one is
@@ -89,12 +91,17 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
         declared.forEach { key ->
             when (key) {
                 is QueryParam<*> -> queries += key
+
                 is HeaderParam<*> -> headerParams += key
+
                 is CookieParam<*> -> cookieParams += key
+
                 is BodyInput<*> -> bodyInput = key
+
                 // A part is an input in its own right; the envelope holding
                 // them is assembled below, once they are all known.
                 is MultipartPart<*> -> parts += key
+
                 is PathParam<*> -> Unit // matched positionally from the path
             }
         }
@@ -181,17 +188,14 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
      * of requirements as "any one of these".
      */
     fun security(scheme: SecurityScheme, vararg scopes: String) {
-        val list = securityRequirements ?: mutableListOf<SecurityRequirement>().also {
-            securityRequirements = it
-        }
-        list += SecurityRequirement(scheme, scopes.toList())
+        securityRequirements = securityRequirements.orEmpty() + SecurityRequirement(scheme, scopes.toList())
     }
 
     /**
      * Marks this endpoint as open, overriding the API-wide requirement — the
      * login route, a health check.
      */
-    fun noSecurity() { securityRequirements = mutableListOf() }
+    fun noSecurity() { securityRequirements = emptyList() }
 
     fun errorResponse(status: Int, description: String, vararg headers: ResponseHeader<*>) {
         errors += ErrorSpec(status, description, null, headers.toList())
@@ -482,3 +486,22 @@ private fun derivedOperationName(method: Method, pathSpec: PathSpec): String {
     }
     return method.name.lowercase() + parts.joinToString("")
 }
+
+/**
+ * How many values a request for this endpoint will decode, for sizing the bag
+ * they go into. `LinkedHashMap()` with no argument allocates sixteen buckets
+ * on first insert, which is most of a request's worth of allocation for an
+ * endpoint that declares two.
+ *
+ * Capacity, not size: a hash map resizes at three quarters full, so asking for
+ * exactly what will be put in it would grow it on the last insert.
+ */
+fun Endpoint<*, *>.declaredInputCount(): Int {
+    val declared = pathSpec.captures.size + queries.size + headerParams.size +
+        cookieParams.size + (if (bodyInput == null) 0 else 1)
+    return if (declared == 0) 1 else declared * INVERSE_LOAD_FACTOR_NUMERATOR / INVERSE_LOAD_FACTOR_DENOMINATOR + 1
+}
+
+/** A hash map grows at three quarters full; 4/3 of what goes in is what to ask for. */
+private const val INVERSE_LOAD_FACTOR_NUMERATOR = 4
+private const val INVERSE_LOAD_FACTOR_DENOMINATOR = 3

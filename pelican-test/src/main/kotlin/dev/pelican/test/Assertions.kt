@@ -62,6 +62,7 @@ fun ResponseSpec.shouldHaveNoBody(): ResponseSpec = apply {
  */
 fun <E, T> Outcome<E, T>.shouldBeOk(): T = when (this) {
     is Outcome.Ok -> value
+
     is Outcome.Err -> fail(
         "Expected a successful outcome but the endpoint returned its declared " +
             "${declared.status} failure: $error",
@@ -109,6 +110,7 @@ infix fun <E, T> Outcome<E, T>.shouldBeError(expected: E): E {
  */
 infix fun <E, T> Outcome<E, T>.shouldBeFailure(expected: ErrorOutput<out E>): E = when (this) {
     is Outcome.Ok -> fail("Expected the declared failure $expected but the call succeeded with: $value")
+
     is Outcome.Err ->
         if (declared === expected) error
         else fail(

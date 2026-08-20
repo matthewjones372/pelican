@@ -1,9 +1,9 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -42,37 +42,37 @@ class StartupChecksTest {
 
     @Test
     fun `two handlers on one route is a startup failure`() {
-        val failure = assertThrows<IllegalArgumentException> {
+        val failure = shouldThrow<IllegalArgumentException> {
             Api(endpoints = listOf(bind(getUser), bind(getUser)))
         }
-        assertTrue(failure.message!!.contains("can never be reached"), failure.message!!)
-        assertTrue(failure.message!!.contains("GET /users/{userId}"), failure.message!!)
+        withClue(failure.message!!) { failure.message!!.contains("can never be reached") shouldBe true }
+        withClue(failure.message!!) { failure.message!!.contains("GET /users/{userId}") shouldBe true }
     }
 
     @Test
     fun `the same path under different methods is fine`() {
         val api = Api(endpoints = listOf(bind(getUser), bind(deleteUser)))
-        assertEquals(2, api.endpoints.size)
+        api.endpoints.size shouldBe 2
     }
 
     @Test
     fun `an endpoint declared but never bound is a startup failure`() {
-        val failure = assertThrows<IllegalArgumentException> {
+        val failure = shouldThrow<IllegalArgumentException> {
             Api(
                 endpoints = listOf(bind(getUser)),
                 covers = listOf(getUser, listUsers, deleteUser),
             )
         }
-        assertTrue(failure.message!!.contains("never bound"), failure.message!!)
-        assertTrue(failure.message!!.contains("GET /users"), failure.message!!)
-        assertTrue(failure.message!!.contains("DELETE /users/{userId}"), failure.message!!)
+        withClue(failure.message!!) { failure.message!!.contains("never bound") shouldBe true }
+        withClue(failure.message!!) { failure.message!!.contains("GET /users") shouldBe true }
+        withClue(failure.message!!) { failure.message!!.contains("DELETE /users/{userId}") shouldBe true }
     }
 
     @Test
     fun `covering every declared endpoint passes`() {
         val all = listOf(getUser, listUsers, deleteUser)
         val api = Api(endpoints = all.map(::bind), covers = all)
-        assertEquals(3, api.endpoints.size)
+        api.endpoints.size shouldBe 3
     }
 
     @Test
@@ -85,7 +85,7 @@ class StartupChecksTest {
             operationId = "getUser"
             text()
         }
-        assertThrows<IllegalArgumentException> {
+        shouldThrow<IllegalArgumentException> {
             Api(endpoints = listOf(bind(getUser)), covers = listOf(twin))
         }
     }
@@ -95,13 +95,13 @@ class StartupChecksTest {
         val etag = responseHeader<String>("ETag")
         val alsoEtag = responseHeader<String>("etag")
 
-        val failure = assertThrows<IllegalStateException> {
+        val failure = shouldThrow<IllegalStateException> {
             endpoint {
                 get("things")
                 emits(etag, alsoEtag)
                 text()
             }
         }
-        assertTrue(failure.message!!.contains("more than once"), failure.message!!)
+        withClue(failure.message!!) { failure.message!!.contains("more than once") shouldBe true }
     }
 }

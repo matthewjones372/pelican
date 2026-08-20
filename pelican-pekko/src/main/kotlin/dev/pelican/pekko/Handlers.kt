@@ -38,11 +38,11 @@ infix fun <I, T : Any> Endpoint<I, T>.handledBy(f: Params.(I) -> CompletionStage
 
 /** Binds an endpoint whose output is a single value, computed synchronously. */
 infix fun <I, T : Any> Endpoint<I, T>.handledNow(f: Params.(I) -> T): ServerEndpoint =
-    ServerEndpoint(this) { p -> CompletableFuture.completedStage(p.f(inputs.extract(p)) as Any?) }
+    ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
 
 /** Binds an endpoint that returns no body. */
 infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoint =
-    ServerEndpoint(this) { p -> CompletableFuture.completedStage(p.f(inputs.extract(p)) as Any?) }
+    ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
 
 // ------------------------------------------------------------- declared failures
 //
@@ -59,7 +59,7 @@ infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoi
 infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOrFail(
     f: Params.(I) -> Outcome<E, T>,
 ): ServerEndpoint = ServerEndpoint(this) { p ->
-    CompletableFuture.completedStage(p.f(inputs.extract(p)) as Any?)
+    CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?)
 }
 
 /** As [handledOrFail], for a handler that answers asynchronously. */
@@ -71,7 +71,7 @@ infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledByOrFail(
 infix fun <I, E : Any, T> Endpoint<I, Fallible<E, StreamOf<T>>>.streamedOrFail(
     f: Params.(I) -> Outcome<E, Source<T, NotUsed>>,
 ): ServerEndpoint = ServerEndpoint(this) { p ->
-    CompletableFuture.completedStage(p.f(inputs.extract(p)) as Any?)
+    CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?)
 }
 
 /** As [streamedOrFail], for a handler that decides asynchronously. */
@@ -86,7 +86,7 @@ infix fun <I, E : Any, T> Endpoint<I, Fallible<E, StreamOf<T>>>.streamedByOrFail
  * the work happens as it is consumed — so this is the usual case.
  */
 infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedNow(f: Params.(I) -> Source<T, NotUsed>): ServerEndpoint =
-    ServerEndpoint(this) { p -> CompletableFuture.completedStage(p.f(inputs.extract(p)) as Any?) }
+    ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
 
 /** Binds a streaming endpoint where deciding *what* to stream is itself async. */
 infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedBy(
@@ -95,7 +95,7 @@ infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedBy(
 
 /** Binds an endpoint that streams opaque bytes. */
 infix fun <I> Endpoint<I, ByteStream>.bytesNow(f: Params.(I) -> Source<ByteString, NotUsed>): ServerEndpoint =
-    ServerEndpoint(this) { p -> CompletableFuture.completedStage(p.f(inputs.extract(p)) as Any?) }
+    ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
 
 // ------------------------------------------------------------- accessors
 

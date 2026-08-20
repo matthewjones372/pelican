@@ -14,11 +14,11 @@ import example.generated.OrdersClient
 import example.generated.Outcome
 import example.generated.PlaceOrderFailure
 import example.generated.StreamOrdersFailure
+import io.kotest.assertions.withClue
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.nulls.shouldNotBeNull
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -71,19 +71,20 @@ class GeneratedKotlinClientTest {
     @Test
     fun `a single json payload comes back as the declared type`() {
         val result = client.getUser(1L)
-        assertEquals(Outcome.Ok(example.generated.User(1L, "Ada Lovelace", "ada@example.com")), result)
+        result shouldBe Outcome.Ok(example.generated.User(1L, "Ada Lovelace", "ada@example.com"))
     }
 
     @Test
     fun `a declared failure comes back as the failure, typed`() {
         when (val result = client.getUser(999L)) {
             is Outcome.Ok -> error("expected a failure, got ${result.value}")
+
             is Outcome.Err -> when (val failure = result.failure) {
                 // Exhaustive: adding a failure to the endpoint and regenerating
                 // breaks this `when` rather than slipping through as a 500.
                 is GetUserFailure.NotFound -> {
-                    assertEquals(404, failure.status)
-                    assertEquals("No user 999", failure.body.error)
+                    failure.status shouldBe 404
+                    failure.body.error shouldBe "No user 999"
                 }
             }
         }
@@ -98,20 +99,22 @@ class GeneratedKotlinClientTest {
     fun `an optional body property left out is defaulted by the server, not sent as null`() {
         val placed = client.placeOrder(1L, CreateOrder("anvil"), xApiKey = "let-me-in")
         val order = (placed as Outcome.Ok).value
-        assertEquals("anvil", order.item)
-        assertEquals(1, order.quantity, "the server's own default should have applied")
+        order.item shouldBe "anvil"
+        withClue("the server's own default should have applied") { order.quantity shouldBe 1 }
     }
 
     @Test
     fun `two failures sharing a payload type keep their own statuses`() {
         val denied = client.placeOrder(1L, CreateOrder("anvil", 2), xApiKey = "wrong")
         when (val failure = (denied as Outcome.Err).failure) {
-            is PlaceOrderFailure.Unauthorized -> assertEquals("Bad API key", failure.body.error)
+            is PlaceOrderFailure.Unauthorized -> failure.body.error shouldBe "Bad API key"
             is PlaceOrderFailure.NotFound -> error("wrong failure: $failure")
         }
 
-        val missing = client.placeOrder(999L, CreateOrder("anvil"), xApiKey = "let-me-in")
-        assertTrue((missing as Outcome.Err).failure is PlaceOrderFailure.NotFound, "${missing.failure}")
+        val missing = client.placeOrder(999L, CreateOrder("anvil"), xApiKey = "let-me-in") as Outcome.Err
+        withClue("${missing.failure}") {
+            (missing.failure is PlaceOrderFailure.NotFound) shouldBe true
+        }
     }
 
     @Test
@@ -120,8 +123,8 @@ class GeneratedKotlinClientTest {
         // shaped by the same schema the server decodes it against.
         val order = client.placeOrderForm(1L, CreateOrder("anvil", quantity = 2))
 
-        assertEquals("anvil", order.item)
-        assertEquals(2, order.quantity)
+        order.item shouldBe "anvil"
+        order.quantity shouldBe 2
     }
 
     @Test
@@ -136,10 +139,10 @@ class GeneratedKotlinClientTest {
             session = "s-42",
         )
 
-        assertEquals("March", result.label)
-        assertEquals("orders.csv", result.filename)
-        assertEquals(3, result.lines)
-        assertEquals("s-42", result.session)
+        result.label shouldBe "March"
+        result.filename shouldBe "orders.csv"
+        result.lines shouldBe 3
+        result.session shouldBe "s-42"
     }
 
     @Test
@@ -150,13 +153,13 @@ class GeneratedKotlinClientTest {
             file = UploadedFile("orders.csv", "text/csv", ByteArrayInputStream("1,anvil\n".toByteArray())),
         )
 
-        assertNull(result.session)
+        result.session.shouldBeNull()
     }
 
     @Test
     fun `a raw body is echoed back as an opaque stream`() {
         val echoed = client.echo(ByteArrayInputStream("hello pelican".toByteArray()))
-        assertEquals("hello pelican", echoed.use { it.readBytes().toString(Charsets.UTF_8) })
+        echoed.use { it.readBytes().toString(Charsets.UTF_8) } shouldBe "hello pelican"
     }
 
     // ------------------------------------------------------------ streaming
@@ -165,26 +168,28 @@ class GeneratedKotlinClientTest {
     fun `ndjson arrives as a sequence of the element type`() {
         val stream = client.streamOrders(1L, limit = 3, status = OrderStatus.SHIPPED)
         val orders = (stream as Outcome.Ok).value.toList()
-        assertEquals(3, orders.size)
-        assertTrue(orders.all { it.status == OrderStatus.SHIPPED }, "$orders")
+        orders.size shouldBe 3
+        withClue("$orders") { orders.all { it.status == OrderStatus.SHIPPED } shouldBe true }
     }
 
     @Test
     fun `a stream that fails before its first element is the declared failure`() {
-        val stream = client.streamOrders(999L, limit = 3)
-        assertTrue((stream as Outcome.Err).failure is StreamOrdersFailure.NotFound, "${stream.failure}")
+        val stream = client.streamOrders(999L, limit = 3) as Outcome.Err
+        withClue("${stream.failure}") {
+            (stream.failure is StreamOrdersFailure.NotFound) shouldBe true
+        }
     }
 
     @Test
     fun `a chunked json array is split element by element`() {
         val ids = client.listOrders(1L, limit = 4).map { it.id }.toList()
-        assertEquals(listOf(1L, 2L, 3L, 4L), ids)
+        ids shouldBe listOf(1L, 2L, 3L, 4L)
     }
 
     @Test
     fun `the lens-style endpoint reads its inputs the same way`() {
         val orders = client.searchOrders(limit = 2, xTraceId = "trace-1").toList()
-        assertEquals(2, orders.size)
+        orders.size shouldBe 2
     }
 
     @Test
@@ -195,8 +200,8 @@ class GeneratedKotlinClientTest {
         val first = client.watchOrders(1L, limit = 10).use { ticks -> ticks.take(2).toList() }
         val elapsedMs = (System.nanoTime() - started) / 1_000_000
 
-        assertEquals(listOf(1, 2), first.map { it.seq })
-        assertTrue(elapsedMs < 700, "two of ten events took ${elapsedMs}ms — that looks buffered")
+        first.map { it.seq } shouldBe listOf(1, 2)
+        withClue("two of ten events took ${elapsedMs}ms — that looks buffered") { (elapsedMs < 700) shouldBe true }
     }
 
     // ------------------------------------------------------------ the file itself
@@ -204,18 +209,16 @@ class GeneratedKotlinClientTest {
     @Test
     fun `the checked-in client is what the descriptions generate today`() {
         val committed = File("src/test/kotlin/example/generated/OrdersClient.kt")
-        assertEquals(
-            committed.readText(),
-            ordersSpec().kotlinClient(packageName = "example.generated"),
-            "${committed.path} is stale — run ./gradlew :example:generateKotlinClient and copy it over",
-        )
+        withClue("${committed.path} is stale — run ./gradlew :example:generateKotlinClient and copy it over") {
+            ordersSpec().kotlinClient(packageName = "example.generated") shouldBe committed.readText()
+        }
     }
 
     @Test
     fun `a hidden endpoint is left out, as it is left out of the document`() {
         val generated = ordersSpec().kotlinClient(packageName = "example.generated")
-        assertTrue("reindex" !in generated, "a hidden endpoint reached the generated client")
-        assertTrue("reindex" in ordersSpec().kotlinClient("x", includeHidden = true))
-        assertNotNull(reindex)
+        withClue("a hidden endpoint reached the generated client") { ("reindex" !in generated) shouldBe true }
+        ("reindex" in ordersSpec().kotlinClient("x", includeHidden = true)) shouldBe true
+        reindex.shouldNotBeNull()
     }
 }

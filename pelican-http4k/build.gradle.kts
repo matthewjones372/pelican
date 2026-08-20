@@ -8,11 +8,11 @@
 // serving documentation is opt-in and lives in pelican-http4k-docs.
 // NoPekkoDependencyTest and NoOpenApiDependencyTest hold both lines.
 //
-// The version is pinned to the last http4k built against Kotlin 2.2.20, which
-// is what this repository compiles with. A newer http4k ships stdlib metadata
-// this compiler refuses to read, so bump both together or neither.
-val http4kVersion = "6.22.0.0"
-val slf4jVersion = "2.0.17"
+// Bumped together with Kotlin, which is the rule the old pin here stated: an
+// http4k built against a newer stdlib than the compiler reading it fails on
+// metadata, so these two versions move as a pair or not at all.
+val http4kVersion = "6.58.0.0"
+val slf4jVersion = "2.0.18"
 
 dependencies {
     api(project(":pelican-core"))

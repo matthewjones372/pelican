@@ -1,9 +1,9 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.assertEquals
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.io.ByteArrayInputStream
 import java.time.Duration
 
@@ -53,14 +53,14 @@ class MultipartAttackTest {
         // second is followed by neither CRLF nor `--`.
         val content = "alpha--${boundary}XX beta\r\nplain--${boundary}9 gamma"
         val values = decode(envelope(part("caption", "c"), part("file", content, "f")))
-        assertEquals(content, values.upload().text())
+        values.upload().text() shouldBe content
     }
 
     @Test
     fun `a delimiter-shaped line with the wrong line ending is content`() {
         val content = "x\n--$boundary\ny"
         val values = decode(envelope(part("caption", "c"), part("file", content, "f")))
-        assertEquals(content, values.upload().text())
+        values.upload().text() shouldBe content
     }
 
     // ---------------------------------------------------------------- budget
@@ -69,7 +69,7 @@ class MultipartAttackTest {
     fun `many small text parts cannot add up past the limit`() {
         // The budget is shared across parts, so a caller cannot spend it twice.
         val parts = Array(6) { part("caption", "z".repeat(400)) }
-        assertThrows<PayloadTooLarge> { decode(envelope(*parts), limit = 1000) }
+        shouldThrow<PayloadTooLarge> { decode(envelope(*parts), limit = 1000) }
     }
 
     @Test
@@ -79,8 +79,8 @@ class MultipartAttackTest {
             envelope(huge, part("caption", "c"), part("file", "F", "f")),
             limit = 1024,
         )
-        assertEquals("c", values[caption])
-        assertEquals("F", values.upload().text())
+        values[caption] shouldBe "c"
+        values.upload().text() shouldBe "F"
     }
 
     // ------------------------------------------------------- malformed input
@@ -88,30 +88,30 @@ class MultipartAttackTest {
     @Test
     fun `an entirely empty body is a 400 rather than a hang`() {
         assertTimeoutPreemptively(Duration.ofSeconds(5)) {
-            assertThrows<ApiException> { decode(ByteArray(0)) }
+            shouldThrow<ApiException> { decode(ByteArray(0)) }
         }
     }
 
     @Test
     fun `a content type with no boundary parameter is a 400`() {
-        val failure = assertThrows<ApiException> {
+        val failure = shouldThrow<ApiException> {
             decode(envelope(part("caption", "c")), contentType = "multipart/form-data")
         }
-        assertEquals(400, failure.status)
+        failure.status shouldBe 400
     }
 
     @Test
     fun `a part with no name attribute is skipped rather than crashing`() {
         val anonymous = "Content-Disposition: form-data\r\n\r\nanon"
         val values = decode(envelope(anonymous, part("caption", "c"), part("file", "F", "f")))
-        assertEquals("c", values[caption])
+        values[caption] shouldBe "c"
     }
 
     @Test
     fun `a zero length file part is a file, not an absent one`() {
         val values = decode(envelope(part("caption", "c"), part("file", "", "empty.txt")))
-        assertEquals("empty.txt", values.upload().filename)
-        assertEquals("", values.upload().text())
+        values.upload().filename shouldBe "empty.txt"
+        values.upload().text() shouldBe ""
     }
 
     @Test
@@ -122,7 +122,7 @@ class MultipartAttackTest {
             ).toByteArray(Charsets.ISO_8859_1)
 
         assertTimeoutPreemptively(Duration.ofSeconds(5)) {
-            assertThrows<Exception> { decode(truncated).upload().text() }
+            shouldThrow<Exception> { decode(truncated).upload().text() }
         }
     }
 
@@ -131,7 +131,7 @@ class MultipartAttackTest {
     @Test
     fun `a filename containing a quoted semicolon survives intact`() {
         val values = decode(envelope(part("caption", "c"), part("file", "F", "a;b .txt")))
-        assertEquals("a;b .txt", values.upload().filename)
+        values.upload().filename shouldBe "a;b .txt"
     }
 
     @Test
@@ -140,6 +140,6 @@ class MultipartAttackTest {
         // would be worse than leaving it alone: a handler would then be trusting
         // a value nothing actually guarantees.
         val values = decode(envelope(part("caption", "c"), part("file", "F", "../../etc/passwd")))
-        assertEquals("../../etc/passwd", values.upload().filename)
+        values.upload().filename shouldBe "../../etc/passwd"
     }
 }

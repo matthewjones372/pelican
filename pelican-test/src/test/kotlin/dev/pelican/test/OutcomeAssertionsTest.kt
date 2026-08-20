@@ -4,10 +4,10 @@ import dev.pelican.ApiError
 import dev.pelican.Outcome
 import dev.pelican.errorJson
 import dev.pelican.ok
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 
 /**
  * What an assertion on an `Outcome` should read like, and what it should say
@@ -34,14 +34,14 @@ class OutcomeAssertionsTest {
 
     @Test
     fun `shouldBeOk returns the value, so the next assertion is about the payload`() {
-        assertEquals("Pekko", found.shouldBeOk())
+        found.shouldBeOk() shouldBe "Pekko"
     }
 
     @Test
     fun `shouldBeOk on a failure says which failure it got`() {
-        val failure = assertThrows<AssertionError> { missing.shouldBeOk() }
-        assertTrue(failure.message!!.contains("404"), failure.message!!)
-        assertTrue(failure.message!!.contains("No bookmark 9999"), failure.message!!)
+        val failure = shouldThrow<AssertionError> { missing.shouldBeOk() }
+        withClue(failure.message!!) { failure.message!!.contains("404") shouldBe true }
+        withClue(failure.message!!) { failure.message!!.contains("No bookmark 9999") shouldBe true }
     }
 
     // --------------------------------------------------------------- error
@@ -49,7 +49,7 @@ class OutcomeAssertionsTest {
     @Test
     fun `shouldBeError returns the payload, for chaining onto your own matchers`() {
         val error: NoSuchBookmark = missing.shouldBeError()
-        assertEquals(9_999L, error.id)
+        error.id shouldBe 9_999L
     }
 
     @Test
@@ -59,17 +59,17 @@ class OutcomeAssertionsTest {
 
     @Test
     fun `shouldBeError prints both sides when the payload differs`() {
-        val failure = assertThrows<AssertionError> {
+        val failure = shouldThrow<AssertionError> {
             missing shouldBeError NoSuchBookmark(1L, "wrong")
         }
-        assertTrue(failure.message!!.contains("id=1"), failure.message!!)
-        assertTrue(failure.message!!.contains("id=9999"), failure.message!!)
+        withClue(failure.message!!) { failure.message!!.contains("id=1") shouldBe true }
+        withClue(failure.message!!) { failure.message!!.contains("id=9999") shouldBe true }
     }
 
     @Test
     fun `shouldBeError on a success says what came back instead`() {
-        val failure = assertThrows<AssertionError> { found.shouldBeError() }
-        assertTrue(failure.message!!.contains("succeeded with: Pekko"), failure.message!!)
+        val failure = shouldThrow<AssertionError> { found.shouldBeError() }
+        withClue(failure.message!!) { failure.message!!.contains("succeeded with: Pekko") shouldBe true }
     }
 
     // ----------------------------------------------------- which declaration
@@ -83,15 +83,15 @@ class OutcomeAssertionsTest {
 
         unauthorized shouldBeFailure badKey
 
-        val failure = assertThrows<AssertionError> { unauthorized shouldBeFailure forbidden }
-        assertTrue(failure.message!!.contains("error:403"), failure.message!!)
-        assertTrue(failure.message!!.contains("error:401"), failure.message!!)
+        val failure = shouldThrow<AssertionError> { unauthorized shouldBeFailure forbidden }
+        withClue(failure.message!!) { failure.message!!.contains("error:403") shouldBe true }
+        withClue(failure.message!!) { failure.message!!.contains("error:401") shouldBe true }
     }
 
     @Test
     fun `shouldBeFailure on a success says so`() {
         val ok: Outcome<ApiError, String> = ok("fine")
-        val failure = assertThrows<AssertionError> { ok shouldBeFailure badKey }
-        assertTrue(failure.message!!.contains("succeeded with: fine"), failure.message!!)
+        val failure = shouldThrow<AssertionError> { ok shouldBeFailure badKey }
+        withClue(failure.message!!) { failure.message!!.contains("succeeded with: fine") shouldBe true }
     }
 }

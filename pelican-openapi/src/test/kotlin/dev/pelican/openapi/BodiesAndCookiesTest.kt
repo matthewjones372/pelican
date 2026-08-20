@@ -1,8 +1,8 @@
 package dev.pelican.openapi
 
 import dev.pelican.*
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -70,17 +70,17 @@ class BodiesAndCookiesTest {
     fun `a cookie parameter is documented in the cookie location, like any other parameter`() {
         val parameters = (preferences / "parameters").arr()
 
-        assertEquals(listOf("cookie", "cookie"), parameters.map { (it / "in").str() })
-        assertEquals(listOf("locale", "session"), parameters.map { (it / "name").str() })
+        parameters.map { (it / "in").str() } shouldBe listOf("cookie", "cookie")
+        parameters.map { (it / "name").str() } shouldBe listOf("locale", "session")
     }
 
     @Test
     fun `a cookie with a default is optional, and one without is not required either when optional`() {
         val parameters = (preferences / "parameters").arr()
 
-        assertEquals(listOf(false, false), parameters.map { (it / "required").bool() })
-        assertEquals("Which language to answer in", (parameters[0] / "description").str())
-        assertEquals("string", (parameters[0] / "schema" / "type").str())
+        parameters.map { (it / "required").bool() } shouldBe listOf(false, false)
+        (parameters[0] / "description").str() shouldBe "Which language to answer in"
+        (parameters[0] / "schema" / "type").str() shouldBe "string"
     }
 
     // ---------------------------------------------------------------- forms
@@ -89,12 +89,10 @@ class BodiesAndCookiesTest {
     fun `a form body is documented under its own media type, with the type's own schema`() {
         val body = signIn / "requestBody"
 
-        assertEquals(setOf("application/x-www-form-urlencoded"), (body / "content").keys())
-        assertEquals("The sign-in form", (body / "description").str())
-        assertEquals(
-            "#/components/schemas/SignIn",
-            (body / "content" / "application/x-www-form-urlencoded" / "schema" / "\$ref").str(),
-        )
+        (body / "content").keys() shouldBe setOf("application/x-www-form-urlencoded")
+        (body / "description").str() shouldBe "The sign-in form"
+        (body / "content" / "application/x-www-form-urlencoded" / "schema" / "\$ref").str() shouldBe
+            "#/components/schemas/SignIn"
     }
 
     // ------------------------------------------------------------ multipart
@@ -103,9 +101,9 @@ class BodiesAndCookiesTest {
     fun `a multipart body is an object with one property per part`() {
         val schema = uploaded / "requestBody" / "content" / "multipart/form-data" / "schema"
 
-        assertEquals("object", (schema / "type").str())
-        assertEquals(setOf("caption", "notes", "attachment"), (schema / "properties").keys())
-        assertEquals(listOf("caption", "attachment"), (schema / "required").strings())
+        (schema / "type").str() shouldBe "object"
+        (schema / "properties").keys() shouldBe setOf("caption", "notes", "attachment")
+        (schema / "required").strings() shouldBe listOf("caption", "attachment")
     }
 
     @Test
@@ -115,26 +113,26 @@ class BodiesAndCookiesTest {
         // 3.1 spells "these are opaque bytes" as contentMediaType rather than
         // 3.0's `format: binary`, and the part's own declared type is what goes
         // there — so a reader is told it is a CSV, not merely that it is a file.
-        assertEquals("string", (properties / "attachment" / "type").str())
-        assertEquals("text/csv", (properties / "attachment" / "contentMediaType").str())
-        assertNull((properties / "attachment").obj()["format"])
-        assertEquals("The file itself", (properties / "attachment" / "description").str())
+        (properties / "attachment" / "type").str() shouldBe "string"
+        (properties / "attachment" / "contentMediaType").str() shouldBe "text/csv"
+        (properties / "attachment").obj()["format"].shouldBeNull()
+        (properties / "attachment" / "description").str() shouldBe "The file itself"
 
         // The same facet the same refinement would put on a query parameter,
         // so Swagger UI refuses to submit what the server would reject.
-        assertEquals(3, (properties / "caption" / "minLength").num())
-        assertEquals("What to call it", (properties / "caption" / "description").str())
+        (properties / "caption" / "minLength").num() shouldBe 3
+        (properties / "caption" / "description").str() shouldBe "What to call it"
     }
 
     @Test
     fun `what a file part expects to carry reaches the encoding block`() {
         val encoding = uploaded / "requestBody" / "content" / "multipart/form-data" / "encoding"
 
-        assertEquals("text/csv", (encoding / "attachment" / "contentType").str())
+        (encoding / "attachment" / "contentType").str() shouldBe "text/csv"
     }
 
     @Test
     fun `a multipart body has no parameters section, since its parts are not parameters`() {
-        assertNull(uploaded / "parameters")
+        (uploaded / "parameters").shouldBeNull()
     }
 }

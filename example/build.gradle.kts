@@ -13,13 +13,19 @@ dependencies {
     implementation(project(":pelican-ktor"))
     implementation(project(":pelican-ktor-docs"))
     implementation(project(":pelican-jackson"))
-    runtimeOnly("ch.qos.logback:logback-classic:1.5.18")
+    runtimeOnly("ch.qos.logback:logback-classic:1.6.3")
 
     // A JSON parser for the assertions only. The tests read responses off a
     // socket, and something has to turn them back into a tree; this is not the
     // example's codec, which is Jackson. No serialization compiler plugin is
     // involved — `parseToJsonElement` needs none.
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+
+    // The OpenAPI documents this repository emits are checked by a parser that
+    // is not the one that wrote them — swagger-parser reads the document back
+    // and reports what is wrong with it. A generator marking its own homework
+    // is worth very little; see OpenApiSpecQualityTest.
+    testImplementation("io.swagger.parser.v3:swagger-parser:2.1.47")
 
     testImplementation(project(":pelican-test"))
     // The in-memory transports are per-backend, so the suites that run twice
@@ -30,7 +36,7 @@ dependencies {
     // Matchers, declared here rather than arriving through pelican-test. The
     // library ships assertions that throw AssertionError; which matcher
     // library a suite uses on top is the suite's own choice.
-    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
+    testImplementation("io.kotest:kotest-assertions-core:6.2.4")
 }
 
 application { mainClass.set("example.MainKt") }
@@ -104,4 +110,30 @@ val generateKotlinClient by tasks.registering(JavaExec::class) {
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("example.GenerateKotlinClientKt")
     args(layout.projectDirectory.dir("src/test/kotlin").asFile.absolutePath)
+}
+
+// The benchmark is a test that takes ten seconds and asserts nothing, so it is
+// off unless asked for: `./gradlew :example:test -Dbenchmark=true --tests "*OverheadBenchmark*"`.
+val benchmarking = providers.systemProperty("benchmark").getOrElse("false") == "true"
+
+tasks.withType<Test>().configureEach {
+    systemProperty("benchmark", if (benchmarking) "true" else "false")
+
+    // `-Dprofile=true` alongside it records a flight recording of the run, so
+    // "where does the overhead go" is answered by the JVM rather than guessed.
+    if (providers.systemProperty("profile").getOrElse("false") == "true") {
+        val recording = layout.buildDirectory.file("benchmark.jfr").get().asFile
+        jvmArgs(
+            "-XX:StartFlightRecording=settings=profile,filename=$recording,dumponexit=true",
+            "-XX:+UnlockDiagnosticVMOptions",
+            "-XX:+DebugNonSafepoints",
+        )
+    }
+}
+
+// Coverage instrumentation rewrites bytecode, and it rewrites more of Pelican
+// than of a hand-written route — which is exactly the comparison the benchmark
+// makes. Measuring through it would report the agent, not the library.
+if (benchmarking) {
+    kover { currentProject { instrumentation { disabledForAll.set(true) } } }
 }

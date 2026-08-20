@@ -1,6 +1,9 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.*
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeSameInstanceAs
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
@@ -16,41 +19,41 @@ class RefinedInputsTest {
     private fun decode(codec: PlainCodec<*>, raw: String) = codec.decode("p", raw)
 
     private fun rejects(codec: PlainCodec<*>, raw: String): DecodeFailure =
-        assertThrows(DecodeFailure::class.java) { decode(codec, raw) }
+        shouldThrow<DecodeFailure> { decode(codec, raw) }
 
     // -------------------------------------------------------------- strings
 
     @Test
     fun `nonEmpty rejects the empty string and documents minLength`() {
         val codec = StringCodec.nonEmpty()
-        assertEquals("x", decode(codec, "x"))
-        assertEquals("a non-empty value", rejects(codec, "").expected)
-        assertEquals(JsonNum(1), codec.openApiSchema()["minLength"])
+        decode(codec, "x") shouldBe "x"
+        rejects(codec, "").expected shouldBe "a non-empty value"
+        codec.openApiSchema()["minLength"] shouldBe JsonNum(1)
     }
 
     @Test
     fun `nonBlank rejects whitespace, which nonEmpty allows`() {
-        assertEquals(" ", decode(StringCodec.nonEmpty(), " "))
+        decode(StringCodec.nonEmpty(), " ") shouldBe " "
         rejects(StringCodec.nonBlank(), " ")
     }
 
     @Test
     fun `matching enforces the whole value and documents the pattern`() {
         val codec = StringCodec.matching(Regex("[a-z-]+"), "a slug")
-        assertEquals("open-source", decode(codec, "open-source"))
+        decode(codec, "open-source") shouldBe "open-source"
         rejects(codec, "Open Source")
         rejects(codec, "abc1")   // matches() is anchored, unlike containsMatchIn
-        assertEquals(JsonStr("[a-z-]+"), codec.openApiSchema()["pattern"])
+        codec.openApiSchema()["pattern"] shouldBe JsonStr("[a-z-]+")
     }
 
     @Test
     fun `length bounds compose`() {
         val codec = StringCodec.minLength(2).maxLength(4)
-        assertEquals("abc", decode(codec, "abc"))
+        decode(codec, "abc") shouldBe "abc"
         rejects(codec, "a")
         rejects(codec, "abcde")
-        assertEquals(JsonNum(2), codec.openApiSchema()["minLength"])
-        assertEquals(JsonNum(4), codec.openApiSchema()["maxLength"])
+        codec.openApiSchema()["minLength"] shouldBe JsonNum(2)
+        codec.openApiSchema()["maxLength"] shouldBe JsonNum(4)
     }
 
     // -------------------------------------------------------------- numbers
@@ -58,22 +61,22 @@ class RefinedInputsTest {
     @Test
     fun `between bounds the value at both ends and documents both`() {
         val codec = IntCodec.between(1, 100)
-        assertEquals(50, decode(codec, "50"))
-        assertEquals("a value between 1 and 100", rejects(codec, "0").expected)
+        decode(codec, "50") shouldBe 50
+        rejects(codec, "0").expected shouldBe "a value between 1 and 100"
         rejects(codec, "101")
 
         val schema = codec.openApiSchema()
-        assertEquals(JsonNum(1), schema["minimum"])
-        assertEquals(JsonNum(100), schema["maximum"])
+        schema["minimum"] shouldBe JsonNum(1)
+        schema["maximum"] shouldBe JsonNum(100)
         // The underlying codec still decides what parses at all.
-        assertEquals("a 32-bit integer", rejects(codec, "many").expected)
-        assertEquals(JsonStr("integer"), schema["type"])
+        rejects(codec, "many").expected shouldBe "a 32-bit integer"
+        schema["type"] shouldBe JsonStr("integer")
     }
 
     @Test
     fun `positive rejects zero`() {
         rejects(LongCodec.positive(), "0")
-        assertEquals(1L, decode(LongCodec.positive(), "1"))
+        decode(LongCodec.positive(), "1") shouldBe 1L
     }
 
     // ---------------------------------------------------------- own types
@@ -90,44 +93,44 @@ class RefinedInputsTest {
 
     @Test
     fun `mapOrFail turns a rejected value into a decode failure, not an exception`() {
-        assertEquals(Email("ada@example.com"), decode(emailCodec, "ada@example.com"))
-        assertEquals("an email address", rejects(emailCodec, "nope").expected)
+        decode(emailCodec, "ada@example.com") shouldBe Email("ada@example.com")
+        rejects(emailCodec, "nope").expected shouldBe "an email address"
     }
 
     @Test
     fun `a codec can document itself, and encode round-trips`() {
-        assertEquals("Where the receipt is sent", emailCodec.description)
-        assertEquals("ada@example.com", emailCodec.example)
-        assertEquals(JsonStr("email"), emailCodec.openApiSchema()["format"])
-        assertEquals("ada@example.com", emailCodec.encode(Email("ada@example.com")))
+        emailCodec.description shouldBe "Where the receipt is sent"
+        emailCodec.example shouldBe "ada@example.com"
+        emailCodec.openApiSchema()["format"] shouldBe JsonStr("email")
+        emailCodec.encode(Email("ada@example.com")) shouldBe "ada@example.com"
     }
 
     @Test
     fun `NonEmptyString cannot be constructed empty`() {
-        assertNull(NonEmptyString.of(""))
-        assertEquals("rope", NonEmptyString.of("rope")!!.value)
-        assertEquals("a non-empty value", rejects(NonEmptyStringCodec, "").expected)
-        assertEquals(NonEmptyString.of("rope"), decode(NonEmptyStringCodec, "rope"))
+        NonEmptyString.of("").shouldBeNull()
+        NonEmptyString.of("rope")!!.value shouldBe "rope"
+        rejects(NonEmptyStringCodec, "").expected shouldBe "a non-empty value"
+        decode(NonEmptyStringCodec, "rope") shouldBe NonEmptyString.of("rope")
     }
 
     // ------------------------------------------------------------ built-ins
 
     @Test
     fun `time and uri codecs parse, document a format, and fail as a 400`() {
-        assertEquals(Instant.parse("2026-08-19T09:30:00Z"), decode(InstantCodec, "2026-08-19T09:30:00Z"))
-        assertEquals(LocalDate.of(2026, 8, 19), decode(LocalDateCodec, "2026-08-19"))
-        assertEquals(JsonStr("date-time"), InstantCodec.openApiSchema()["format"])
-        assertEquals(JsonStr("date"), LocalDateCodec.openApiSchema()["format"])
-        assertEquals(JsonStr("uri"), UriCodec.openApiSchema()["format"])
+        decode(InstantCodec, "2026-08-19T09:30:00Z") shouldBe Instant.parse("2026-08-19T09:30:00Z")
+        decode(LocalDateCodec, "2026-08-19") shouldBe LocalDate.of(2026, 8, 19)
+        InstantCodec.openApiSchema()["format"] shouldBe JsonStr("date-time")
+        LocalDateCodec.openApiSchema()["format"] shouldBe JsonStr("date")
+        UriCodec.openApiSchema()["format"] shouldBe JsonStr("uri")
         rejects(InstantCodec, "yesterday")
         rejects(LocalDateCodec, "19/08/2026")
     }
 
     @Test
     fun `plainCodecFor resolves the built-ins by type`() {
-        assertSame(InstantCodec, plainCodecFor<Instant>())
-        assertSame(LocalDateCodec, plainCodecFor<LocalDate>())
-        assertSame(NonEmptyStringCodec, plainCodecFor<NonEmptyString>())
+        plainCodecFor<Instant>() shouldBeSameInstanceAs InstantCodec
+        plainCodecFor<LocalDate>() shouldBeSameInstanceAs LocalDateCodec
+        plainCodecFor<NonEmptyString>() shouldBeSameInstanceAs NonEmptyStringCodec
     }
 
     // ------------------------------------------------------------ endpoints
@@ -141,6 +144,6 @@ class RefinedInputsTest {
         }
 
         val schema = ep.queries.single().codec.openApiSchema()
-        assertEquals(JsonNum(1), schema["minimum"])
+        schema["minimum"] shouldBe JsonNum(1)
     }
 }

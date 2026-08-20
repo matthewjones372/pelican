@@ -5,9 +5,13 @@ import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.openapi.openApiJson
 import dev.pelican.test.ApiClient
 import dev.pelican.test.apiClient
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -64,13 +68,13 @@ class AllBackendsTest {
         // returns a Greeting and passing anything else does not compile.
         val greeting = client.call(greet, In2("ada", false))
 
-        assertEquals(Greeting("Hello, ada!", "en"), greeting)
+        greeting shouldBe Greeting("Hello, ada!", "en")
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a query parameter reaches the handler decoded`(name: String, client: ApiClient) {
-        assertEquals("HELLO, ADA!", client.call(greet, In2("ada", true)).greeting)
+        client.call(greet, In2("ada", true)).greeting shouldBe "HELLO, ADA!"
     }
 
     @ParameterizedTest(name = "{0}")
@@ -81,8 +85,8 @@ class AllBackendsTest {
         // to apply it for itself.
         val res = client.transport.send(client.request(greet, In2("ada", true)).withoutQuery("shout"))
 
-        assertEquals(200, res.status)
-        assertEquals("""{"greeting":"Hello, ada!","language":"en"}""", res.body)
+        res.status shouldBe 200
+        res.body shouldBe """{"greeting":"Hello, ada!","language":"en"}"""
     }
 
     @ParameterizedTest(name = "{0}")
@@ -92,14 +96,14 @@ class AllBackendsTest {
             client.request(countdown, 3).withPath("/countdown/not-a-number"),
         )
 
-        assertEquals(400, res.status)
-        assertTrue("Invalid parameter" in res.body, res.body)
+        res.status shouldBe 400
+        res.body shouldContain "Invalid parameter"
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `an unknown path is a 404`(name: String, client: ApiClient) {
-        assertEquals(404, client.transport.send(client.request(greet, In2("ada", false)).withPath("/nope")).status)
+        client.transport.send(client.request(greet, In2("ada", false)).withPath("/nope")).status shouldBe 404
     }
 
     // ------------------------------------------------------------- the stream
@@ -107,17 +111,14 @@ class AllBackendsTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a streamed response has the same rows and framing`(name: String, client: ApiClient) {
-        assertEquals(listOf(3, 2, 1), client.collect(countdown, 3).map { it.seq })
+        client.collect(countdown, 3).map { it.seq } shouldBe listOf(3, 2, 1)
 
         val res = client.response(countdown, 3)
-        assertEquals("application/x-ndjson", res.contentType)
-        assertEquals(
-            listOf(
-                """{"seq":3,"at":"T-minus-3"}""",
-                """{"seq":2,"at":"T-minus-2"}""",
-                """{"seq":1,"at":"T-minus-1"}""",
-            ),
-            res.body.lines().filter { it.isNotBlank() },
+        res.contentType shouldBe "application/x-ndjson"
+        res.body.lines().filter { it.isNotBlank() } shouldBe listOf(
+            """{"seq":3,"at":"T-minus-3"}""",
+            """{"seq":2,"at":"T-minus-2"}""",
+            """{"seq":1,"at":"T-minus-1"}""",
         )
     }
 
@@ -131,8 +132,8 @@ class AllBackendsTest {
     ) {
         val document = allBackends.single { it.name == name }.api().spec().openApiJson()
 
-        assertTrue("\"operationId\": \"greet\"" in document, document.take(300))
-        assertTrue("\"/hello/{name}\"" in document, document.take(300))
+        withClue(document.take(300)) { document shouldContain "\"operationId\": \"greet\"" }
+        withClue(document.take(300)) { document shouldContain "\"/hello/{name}\"" }
     }
 
     // ------------------------------------------------------------- and together
@@ -148,12 +149,12 @@ class AllBackendsTest {
         val bodies = clients.mapValues { (_, client) ->
             client.transport.send(client.request(greet, In2("ada", true))).body
         }
-        assertEquals(1, bodies.values.toSet().size, "backends disagreed: $bodies")
+        withClue("backends disagreed: $bodies") { bodies.values.toSet().size shouldBe 1 }
 
         val streams = clients.mapValues { (_, client) -> client.response(countdown, 3).body }
-        assertEquals(1, streams.values.toSet().size, "streamed bodies disagreed: $streams")
+        withClue("streamed bodies disagreed: $streams") { streams.values.toSet().size shouldBe 1 }
 
         val documents = allBackends.associate { it.name to it.api().spec().openApiJson() }
-        assertEquals(1, documents.values.toSet().size, "documents disagreed between backends")
+        withClue("documents disagreed between backends") { documents.values.toSet().size shouldBe 1 }
     }
 }

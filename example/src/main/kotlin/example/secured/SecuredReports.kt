@@ -279,11 +279,13 @@ private fun callerOf(p: Params): Caller? {
     val (kind, credential) = header.split(' ', limit = 2).takeIf { it.size == 2 } ?: return null
     return when (kind.lowercase()) {
         "bearer" -> Introspection.introspect(credential)
+
         "basic" -> {
             val decoded = runCatching { String(Base64.getDecoder().decode(credential)) }.getOrNull()
             val (user, password) = decoded?.split(':', limit = 2)?.takeIf { it.size == 2 } ?: return null
             StaffDirectory.check(user, password)
         }
+
         else -> null
     }
 }
@@ -424,7 +426,7 @@ val securedDocs = Docs(
 )
 
 fun main(args: Array<String>) {
-    val port = args.firstOrNull()?.toInt() ?: 8080
+    val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
     val server = securedApi().startWithDocs(port = port, docs = securedDocs)
     println(
         """
@@ -469,3 +471,6 @@ fun securedSpec(): ApiSpec = ApiSpec(
 )
 
 fun writeSecuredSpec() = println(securedSpec().openApiJson())
+
+/** What every example binds to unless told otherwise; `--args=8081` moves it. */
+private const val DEFAULT_PORT = 8080

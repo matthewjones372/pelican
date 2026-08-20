@@ -22,10 +22,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 21 is the toolchain the modules compile against; 23 is what the repo
-        # is developed on. Running both is what catches "works on my machine"
-        # before someone else finds it.
-        java: ["21", "23"]
+        # 21 is the toolchain the modules compile against, so it is what the
+        # published bytecode has to keep working on; 23 and 25 are what the repo
+        # is developed and run on. Running all three is what catches "works on
+        # my machine" before someone else finds it.
+        #
+        # detekt is skipped on 25 alone: 1.23.8 fails reading that JDK's version
+        # string, analyses inside the Gradle daemon and cannot fork, so there is
+        # no way to give it an older JVM. The 21 and 23 jobs lint the same code,
+        # so nothing goes unchecked — this job is here for compile and tests.
+        include:
+          - java: "21"
+            gradleArgs: ""
+          - java: "23"
+            gradleArgs: ""
+          - java: "25"
+            gradleArgs: "-x detektMain -x detektTest -x detekt"
 
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +50,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
-        run: ./gradlew build --stacktrace
+        run: ./gradlew build ${{ matrix.gradleArgs }} --stacktrace
 
       # The suites bind real sockets and assert on delivery timing, so a
       # failure is worth reading rather than guessing at.

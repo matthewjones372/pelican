@@ -132,14 +132,19 @@ val Params.call: ApplicationCall
  * that disconnects cancels the handler, and that one is rethrown rather than
  * swallowed.
  */
+@Suppress("TooGenericExceptionCaught") // Catching everything is the contract; see the KDoc above.
 private fun Params.launch(f: suspend () -> Any?): CompletionStage<Any?> {
     val stage = CompletableFuture<Any?>()
     call.launch {
         try {
             stage.complete(f())
+        } catch (cancelled: CancellationException) {
+            // Travels the other way: a client that disconnects cancels the
+            // handler, and that one is rethrown rather than swallowed.
+            stage.completeExceptionally(cancelled)
+            throw cancelled
         } catch (t: Throwable) {
             stage.completeExceptionally(t)
-            if (t is CancellationException) throw t
         }
     }
     return stage

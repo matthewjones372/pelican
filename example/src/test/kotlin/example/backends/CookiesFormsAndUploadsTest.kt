@@ -6,9 +6,13 @@ import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.test.ApiClient
 import dev.pelican.test.apiClient
 import dev.pelican.test.shouldHaveStatus
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -49,10 +53,7 @@ class CookiesFormsAndUploadsTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a cookie parameter reaches the handler decoded`(name: String, client: ApiClient) {
-        assertEquals(
-            Preferences("fr", "abc123"),
-            client.call(preferences, In2("fr", "abc123")),
-        )
+        client.call(preferences, In2("fr", "abc123")) shouldBe Preferences("fr", "abc123")
     }
 
     @ParameterizedTest(name = "{0}")
@@ -68,8 +69,8 @@ class CookiesFormsAndUploadsTest {
             client.request(preferences, In2("fr", "abc123")).withoutHeader("Cookie"),
         )
 
-        assertEquals(200, res.status)
-        assertEquals("""{"locale":"en","session":null}""", res.body)
+        res.status shouldBe 200
+        res.body shouldBe """{"locale":"en","session":null}"""
     }
 
     @ParameterizedTest(name = "{0}")
@@ -83,7 +84,7 @@ class CookiesFormsAndUploadsTest {
                 .withHeader("Cookie", "consent=all; locale=de; _ga=GA1.2.3; session=xyz"),
         )
 
-        assertEquals("""{"locale":"de","session":"xyz"}""", res.body)
+        res.body shouldBe """{"locale":"de","session":"xyz"}"""
     }
 
     // ---------------------------------------------------------------- forms
@@ -91,10 +92,8 @@ class CookiesFormsAndUploadsTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a form body decodes into the type the schema describes`(name: String, client: ApiClient) {
-        assertEquals(
-            Session("ada", remember = true, visits = 3),
-            client.call(signIn, SignIn("ada", remember = true, visits = 3)),
-        )
+        client.call(signIn, SignIn("ada", remember = true, visits = 3)) shouldBe
+            Session("ada", remember = true, visits = 3)
     }
 
     @ParameterizedTest(name = "{0}")
@@ -108,8 +107,8 @@ class CookiesFormsAndUploadsTest {
                 .withBody("user=ada&remember=on&visits=3"),
         )
 
-        assertEquals(200, res.status)
-        assertEquals("""{"user":"ada","remember":true,"visits":3}""", res.body)
+        res.status shouldBe 200
+        res.body shouldBe """{"user":"ada","remember":true,"visits":3}"""
     }
 
     @ParameterizedTest(name = "{0}")
@@ -120,7 +119,7 @@ class CookiesFormsAndUploadsTest {
                 .withBody("user=ada&remember=on&visits=lots"),
         ).shouldHaveStatus(400)
 
-        assertTrue("visits" in res.body, res.body)
+        res.body shouldContain "visits"
     }
 
     @ParameterizedTest(name = "{0}")
@@ -131,8 +130,8 @@ class CookiesFormsAndUploadsTest {
                 .withBody("user=ada&remember=on&visits=1&_csrf=deadbeef&submit=Sign+in"),
         )
 
-        assertEquals(200, res.status)
-        assertEquals("""{"user":"ada","remember":true,"visits":1}""", res.body)
+        res.status shouldBe 200
+        res.body shouldBe """{"user":"ada","remember":true,"visits":1}"""
     }
 
     // ------------------------------------------------------------ multipart
@@ -148,7 +147,7 @@ class CookiesFormsAndUploadsTest {
             In2("The notes", file("notes.txt", "text/plain", "line one\nline two")),
         )
 
-        assertEquals(Uploaded("The notes", "notes.txt", "text/plain", "line one\nline two"), uploaded)
+        uploaded shouldBe Uploaded("The notes", "notes.txt", "text/plain", "line one\nline two")
     }
 
     @ParameterizedTest(name = "{0}")
@@ -163,7 +162,7 @@ class CookiesFormsAndUploadsTest {
         val content = "x".repeat(10_000)
         val uploaded = client.call(uploadFile, In2("Big", file("big.txt", "text/plain", content)))
 
-        assertEquals(10_000, uploaded.content.length)
+        uploaded.content.length shouldBe 10_000
     }
 
     @ParameterizedTest(name = "{0}")
@@ -185,8 +184,8 @@ class CookiesFormsAndUploadsTest {
                 .withBody(body),
         ).shouldHaveStatus(400)
 
-        assertTrue("caption" in res.body, res.body)
-        assertTrue("Send 'caption' before it" in res.body, res.body)
+        res.body shouldContain "caption"
+        res.body shouldContain "Send 'caption' before it"
     }
 
     @ParameterizedTest(name = "{0}")
@@ -199,7 +198,7 @@ class CookiesFormsAndUploadsTest {
             client.request(uploadFile, In2("", file("a.txt", "text/plain", "hello"))),
         ).shouldHaveStatus(400)
 
-        assertTrue("caption" in res.body, res.body)
+        res.body shouldContain "caption"
     }
 
     @ParameterizedTest(name = "{0}")
@@ -211,7 +210,7 @@ class CookiesFormsAndUploadsTest {
                 .withBody("""{"caption":"x"}"""),
         ).shouldHaveStatus(400)
 
-        assertTrue("multipart" in res.body, res.body)
+        res.body shouldContain "multipart"
     }
 
     // ------------------------------------------------------------ and together
@@ -225,20 +224,11 @@ class CookiesFormsAndUploadsTest {
         fun answers(question: (ApiClient) -> String): Set<String> =
             clients.values.map(question).toSet()
 
-        assertEquals(
-            1,
-            answers { it.transport.send(it.request(preferences, In2("de", "s1"))).body }.size,
-        )
-        assertEquals(
-            1,
-            answers { it.transport.send(it.request(signIn, SignIn("ada", true, 2))).body }.size,
-        )
-        assertEquals(
-            1,
-            answers {
-                it.transport.send(it.request(uploadFile, In2("c", file("a.txt", "text/plain", "hi")))).body
-            }.size,
-        )
+        answers { it.transport.send(it.request(preferences, In2("de", "s1"))).body }.size shouldBe 1
+        answers { it.transport.send(it.request(signIn, SignIn("ada", true, 2))).body }.size shouldBe 1
+        answers {
+            it.transport.send(it.request(uploadFile, In2("c", file("a.txt", "text/plain", "hi")))).body
+        }.size shouldBe 1
     }
 
     private fun file(filename: String, contentType: String, content: String) =

@@ -26,17 +26,18 @@ object Cookies {
      * and a later duplicate is the one to drop.
      */
     fun parse(headers: List<String>): Map<String, String> {
-        val cookies = LinkedHashMap<String, String>()
-        for (header in headers) {
-            for (pair in header.split(';')) {
+        return headers
+            .flatMap { it.split(';') }
+            .mapNotNull { pair ->
                 val separator = pair.indexOf('=')
-                if (separator <= 0) continue
-                val name = pair.substring(0, separator).trim()
-                if (name.isEmpty() || name in cookies) continue
-                cookies[name] = unquote(pair.substring(separator + 1).trim())
+                val name = if (separator > 0) pair.substring(0, separator).trim() else ""
+                if (name.isEmpty()) null else name to unquote(pair.substring(separator + 1).trim())
             }
-        }
-        return cookies
+            // RFC 6265 orders the more specific cookie first, so the first
+            // spelling of a name is the one to keep — across headers as well
+            // as within one.
+            .distinctBy { it.first }
+            .toMap()
     }
 
     fun parse(header: String?): Map<String, String> = parse(listOfNotNull(header))
@@ -46,7 +47,7 @@ object Cookies {
         cookies.joinToString("; ") { (name, value) ->
             require(value.none { it == ';' || it == ',' || it == ' ' || it < ' ' }) {
                 "A cookie value cannot contain ';', ',', a space or a control character, " +
-                    "and '$name' does: ${value.take(40)}"
+                    "and '$name' does: ${value.take(COOKIE_VALUE_PREVIEW)}"
             }
             "$name=$value"
         }
@@ -60,3 +61,6 @@ object Cookies {
         if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) value.substring(1, value.length - 1)
         else value
 }
+
+/** Enough of an offending cookie value to recognise it, without pasting a session token into a log. */
+private const val COOKIE_VALUE_PREVIEW = 40

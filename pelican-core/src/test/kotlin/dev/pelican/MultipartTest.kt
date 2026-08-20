@@ -1,10 +1,14 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 
@@ -57,24 +61,24 @@ class MultipartTest {
             envelope(text("caption", "Holiday"), text("count", "3"), upload("file", "a.txt", "hello")),
         )
 
-        assertEquals("Holiday", values[caption])
-        assertEquals(3, values[count])
+        values[caption] shouldBe "Holiday"
+        values[count] shouldBe 3
     }
 
     @Test
     fun `a part that was not sent falls back to its default, or to null`() {
         val values = decode(envelope(text("caption", "Holiday"), upload("file", "a.txt", "hello")))
 
-        assertEquals(1, values[count])
-        assertNull(values[notes])
+        values[count] shouldBe 1
+        values[notes].shouldBeNull()
     }
 
     @Test
     fun `a required part that was not sent is a 400 naming it`() {
-        val failure = assertThrows<ApiException> { decode(envelope(text("count", "3"))) }
+        val failure = shouldThrow<ApiException> { decode(envelope(text("count", "3"))) }
 
-        assertEquals(400, failure.status)
-        assertTrue("caption" in failure.message, failure.message)
+        failure.status shouldBe 400
+        failure.message shouldContain "caption"
     }
 
     @Test
@@ -88,7 +92,7 @@ class MultipartTest {
             ),
         )
 
-        assertEquals("Holiday", values[caption])
+        values[caption] shouldBe "Holiday"
     }
 
     @Test
@@ -96,29 +100,29 @@ class MultipartTest {
         val values = decode(envelope(text("caption", "c"), upload("file", "notes.txt", "hello")))
         val uploaded = values[file] as UploadedFile
 
-        assertEquals("notes.txt", uploaded.filename)
-        assertEquals("text/plain", uploaded.contentType)
-        assertEquals("hello", uploaded.text())
+        uploaded.filename shouldBe "notes.txt"
+        uploaded.contentType shouldBe "text/plain"
+        uploaded.text() shouldBe "hello"
     }
 
     @Test
     fun `a text part sent after the file part is a 400 that says why`() {
-        val failure = assertThrows<ApiException> {
+        val failure = shouldThrow<ApiException> {
             decode(envelope(upload("file", "a.txt", "hello"), text("caption", "Too late")))
         }
 
-        assertEquals(400, failure.status)
-        assertTrue("Send 'caption' before it" in (failure.detail ?: ""), failure.detail ?: "")
+        failure.status shouldBe 400
+        (failure.detail ?: "") shouldContain "Send 'caption' before it"
     }
 
     @Test
     fun `a body that is not multipart at all is a 400 rather than a parse failure`() {
-        val failure = assertThrows<ApiException> {
+        val failure = shouldThrow<ApiException> {
             decode(ByteArrayInputStream("{}".toByteArray()), contentType = "application/json")
         }
 
-        assertEquals(400, failure.status)
-        assertTrue("multipart" in failure.message, failure.message)
+        failure.status shouldBe 400
+        failure.message shouldContain "multipart"
     }
 
     // ------------------------------------------------------------- the file
@@ -134,11 +138,11 @@ class MultipartTest {
 
         val values = decode(counting, limit = 1_000_000)
 
-        assertEquals("Holiday", values[caption])
+        values[caption] shouldBe "Holiday"
         // The reader buffers, so this is an upper bound rather than an exact
         // byte count — but it is an upper bound a buffering parser could not
         // meet.
-        assertTrue(counting.read < 50_000, "read ${counting.read} of ${text.length}")
+        withClue("read ${counting.read} of ${text.length}") { (counting.read < 50_000) shouldBe true }
     }
 
     @Test
@@ -147,7 +151,7 @@ class MultipartTest {
             envelope(text("caption", "c"), upload("file", "a.txt", "one\r\ntwo\r\nthree")),
         )
 
-        assertEquals("one\r\ntwo\r\nthree", (values[file] as UploadedFile).text())
+        (values[file] as UploadedFile).text() shouldBe "one\r\ntwo\r\nthree"
     }
 
     @Test
@@ -158,7 +162,7 @@ class MultipartTest {
         val content = "before\r\n--b0 not a boundary\r\n--b0undaryish\r\nafter"
         val values = decode(envelope(text("caption", "c"), upload("file", "a.txt", content)))
 
-        assertEquals(content, (values[file] as UploadedFile).text())
+        (values[file] as UploadedFile).text() shouldBe content
     }
 
     @Test
@@ -169,20 +173,20 @@ class MultipartTest {
             limit = 1_000_000,
         )
 
-        assertEquals(content, (values[file] as UploadedFile).text())
+        (values[file] as UploadedFile).text() shouldBe content
     }
 
     @Test
     fun `text parts are bounded by the limit, and the file is not`() {
         val huge = "x".repeat(5_000)
 
-        assertThrows<PayloadTooLarge> {
+        shouldThrow<PayloadTooLarge> {
             decode(envelope(text("caption", huge), upload("file", "a.txt", "hello")), limit = 100)
         }
 
         // The same limit, with the size in the part that is streamed instead.
         val values = decode(envelope(text("caption", "c"), upload("file", "a.txt", huge)), limit = 100)
-        assertEquals(huge, (values[file] as UploadedFile).text())
+        (values[file] as UploadedFile).text() shouldBe huge
     }
 
     // ------------------------------------------------------------ the envelope
@@ -195,7 +199,7 @@ class MultipartTest {
 
         val values = decode(ByteArrayInputStream(text.toByteArray()))
 
-        assertEquals("Holiday", values[caption])
+        values[caption] shouldBe "Holiday"
     }
 
     @Test
@@ -205,7 +209,7 @@ class MultipartTest {
             contentType = """multipart/form-data; charset=utf-8; boundary="b0undary"""",
         )
 
-        assertEquals("Holiday", values[caption])
+        values[caption] shouldBe "Holiday"
     }
 
     @Test
@@ -213,50 +217,52 @@ class MultipartTest {
         val truncated = "--b0undary\r\n" + text("caption", "Holiday") + "\r\n--b0undary\r\n" +
             upload("file", "a.txt", "hello")
 
-        val failure = assertThrows<ApiException> {
+        val failure = shouldThrow<ApiException> {
             val values = decode(ByteArrayInputStream(truncated.toByteArray()))
             (values[file] as UploadedFile).text()
         }
 
-        assertEquals(400, failure.status)
+        failure.status shouldBe 400
     }
 
     // ---------------------------------------------------- what is describable
 
     @Test
     fun `two file parts is a description no handler could be given, so it fails when built`() {
-        val failure = assertThrows<IllegalStateException> {
+        val failure = shouldThrow<IllegalStateException> {
             endpoint(filePart("first"), filePart("second")) {
                 post("upload")
                 text()
             }
         }
 
-        assertTrue("only the first could be streamed" in (failure.message ?: ""), failure.message ?: "")
+        withClue(failure.message ?: "") {
+            (failure.message ?: "") shouldContain "only the first could be streamed"
+        }
     }
 
     @Test
     fun `parts and a body of another kind both claiming to be the body fails when built`() {
-        val failure = assertThrows<IllegalArgumentException> {
+        val failure = shouldThrow<IllegalArgumentException> {
             endpoint(caption, jsonBody<String>()) {
                 post("upload")
                 text()
             }
         }
 
-        assertTrue("the parts are the body" in (failure.message ?: ""), failure.message ?: "")
+        (failure.message ?: "") shouldContain "the parts are the body"
     }
 
     @Test
     fun `one part name declared twice fails when built`() {
-        val failure = assertThrows<IllegalStateException> {
+        val failure = shouldThrow<IllegalStateException> {
             endpoint(textPart<String>("caption"), textPart<Int>("caption")) {
                 post("upload")
                 text()
             }
         }
 
-        assertTrue("more than once" in (failure.message ?: ""), failure.message ?: "")
+        (failure.message ?: "") shouldContain "more than once"
     }
 
     /** Counts what has actually been pulled from the source. */

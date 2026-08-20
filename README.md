@@ -52,7 +52,6 @@ streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
 [Install](#install) · [A whole service, in one file](#a-whole-service-in-one-file) ·
 [What the compiler catches](#what-the-compiler-catches) ·
 [Describing endpoints](#describing-endpoints) · [Running a server](#running-a-server) ·
-[Handlers in Arrow's Raise style](#handlers-in-arrows-raise-style) ·
 [Testing](#testing) · [A generated Kotlin client](#a-generated-kotlin-client) ·
 [Backends](#backends) · [Modules](#modules) ·
 [Running the examples](#running-the-examples) · [Known limits](#known-limits)
@@ -62,7 +61,7 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-Not on Maven Central yet. `./gradlew publishToMavenLocal` installs all eighteen
+Not on Maven Central yet. `./gradlew publishToMavenLocal` installs all fourteen
 modules at `dev.pelican:<module>:0.1.0-SNAPSHOT` with sources and javadoc, so
 `mavenLocal()` or `includeBuild` both work today.
 
@@ -294,132 +293,6 @@ placeOrder handledOrFail { (id, key, req) ->
 ```
 
 Give the failures a sealed supertype and that `when` is exhaustive too.
-
-## Handlers in Arrow's Raise style
-
-The same endpoints bind to handlers that `raise` rather than return, through
-`pelican-arrow`:
-
-```kotlin
-// The service's own errors. Nothing here knows about HTTP.
-sealed interface Problem {
-    data class NoneMatched(val tag: String) : Problem
-    data object TagRequiredForDeepPages : Problem
-}
-
-val noMatches   = errorJson<ApiError>(404, "No items with that tag")
-val tagRequired = errorJson<ApiError>(400, "Paging past the first page needs a tag")
-
-val toResponse: ErrorMapper<Problem, ApiError> = { problem ->
-    when (problem) {
-        is Problem.NoneMatched              -> noMatches(ApiError(404, "No items tagged ${problem.tag}"))
-        is Problem.TagRequiredForDeepPages  -> tagRequired(ApiError(400, "Filter by tag to page further"))
-    }
-}
-
-val tag   = queryParam("tag", StringCodec.nonEmpty(), description = "Only items with this tag").optional()
-val limit = queryParam("limit", IntCodec.between(1, 100)).default(20)
-val page  = queryParam("page", IntCodec.between(1, 50)).default(1)
-
-val listItems = endpoint(tag, limit, page) {
-    get("items")
-    json<List<Item>>().orFail(noMatches, tagRequired)
-}
-
-listItems.handledRaise(toResponse) { (tag, limit, page) ->
-    val wanted = if (page == 1) tag else ensureNotNull(tag) { TagRequiredForDeepPages }
-
-    val found = Store.list(wanted, limit, page)
-    ensure(found.isNotEmpty()) { NoneMatched(wanted ?: "anything") }
-    found
-}
-```
-
-That handler and every claim made about it below run as
-[`ReadmeArrowTest`](pelican-arrow-pekko/src/test/kotlin/dev/pelican/arrow/pekko/ReadmeArrowTest.kt).
-
-The mapping is an argument rather than a convention, because what fixes a
-failure's status is *which* declared `ErrorOutput` produced it — a raised value
-has to be told which one it is. Against a sealed problem type that `when` is
-exhaustive, so raising something the endpoint never declared is a compile error
-rather than a 500.
-
-`Raise<E>` reaches the handler as a context parameter: the receiver slot is
-already spent on `Params`, which is what lets the handler above also call
-`setHeader`. Two consequences, both of them stated once and then invisible — a
-module using these compiles with `-Xcontext-parameters`, and `raise`, `ensure`,
-`ensureNotNull` and `bind` are imported from `dev.pelican.arrow`, because
-Kotlin's context parameters are deliberately not implicit receivers and Arrow's
-own receiver-based DSL will not resolve inside that lambda. They forward to
-Arrow and do nothing else; `raiseScope()` hands you the `Raise` itself for the
-rest of it.
-
-Binding a value-returning handler names no backend type, so those binders work
-on all three. A stream is a `Source`, a `Sequence` or a `Flow`, so `streamedRaise`
-comes from `pelican-arrow-pekko`, `pelican-arrow-http4k` or `pelican-arrow-ktor`.
-The Ktor module is also where the `suspend` handlers are, and `raise`
-short-circuits across a suspension — the awaits happen inside the same block.
-
-### Optional parameters
-
-`optional()` and `default(v)` are declared on the parameter, not handled in the
-handler, so the type the handler receives is the one the declaration implies and
-the OpenAPI document says `required: false` without anybody writing it twice:
-
-```kotlin
-val tag   = queryParam<String>("tag").optional()   // handler sees String?
-val limit = queryParam<Int>("limit").default(20)   // handler sees Int, never null
-```
-
-A parameter that breaks its own rule never reaches the handler at all — the same
-400 as anywhere else in Pelican, raised before any of this runs:
-
-```
-GET /items?limit=0
-{"status":400,"error":"Invalid parameter","detail":"Cannot decode '0' for 'limit': expected a value between 1 and 100"}
-```
-
-Which leaves the interesting case: an input that is optional in general but
-required under some condition. That is a domain rule rather than a decoding
-rule, so it belongs in the handler, and `ensureNotNull` is how it reads — it
-narrows `String?` to `String` and raises when it cannot:
-
-```
-GET /items                → 200, everything, unfiltered
-GET /items?tag=kitchen    → 200, the kitchen ones
-GET /items?page=2         → 400 {"status":400,"error":"Filter by tag to page further"}
-GET /items?tag=garage     → 404 {"status":404,"error":"No items tagged garage"}
-```
-
-### Beside the routes you already have
-
-Nothing above changes what an `Api` *is*: a description bound to handlers, which
-each backend turns into its own routes. On Pekko that is a plain `Route`, so a
-service with routes of its own concatenates them exactly as it would any other:
-
-```kotlin
-// Written in Pekko's own DSL, years before this library existed.
-val ownRoutes: Route = Directives.concat(
-    Directives.get { Directives.path("health") { Directives.complete("ok") } },
-    Directives.get { Directives.path("legacy") { Directives.complete("still here") } },
-)
-
-val route = Directives.concat(api.toRoute(system), ownRoutes)
-
-Http.get(system).newServerAt("0.0.0.0", 8080).bind(route)
-```
-
-Either order works. A Pelican route *rejects* a path it does not describe rather
-than completing it with a 404, which is what lets the next route in the concat
-have its turn — and the CORS preflight route is careful about the same thing, so
-it does not swallow every `OPTIONS` in the service. Both orderings are asserted,
-here and in
-[`ConcatenatedRoutesTest`](pelican-pekko/src/test/kotlin/dev/pelican/pekko/ConcatenatedRoutesTest.kt).
-
-None of that is Arrow-specific: the handlers behind those endpoints could be
-`handledNow`, `handledOrFail` or `handledRaise` and the route is the same value.
-The equivalents elsewhere are `api.toHttpHandler()` on http4k and
-`application { pelican(api) }` on Ktor, both of which compose the same way.
 
 ## Streaming
 
@@ -729,7 +602,7 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 # Modules
 
-Eighteen modules; you take four or five. The layering is enforced by tests
+Fourteen modules; you take four or five. The layering is enforced by tests
 rather than convention.
 
 | Module | Depends on | Contains |
@@ -740,8 +613,6 @@ rather than convention.
 | `pelican-*-docs` | its backend, openapi | serves the document and Swagger UI |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
-| `pelican-arrow` | core + arrow-core | Raise-style handlers, on any backend |
-| `pelican-arrow-pekko` / `-http4k` / `-ktor` | arrow + that backend | Raise binders for that backend's streams, and Ktor's suspend handlers |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-pekko` / `-http4k` | test + that backend | the in-memory transport |
 
@@ -758,7 +629,7 @@ library. The full breakdown is in
 # Running the examples
 
 ```bash
-./gradlew build                          # all modules, 601 tests
+./gradlew build                          # all modules, 572 tests
 ./gradlew :example:runReadmeExample      # the service above, on :8080
 ./gradlew :example:run                   # the fuller orders API (streaming, SSE, raw bodies)
 ./gradlew :example:runBackends           # all three backends at once, on :8080-:8082

@@ -2,12 +2,16 @@ package dev.pelican.http4k
 
 import dev.pelican.Api
 import dev.pelican.jackson.JacksonCodecs
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.http4k.core.HttpHandler
 import org.http4k.core.Method
 import org.http4k.core.Request
 import org.http4k.core.Response
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -30,37 +34,37 @@ class Http4kInterpreterTest {
     @Test
     fun `a path parameter is decoded into its declared type`() {
         val res = get("/items/1")
-        assertEquals(200, res.status.code)
-        assertEquals("application/json", res.header("Content-Type"))
-        assertEquals("""{"id":1,"name":"widget"}""", res.bodyString())
+        res.status.code shouldBe 200
+        res.header("Content-Type") shouldBe "application/json"
+        res.bodyString() shouldBe """{"id":1,"name":"widget"}"""
     }
 
     @Test
     fun `a path parameter that does not decode is a 400, not a 404`() {
         val res = get("/items/not-a-number")
-        assertEquals(400, res.status.code)
-        assertTrue("Invalid parameter" in res.bodyString(), res.bodyString())
+        res.status.code shouldBe 400
+        res.bodyString() shouldContain "Invalid parameter"
     }
 
     @Test
     fun `an absent optional query parameter gets the declared default`() {
-        assertEquals("3/-", get("/items/count").bodyString())
+        get("/items/count").bodyString() shouldBe "3/-"
     }
 
     @Test
     fun `query parameters are decoded, and a refinement is enforced`() {
-        assertEquals("7/urgent", get("/items/count?limit=7&tag=urgent").bodyString())
+        get("/items/count?limit=7&tag=urgent").bodyString() shouldBe "7/urgent"
 
         val res = get("/items/count?limit=0")
-        assertEquals(400, res.status.code)
-        assertTrue("between 1 and 100" in res.bodyString(), res.bodyString())
+        res.status.code shouldBe 400
+        res.bodyString() shouldContain "between 1 and 100"
     }
 
     @Test
     fun `a missing required header is a 400 naming the header`() {
         val res = handler(Request(Method.POST, "/items").body("""{"name":"rope"}"""))
-        assertEquals(400, res.status.code)
-        assertTrue("X-Api-Key" in res.bodyString(), res.bodyString())
+        res.status.code shouldBe 400
+        res.bodyString() shouldContain "X-Api-Key"
     }
 
     @Test
@@ -70,8 +74,8 @@ class Http4kInterpreterTest {
                 .header("X-Api-Key", "let-me-in")
                 .body("""{"name":"rope"}"""),
         )
-        assertEquals(201, res.status.code)
-        assertEquals("""{"id":7,"name":"rope"}""", res.bodyString())
+        res.status.code shouldBe 201
+        res.bodyString() shouldBe """{"id":7,"name":"rope"}"""
     }
 
     @Test
@@ -81,16 +85,16 @@ class Http4kInterpreterTest {
                 .header("X-Api-Key", "let-me-in")
                 .body("{ not json"),
         )
-        assertEquals(400, res.status.code)
-        assertTrue("Malformed request body" in res.bodyString(), res.bodyString())
+        res.status.code shouldBe 400
+        res.bodyString() shouldContain "Malformed request body"
     }
 
     @Test
     fun `a raw body is streamed back without being buffered by the framework`() {
         val res = handler(Request(Method.POST, "/echo").body("the quick brown fox"))
-        assertEquals(200, res.status.code)
-        assertEquals("application/octet-stream", res.header("Content-Type"))
-        assertEquals("the quick brown fox", res.bodyString())
+        res.status.code shouldBe 200
+        res.header("Content-Type") shouldBe "application/octet-stream"
+        res.bodyString() shouldBe "the quick brown fox"
     }
 
     // ------------------------------------------------------------- outputs
@@ -98,46 +102,38 @@ class Http4kInterpreterTest {
     @Test
     fun `an empty output sends the declared status and no body`() {
         val res = handler(Request(Method.DELETE, "/items/1"))
-        assertEquals(204, res.status.code)
-        assertEquals("", res.bodyString())
+        res.status.code shouldBe 204
+        res.bodyString() shouldBe ""
     }
 
     @Test
     fun `ndjson is one document per line`() {
         val res = get("/items/stream?limit=2")
-        assertEquals("application/x-ndjson", res.header("Content-Type"))
-        assertEquals(
-            listOf("""{"id":1,"name":"item-1"}""", """{"id":2,"name":"item-2"}"""),
-            res.bodyString().lines().filter { it.isNotBlank() },
-        )
+        res.header("Content-Type") shouldBe "application/x-ndjson"
+        res.bodyString().lines().filter { it.isNotBlank() } shouldBe
+            listOf("""{"id":1,"name":"item-1"}""", """{"id":2,"name":"item-2"}""")
     }
 
     @Test
     fun `sse frames carry the declared event name`() {
         val res = get("/items/watch?limit=2")
-        assertEquals("text/event-stream", res.header("Content-Type"))
-        assertEquals(
-            "event: item\ndata: {\"id\":1,\"name\":\"item-1\"}\n\n" +
-                "event: item\ndata: {\"id\":2,\"name\":\"item-2\"}\n\n",
-            res.bodyString(),
-        )
+        res.header("Content-Type") shouldBe "text/event-stream"
+        res.bodyString() shouldBe "event: item\ndata: {\"id\":1,\"name\":\"item-1\"}\n\n" +
+            "event: item\ndata: {\"id\":2,\"name\":\"item-2\"}\n\n"
     }
 
     @Test
     fun `a streamed json array is framed by this module`() {
         val res = get("/items/list?limit=2")
-        assertEquals("application/json", res.header("Content-Type"))
-        assertEquals(
-            """[{"id":1,"name":"item-1"},{"id":2,"name":"item-2"}]""",
-            res.bodyString(),
-        )
+        res.header("Content-Type") shouldBe "application/json"
+        res.bodyString() shouldBe """[{"id":1,"name":"item-1"},{"id":2,"name":"item-2"}]"""
     }
 
     @Test
     fun `an empty stream still renders an empty json array`() {
         val empty = Api(listOf(listItems streamedNow { _ -> emptySequence<Item>() }), JacksonCodecs)
             .toHttpHandler()
-        assertEquals("[]", empty(Request(Method.GET, "/items/list")).bodyString())
+        empty(Request(Method.GET, "/items/list")).bodyString() shouldBe "[]"
     }
 
     // ------------------------------------------------------------- failures
@@ -145,9 +141,9 @@ class Http4kInterpreterTest {
     @Test
     fun `a declared failure is sent as its own declared type and status`() {
         val res = get("/items/2")
-        assertEquals(404, res.status.code)
-        assertEquals("application/json", res.header("Content-Type"))
-        assertTrue("""No item 2""" in res.bodyString(), res.bodyString())
+        res.status.code shouldBe 404
+        res.header("Content-Type") shouldBe "application/json"
+        res.bodyString() shouldContain """No item 2"""
     }
 
     @Test
@@ -155,32 +151,32 @@ class Http4kInterpreterTest {
         val unauthorised = handler(
             Request(Method.POST, "/items").header("X-Api-Key", "wrong").body("""{"name":"rope"}"""),
         )
-        assertEquals(401, unauthorised.status.code)
+        unauthorised.status.code shouldBe 401
 
         val missing = handler(
             Request(Method.POST, "/items").header("X-Api-Key", "let-me-in").body("""{"name":"nope"}"""),
         )
-        assertEquals(404, missing.status.code)
+        missing.status.code shouldBe 404
     }
 
     @Test
     fun `returning another endpoint's failure is a 500, not an undocumented status`() {
         val res = get("/misdeclared")
-        assertEquals(500, res.status.code)
+        res.status.code shouldBe 500
     }
 
     @Test
     fun `an ApiException becomes the status it names`() {
         val res = handler(Request(Method.DELETE, "/items/9"))
-        assertEquals(404, res.status.code)
-        assertTrue("No item 9" in res.bodyString(), res.bodyString())
+        res.status.code shouldBe 404
+        res.bodyString() shouldContain "No item 9"
     }
 
     @Test
     fun `anything else escaping a handler is a 500`() {
         val res = get("/boom")
-        assertEquals(500, res.status.code)
-        assertTrue("Internal server error" in res.bodyString(), res.bodyString())
+        res.status.code shouldBe 500
+        res.bodyString() shouldContain "Internal server error"
     }
 
     // ------------------------------------------------------------- routing
@@ -189,16 +185,16 @@ class Http4kInterpreterTest {
     fun `a more specific path wins over a capture regardless of declaration order`() {
         // /items/stream and /items/{itemId} both match; the literal one is tried
         // first, so this is a stream rather than "no item 'stream'".
-        assertEquals("application/x-ndjson", get("/items/stream").header("Content-Type"))
+        get("/items/stream").header("Content-Type") shouldBe "application/x-ndjson"
     }
 
     @Test
     fun `an unknown path is a 404`() {
-        assertEquals(404, get("/nothing/here").status.code)
+        get("/nothing/here").status.code shouldBe 404
     }
 
     @Test
     fun `a known path with the wrong method is a 405`() {
-        assertEquals(405, handler(Request(Method.PUT, "/items/1")).status.code)
+        handler(Request(Method.PUT, "/items/1")).status.code shouldBe 405
     }
 }

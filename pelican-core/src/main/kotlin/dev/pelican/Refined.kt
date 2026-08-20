@@ -1,6 +1,7 @@
 package dev.pelican
 
 import java.net.URI
+import java.net.URISyntaxException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -226,5 +227,5 @@ object UriCodec : PlainCodec<URI> {
     override val openApiFormat = "uri"
     override val example = "https://example.com/page"
     override fun decode(name: String, raw: String): URI =
-        try { URI(raw) } catch (e: Exception) { throw DecodeFailure(name, raw, "a URI") }
+        try { URI(raw) } catch (e: URISyntaxException) { throw DecodeFailure(name, raw, "a URI", e) }
 }

@@ -79,6 +79,98 @@ fun ApiSpec.openApi(): JsonObj {
 
 fun ApiSpec.openApiJson(): String = openApi().renderPretty()
 
+/** Every declared input that travels outside the body, in the order a reader expects them. */
+private fun parameters(ep: Endpoint<*, *>): List<JsonValue> = buildList {
+    ep.pathSpec.captures.forEach { p ->
+        add(parameter(p.name, "path", true, p.codec, p.description))
+    }
+    ep.queries.forEach { q ->
+        add(parameter(q.name, "query", q.required, q.codec, q.description))
+    }
+    ep.headerParams.forEach { h ->
+        add(parameter(h.name, "header", h.required, h.codec, h.description))
+    }
+    ep.cookieParams.forEach { c ->
+        add(parameter(c.name, "cookie", c.required, c.codec, c.description))
+    }
+}
+
+/** The request body, or null where the endpoint declares none. */
+private fun requestBody(ep: Endpoint<*, *>, schemas: SchemaSource, components: SchemaComponents): JsonObj? =
+    when (val body = ep.bodyInput) {
+        is JsonBody<*> -> jsonObj {
+            "required" to true
+            putIfNotNull("description", body.description)
+            put("content", jsonObj {
+                put("application/json", jsonObj {
+                    put("schema", schemas.schema(body.type, components))
+                })
+            })
+        }
+
+        // The same schema a JSON body of this type would publish. That is not
+        // a shortcut: the form is decoded *against* that schema, so a document
+        // saying anything else would be describing a decode that cannot happen.
+        is FormBody<*> -> jsonObj {
+            "required" to true
+            putIfNotNull("description", body.description)
+            put("content", jsonObj {
+                put("application/x-www-form-urlencoded", jsonObj {
+                    put("schema", schemas.schema(body.type, components))
+                })
+            })
+        }
+
+        is MultipartBody -> jsonObj {
+            "required" to true
+            putIfNotNull("description", body.description)
+            put("content", jsonObj {
+                put("multipart/form-data", jsonObj {
+                    put("schema", multipartSchema(body))
+                    multipartEncoding(body)?.let { put("encoding", it) }
+                })
+            })
+        }
+
+        is RawBody -> jsonObj {
+            "required" to true
+            putIfNotNull("description", body.description)
+            put("content", jsonObj {
+                put("application/octet-stream", jsonObj {
+                    put("schema", binarySchema("application/octet-stream"))
+                })
+            })
+        }
+
+        null -> null
+    }
+
+/** The success response the output describes, and one per declared failure. */
+private fun responses(ep: Endpoint<*, *>, schemas: SchemaSource, components: SchemaComponents): JsonObj = jsonObj {
+    val out = ep.output
+    put(out.status.toString(), jsonObj {
+        "description" to successDescription(out)
+        responseHeaders(ep.responseHeaders)?.let { put("headers", it) }
+        val media = out.mediaType
+        val schema = schemaOf(out, schemas, components)
+        if (media != null && schema != null) {
+            put("content", jsonObj { put(media, jsonObj { put("schema", schema) }) })
+        }
+    })
+    ep.errors.forEach { err ->
+        put(err.status.toString(), jsonObj {
+            "description" to err.description
+            responseHeaders(err.headers)?.let { put("headers", it) }
+            val schema = err.type?.let { schemas.schema(it, components) }
+            if (schema != null) {
+                put("content", jsonObj {
+                    put("application/json", jsonObj { put("schema", schema) })
+                })
+            }
+        })
+    }
+}
+
 private fun operation(
     ep: Endpoint<*, *>,
     schemas: SchemaSource,
@@ -94,94 +186,12 @@ private fun operation(
     // endpoint saying it is public, which OpenAPI spells as `security: []`.
     ep.security?.let { put("security", requirements(it)) }
 
-    val params = buildList {
-        ep.pathSpec.captures.forEach { p ->
-            add(parameter(p.name, "path", true, p.codec, p.description))
-        }
-        ep.queries.forEach { q ->
-            add(parameter(q.name, "query", q.required, q.codec, q.description))
-        }
-        ep.headerParams.forEach { h ->
-            add(parameter(h.name, "header", h.required, h.codec, h.description))
-        }
-        ep.cookieParams.forEach { c ->
-            add(parameter(c.name, "cookie", c.required, c.codec, c.description))
-        }
-    }
+    val params = parameters(ep)
     if (params.isNotEmpty()) put("parameters", jsonArr(params))
 
-    when (val body = ep.bodyInput) {
-        is JsonBody<*> -> put("requestBody", jsonObj {
-            "required" to true
-            putIfNotNull("description", body.description)
-            put("content", jsonObj {
-                put("application/json", jsonObj {
-                    put("schema", schemas.schema(body.type, components))
-                })
-            })
-        })
+    requestBody(ep, schemas, components)?.let { put("requestBody", it) }
 
-        // The same schema a JSON body of this type would publish. That is not
-        // a shortcut: the form is decoded *against* that schema, so a document
-        // saying anything else would be describing a decode that cannot happen.
-        is FormBody<*> -> put("requestBody", jsonObj {
-            "required" to true
-            putIfNotNull("description", body.description)
-            put("content", jsonObj {
-                put("application/x-www-form-urlencoded", jsonObj {
-                    put("schema", schemas.schema(body.type, components))
-                })
-            })
-        })
-
-        is MultipartBody -> put("requestBody", jsonObj {
-            "required" to true
-            putIfNotNull("description", body.description)
-            put("content", jsonObj {
-                put("multipart/form-data", jsonObj {
-                    put("schema", multipartSchema(body))
-                    multipartEncoding(body)?.let { put("encoding", it) }
-                })
-            })
-        })
-
-        is RawBody -> put("requestBody", jsonObj {
-            "required" to true
-            putIfNotNull("description", body.description)
-            put("content", jsonObj {
-                put("application/octet-stream", jsonObj {
-                    put("schema", binarySchema("application/octet-stream"))
-                })
-            })
-        })
-
-        null -> {}
-    }
-
-    put("responses", jsonObj {
-        val out = ep.output
-        put(out.status.toString(), jsonObj {
-            "description" to successDescription(out)
-            responseHeaders(ep.responseHeaders)?.let { put("headers", it) }
-            val media = out.mediaType
-            val schema = schemaOf(out, schemas, components)
-            if (media != null && schema != null) {
-                put("content", jsonObj { put(media, jsonObj { put("schema", schema) }) })
-            }
-        })
-        ep.errors.forEach { err ->
-            put(err.status.toString(), jsonObj {
-                "description" to err.description
-                responseHeaders(err.headers)?.let { put("headers", it) }
-                val schema = err.type?.let { schemas.schema(it, components) }
-                if (schema != null) {
-                    put("content", jsonObj {
-                        put("application/json", jsonObj { put("schema", schema) })
-                    })
-                }
-            })
-        }
-    })
+    put("responses", responses(ep, schemas, components))
 }
 
 /**
@@ -198,15 +208,22 @@ private fun schemaOf(
     components: SchemaComponents,
 ): JsonObj? = when (out) {
     is JsonOutput<*> -> schemas.schema(out.type, components)
+
     is NdjsonOutput<*> -> schemas.schema(out.type, components)
+
     is SseOutput<*> -> schemas.schema(out.type, components)
+
     is JsonArrayOutput<*> -> jsonObj {
         "type" to "array"
         put("items", schemas.schema(out.type, components))
     }
+
     is ByteStreamOutput -> binarySchema(out.mediaType)
+
     is TextOutput -> jsonObj { "type" to "string" }
+
     is EmptyOutput -> null
+
     // Declared failures are documented from ep.errors, alongside the success
     // response this wraps — so the schema here is the success one.
     is FallibleOutput<*, *> -> schemaOf(out.success, schemas, components)
@@ -277,6 +294,7 @@ private fun multipartSchema(body: MultipartBody): JsonObj = jsonObj {
             when (part) {
                 is TextPart<*> -> put(part.name, describedSchema(part.codec.openApiSchema(),
                     part.description ?: part.codec.description,))
+
                 is FilePart<*> -> put(
                     part.name,
                     describedSchema(binarySchema(part.contentType ?: "application/octet-stream"), part.description),
@@ -284,7 +302,7 @@ private fun multipartSchema(body: MultipartBody): JsonObj = jsonObj {
             }
         }
     })
-    val required = body.parts.filter { it is TextPart<*> && it.required || it is FilePart<*> && it.required }
+    val required = body.parts.filter { (it is TextPart<*> && it.required) || (it is FilePart<*> && it.required) }
     if (required.isNotEmpty()) put("required", jsonStrings(required.map { it.name }))
 }
 
@@ -297,11 +315,11 @@ private fun describedSchema(schema: JsonObj, description: String?): JsonObj =
  * `application/octet-stream` and writing it out would be noise.
  */
 private fun multipartEncoding(body: MultipartBody): JsonObj? {
-    val declared = body.fileParts.filter { it.contentType != null }
+    val declared = body.fileParts.mapNotNull { part -> part.contentType?.let { part.name to it } }
     if (declared.isEmpty()) return null
     return jsonObj {
-        declared.forEach { part ->
-            put(part.name, jsonObj { "contentType" to part.contentType!! })
+        declared.forEach { (name, contentType) ->
+            put(name, jsonObj { "contentType" to contentType })
         }
     }
 }

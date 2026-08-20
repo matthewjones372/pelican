@@ -2,9 +2,9 @@ package dev.pelican.http4k
 
 import dev.pelican.Api
 import dev.pelican.jackson.JacksonCodecs
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import java.net.URI
@@ -52,28 +52,26 @@ class BoundServerTest {
     @Test
     fun `a bound server answers on the port it reports`() {
         val res = get("/items/1")
-        assertEquals(200, res.statusCode())
-        assertEquals("""{"id":1,"name":"widget"}""", res.body())
-        assertEquals("application/json", res.headers().firstValue("content-type").orElse(null))
+        res.statusCode() shouldBe 200
+        res.body() shouldBe """{"id":1,"name":"widget"}"""
+        res.headers().firstValue("content-type").orElse(null) shouldBe "application/json"
     }
 
     @Test
     fun `a declared failure keeps its status over the wire`() {
-        assertEquals(404, get("/items/2").statusCode())
+        get("/items/2").statusCode() shouldBe 404
     }
 
     @Test
     fun `a streamed response is chunked, with no content length`() {
         val res = get("/items/stream?limit=3")
 
-        assertEquals(200, res.statusCode())
-        assertEquals(
-            "chunked",
-            res.headers().firstValue("transfer-encoding").orElse(null),
-            "a streamed body must not be given a length, or the server would have to buffer it",
-        )
-        assertTrue(res.headers().firstValue("content-length").isEmpty)
-        assertEquals(3, res.body().lines().count { it.isNotBlank() })
+        res.statusCode() shouldBe 200
+        withClue("a streamed body must not be given a length, or the server would have to buffer it") {
+            res.headers().firstValue("transfer-encoding").orElse(null) shouldBe "chunked"
+        }
+        res.headers().firstValue("content-length").isEmpty shouldBe true
+        res.body().lines().count { it.isNotBlank() } shouldBe 3
     }
 
     @Test
@@ -84,13 +82,13 @@ class BoundServerTest {
                 .build(),
             HttpResponse.BodyHandlers.ofString(),
         )
-        assertEquals("over the wire", res.body())
+        res.body() shouldBe "over the wire"
     }
 
     @Test
     fun `an api with no endpoints is a startup failure, not a mystery 404`() {
         val empty = Api(endpoints = emptyList(), codecs = JacksonCodecs)
         val failure = runCatching { empty.toHttpHandler() }.exceptionOrNull()
-        assertTrue(failure is IllegalArgumentException, "expected a startup failure, got $failure")
+        withClue("expected a startup failure, got $failure") { (failure is IllegalArgumentException) shouldBe true }
     }
 }

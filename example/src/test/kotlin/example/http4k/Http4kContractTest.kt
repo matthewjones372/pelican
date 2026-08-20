@@ -6,8 +6,8 @@ import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.test.ApiClient
 import dev.pelican.test.apiClient
 import example.ClientContractTest
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.net.http.HttpClient
@@ -51,7 +51,7 @@ class Http4kContractTest : ClientContractTest() {
             HttpRequest.newBuilder(URI.create("${server.baseUrl}/users/1/orders/watch?limit=8")).build(),
             HttpResponse.BodyHandlers.ofInputStream(),
         )
-        assertEquals(200, response.statusCode())
+        response.statusCode() shouldBe 200
 
         val start = System.nanoTime()
         val reader = response.body().bufferedReader()
@@ -64,10 +64,9 @@ class Http4kContractTest : ClientContractTest() {
         while (reader.readLine() != null) Unit
         val totalMs = (System.nanoTime() - start) / 1_000_000
 
-        assertTrue(totalMs >= 600, "stream finished suspiciously fast: ${totalMs}ms")
-        assertTrue(
-            firstMs < totalMs / 2,
-            "first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed",
-        )
+        withClue("stream finished suspiciously fast: ${totalMs}ms") { (totalMs >= 600) shouldBe true }
+        withClue("first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
+            (firstMs < totalMs / 2) shouldBe true
+        }
     }
 }

@@ -36,7 +36,7 @@ class Params(
     @Suppress("UNCHECKED_CAST")
     operator fun <T> get(key: ParamKey<T>): T {
         if (!values.containsKey(key)) {
-            throw IllegalStateException(
+            error(
                 "$key was read but never declared on this endpoint. " +
                     "Register it with query(...)/header(...)/body(...) first.",
             )
@@ -54,7 +54,18 @@ class Params(
 
     // ---------------------------------------------------------- attributes
 
-    private val attributes = LinkedHashMap<Attribute<*>, Any?>()
+    // Created on first write rather than per request. Most requests never
+    // touch either of these maps — no filter sets an attribute, no handler
+    // sets a header — and two empty LinkedHashMaps per request was a
+    // measurable part of what the interpreter allocates over a hand-written
+    // route. See OverheadBenchmark, which measures allocation as well as time.
+    //
+    // Neither map was ever synchronised, and this does not change that: a
+    // Params belongs to one request. Where that request crosses a thread —
+    // a filter here, a handler there — the CompletionStage between them is
+    // what publishes the writes, as it already had to for the contents.
+    @Suppress("DoubleMutabilityForCollection") // Null until first write is the point; see above.
+    private var attributes: MutableMap<Attribute<*>, Any?>? = null
 
     /**
      * Reads what a filter worked out earlier in this request. Throws if nothing
@@ -63,28 +74,34 @@ class Params(
      */
     @Suppress("UNCHECKED_CAST")
     operator fun <T> get(key: Attribute<T>): T {
-        if (!attributes.containsKey(key)) {
-            throw IllegalStateException(
+        val set = attributes
+        if (set == null || !set.containsKey(key)) {
+            error(
                 "$key was read but nothing set it on this request. " +
                     "A filter that sets it has to be registered on the Api, and reach this endpoint.",
             )
         }
-        return attributes[key] as T
+        return set[key] as T
     }
 
     /** As [get], but null rather than throwing when no filter set it. */
     @Suppress("UNCHECKED_CAST")
-    fun <T> find(key: Attribute<T>): T? = attributes[key] as T?
+    fun <T> find(key: Attribute<T>): T? = attributes?.get(key) as T?
 
     operator fun <T> set(key: Attribute<T>, value: T) {
-        attributes[key] = value
+        val set = attributes ?: LinkedHashMap<Attribute<*>, Any?>().also { attributes = it }
+        set[key] = value
     }
 
-    operator fun contains(key: Attribute<*>): Boolean = attributes.containsKey(key)
+    operator fun contains(key: Attribute<*>): Boolean = attributes?.containsKey(key) == true
 
     // ------------------------------------------------------ response headers
 
-    private val outgoing = LinkedHashMap<String, String>()
+    @Suppress("DoubleMutabilityForCollection") // As with `attributes`: allocated only if used.
+    private var outgoing: MutableMap<String, String>? = null
+
+    private fun outgoing(): MutableMap<String, String> =
+        outgoing ?: LinkedHashMap<String, String>().also { outgoing = it }
 
     /**
      * Sets a declared response header. The value is encoded by the header's own
@@ -97,12 +114,12 @@ class Params(
     fun <T : Any> setHeader(header: ResponseHeader<T>, value: T) {
         val declared = endpoint?.responseHeaders
         if (declared != null && declared.none { it === header }) {
-            throw IllegalStateException(
+            error(
                 "${header.name} was set but $endpoint never declared it. " +
                     "Add it with emits(${header.name.substringAfterLast('-')}) on the endpoint.",
             )
         }
-        outgoing[header.name] = (header.codec as PlainCodec<Any>).encode(value)
+        outgoing()[header.name] = (header.codec as PlainCodec<Any>).encode(value)
     }
 
     /**
@@ -111,7 +128,7 @@ class Params(
      * purpose; [setHeader] is the one to reach for otherwise.
      */
     fun setRawHeader(name: String, value: String) {
-        outgoing[name] = value
+        outgoing()[name] = value
     }
 
     /**
@@ -120,7 +137,8 @@ class Params(
      * came back — including an error response, since a header set before a
      * failure was still deliberate.
      */
-    fun responseHeaders(): List<Pair<String, String>> = outgoing.map { it.key to it.value }
+    fun responseHeaders(): List<Pair<String, String>> =
+        outgoing?.map { it.key to it.value }.orEmpty()
 
     /**
      * The headers a required declaration promised but nobody set. Interpreters
@@ -129,7 +147,7 @@ class Params(
      * 500 — but a test can assert on it.
      */
     fun missingRequiredHeaders(): List<ResponseHeader<*>> =
-        endpoint?.responseHeaders.orEmpty().filter { it.required && it.name !in outgoing }
+        endpoint?.responseHeaders.orEmpty().filter { it.required && it.name !in outgoing.orEmpty() }
 }
 
 /**
@@ -146,7 +164,8 @@ class ApiException(
      * in a handler has no endpoint description to hand.
      */
     val headers: List<Pair<String, String>> = emptyList(),
-) : RuntimeException(message)
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
 
 fun badRequest(message: String): Nothing = throw ApiException(400, message)
 fun notFound(message: String = "Not found"): Nothing = throw ApiException(404, message)

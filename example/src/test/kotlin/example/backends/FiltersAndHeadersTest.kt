@@ -7,13 +7,12 @@ import dev.pelican.test.ApiClient
 import dev.pelican.test.apiClient
 import dev.pelican.test.shouldHaveHeader
 import dev.pelican.test.shouldHaveStatus
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -58,7 +57,7 @@ class FiltersAndHeadersTest {
         // every endpoint, through the same value the endpoints declared.
         val res = client.response(greet, In2("ada", false)).shouldHaveStatus(200)
         val id = res.header("X-Request-Id")
-        assertTrue(id != null && id.startsWith("gen-"), "no generated id in ${res.headers}")
+        withClue("no generated id in ${res.headers}") { (id != null && id.startsWith("gen-")) shouldBe true }
     }
 
     @ParameterizedTest(name = "{0}")
@@ -76,7 +75,7 @@ class FiltersAndHeadersTest {
         // on before any element is encoded.
         val res = client.response(countdown, 3)
         res shouldHaveStatus 200
-        assertTrue(res.header("X-Request-Id") != null, res.headers.toString())
+        withClue(res.headers.toString()) { (res.header("X-Request-Id") != null) shouldBe true }
     }
 
     // -------------------------------------------------------------- filters
@@ -86,8 +85,8 @@ class FiltersAndHeadersTest {
     fun `a filter that refuses is a 403, and the handler never runs`(name: String, client: ApiClient) {
         val res = client.response(echo, In2("blocked", Note("should not be echoed")))
         res shouldHaveStatus 403
-        assertFalse(res.body.contains("should not be echoed"), res.body)
-        assertTrue(res.body.contains("refused by the gate"), res.body)
+        withClue(res.body) { res.body.contains("should not be echoed") shouldBe false }
+        withClue(res.body) { res.body.contains("refused by the gate") shouldBe true }
     }
 
     @ParameterizedTest(name = "{0}")
@@ -111,16 +110,16 @@ class FiltersAndHeadersTest {
         val res = client.transport.send(huge)
 
         res shouldHaveStatus 413
-        assertTrue(res.body.contains("Payload too large"), res.body)
+        withClue(res.body) { res.body.contains("Payload too large") shouldBe true }
         // Decoding never happened, so nothing about the payload comes back.
-        assertFalse(res.body.contains("xxxx"), res.body.take(200))
+        withClue(res.body.take(200)) { res.body.contains("xxxx") shouldBe false }
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a body under the limit is unaffected`(name: String, client: ApiClient) {
         val fine = client.call(echo, In2(null, Note("x".repeat(100))))
-        assertEquals(100, fine.text.length)
+        fine.text.length shouldBe 100
     }
 
     // ------------------------------------------------------------ the document
@@ -134,18 +133,15 @@ class FiltersAndHeadersTest {
         val header = spec["paths"]!!.jsonObject["/hello/{name}"]!!.jsonObject["get"]!!.jsonObject["responses"]!!
             .jsonObject["200"]!!.jsonObject["headers"]!!.jsonObject["X-Request-Id"]!!.jsonObject
 
-        assertEquals(true, header["required"]!!.jsonPrimitive.content.toBoolean())
-        assertEquals(
-            "Correlates this answer with the server's log",
-            header["description"]!!.jsonPrimitive.content,
-        )
-        assertEquals("string", header["schema"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+        header["required"]!!.jsonPrimitive.content.toBoolean() shouldBe true
+        header["description"]!!.jsonPrimitive.content shouldBe "Correlates this answer with the server's log"
+        header["schema"]!!.jsonObject["type"]!!.jsonPrimitive.content shouldBe "string"
     }
 
     @Test
     fun `all three backends document it identically`() {
         val docs = allBackends.map { it.api().spec().openApiJson() }
-        assertEquals(1, docs.distinct().size, "the three documents differ")
-        assertTrue(docs.first().contains("X-Request-Id"), "the header is missing from the document")
+        withClue("the three documents differ") { docs.distinct().size shouldBe 1 }
+        withClue("the header is missing from the document") { docs.first().contains("X-Request-Id") shouldBe true }
     }
 }

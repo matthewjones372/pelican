@@ -1,7 +1,14 @@
 package dev.pelican.openapi
 
 import dev.pelican.*
-import org.junit.jupiter.api.Assertions.*
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -69,14 +76,14 @@ class SecurityTest {
     fun `a hidden endpoint is left out of the document`() {
         val doc = spec(getWidget, debugDump).openApi()
         val paths = doc / "paths"
-        assertTrue("/widgets/{widgetId}" in paths.keys())
-        assertFalse("/internal/dump" in paths.keys(), paths.keys().toString())
+        paths.keys() shouldContain "/widgets/{widgetId}"
+        withClue(paths.keys().toString()) { paths.keys() shouldNotContain "/internal/dump" }
     }
 
     @Test
     fun `a scheme only a hidden endpoint uses is not published either`() {
         val doc = spec(debugDump).openApi()
-        assertFalse("securitySchemes" in (doc / "components").keys())
+        ("securitySchemes" in (doc / "components").keys()) shouldBe false
     }
 
     @Test
@@ -84,11 +91,11 @@ class SecurityTest {
         val doc = spec(getWidget, deleteWidget).openApi()
 
         val read = (doc / "paths" / "/widgets/{widgetId}" / "get" / "security").arr()
-        assertEquals(1, read.size)
-        assertEquals(listOf("widgets:read"), (read[0] / "widgets-oauth").strings())
+        read.size shouldBe 1
+        (read[0] / "widgets-oauth").strings() shouldBe listOf("widgets:read")
 
         val write = (doc / "paths" / "/widgets/{widgetId}" / "delete" / "security").arr()
-        assertEquals(listOf("widgets:read", "widgets:write"), (write[0] / "widgets-oauth").strings())
+        (write[0] / "widgets-oauth").strings() shouldBe listOf("widgets:read", "widgets:write")
     }
 
     @Test
@@ -96,44 +103,38 @@ class SecurityTest {
         val doc = spec(getWidget).openApi()
         val scheme = doc / "components" / "securitySchemes" / "widgets-oauth"
 
-        assertEquals("oauth2", (scheme / "type").str())
+        (scheme / "type").str() shouldBe "oauth2"
         val flow = scheme / "flows" / "authorizationCode"
-        assertEquals("https://id.example.com/authorize", (flow / "authorizationUrl").str())
-        assertEquals("https://id.example.com/token", (flow / "tokenUrl").str())
-        assertEquals("https://id.example.com/token", (flow / "refreshUrl").str())
-        assertEquals(
-            setOf("widgets:read", "widgets:write"),
-            (flow / "scopes").keys(),
-        )
-        assertEquals("Read widgets", (flow / "scopes" / "widgets:read").str())
+        (flow / "authorizationUrl").str() shouldBe "https://id.example.com/authorize"
+        (flow / "tokenUrl").str() shouldBe "https://id.example.com/token"
+        (flow / "refreshUrl").str() shouldBe "https://id.example.com/token"
+        (flow / "scopes").keys() shouldBe setOf("widgets:read", "widgets:write")
+        (flow / "scopes" / "widgets:read").str() shouldBe "Read widgets"
     }
 
     @Test
     fun `an api-wide requirement is documented once, and endpoints inherit it`() {
         val doc = spec(getWidget, health, default = listOf(oauth.requires("widgets:read"))).openApi()
 
-        assertEquals(
-            listOf("widgets:read"),
-            ((doc / "security").arr()[0] / "widgets-oauth").strings(),
-        )
+        ((doc / "security").arr()[0] / "widgets-oauth").strings() shouldBe listOf("widgets:read")
         // The endpoint that says nothing says nothing in the document either —
         // that is what inheriting the default looks like.
-        assertNull(doc / "paths" / "/health" / "get" / "summary")
+        (doc / "paths" / "/health" / "get" / "summary").shouldBeNull()
         // noSecurity() is an explicit override, and OpenAPI spells it `[]`.
-        assertTrue((doc / "paths" / "/health" / "get" / "security").arr().isEmpty())
+        (doc / "paths" / "/health" / "get" / "security").arr().isEmpty() shouldBe true
     }
 
     @Test
     fun `a scope the scheme never declared fails when the endpoint is built`() {
-        val e = assertThrows(IllegalStateException::class.java) {
+        val e = shouldThrow<IllegalStateException> {
             endpoint(noInputs) {
                 get("widgets")
                 security(oauth, "widgets:delete")
                 text()
             }
         }
-        assertTrue(e.message!!.contains("widgets:delete"), e.message)
-        assertTrue(e.message!!.contains("widgets:read"), e.message)
+        withClue(e.message) { e.message!!.contains("widgets:delete") shouldBe true }
+        withClue(e.message) { e.message!!.contains("widgets:read") shouldBe true }
     }
 
     @Test
@@ -153,19 +154,19 @@ class SecurityTest {
             "flows" / "authorizationCode"
 
         // Still one checkbox per scope in the Authorize dialog, in this order.
-        assertEquals(listOf("widgets:read", "widgets:write"), (flow / "scopes").keys().toList())
-        assertEquals("", (flow / "scopes" / "widgets:read").str())
+        (flow / "scopes").keys().toList() shouldBe listOf("widgets:read", "widgets:write")
+        (flow / "scopes" / "widgets:read").str() shouldBe ""
 
         // A requirement names scopes either way — that half never carried
         // descriptions.
         val req = (spec(ep).openApi() / "paths" / "/widgets" / "get" / "security").arr()
-        assertEquals(listOf("widgets:write"), (req[0] / "oauth2").strings())
+        (req[0] / "oauth2").strings() shouldBe listOf("widgets:write")
     }
 
     @Test
     fun `a non-oauth scheme takes no scopes`() {
         val bearer = bearerAuth()
-        assertThrows(IllegalStateException::class.java) { bearer.requires("anything") }
+        shouldThrow<IllegalStateException> { bearer.requires("anything") }
 
         val doc = spec(
             endpoint(noInputs) {
@@ -175,9 +176,9 @@ class SecurityTest {
             },
         ).openApi()
         val scheme = doc / "components" / "securitySchemes" / "bearerAuth"
-        assertEquals("http", (scheme / "type").str())
-        assertEquals("bearer", (scheme / "scheme").str())
-        assertEquals("JWT", (scheme / "bearerFormat").str())
+        (scheme / "type").str() shouldBe "http"
+        (scheme / "scheme").str() shouldBe "bearer"
+        (scheme / "bearerFormat").str() shouldBe "JWT"
     }
 
     @Test
@@ -190,9 +191,9 @@ class SecurityTest {
             },
         ).openApi()
         val scheme = doc / "components" / "securitySchemes" / "apiKey"
-        assertEquals("apiKey", (scheme / "type").str())
-        assertEquals("header", (scheme / "in").str())
-        assertEquals("X-Api-Key", (scheme / "name").str())
+        (scheme / "type").str() shouldBe "apiKey"
+        (scheme / "in").str() shouldBe "header"
+        (scheme / "name").str() shouldBe "X-Api-Key"
     }
 
     @Test
@@ -202,7 +203,7 @@ class SecurityTest {
         val one = endpoint(noInputs) { get("a"); security(a); text() }
         val two = endpoint(noInputs) { get("b"); security(b); text() }
 
-        val e = assertThrows(IllegalStateException::class.java) { spec(one, two).openApi() }
-        assertTrue(e.message!!.contains("'auth'"), e.message)
+        val e = shouldThrow<IllegalStateException> { spec(one, two).openApi() }
+        withClue(e.message) { e.message!!.contains("'auth'") shouldBe true }
     }
 }

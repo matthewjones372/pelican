@@ -53,6 +53,7 @@ class ApiClient(
         val path = "/" + endpoint.pathSpec.segments.joinToString("/") { segment ->
             when (segment) {
                 is PathSegment.Literal -> encodeSegment(segment.value)
+
                 is PathSegment.Capture -> {
                     val param = segment.param
                     val value = values[param]
@@ -112,6 +113,7 @@ class ApiClient(
 
             is RawBody -> when (val handle = values[input]) {
                 is TextBody -> Payload(handle.text)
+
                 else -> error(
                     "$endpoint takes a raw body. Pass rawText(\"...\") as its input, " +
                         "or drive `transport` directly for anything a String cannot hold.",
@@ -247,12 +249,17 @@ class ApiClient(
     private fun decodeSuccess(endpoint: Endpoint<*, *>, out: Output<*>, res: ResponseSpec): Any? =
         when (out) {
             is JsonOutput<*> -> codecs.codec<Any?>(out.type).decodeFromString(res.body)
+
             is TextOutput -> res.body
+
             is EmptyOutput -> Unit
+
             is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*> ->
                 error("$endpoint streams its response; use collect(...) rather than call(...)")
+
             is ByteStreamOutput ->
                 error("$endpoint returns opaque bytes; use response(...) and read the body")
+
             is FallibleOutput<*, *> ->
                 error("$endpoint declares its failures; use outcome(...) rather than call(...)")
         }

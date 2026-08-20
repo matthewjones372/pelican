@@ -2,10 +2,10 @@ package dev.pelican.ktor
 
 import dev.pelican.Api
 import dev.pelican.jackson.JacksonCodecs
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.net.http.HttpClient
@@ -64,19 +64,17 @@ class StreamingTimingTest {
             while (reader.readLine() != null) count++
             val allRowsMillis = millisSince(started)
 
-            assertEquals("""{"id":1,"name":"item-1"}""", first)
-            assertEquals(rows, count)
+            first shouldBe """{"id":1,"name":"item-1"}"""
+            count shouldBe rows
 
             // The stream cannot have finished before the last delay, so a first
             // row that arrives near the end arrived with it.
-            assertTrue(
-                allRowsMillis > rows * gapMillis * 0.8,
-                "the test's own premise failed: all $rows rows in ${allRowsMillis}ms",
-            )
-            assertTrue(
-                firstRowMillis < allRowsMillis / 2,
-                "the first row took ${firstRowMillis}ms of ${allRowsMillis}ms, so it waited for the rest",
-            )
+            withClue("the test's own premise failed: all $rows rows in ${allRowsMillis}ms") {
+                (allRowsMillis > rows * gapMillis * 0.8) shouldBe true
+            }
+            withClue("the first row took ${firstRowMillis}ms of ${allRowsMillis}ms, so it waited for the rest") {
+                (firstRowMillis < allRowsMillis / 2) shouldBe true
+            }
         } finally {
             server.stop()
         }

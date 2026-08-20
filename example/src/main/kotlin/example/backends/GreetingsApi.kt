@@ -77,7 +77,7 @@ val stamping: Filter = Filter { params, next ->
     // assuming it. Reading an undeclared key throws, deliberately: on a handler
     // that is a wiring mistake, and a filter is the one place it is not.
     val id = (if (traceId in params) params[traceId] else null)
-        ?: ("gen-" + params.hashCode().toString(16))
+        ?: ("gen-" + params.hashCode().toString(HEX))
     params[correlationId] = id
     params.setHeader(requestId, id)
     next(params)
@@ -95,3 +95,5 @@ val gate: Filter = before { params ->
         forbidden("This trace id is refused by the gate")
     }
 }
+
+private const val HEX = 16

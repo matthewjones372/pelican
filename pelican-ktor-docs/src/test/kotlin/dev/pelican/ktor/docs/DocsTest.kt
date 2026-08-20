@@ -6,12 +6,16 @@ import dev.pelican.endpoint
 import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.ktor.handledNow
 import dev.pelican.pathParam
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.server.testing.testApplication
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 data class Widget(val id: Long, val name: String)
@@ -37,37 +41,37 @@ class DocsTest {
         application { pelicanWithDocs(api(), Docs(docsPath = "/api-docs")) }
 
         val spec = client.get("/openapi.json")
-        assertEquals(200, spec.status.value)
-        assertEquals("application/json", spec.headers[HttpHeaders.ContentType])
-        assertTrue("\"operationId\": \"getWidget\"" in spec.bodyAsText(), spec.bodyAsText().take(300))
+        spec.status.value shouldBe 200
+        spec.headers[HttpHeaders.ContentType] shouldBe "application/json"
+        withClue(spec.bodyAsText().take(300)) { spec.bodyAsText() shouldContain "\"operationId\": \"getWidget\"" }
 
         val page = client.get("/api-docs")
-        assertEquals(200, page.status.value)
-        assertTrue(page.headers[HttpHeaders.ContentType]!!.startsWith("text/html"))
-        assertTrue("swagger-ui" in page.bodyAsText())
+        page.status.value shouldBe 200
+        page.headers[HttpHeaders.ContentType]!!.startsWith("text/html") shouldBe true
+        page.bodyAsText() shouldContain "swagger-ui"
 
         // The endpoints are still there; the docs are an addition, not a wrapper.
-        assertEquals("""{"id":3,"name":"widget-3"}""", client.get("/widgets/3").bodyAsText())
+        client.get("/widgets/3").bodyAsText() shouldBe """{"id":3,"name":"widget-3"}"""
     }
 
     @Test
     fun `each page can be switched off on its own`() = testApplication {
         application { pelicanWithDocs(api(), Docs(docsPath = null)) }
-        assertEquals(200, client.get("/openapi.json").status.value)
-        assertEquals(404, client.get("/docs").status.value)
+        client.get("/openapi.json").status.value shouldBe 200
+        client.get("/docs").status.value shouldBe 404
     }
 
     @Test
     fun `with no document route the page embeds the document instead of fetching it`() = testApplication {
         application { pelicanWithDocs(api(), Docs(openApiPath = null)) }
-        assertEquals(404, client.get("/openapi.json").status.value)
-        assertTrue("\"openapi\"" in client.get("/docs").bodyAsText())
+        client.get("/openapi.json").status.value shouldBe 404
+        ("\"openapi\"" in client.get("/docs").bodyAsText()) shouldBe true
     }
 
     @Test
     fun `with both switched off the application is the endpoints alone`() = testApplication {
         application { pelicanWithDocs(api(), Docs(openApiPath = null, docsPath = null)) }
-        assertEquals(404, client.get("/docs").status.value)
-        assertEquals(200, client.get("/widgets/1").status.value)
+        client.get("/docs").status.value shouldBe 404
+        client.get("/widgets/1").status.value shouldBe 200
     }
 }

@@ -72,7 +72,7 @@ fun Api.docsRoutes(docs: Docs = Docs()): List<Route> {
 /** The endpoints and the documentation, as one route. */
 fun Api.routeWithDocs(system: ClassicActorSystemProvider, docs: Docs = Docs()): Route {
     val routes = listOf(toRoute(system)) + docsRoutes(docs)
-    return Directives.concat(routes.first(), *routes.drop(1).toTypedArray())
+    return routes.reduce { left, right -> Directives.concat(left, right) }
 }
 
 /** [start], with the document and the Swagger UI page served alongside. */
@@ -100,7 +100,7 @@ private fun staticRoute(
     val wanted = rawPath.trim('/')
     return Directives.get {
         Directives.extractRequest { req ->
-            if (req.uri.getPathString().trim('/') != wanted) Directives.reject()
+            if (req.uri.pathString.trim('/') != wanted) Directives.reject()
             else {
                 val origin = req.getHeader(CorsHeaders.ORIGIN).orElse(null)?.value()
                 Directives.complete(

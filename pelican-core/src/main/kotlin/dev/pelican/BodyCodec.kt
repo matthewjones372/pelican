@@ -70,9 +70,11 @@ interface SchemaSource {
  */
 fun JsonObj.orNull(): JsonObj = when (val type = this["type"]) {
     is JsonStr -> this + jsonObj { put("type", jsonArr(listOf(type, JsonStr("null")))) }
+
     is JsonArr ->
         if (JsonStr("null") in type.items) this
         else this + jsonObj { put("type", JsonArr(type.items + JsonStr("null"))) }
+
     // No `type` to widen: a `$ref`, or a schema built out of `allOf`/`anyOf`.
     else -> jsonObj {
         put("anyOf", jsonArr(listOf(this@orNull, jsonObj { "type" to "null" })))

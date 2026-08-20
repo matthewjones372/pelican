@@ -113,7 +113,7 @@ private fun supportedMethod(name: String): Method? = Method.entries.firstOrNull 
  * wire instead of in a buffer.
  */
 private fun HttpExchange.respondWith(response: Response) {
-    response.headers.forEach { (name, value) -> responseHeaders.add(name, value ?: "") }
+    response.headers.forEach { (name, value) -> responseHeaders.add(name, value.orEmpty()) }
 
     if (requestMethod == "HEAD" || response.status == Status.NO_CONTENT) {
         sendResponseHeaders(response.status.code, -1)
@@ -124,7 +124,7 @@ private fun HttpExchange.respondWith(response: Response) {
     // streamed body has, because giving it a length would mean buffering it.
     sendResponseHeaders(response.status.code, response.body.length ?: 0)
 
-    val buffer = ByteArray(8192)
+    val buffer = ByteArray(COPY_BUFFER_BYTES)
     response.body.stream.use { input ->
         responseBody.use { output ->
             while (true) {
@@ -136,3 +136,6 @@ private fun HttpExchange.respondWith(response: Response) {
         }
     }
 }
+
+/** Two pages, the usual size for a copy loop that is not trying to be clever. */
+private const val COPY_BUFFER_BYTES = 8192

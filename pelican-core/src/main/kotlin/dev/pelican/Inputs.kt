@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions") // One declaration per input kind; the list is the vocabulary.
+
 package dev.pelican
 
 import kotlin.reflect.KType

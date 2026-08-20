@@ -2,6 +2,12 @@ package dev.pelican.ktor
 
 import dev.pelican.Api
 import dev.pelican.jackson.JacksonCodecs
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -13,8 +19,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.flow.emptyFlow
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -35,44 +39,44 @@ class KtorInterpreterTest {
         block(client)
     }
 
-    private suspend fun HttpResponse.contentType(): String? = headers[HttpHeaders.ContentType]
+    private fun HttpResponse.contentType(): String? = headers[HttpHeaders.ContentType]
 
     // ------------------------------------------------------------- inputs
 
     @Test
     fun `a path parameter is decoded into its declared type`() = served { client ->
         val res = client.get("/items/1")
-        assertEquals(200, res.status.value)
-        assertEquals("application/json", res.contentType())
-        assertEquals("""{"id":1,"name":"widget"}""", res.bodyAsText())
+        res.status.value shouldBe 200
+        res.contentType() shouldBe "application/json"
+        res.bodyAsText() shouldBe """{"id":1,"name":"widget"}"""
     }
 
     @Test
     fun `a path parameter that does not decode is a 400, not a 404`() = served { client ->
         val res = client.get("/items/not-a-number")
-        assertEquals(400, res.status.value)
-        assertTrue("Invalid parameter" in res.bodyAsText(), res.bodyAsText())
+        res.status.value shouldBe 400
+        res.bodyAsText() shouldContain "Invalid parameter"
     }
 
     @Test
     fun `an absent optional query parameter gets the declared default`() = served { client ->
-        assertEquals("3/-", client.get("/items/count").bodyAsText())
+        client.get("/items/count").bodyAsText() shouldBe "3/-"
     }
 
     @Test
     fun `query parameters are decoded, and a refinement is enforced`() = served { client ->
-        assertEquals("7/urgent", client.get("/items/count?limit=7&tag=urgent").bodyAsText())
+        client.get("/items/count?limit=7&tag=urgent").bodyAsText() shouldBe "7/urgent"
 
         val res = client.get("/items/count?limit=0")
-        assertEquals(400, res.status.value)
-        assertTrue("between 1 and 100" in res.bodyAsText(), res.bodyAsText())
+        res.status.value shouldBe 400
+        res.bodyAsText() shouldContain "between 1 and 100"
     }
 
     @Test
     fun `a missing required header is a 400 naming the header`() = served { client ->
         val res = client.post("/items") { setBody("""{"name":"rope"}""") }
-        assertEquals(400, res.status.value)
-        assertTrue("X-Api-Key" in res.bodyAsText(), res.bodyAsText())
+        res.status.value shouldBe 400
+        res.bodyAsText() shouldContain "X-Api-Key"
     }
 
     @Test
@@ -81,8 +85,8 @@ class KtorInterpreterTest {
             header("X-Api-Key", "let-me-in")
             setBody("""{"name":"rope"}""")
         }
-        assertEquals(201, res.status.value)
-        assertEquals("""{"id":7,"name":"rope"}""", res.bodyAsText())
+        res.status.value shouldBe 201
+        res.bodyAsText() shouldBe """{"id":7,"name":"rope"}"""
     }
 
     @Test
@@ -91,16 +95,16 @@ class KtorInterpreterTest {
             header("X-Api-Key", "let-me-in")
             setBody("{ not json")
         }
-        assertEquals(400, res.status.value)
-        assertTrue("Malformed request body" in res.bodyAsText(), res.bodyAsText())
+        res.status.value shouldBe 400
+        res.bodyAsText() shouldContain "Malformed request body"
     }
 
     @Test
     fun `a raw body is streamed back without being buffered by the framework`() = served { client ->
         val res = client.post("/echo") { setBody("the quick brown fox") }
-        assertEquals(200, res.status.value)
-        assertEquals("application/octet-stream", res.contentType())
-        assertEquals("the quick brown fox", res.bodyAsText())
+        res.status.value shouldBe 200
+        res.contentType() shouldBe "application/octet-stream"
+        res.bodyAsText() shouldBe "the quick brown fox"
     }
 
     // ------------------------------------------------------------- outputs
@@ -108,36 +112,31 @@ class KtorInterpreterTest {
     @Test
     fun `an empty output sends the declared status and no body`() = served { client ->
         val res = client.delete("/items/1")
-        assertEquals(204, res.status.value)
-        assertEquals("", res.bodyAsText())
+        res.status.value shouldBe 204
+        res.bodyAsText() shouldBe ""
     }
 
     @Test
     fun `ndjson is one document per line`() = served { client ->
         val res = client.get("/items/stream?limit=2")
-        assertEquals("application/x-ndjson", res.contentType())
-        assertEquals(
-            listOf("""{"id":1,"name":"item-1"}""", """{"id":2,"name":"item-2"}"""),
-            res.bodyAsText().lines().filter { it.isNotBlank() },
-        )
+        res.contentType() shouldBe "application/x-ndjson"
+        res.bodyAsText().lines().filter { it.isNotBlank() } shouldBe
+            listOf("""{"id":1,"name":"item-1"}""", """{"id":2,"name":"item-2"}""")
     }
 
     @Test
     fun `sse frames carry the declared event name`() = served { client ->
         val res = client.get("/items/watch?limit=2")
-        assertEquals("text/event-stream", res.contentType())
-        assertEquals(
-            "event: item\ndata: {\"id\":1,\"name\":\"item-1\"}\n\n" +
-                "event: item\ndata: {\"id\":2,\"name\":\"item-2\"}\n\n",
-            res.bodyAsText(),
-        )
+        res.contentType() shouldBe "text/event-stream"
+        res.bodyAsText() shouldBe "event: item\ndata: {\"id\":1,\"name\":\"item-1\"}\n\n" +
+            "event: item\ndata: {\"id\":2,\"name\":\"item-2\"}\n\n"
     }
 
     @Test
     fun `a streamed json array is framed by this module`() = served { client ->
         val res = client.get("/items/list?limit=2")
-        assertEquals("application/json", res.contentType())
-        assertEquals("""[{"id":1,"name":"item-1"},{"id":2,"name":"item-2"}]""", res.bodyAsText())
+        res.contentType() shouldBe "application/json"
+        res.bodyAsText() shouldBe """[{"id":1,"name":"item-1"},{"id":2,"name":"item-2"}]"""
     }
 
     @Test
@@ -145,7 +144,7 @@ class KtorInterpreterTest {
         application {
             pelican(Api(listOf(listItems streamedNow { _ -> emptyFlow<Item>() }), JacksonCodecs))
         }
-        assertEquals("[]", client.get("/items/list").bodyAsText())
+        client.get("/items/list").bodyAsText() shouldBe "[]"
     }
 
     // ------------------------------------------------------------- failures
@@ -153,9 +152,9 @@ class KtorInterpreterTest {
     @Test
     fun `a declared failure is sent as its own declared type and status`() = served { client ->
         val res = client.get("/items/2")
-        assertEquals(404, res.status.value)
-        assertEquals("application/json", res.contentType())
-        assertTrue("No item 2" in res.bodyAsText(), res.bodyAsText())
+        res.status.value shouldBe 404
+        res.contentType() shouldBe "application/json"
+        res.bodyAsText() shouldContain "No item 2"
     }
 
     @Test
@@ -164,32 +163,32 @@ class KtorInterpreterTest {
             header("X-Api-Key", "wrong")
             setBody("""{"name":"rope"}""")
         }
-        assertEquals(401, unauthorised.status.value)
+        unauthorised.status.value shouldBe 401
 
         val missing = client.post("/items") {
             header("X-Api-Key", "let-me-in")
             setBody("""{"name":"nope"}""")
         }
-        assertEquals(404, missing.status.value)
+        missing.status.value shouldBe 404
     }
 
     @Test
     fun `returning another endpoint's failure is a 500, not an undocumented status`() = served { client ->
-        assertEquals(500, client.get("/misdeclared").status.value)
+        client.get("/misdeclared").status.value shouldBe 500
     }
 
     @Test
     fun `an ApiException becomes the status it names`() = served { client ->
         val res = client.delete("/items/9")
-        assertEquals(404, res.status.value)
-        assertTrue("No item 9" in res.bodyAsText(), res.bodyAsText())
+        res.status.value shouldBe 404
+        res.bodyAsText() shouldContain "No item 9"
     }
 
     @Test
     fun `anything else escaping a handler is a 500`() = served { client ->
         val res = client.get("/boom")
-        assertEquals(500, res.status.value)
-        assertTrue("Internal server error" in res.bodyAsText(), res.bodyAsText())
+        res.status.value shouldBe 500
+        res.bodyAsText() shouldContain "Internal server error"
     }
 
     // ------------------------------------------------------------- routing
@@ -199,12 +198,12 @@ class KtorInterpreterTest {
         // /items/stream and /items/{itemId} both match. Ktor scores a constant
         // segment above a parameter, so no sorting is needed here — unlike the
         // other two backends, whose routers try alternatives in order.
-        assertEquals("application/x-ndjson", client.get("/items/stream").contentType())
+        client.get("/items/stream").contentType() shouldBe "application/x-ndjson"
     }
 
     @Test
     fun `an unknown path is a 404`() = served { client ->
-        assertEquals(404, client.get("/nothing/here").status.value)
+        client.get("/nothing/here").status.value shouldBe 404
     }
 
     /**
@@ -216,7 +215,7 @@ class KtorInterpreterTest {
      */
     @Test
     fun `a known path with the wrong method is a 404 on this backend`() = served { client ->
-        assertEquals(404, client.put("/items/1").status.value)
+        client.put("/items/1").status.value shouldBe 404
     }
 
     @Test
@@ -227,6 +226,8 @@ class KtorInterpreterTest {
                 startApplication()
             }
         }
-        assertTrue(failure.isFailure, "an empty API should fail at startup, not answer 404 to everything")
+        withClue("an empty API should fail at startup, not answer 404 to everything") {
+            failure.isFailure shouldBe true
+        }
     }
 }

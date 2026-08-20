@@ -22,6 +22,7 @@ import dev.pelican.PayloadTooLarge
 import dev.pelican.RawBody
 import dev.pelican.ServerEndpoint
 import dev.pelican.corsPolicy
+import dev.pelican.declaredInputCount
 import dev.pelican.decode
 import dev.pelican.handlerFor
 import dev.pelican.requestBodyCodec
@@ -151,7 +152,7 @@ private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = Endpo
     failures = (output as? FallibleOutput<*, *>)
         ?.failures
         ?.associateTo(IdentityHashMap()) { it to codecs.codec<Any?>(it.type) }
-        ?: emptyMap(),
+        .orEmpty(),
 )
 
 /**
@@ -192,6 +193,133 @@ private fun Response.withCors(cors: CorsPolicy?, req: Request): Response {
         .fold(this) { res, (name, value) -> res.header(name, value) }
 }
 
+/**
+ * Everything decodable before the body, as values rather than as writes into a
+ * map somebody else owns. One rule, written once per input kind because what
+ * "present" means differs between a query parameter, a header and a cookie
+ * core parsed out of the header itself.
+ */
+private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap<ParamKey<*>, Any?>) = with(into) {
+    // A loop rather than `filterIsInstance`, which would allocate a list per
+    // request to hold what is walked once.
+    ep.pathSpec.segments.forEach { segment ->
+        if (segment is PathSegment.Capture) {
+            val param = segment.param
+            // Present by construction: this handler only runs for a request the
+            // template matched, and the template's captures are these params.
+            val raw = req.path(param.name)
+                ?: error("$ep matched ${req.uri.path} but captured no '${param.name}'")
+            put(param, param.codec.decode(param.name, raw))
+        }
+    }
+
+    ep.queries.forEach { q ->
+        val raw = req.query(q.name)
+        put(
+            q,
+            when {
+                raw != null -> q.codec.decode(q.name, raw)
+                q.required -> throw ApiException(400, "Missing required query parameter '${q.name}'")
+                else -> q.default
+            },
+        )
+    }
+
+    ep.headerParams.forEach { h ->
+        val raw = req.header(h.name)
+        put(
+            h,
+            when {
+                raw != null -> h.codec.decode(h.name, raw)
+                h.required -> throw ApiException(400, "Missing required header '${h.name}'")
+                else -> h.default
+            },
+        )
+    }
+
+    decodeCookies(ep, req, into)
+}
+
+/**
+ * Cookies, parsed by core from the header rather than by http4k's own cookie
+ * support — so a cookie decodes to the same value on all three backends. See
+ * `Cookies`.
+ *
+ * Skipped entirely when nothing declared one: reading the header and parsing
+ * it costs the same whether or not anybody asked for a cookie.
+ */
+private fun decodeCookies(ep: Endpoint<*, *>, req: Request, into: MutableMap<ParamKey<*>, Any?>) {
+    if (ep.cookieParams.isEmpty()) return
+
+    val cookies = Cookies.parse(req.headerValues("Cookie").filterNotNull())
+    ep.cookieParams.forEach { c ->
+        val raw = cookies[c.name]
+        into[c] = when {
+            raw != null -> c.codec.decode(c.name, raw)
+            c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
+            else -> c.default
+        }
+    }
+}
+
+/**
+ * The body, read the way its declaration says to: not at all, handed over
+ * unconsumed, parsed as a multipart envelope, or pulled into a string for a
+ * codec. Decoded values go into [values]; a refusal is thrown, and the caller
+ * turns it into a response through core's `renderError`.
+ */
+
+/** One place to refuse an oversized body, so both checks answer alike. */
+private fun refuseIfOversize(length: Long?, limit: Long) {
+    if (length != null && length > limit) throw PayloadTooLarge(limit)
+}
+
+private fun readBody(
+    ep: Endpoint<*, *>,
+    api: Api,
+    codecs: EndpointCodecs,
+    req: Request,
+    values: MutableMap<ParamKey<*>, Any?>,
+) {
+    when (val body = ep.bodyInput) {
+        null -> Unit
+
+        // Handed over unconsumed. http4k's own body is already lazy, so a
+        // handler that never reads it never pulls the request into memory.
+        is RawBody -> values[body] = Http4kByteStream(req.body)
+
+        // Exempt from the size limit for the same reason a raw body is:
+        // the file part is never held whole. What the text parts may cost
+        // is bounded, and that is what the limit is passed in for.
+        is MultipartBody -> body.decode(
+            contentType = req.header("Content-Type"),
+            input = req.body.stream,
+            maxTextBytes = api.maxBodyBytes,
+            into = values,
+        )
+
+        is JsonBody<*>, is FormBody<*> -> {
+            // Checked before the body is pulled into a String, so an
+            // oversized payload is refused rather than allocated — and again
+            // on what arrived, because a request may declare no length.
+            refuseIfOversize(req.header("Content-Length")?.toLongOrNull(), api.maxBodyBytes)
+            val text = req.bodyString()
+            refuseIfOversize(text.length.toLong(), api.maxBodyBytes)
+            // Whatever the codec throws is its own library's exception, and
+            // nothing here should have to recognise it. Wrapping it in
+            // core's own failure is what keeps this file codec-agnostic.
+            values[body] = try {
+                checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
+                    .decodeFromString(text)
+            } catch (t: BodyDecodeFailure) {
+                throw t
+            } catch (t: Throwable) {
+                throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
+            }
+        }
+    }
+}
+
 private fun invoke(
     se: ServerEndpoint,
     api: Api,
@@ -200,7 +328,9 @@ private fun invoke(
     req: Request,
 ): Response {
     val ep = se.endpoint
-    val values = LinkedHashMap<ParamKey<*>, Any?>()
+    // Sized to what the endpoint declares. The default of 16 buckets is a
+    // 144-byte table for the two or three inputs an endpoint usually has.
+    val values = LinkedHashMap<ParamKey<*>, Any?>(ep.declaredInputCount())
 
     // Built before decoding, so a filter or a failing decode can still put a
     // header on the way out.
@@ -208,85 +338,9 @@ private fun invoke(
 
     // ---- inputs: path, query, headers, body -------------------------------
     try {
-        for (segment in ep.pathSpec.segments) {
-            if (segment !is PathSegment.Capture) continue
-            val param = segment.param
-            // Present by construction: this handler only runs for a request the
-            // template matched, and the template's captures are these params.
-            val raw = req.path(param.name)
-                ?: error("$ep matched ${req.uri.path} but captured no '${param.name}'")
-            values[param] = param.codec.decode(param.name, raw)
-        }
+        decodePlainInputs(ep, req, values)
 
-        for (q in ep.queries) {
-            val raw = req.query(q.name)
-            values[q] = when {
-                raw != null -> q.codec.decode(q.name, raw)
-                q.required -> throw ApiException(400, "Missing required query parameter '${q.name}'")
-                else -> q.default
-            }
-        }
-
-        for (h in ep.headerParams) {
-            val raw = req.header(h.name)
-            values[h] = when {
-                raw != null -> h.codec.decode(h.name, raw)
-                h.required -> throw ApiException(400, "Missing required header '${h.name}'")
-                else -> h.default
-            }
-        }
-
-        // Parsed by core, from the header, rather than by http4k's own cookie
-        // support — so a cookie decodes to the same value on all three
-        // backends. See `Cookies`.
-        val cookies = Cookies.parse(req.headerValues("Cookie").filterNotNull())
-        for (c in ep.cookieParams) {
-            val raw = cookies[c.name]
-            values[c] = when {
-                raw != null -> c.codec.decode(c.name, raw)
-                c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
-                else -> c.default
-            }
-        }
-
-        when (val body = ep.bodyInput) {
-            null -> Unit
-
-            // Handed over unconsumed. http4k's own body is already lazy, so a
-            // handler that never reads it never pulls the request into memory.
-            is RawBody -> values[body] = Http4kByteStream(req.body)
-
-            // Exempt from the size limit for the same reason a raw body is:
-            // the file part is never held whole. What the text parts may cost
-            // is bounded, and that is what the limit is passed in for.
-            is MultipartBody -> body.decode(
-                contentType = req.header("Content-Type"),
-                input = req.body.stream,
-                maxTextBytes = api.maxBodyBytes,
-                into = values,
-            )
-
-            is JsonBody<*>, is FormBody<*> -> {
-                // Checked before the body is pulled into a String, so an
-                // oversized payload is refused rather than allocated.
-                req.header("Content-Length")?.toLongOrNull()?.let {
-                    if (it > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
-                }
-                val text = req.bodyString()
-                if (text.length.toLong() > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
-                // Whatever the codec throws is its own library's exception, and
-                // nothing here should have to recognise it. Wrapping it in
-                // core's own failure is what keeps this file codec-agnostic.
-                values[body] = try {
-                    checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
-                        .decodeFromString(text)
-                } catch (t: BodyDecodeFailure) {
-                    throw t
-                } catch (t: Throwable) {
-                    throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
-                }
-            }
-        }
+        readBody(ep, api, codecs, req, values)
     } catch (t: Throwable) {
         return errorResponse(t, api, ep).withHeaders(params)
     }

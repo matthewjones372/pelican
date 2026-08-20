@@ -4,9 +4,15 @@ import dev.pelican.openapi.oauth2RedirectPath
 import dev.pelican.openapi.openApiJson
 import dev.pelican.pekko.PelicanServer
 import dev.pelican.pekko.docs.startWithDocs
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldNotBeNull
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import java.net.URI
@@ -96,23 +102,17 @@ class SecuredReportsTest {
         val schemes = spec["components"]!!.jsonObject["securitySchemes"]!!.jsonObject
 
         val basic = schemes["staffLogin"]!!.jsonObject
-        assertEquals("http", basic["type"]!!.jsonPrimitive.content)
-        assertEquals("basic", basic["scheme"]!!.jsonPrimitive.content)
+        basic["type"]!!.jsonPrimitive.content shouldBe "http"
+        basic["scheme"]!!.jsonPrimitive.content shouldBe "basic"
 
         val oauth = schemes["companyIdp"]!!.jsonObject
-        assertEquals("oauth2", oauth["type"]!!.jsonPrimitive.content)
+        oauth["type"]!!.jsonPrimitive.content shouldBe "oauth2"
 
         val flow = oauth["flows"]!!.jsonObject["authorizationCode"]!!.jsonObject
-        assertEquals(
-            "https://id.example.com/oauth2/authorize",
-            flow["authorizationUrl"]!!.jsonPrimitive.content,
-        )
-        assertEquals("https://id.example.com/oauth2/token", flow["tokenUrl"]!!.jsonPrimitive.content)
-        assertEquals("https://id.example.com/oauth2/token", flow["refreshUrl"]!!.jsonPrimitive.content)
-        assertEquals(
-            listOf("reports:read", "reports:write", "reports:admin"),
-            flow["scopes"]!!.jsonObject.keys.toList(),
-        )
+        flow["authorizationUrl"]!!.jsonPrimitive.content shouldBe "https://id.example.com/oauth2/authorize"
+        flow["tokenUrl"]!!.jsonPrimitive.content shouldBe "https://id.example.com/oauth2/token"
+        flow["refreshUrl"]!!.jsonPrimitive.content shouldBe "https://id.example.com/oauth2/token"
+        flow["scopes"]!!.jsonObject.keys.toList() shouldBe listOf("reports:read", "reports:write", "reports:admin")
     }
 
     @Test
@@ -120,46 +120,37 @@ class SecuredReportsTest {
         // The default is written once, at the root of the document, and an
         // operation that does not override it simply has no `security` of its
         // own — which is how a reader (and Swagger UI) is told it applies.
-        assertEquals(
-            listOf("companyIdp" to listOf("reports:read")),
-            spec["security"]!!.jsonArray.flatMap { req ->
-                req.jsonObject.map { (scheme, scopes) ->
-                    scheme to scopes.jsonArray.map { it.jsonPrimitive.content }
-                }
-            },
-        )
-        assertFalse(operation("/reports", "get").containsKey("security"))
+        spec["security"]!!.jsonArray.flatMap { req ->
+            req.jsonObject.map { (scheme, scopes) ->
+                scheme to scopes.jsonArray.map { it.jsonPrimitive.content }
+            }
+        } shouldBe listOf("companyIdp" to listOf("reports:read"))
+        operation("/reports", "get").containsKey("security") shouldBe false
     }
 
     @Test
     fun `an endpoint that names a scope replaces the default`() {
-        assertEquals(
-            listOf("companyIdp" to listOf("reports:write")),
-            requirementsOf(operation("/reports", "post")),
-        )
+        requirementsOf(operation("/reports", "post")) shouldBe listOf("companyIdp" to listOf("reports:write"))
     }
 
     @Test
     fun `two requirements are documented as alternatives`() {
-        assertEquals(
-            listOf(
-                "companyIdp" to listOf("reports:admin"),
-                "staffLogin" to emptyList(),
-            ),
-            requirementsOf(operation("/reports/{reportId}", "delete")),
+        requirementsOf(operation("/reports/{reportId}", "delete")) shouldBe listOf(
+            "companyIdp" to listOf("reports:admin"),
+            "staffLogin" to emptyList(),
         )
     }
 
     @Test
     fun `noSecurity publishes an empty requirement list rather than inheriting`() {
-        assertTrue(operation("/health", "get")["security"]!!.jsonArray.isEmpty())
+        operation("/health", "get")["security"]!!.jsonArray.isEmpty() shouldBe true
     }
 
     @Test
     fun `the failures a credential can cause are documented alongside it`() {
         val responses = operation("/internal/usage", "get")["responses"]!!.jsonObject
-        assertTrue("401" in responses, responses.keys.toString())
-        assertTrue("403" in responses, responses.keys.toString())
+        responses.keys shouldContain "401"
+        responses.keys shouldContain "403"
     }
 
     // ------------------------------------------------------ the docs page
@@ -167,81 +158,81 @@ class SecuredReportsTest {
     @Test
     fun `the docs page signs in as its own client and is sent back to the redirect it serves`() {
         val page = send("GET", "/api-docs").body()
-        assertTrue(page.contains("initOAuth"), page)
-        assertTrue(page.contains(""""clientId":"reports-docs-ui""""), page)
-        assertTrue(page.contains(""""usePkceWithAuthorizationCodeGrant":true"""), page)
-        assertTrue(page.contains(""""audience":"https://api.example.com/reports""""), page)
-        assertTrue(page.contains("oauth2RedirectUrl"), page)
-        assertTrue(page.contains(oauth2RedirectPath(DOCS_PATH)), page)
+        withClue(page) { page.contains("initOAuth") shouldBe true }
+        withClue(page) { page.contains(""""clientId":"reports-docs-ui"""") shouldBe true }
+        withClue(page) { page.contains(""""usePkceWithAuthorizationCodeGrant":true""") shouldBe true }
+        withClue(page) { page.contains(""""audience":"https://api.example.com/reports"""") shouldBe true }
+        withClue(page) { page.contains("oauth2RedirectUrl") shouldBe true }
+        withClue(page) { page.contains(oauth2RedirectPath(DOCS_PATH)) shouldBe true }
 
         // Served by this service, on the same origin as the page — which is the
         // URL the identity provider has to have registered.
         val redirect = send("GET", oauth2RedirectPath(DOCS_PATH))
-        assertEquals(200, redirect.statusCode())
-        assertTrue(redirect.body().contains("swaggerUIRedirectOauth2"), redirect.body())
+        redirect.statusCode() shouldBe 200
+        withClue(redirect.body()) { redirect.body().contains("swaggerUIRedirectOauth2") shouldBe true }
     }
 
     // ------------------------------------------------------ the enforcement
 
     @Test
     fun `an open endpoint needs nothing`() {
-        assertEquals(200, send("GET", "/health").statusCode())
+        send("GET", "/health").statusCode() shouldBe 200
     }
 
     @Test
     fun `no credential is a 401`() {
-        assertEquals(401, send("GET", "/reports").statusCode())
-        assertEquals(401, send("GET", "/internal/usage").statusCode())
+        send("GET", "/reports").statusCode() shouldBe 401
+        send("GET", "/internal/usage").statusCode() shouldBe 401
     }
 
     @Test
     fun `a credential that does not check out is a 401, not a 403`() {
-        assertEquals(401, send("GET", "/reports", null, bearer("made-up")).statusCode())
-        assertEquals(401, send("GET", "/internal/usage", null, basic("ops", "wrong")).statusCode())
+        send("GET", "/reports", null, bearer("made-up")).statusCode() shouldBe 401
+        send("GET", "/internal/usage", null, basic("ops", "wrong")).statusCode() shouldBe 401
     }
 
     @Test
     fun `a token with the scope gets through`() {
         val res = send("GET", "/reports", null, bearer("demo-reader"))
-        assertEquals(200, res.statusCode())
+        res.statusCode() shouldBe 200
         // Not a count: the store is shared with the tests below, which file and
         // withdraw reports in whatever order JUnit runs them.
-        assertTrue(Json.parseToJsonElement(res.body()).jsonArray.isNotEmpty(), res.body())
+        withClue(res.body()) { Json.parseToJsonElement(res.body()).jsonArray.isNotEmpty() shouldBe true }
     }
 
     @Test
     fun `a token without the scope is a 403 naming what is missing`() {
         val res = send("POST", "/reports", """{"title":"Cold start","body":"90s"}""", bearer("demo-reader"))
-        assertEquals(403, res.statusCode())
-        assertTrue(res.body().contains("reports:write"), res.body())
+        res.statusCode() shouldBe 403
+        withClue(res.body()) { res.body().contains("reports:write") shouldBe true }
     }
 
     @Test
     fun `the author comes from the token, not from the caller's body`() {
         val res = send("POST", "/reports", """{"title":"Cold start","body":"90s"}""", bearer("demo-writer"))
-        assertEquals(201, res.statusCode())
+        res.statusCode() shouldBe 201
         val obj = Json.parseToJsonElement(res.body()).jsonObject
-        assertEquals("grace@example.com", obj["author"]!!.jsonPrimitive.content)
-        assertEquals("Cold start", obj["title"]!!.jsonPrimitive.content)
+        obj["author"]!!.jsonPrimitive.content shouldBe "grace@example.com"
+        obj["title"]!!.jsonPrimitive.content shouldBe "Cold start"
     }
 
     @Test
     fun `either alternative satisfies an endpoint that documents two`() {
-        assertEquals(204, send("DELETE", "/reports/1", null, bearer("demo-admin")).statusCode())
-        assertEquals(204, send("DELETE", "/reports/2", null, basic("ops", "s3cret")).statusCode())
-        assertEquals(403, send("DELETE", "/reports/3", null, bearer("demo-writer")).statusCode())
+        send("DELETE", "/reports/1", null, bearer("demo-admin")).statusCode() shouldBe 204
+        send("DELETE", "/reports/2", null, basic("ops", "s3cret")).statusCode() shouldBe 204
+        send("DELETE", "/reports/3", null, bearer("demo-writer")).statusCode() shouldBe 403
     }
 
     @Test
     fun `basic auth reaches the endpoint that only accepts it`() {
         val res = send("GET", "/internal/usage", null, basic("sre", "pager-duty"))
-        assertEquals(200, res.statusCode())
-        assertTrue(Json.parseToJsonElement(res.body()).jsonObject.containsKey("reports"))
+        res.statusCode() shouldBe 200
+        Json.parseToJsonElement(res.body()).jsonObject.containsKey("reports") shouldBe true
     }
 
     @Test
     fun `an oauth token is not an operator login`() {
-        assertEquals(403, send("GET", "/internal/usage", null, bearer("demo-admin")).statusCode())
+        send("GET", "/internal/usage", null, bearer("demo-admin")).statusCode() shouldBe 403
     }
 
     // -------------------------------------------- what the answer carries
@@ -249,13 +240,13 @@ class SecuredReportsTest {
     @Test
     fun `the 401 says which credential to present`() {
         val res = send("GET", "/reports")
-        assertEquals(401, res.statusCode())
+        res.statusCode() shouldBe 401
         // Without this a browser has nothing to prompt with, and a client has
         // to guess which of the two schemes this endpoint wanted.
         val challenge = res.headers().firstValue("WWW-Authenticate").orElse(null)
-        assertNotNull(challenge, res.headers().map().toString())
-        assertTrue(challenge.contains("Bearer"), challenge)
-        assertTrue(challenge.contains("Basic"), challenge)
+        withClue(res.headers().map().toString()) { challenge.shouldNotBeNull() }
+        withClue(challenge) { challenge.contains("Bearer") shouldBe true }
+        withClue(challenge) { challenge.contains("Basic") shouldBe true }
     }
 
     @Test
@@ -265,10 +256,10 @@ class SecuredReportsTest {
             """{"title":"Cache stampede","body":"On deploy."}""",
             bearer("demo-writer"),
         )
-        assertEquals(201, res.statusCode())
+        res.statusCode() shouldBe 201
 
         val id = Json.parseToJsonElement(res.body()).jsonObject["id"]!!.jsonPrimitive.content
-        assertEquals("/reports/$id", res.headers().firstValue("Location").orElse(null))
+        res.headers().firstValue("Location").orElse(null) shouldBe "/reports/$id"
     }
 
     @Test
@@ -276,11 +267,8 @@ class SecuredReportsTest {
         val header = operation("/reports", "post")["responses"]!!.jsonObject["201"]!!
             .jsonObject["headers"]!!.jsonObject["Location"]!!.jsonObject
 
-        assertEquals("string", header["schema"]!!.jsonObject["type"]!!.jsonPrimitive.content)
-        assertEquals(
-            "Where the report that was just filed lives",
-            header["description"]!!.jsonPrimitive.content,
-        )
+        header["schema"]!!.jsonObject["type"]!!.jsonPrimitive.content shouldBe "string"
+        header["description"]!!.jsonPrimitive.content shouldBe "Where the report that was just filed lives"
     }
 
     @Test
@@ -288,8 +276,8 @@ class SecuredReportsTest {
         val header = operation("/reports", "post")["responses"]!!.jsonObject["429"]!!
             .jsonObject["headers"]!!.jsonObject["Retry-After"]!!.jsonObject
 
-        assertEquals(false, header["required"]!!.jsonPrimitive.content.toBoolean())
-        assertEquals("integer", header["schema"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+        header["required"]!!.jsonPrimitive.content.toBoolean() shouldBe false
+        header["schema"]!!.jsonObject["type"]!!.jsonPrimitive.content shouldBe "integer"
     }
 
     @Test
@@ -297,6 +285,6 @@ class SecuredReportsTest {
         // `securedApi()` passes `covers = allSecuredEndpoints`. If a handler
         // were dropped from `securedRoutes` this suite would fail to start
         // rather than reporting a 404 on one endpoint.
-        assertEquals(allSecuredEndpoints.size, securedApi().endpoints.size)
+        securedApi().endpoints.size shouldBe allSecuredEndpoints.size
     }
 }

@@ -24,14 +24,20 @@ import dev.pelican.test.pekko.inMemory
 import dev.pelican.test.rawText
 import dev.pelican.test.shouldBeFailure
 import dev.pelican.test.shouldBeOk
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldNotBeNull
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.apache.pekko.http.javadsl.model.HttpRequest
 import org.apache.pekko.stream.Materializer
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import org.junit.jupiter.api.assertThrows
 import java.io.ByteArrayInputStream
 
 /**
@@ -65,21 +71,21 @@ abstract class ClientContractTest {
     @Test
     fun `returns a typed user`() {
         val user: User = app.call(getUser, 1L)
-        assertEquals(User(1, "Ada Lovelace", "ada@example.com"), user)
+        user shouldBe User(1, "Ada Lovelace", "ada@example.com")
     }
 
     @Test
     fun `a handler's notFound surfaces as a failed call`() {
-        val failure = assertThrows<ApiCallFailed> { app.call(getUser, 999L) }
-        assertEquals(404, failure.response.status)
-        assertTrue(failure.response.body.contains("No user 999"), failure.response.body)
+        val failure = shouldThrow<ApiCallFailed> { app.call(getUser, 999L) }
+        failure.response.status shouldBe 404
+        withClue(failure.response.body) { failure.response.body.contains("No user 999") shouldBe true }
     }
 
     @Test
     fun `the error path can be asserted on without an exception`() {
         val res = app.response(getUser, 999L)
-        assertEquals(404, res.status)
-        assertEquals("application/json", res.contentType)
+        res.status shouldBe 404
+        res.contentType shouldBe "application/json"
     }
 
     // ------------------------------------------------------------ streaming
@@ -87,16 +93,16 @@ abstract class ClientContractTest {
     @Test
     fun `collects ndjson into typed elements`() {
         val orders: List<Order> = app.collect(streamOrders, In4(1L, 7, null, null))
-        assertEquals(7, orders.size)
-        assertTrue(orders.all { it.userId == 1L })
-        assertEquals("application/x-ndjson", app.response(streamOrders, In4(1L, 7, null, null)).contentType)
+        orders.size shouldBe 7
+        orders.all { it.userId == 1L } shouldBe true
+        app.response(streamOrders, In4(1L, 7, null, null)).contentType shouldBe "application/x-ndjson"
     }
 
     @Test
     fun `an enum filter is applied`() {
         val orders = app.collect(streamOrders, In4(1L, 10, OrderStatus.SHIPPED, null))
-        assertEquals(10, orders.size)
-        assertTrue(orders.all { it.status == OrderStatus.SHIPPED })
+        orders.size shouldBe 10
+        orders.all { it.status == OrderStatus.SHIPPED } shouldBe true
     }
 
     @Test
@@ -105,21 +111,21 @@ abstract class ClientContractTest {
         // request to exercise the default the endpoint declares.
         val req = app.request(streamOrders, In4(1L, 7, null, null)).withoutQuery("limit")
         val body = app.transport.send(req).body
-        assertEquals(25, body.trim().lines().size)
+        body.trim().lines().size shouldBe 25
     }
 
     @Test
     fun `collects a streamed json array`() {
         val orders: List<Order> = app.collect(listOrders, In2(1L, 3))
-        assertEquals(3, orders.size)
-        assertTrue(orders.all { it.userId == 1L })
+        orders.size shouldBe 3
+        orders.all { it.userId == 1L } shouldBe true
     }
 
     @Test
     fun `collects server-sent events`() {
         val ticks: List<Tick> = app.collect(watchOrders, In2(1L, 3))
-        assertEquals(listOf(1, 2, 3), ticks.map { it.seq })
-        assertEquals("text/event-stream", app.response(watchOrders, In2(1L, 3)).contentType)
+        ticks.map { it.seq } shouldBe listOf(1, 2, 3)
+        app.response(watchOrders, In2(1L, 3)).contentType shouldBe "text/event-stream"
     }
 
     // ------------------------------------------------------------ bodies
@@ -127,21 +133,21 @@ abstract class ClientContractTest {
     @Test
     fun `posts a typed body and gets the declared 201`() {
         val order = app.call(placeOrder, In3(1L, "let-me-in", CreateOrder("anvil", 3)))
-        assertEquals("anvil", order.item)
-        assertEquals(3, order.quantity)
-        assertEquals(OrderStatus.PENDING, order.status)
-        assertEquals(201, app.response(placeOrder, In3(1L, "let-me-in", CreateOrder("anvil", 3))).status)
+        order.item shouldBe "anvil"
+        order.quantity shouldBe 3
+        order.status shouldBe OrderStatus.PENDING
+        app.response(placeOrder, In3(1L, "let-me-in", CreateOrder("anvil", 3))).status shouldBe 201
     }
 
     @Test
     fun `a body field's default is applied by the codec`() {
         val order = app.call(placeOrder, In3(1L, "let-me-in", CreateOrder("rope")))
-        assertEquals(1, order.quantity)
+        order.quantity shouldBe 1
     }
 
     @Test
     fun `a bad api key is 401`() {
-        assertEquals(401, app.response(placeOrder, In3(1L, "wrong", CreateOrder("anvil", 1))).status)
+        app.response(placeOrder, In3(1L, "wrong", CreateOrder("anvil", 1))).status shouldBe 401
     }
 
     // ------------------------------------------------------ declared failures
@@ -157,40 +163,40 @@ abstract class ClientContractTest {
         // which one this is — `shouldBeFailure` asserts on the declaration the
         // handler named, which is what fixes the status.
         val badKey = app.outcome(placeOrder, In3(1L, "wrong", CreateOrder("anvil")))
-        assertEquals(ApiError(401, "Bad API key"), badKey shouldBeFailure badApiKey)
+        badKey shouldBeFailure badApiKey shouldBe ApiError(401, "Bad API key")
 
         app.outcome(placeOrder, In3(9_999L, "let-me-in", CreateOrder("anvil"))) shouldBeFailure noSuchUser
-        assertEquals(404, noSuchUser.status)
+        noSuchUser.status shouldBe 404
     }
 
     @Test
     fun `the success side of a fallible endpoint is unchanged`() {
         val placed = app.outcome(placeOrder, In3(1L, "let-me-in", CreateOrder("rope"))).shouldBeOk()
-        assertEquals("rope", placed.item)
-        assertEquals(201, app.response(placeOrder, In3(1L, "let-me-in", CreateOrder("rope"))).status)
+        placed.item shouldBe "rope"
+        app.response(placeOrder, In3(1L, "let-me-in", CreateOrder("rope"))).status shouldBe 201
     }
 
     @Test
     fun `a stream can fail before its first element`() {
         val res = app.response(streamOrders, In4(9_999L, 5, null, null))
-        assertEquals(404, res.status)
-        assertEquals("application/json", res.contentType)
-        assertTrue(res.body.contains("No user 9999"), res.body)
+        res.status shouldBe 404
+        res.contentType shouldBe "application/json"
+        withClue(res.body) { res.body.contains("No user 9999") shouldBe true }
     }
 
     @Test
     fun `an empty output is 204 with no body`() {
         val res = app.response(cancelOrder, In3(1L, 5L, "let-me-in"))
-        assertEquals(204, res.status)
-        assertEquals("", res.body)
+        res.status shouldBe 204
+        res.body shouldBe ""
     }
 
     @Test
     fun `a raw body is echoed back`() {
         val payload = "x".repeat(50_000)
         val res = app.response(echo, rawText(payload))
-        assertEquals(200, res.status)
-        assertEquals(payload, res.body)
+        res.status shouldBe 200
+        res.body shouldBe payload
     }
 
     // -------------------------------------------------- forms and uploads
@@ -199,8 +205,8 @@ abstract class ClientContractTest {
     fun `a form body is posted as a form and read back as the declared types`() {
         val order = app.call(placeOrderForm, In2(1L, CreateOrder("anvil", quantity = 2)))
 
-        assertEquals("anvil", order.item)
-        assertEquals(2, order.quantity)
+        order.item shouldBe "anvil"
+        order.quantity shouldBe 2
     }
 
     @Test
@@ -215,7 +221,7 @@ abstract class ClientContractTest {
             ),
         )
 
-        assertEquals(ImportResult("March", "orders.csv", 2, "s-42"), result)
+        result shouldBe ImportResult("March", "orders.csv", 2, "s-42")
     }
 
     @Test
@@ -227,7 +233,7 @@ abstract class ClientContractTest {
             ).withoutHeader("Cookie"),
         )
 
-        assertTrue("\"session\":null" in res.body, res.body)
+        res.body shouldContain "\"session\":null"
     }
 
     // ------------------------------------------------------------ lens style
@@ -238,7 +244,7 @@ abstract class ClientContractTest {
             searchOrders,
             Params(mapOf(limit to 4, statusFilter to null, traceId to "abc"), null),
         )
-        assertEquals(4, orders.size)
+        orders.size shouldBe 4
     }
 }
 
@@ -260,25 +266,30 @@ class InMemoryContractTest : ClientContractTest() {
         val materializer = Materializer.createMaterializer(transport.system)
 
         val res = transport.exchange(HttpRequest.GET("/users/1/orders/watch?limit=8"))
-        assertEquals(200, res.status().intValue())
+        res.status().intValue() shouldBe 200
 
         val start = System.nanoTime()
         var firstAt = -1L
         var chunks = 0
         res.entity().dataBytes
-            .runForeach({ if (firstAt < 0) firstAt = System.nanoTime(); chunks++ }, materializer)
+            .runForeach(
+                {
+                    if (firstAt < 0) firstAt = System.nanoTime()
+                    chunks++
+                },
+                materializer,
+            )
             .toCompletableFuture()
             .join()
 
         val totalMs = (System.nanoTime() - start) / 1_000_000
         val firstMs = (firstAt - start) / 1_000_000
 
-        assertEquals(8, chunks)
-        assertTrue(totalMs >= 600, "stream finished suspiciously fast: ${totalMs}ms")
-        assertTrue(
-            firstMs < totalMs / 2,
-            "first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed",
-        )
+        chunks shouldBe 8
+        withClue("stream finished suspiciously fast: ${totalMs}ms") { (totalMs >= 600) shouldBe true }
+        withClue("first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
+            (firstMs < totalMs / 2) shouldBe true
+        }
     }
 }
 
@@ -333,7 +344,7 @@ class UndeclaredFailureTest {
     @Test
     fun `returning a failure this endpoint never declared is a 500, not a 410`() {
         apiThatReturnsAStrayFailure().inMemory().use {
-            assertEquals(500, it.response(fetchUser, 1L).status)
+            it.response(fetchUser, 1L).status shouldBe 500
         }
     }
 
@@ -343,10 +354,10 @@ class UndeclaredFailureTest {
             val body = it.response(fetchUser, 1L).body
             // The internal message — the one naming the endpoint and the stray
             // declaration — is what a caller must not be handed.
-            assertFalse(body.contains("never declared"), body)
-            assertFalse(body.contains("410"), body)
-            assertTrue(body.contains("Internal server error"), body)
-            assertTrue(body.contains("Reference: "), body)
+            withClue(body) { body.contains("never declared") shouldBe false }
+            withClue(body) { body.contains("410") shouldBe false }
+            withClue(body) { body.contains("Internal server error") shouldBe true }
+            withClue(body) { body.contains("Reference: ") shouldBe true }
         }
     }
 
@@ -354,19 +365,19 @@ class UndeclaredFailureTest {
     fun `the reference in the body is what the server logs against`() {
         val logged = mutableListOf<Triple<String, String?, String>>()
         val api = apiThatReturnsAStrayFailure(
-            onServerError = { ref, ep, t -> logged += Triple(ref, ep?.toString(), t.message ?: "") },
+            onServerError = { ref, ep, t -> logged += Triple(ref, ep?.toString(), t.message.orEmpty()) },
         )
 
         api.inMemory().use {
             val body = it.response(fetchUser, 1L).body
             val reference = Regex("""Reference: ([0-9a-f]+)""").find(body)?.groupValues?.get(1)
-            assertNotNull(reference, "no reference in $body")
+            withClue("no reference in $body") { reference.shouldNotBeNull() }
 
             val (loggedRef, endpoint, message) = logged.single()
-            assertEquals(reference, loggedRef)
+            loggedRef shouldBe reference
             // What the caller was denied is exactly what the log gets.
-            assertEquals("GET /users/{userId}", endpoint)
-            assertTrue(message.contains("never declared"), message)
+            endpoint shouldBe "GET /users/{userId}"
+            withClue(message) { message.contains("never declared") shouldBe true }
         }
     }
 
@@ -374,7 +385,7 @@ class UndeclaredFailureTest {
     fun `a local run can ask for the detail back`() {
         apiThatReturnsAStrayFailure(exposeInternalErrors = true).inMemory().use {
             val body = it.response(fetchUser, 1L).body
-            assertTrue(body.contains("never declared"), body)
+            withClue(body) { body.contains("never declared") shouldBe true }
         }
     }
 }

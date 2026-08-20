@@ -8,10 +8,14 @@ import dev.pelican.endpoint
 import dev.pelican.http4k.handledNow
 import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.pathParam
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.http4k.core.Method
 import org.http4k.core.Request
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 data class Widget(val id: Long, val name: String)
@@ -38,29 +42,29 @@ class DocsTest {
         val handler = api().handlerWithDocs(Docs(docsPath = "/api-docs"))
 
         val spec = handler(Request(Method.GET, "/openapi.json"))
-        assertEquals(200, spec.status.code)
-        assertEquals("application/json", spec.header("Content-Type"))
-        assertTrue("\"operationId\": \"getWidget\"" in spec.bodyString(), spec.bodyString().take(300))
+        spec.status.code shouldBe 200
+        spec.header("Content-Type") shouldBe "application/json"
+        withClue(spec.bodyString().take(300)) { spec.bodyString() shouldContain "\"operationId\": \"getWidget\"" }
 
         val page = handler(Request(Method.GET, "/api-docs"))
-        assertEquals(200, page.status.code)
-        assertTrue(page.header("Content-Type")!!.startsWith("text/html"))
-        assertTrue("swagger-ui" in page.bodyString())
+        page.status.code shouldBe 200
+        page.header("Content-Type")!!.startsWith("text/html") shouldBe true
+        page.bodyString() shouldContain "swagger-ui"
 
         // The endpoints are still there; the docs are an addition, not a wrapper.
-        assertEquals("""{"id":3,"name":"widget-3"}""", handler(Request(Method.GET, "/widgets/3")).bodyString())
+        handler(Request(Method.GET, "/widgets/3")).bodyString() shouldBe """{"id":3,"name":"widget-3"}"""
     }
 
     @Test
     fun `each page can be switched off on its own`() {
         val specOnly = api().handlerWithDocs(Docs(docsPath = null))
-        assertEquals(200, specOnly(Request(Method.GET, "/openapi.json")).status.code)
-        assertEquals(404, specOnly(Request(Method.GET, "/docs")).status.code)
+        specOnly(Request(Method.GET, "/openapi.json")).status.code shouldBe 200
+        specOnly(Request(Method.GET, "/docs")).status.code shouldBe 404
 
         val pageOnly = api().handlerWithDocs(Docs(openApiPath = null))
-        assertEquals(404, pageOnly(Request(Method.GET, "/openapi.json")).status.code)
+        pageOnly(Request(Method.GET, "/openapi.json")).status.code shouldBe 404
         // With no spec endpoint the page embeds the document rather than fetching it.
-        assertTrue("\"openapi\"" in pageOnly(Request(Method.GET, "/docs")).bodyString())
+        ("\"openapi\"" in pageOnly(Request(Method.GET, "/docs")).bodyString()) shouldBe true
     }
 
     /**
@@ -75,19 +79,19 @@ class DocsTest {
         val spec = handler(
             Request(Method.GET, "/openapi.json").header("Origin", "https://tools.example.com"),
         )
-        assertEquals("https://tools.example.com", spec.header("Access-Control-Allow-Origin"))
+        spec.header("Access-Control-Allow-Origin") shouldBe "https://tools.example.com"
 
         // And nothing changes for an API that never asked for CORS.
         val plain = api().handlerWithDocs()(
             Request(Method.GET, "/openapi.json").header("Origin", "https://tools.example.com"),
         )
-        assertEquals(null, plain.header("Access-Control-Allow-Origin"))
+        plain.header("Access-Control-Allow-Origin") shouldBe null
     }
 
     @Test
     fun `with both switched off the handler is the endpoints alone`() {
         val handler = api().handlerWithDocs(Docs(openApiPath = null, docsPath = null))
-        assertEquals(404, handler(Request(Method.GET, "/docs")).status.code)
-        assertEquals(200, handler(Request(Method.GET, "/widgets/1")).status.code)
+        handler(Request(Method.GET, "/docs")).status.code shouldBe 404
+        handler(Request(Method.GET, "/widgets/1")).status.code shouldBe 200
     }
 }

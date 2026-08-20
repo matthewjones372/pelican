@@ -7,10 +7,14 @@ import dev.pelican.test.ApiClient
 import dev.pelican.test.RequestSpec
 import dev.pelican.test.ResponseSpec
 import dev.pelican.test.apiClient
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -74,10 +78,10 @@ class CorsTest {
     fun `a preflight is answered from the description of that path`(name: String, client: ApiClient) {
         val res = client.preflight(from = ALLOWED)
 
-        assertEquals(204, res.status)
-        assertEquals(ALLOWED, res.header("Access-Control-Allow-Origin"))
-        assertEquals("POST", res.header("Access-Control-Allow-Methods"))
-        assertEquals("600", res.header("Access-Control-Max-Age"))
+        res.status shouldBe 204
+        res.header("Access-Control-Allow-Origin") shouldBe ALLOWED
+        res.header("Access-Control-Allow-Methods") shouldBe "POST"
+        res.header("Access-Control-Max-Age") shouldBe "600"
     }
 
     /**
@@ -88,10 +92,7 @@ class CorsTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `the headers a browser may send are the ones the endpoint declares`(name: String, client: ApiClient) {
-        assertEquals(
-            "X-Trace-Id, Content-Type",
-            client.preflight(from = ALLOWED).header("Access-Control-Allow-Headers"),
-        )
+        client.preflight(from = ALLOWED).header("Access-Control-Allow-Headers") shouldBe "X-Trace-Id, Content-Type"
     }
 
     @ParameterizedTest(name = "{0}")
@@ -99,8 +100,8 @@ class CorsTest {
     fun `an origin the API does not name is refused, with nothing leaked`(name: String, client: ApiClient) {
         val res = client.preflight(from = REJECTED)
 
-        assertEquals(403, res.status)
-        assertNull(res.header("Access-Control-Allow-Origin"))
+        res.status shouldBe 403
+        res.header("Access-Control-Allow-Origin").shouldBeNull()
     }
 
     @ParameterizedTest(name = "{0}")
@@ -108,8 +109,8 @@ class CorsTest {
     fun `a method that path never describes is refused`(name: String, client: ApiClient) {
         val res = client.preflight(from = ALLOWED, method = Method.DELETE)
 
-        assertEquals(403, res.status)
-        assertTrue("DELETE" in res.body, res.body)
+        res.status shouldBe 403
+        res.body shouldContain "DELETE"
     }
 
     // ----------------------------------------------------------- real requests
@@ -122,10 +123,10 @@ class CorsTest {
     ) {
         val res = client.transport.send(client.request(echo, In2("trace-1", Note("hi"))).fromBrowser())
 
-        assertEquals(200, res.status)
-        assertEquals("""{"text":"hi","trace":"trace-1"}""", res.body)
-        assertEquals(ALLOWED, res.header("Access-Control-Allow-Origin"))
-        assertEquals("Origin", res.header("Vary"))
+        res.status shouldBe 200
+        res.body shouldBe """{"text":"hi","trace":"trace-1"}"""
+        res.header("Access-Control-Allow-Origin") shouldBe ALLOWED
+        res.header("Vary") shouldBe "Origin"
     }
 
     @ParameterizedTest(name = "{0}")
@@ -133,7 +134,7 @@ class CorsTest {
     fun `a streamed response carries them too`(name: String, client: ApiClient) {
         val res = client.transport.send(client.request(countdown, 2).fromBrowser())
 
-        assertEquals(ALLOWED, res.header("Access-Control-Allow-Origin"))
+        res.header("Access-Control-Allow-Origin") shouldBe ALLOWED
     }
 
     /**
@@ -147,8 +148,8 @@ class CorsTest {
             client.request(echo, In2("trace-1", Note("hi"))).withBody("not json").fromBrowser(),
         )
 
-        assertEquals(400, res.status)
-        assertEquals(ALLOWED, res.header("Access-Control-Allow-Origin"))
+        res.status shouldBe 400
+        res.header("Access-Control-Allow-Origin") shouldBe ALLOWED
     }
 
     @ParameterizedTest(name = "{0}")
@@ -162,9 +163,9 @@ class CorsTest {
         // credential check, and pretending otherwise would make a `curl` and a
         // fetch behave differently. What is withheld is the permission to read
         // the answer.
-        assertEquals(200, res.status)
-        assertNull(res.header("Access-Control-Allow-Origin"))
-        assertEquals("Origin", res.header("Vary"))
+        res.status shouldBe 200
+        res.header("Access-Control-Allow-Origin").shouldBeNull()
+        res.header("Vary") shouldBe "Origin"
     }
 
     /**
@@ -182,9 +183,9 @@ class CorsTest {
     ) {
         val res = client.transport.send(client.request(echo, In2("trace-1", Note("hi"))))
 
-        assertEquals(200, res.status)
-        assertNull(res.header("Access-Control-Allow-Origin"))
-        assertEquals("Origin", res.header("Vary"))
+        res.status shouldBe 200
+        res.header("Access-Control-Allow-Origin").shouldBeNull()
+        res.header("Vary") shouldBe "Origin"
     }
 
     // ------------------------------------------------------------ and together
@@ -202,6 +203,6 @@ class CorsTest {
             ).map { it to res.header(it) }
         }
 
-        assertEquals(1, answers.values.toSet().size, "backends disagreed: $answers")
+        withClue("backends disagreed: $answers") { answers.values.toSet().size shouldBe 1 }
     }
 }

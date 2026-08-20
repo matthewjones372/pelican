@@ -1,6 +1,8 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.*
+import io.kotest.assertions.withClue
+import io.kotest.matchers.nulls.shouldNotBeNull
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
@@ -18,16 +20,15 @@ class NoThirdPartyDependenciesTest {
     @Test
     fun `the main runtime classpath is the kotlin standard library and nothing else`() {
         val raw = System.getProperty("pelican.core.runtimeClasspath")
-        assertNotNull(raw, "the build must pass -Dpelican.core.runtimeClasspath; see build.gradle.kts")
+        withClue("the build must pass -Dpelican.core.runtimeClasspath; see build.gradle.kts") { raw.shouldNotBeNull() }
 
         val unexpected = raw!!.split(java.io.File.pathSeparator)
             .filter { it.isNotBlank() }
             .filterNot { entry -> allowed.any { entry.startsWith(it) } }
 
-        assertTrue(
-            unexpected.isEmpty(),
-            "pelican-core must have no third-party runtime dependencies, but found: $unexpected",
-        )
+        withClue("pelican-core must have no third-party runtime dependencies, but found: $unexpected") {
+            unexpected.isEmpty() shouldBe true
+        }
     }
 
     @Test
@@ -37,10 +38,9 @@ class NoThirdPartyDependenciesTest {
             "com.fasterxml.jackson.databind.ObjectMapper",
             "org.apache.pekko.http.javadsl.server.Directives",
         ).forEach { name ->
-            assertTrue(
-                runCatching { Class.forName(name) }.isFailure,
-                "$name is on core's classpath; a dependency crept in",
-            )
+            withClue("$name is on core's classpath; a dependency crept in") {
+                runCatching { Class.forName(name) }.isFailure shouldBe true
+            }
         }
     }
 
@@ -51,9 +51,6 @@ class NoThirdPartyDependenciesTest {
             put("properties", jsonObj { "id" to jsonObj { "type" to "integer" } })
             put("required", jsonStrings(listOf("id")))
         }
-        assertEquals(
-            """{"type":"object","properties":{"id":{"type":"integer"}},"required":["id"]}""",
-            doc.render(),
-        )
+        doc.render() shouldBe """{"type":"object","properties":{"id":{"type":"integer"}},"required":["id"]}"""
     }
 }

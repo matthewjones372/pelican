@@ -202,6 +202,149 @@ private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = Endpo
         ?: emptyMap(),
 )
 
+/**
+ * Everything decodable before the body: path captures, query parameters,
+ * headers, cookies.
+ *
+ * Decoded straight into the request's own value bag rather than into a map of
+ * its own that the caller then copies — see the http4k interpreter, where that
+ * copy measured at roughly 70ns per request.
+ */
+private fun decodePlainInputs(
+    ep: Endpoint<*, *>,
+    call: ApplicationCall,
+    into: MutableMap<ParamKey<*>, Any?>,
+) = with(into) {
+    // A loop rather than `filterIsInstance`, which would allocate a list per
+    // request to hold what is walked once.
+    ep.pathSpec.segments.forEach { segment ->
+        if (segment is PathSegment.Capture) {
+            val param = segment.param
+            // Present by construction: this handler only runs for a request the
+            // template matched, and the template's captures are these params.
+            val raw = call.parameters[param.name]
+                ?: error("$ep matched ${call.request.local.uri} but captured no '${param.name}'")
+            put(param, param.codec.decode(param.name, raw))
+        }
+    }
+
+    ep.queries.forEach { q ->
+        val raw = call.request.queryParameters[q.name]
+        put(
+            q,
+            when {
+                raw != null -> q.codec.decode(q.name, raw)
+                q.required -> throw ApiException(400, "Missing required query parameter '${q.name}'")
+                else -> q.default
+            },
+        )
+    }
+
+    ep.headerParams.forEach { h ->
+        val raw = call.request.headers[h.name]
+        put(
+            h,
+            when {
+                raw != null -> h.codec.decode(h.name, raw)
+                h.required -> throw ApiException(400, "Missing required header '${h.name}'")
+                else -> h.default
+            },
+        )
+    }
+
+    decodeCookies(ep, call, into)
+}
+
+/**
+ * Cookies, parsed by core from the header rather than by Ktor's own cookie
+ * support — so a cookie decodes to the same value on all three backends. See
+ * `Cookies`. Skipped when nothing declared one: reading and parsing the header
+ * costs the same whether or not anybody asked for a cookie.
+ */
+private fun decodeCookies(ep: Endpoint<*, *>, call: ApplicationCall, into: MutableMap<ParamKey<*>, Any?>) {
+    if (ep.cookieParams.isEmpty()) return
+
+    val cookies = Cookies.parse(call.request.headers.getAll("Cookie").orEmpty())
+    ep.cookieParams.forEach { c ->
+        val raw = cookies[c.name]
+        into[c] = when {
+            raw != null -> c.codec.decode(c.name, raw)
+            c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
+            else -> c.default
+        }
+    }
+}
+
+/**
+ * The body, read the way its declaration says to: not at all, handed over as a
+ * channel, parsed as a multipart envelope on the IO dispatcher, or pulled into
+ * a string for a codec. Decoded values go into [values]; a refusal is thrown,
+ * and the caller turns it into a response through core's `renderError`.
+ */
+
+/** One place to refuse an oversized body, so every check answers alike. */
+private fun refuseIfOversize(length: Long?, limit: Long) {
+    if (length != null && length > limit) throw PayloadTooLarge(limit)
+}
+
+private suspend fun readBody(
+    ep: Endpoint<*, *>,
+    api: Api,
+    codecs: EndpointCodecs,
+    call: ApplicationCall,
+    values: MutableMap<ParamKey<*>, Any?>,
+) {
+    when (val body = ep.bodyInput) {
+        null -> Unit
+
+        // Handed over unconsumed: no buffering, full back-pressure.
+        is RawBody -> values[body] = KtorByteStream(call.receiveChannel())
+
+        // The one place this backend reads a body with a blocking stream
+        // rather than a channel. Core parses the envelope, because three
+        // parsers would be three sets of behaviour, and core's is a
+        // `java.io.InputStream` — so the read moves to the IO dispatcher
+        // rather than parking a thread the engine wanted. The handler's
+        // own read of the file part is blocking for the same reason, which
+        // is the honest cost of one parser instead of three.
+        is MultipartBody -> withContext(Dispatchers.IO) {
+            body.decode(
+                contentType = call.request.headers[HttpHeaders.ContentType],
+                input = call.receiveChannel().toInputStream(),
+                maxTextBytes = api.maxBodyBytes,
+                into = values,
+            )
+        }
+
+        is JsonBody<*>, is FormBody<*> -> {
+            // The one place a slow client is this module's problem: a
+            // strict body has to arrive in full before the handler can be
+            // called, so it gets the API's own deadline rather than the
+            // engine's idle timeout.
+            // Checked before the body is pulled into a String, so an
+            // oversized payload is refused rather than allocated.
+            refuseIfOversize(call.request.headers["Content-Length"]?.toLongOrNull(), api.maxBodyBytes)
+            val text = try {
+                withTimeout(api.strictBodyTimeoutMillis) { call.receiveText() }
+            } catch (t: TimeoutCancellationException) {
+                throw ApiException(408, "Timed out reading the request body", t.message, cause = t)
+            }
+            refuseIfOversize(text.length.toLong(), api.maxBodyBytes)
+            // Whatever the codec throws is its own library's exception, and
+            // nothing here should have to recognise it. Wrapping it in
+            // core's own failure is what keeps this file codec-agnostic.
+            values[body] = try {
+                checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
+                    .decodeFromString(text)
+            } catch (t: BodyDecodeFailure) {
+                throw t
+            } catch (t: Throwable) {
+                throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
+            }
+        }
+    }
+}
+
 private suspend fun invoke(
     se: ServerEndpoint,
     api: Api,
@@ -218,98 +361,9 @@ private suspend fun invoke(
 
     // ---- inputs: path, query, headers, body -------------------------------
     try {
-        for (segment in ep.pathSpec.segments) {
-            if (segment !is PathSegment.Capture) continue
-            val param = segment.param
-            // Present by construction: this handler only runs for a request the
-            // template matched, and the template's captures are these params.
-            val raw = call.parameters[param.name]
-                ?: error("$ep matched ${call.request.local.uri} but captured no '${param.name}'")
-            values[param] = param.codec.decode(param.name, raw)
-        }
+        decodePlainInputs(ep, call, values)
 
-        for (q in ep.queries) {
-            val raw = call.request.queryParameters[q.name]
-            values[q] = when {
-                raw != null -> q.codec.decode(q.name, raw)
-                q.required -> throw ApiException(400, "Missing required query parameter '${q.name}'")
-                else -> q.default
-            }
-        }
-
-        for (h in ep.headerParams) {
-            val raw = call.request.headers[h.name]
-            values[h] = when {
-                raw != null -> h.codec.decode(h.name, raw)
-                h.required -> throw ApiException(400, "Missing required header '${h.name}'")
-                else -> h.default
-            }
-        }
-
-        // Parsed by core, from the header, rather than by Ktor's own cookie
-        // support — so a cookie decodes to the same value on all three
-        // backends. See `Cookies`.
-        val cookies = Cookies.parse(call.request.headers.getAll("Cookie").orEmpty())
-        for (c in ep.cookieParams) {
-            val raw = cookies[c.name]
-            values[c] = when {
-                raw != null -> c.codec.decode(c.name, raw)
-                c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
-                else -> c.default
-            }
-        }
-
-        when (val body = ep.bodyInput) {
-            null -> Unit
-
-            // Handed over unconsumed: no buffering, full back-pressure.
-            is RawBody -> values[body] = KtorByteStream(call.receiveChannel())
-
-            // The one place this backend reads a body with a blocking stream
-            // rather than a channel. Core parses the envelope, because three
-            // parsers would be three sets of behaviour, and core's is a
-            // `java.io.InputStream` — so the read moves to the IO dispatcher
-            // rather than parking a thread the engine wanted. The handler's
-            // own read of the file part is blocking for the same reason, which
-            // is the honest cost of one parser instead of three.
-            is MultipartBody -> withContext(Dispatchers.IO) {
-                body.decode(
-                    contentType = call.request.headers[HttpHeaders.ContentType],
-                    input = call.receiveChannel().toInputStream(),
-                    maxTextBytes = api.maxBodyBytes,
-                    into = values,
-                )
-            }
-
-            is JsonBody<*>, is FormBody<*> -> {
-                // The one place a slow client is this module's problem: a
-                // strict body has to arrive in full before the handler can be
-                // called, so it gets the API's own deadline rather than the
-                // engine's idle timeout.
-                // Checked before the body is pulled into a String, so an
-                // oversized payload is refused rather than allocated.
-                call.request.headers["Content-Length"]?.toLongOrNull()?.let {
-                    if (it > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
-                }
-                val text = try {
-                    withTimeout(api.strictBodyTimeoutMillis) { call.receiveText() }
-                } catch (t: TimeoutCancellationException) {
-                    throw ApiException(408, "Timed out reading the request body", t.message)
-                }
-                if (text.length.toLong() > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
-                // Whatever the codec throws is its own library's exception, and
-                // nothing here should have to recognise it. Wrapping it in
-                // core's own failure is what keeps this file codec-agnostic.
-                values[body] = try {
-                    checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
-                        .decodeFromString(text)
-                } catch (t: BodyDecodeFailure) {
-                    throw t
-                } catch (t: Throwable) {
-                    throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
-                }
-            }
-        }
+        readBody(ep, api, codecs, call, values)
     } catch (t: Throwable) {
         call.applyHeaders(params)
         return call.respondError(t, api, ep)

@@ -94,6 +94,11 @@ class Attribute<T> internal constructor(val name: String) {
 fun <T> attribute(name: String): Attribute<T> = Attribute(name)
 
 private fun Throwable.unwrapCompletion(): Throwable =
-    if (this is java.util.concurrent.CompletionException && cause != null) cause!!.unwrapCompletion() else this
+    if (this is java.util.concurrent.CompletionException) cause?.unwrapCompletion() ?: this else this
 
-internal fun completed(value: Any?): CompletionStage<Any?> = CompletableFuture.completedStage(value)
+/**
+ * `completedFuture`, not `completedStage`: the latter returns a *minimal*
+ * stage, whose `toCompletableFuture()` allocates a second future — and every
+ * synchronous handler goes through exactly that call on the way out.
+ */
+internal fun completed(value: Any?): CompletionStage<Any?> = CompletableFuture.completedFuture(value)

@@ -91,3 +91,12 @@ ktlint_standard_statement-wrapping = disabled
 # forbids a block comment in that position.
 ktlint_standard_comment-wrapping = disabled
 ktlint_standard_discouraged-comment-location = disabled
+
+# New in ktlint 1.8, and it disagrees with how this repository explains itself.
+# Every backend's Handlers.kt opens with a KDoc block about the *file* — what
+# the typed bridge is for, why streaming binders live there — and so does the
+# module description block in build.gradle.kts. ktlint calls that a "dangling
+# toplevel KDoc" and wants it turned into a line comment or attached to a
+# declaration. Attaching it to the first function would say the paragraph is
+# about that function, which it is not.
+ktlint_standard_kdoc = disabled

@@ -1,0 +1,189 @@
+# detekt, layered on top of its default rule set (`buildUponDefaultConfig`).
+# Only the deviations are written here, so this file reads as a list of
+# decisions rather than a copy of somebody else's defaults.
+#
+# Two of those decisions are already made elsewhere: .editorconfig turns off
+# the ktlint rules for wildcard imports and for filenames, with the reasoning
+# beside them. They are turned off here too rather than fought twice.
+
+build:
+  # No free allowance. A finding is either worth fixing or worth turning off
+  # by name, and "23 issues, under the threshold" is neither.
+  maxIssues: 0
+
+comments:
+  active: true
+  UndocumentedPublicClass:
+    active: false        # KDoc is prose here, and the reference manual carries the long form.
+  UndocumentedPublicFunction:
+    active: false
+
+complexity:
+  LongParameterList:
+    # An endpoint description is a list of inputs; `endpoint(a, b, c, d, e, f)`
+    # is the shape, not an accident.
+    functionThreshold: 8
+    constructorThreshold: 9
+    ignoreDefaultParameters: true
+  TooManyFunctions:
+    thresholdInFiles: 20
+    thresholdInClasses: 20
+    ignorePrivate: true
+    ignoreOverridden: true
+    ignoreDeprecated: true
+  CyclomaticComplexMethod:
+    threshold: 12
+    # A `when` that dispatches over a sealed hierarchy — Output, BodyInput — is
+    # one decision written out in full, and the compiler checks it is complete.
+    # Splitting one to lower a count would trade that exhaustiveness for the
+    # metric, so the branches of a simple dispatch count once.
+    ignoreSimpleWhenEntries: true
+  LongMethod:
+    threshold: 80
+  NestedBlockDepth:
+    threshold: 5
+
+exceptions:
+  TooGenericExceptionCaught:
+    # A server's last line of defence catches Throwable on purpose — that is
+    # the 500-and-log path each backend documents.
+    excludes: ['**/Interpreter.kt', '**/Server.kt', '**/Responses.kt']
+  SwallowedException:
+    excludes: ['**/test/**']
+
+naming:
+  MatchingDeclarationName:
+    # See .editorconfig: ResponseHeaders.kt holds ResponseHeader and the
+    # declarations that belong with it, which is the name a reader wants.
+    active: false
+  FunctionNaming:
+    # Test names are sentences in backticks.
+    excludes: ['**/test/**']
+
+style:
+  WildcardImport:
+    # See .editorconfig: `import dev.pelican.*` is the point of the core
+    # module's vocabulary, and the example sources are written to read that way.
+    active: false
+  MagicNumber:
+    # A status code in a test is the assertion, not a number needing a name.
+    excludes: ['**/test/**']
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreNamedArgument: true
+    # HTTP status codes are a vocabulary rather than magic. RFC 9110 gives 404
+    # its meaning, and this library hands them to you as integers —
+    # `errorJson<ApiError>(404, ...)`, `ApiError(400, ...)`, `json<T>(201)`.
+    # A private NOT_FOUND const sitting beside a public parameter that takes
+    # 404 would read as though the two were different things. Every code below
+    # is one this codebase actually emits; anything else still has to earn a
+    # name.
+    # The codes below are the ones this codebase writes down: those it emits,
+    # plus the RFC status-name table pelican-codegen turns into sealed failure
+    # classes (`402 -> "PaymentRequired"`), where the number is the data.
+    ignoreNumbers: ['-1', '0', '1', '2', '100', '200', '201', '204', '301', '302', '304', '400', '401', '402',
+                    '403', '404', '405', '406', '408', '409', '410', '412', '413', '415', '422', '423', '428',
+                    '429', '451', '500', '501', '502', '503', '504']
+  ReturnCount:
+    # Four, because two functions here are lookups that answer as soon as they
+    # know — `Cors.preflight` and the codegen type mapper. Threading a nullable
+    # through to one exit would not make either clearer.
+    max: 4
+    excludeGuardClauses: true
+  ThrowsCount:
+    max: 3
+  MaxLineLength:
+    maxLineLength: 120
+    excludes: ['**/test/**/generated/**']
+  ForbiddenComment:
+    active: true
+    comments:
+      - reason: 'Unfinished work does not belong on main.'
+        value: 'TODO:'
+      - reason: 'Unfinished work does not belong on main.'
+        value: 'FIXME:'
+  UnusedPrivateMember:
+    active: true
+  UnusedParameter:
+    # `@ParameterizedTest(name = "{0}")` takes the case's label as its first
+    # parameter and uses it for the test name, not in the body. That is the
+    # whole of this rule's catch in the test sources.
+    excludes: ['**/test/**']
+  ForbiddenVoid:
+    # `ActorSystem<Void>` is Pekko's Java DSL, not our choice:
+    # `Behaviors.empty<Void>()` is how a guardian with no protocol is spelled.
+    excludes: ['**/pekko/**']
+  DestructuringDeclarationWithTooManyEntries:
+    # `handledNow { (a, b, c, d) -> }` destructures the endpoint's declared
+    # inputs. Six of them is a six-input endpoint.
+    maxDestructuringEntries: 6
+
+  # ---------------------------------------------------------------- functional
+  #
+  # The rules below are off in detekt's defaults and on here. They are what
+  # "written functionally" is checkable as: a value once bound stays bound,
+  # a function is an expression, and a lambda is not a place to hide a loop.
+  ExpressionBodySyntax:
+    active: true
+    includeLineWrapping: false
+  VarCouldBeVal:
+    active: true
+    ignoreLateinitVar: false
+  UnnecessaryLet:
+    active: true
+  UnnecessaryApply:
+    active: true
+  UnnecessaryFilter:
+    active: true
+  CollapsibleIfStatements:
+    active: true
+  UseIfEmptyOrIfBlank:
+    active: true
+  PreferToOverPairSyntax:
+    active: true
+  ForbiddenMethodCall:
+    # Kept for the calls detekt can still resolve — anything with a JVM
+    # signature behind it. The mutable-collection ban this was written for is
+    # NOT enforced here: on Kotlin 2.4, detekt 1.23.8 resolves
+    # `java.util.UUID.randomUUID` but not `kotlin.collections.mutableListOf`,
+    # so those entries matched 28 sites under Kotlin 2.2 and silently zero
+    # after the bump. A rule that stops firing without saying so is worse than
+    # no rule, so that claim moved to FunctionalStyleTest, which reads the
+    # sources directly and cannot go quiet.
+    active: true
+    methods:
+      - reason: 'Thread.sleep in library code turns a timeout into a stall; schedule instead.'
+        value: 'java.lang.Thread.sleep'
+    # The example services sleep on purpose, to have something slow to stream,
+    # and the timing tests sleep to make a gap they can measure.
+    excludes: ['**/test/**', '**/example/**']
+
+# ---------------------------------------------------------------- tool limits
+#
+# Turned off because of what the tool can see rather than what the code does,
+# checked by hand at every site it fired.
+
+coroutines:
+  RedundantSuspendModifier:
+    # Wrong on Kotlin 2.4. It flags `respondFailure` and `respondError` in
+    # pelican-ktor, both of which call `ApplicationCall.respondText` — a
+    # suspend function. Removing the modifier as instructed does not compile:
+    #   "Suspend function 'respondText' can only be called from a coroutine".
+    # Same root cause as the ForbiddenMethodCall note above: 1.23.8 resolves
+    # some declarations against 2.4 metadata and not others.
+    active: false
+  InjectDispatcher:
+    # `withContext(Dispatchers.IO)` around the multipart parse is deliberate
+    # and explained where it happens: the parser is blocking, and the
+    # alternative is parking an engine thread. A library that took its
+    # dispatcher as a parameter would be asking every caller to answer a
+    # question only this file knows about.
+    active: false
+
+potential-bugs:
+  UnreachableCode:
+    # False on Kotlin 2.2 constructs: detekt 1.23.8 is built against the 2.0
+    # frontend and reads `val (a, b) = expr ?: return null`, and a statement
+    # after a `throw` inside a `catch`, as unreachable. All 11 sites it flagged
+    # are reached; SecuredReports.callerOf is the clearest.
+    active: false

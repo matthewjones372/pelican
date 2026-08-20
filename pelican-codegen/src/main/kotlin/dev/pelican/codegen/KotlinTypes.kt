@@ -58,35 +58,41 @@ internal class KotlinTypes {
     }
 
     private fun base(obj: JsonObj, context: String): String {
-        (obj["\$ref"] as? JsonStr)?.let { return typeName(it.value.substringAfterLast('/')) }
+        val named = (obj["\$ref"] as? JsonStr)?.let { typeName(it.value.substringAfterLast('/')) }
+            ?: stringConstants(obj)?.let { enumFor(context, it) }
+            ?: (obj["allOf"] as? JsonArr)?.items?.singleOrNull()?.let { type(it, context) }
+            // `anyOf` of one real branch and a null one is how 3.1 spells a
+            // nullable reference; the null branch is already accounted for by
+            // `admitsNull`, so what is left is the type. Anything richer is a
+            // union this generator does not model, and falls through below.
+            ?: obj.anyOfBranches()?.singleOrNull()?.let { type(it, context) }
+        if (named != null) return named
 
-        stringConstants(obj)?.let { return enumFor(context, it) }
+        return scalarType(obj, context)
+    }
 
-        (obj["allOf"] as? JsonArr)?.items?.singleOrNull()?.let { return type(it, context) }
+    private fun scalarType(obj: JsonObj, context: String): String = when (obj.scalarType()) {
+        "string" -> "String"
 
-        // `anyOf` of one real branch and a null one is how 3.1 spells a nullable
-        // reference; the null branch is already accounted for by `admitsNull`,
-        // so what is left is the type. Anything richer than that is a union this
-        // generator does not model, and falls through to `Any?` below.
-        obj.anyOfBranches()?.singleOrNull()?.let { return type(it, context) }
-
-        return when (obj.scalarType()) {
-            "string" -> "String"
-            "integer" -> when ((obj["format"] as? JsonStr)?.value) {
-                "int32" -> "Int"
-                else -> "Long"
-            }
-
-            "number" -> if ((obj["format"] as? JsonStr)?.value == "float") "Float" else "Double"
-            "boolean" -> "Boolean"
-            "array" -> "List<${type(obj["items"], context + "Item")}>"
-            "object" -> objectType(obj, context)
-            // A schema with properties and no `type` is still an object.
-            null -> if (obj["properties"] != null) objectType(obj, context) else "Any?"
-            // A shape this generator does not model becomes `Any?` rather than a
-            // guess — honest, and it still compiles.
-            else -> "Any?"
+        "integer" -> when ((obj["format"] as? JsonStr)?.value) {
+            "int32" -> "Int"
+            else -> "Long"
         }
+
+        "number" -> if ((obj["format"] as? JsonStr)?.value == "float") "Float" else "Double"
+
+        "boolean" -> "Boolean"
+
+        "array" -> "List<${type(obj["items"], context + "Item")}>"
+
+        "object" -> objectType(obj, context)
+
+        // A schema with properties and no `type` is still an object.
+        null -> if (obj["properties"] != null) objectType(obj, context) else "Any?"
+
+        // A shape this generator does not model becomes `Any?` rather than a
+        // guess — honest, and it still compiles.
+        else -> "Any?"
     }
 
     private fun objectType(obj: JsonObj, context: String): String {

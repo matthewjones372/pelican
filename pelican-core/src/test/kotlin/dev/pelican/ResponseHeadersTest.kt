@@ -1,9 +1,9 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 
 /**
  * A response header is declared the way an input is, and the bargain is the
@@ -30,22 +30,22 @@ class ResponseHeadersTest {
         p.setHeader(location, "/things/7")
         p.setHeader(retryAfter, 30L)
 
-        assertEquals(listOf("Location" to "/things/7", "Retry-After" to "30"), p.responseHeaders())
+        p.responseHeaders() shouldBe listOf("Location" to "/things/7", "Retry-After" to "30")
     }
 
     @Test
     fun `setting a header the endpoint never declared throws`() {
-        val failure = assertThrows<IllegalStateException> {
+        val failure = shouldThrow<IllegalStateException> {
             paramsFor(created).setHeader(undeclared, "surprise")
         }
-        assertTrue(failure.message!!.contains("never declared it"), failure.message!!)
+        withClue(failure.message!!) { failure.message!!.contains("never declared it") shouldBe true }
     }
 
     @Test
     fun `an undocumented header can still be set deliberately`() {
         val p = paramsFor(created)
         p.setRawHeader("X-Debug-Timing", "12ms")
-        assertEquals(listOf("X-Debug-Timing" to "12ms"), p.responseHeaders())
+        p.responseHeaders() shouldBe listOf("X-Debug-Timing" to "12ms")
     }
 
     @Test
@@ -54,10 +54,10 @@ class ResponseHeadersTest {
         p.setHeader(retryAfter, 1L)
 
         // `location` is required and missing; `retryAfter` is optional and set.
-        assertEquals(listOf(location), p.missingRequiredHeaders())
+        p.missingRequiredHeaders() shouldBe listOf(location)
         // Reporting, not failing: replacing a wrong header with a 500 would be
         // a worse answer than the one the handler produced.
-        assertEquals(listOf("Retry-After" to "1"), p.responseHeaders())
+        p.responseHeaders() shouldBe listOf("Retry-After" to "1")
     }
 
     @Test
@@ -67,6 +67,6 @@ class ResponseHeadersTest {
         p.setHeader(retryAfter, 5L)
         p.setHeader(location, "/things/2")
 
-        assertEquals(listOf("Location" to "/things/2", "Retry-After" to "5"), p.responseHeaders())
+        p.responseHeaders() shouldBe listOf("Location" to "/things/2", "Retry-After" to "5")
     }
 }

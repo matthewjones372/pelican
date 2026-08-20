@@ -52,16 +52,24 @@ internal class KotlinAwareModelResolver(mapper: ObjectMapper) : ModelResolver(ma
         val properties = schema.properties ?: return
         val parameters = kClass.primaryConstructor?.parameters ?: return
 
-        val optional = mutableSetOf<String>()
-        for (parameter in parameters) {
-            val name = parameter.name ?: continue
-            val property = properties[name] ?: continue // renamed by @JsonProperty; leave it be
-
-            properties[name] = property.matching(parameter.type)
-            if (parameter.type.isMarkedNullable) optional += name
-            // A default means the field may be omitted, whatever its type.
-            if (parameter.isOptional) optional += name
+        // A parameter with no matching property was renamed by @JsonProperty;
+        // leave that one be.
+        val described = parameters.mapNotNull { parameter ->
+            val name = parameter.name ?: return@mapNotNull null
+            val property = properties[name] ?: return@mapNotNull null
+            Triple(name, parameter, property)
         }
+
+        described.forEach { (name, parameter, property) ->
+            properties[name] = property.matching(parameter.type)
+        }
+
+        // Nullable, or defaulted — a default means the field may be omitted,
+        // whatever its type.
+        val optional = described
+            .filter { (_, parameter, _) -> parameter.type.isMarkedNullable || parameter.isOptional }
+            .map { (name, _, _) -> name }
+            .toSet()
         if (optional.isEmpty()) return
 
         // Rebuilt in declaration order rather than swagger's alphabetical one,

@@ -116,8 +116,23 @@ fun MultipartBody.decode(
         }
     }
 
-    for (part in parts) {
-        if (into.containsKey(part)) continue
+    fillMissingParts(parts, into, stoppedAtFile)
+}
+
+/**
+ * What the declaration expected and the request did not send: a required part
+ * is a 400, an optional one takes its default.
+ *
+ * The detail names the file part reading stopped at, when there was one. That
+ * is the whole difference between "you forgot a field" and "you sent it after
+ * the upload, and nothing buffers an upload".
+ */
+private fun fillMissingParts(
+    parts: List<MultipartPart<*>>,
+    into: MutableMap<ParamKey<*>, Any?>,
+    stoppedAtFile: String?,
+) {
+    parts.filterNot { into.containsKey(it) }.forEach { part ->
         val required = when (part) {
             is TextPart<*> -> part.required
             is FilePart<*> -> part.required
@@ -138,7 +153,7 @@ fun MultipartBody.decode(
 /** Reads up to [limit] bytes, calling [tooLarge] if there are more. */
 private inline fun InputStream.readAtMost(limit: Long, tooLarge: () -> Nothing): ByteArray {
     val out = ByteArrayOutputStream()
-    val buffer = ByteArray(4096)
+    val buffer = ByteArray(READ_BUFFER_BYTES)
     var remaining = limit
     while (true) {
         val read = read(buffer, 0, buffer.size)
@@ -201,37 +216,37 @@ internal class MultipartReader(source: InputStream, boundary: String) {
             else -> scanner.readLine()
         }
 
-        var name: String? = null
-        var filename: String? = null
-        var contentType: String? = null
-        while (true) {
-            val line = scanner.readLine()
-            if (line.isEmpty()) break
-            val colon = line.indexOf(':')
-            if (colon < 0) continue
-            val header = line.substring(0, colon).trim()
-            val value = line.substring(colon + 1).trim()
-            when {
-                header.equals("Content-Disposition", ignoreCase = true) -> {
-                    name = headerParameter(value, "name")
-                    filename = headerParameter(value, "filename")
-                }
-
-                header.equals("Content-Type", ignoreCase = true) -> contentType = value
-            }
-        }
+        val headers = partHeaders()
+        val disposition = headers["content-disposition"]
+        val name = disposition?.let { headerParameter(it, "name") }
+        val filename = disposition?.let { headerParameter(it, "filename") }
+        val contentType = headers["content-type"]
 
         val body = PartStream()
         current = body
         return MultipartPartData(name, filename, contentType, body)
     }
 
+    /**
+     * The headers of one part, up to the blank line that ends them. Keyed in
+     * lower case: header names are case-insensitive, and folding them once
+     * here is cheaper than remembering to compare them that way at each use.
+     */
+    private fun partHeaders(): Map<String, String> =
+        generateSequence { scanner.readLine().takeIf { it.isNotEmpty() } }
+            .mapNotNull { line ->
+                val colon = line.indexOf(':')
+                if (colon < 0) null
+                else line.substring(0, colon).trim().lowercase() to line.substring(colon + 1).trim()
+            }
+            .toMap()
+
     private inner class PartStream : InputStream() {
         private var ended = false
 
         override fun read(): Int {
             val one = ByteArray(1)
-            return if (read(one, 0, 1) < 0) -1 else one[0].toInt() and 0xFF
+            return if (read(one, 0, 1) < 0) -1 else one[0].toInt() and BYTE_MASK
         }
 
         override fun read(b: ByteArray, off: Int, len: Int): Int {
@@ -242,7 +257,7 @@ internal class MultipartReader(source: InputStream, boundary: String) {
         }
 
         fun drain() {
-            val scratch = ByteArray(4096)
+            val scratch = ByteArray(READ_BUFFER_BYTES)
             while (read(scratch, 0, scratch.size) >= 0) Unit
         }
     }
@@ -283,7 +298,7 @@ private class BoundaryScanner(
         return end - start
     }
 
-    fun readByte(): Int = if (fill(1) < 1) -1 else buffer[start++].toInt() and 0xFF
+    fun readByte(): Int = if (fill(1) < 1) -1 else buffer[start++].toInt() and BYTE_MASK
 
     /** One CRLF-terminated line, as ASCII. Part headers are the only thing this reads. */
     fun readLine(): String {
@@ -363,8 +378,8 @@ private class BoundaryScanner(
         // this could be except the last delimiter of a truncated envelope, and
         // reading it as content would only turn one complaint into another.
         if (index + 2 > end) return exhausted
-        val first = buffer[index].toInt() and 0xFF
-        val second = buffer[index + 1].toInt() and 0xFF
+        val first = buffer[index].toInt() and BYTE_MASK
+        val second = buffer[index + 1].toInt() and BYTE_MASK
         return (first == CR && second == LF) || (first == DASH && second == DASH)
     }
 }
@@ -384,29 +399,41 @@ private val CRLF = byteArrayOf(CR.toByte(), LF.toByte())
  * `;` this is splitting on, and a regex that gets that right is longer than
  * the loop.
  */
-internal fun headerParameter(header: String, parameter: String): String? {
-    val segments = mutableListOf<String>()
-    val sb = StringBuilder()
-    var quoted = false
-    for (c in header) {
-        when {
-            c == '"' -> { quoted = !quoted; sb.append(c) }
-            c == ';' && !quoted -> { segments += sb.toString(); sb.setLength(0) }
-            else -> sb.append(c)
-        }
-    }
-    segments += sb.toString()
-
-    for (segment in segments) {
+internal fun headerParameter(header: String, parameter: String): String? =
+    semicolonSegments(header).firstNotNullOfOrNull { segment ->
         val equals = segment.indexOf('=')
-        if (equals < 0) continue
-        if (!segment.substring(0, equals).trim().equals(parameter, ignoreCase = true)) continue
-        val value = segment.substring(equals + 1).trim()
-        return if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-            value.substring(1, value.length - 1).replace("\\\"", "\"")
+        val name = if (equals < 0) null else segment.substring(0, equals).trim()
+        if (name != null && name.equals(parameter, ignoreCase = true)) {
+            unquoteParameter(segment.substring(equals + 1).trim())
         } else {
-            value
+            null
         }
     }
-    return null
+
+/**
+ * Splits on the semicolons that separate header parameters, and only those:
+ * a semicolon inside a quoted value is part of the value. `filename="a;b.txt"`
+ * is one segment, which is the whole reason this is not `split(';')`.
+ */
+private fun semicolonSegments(header: String): List<String> {
+    // How many quotes precede each index. A semicolon with an even number in
+    // front of it is outside a quoted value, and so is a real separator.
+    val quotesBefore = header.runningFold(0) { seen, c -> if (c == '"') seen + 1 else seen }
+    val cuts = header.indices.filter { i -> header[i] == ';' && quotesBefore[i] % 2 == 0 }
+
+    return (listOf(-1) + cuts + header.length).zipWithNext { from, to -> header.substring(from + 1, to) }
 }
+
+/** `"a b"` is the value `a b`; an escaped quote inside it is a quote. */
+private fun unquoteParameter(value: String): String =
+    if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+        value.substring(1, value.length - 1).replace("\\\"", "\"")
+    } else {
+        value
+    }
+
+/** One page. Big enough that the syscall is not the cost, small enough to hold several. */
+private const val READ_BUFFER_BYTES = 4096
+
+/** A Kotlin Byte is signed; this is how one becomes the 0..255 the format talks about. */
+private const val BYTE_MASK = 0xFF

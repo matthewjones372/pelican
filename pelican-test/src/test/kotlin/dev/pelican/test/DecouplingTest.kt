@@ -1,7 +1,8 @@
 package dev.pelican.test
 
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.withClue
+import io.kotest.matchers.nulls.shouldNotBeNull
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
@@ -26,16 +27,15 @@ class DecouplingTest {
     @Test
     fun `the main runtime classpath is core, the kotlin runtime, and nothing else`() {
         val raw = System.getProperty("pelican.test.runtimeClasspath")
-        assertNotNull(raw, "the build must pass -Dpelican.test.runtimeClasspath; see build.gradle.kts")
+        withClue("the build must pass -Dpelican.test.runtimeClasspath; see build.gradle.kts") { raw.shouldNotBeNull() }
 
         val unexpected = raw!!.split(java.io.File.pathSeparator)
             .filter { it.isNotBlank() }
             .filterNot { entry -> allowed.any { entry.startsWith(it) } }
 
-        assertTrue(
-            unexpected.isEmpty(),
-            "pelican-test must stay backend-agnostic, but found: $unexpected",
-        )
+        withClue("pelican-test must stay backend-agnostic, but found: $unexpected") {
+            unexpected.isEmpty() shouldBe true
+        }
     }
 
     @Test
@@ -45,18 +45,35 @@ class DecouplingTest {
             "org.http4k.core.Request",
             "io.ktor.server.application.Application",
         ).forEach { name ->
-            assertTrue(
-                runCatching { Class.forName(name) }.isFailure,
-                "$name is on pelican-test's classpath; a backend crept back in",
-            )
+            withClue("$name is on pelican-test's classpath; a backend crept back in") {
+                runCatching { Class.forName(name) }.isFailure shouldBe true
+            }
         }
     }
 
+    /**
+     * The assertions this module ships throw plain `AssertionError`, so a
+     * service that wants a typed test client is not handed somebody else's
+     * matcher library along with it.
+     *
+     * Asked of the *published* classpath rather than of `Class.forName`: this
+     * repository's own tests are written with kotest's matchers, so kotest is
+     * on the test classpath here by construction and a `Class.forName` check
+     * would only be restating that. What a consumer gets is the claim worth
+     * holding, and `runtimeClasspath` is where that is written down.
+     */
     @Test
     fun `the matchers do not drag in a matcher library`() {
-        assertTrue(
-            runCatching { Class.forName("io.kotest.matchers.Matcher") }.isFailure,
-            "kotest is on pelican-test's classpath; the assertions here throw AssertionError instead",
-        )
+        val raw = System.getProperty("pelican.test.runtimeClasspath")
+        raw.shouldNotBeNull()
+
+        val matcherLibraries = listOf("kotest", "hamcrest", "assertj", "truth-", "strikt")
+        val found = raw.split(java.io.File.pathSeparator)
+            .filter { it.isNotBlank() }
+            .filter { entry -> matcherLibraries.any { entry.startsWith(it) } }
+
+        withClue("a matcher library is published with pelican-test: $found") {
+            found.isEmpty() shouldBe true
+        }
     }
 }

@@ -3,8 +3,12 @@ package dev.pelican
 import java.util.UUID
 
 /** Thrown when a path/query/header value cannot be decoded into its declared type. */
-class DecodeFailure(val paramName: String, val raw: String, val expected: String) :
-    RuntimeException("Cannot decode '$raw' for '$paramName': expected $expected")
+class DecodeFailure(
+    val paramName: String,
+    val raw: String,
+    val expected: String,
+    cause: Throwable? = null,
+) : RuntimeException("Cannot decode '$raw' for '$paramName': expected $expected", cause)
 
 /**
  * Codec for a value that travels as a single string: a path segment, a query
@@ -82,9 +86,9 @@ object BooleanCodec : PlainCodec<Boolean> {
 object UuidCodec : PlainCodec<UUID> {
     override val openApiType = "string"
     override val openApiFormat = "uuid"
-    override fun decode(name: String, raw: String) =
+    override fun decode(name: String, raw: String): UUID =
         try { UUID.fromString(raw) } catch (e: IllegalArgumentException) {
-            throw DecodeFailure(name, raw, "a UUID")
+            throw DecodeFailure(name, raw, "a UUID", e)
         }
 }
 
@@ -111,16 +115,27 @@ inline fun <reified T : Any> plainCodecFor(): PlainCodec<T> {
     }
     return when (T::class) {
         String::class -> StringCodec
+
         Int::class -> IntCodec
+
         Long::class -> LongCodec
+
         Double::class -> DoubleCodec
+
         Boolean::class -> BooleanCodec
+
         UUID::class -> UuidCodec
+
         NonEmptyString::class -> NonEmptyStringCodec
+
         java.time.Instant::class -> InstantCodec
+
         java.time.LocalDate::class -> LocalDateCodec
+
         java.time.LocalDateTime::class -> LocalDateTimeCodec
+
         java.net.URI::class -> UriCodec
+
         else -> throw IllegalArgumentException(
             "No PlainCodec for ${T::class.qualifiedName}. Pass one explicitly.",
         )

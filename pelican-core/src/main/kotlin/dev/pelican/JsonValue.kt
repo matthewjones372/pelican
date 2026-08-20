@@ -55,7 +55,7 @@ data class JsonStr(val value: String) : JsonValue {
                 c == '\n' -> sb.append("\\n")
                 c == '\r' -> sb.append("\\r")
                 c == '\t' -> sb.append("\\t")
-                c < ' ' -> sb.append("\\u").append(c.code.toString(16).padStart(4, '0'))
+                c < ' ' -> sb.append("\\u").append(c.code.toString(HEX).padStart(UNICODE_ESCAPE_DIGITS, '0'))
                 else -> sb.append(c)
             }
         }
@@ -187,19 +187,30 @@ private class JsonReader(private val text: String) {
         while (true) {
             when (val c = take()) {
                 '"' -> return sb.toString()
+
                 '\\' -> when (val escape = take()) {
                     '"' -> sb.append('"')
+
                     '\\' -> sb.append('\\')
+
                     '/' -> sb.append('/')
+
                     'b' -> sb.append('\b')
+
                     'f' -> sb.append('\u000C')
+
                     'n' -> sb.append('\n')
+
                     'r' -> sb.append('\r')
+
                     't' -> sb.append('\t')
+
                     'u' -> {
-                        require(offset + 4 <= text.length) { "Truncated \\u escape at offset $offset" }
-                        sb.append(text.substring(offset, offset + 4).toInt(16).toChar())
-                        offset += 4
+                        require(offset + UNICODE_ESCAPE_DIGITS <= text.length) {
+                            "Truncated \\u escape at offset $offset"
+                        }
+                        sb.append(text.substring(offset, offset + UNICODE_ESCAPE_DIGITS).toInt(HEX).toChar())
+                        offset += UNICODE_ESCAPE_DIGITS
                     }
 
                     else -> error("Unknown escape '\\$escape' at offset ${offset - 1}")
@@ -250,9 +261,15 @@ fun JsonValue.renderPretty(indent: String = ""): String {
             else fields.entries.joinToString(",\n", "{\n", "\n$indent}") { (k, v) ->
                 "$next${JsonStr(k).render()}: ${v.renderPretty(next)}"
             }
+
         is JsonArr ->
             if (items.isEmpty()) "[]"
             else items.joinToString(",\n", "[\n", "\n$indent]") { "$next${it.renderPretty(next)}" }
+
         else -> render()
     }
 }
+
+/** `\uXXXX` is four hex digits, by the JSON grammar. */
+private const val UNICODE_ESCAPE_DIGITS = 4
+private const val HEX = 16

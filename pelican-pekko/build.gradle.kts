@@ -1,5 +1,5 @@
-val slf4jVersion = "2.0.17"
-val pekkoVersion = "1.6.0"
+val slf4jVersion = "2.0.18"
+val pekkoVersion = "1.7.0"
 val pekkoHttpVersion = "1.4.0"
 val scalaBinary = "2.13"
 
@@ -23,4 +23,14 @@ dependencies {
     // has to write it down, and an API — not a binding — is the right weight:
     // the application picks the implementation.
     api("org.slf4j:slf4j-api:$slf4jVersion")
+
+    // Pekko's own route testkit, rather than a hand-rolled way of running a
+    // route. `pekko-stream-testkit` and `pekko-testkit` are `provided` in its
+    // pom and JUnit 4 is `test`, so all of them are named here: TestRouteResult
+    // reports a failure through `org.junit.Assert`, which has to be on the
+    // classpath even though nothing in this repository is a JUnit 4 test.
+    testImplementation("org.apache.pekko:pekko-http-testkit_$scalaBinary:$pekkoHttpVersion")
+    testImplementation("org.apache.pekko:pekko-stream-testkit_$scalaBinary")
+    testImplementation("org.apache.pekko:pekko-testkit_$scalaBinary")
+    testImplementation("junit:junit:4.13.2")
 }

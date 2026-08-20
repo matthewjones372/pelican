@@ -5,7 +5,7 @@ plugins { kotlin("plugin.serialization") }
 // endpoint descriptions are documented and served through this too.
 dependencies {
     api(project(":pelican-core"))
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // CodecAgreementTest generates one spec through each codec module and
     // compares them. It lives here because this is the module whose reason to

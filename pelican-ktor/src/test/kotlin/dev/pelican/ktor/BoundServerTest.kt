@@ -1,8 +1,8 @@
 package dev.pelican.ktor
 
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import java.net.URI
@@ -50,25 +50,21 @@ class BoundServerTest {
     @Test
     fun `a bound server answers on the port it reports`() {
         val res = get("/items/1")
-        assertEquals(200, res.statusCode())
-        assertEquals("""{"id":1,"name":"widget"}""", res.body())
-        assertEquals("application/json", res.headers().firstValue("content-type").orElse(null))
+        res.statusCode() shouldBe 200
+        res.body() shouldBe """{"id":1,"name":"widget"}"""
+        res.headers().firstValue("content-type").orElse(null) shouldBe "application/json"
     }
 
     @Test
     fun `a streamed response is chunked rather than measured`() {
         val res = get("/items/stream?limit=3")
-        assertEquals(200, res.statusCode())
-        assertEquals(
-            3,
-            res.body().lines().count { it.isNotBlank() },
-        )
+        res.statusCode() shouldBe 200
+        res.body().lines().count { it.isNotBlank() } shouldBe 3
         // No content length: the server cannot know one without buffering the
         // whole stream, which is the thing being avoided.
-        assertTrue(
-            res.headers().firstValue("content-length").isEmpty,
-            "a streamed response declared a length, so something buffered it",
-        )
+        withClue("a streamed response declared a length, so something buffered it") {
+            res.headers().firstValue("content-length").isEmpty shouldBe true
+        }
     }
 
     @Test
@@ -81,8 +77,8 @@ class BoundServerTest {
                 .build(),
             HttpResponse.BodyHandlers.ofString(),
         )
-        assertEquals(201, res.statusCode())
-        assertEquals("""{"id":7,"name":"rope"}""", res.body())
+        res.statusCode() shouldBe 201
+        res.body() shouldBe """{"id":7,"name":"rope"}"""
     }
 
     @Test
@@ -94,12 +90,12 @@ class BoundServerTest {
                 .build(),
             HttpResponse.BodyHandlers.ofString(),
         )
-        assertEquals(200, res.statusCode())
-        assertEquals(body, res.body())
+        res.statusCode() shouldBe 200
+        res.body() shouldBe body
     }
 
     @Test
     fun `a declared failure keeps its status over the wire`() {
-        assertEquals(404, get("/items/2").statusCode())
+        get("/items/2").statusCode() shouldBe 404
     }
 }

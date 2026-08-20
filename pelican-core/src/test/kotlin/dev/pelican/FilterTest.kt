@@ -1,9 +1,9 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.CompletionStage
@@ -35,8 +35,8 @@ class FilterTest {
         val log = mutableListOf<String>()
         val chain = listOf(record(log, "a"), record(log, "b")).wrap(handler)
 
-        assertEquals("handled", chain(params()).toCompletableFuture().join())
-        assertEquals(listOf("a in", "b in", "b out", "a out"), log)
+        chain(params()).toCompletableFuture().join() shouldBe "handled"
+        log shouldBe listOf("a in", "b in", "b out", "a out")
     }
 
     @Test
@@ -45,14 +45,14 @@ class FilterTest {
         val chain = listOf(before { forbidden("no") })
             .wrap { ran = true; CompletableFuture.completedStage("handled" as Any?) }
 
-        val failure = assertThrows<ApiException> { chain(params()) }
-        assertEquals(403, failure.status)
-        assertEquals(false, ran)
+        val failure = shouldThrow<ApiException> { chain(params()) }
+        failure.status shouldBe 403
+        ran shouldBe false
     }
 
     @Test
     fun `an empty chain is the handler itself`() {
-        assertEquals("handled", emptyList<Filter>().wrap(handler)(params()).toCompletableFuture().join())
+        emptyList<Filter>().wrap(handler)(params()).toCompletableFuture().join() shouldBe "handled"
     }
 
     @Test
@@ -63,7 +63,7 @@ class FilterTest {
         ).wrap(handler)
 
         chain(params()).toCompletableFuture().join()
-        assertEquals(emptyList<String>(), seen)
+        seen shouldBe emptyList<String>()
     }
 
     @Test
@@ -72,16 +72,16 @@ class FilterTest {
         val chain = listOf(before { it[who] = "ada" })
             .wrap { p -> CompletableFuture.completedStage(p[who] as Any?) }
 
-        assertEquals("ada", chain(params()).toCompletableFuture().join())
+        chain(params()).toCompletableFuture().join() shouldBe "ada"
     }
 
     @Test
     fun `reading an attribute nothing set names the wiring mistake`() {
         val who = attribute<String>("who")
-        val failure = assertThrows<IllegalStateException> { params()[who] }
-        assertTrue(failure.message!!.contains("nothing set it"), failure.message!!)
+        val failure = shouldThrow<IllegalStateException> { params()[who] }
+        withClue(failure.message!!) { failure.message!!.contains("nothing set it") shouldBe true }
         // And the non-throwing read, for a filter that is genuinely optional.
-        assertEquals(null, params().find(who))
+        params().find(who) shouldBe null
     }
 
     @Test
@@ -90,7 +90,7 @@ class FilterTest {
         val chain = listOf(after { _, result, error -> seen += (error ?: result) }).wrap(handler)
 
         chain(params()).toCompletableFuture().join()
-        assertEquals(listOf<Any?>("handled"), seen)
+        seen shouldBe listOf<Any?>("handled")
     }
 
     @Test
@@ -100,10 +100,10 @@ class FilterTest {
         val chain = listOf(after { _, _, error -> seen += error })
             .wrap { CompletableFuture.failedStage<Any?>(boom) }
 
-        val failure = assertThrows<CompletionException> {
+        val failure = shouldThrow<CompletionException> {
             chain(params()).toCompletableFuture().join()
         }
-        assertEquals(boom, unwrapCompletion(failure))
-        assertEquals(listOf<Any?>(boom), seen)
+        unwrapCompletion(failure) shouldBe boom
+        seen shouldBe listOf<Any?>(boom)
     }
 }

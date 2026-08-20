@@ -5,7 +5,12 @@
 package dev.pelican.openapi
 
 import dev.pelican.*
-import org.junit.jupiter.api.Assertions.*
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -72,16 +77,16 @@ class DecouplingTest {
     @Test
     fun `a spec can be generated with no server library present`() {
         val doc = spec().openApi()
-        assertEquals("3.1.0", (doc / "openapi").str())
+        (doc / "openapi").str() shouldBe "3.1.0"
 
         val paths = doc / "paths"
-        assertTrue("/widgets/{widgetId}" in paths.keys())
-        assertTrue("/widgets" in paths.keys())
+        paths.keys() shouldContain "/widgets/{widgetId}"
+        paths.keys() shouldContain "/widgets"
 
         val ok = paths / "/widgets" / "get" / "responses" / "200"
-        assertTrue("application/x-ndjson" in (ok / "content").keys())
+        ("application/x-ndjson" in (ok / "content").keys()) shouldBe true
 
-        assertTrue("Widget" in (doc / "components" / "schemas").keys())
+        ("Widget" in (doc / "components" / "schemas").keys()) shouldBe true
     }
 
     @Test
@@ -90,8 +95,8 @@ class DecouplingTest {
         val schema = doc / "paths" / "/widgets/all" / "get" /
             "responses" / "200" / "content" / "application/json" / "schema"
 
-        assertEquals("array", (schema / "type").str())
-        assertEquals("#/components/schemas/Widget", (schema / "items" / "\$ref").str())
+        (schema / "type").str() shouldBe "array"
+        (schema / "items" / "\$ref").str() shouldBe "#/components/schemas/Widget"
     }
 
     @Test
@@ -99,16 +104,15 @@ class DecouplingTest {
         // Not a formality: if `openApi()` ever returns someone else's tree, this
         // module has acquired a JSON dependency it is not supposed to have.
         val doc: JsonObj = spec().openApi()
-        assertTrue(doc.render().startsWith("""{"openapi":"3.1.0","""), doc.render().take(60))
-        assertTrue(spec().openApiJson().startsWith("{\n  \"openapi\""))
+        withClue(doc.render().take(60)) { doc.render().startsWith("""{"openapi":"3.1.0",""") shouldBe true }
+        spec().openApiJson().startsWith("{\n  \"openapi\"") shouldBe true
     }
 
     @Test
     fun `pekko is genuinely absent from this module's classpath`() {
         val loaded = runCatching { Class.forName("org.apache.pekko.http.javadsl.server.Directives") }
-        assertTrue(
-            loaded.isFailure,
-            "pelican-openapi must not see Pekko; if this passes, a dependency crept in",
-        )
+        withClue("pelican-openapi must not see Pekko; if this passes, a dependency crept in") {
+            loaded.isFailure shouldBe true
+        }
     }
 }

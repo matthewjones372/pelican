@@ -38,7 +38,7 @@ internal class FrameInputStream(frames: Sequence<String>) : InputStream() {
     }
 
     override fun read(): Int =
-        if (!advance()) -1 else current[position++].toInt() and 0xFF
+        if (!advance()) -1 else current[position++].toInt() and BYTE_MASK
 
     override fun read(b: ByteArray, off: Int, len: Int): Int {
         if (len == 0) return 0
@@ -73,3 +73,6 @@ internal fun jsonArrayFrames(
     }
     yield(if (seen) "]" else "[]")
 }
+
+/** A Kotlin Byte is signed; `InputStream.read` promises 0..255. */
+private const val BYTE_MASK = 0xFF

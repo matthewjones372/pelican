@@ -12,7 +12,7 @@
 // dependency, exactly as the JDK's own server does for http4k. Any other engine
 // works: pass its factory to `start` and add that Ktor module to your build.
 val ktorVersion = "3.5.2"
-val slf4jVersion = "2.0.17"
+val slf4jVersion = "2.0.18"
 
 dependencies {
     api(project(":pelican-core"))

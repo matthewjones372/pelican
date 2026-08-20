@@ -1,6 +1,7 @@
 package dev.pelican.http4k
 
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
@@ -17,18 +18,19 @@ class DecouplingTest {
     @Test
     fun `pekko is genuinely absent from this module's classpath`() {
         val loaded = runCatching { Class.forName("org.apache.pekko.http.javadsl.server.Directives") }
-        assertTrue(
-            loaded.isFailure,
-            "pelican-http4k must not see Pekko: the point of a second backend is that it shares no server library with the first",
-        )
+        withClue(
+            "pelican-http4k must not see Pekko: the point of a second backend is that it " +
+                "shares no server library with the first",
+        ) {
+            loaded.isFailure shouldBe true
+        }
     }
 
     @Test
     fun `the openapi module is genuinely absent from this module's classpath`() {
         val loaded = runCatching { Class.forName("dev.pelican.openapi.OpenApiKt") }
-        assertTrue(
-            loaded.isFailure,
-            "pelican-http4k must not see pelican-openapi; docs live in pelican-http4k-docs",
-        )
+        withClue("pelican-http4k must not see pelican-openapi; docs live in pelican-http4k-docs") {
+            loaded.isFailure shouldBe true
+        }
     }
 }

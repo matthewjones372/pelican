@@ -3,8 +3,12 @@ package dev.pelican.kotlinx
 import dev.pelican.*
 import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.openapi.openApi
+import io.kotest.assertions.fail
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.Serializable
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 /**
@@ -165,11 +169,9 @@ class CodecAgreementTest {
         val jackson = documentWith(JacksonCodecs)
         val kotlinx = documentWith(KotlinxCodecs)
 
-        assertEquals(
-            kotlinx.normalise().renderPretty(),
-            jackson.normalise().renderPretty(),
-            "the two schema sources disagree; the abstraction is leaking",
-        )
+        withClue("the two schema sources disagree; the abstraction is leaking") {
+            jackson.normalise().renderPretty() shouldBe kotlinx.normalise().renderPretty()
+        }
     }
 
     @Test
@@ -177,22 +179,17 @@ class CodecAgreementTest {
         // A guard on the test itself: comparing two empty documents would pass.
         listOf(JacksonCodecs, KotlinxCodecs).forEach { source ->
             val schemas = documentWith(source)["components"].asObj()["schemas"].asObj()
-            assertEquals(
-                setOf("Order", "Line", "Address", "Category", "CreateOrder", "Failure"),
-                schemas.fields.keys,
-                "$source did not describe the expected models",
-            )
+            withClue("$source did not describe the expected models") {
+                schemas.fields.keys shouldBe setOf("Order", "Line", "Address", "Category", "CreateOrder", "Failure")
+            }
             val order = schemas["Order"].asObj()
-            assertEquals(
-                listOf(
-                    "id", "status", "previousStatus", "history", "lines", "attempts",
-                    "batches", "shipTo", "billTo", "depots", "couriers", "labels",
-                    "weight", "gift",
-                ),
-                order["properties"].asObj().fields.keys.toList(),
+            order["properties"].asObj().fields.keys.toList() shouldBe listOf(
+                "id", "status", "previousStatus", "history", "lines", "attempts",
+                "batches", "shipTo", "billTo", "depots", "couriers", "labels",
+                "weight", "gift",
             )
             // `gift` has a default, so a payload may leave it out.
-            assertFalse("gift" in order["required"].asStrings())
+            order["required"].asStrings() shouldNotContain "gift"
         }
     }
 
@@ -206,20 +203,16 @@ class CodecAgreementTest {
             val properties = document["components"].asObj()["schemas"].asObj()["Order"]
                 .asObj()["properties"].asObj()
 
-            assertEquals(
-                listOf("string", "null"),
-                properties["previousStatus"].asObj()["type"].asStrings(),
-                "$source did not widen an enum's type",
-            )
-            assertEquals(
-                listOf("array", "null"),
-                properties["couriers"].asObj()["type"].asStrings(),
-                "$source did not widen an array's type",
-            )
+            withClue("$source did not widen an enum's type") {
+                properties["previousStatus"].asObj()["type"].asStrings() shouldBe listOf("string", "null")
+            }
+            withClue("$source did not widen an array's type") {
+                properties["couriers"].asObj()["type"].asStrings() shouldBe listOf("array", "null")
+            }
             // A reference has no `type` to widen, so it goes under `anyOf`.
             assertNullableRef(source, properties["billTo"], "Address")
 
-            assertFalse("nullable" in document.render(), "$source still writes 3.0's keyword")
+            withClue("$source still writes 3.0's keyword") { document.render() shouldNotContain "nullable" }
         }
     }
 
@@ -237,8 +230,8 @@ class CodecAgreementTest {
 
             // List<Status?> — the element widens; its constants stay where they are.
             val element = order["history"].asObj()["items"].asObj()
-            assertEquals(listOf("string", "null"), element["type"].asStrings(), "$source: List<Status?>")
-            assertEquals(listOf("PENDING", "SHIPPED", "CANCELLED"), element["enum"].asStrings())
+            withClue("$source: List<Status?>") { element["type"].asStrings() shouldBe listOf("string", "null") }
+            element["enum"].asStrings() shouldBe listOf("PENDING", "SHIPPED", "CANCELLED")
 
             // List<Line?> and Map<String, Address?> — references again, so `anyOf`.
             assertNullableRef(source, order["attempts"].asObj()["items"], "Line")
@@ -246,8 +239,8 @@ class CodecAgreementTest {
 
             // List<List<Line>?> — two levels down, and only the middle is nullable.
             val batch = order["batches"].asObj()["items"].asObj()
-            assertEquals(listOf("array", "null"), batch["type"].asStrings(), "$source: List<List<Line>?>")
-            assertEquals("#/components/schemas/Line", batch["items"].asObj().ref())
+            withClue("$source: List<List<Line>?>") { batch["type"].asStrings() shouldBe listOf("array", "null") }
+            batch["items"].asObj().ref() shouldBe "#/components/schemas/Line"
 
             // A type that refers to itself, one collection down.
             val category = schemas["Category"].asObj()["properties"].asObj()
@@ -267,11 +260,11 @@ class CodecAgreementTest {
             // The non-nullable siblings are untouched. Widening happens in place
             // on swagger's objects, so this is the evidence that no schema
             // instance was shared and widened out from under another property.
-            assertEquals("array", order["lines"].asObj()["type"].asString())
-            assertEquals("#/components/schemas/Line", order["lines"].asObj()["items"].asObj().ref())
-            assertEquals("string", order["labels"].asObj()["additionalProperties"].asObj()["type"].asString())
-            assertEquals("string", order["status"].asObj()["type"].asString())
-            assertEquals("#/components/schemas/Category", category["children"].asObj()["items"].asObj().ref())
+            order["lines"].asObj()["type"].asString() shouldBe "array"
+            order["lines"].asObj()["items"].asObj().ref() shouldBe "#/components/schemas/Line"
+            order["labels"].asObj()["additionalProperties"].asObj()["type"].asString() shouldBe "string"
+            order["status"].asObj()["type"].asString() shouldBe "string"
+            category["children"].asObj()["items"].asObj().ref() shouldBe "#/components/schemas/Category"
         }
     }
 
@@ -279,9 +272,9 @@ class CodecAgreementTest {
     private fun assertNullableRef(source: SchemaSource, schema: JsonValue?, name: String) {
         val branches = (schema.asObj()["anyOf"] as? JsonArr)?.items
             ?: fail("$source: expected an anyOf for a nullable $name, got ${schema?.render()}")
-        assertEquals(2, branches.size, "$source: $name")
-        assertEquals("#/components/schemas/$name", branches[0].asObj().ref(), "$source: $name")
-        assertEquals("null", branches[1].asObj()["type"].asString(), "$source: $name")
+        withClue("$source: $name") { branches.size shouldBe 2 }
+        withClue("$source: $name") { branches[0].asObj().ref() shouldBe "#/components/schemas/$name" }
+        withClue("$source: $name") { branches[1].asObj()["type"].asString() shouldBe "null" }
     }
 
     @Test
@@ -294,8 +287,8 @@ class CodecAgreementTest {
         val byJackson = JacksonCodecs.codec<Line>(type)
         val byKotlinx = KotlinxCodecs.codec<Line>(type)
 
-        assertEquals(order, byKotlinx.decodeFromString(byJackson.encodeToString(order)))
-        assertEquals(order, byJackson.decodeFromString(byKotlinx.encodeToString(order)))
+        byKotlinx.decodeFromString(byJackson.encodeToString(order)) shouldBe order
+        byJackson.decodeFromString(byKotlinx.encodeToString(order)) shouldBe order
     }
 
     @Test
@@ -311,12 +304,10 @@ class CodecAgreementTest {
         val byKotlinx = KotlinxCodecs.formCodec<Line>(type)
 
         val expected = Line("sku-1", quantity = 4, note = null)
-        assertEquals(expected, byJackson.decodeFromString(form))
-        assertEquals(expected, byKotlinx.decodeFromString(form))
-        assertEquals(
-            byJackson.encodeToString(expected).split("&").toSet(),
-            byKotlinx.encodeToString(expected).split("&").toSet(),
-        )
+        byJackson.decodeFromString(form) shouldBe expected
+        byKotlinx.decodeFromString(form) shouldBe expected
+        byKotlinx.encodeToString(expected).split("&").toSet() shouldBe
+            byJackson.encodeToString(expected).split("&").toSet()
     }
 
     private fun typeOfLine() = kotlin.reflect.typeOf<Line>()
@@ -343,12 +334,14 @@ private fun JsonValue.normalise(): JsonValue = when (this) {
     is JsonObj -> JsonObj(
         fields.toSortedMap().mapValues { (key, value) ->
             if (key == "required" && value is JsonArr) {
-                JsonArr(value.items.sortedBy { (it as? JsonStr)?.value ?: "" })
+                JsonArr(value.items.sortedBy { (it as? JsonStr)?.value.orEmpty() })
             } else {
                 value.normalise()
             }
         },
     )
+
     is JsonArr -> JsonArr(items.map { it.normalise() })
+
     else -> this
 }

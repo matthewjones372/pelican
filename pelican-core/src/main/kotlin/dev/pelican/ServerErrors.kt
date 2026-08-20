@@ -82,11 +82,14 @@ fun renderError(raw: Throwable, exposeInternalDetail: Boolean = false): Rendered
 }
 
 internal fun unwrapCompletion(t: Throwable): Throwable =
-    if (t is CompletionException && t.cause != null) unwrapCompletion(t.cause!!) else t
+    if (t is CompletionException) t.cause?.let(::unwrapCompletion) ?: t else t
 
 /**
  * Short, unique enough to find in a log, and not sequential — a counter would
  * tell a caller how much traffic the service takes.
  */
 private fun newReference(): String =
-    java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+    java.util.UUID.randomUUID().toString().replace("-", "").take(REFERENCE_LENGTH)
+
+/** Long enough to be unique in a log, short enough to read out over a phone. */
+private const val REFERENCE_LENGTH = 12

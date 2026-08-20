@@ -22,7 +22,7 @@ import dev.pelican.pekko.docs.startWithDocs as startPekkoWithDocs
  * bottom of the banner prints nothing.
  */
 fun main(args: Array<String>) {
-    val basePort = args.firstOrNull()?.toInt() ?: 8080
+    val basePort = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
     val docs = Docs(docsPath = "/api-docs")
 
     val pekko = pekkoApi().startPekkoWithDocs(port = basePort, docs = docs)
@@ -77,3 +77,6 @@ fun main(args: Array<String>) {
     )
     Thread.currentThread().join()
 }
+
+/** What every example binds to unless told otherwise; `--args=8081` moves it. */
+private const val DEFAULT_PORT = 8080

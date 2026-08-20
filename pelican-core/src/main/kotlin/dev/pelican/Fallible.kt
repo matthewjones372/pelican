@@ -91,7 +91,7 @@ class FallibleOutput<E, T> internal constructor(
 
 /** Declares the one failure this output's handler may return instead. */
 infix fun <E, T> Output<T>.orFail(failure: ErrorOutput<E>): FallibleOutput<E, T> =
-    orFail(*arrayOf(failure))
+    declareFailures(listOf(failure))
 
 /**
  * Declares the failures this output's handler may return instead. With several
@@ -99,8 +99,12 @@ infix fun <E, T> Output<T>.orFail(failure: ErrorOutput<E>): FallibleOutput<E, T>
  * problems being the case worth aiming for, since the handler's `when` over it
  * is then exhaustive.
  */
-fun <E, T> Output<T>.orFail(vararg failures: ErrorOutput<out E>): FallibleOutput<E, T> {
+fun <E, T> Output<T>.orFail(vararg failures: ErrorOutput<out E>): FallibleOutput<E, T> =
+    declareFailures(failures.toList())
+
+/** Both spellings of `orFail` end here, so they cannot disagree about what one means. */
+private fun <E, T> Output<T>.declareFailures(failures: List<ErrorOutput<out E>>): FallibleOutput<E, T> {
     require(this !is FallibleOutput<*, *>) { "orFail is already applied to $this" }
     @Suppress("UNCHECKED_CAST")
-    return FallibleOutput(this, failures.toList() as List<ErrorOutput<E>>)
+    return FallibleOutput(this, failures as List<ErrorOutput<E>>)
 }

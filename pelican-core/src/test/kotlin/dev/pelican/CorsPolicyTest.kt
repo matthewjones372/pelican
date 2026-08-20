@@ -1,10 +1,14 @@
 package dev.pelican
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -51,41 +55,41 @@ class CorsPolicyTest {
 
     @Test
     fun `an API with no cors has no policy at all`() {
-        assertNull(Api(listOf(ServerEndpoint(health) { CompletableFuture.completedStage(null) })).corsPolicy())
+        Api(listOf(ServerEndpoint(health) { CompletableFuture.completedStage(null) })).corsPolicy().shouldBeNull()
     }
 
     @Test
     fun `a listed origin is echoed back, and the answer varies by origin`() {
         val headers = policy(cors(app)).actualResponseHeaders(app).toMap()
 
-        assertEquals(app, headers["Access-Control-Allow-Origin"])
-        assertEquals("Origin", headers["Vary"])
+        headers["Access-Control-Allow-Origin"] shouldBe app
+        headers["Vary"] shouldBe "Origin"
     }
 
     @Test
     fun `an origin nobody listed is told nothing, which is what blocks it`() {
         val headers = policy(cors(app)).actualResponseHeaders("https://evil.test").toMap()
 
-        assertNull(headers["Access-Control-Allow-Origin"])
+        headers["Access-Control-Allow-Origin"].shouldBeNull()
         // The refusal still varies by origin, or a cache in front of the
         // service could serve this answer to the origin that is allowed.
-        assertEquals("Origin", headers["Vary"])
+        headers["Vary"] shouldBe "Origin"
     }
 
     @Test
     fun `a request with no Origin is not a cross-origin request`() {
         val headers = policy(cors(app)).actualResponseHeaders(null).toMap()
 
-        assertNull(headers["Access-Control-Allow-Origin"])
-        assertEquals("Origin", headers["Vary"])
+        headers["Access-Control-Allow-Origin"].shouldBeNull()
+        headers["Vary"] shouldBe "Origin"
     }
 
     @Test
     fun `any origin answers a star, and needs no Vary because the answer never differs`() {
         val headers = policy(corsAnyOrigin()).actualResponseHeaders(app).toMap()
 
-        assertEquals("*", headers["Access-Control-Allow-Origin"])
-        assertNull(headers["Vary"])
+        headers["Access-Control-Allow-Origin"] shouldBe "*"
+        headers["Vary"].shouldBeNull()
     }
 
     @Test
@@ -94,28 +98,26 @@ class CorsPolicyTest {
             cors(app, exposedHeaders = listOf("X-Request-Id"), allowCredentials = true),
         ).actualResponseHeaders(app).toMap()
 
-        assertEquals("true", headers["Access-Control-Allow-Credentials"])
-        assertEquals("X-Request-Id", headers["Access-Control-Expose-Headers"])
+        headers["Access-Control-Allow-Credentials"] shouldBe "true"
+        headers["Access-Control-Expose-Headers"] shouldBe "X-Request-Id"
     }
 
     @Test
     fun `credentials and a wildcard origin is rejected where it is written`() {
-        val failure = assertThrows<IllegalArgumentException> {
+        val failure = shouldThrow<IllegalArgumentException> {
             cors(CorsOrigins.Any, allowCredentials = true)
         }
 
-        assertTrue("credentials" in failure.message!!, failure.message!!)
+        failure.message!! shouldContain "credentials"
     }
 
     @Test
     fun `a predicate decides for itself`() {
         val subdomains = CorsOrigins.Matching("https://*.example.com") { it.endsWith(".example.com") }
 
-        assertEquals(app, policy(cors(subdomains)).actualResponseHeaders(app).toMap()["Access-Control-Allow-Origin"])
-        assertNull(
-            policy(cors(subdomains)).actualResponseHeaders("https://example.test")
-                .toMap()["Access-Control-Allow-Origin"],
-        )
+        policy(cors(subdomains)).actualResponseHeaders(app).toMap()["Access-Control-Allow-Origin"] shouldBe app
+        policy(cors(subdomains)).actualResponseHeaders("https://example.test")
+            .toMap()["Access-Control-Allow-Origin"].shouldBeNull()
     }
 
     // ------------------------------------------------------------- preflight
@@ -125,19 +127,16 @@ class CorsPolicyTest {
         val allowed = policy(cors(app)).preflight(app, "PUT", "/users/7") as CorsPreflight.Allowed
         val headers = allowed.headers.toMap()
 
-        assertEquals("GET, PUT", headers["Access-Control-Allow-Methods"])
-        assertEquals(app, headers["Access-Control-Allow-Origin"])
-        assertEquals("600", headers["Access-Control-Max-Age"])
+        headers["Access-Control-Allow-Methods"] shouldBe "GET, PUT"
+        headers["Access-Control-Allow-Origin"] shouldBe app
+        headers["Access-Control-Max-Age"] shouldBe "600"
     }
 
     @Test
     fun `the headers offered are the ones the endpoints on that path declare`() {
         val allowed = policy(cors(app)).preflight(app, "PUT", "/users/7") as CorsPreflight.Allowed
 
-        assertEquals(
-            "X-Trace-Id, Content-Type, Authorization",
-            allowed.headers.toMap()["Access-Control-Allow-Headers"],
-        )
+        allowed.headers.toMap()["Access-Control-Allow-Headers"] shouldBe "X-Trace-Id, Content-Type, Authorization"
     }
 
     @Test
@@ -146,7 +145,7 @@ class CorsPolicyTest {
 
         // GET on this path declares no header, no body and no scheme, so there
         // is nothing to allow — and nothing invented.
-        assertNull(allowed.headers.toMap()["Access-Control-Allow-Headers"])
+        allowed.headers.toMap()["Access-Control-Allow-Headers"].shouldBeNull()
     }
 
     @Test
@@ -159,7 +158,7 @@ class CorsPolicyTest {
         val allowed = checkNotNull(secured.corsPolicy())
             .preflight(app, "GET", "/users/7") as CorsPreflight.Allowed
 
-        assertEquals("Authorization", allowed.headers.toMap()["Access-Control-Allow-Headers"])
+        allowed.headers.toMap()["Access-Control-Allow-Headers"] shouldBe "Authorization"
     }
 
     @Test
@@ -167,41 +166,39 @@ class CorsPolicyTest {
         val allowed = policy(cors(app, additionalAllowedHeaders = listOf("X-Tenant")))
             .preflight(app, "PUT", "/users/7") as CorsPreflight.Allowed
 
-        assertEquals(
-            "X-Trace-Id, Content-Type, Authorization, X-Tenant",
-            allowed.headers.toMap()["Access-Control-Allow-Headers"],
-        )
+        allowed.headers.toMap()["Access-Control-Allow-Headers"] shouldBe
+            "X-Trace-Id, Content-Type, Authorization, X-Tenant"
     }
 
     @Test
     fun `a method nobody described on that path is refused`() {
         val refused = policy(cors(app)).preflight(app, "DELETE", "/users/7") as CorsPreflight.Refused
 
-        assertTrue("DELETE" in refused.reason, refused.reason)
-        assertTrue("GET, PUT" in refused.reason, refused.reason)
+        refused.reason shouldContain "DELETE"
+        refused.reason shouldContain "GET, PUT"
     }
 
     @Test
     fun `an origin nobody listed is refused before any method is considered`() {
         val refused = policy(cors(app)).preflight("https://evil.test", "GET", "/users/7") as CorsPreflight.Refused
 
-        assertTrue("evil.test" in refused.reason, refused.reason)
+        refused.reason shouldContain "evil.test"
     }
 
     @Test
     fun `an OPTIONS that is not a preflight is left to the router`() {
         val policy = policy(cors(app))
 
-        assertEquals(CorsPreflight.NotPreflight, policy.preflight(null, "GET", "/users/7"))
-        assertEquals(CorsPreflight.NotPreflight, policy.preflight(app, null, "/users/7"))
-        assertEquals(CorsPreflight.NotPreflight, policy.preflight(app, "GET", "/nowhere"))
+        policy.preflight(null, "GET", "/users/7") shouldBe CorsPreflight.NotPreflight
+        policy.preflight(app, null, "/users/7") shouldBe CorsPreflight.NotPreflight
+        policy.preflight(app, "GET", "/nowhere") shouldBe CorsPreflight.NotPreflight
     }
 
     @Test
     fun `a path template matches on shape, whatever the capture holds`() {
         val policy = policy(cors(app))
 
-        assertTrue(policy.preflight(app, "GET", "/users/not-a-number") is CorsPreflight.Allowed)
-        assertEquals(CorsPreflight.NotPreflight, policy.preflight(app, "GET", "/users/7/orders"))
+        (policy.preflight(app, "GET", "/users/not-a-number") is CorsPreflight.Allowed) shouldBe true
+        policy.preflight(app, "GET", "/users/7/orders") shouldBe CorsPreflight.NotPreflight
     }
 }

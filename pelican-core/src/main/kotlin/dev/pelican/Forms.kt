@@ -91,11 +91,13 @@ private class FormShape(private val fields: Map<String, Field>) {
                 val field = fields.getValue(name)
                 when {
                     field.repeated -> name to JsonArr(values.map { scalar(name, field.kind, it) })
+
                     // An untouched field in an HTML form is submitted empty,
                     // and "" is not a number, a boolean or an enum. Treating
                     // it as absent is what lets the type's own default apply,
                     // rather than answering 400 for a field nobody filled in.
                     values.first().isEmpty() && field.kind != Kind.STRING -> null
+
                     else -> name to scalar(name, field.kind, values.first())
                 }
             }.toMap(),
@@ -163,9 +165,13 @@ private class FormShape(private val fields: Map<String, Field>) {
             }
             val kind = when (type) {
                 "string", null -> Kind.STRING
+
                 "integer" -> Kind.INTEGER
+
                 "number" -> Kind.NUMBER
+
                 "boolean" -> Kind.BOOLEAN
+
                 else -> error(
                     "A form body carries strings, so the property '$name' of $owner cannot have " +
                         "type '$type'. Take the body as a jsonBody instead, or flatten the property.",

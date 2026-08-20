@@ -4,7 +4,7 @@ import dev.pelican.pekko.docs.startWithDocs
 
 fun main(args: Array<String>) {
     // `./gradlew :example:run --args=8081` when 8080 is taken.
-    val port = args.firstOrNull()?.toInt() ?: 8080
+    val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
     val server = ordersApi().startWithDocs(port = port, docs = ordersDocs)
     println(
         """
@@ -25,3 +25,6 @@ fun main(args: Array<String>) {
     Runtime.getRuntime().addShutdownHook(Thread { server.stop().toCompletableFuture().join() })
     Thread.currentThread().join()
 }
+
+/** What every example binds to unless told otherwise; `--args=8081` moves it. */
+private const val DEFAULT_PORT = 8080

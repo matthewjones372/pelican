@@ -124,10 +124,16 @@ private fun JsonNode.toJsonValue(): JsonValue = when {
             .filter { (name, _) -> name != SWAGGER_BOOKKEEPING }
             .associate { (name, value) -> name to value.toJsonValue() },
     )
+
     isArray -> JsonArr(map { it.toJsonValue() })
+
     isTextual -> JsonStr(textValue())
+
     isBoolean -> JsonBool(booleanValue())
+
     isIntegralNumber -> JsonNum(longValue())
+
     isNumber -> JsonNum(doubleValue())
+
     else -> JsonNull
 }
