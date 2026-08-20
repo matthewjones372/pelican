@@ -615,13 +615,23 @@ is the interpreter.
 |---|---|
 | http4k written the ordinary way | **0-35ns, 112 bytes** |
 | http4k with the response hand-tuned | ~150ns, ~400 bytes |
+| Pekko's routing DSL, written the ordinary way | **90ns and 1.4KB *faster*** |
+| Pekko with the route hand-tuned | ~95ns, ~950 bytes |
 
-Two baselines, because one would flatter. An http4k `Response` is immutable, so
+Two baselines each, because one would flatter. An http4k `Response` is immutable, so
 the idiomatic `Response(status).header(...).body(...)` copies it at each step —
 three responses and two header lists where one of each will do. Pelican builds
 it in one construction, which is worth about 300 bytes a request and is most of
 why the first row is what it is. The second row is the honest comparison
 against someone who has done the same thing by hand.
+
+On Pekko the ordinary way costs more than the description does, which is the
+row worth explaining rather than boasting about: an idiomatic route nests
+`pathPrefix`, a `PathMatcher` and `parameterOptional`, and each layer allocates.
+Pelican matches the path itself in one pass inside a single `extractRequest`,
+which is what the fourth row measures against — the same thing done by hand.
+[`PekkoOverheadBenchmark`](example/src/test/kotlin/example/PekkoOverheadBenchmark.kt)
+seals both routes with `Route.function(system)`, so neither pays for a socket.
 
 For scale: a loopback socket round trip is tens of microseconds and a database
 call is milliseconds, so on a realistic endpoint this is a fraction of a
@@ -633,7 +643,7 @@ two, which on the smaller absolute numbers of an empty endpoint reads as a
 larger ratio.
 
 ```bash
-./gradlew :example:test -Dbenchmark=true --tests "*OverheadBenchmark*"
+./gradlew :example:test -Dbenchmark=true --tests "*OverheadBenchmark*"   # both
 ```
 
 It is not JMH: one JVM, no forks, no blackholes. Treat the ratio as sound and
@@ -672,7 +682,7 @@ library. The full breakdown is in
 # Running the examples
 
 ```bash
-./gradlew build                          # all modules, 573 tests
+./gradlew build                          # all modules, 574 tests
 ./gradlew :example:runReadmeExample      # the service above, on :8080
 ./gradlew :example:run                   # the fuller orders API (streaming, SSE, raw bodies)
 ./gradlew :example:runBackends           # all three backends at once, on :8080-:8082

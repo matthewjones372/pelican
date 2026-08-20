@@ -138,17 +138,28 @@ private fun routeFor(
 ): Route = Directives.method(se.endpoint.method.toPekko()) {
     Directives.extractRequest { req ->
         val captures = matchPath(se.endpoint.pathSpec, req)
-        if (captures == null) Directives.reject()
-        else Directives.completeWithFuture(
-            // The headers go on whatever came back — a handler's value, a
-            // decode failure, an exception. A browser needs them on the error
-            // as much as on the success: without them the script sees a network
-            // error instead of the 400 that explains itself.
-            invoke(se, api, codecs, handler, req, captures, system).thenApply { res ->
-                if (cors == null) res
-                else res.withCorsHeaders(cors.actualResponseHeaders(originOf(req)))
-            },
-        )
+        if (captures == null) {
+            Directives.reject()
+        } else {
+            val answered = invoke(se, api, codecs, handler, req, captures, system)
+            Directives.completeWithFuture(
+                // The headers go on whatever came back — a handler's value, a
+                // decode failure, an exception. A browser needs them on the
+                // error as much as on the success: without them the script
+                // sees a network error instead of the 400 that explains
+                // itself.
+                //
+                // Left alone when CORS is off: `thenApply` on an answer that
+                // needs nothing done to it still allocates a stage and a
+                // closure, on every request, for every API that never
+                // configured CORS.
+                if (cors == null) {
+                    answered
+                } else {
+                    answered.thenApply { res -> res.withCorsHeaders(cors.actualResponseHeaders(originOf(req))) }
+                },
+            )
+        }
     }
 }
 
@@ -157,19 +168,56 @@ private fun originOf(req: HttpRequest): String? =
 
 /** Returns the captured segments, or null when this request is for another endpoint. */
 private fun matchPath(spec: PathSpec, req: HttpRequest): Map<PathParam<*>, String>? {
-    val parts = req.uri.getPathString()
-        .split('/')
-        .filter { it.isNotEmpty() }
-        .map { URLDecoder.decode(it, StandardCharsets.UTF_8) }
-    if (parts.size != spec.segments.size) return null
-    val captured = LinkedHashMap<PathParam<*>, String>()
-    spec.segments.forEachIndexed { i, segment ->
-        when (segment) {
-            is PathSegment.Literal -> if (segment.value != parts[i]) return null
-            is PathSegment.Capture -> captured[segment.param] = parts[i]
+    // Walked in one pass over the path string rather than split into a list,
+    // filtered into a second and decoded into a third. This runs for every
+    // endpoint a request is offered to until one matches, so what it allocates
+    // is paid per candidate route rather than per request — three lists and a
+    // map each time, for a comparison that mostly fails.
+    val path = req.uri.getPathString()
+    val segments = spec.segments
+
+    // Allocated once, and only when the route has something to capture.
+    val captured =
+        if (spec.captures.isEmpty()) null else LinkedHashMap<PathParam<*>, String>(spec.captures.size)
+
+    var index = 0
+    var at = 0
+
+    while (at < path.length) {
+        if (path[at] == '/') { at++; continue }
+        val end = segmentEnd(path, at)
+        if (index == segments.size) return null
+
+        when (val segment = segments[index]) {
+            // Compared in place. A literal is the common case and the one that
+            // decides whether this route is even a candidate.
+            is PathSegment.Literal -> if (!segment.matchesAt(path, at, end)) return null
+
+            is PathSegment.Capture -> captured?.put(segment.param, decodeSegment(path, at, end))
         }
+
+        index++
+        at = end
     }
-    return captured
+
+    return if (index != segments.size) null else captured ?: emptyMap()
+}
+
+/** Where this path segment ends: the next slash, or the end of the path. */
+private fun segmentEnd(path: String, from: Int): Int {
+    val next = path.indexOf('/', from)
+    return if (next < 0) path.length else next
+}
+
+/** A literal segment, compared against the path in place rather than copied out of it. */
+private fun PathSegment.Literal.matchesAt(path: String, from: Int, to: Int): Boolean =
+    value.length == to - from && path.regionMatches(from, value, 0, to - from)
+
+/** Decoding allocates, and most path segments have nothing in them to decode. */
+private fun decodeSegment(path: String, from: Int, to: Int): String {
+    val raw = path.substring(from, to)
+    val encoded = raw.any { it == '%' || it == '+' }
+    return if (encoded) URLDecoder.decode(raw, StandardCharsets.UTF_8) else raw
 }
 
 @Suppress("UNCHECKED_CAST")

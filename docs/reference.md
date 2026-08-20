@@ -1389,7 +1389,7 @@ http4k route; see [What it costs](../README.md#what-it-costs).
 ## Run it
 
 ```bash
-./gradlew build                     # 573 tests across all modules
+./gradlew build                     # 574 tests across all modules
 ./gradlew :example:run              # server on :8080, on Pekko
 ./gradlew :example:runHttp4k        # the same service on :8080, on http4k
 ./gradlew :example:runBackends      # the small example on all three backends at once
