@@ -1,0 +1,356 @@
+package dev.pelican.ktor
+
+import dev.pelican.Api
+import dev.pelican.ApiException
+import dev.pelican.BodyCodec
+import dev.pelican.BodyDecodeFailure
+import dev.pelican.Codecs
+import dev.pelican.Cookies
+import dev.pelican.CorsHeaders
+import dev.pelican.CorsPolicy
+import dev.pelican.CorsPreflight
+import dev.pelican.Endpoint
+import dev.pelican.ErrorOutput
+import dev.pelican.FallibleOutput
+import dev.pelican.FormBody
+import dev.pelican.JsonBody
+import dev.pelican.Method
+import dev.pelican.MultipartBody
+import dev.pelican.ParamKey
+import dev.pelican.Params
+import dev.pelican.PathSegment
+import dev.pelican.PayloadTooLarge
+import dev.pelican.RawBody
+import dev.pelican.ServerEndpoint
+import dev.pelican.corsPolicy
+import dev.pelican.decode
+import dev.pelican.handlerFor
+import dev.pelican.requestBodyCodec
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.request.path
+import io.ktor.server.request.receiveChannel
+import io.ktor.server.request.receiveText
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.route
+import io.ktor.server.routing.routing
+import io.ktor.utils.io.jvm.javaio.toInputStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.future.await
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import java.util.IdentityHashMap
+
+/**
+ * Interprets an [Api] as Ktor routes.
+ *
+ * Each endpoint becomes `route(template, method) { handle { ... } }`, so path
+ * matching, template extraction and the 404/405 rules are Ktor's own — driven
+ * by the descriptions instead of hand-written route declarations. An endpoint's
+ * [dev.pelican.PathSpec.template] is already `/users/{userId}`, which is
+ * exactly Ktor's template syntax, so the two agree by construction rather than
+ * by translation.
+ *
+ * Nothing is sorted here, unlike the other two backends. Ktor resolves a
+ * request against a routing *tree* and scores a constant segment above a
+ * parameter, so `/orders/watch` wins over `/orders/{orderId}` whichever was
+ * declared first. `RoutingTest` states that as a test rather than trusting it.
+ *
+ * This is a `Route` extension because that is the unit a Ktor service already
+ * composes: put Pelican's endpoints under an `authenticate { }` block, behind a
+ * `route("/v2")`, or next to routes written by hand, and the surrounding
+ * plugins apply to them like any others.
+ *
+ * ```
+ * embeddedServer(CIO, port = 8080) {
+ *     install(CallLogging)
+ *     routing {
+ *         pelican(ordersApi())
+ *     }
+ * }.start(wait = true)
+ * ```
+ *
+ * Endpoints only. Nothing here generates or serves an OpenAPI document, which
+ * is why a service can depend on this module without the doc generator being
+ * compiled in at all — see `pelican-ktor-docs` for `startWithDocs`.
+ */
+fun Route.pelican(api: Api) {
+    require(api.endpoints.isNotEmpty()) { "This API has no endpoints." }
+
+    // Worked out once, from the descriptions, and captured by the routes — the
+    // same shape as the codecs below and for the same reason.
+    val cors = api.corsPolicy()
+
+    // Codecs are resolved here, once per endpoint, and captured by the routes.
+    // KType -> JavaType reflection is not free, and doing it per request would
+    // put it on the hot path for no benefit. It also means a missing or broken
+    // codec is a startup failure rather than a surprise on the first request.
+    for (se in api.endpoints) {
+        val codecs = se.endpoint.resolveCodecs(api.codecs)
+        // Filters are folded around the handler here, once, rather than per
+        // request — the same reasoning as the codecs above.
+        val bound = api.handlerFor(se)
+        route(se.endpoint.pathSpec.template, se.endpoint.method.toKtor()) {
+            handle {
+                // Before anything responds: Ktor sends the headers with the
+                // first byte of the body, and a streamed response starts
+                // writing that body as soon as its first frame is encoded.
+                call.addCorsHeaders(cors)
+                invoke(se, api, codecs, bound, call)
+            }
+        }
+    }
+
+    preflightRoutes(api, cors)
+}
+
+/**
+ * One `OPTIONS` route per declared path, which is what a browser asks before it
+ * sends anything interesting.
+ *
+ * A path that already declares an `OPTIONS` endpoint of its own keeps it: an
+ * endpoint someone wrote down outranks one this module would have invented.
+ */
+private fun Route.preflightRoutes(api: Api, cors: CorsPolicy?) {
+    if (cors == null) return
+
+    val declaresOptions = api.endpoints
+        .filter { it.endpoint.method == Method.OPTIONS }
+        .map { it.endpoint.pathSpec.template }
+        .toSet()
+
+    api.endpoints
+        .map { it.endpoint.pathSpec.template }
+        .distinct()
+        .filterNot { it in declaresOptions }
+        .forEach { template ->
+            route(template, HttpMethod.Options) {
+                handle { call.respondPreflight(cors) }
+            }
+        }
+}
+
+private suspend fun ApplicationCall.respondPreflight(cors: CorsPolicy) {
+    when (
+        val decision = cors.preflight(
+            origin = request.headers[CorsHeaders.ORIGIN],
+            requestMethod = request.headers[CorsHeaders.REQUEST_METHOD],
+            path = request.path(),
+        )
+    ) {
+        // Not a preflight — a bare OPTIONS, or one aimed at no described path.
+        // Nothing here describes an answer to that, so it gets the same 404
+        // Ktor's own router gives a method it does not recognise on a path it
+        // does. See `MethodMismatchTest` for why that number is Ktor's, not
+        // Pelican's.
+        is CorsPreflight.NotPreflight -> respondError(ApiException(404, "Not found"), null)
+
+        is CorsPreflight.Refused -> respondError(ApiException(403, "Forbidden", decision.reason), null)
+
+        is CorsPreflight.Allowed -> {
+            decision.headers.forEach { (name, value) -> response.headers.append(name, value) }
+            respond(HttpStatusCode.NoContent)
+        }
+    }
+}
+
+/**
+ * Adds the cross-origin headers to whatever this call ends up answering — a
+ * handler's value, a decode failure, an exception. A browser needs them on the
+ * error as much as on the success: without them the script sees a network error
+ * instead of the 400 that explains itself.
+ */
+private fun ApplicationCall.addCorsHeaders(cors: CorsPolicy?) {
+    cors?.actualResponseHeaders(request.headers[CorsHeaders.ORIGIN])
+        ?.forEach { (name, value) -> response.headers.append(name, value) }
+}
+
+/** Installs the routing plugin and the endpoints in one step. */
+fun Application.pelican(api: Api) {
+    routing { pelican(api) }
+}
+
+/**
+ * The codecs one endpoint needs, resolved ahead of any request.
+ *
+ * Both are null for an endpoint that moves no JSON — a byte-stream echo, a
+ * 204 — which is why such an API needs no codec configured at all.
+ */
+internal class EndpointCodecs(
+    val body: BodyCodec<Any?>?,
+    val payload: BodyCodec<Any?>?,
+    /**
+     * One per declared failure, keyed by identity — two failures can carry the
+     * same payload type under different statuses, so the declaration is the
+     * key rather than the type.
+     */
+    val failures: Map<ErrorOutput<*>, BodyCodec<Any?>> = emptyMap(),
+)
+
+private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = EndpointCodecs(
+    body = codecs.requestBodyCodec(bodyInput),
+    payload = output.payloadType?.let { codecs.codec(it) },
+    failures = (output as? FallibleOutput<*, *>)
+        ?.failures
+        ?.associateTo(IdentityHashMap()) { it to codecs.codec<Any?>(it.type) }
+        ?: emptyMap(),
+)
+
+private suspend fun invoke(
+    se: ServerEndpoint,
+    api: Api,
+    codecs: EndpointCodecs,
+    bound: (Params) -> java.util.concurrent.CompletionStage<Any?>,
+    call: ApplicationCall,
+) {
+    val ep = se.endpoint
+    val values = LinkedHashMap<ParamKey<*>, Any?>()
+
+    // Built before decoding, so a filter or a failing decode can still put a
+    // header on the way out.
+    val params = Params(values, call, ep)
+
+    // ---- inputs: path, query, headers, body -------------------------------
+    try {
+        for (segment in ep.pathSpec.segments) {
+            if (segment !is PathSegment.Capture) continue
+            val param = segment.param
+            // Present by construction: this handler only runs for a request the
+            // template matched, and the template's captures are these params.
+            val raw = call.parameters[param.name]
+                ?: error("$ep matched ${call.request.local.uri} but captured no '${param.name}'")
+            values[param] = param.codec.decode(param.name, raw)
+        }
+
+        for (q in ep.queries) {
+            val raw = call.request.queryParameters[q.name]
+            values[q] = when {
+                raw != null -> q.codec.decode(q.name, raw)
+                q.required -> throw ApiException(400, "Missing required query parameter '${q.name}'")
+                else -> q.default
+            }
+        }
+
+        for (h in ep.headerParams) {
+            val raw = call.request.headers[h.name]
+            values[h] = when {
+                raw != null -> h.codec.decode(h.name, raw)
+                h.required -> throw ApiException(400, "Missing required header '${h.name}'")
+                else -> h.default
+            }
+        }
+
+        // Parsed by core, from the header, rather than by Ktor's own cookie
+        // support — so a cookie decodes to the same value on all three
+        // backends. See `Cookies`.
+        val cookies = Cookies.parse(call.request.headers.getAll("Cookie").orEmpty())
+        for (c in ep.cookieParams) {
+            val raw = cookies[c.name]
+            values[c] = when {
+                raw != null -> c.codec.decode(c.name, raw)
+                c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
+                else -> c.default
+            }
+        }
+
+        when (val body = ep.bodyInput) {
+            null -> Unit
+
+            // Handed over unconsumed: no buffering, full back-pressure.
+            is RawBody -> values[body] = KtorByteStream(call.receiveChannel())
+
+            // The one place this backend reads a body with a blocking stream
+            // rather than a channel. Core parses the envelope, because three
+            // parsers would be three sets of behaviour, and core's is a
+            // `java.io.InputStream` — so the read moves to the IO dispatcher
+            // rather than parking a thread the engine wanted. The handler's
+            // own read of the file part is blocking for the same reason, which
+            // is the honest cost of one parser instead of three.
+            is MultipartBody -> withContext(Dispatchers.IO) {
+                body.decode(
+                    contentType = call.request.headers[HttpHeaders.ContentType],
+                    input = call.receiveChannel().toInputStream(),
+                    maxTextBytes = api.maxBodyBytes,
+                    into = values,
+                )
+            }
+
+            is JsonBody<*>, is FormBody<*> -> {
+                // The one place a slow client is this module's problem: a
+                // strict body has to arrive in full before the handler can be
+                // called, so it gets the API's own deadline rather than the
+                // engine's idle timeout.
+                // Checked before the body is pulled into a String, so an
+                // oversized payload is refused rather than allocated.
+                call.request.headers["Content-Length"]?.toLongOrNull()?.let {
+                    if (it > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
+                }
+                val text = try {
+                    withTimeout(api.strictBodyTimeoutMillis) { call.receiveText() }
+                } catch (t: TimeoutCancellationException) {
+                    throw ApiException(408, "Timed out reading the request body", t.message)
+                }
+                if (text.length.toLong() > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
+                // Whatever the codec throws is its own library's exception, and
+                // nothing here should have to recognise it. Wrapping it in
+                // core's own failure is what keeps this file codec-agnostic.
+                values[body] = try {
+                    checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
+                        .decodeFromString(text)
+                } catch (t: BodyDecodeFailure) {
+                    throw t
+                } catch (t: Throwable) {
+                    throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
+                }
+            }
+        }
+    } catch (t: Throwable) {
+        call.applyHeaders(params)
+        return call.respondError(t, api, ep)
+    }
+
+    // ---- the handler ------------------------------------------------------
+    //
+    // The handler was launched as a child of this call (see `Handlers.kt`), so
+    // awaiting it here suspends rather than parks a thread, and a client that
+    // goes away cancels it. Whatever it throws is rendered, exactly as on the
+    // other backends — nothing is left for Ktor's own error handling to catch,
+    // which is what keeps an ApiException a 404 rather than a stack trace.
+    val result = try {
+        bound(params).await()
+    } catch (t: CancellationException) {
+        // The client went away, or the server is shutting down. There is nobody
+        // left to answer, and pretending otherwise would swallow a cancellation
+        // Ktor needs to see.
+        throw t
+    } catch (t: Throwable) {
+        call.applyHeaders(params)
+        return call.respondError(t, api, ep)
+    }
+
+    // Ktor sends headers with the first byte of the body, so this is the last
+    // moment they can go on.
+    call.applyHeaders(params)
+
+    try {
+        respond(call, ep.output, result, codecs)
+    } catch (t: Throwable) {
+        // A stream that fails after its first element has already committed a
+        // 200 and some bytes; there is no status left to change. Let it out, so
+        // the engine tears the connection down and the client sees a truncated
+        // response rather than a well-formed lie.
+        if (call.response.isCommitted) throw t
+        call.respondError(t, api, ep)
+    }
+}
+
+/** What the handler asked for, before anything is committed. */
+private fun ApplicationCall.applyHeaders(params: Params) {
+    params.responseHeaders().forEach { (name, value) -> response.headers.append(name, value) }
+}

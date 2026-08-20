@@ -1,0 +1,76 @@
+name: build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# A push that lands while an earlier run is still going supersedes it. The
+# earlier answer is about code nobody has any more.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 21 is the toolchain the modules compile against; 23 is what the repo
+        # is developed on. Running both is what catches "works on my machine"
+        # before someone else finds it.
+        java: ["21", "23"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        run: ./gradlew build --stacktrace
+
+      # The suites bind real sockets and assert on delivery timing, so a
+      # failure is worth reading rather than guessing at.
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-java-${{ matrix.java }}
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+          retention-days: 7
+
+  # The claim the README makes about generating documentation with no HTTP
+  # library present, checked rather than asserted.
+  artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate the OpenAPI document
+        run: ./gradlew :example:generateOpenApi
+
+      - name: Generate the Kotlin client
+        run: ./gradlew :example:generateKotlinClient
+
+      - name: The checked-in client is what the descriptions generate
+        run: git diff --exit-code -- example/src/test/kotlin/example/generated
