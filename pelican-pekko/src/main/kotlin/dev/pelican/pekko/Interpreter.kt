@@ -365,13 +365,13 @@ private fun readBody(
             // exactly that many bytes off the connection, so the entity cannot
             // arrive larger than the number already refused. Chunked requests
             // declare nothing, and those still get the limiting stage.
-            val strict =
+            val reading =
                 if (declaredLength.isPresent) {
                     req.entity().toStrict(api.strictBodyTimeoutMillis, system)
                 } else {
                     req.entity().toStrict(api.strictBodyTimeoutMillis, api.maxBodyBytes, system)
                 }
-            strict
+            reading
                 .exceptionally { t ->
                     // The backstop, for a chunked request that declared no length.
                     // Pekko signals it with an EntityStreamException; core has its
