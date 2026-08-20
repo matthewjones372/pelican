@@ -129,6 +129,36 @@ class PekkoOverheadBenchmark {
         route.function(system)
     }
 
+    /**
+     * PathMatchers as before, but the query parameter read off the request
+     * instead of through `parameterOptional` — to say which of the two layers
+     * the idiomatic route is actually paying for.
+     */
+    private val handWrittenMatcherOnly: Function<HttpRequest, java.util.concurrent.CompletionStage<HttpResponse>> =
+        run {
+            val mapper = ObjectMapper().registerKotlinModule()
+            val route: Route = Directives.get {
+                Directives.pathPrefix("items") {
+                    Directives.path(PathMatchers.longSegment()) { id ->
+                        Directives.extractRequest { req ->
+                            val lim = req.uri.query().get("limit").map { it.toInt() }.orElse(10)
+                            Directives.complete(
+                                HttpResponse.create()
+                                    .withStatus(StatusCodes.OK)
+                                    .withEntity(
+                                        HttpEntities.create(
+                                            ContentTypes.APPLICATION_JSON,
+                                            mapper.writeValueAsString(Item(id, "item-$lim")),
+                                        ),
+                                    ),
+                            )
+                        }
+                    }
+                }
+            }
+            route.function(system)
+        }
+
     @AfterAll
     fun stop() {
         system.terminate()
@@ -194,7 +224,13 @@ class PekkoOverheadBenchmark {
         println("pekko tuned  %8.0f ns/op  (one directive, path read directly)".format(tunedMedian))
         println("vs tuned     %8.0f ns/op  %.2fx".format(pelicanMedian - tunedMedian, pelicanMedian / tunedMedian))
 
+        repeat(200_000) { once(handWrittenMatcherOnly) }
+        val matcherOnly = mutableListOf<Double>()
+        repeat(9) { matcherOnly += measure(handWrittenMatcherOnly, 50_000) }
+        println("pekko matchers %6.0f ns/op  (PathMatchers, query read directly)".format(median(matcherOnly)))
+
         println("-- bytes allocated per request")
+        println("pekko matchers %4d B".format(bytesPerRequest(handWrittenMatcherOnly)))
         println("pekko raw    %6d B".format(bytesPerRequest(handWritten)))
         println("pekko tuned  %6d B".format(bytesPerRequest(handWrittenTuned)))
         println("pelican      %6d B".format(bytesPerRequest(described)))

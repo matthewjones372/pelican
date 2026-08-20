@@ -615,8 +615,9 @@ is the interpreter.
 |---|---|
 | http4k written the ordinary way | **0-35ns, 112 bytes** |
 | http4k with the response hand-tuned | ~150ns, ~400 bytes |
-| Pekko's routing DSL, written the ordinary way | **90ns and 1.4KB *faster*** |
-| Pekko with the route hand-tuned | ~95ns, ~950 bytes |
+| Pekko, idiomatic (`PathMatchers` + `parameterOptional`) | 95ns and 1.4KB *faster* |
+| Pekko, `PathMatchers` with the query read off the request | level on time, ~570 bytes lighter |
+| Pekko, one directive and both read off the request | ~140ns, ~950 bytes |
 
 Two baselines each, because one would flatter. An http4k `Response` is immutable, so
 the idiomatic `Response(status).header(...).body(...)` copies it at each step —
@@ -625,13 +626,17 @@ it in one construction, which is worth about 300 bytes a request and is most of
 why the first row is what it is. The second row is the honest comparison
 against someone who has done the same thing by hand.
 
-On Pekko the ordinary way costs more than the description does, which is the
-row worth explaining rather than boasting about: an idiomatic route nests
-`pathPrefix`, a `PathMatcher` and `parameterOptional`, and each layer allocates.
-Pelican matches the path itself in one pass inside a single `extractRequest`,
-which is what the fourth row measures against — the same thing done by hand.
+Pelican beating an idiomatic Pekko route is not a claim that the library is
+faster than the server it runs on — it is a claim about `parameterOptional`,
+which costs about 100ns and 900 bytes a request. Take that one directive out
+and a hand-written route draws level; write the whole thing as a single
+`extractRequest` that reads the path and query itself — which is what the
+interpreter does — and the hand-written version is ~140ns ahead, where you
+would expect it to be. Three Pekko rows rather than one because the first
+number on its own would leave the wrong impression.
 [`PekkoOverheadBenchmark`](example/src/test/kotlin/example/PekkoOverheadBenchmark.kt)
-seals both routes with `Route.function(system)`, so neither pays for a socket.
+seals every route with `Route.function(system)`, so none of them pays for a
+socket.
 
 For scale: a loopback socket round trip is tens of microseconds and a database
 call is milliseconds, so on a realistic endpoint this is a fraction of a
