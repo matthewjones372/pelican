@@ -1,6 +1,8 @@
 package example
 
+import dev.pelican.ApiSpec
 import dev.pelican.openapi.openApiJson
+import dev.pelican.openapi.openApiYaml
 import example.bookmarks.bookmarksSpec
 import example.secured.securedSpec
 import io.kotest.assertions.withClue
@@ -35,15 +37,17 @@ import org.junit.jupiter.params.provider.MethodSource
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OpenApiSpecQualityTest {
 
-    data class Spec(val name: String, val json: String) {
+    data class Spec(val name: String, val json: String, val yaml: String) {
         override fun toString() = name
     }
 
+    private fun spec(name: String, spec: ApiSpec) = Spec(name, spec.openApiJson(), spec.openApiYaml())
+
     @Suppress("unused") // @MethodSource
     private fun specs() = listOf(
-        Spec("orders", ordersSpec().openApiJson()),
-        Spec("secured-reports", securedSpec().openApiJson()),
-        Spec("bookmarks", bookmarksSpec().openApiJson()),
+        spec("orders", ordersSpec()),
+        spec("secured-reports", securedSpec()),
+        spec("bookmarks", bookmarksSpec()),
     )
 
     private fun parse(json: String) = OpenAPIV3Parser().readContents(
@@ -110,6 +114,24 @@ class OpenApiSpecQualityTest {
                 }
             }
         }
+    }
+
+    /**
+     * The YAML is not a second document. It is the same tree, written the
+     * other way, so the parser has to read the two into the same object —
+     * which is a claim about the renderer that nothing in `pelican-openapi`
+     * can make about itself: the emitter that would agree with a wrong quoting
+     * rule is the one that wrote it.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("specs")
+    fun `the YAML rendering parses as the same document`(spec: Spec) {
+        val fromYaml = parse(spec.yaml)
+
+        withClue("${spec.name}: swagger-parser reported ${fromYaml.messages} for the YAML") {
+            fromYaml.messages.orEmpty() shouldBe emptyList()
+        }
+        fromYaml.openAPI shouldBe parse(spec.json).openAPI
     }
 
     /**

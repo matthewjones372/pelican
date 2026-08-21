@@ -67,7 +67,9 @@ The reference manual, with the reasoning behind each design decision, is
 
 Not on Maven Central yet. `./gradlew publishToMavenLocal` installs all fourteen
 modules at `dev.pelican:<module>:0.1.0-SNAPSHOT` with sources and javadoc, so
-`mavenLocal()` or `includeBuild` both work today.
+`mavenLocal()` or `includeBuild` both work today. The Gradle plugin is a build
+of its own and installs the same way:
+`./gradlew -p pelican-gradle-plugin publishToMavenLocal`.
 
 ```kotlin
 dependencies {
@@ -76,6 +78,14 @@ dependencies {
     implementation("dev.pelican:pelican-jackson:0.1.0-SNAPSHOT")
     testImplementation("dev.pelican:pelican-test:0.1.0-SNAPSHOT")
 }
+```
+
+The plugin is `dev.pelican`, and it is not on the Gradle Plugin Portal yet
+either — so until it is, tell the build where to find it:
+
+```kotlin
+// settings.gradle.kts
+pluginManagement { repositories { mavenLocal(); gradlePluginPortal() } }
 ```
 
 ## A whole service, in one file
@@ -562,13 +572,30 @@ red line here is the 404 your callers would have found for you.
 # A generated Kotlin client
 
 Callers who cannot hold the descriptions, because they are in another repository
-or on another release cycle, get a file generated from them instead. Point it at
-a source root and it lays out the package directories itself.
+or on another release cycle, get a file generated from them instead. It is a
+Gradle task: no `main` to write, no `JavaExec` to wire.
 
 ```kotlin
-ordersSpec().writeKotlinClient(sourceRoot, packageName = "com.example.orders")
-// -> <sourceRoot>/com/example/orders/OrdersClient.kt
+plugins { id("dev.pelican") version "0.1.0-SNAPSHOT" }
+
+pelican {
+    clients {
+        create("orders") {
+            specClass.set("com.example.OrdersSpecKt")   // where ordersSpec() lives
+            specFunction.set("ordersSpec")
+            packageName.set("com.example.orders")
+        }
+    }
+}
 ```
+
+`./gradlew generateOrdersClient` writes
+`build/generated/pelican/orders/com/example/orders/OrdersClient.kt`. Point
+`outputDir` at a source root instead and the client is a file you commit and
+review — which turns on `checkOrdersClient`, wired into `check`, so it cannot
+quietly stop matching the descriptions. The plugin generates the OpenAPI
+document from the same function; see
+[docs/reference.md](docs/reference.md#the-gradle-plugin).
 
 ```kotlin
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
@@ -597,6 +624,10 @@ The generated file needs `pelican-core`, which has no dependencies of its own,
 and a `Codecs` chosen by the caller. Transport is the JDK's `HttpClient`. The
 example checks its generated client into the repo and runs the suite against a
 real server, so a test fails if the file drifts from the descriptions.
+
+`ordersSpec().writeKotlinClient(sourceRoot, packageName = "com.example.orders")`
+is the same thing without the build task, for a build that would rather make the
+call itself.
 
 ---
 
@@ -994,7 +1025,7 @@ agent rather than the library, which cost an afternoon to notice.
 
 # Modules
 
-Fourteen modules; you take four or five. The layering is enforced by tests
+Fourteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
 rather than convention.
 
 | Module | Depends on | Contains |
@@ -1005,6 +1036,7 @@ rather than convention.
 | `pelican-*-docs` | its backend, openapi | serves the document and Swagger UI |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
+| `pelican-gradle-plugin` | **nothing** | `dev.pelican`: both generators, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-pekko` / `-http4k` | test + that backend | the in-memory transport |
 
@@ -1021,18 +1053,19 @@ library. The full breakdown is in
 # Running the examples
 
 ```bash
-./gradlew build                          # all modules, 574 tests
+./gradlew build                          # all modules, 630 tests
 ./gradlew :example:runReadmeExample      # the service above, on :8080
 ./gradlew :example:run                   # the fuller orders API (streaming, SSE, raw bodies)
 ./gradlew :example:runBackends           # all three backends at once, on :8080-:8082
 ./gradlew :example:runSecured            # a filter enforcing the security the descriptions declare
-./gradlew :example:generateOpenApi       # the spec, with no server started
-./gradlew :example:generateKotlinClient  # the Kotlin client, likewise
+./gradlew :example:generateOrdersDocument  # the spec, with no server started
+./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ```
 
 `runHttp4k` and `runBookmarks` are there too, and every example takes a port with
-`--args=8081`. The two generator tasks start nothing: `pelican-openapi` and
-`pelican-codegen` depend on core alone, so neither needs an HTTP library present.
+`--args=8081`. The two generator tasks come from the repository's own Gradle
+plugin, and they start nothing: `pelican-openapi` and `pelican-codegen` depend
+on core alone, so neither needs an HTTP library present.
 
 ---
 

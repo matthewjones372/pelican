@@ -1,4 +1,12 @@
-plugins { application }
+import dev.pelican.gradle.DocumentFormat
+
+plugins {
+    application
+    // The build's own plugin, included from pluginManagement in settings.gradle.kts.
+    // The example applies it by id exactly as a consumer would, which is what
+    // keeps the plugin honest: if generation breaks, this build breaks.
+    id("dev.pelican")
+}
 
 dependencies {
     implementation(project(":pelican-core"))
@@ -82,34 +90,44 @@ val runReadmeExample by tasks.registering(JavaExec::class) {
 }
 
 /**
- * Generates the OpenAPI document straight from the endpoint descriptions.
- * No server is started and no request is made — it only needs pelican-core,
- * pelican-openapi and a schema source.
- */
-val generateOpenApi by tasks.registering(JavaExec::class) {
-    group = "documentation"
-    description = "Writes build/openapi.json from the endpoint descriptions"
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("example.GenerateOpenApiKt")
-    args(layout.buildDirectory.file("openapi.json").get().asFile.absolutePath)
-    outputs.file(layout.buildDirectory.file("openapi.json"))
-}
-
-/**
- * Generates the Kotlin client straight from the endpoint descriptions — the
- * same values, the same schemas, and still no server.
+ * Both readings of the same descriptions, as build tasks: the OpenAPI document
+ * and the Kotlin client. No server is started and no request is made — the
+ * plugin loads `ordersSpec()` off this module's own runtime classpath and
+ * generates from the values it returns.
  *
- * It writes into this module's *test* sources, so the generated client is
- * compiled and run against a real server by `GeneratedKotlinClientTest`. The
- * generator lays out the package directories itself; regenerating is this task
- * and nothing else.
+ * `./gradlew :example:generateOrdersDocument` writes build/openapi.json.
+ * `./gradlew :example:generateOrdersClient` rewrites the checked-in client.
+ *
+ * The client is written into this module's *test* sources on purpose, so it is
+ * compiled and run against a real server by `GeneratedKotlinClientTest`. That
+ * is what turns on `checkOrdersClient`, which `check` depends on: a committed
+ * client that no longer matches the descriptions fails the build.
  */
-val generateKotlinClient by tasks.registering(JavaExec::class) {
-    group = "documentation"
-    description = "Regenerates example.generated.OrdersClient from the endpoint descriptions"
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("example.GenerateKotlinClientKt")
-    args(layout.projectDirectory.dir("src/test/kotlin").asFile.absolutePath)
+pelican {
+    documents {
+        create("orders") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("ordersSpec")
+            outputFile.set(layout.buildDirectory.file("openapi.json"))
+        }
+        // The same document, written the other way. Two entries rather than a
+        // format that flips, because a service that publishes both publishes
+        // both — and it is what keeps the YAML rendering exercised.
+        create("ordersYaml") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("ordersSpec")
+            format.set(DocumentFormat.YAML)
+            outputFile.set(layout.buildDirectory.file("openapi.yaml"))
+        }
+    }
+    clients {
+        create("orders") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("ordersSpec")
+            packageName.set("example.generated")
+            outputDir.set(layout.projectDirectory.dir("src/test/kotlin"))
+        }
+    }
 }
 
 // The benchmark is a test that takes ten seconds and asserts nothing, so it is

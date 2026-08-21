@@ -2,13 +2,17 @@ package example
 
 import dev.pelican.ApiSpec
 import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.openapi.openApiJson
-import java.io.File
 
 /**
- * The documentation half. Note what this file does not import: no server, no
- * handler. The descriptions in Endpoints.kt plus a way to describe the
- * payload types are enough.
+ * The spec, as a value. Note what this file does not import: no server, no
+ * handler, and no generator either. The descriptions in Endpoints.kt plus a
+ * way to describe the payload types are enough.
+ *
+ * Both readings of it are Gradle tasks — `generateOrdersDocument` writes the
+ * OpenAPI document and `generateOrdersClient` writes the Kotlin client. The
+ * plugin loads this function by name off the module's own classpath, so there
+ * is no `main` here to keep in step with the build file. The hidden endpoint is
+ * absent from both for the same reason: it is not published.
  */
 fun ordersSpec(): ApiSpec = ApiSpec(
     endpoints = allEndpoints,
@@ -19,11 +23,3 @@ fun ordersSpec(): ApiSpec = ApiSpec(
     description = "A Kotlin-first Pekko HTTP service, described as values.",
     servers = listOf("http://localhost:8080"),
 )
-
-/** Entry point for the `generateOpenApi` Gradle task. */
-fun main(args: Array<String>) {
-    val target = File(args.firstOrNull() ?: "openapi.json")
-    target.parentFile?.mkdirs()
-    target.writeText(ordersSpec().openApiJson())
-    println("Wrote ${target.absolutePath}")
-}

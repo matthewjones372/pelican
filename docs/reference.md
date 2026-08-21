@@ -11,7 +11,8 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | Module | Depends on | Contains |
 |---|---|---|
 | `pelican-core` | **nothing** | endpoint descriptions, plain-value codecs, a minimal JSON tree. No HTTP library, no JSON library. |
-| `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 |
+| `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 document, in JSON or YAML |
+| `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-kotlinx` | core, kotlinx.serialization | the alternative `Codecs` |
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
@@ -23,6 +24,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
 | `pelican-test-http4k` | test, http4k | the in-memory transport, on http4k |
+| `pelican-gradle-plugin` | **nothing** | the `dev.pelican` Gradle plugin: the two generators above, as tasks |
 | `example` | core, openapi, jackson, all three backends | the orders, bookmarks, greetings and secured services |
 
 The layering is load-bearing, not decorative, and each edge is a test:
@@ -221,15 +223,24 @@ Three ways, all reading the same descriptions.
 **At build time**, no server, no request:
 
 ```bash
-./gradlew :example:generateOpenApi     # -> example/build/openapi.json
+./gradlew :example:generateOrdersDocument      # -> example/build/openapi.json
+./gradlew :example:generateOrdersYamlDocument  # -> example/build/openapi.yaml
 ```
 
 ```kotlin
-// the whole task body
-fun main(args: Array<String>) {
-    File(args[0]).writeText(ordersSpec().openApiJson())
+// the whole build script
+plugins { id("dev.pelican") }
+
+pelican {
+    documents {
+        create("orders") { specClass.set("example.GenerateOpenApiKt"); specFunction.set("ordersSpec") }
+    }
 }
 ```
+
+There is no `main` to write and no `JavaExec` to wire: the plugin loads that
+function off the module's own classpath and writes what it returns. See
+[The Gradle plugin](#the-gradle-plugin).
 
 **From descriptions, in code** — this needs only `pelican-core` and
 `pelican-openapi`:
@@ -241,6 +252,7 @@ val spec = ApiSpec(
     title = "Orders",
 )
 spec.openApiJson()      // String
+spec.openApiYaml()      // the same document, written as YAML
 spec.openApi()          // JsonObj — core's own tree, if you want to post-process it
 ```
 
@@ -350,6 +362,102 @@ api.startWithDocs(docs = Docs(
 
 An `Api` (handlers included) can hand back its description half with
 `api.spec()`, so a test can assert the served spec matches the generated file.
+
+## The Gradle plugin
+
+The document and the client are both readings of the same values, and both are
+build tasks:
+
+```kotlin
+plugins { id("dev.pelican") version "0.1.0-SNAPSHOT" }
+
+pelican {
+    documents {
+        create("orders") {
+            specClass.set("com.example.OrdersSpecKt")
+            specFunction.set("ordersSpec")
+        }
+    }
+    clients {
+        create("orders") {
+            specClass.set("com.example.OrdersSpecKt")
+            specFunction.set("ordersSpec")
+            packageName.set("com.example.generated")
+        }
+    }
+}
+```
+
+Each entry names its tasks — `generateOrdersDocument`, `generateOrdersClient`
+and `checkOrdersClient` — so a module talking to three services generates three
+clients without three build scripts.
+
+It is not on the Gradle Plugin Portal yet:
+`./gradlew -p pelican-gradle-plugin publishToMavenLocal` installs it, and
+`pluginManagement { repositories { mavenLocal(); gradlePluginPortal() } }` in
+`settings.gradle.kts` is what lets a build resolve it from there.
+
+### How it finds the spec
+
+The spec is Kotlin in your project, so the only way to have the generated
+output agree with the running service is to run that code. `specClass` and
+`specFunction` name a no-argument function returning an `ApiSpec`: a top-level
+one (whose class is the file name plus `Kt` — `OrdersSpec.kt` is
+`OrdersSpecKt`), a member of an `object`, or a member of a class with a
+no-argument constructor.
+
+It is loaded off `classpath`, which defaults to `main`'s runtime classpath.
+That default carries its own task dependencies, so generating compiles first
+without anybody writing a `dependsOn` — and it is why `pelican-codegen` or
+`pelican-openapi` has to be a dependency of the module: the plugin reaches them
+through *your* classpath rather than shipping its own copy. Nothing in the
+plugin compiles against Pelican, which is what leaves the plugin's version and
+the library's free to move independently.
+
+The work runs in a Gradle worker with classloader isolation, so your Jackson
+and Gradle's are not the same Jackson.
+
+### What each entry takes
+
+| Property | Applies to | Default |
+|---|---|---|
+| `specClass` | both | — required |
+| `specFunction` | both | `spec` |
+| `classpath` | both | `main`'s runtime classpath |
+| `packageName` | clients | — required |
+| `clientName` | clients | the spec's title: `Orders` → `OrdersClient` |
+| `baseUrl` | clients | the spec's first server |
+| `includeHidden` | clients | `false` — hidden endpoints are left out, as they are left out of the document |
+| `outputDir` | clients | `build/generated/pelican/<name>` |
+| `format` | documents | `JSON`; `YAML` writes the same document the other way |
+| `outputFile` | documents | `build/generated/pelican/<name>/openapi.<format>` |
+
+### Where the output goes, and what that changes
+
+Under `build/`, the generated directory belongs to the task: it is a tracked
+output, up to date when nothing changed, and emptied when it is not — so a
+renamed client cannot leave the old one behind.
+
+Point `outputDir` at a source root instead and the client becomes a file in
+your repository, reviewable in a diff. The plugin treats that as the different
+thing it is. The directory is *not* declared as an output, because declaring it
+would make every task that compiles those sources depend on this one, and
+nothing else in the directory is deleted. What turns on instead is
+`check<Name>Client`, wired into `check`: it regenerates into a scratch
+directory, compares, and fails when the committed client is no longer what the
+descriptions produce, naming the task that fixes it.
+
+That is how this repository generates its own example client — into
+`example/src/test/kotlin`, compiled and run against a real server by
+`GeneratedKotlinClientTest`, with `checkOrdersClient` on `check` so it cannot
+drift.
+
+### Without the plugin
+
+Both generators are ordinary functions, and a build that would rather call them
+itself still can: `spec.openApiJson()`, `spec.openApiYaml()` and
+`spec.writeKotlinClient(sourceRoot, packageName)`. The plugin is those calls
+with the classpath, the up-to-date checks and the staleness gate already wired.
 
 ## Hiding an endpoint
 
@@ -1413,7 +1521,7 @@ is the socket test, minus the socket.
 
 ## What the build checks
 
-Four gates beyond the tests, each of which exists because a claim in this
+Five gates beyond the tests, each of which exists because a claim in this
 document would otherwise be unverified.
 
 **detekt**, on the type-resolving `detektMain`/`detektTest` tasks rather than
@@ -1453,7 +1561,16 @@ swagger-parser, an implementation that did not write them: `$ref`s resolved,
 3.1 conformance, every path keeping its operations and responses, every
 security requirement naming a scheme the document defines. A generator marking
 its own homework is the failure mode it rules out, and it caught a wrong
-assumption the first time it ran.
+assumption the first time it ran. The YAML rendering is held to the same
+standard and to one more: the parser has to read it into the same document it
+read the JSON into, which is a claim about the quoting rules that no test
+written beside the emitter could make.
+
+**checkOrdersClient**, from the repository's own Gradle plugin, regenerates the
+committed example client and fails when it is not what the descriptions
+produce. It is on `check`, so a change to an endpoint that nobody regenerated
+for stops the build rather than being noticed by whoever compiles the client
+next.
 
 Two smaller things. The Pekko route tests run through Pekko's own route
 testkit, behind a JUnit 5 extension in `PekkoRouteTestKit` — the testkit drives
@@ -1464,11 +1581,12 @@ http4k route; see [What it costs](../README.md#what-it-costs).
 ## Run it
 
 ```bash
-./gradlew build                     # 574 tests across all modules
+./gradlew build                     # 630 tests across all modules and the plugin
 ./gradlew :example:run              # server on :8080, on Pekko
 ./gradlew :example:runHttp4k        # the same service on :8080, on http4k
 ./gradlew :example:runBackends      # the small example on all three backends at once
-./gradlew :example:generateOpenApi  # spec, no server
+./gradlew :example:generateOrdersDocument  # spec, no server
+./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ```
 
 ```bash
@@ -1554,10 +1672,13 @@ open  localhost:8080/api-docs                                 # Swagger UI
 
 ## Versions
 
-Kotlin 2.2.20 · Pekko 1.6.0 · Pekko HTTP 1.4.0 · http4k 6.22.0.0 · Ktor 3.5.2 ·
-Jackson 2.22.2 · swagger-core 2.2.54 · kotlinx.serialization 1.9.0 ·
-slf4j-api 2.0.17 · JDK 21 · Gradle 8.14.3
+Kotlin 2.4.10 · Pekko 1.7.0 · Pekko HTTP 1.4.0 · http4k 6.58.0.0 · Ktor 3.5.2 ·
+Jackson 2.22.2 · swagger-core 2.2.54 · kotlinx.serialization 1.11.0 ·
+slf4j-api 2.0.17 · JDK 21 · Gradle 9.7.1
 
-http4k is pinned to the last release compiled against Kotlin 2.2.20; 6.23 and
-later ship stdlib metadata this compiler will not read. Bump Kotlin and http4k
-together.
+http4k built against a newer stdlib than the compiler reading it fails on
+metadata, so the two are bumped together; `pelican-http4k/build.gradle.kts`
+records the pairing where the version is set.
+
+The Gradle plugin is built against the Gradle 9.7.1 API as Java 21 bytecode, so
+the build applying it runs on Java 21 or newer.

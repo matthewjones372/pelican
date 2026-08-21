@@ -73,11 +73,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Generate the OpenAPI document
-        run: ./gradlew :example:generateOpenApi
+      - name: Generate the OpenAPI document, in both spellings
+        run: ./gradlew :example:generateOrdersDocument :example:generateOrdersYamlDocument
 
       - name: Generate the Kotlin client
-        run: ./gradlew :example:generateKotlinClient
+        run: ./gradlew :example:generateOrdersClient
 
+      # `checkOrdersClient` makes the same claim inside the build, and `check`
+      # depends on it. This says it in the terms a reviewer reads: the diff.
       - name: The checked-in client is what the descriptions generate
         run: git diff --exit-code -- example/src/test/kotlin/example/generated

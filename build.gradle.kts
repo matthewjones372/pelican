@@ -84,7 +84,13 @@ dependencies {
 }
 
 // A floor nobody runs is not a floor: `./gradlew build` checks it.
-tasks.named("check") { dependsOn("koverVerify") }
+tasks.named("check") {
+    dependsOn("koverVerify")
+    // The Gradle plugin is a build of its own — included, so `example` can
+    // apply it by id — and a build of its own is not checked by this one
+    // unless it is asked for.
+    dependsOn(gradle.includedBuild("pelican-gradle-plugin").task(":check"))
+}
 
 /**
  * Every module but the example is published. The example is a runnable service
