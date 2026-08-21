@@ -200,7 +200,7 @@ private fun matchPath(spec: PathSpec, req: HttpRequest): Map<PathParam<*>, Strin
         at = end
     }
 
-    return if (index != segments.size) null else captured ?: emptyMap()
+    return if (index != segments.size) null else captured.orEmpty()
 }
 
 /** Where this path segment ends: the next slash, or the end of the path. */

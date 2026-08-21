@@ -199,7 +199,7 @@ private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = Endpo
     failures = (output as? FallibleOutput<*, *>)
         ?.failures
         ?.associateTo(IdentityHashMap()) { it to codecs.codec<Any?>(it.type) }
-        ?: emptyMap(),
+        .orEmpty(),
 )
 
 /**

@@ -70,10 +70,7 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     },
 
     listOrders streamedNow { (id, max) ->
-        Store.orders(id, max, status = null).asSequence().map { order ->
-            Thread.sleep(50)
-            order
-        }
+        Store.orders(id, max, status = null).asSequence().onEach { Thread.sleep(50) }
     },
 
     placeOrder handledOrFail { (id, key, req) ->
