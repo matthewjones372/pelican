@@ -141,6 +141,40 @@ this — flushing after each write, on the JDK's own server, so the default need
 no dependency beyond http4k-core. Pass `Jetty(port)` or any other
 `ServerConfig` for a service under real load.
 
+### Bringing your own ActorSystem
+
+`Api` is a `pelican-core` type and holds no `ActorSystem`. It cannot: core's
+runtime classpath is asserted to be the Kotlin standard library and nothing
+else, and one description has to be servable on http4k and Ktor as well. The
+system belongs to the binding, so it is a parameter of the Pekko `start`:
+
+```kotlin
+val system = ActorSystem.create(Behaviors.empty<Void>(), "orders")   // yours: cluster, persistence, streams
+
+val server = ordersApi().start(system, port = 8080)
+val server = ordersApi().startWithDocs(system, port = 8080, docs = ordersDocs)
+```
+
+A service that is more than its HTTP layer already has a system before it has a
+route, and `start()` creating a second one means two of everything an actor
+system carries — dispatchers, thread pools, a scheduler — on a machine sized
+for one.
+
+The rule that comes with it: **whoever created a system is who ends it.**
+`PelicanServer.stop()` unbinds the port either way, and terminates the system
+only when `start` was the one that created it. Terminating a borrowed system
+would take the caller's cluster and streams down with their HTTP port, and
+leave them nothing to restart it with. `PelicanServer.ownsSystem` says which
+kind of handle you are holding, and `InMemoryTransport.close()` has always
+followed the same rule for `inMemory(system)`.
+
+`toRoute(system)` remains the lower-level door: it returns a Pekko `Route` and
+binds nothing, for a service that concatenates Pelican's route with its own and
+calls `Http.get(system).newServerAt(...)` itself. `start(system)` is that,
+minus the binding boilerplate, plus the `PelicanServer` handle that
+`client()` and `stop()` hang off. `BorrowedSystemTest` holds the ownership
+rule and `BorrowedSystemDocsTest` holds it for the documented form.
+
 ## Choosing a JSON library
 
 Descriptions carry a `KType` and nothing else — no serializer, no mapper. The

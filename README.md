@@ -375,6 +375,24 @@ inputs.
 
 # Running a server
 
+```kotlin
+ordersApi().start(port = 8080)                                  // endpoints only
+ordersApi().startWithDocs(port = 8080, docs = ordersDocs)       // plus /openapi.json and /docs
+```
+
+Both create an `ActorSystem` and shut it down again on `stop()`. A service that
+already has one — for its cluster, its persistence, its streams — hands it over
+instead of running a second:
+
+```kotlin
+val server = ordersApi().startWithDocs(system, port = 8080, docs = ordersDocs)
+```
+
+`stop()` unbinds the port either way, and terminates the system only if Pelican
+created it: whoever made a system is who ends it. `toRoute(system)` is still
+there for a service that concatenates Pelican's route with its own and binds
+the result itself.
+
 ## Filters
 
 ```kotlin

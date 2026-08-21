@@ -86,6 +86,20 @@ fun Api.startWithDocs(
 }
 
 /**
+ * The same, on a system you already have. A service that brought its own
+ * `ActorSystem` should not have to give up its documentation to keep it — and
+ * [PelicanServer.stop] will unbind without terminating a system it borrowed.
+ */
+fun Api.startWithDocs(
+    system: ActorSystem<Void>,
+    host: String = "127.0.0.1",
+    port: Int = 8080,
+    docs: Docs = Docs(),
+): PelicanServer = start(system, host, port) { on: ActorSystem<Void> ->
+    routeWithDocs(on, docs)
+}
+
+/**
  * Matched against the request path directly rather than through a path matcher,
  * because these paths are configuration — `/api-docs/oauth2-redirect.html` is as
  * valid a setting as `/docs`, and a segment matcher would only handle the
