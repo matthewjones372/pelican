@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pelican-mark-dark.svg">
+  <img src="docs/assets/pelican-mark-light.svg" width="56" height="56" alt="">
+</picture>
+
 # Pelican
 
 Type-safe HTTP for Kotlin. You describe an endpoint once, as a value. Pelican
