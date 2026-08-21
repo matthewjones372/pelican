@@ -4,6 +4,7 @@ import dev.pelican.Api
 import dev.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -89,6 +90,6 @@ class BoundServerTest {
     fun `an api with no endpoints is a startup failure, not a mystery 404`() {
         val empty = Api(endpoints = emptyList(), codecs = JacksonCodecs)
         val failure = runCatching { empty.toHttpHandler() }.exceptionOrNull()
-        withClue("expected a startup failure, got $failure") { (failure is IllegalArgumentException) shouldBe true }
+        withClue("expected a startup failure, got $failure") { failure.shouldBeInstanceOf<IllegalArgumentException>() }
     }
 }

@@ -1,7 +1,7 @@
 package dev.pelican.ktor
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
-import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
@@ -17,26 +17,25 @@ class DecouplingTest {
 
     @Test
     fun `pekko is genuinely absent from this module's classpath`() {
-        val loaded = runCatching { Class.forName("org.apache.pekko.http.javadsl.server.Directives") }
-        withClue("pelican-ktor must not see Pekko") { loaded.isFailure shouldBe true }
+        withClue("pelican-ktor must not see Pekko") {
+            shouldThrow<ClassNotFoundException> { Class.forName("org.apache.pekko.http.javadsl.server.Directives") }
+        }
     }
 
     @Test
     fun `http4k is genuinely absent from this module's classpath`() {
-        val loaded = runCatching { Class.forName("org.http4k.core.Request") }
         withClue(
             "pelican-ktor must not see http4k: the point of another backend is that it " +
                 "shares no server library with the others",
         ) {
-            loaded.isFailure shouldBe true
+            shouldThrow<ClassNotFoundException> { Class.forName("org.http4k.core.Request") }
         }
     }
 
     @Test
     fun `the openapi module is genuinely absent from this module's classpath`() {
-        val loaded = runCatching { Class.forName("dev.pelican.openapi.OpenApiKt") }
         withClue("pelican-ktor must not see pelican-openapi; docs live in pelican-ktor-docs") {
-            loaded.isFailure shouldBe true
+            shouldThrow<ClassNotFoundException> { Class.forName("dev.pelican.openapi.OpenApiKt") }
         }
     }
 }

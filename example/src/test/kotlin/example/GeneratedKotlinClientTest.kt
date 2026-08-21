@@ -15,9 +15,14 @@ import example.generated.Outcome
 import example.generated.PlaceOrderFailure
 import example.generated.StreamOrdersFailure
 import io.kotest.assertions.withClue
+import io.kotest.inspectors.forAll
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -113,7 +118,7 @@ class GeneratedKotlinClientTest {
 
         val missing = client.placeOrder(999L, CreateOrder("anvil"), xApiKey = "let-me-in") as Outcome.Err
         withClue("${missing.failure}") {
-            (missing.failure is PlaceOrderFailure.NotFound) shouldBe true
+            missing.failure.shouldBeInstanceOf<PlaceOrderFailure.NotFound>()
         }
     }
 
@@ -169,14 +174,14 @@ class GeneratedKotlinClientTest {
         val stream = client.streamOrders(1L, limit = 3, status = OrderStatus.SHIPPED)
         val orders = (stream as Outcome.Ok).value.toList()
         orders.size shouldBe 3
-        withClue("$orders") { orders.all { it.status == OrderStatus.SHIPPED } shouldBe true }
+        orders.forAll { it.status shouldBe OrderStatus.SHIPPED }
     }
 
     @Test
     fun `a stream that fails before its first element is the declared failure`() {
         val stream = client.streamOrders(999L, limit = 3) as Outcome.Err
         withClue("${stream.failure}") {
-            (stream.failure is StreamOrdersFailure.NotFound) shouldBe true
+            stream.failure.shouldBeInstanceOf<StreamOrdersFailure.NotFound>()
         }
     }
 
@@ -201,7 +206,7 @@ class GeneratedKotlinClientTest {
         val elapsedMs = (System.nanoTime() - started) / 1_000_000
 
         first.map { it.seq } shouldBe listOf(1, 2)
-        withClue("two of ten events took ${elapsedMs}ms — that looks buffered") { (elapsedMs < 700) shouldBe true }
+        withClue("two of ten events took ${elapsedMs}ms — that looks buffered") { elapsedMs shouldBeLessThan 700 }
     }
 
     // ------------------------------------------------------------ the file itself
@@ -217,8 +222,8 @@ class GeneratedKotlinClientTest {
     @Test
     fun `a hidden endpoint is left out, as it is left out of the document`() {
         val generated = ordersSpec().kotlinClient(packageName = "example.generated")
-        withClue("a hidden endpoint reached the generated client") { ("reindex" !in generated) shouldBe true }
-        ("reindex" in ordersSpec().kotlinClient("x", includeHidden = true)) shouldBe true
+        withClue("a hidden endpoint reached the generated client") { generated shouldNotContain "reindex" }
+        ordersSpec().kotlinClient("x", includeHidden = true) shouldContain "reindex"
         reindex.shouldNotBeNull()
     }
 }

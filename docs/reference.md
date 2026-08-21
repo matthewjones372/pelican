@@ -1351,20 +1351,22 @@ HTTP status codes are exempt from `MagicNumber` because this library hands them
 to you as integers, and a private `NOT_FOUND` beside a public parameter taking
 `404` would read as though the two were different things.
 
-Three rules are off because the tool is wrong rather than the code. detekt
-1.23.8 is built against an older frontend and, on Kotlin 2.4, reads
-`val (a, b) = expr ?: return null` as unreachable, and calls the `suspend` on
-`respondFailure` redundant — removing it does not compile. Each is recorded
-where it is disabled, with what happened when it was believed. detekt also
-cannot read a JDK 25 version string, so the Java 25 CI job skips it; the 21 and
-23 jobs lint the same code.
+Two rules are off because the default answer is wrong for the one place here
+that trips it, and both are recorded where they are disabled: `InjectDispatcher`
+where the multipart parse pins its own dispatcher on purpose, and
+`AbstractClassCanBeInterface` on `Output`, which is published API a lint rule
+should not be reshaping. The three that were off because detekt 1.23.8 could
+not resolve Kotlin 2.4 — `UnreachableCode`, `RedundantSuspendModifier`, and the
+JDK 25 version string that made the Java 25 CI job skip linting altogether —
+are back on under detekt 2, which analyses with a current frontend. All three
+CI jobs lint.
 
-**FunctionalStyleTest** holds the line detekt could not. `ForbiddenMethodCall`
-was banning `mutableListOf` and friends, matched 28 sites under Kotlin 2.2, and
-silently matched zero after the bump — it resolves `java.util.UUID.randomUUID`
-against the new metadata but not the stdlib's top-level functions. A rule that
-stops firing without saying so is worse than no rule, so the claim moved to a
-test that reads the sources. It is a ratchet, not a ban: sixteen files
+**FunctionalStyleTest** holds a line detekt cannot state. `ForbiddenMethodCall`
+could ban `mutableListOf` outright now that the stdlib resolves again, but that
+was never the claim: what matters is whether the mutation escapes. A builder
+that fills a local list and hands back a read-only view is the shape half of
+`Endpoint.kt` is written in, so the claim lives in a test that reads the
+sources. It is a ratchet, not a ban: sixteen files
 accumulate into a mutable collection and hand back something immutable, which
 is what a builder is, and each is listed with why. What it stops is the next
 file quietly starting.

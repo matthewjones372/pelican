@@ -7,6 +7,8 @@ import dev.pelican.test.ApiClient
 import dev.pelican.test.apiClient
 import example.ClientContractTest
 import io.kotest.assertions.withClue
+import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.net.URI
@@ -64,9 +66,9 @@ class Http4kContractTest : ClientContractTest() {
         while (reader.readLine() != null) Unit
         val totalMs = (System.nanoTime() - start) / 1_000_000
 
-        withClue("stream finished suspiciously fast: ${totalMs}ms") { (totalMs >= 600) shouldBe true }
+        withClue("stream finished suspiciously fast: ${totalMs}ms") { totalMs shouldBeGreaterThanOrEqualTo 600 }
         withClue("first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
-            (firstMs < totalMs / 2) shouldBe true
+            firstMs shouldBeLessThan totalMs / 2
         }
     }
 }

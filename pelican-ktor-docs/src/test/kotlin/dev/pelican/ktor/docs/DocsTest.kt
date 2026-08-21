@@ -12,6 +12,7 @@ import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.string.shouldStartWith
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
@@ -47,7 +48,7 @@ class DocsTest {
 
         val page = client.get("/api-docs")
         page.status.value shouldBe 200
-        page.headers[HttpHeaders.ContentType]!!.startsWith("text/html") shouldBe true
+        page.headers[HttpHeaders.ContentType] shouldStartWith "text/html"
         page.bodyAsText() shouldContain "swagger-ui"
 
         // The endpoints are still there; the docs are an addition, not a wrapper.
@@ -65,7 +66,7 @@ class DocsTest {
     fun `with no document route the page embeds the document instead of fetching it`() = testApplication {
         application { pelicanWithDocs(api(), Docs(openApiPath = null)) }
         client.get("/openapi.json").status.value shouldBe 404
-        ("\"openapi\"" in client.get("/docs").bodyAsText()) shouldBe true
+        client.get("/docs").bodyAsText() shouldContain "\"openapi\""
     }
 
     @Test

@@ -201,7 +201,7 @@ internal suspend fun ApplicationCall.respondError(raw: Throwable, api: Api?, end
 
     rendered.unexpected?.let { failure ->
         val hook = api?.onServerError
-        if (hook != null) hook(rendered.reference!!, endpoint, failure)
+        if (hook != null) hook(checkNotNull(rendered.reference), endpoint, failure)
         else log.error("Unhandled failure in {} [ref {}]", endpoint ?: "?", rendered.reference, failure)
     }
 

@@ -26,8 +26,11 @@ import dev.pelican.test.shouldBeFailure
 import dev.pelican.test.shouldBeOk
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
+import io.kotest.inspectors.forAll
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -78,7 +81,7 @@ abstract class ClientContractTest {
     fun `a handler's notFound surfaces as a failed call`() {
         val failure = shouldThrow<ApiCallFailed> { app.call(getUser, 999L) }
         failure.response.status shouldBe 404
-        withClue(failure.response.body) { failure.response.body.contains("No user 999") shouldBe true }
+        failure.response.body shouldContain "No user 999"
     }
 
     @Test
@@ -94,7 +97,7 @@ abstract class ClientContractTest {
     fun `collects ndjson into typed elements`() {
         val orders: List<Order> = app.collect(streamOrders, In4(1L, 7, null, null))
         orders.size shouldBe 7
-        orders.all { it.userId == 1L } shouldBe true
+        orders.forAll { it.userId shouldBe 1L }
         app.response(streamOrders, In4(1L, 7, null, null)).contentType shouldBe "application/x-ndjson"
     }
 
@@ -102,7 +105,7 @@ abstract class ClientContractTest {
     fun `an enum filter is applied`() {
         val orders = app.collect(streamOrders, In4(1L, 10, OrderStatus.SHIPPED, null))
         orders.size shouldBe 10
-        orders.all { it.status == OrderStatus.SHIPPED } shouldBe true
+        orders.forAll { it.status shouldBe OrderStatus.SHIPPED }
     }
 
     @Test
@@ -118,7 +121,7 @@ abstract class ClientContractTest {
     fun `collects a streamed json array`() {
         val orders: List<Order> = app.collect(listOrders, In2(1L, 3))
         orders.size shouldBe 3
-        orders.all { it.userId == 1L } shouldBe true
+        orders.forAll { it.userId shouldBe 1L }
     }
 
     @Test
@@ -181,7 +184,7 @@ abstract class ClientContractTest {
         val res = app.response(streamOrders, In4(9_999L, 5, null, null))
         res.status shouldBe 404
         res.contentType shouldBe "application/json"
-        withClue(res.body) { res.body.contains("No user 9999") shouldBe true }
+        res.body shouldContain "No user 9999"
     }
 
     @Test
@@ -286,9 +289,9 @@ class InMemoryContractTest : ClientContractTest() {
         val firstMs = (firstAt - start) / 1_000_000
 
         chunks shouldBe 8
-        withClue("stream finished suspiciously fast: ${totalMs}ms") { (totalMs >= 600) shouldBe true }
+        withClue("stream finished suspiciously fast: ${totalMs}ms") { totalMs shouldBeGreaterThanOrEqualTo 600 }
         withClue("first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
-            (firstMs < totalMs / 2) shouldBe true
+            firstMs shouldBeLessThan totalMs / 2
         }
     }
 }
@@ -354,10 +357,10 @@ class UndeclaredFailureTest {
             val body = it.response(fetchUser, 1L).body
             // The internal message — the one naming the endpoint and the stray
             // declaration — is what a caller must not be handed.
-            withClue(body) { body.contains("never declared") shouldBe false }
-            withClue(body) { body.contains("410") shouldBe false }
-            withClue(body) { body.contains("Internal server error") shouldBe true }
-            withClue(body) { body.contains("Reference: ") shouldBe true }
+            body shouldNotContain "never declared"
+            body shouldNotContain "410"
+            body shouldContain "Internal server error"
+            body shouldContain "Reference: "
         }
     }
 
@@ -377,7 +380,7 @@ class UndeclaredFailureTest {
             loggedRef shouldBe reference
             // What the caller was denied is exactly what the log gets.
             endpoint shouldBe "GET /users/{userId}"
-            withClue(message) { message.contains("never declared") shouldBe true }
+            message shouldContain "never declared"
         }
     }
 
@@ -385,7 +388,7 @@ class UndeclaredFailureTest {
     fun `a local run can ask for the detail back`() {
         apiThatReturnsAStrayFailure(exposeInternalErrors = true).inMemory().use {
             val body = it.response(fetchUser, 1L).body
-            withClue(body) { body.contains("never declared") shouldBe true }
+            body shouldContain "never declared"
         }
     }
 }

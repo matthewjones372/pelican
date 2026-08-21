@@ -14,6 +14,7 @@ import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.string.shouldStartWith
 import org.http4k.core.Method
 import org.http4k.core.Request
 import org.junit.jupiter.api.Test
@@ -48,7 +49,7 @@ class DocsTest {
 
         val page = handler(Request(Method.GET, "/api-docs"))
         page.status.code shouldBe 200
-        page.header("Content-Type")!!.startsWith("text/html") shouldBe true
+        page.header("Content-Type") shouldStartWith "text/html"
         page.bodyString() shouldContain "swagger-ui"
 
         // The endpoints are still there; the docs are an addition, not a wrapper.
@@ -64,7 +65,7 @@ class DocsTest {
         val pageOnly = api().handlerWithDocs(Docs(openApiPath = null))
         pageOnly(Request(Method.GET, "/openapi.json")).status.code shouldBe 404
         // With no spec endpoint the page embeds the document rather than fetching it.
-        ("\"openapi\"" in pageOnly(Request(Method.GET, "/docs")).bodyString()) shouldBe true
+        pageOnly(Request(Method.GET, "/docs")).bodyString() shouldContain "\"openapi\""
     }
 
     /**

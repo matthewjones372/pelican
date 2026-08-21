@@ -1,8 +1,8 @@
 package dev.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
 
@@ -45,8 +45,8 @@ class StartupChecksTest {
         val failure = shouldThrow<IllegalArgumentException> {
             Api(endpoints = listOf(bind(getUser), bind(getUser)))
         }
-        withClue(failure.message!!) { failure.message!!.contains("can never be reached") shouldBe true }
-        withClue(failure.message!!) { failure.message!!.contains("GET /users/{userId}") shouldBe true }
+        failure.message shouldContain "can never be reached"
+        failure.message shouldContain "GET /users/{userId}"
     }
 
     @Test
@@ -63,9 +63,9 @@ class StartupChecksTest {
                 covers = listOf(getUser, listUsers, deleteUser),
             )
         }
-        withClue(failure.message!!) { failure.message!!.contains("never bound") shouldBe true }
-        withClue(failure.message!!) { failure.message!!.contains("GET /users") shouldBe true }
-        withClue(failure.message!!) { failure.message!!.contains("DELETE /users/{userId}") shouldBe true }
+        failure.message shouldContain "never bound"
+        failure.message shouldContain "GET /users"
+        failure.message shouldContain "DELETE /users/{userId}"
     }
 
     @Test
@@ -102,6 +102,6 @@ class StartupChecksTest {
                 text()
             }
         }
-        withClue(failure.message!!) { failure.message!!.contains("more than once") shouldBe true }
+        failure.message shouldContain "more than once"
     }
 }

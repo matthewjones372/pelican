@@ -1,8 +1,9 @@
 package dev.pelican.test
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
-import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
@@ -34,7 +35,7 @@ class DecouplingTest {
             .filterNot { entry -> allowed.any { entry.startsWith(it) } }
 
         withClue("pelican-test must stay backend-agnostic, but found: $unexpected") {
-            unexpected.isEmpty() shouldBe true
+            unexpected.shouldBeEmpty()
         }
     }
 
@@ -46,7 +47,7 @@ class DecouplingTest {
             "io.ktor.server.application.Application",
         ).forEach { name ->
             withClue("$name is on pelican-test's classpath; a backend crept back in") {
-                runCatching { Class.forName(name) }.isFailure shouldBe true
+                shouldThrow<ClassNotFoundException> { Class.forName(name) }
             }
         }
     }
@@ -73,7 +74,7 @@ class DecouplingTest {
             .filter { entry -> matcherLibraries.any { entry.startsWith(it) } }
 
         withClue("a matcher library is published with pelican-test: $found") {
-            found.isEmpty() shouldBe true
+            found.shouldBeEmpty()
         }
     }
 }

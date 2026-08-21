@@ -2,14 +2,12 @@
 # Only the deviations are written here, so this file reads as a list of
 # decisions rather than a copy of somebody else's defaults.
 #
+# There is no free allowance to configure: detekt 2 fails the build on any
+# finding, which is what the `maxIssues: 0` this file used to carry was for.
+#
 # Two of those decisions are already made elsewhere: .editorconfig turns off
 # the ktlint rules for wildcard imports and for filenames, with the reasoning
 # beside them. They are turned off here too rather than fought twice.
-
-build:
-  # No free allowance. A finding is either worth fixing or worth turning off
-  # by name, and "23 issues, under the threshold" is neither.
-  maxIssues: 0
 
 comments:
   active: true
@@ -22,26 +20,26 @@ complexity:
   LongParameterList:
     # An endpoint description is a list of inputs; `endpoint(a, b, c, d, e, f)`
     # is the shape, not an accident.
-    functionThreshold: 8
-    constructorThreshold: 9
+    allowedFunctionParameters: 7
+    allowedConstructorParameters: 8
     ignoreDefaultParameters: true
   TooManyFunctions:
-    thresholdInFiles: 20
-    thresholdInClasses: 20
+    allowedFunctionsPerFile: 19
+    allowedFunctionsPerClass: 19
     ignorePrivate: true
     ignoreOverridden: true
     ignoreDeprecated: true
   CyclomaticComplexMethod:
-    threshold: 12
+    allowedComplexity: 11
     # A `when` that dispatches over a sealed hierarchy — Output, BodyInput — is
     # one decision written out in full, and the compiler checks it is complete.
     # Splitting one to lower a count would trade that exhaustiveness for the
     # metric, so the branches of a simple dispatch count once.
     ignoreSimpleWhenEntries: true
   LongMethod:
-    threshold: 80
+    allowedLines: 79
   NestedBlockDepth:
-    threshold: 5
+    allowedDepth: 4
 
 exceptions:
   TooGenericExceptionCaught:
@@ -61,6 +59,13 @@ naming:
     excludes: ['**/test/**']
 
 style:
+  AbstractClassCanBeInterface:
+    # `Output` is a sealed class with an `open val` carrying a default, and it
+    # is published API: turning it into an interface would change the ABI for
+    # anyone compiled against it, to save a keyword. If that trade is ever
+    # worth making it should be made deliberately, with a version bump, not by
+    # a lint rule.
+    active: false
   WildcardImport:
     # See .editorconfig: `import dev.pelican.*` is the point of the core
     # module's vocabulary, and the example sources are written to read that way.
@@ -102,8 +107,6 @@ style:
         value: 'TODO:'
       - reason: 'Unfinished work does not belong on main.'
         value: 'FIXME:'
-  UnusedPrivateMember:
-    active: true
   UnusedParameter:
     # `@ParameterizedTest(name = "{0}")` takes the case's label as its first
     # parameter and uses it for the test name, not in the body. That is the
@@ -139,17 +142,13 @@ style:
     active: true
   UseIfEmptyOrIfBlank:
     active: true
-  PreferToOverPairSyntax:
-    active: true
   ForbiddenMethodCall:
-    # Kept for the calls detekt can still resolve — anything with a JVM
-    # signature behind it. The mutable-collection ban this was written for is
-    # NOT enforced here: on Kotlin 2.4, detekt 1.23.8 resolves
-    # `java.util.UUID.randomUUID` but not `kotlin.collections.mutableListOf`,
-    # so those entries matched 28 sites under Kotlin 2.2 and silently zero
-    # after the bump. A rule that stops firing without saying so is worse than
-    # no rule, so that claim moved to FunctionalStyleTest, which reads the
-    # sources directly and cannot go quiet.
+    # detekt 2 resolves the Kotlin stdlib again, so the mutable-collection ban
+    # this was written for could live here — but it does not, because the ban
+    # was never "no mutableListOf": a builder that fills a local list and hands
+    # back a read-only view is the shape half of `Endpoint.kt` is written in.
+    # Which mutation is local and which escapes is a question about the source,
+    # and FunctionalStyleTest is where that claim is made and checked.
     active: true
     methods:
       - reason: 'Thread.sleep in library code turns a timeout into a stall; schedule instead.'
@@ -158,20 +157,12 @@ style:
     # and the timing tests sleep to make a gap they can measure.
     excludes: ['**/test/**', '**/example/**']
 
-# ---------------------------------------------------------------- tool limits
+# ------------------------------------------------------------- what is meant
 #
-# Turned off because of what the tool can see rather than what the code does,
-# checked by hand at every site it fired.
+# Rules whose default answer is right in general and wrong for the one place
+# here that trips them. Each was read at every site it fired.
 
 coroutines:
-  RedundantSuspendModifier:
-    # Wrong on Kotlin 2.4. It flags `respondFailure` and `respondError` in
-    # pelican-ktor, both of which call `ApplicationCall.respondText` — a
-    # suspend function. Removing the modifier as instructed does not compile:
-    #   "Suspend function 'respondText' can only be called from a coroutine".
-    # Same root cause as the ForbiddenMethodCall note above: 1.23.8 resolves
-    # some declarations against 2.4 metadata and not others.
-    active: false
   InjectDispatcher:
     # `withContext(Dispatchers.IO)` around the multipart parse is deliberate
     # and explained where it happens: the parser is blocking, and the
@@ -181,9 +172,8 @@ coroutines:
     active: false
 
 potential-bugs:
-  UnreachableCode:
-    # False on Kotlin 2.2 constructs: detekt 1.23.8 is built against the 2.0
-    # frontend and reads `val (a, b) = expr ?: return null`, and a statement
-    # after a `throw` inside a `catch`, as unreachable. All 11 sites it flagged
-    # are reached; SecuredReports.callerOf is the clearest.
-    active: false
+  ImplicitDefaultLocale:
+    # The benchmarks format their numbers for whoever is reading the console
+    # they were run in, which is exactly what the default locale is. Nothing
+    # there is parsed again or written to a file.
+    excludes: ['**/test/**']
