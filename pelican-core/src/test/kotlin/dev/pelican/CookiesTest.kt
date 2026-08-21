@@ -68,6 +68,6 @@ class CookiesTest {
             Cookies.render(listOf("session" to "a;b"))
         }
 
-        (failure.message ?: "") shouldContain "session"
+        failure.message shouldContain "session"
     }
 }

@@ -1,8 +1,8 @@
 package dev.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
 /**
@@ -38,7 +38,7 @@ class ResponseHeadersTest {
         val failure = shouldThrow<IllegalStateException> {
             paramsFor(created).setHeader(undeclared, "surprise")
         }
-        withClue(failure.message!!) { failure.message!!.contains("never declared it") shouldBe true }
+        failure.message shouldContain "never declared it"
     }
 
     @Test

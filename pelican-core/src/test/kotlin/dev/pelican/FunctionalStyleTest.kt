@@ -1,7 +1,8 @@
 package dev.pelican
 
 import io.kotest.assertions.withClue
-import io.kotest.matchers.shouldBe
+import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.comparables.shouldBeGreaterThan
 import org.junit.jupiter.api.Test
 import java.io.File
 
@@ -100,17 +101,17 @@ class FunctionalStyleTest {
             .toSortedSet()
 
         withClue("the source tree was not found; this test reads files, and looked in $root") {
-            (mainSources().size > 20) shouldBe true
+            mainSources().size shouldBeGreaterThan 20
         }
 
         val unexpected = found - builders.keys
         withClue("a mutable accumulator appeared outside a builder: $unexpected") {
-            unexpected.isEmpty() shouldBe true
+            unexpected.shouldBeEmpty()
         }
 
         val stale = builders.keys - found
         withClue("these no longer accumulate; drop them from the list: $stale") {
-            stale.isEmpty() shouldBe true
+            stale.shouldBeEmpty()
         }
     }
 }

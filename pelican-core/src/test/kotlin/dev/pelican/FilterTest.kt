@@ -1,8 +1,8 @@
 package dev.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
@@ -79,7 +79,7 @@ class FilterTest {
     fun `reading an attribute nothing set names the wiring mistake`() {
         val who = attribute<String>("who")
         val failure = shouldThrow<IllegalStateException> { params()[who] }
-        withClue(failure.message!!) { failure.message!!.contains("nothing set it") shouldBe true }
+        failure.message shouldContain "nothing set it"
         // And the non-throwing read, for a filter that is genuinely optional.
         params().find(who) shouldBe null
     }

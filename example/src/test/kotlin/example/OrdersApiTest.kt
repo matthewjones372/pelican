@@ -13,8 +13,15 @@ import dev.pelican.pekko.start
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
+import io.kotest.matchers.comparables.shouldBeLessThan
+import io.kotest.matchers.maps.shouldContainKey
+import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldEndWith
+import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.string.shouldStartWith
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -79,7 +86,7 @@ class OrdersApiTest {
         val obj = Json.parseToJsonElement(res.body()).jsonObject
         obj["id"]!!.jsonPrimitive.int shouldBe 1
         obj["name"]!!.jsonPrimitive.content shouldBe "Ada Lovelace"
-        res.headers().firstValue("content-type").get().startsWith("application/json") shouldBe true
+        res.headers().firstValue("content-type").get() shouldStartWith "application/json"
     }
 
     @Test
@@ -95,7 +102,7 @@ class OrdersApiTest {
     fun `an undecodable path parameter is a 400, not a 500`() {
         val res = get("/users/not-a-number")
         res.statusCode() shouldBe 400
-        withClue(res.body()) { res.body().contains("Invalid parameter") shouldBe true }
+        res.body() shouldContain "Invalid parameter"
     }
 
     @Test
@@ -116,7 +123,7 @@ class OrdersApiTest {
         lines.forEach { line ->
             val o = Json.parseToJsonElement(line).jsonObject
             o["userId"]!!.jsonPrimitive.int shouldBe 1
-            o.containsKey("item") shouldBe true
+            o shouldContainKey "item"
         }
     }
 
@@ -139,7 +146,7 @@ class OrdersApiTest {
     fun `a bad enum value is rejected with a helpful 400`() {
         val res = get("/users/1/orders?status=BANANA")
         res.statusCode() shouldBe 400
-        withClue(res.body()) { res.body().contains("PENDING") shouldBe true }
+        res.body() shouldContain "PENDING"
     }
 
     @Test
@@ -168,7 +175,7 @@ class OrdersApiTest {
     fun `a missing required header is a 400 before the handler runs`() {
         val res = post("/users/1/orders", """{"item":"anvil"}""")
         res.statusCode() shouldBe 400
-        withClue(res.body()) { res.body().contains("X-Api-Key") shouldBe true }
+        res.body() shouldContain "X-Api-Key"
     }
 
     @Test
@@ -181,7 +188,7 @@ class OrdersApiTest {
     fun `malformed json is a 400`() {
         val res = post("/users/1/orders", """{"item":}""", "X-Api-Key" to "let-me-in")
         res.statusCode() shouldBe 400
-        withClue(res.body()) { res.body().contains("Malformed request body") shouldBe true }
+        res.body() shouldContain "Malformed request body"
     }
 
     @Test
@@ -220,7 +227,8 @@ class OrdersApiTest {
         res.headers().firstValue("content-type").get().substringBefore(';') shouldBe "application/json"
 
         val body = res.body()
-        withClue(body) { (body.startsWith("[") && body.endsWith("]")) shouldBe true }
+        body shouldStartWith "["
+        body shouldEndWith "]"
 
         val items = Json.parseToJsonElement(body).jsonArray
         items.size shouldBe 3
@@ -253,9 +261,9 @@ class OrdersApiTest {
         val firstMs = (firstElementAt - start) / 1_000_000
 
         Json.parseToJsonElement(body.toString()).jsonArray.size shouldBe 8
-        withClue("stream finished suspiciously fast: ${totalMs}ms") { (totalMs >= 250) shouldBe true }
+        withClue("stream finished suspiciously fast: ${totalMs}ms") { totalMs shouldBeGreaterThanOrEqualTo 250 }
         withClue("first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
-            (firstMs < totalMs / 2) shouldBe true
+            firstMs shouldBeLessThan totalMs / 2
         }
     }
 
@@ -278,14 +286,14 @@ class OrdersApiTest {
         val res = get("/users/1/orders/watch?limit=3")
         res.statusCode() shouldBe 200
         withClue(res.headers().firstValue("content-type").toString()) {
-            res.headers().firstValue("content-type").get().startsWith("text/event-stream") shouldBe true
+            res.headers().firstValue("content-type").get() shouldStartWith "text/event-stream"
         }
         val frames = res.body().split("\n\n").filter { it.isNotBlank() }
         frames.size shouldBe 3
         frames.forEach { frame ->
-            withClue(frame) { frame.contains("event: order") shouldBe true }
+            frame shouldContain "event: order"
             val data = frame.lines().first { it.startsWith("data: ") }.removePrefix("data: ")
-            Json.parseToJsonElement(data).jsonObject.containsKey("seq") shouldBe true
+            Json.parseToJsonElement(data).jsonObject shouldContainKey "seq"
         }
     }
 
@@ -314,9 +322,9 @@ class OrdersApiTest {
         val firstMs = (firstFrameAt - start) / 1_000_000
 
         frames shouldBe 8
-        withClue("stream finished suspiciously fast: ${totalMs}ms") { (totalMs >= 600) shouldBe true }
+        withClue("stream finished suspiciously fast: ${totalMs}ms") { totalMs shouldBeGreaterThanOrEqualTo 600 }
         withClue("first frame at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
-            (firstMs < totalMs / 2) shouldBe true
+            firstMs shouldBeLessThan totalMs / 2
         }
     }
 
@@ -332,18 +340,18 @@ class OrdersApiTest {
         doc["info"]!!.jsonObject["title"]!!.jsonPrimitive.content shouldBe "Orders"
 
         val paths = doc["paths"]!!.jsonObject
-        withClue(paths.keys.toString()) { paths.containsKey("/users/{userId}") shouldBe true }
-        withClue(paths.keys.toString()) { paths.containsKey("/users/{userId}/orders") shouldBe true }
-        withClue(paths.keys.toString()) { paths.containsKey("/users/{userId}/orders/{orderId}") shouldBe true }
+        withClue(paths.keys.toString()) { paths shouldContainKey "/users/{userId}" }
+        withClue(paths.keys.toString()) { paths shouldContainKey "/users/{userId}/orders" }
+        withClue(paths.keys.toString()) { paths shouldContainKey "/users/{userId}/orders/{orderId}" }
 
         // GET and POST on the same template are merged into one path item.
         val ordersItem = paths["/users/{userId}/orders"]!!.jsonObject
-        ordersItem.containsKey("get") shouldBe true
-        ordersItem.containsKey("post") shouldBe true
+        ordersItem shouldContainKey "get"
+        ordersItem shouldContainKey "post"
 
         // The streaming endpoint advertises its real media type.
         val streamOk = ordersItem["get"]!!.jsonObject["responses"]!!.jsonObject["200"]!!.jsonObject
-        streamOk["content"]!!.jsonObject.containsKey("application/x-ndjson") shouldBe true
+        streamOk["content"]!!.jsonObject shouldContainKey "application/x-ndjson"
 
         // Parameters carry their location, requiredness and schema.
         val params = ordersItem["get"]!!.jsonObject["parameters"]!!.jsonArray.map { it.jsonObject }
@@ -363,9 +371,9 @@ class OrdersApiTest {
 
         // Model types are hoisted into components and referenced.
         val schemas = doc["components"]!!.jsonObject["schemas"]!!.jsonObject
-        withClue(schemas.keys.toString()) { schemas.containsKey("Order") shouldBe true }
-        withClue(schemas.keys.toString()) { schemas.containsKey("User") shouldBe true }
-        withClue(schemas.keys.toString()) { schemas.containsKey("CreateOrder") shouldBe true }
+        withClue(schemas.keys.toString()) { schemas shouldContainKey "Order" }
+        withClue(schemas.keys.toString()) { schemas shouldContainKey "User" }
+        withClue(schemas.keys.toString()) { schemas shouldContainKey "CreateOrder" }
 
         val orderSchema = schemas["Order"]!!.jsonObject
         val required = orderSchema["required"]!!.jsonArray.map { it.jsonPrimitive.content }
@@ -385,8 +393,8 @@ class OrdersApiTest {
         val doc = Json.parseToJsonElement(ordersSpec().openApiJson()).jsonObject
         val getUserOp = doc["paths"]!!.jsonObject["/users/{userId}"]!!.jsonObject["get"]!!.jsonObject
         val responses = getUserOp["responses"]!!.jsonObject
-        responses.containsKey("200") shouldBe true
-        responses.containsKey("404") shouldBe true
+        responses shouldContainKey "200"
+        responses shouldContainKey "404"
         responses["404"]!!.jsonObject["description"]!!.jsonPrimitive.content shouldBe "No user with that id"
     }
 
@@ -395,14 +403,14 @@ class OrdersApiTest {
         val res = get("/api-docs")
         res.statusCode() shouldBe 200
         withClue(res.headers().firstValue("content-type").toString()) {
-            res.headers().firstValue("content-type").get().startsWith("text/html") shouldBe true
+            res.headers().firstValue("content-type").get() shouldStartWith "text/html"
         }
 
         val body = res.body()
-        withClue(body.take(200)) { body.contains("swagger-ui") shouldBe true }
+        withClue(body.take(200)) { body shouldContain "swagger-ui" }
         // Pointed at the served document rather than a copy of it.
-        withClue(body) { body.contains("url: '/openapi.json'") shouldBe true }
-        withClue(body) { body.contains("Orders — API reference") shouldBe true }
+        body shouldContain "url: '/openapi.json'"
+        body shouldContain "Orders — API reference"
 
         // The default path is gone, not merely duplicated.
         get("/docs").statusCode() shouldBe 404
@@ -420,7 +428,7 @@ class OrdersApiTest {
 
         val doc = Json.parseToJsonElement(get("/openapi.json").body()).jsonObject
         val paths = doc["paths"]!!.jsonObject
-        withClue(paths.keys.toString()) { paths.containsKey("/internal/reindex") shouldBe false }
+        withClue(paths.keys.toString()) { paths shouldNotContainKey "/internal/reindex" }
     }
 }
 
@@ -468,9 +476,9 @@ class SwaggerUiOAuthTest {
     fun `the page authorizes as the configured client and serves its own redirect target`() {
         serve(DocsOAuth(clientId = "docs-ui", scopes = listOf("orders:read"))) { base ->
             val page = fetch("$base/api-docs").body()
-            withClue(page) { page.contains("initOAuth") shouldBe true }
-            withClue(page) { page.contains(""""clientId":"docs-ui"""") shouldBe true }
-            withClue(page) { page.contains(""""usePkceWithAuthorizationCodeGrant":true""") shouldBe true }
+            page shouldContain "initOAuth"
+            page shouldContain """"clientId":"docs-ui""""
+            page shouldContain """"usePkceWithAuthorizationCodeGrant":true"""
             // Resolved against the origin the reader is on, not a configured host.
             withClue(page) {
                 page shouldContain """oauth2RedirectUrl: window.location.origin + "/api-docs/oauth2-redirect.html""""
@@ -478,14 +486,14 @@ class SwaggerUiOAuthTest {
 
             val redirect = fetch("$base/api-docs/oauth2-redirect.html")
             redirect.statusCode() shouldBe 200
-            redirect.headers().firstValue("content-type").get().startsWith("text/html") shouldBe true
-            withClue(redirect.body()) { redirect.body().contains("swaggerUIRedirectOauth2") shouldBe true }
+            redirect.headers().firstValue("content-type").get() shouldStartWith "text/html"
+            redirect.body() shouldContain "swaggerUIRedirectOauth2"
 
             // The requirement itself reaches the document, padlock and all.
             val doc = Json.parseToJsonElement(fetch("$base/openapi.json").body()).jsonObject
             val schemes = doc["components"]!!.jsonObject["securitySchemes"]!!.jsonObject
-            withClue(schemes.keys.toString()) { schemes.containsKey("oauth2") shouldBe true }
-            schemes["oauth2"]!!.jsonObject["flows"]!!.jsonObject.containsKey("authorizationCode") shouldBe true
+            withClue(schemes.keys.toString()) { schemes shouldContainKey "oauth2" }
+            schemes["oauth2"]!!.jsonObject["flows"]!!.jsonObject shouldContainKey "authorizationCode"
         }
     }
 
@@ -493,7 +501,7 @@ class SwaggerUiOAuthTest {
     fun `without docsOAuth there is no redirect page and no initOAuth`() {
         serve(null) { base ->
             val page = fetch("$base/api-docs").body()
-            withClue(page) { page.contains("initOAuth") shouldBe false }
+            page shouldNotContain "initOAuth"
             fetch("$base/api-docs/oauth2-redirect.html").statusCode() shouldBe 404
         }
     }
@@ -535,8 +543,8 @@ class SwaggerUiTest {
     fun `with a spec endpoint, the page fetches it by url`() {
         serve(openApi = "/openapi.json", docs = "/api-docs") { base ->
             val body = fetch("$base/api-docs").body()
-            withClue(body) { body.contains("url: '/openapi.json'") shouldBe true }
-            withClue("the document should not also be inlined") { body.contains("spec: {") shouldBe false }
+            body shouldContain "url: '/openapi.json'"
+            withClue("the document should not also be inlined") { body shouldNotContain "spec: {" }
             fetch("$base/openapi.json").statusCode() shouldBe 200
         }
     }
@@ -547,14 +555,14 @@ class SwaggerUiTest {
             fetch("$base/openapi.json").statusCode() shouldBe 404
 
             val body = fetch("$base/api-docs").body()
-            withClue("nothing left to fetch, so nothing should be fetched") { body.contains("url: '") shouldBe false }
-            withClue(body.take(400)) { body.contains("spec: {") shouldBe true }
+            withClue("nothing left to fetch, so nothing should be fetched") { body shouldNotContain "url: '" }
+            withClue(body.take(400)) { body shouldContain "spec: {" }
 
             // Embedded whole, not truncated to something Swagger UI cannot read.
             val spec = body.substringAfter("spec: ").substringBefore(", dom_id")
             val doc = Json.parseToJsonElement(spec).jsonObject
             doc["openapi"]!!.jsonPrimitive.content shouldBe "3.1.0"
-            doc["paths"]!!.jsonObject.containsKey("/users/{userId}") shouldBe true
+            doc["paths"]!!.jsonObject shouldContainKey "/users/{userId}"
         }
     }
 
@@ -577,8 +585,8 @@ class SwaggerUiTest {
         try {
             val body = fetch("${server.baseUrl}/api-docs").body()
             // The literal sequence must not survive into the page.
-            withClue(body) { body.contains("</script><script>alert") shouldBe false }
-            withClue(body.substringAfter("spec: ").take(400)) { body.contains("<\\/script>") shouldBe true }
+            body shouldNotContain "</script><script>alert"
+            withClue(body.substringAfter("spec: ").take(400)) { body shouldContain "<\\/script>" }
         } finally {
             server.stop().toCompletableFuture().join()
         }
@@ -600,7 +608,7 @@ class RouteSpecificityTest {
                 HttpResponse.BodyHandlers.ofString(),
             )
             sse.statusCode() shouldBe 200
-            sse.headers().firstValue("content-type").get().startsWith("text/event-stream") shouldBe true
+            sse.headers().firstValue("content-type").get() shouldStartWith "text/event-stream"
 
             // The capture still works for anything else.
             val del = client.send(
@@ -641,7 +649,7 @@ class TypedInputsTest {
                 json<User>()
             }
         }
-        withClue(e.message) { e.message!!.contains("declares path parameter 'stray'") shouldBe true }
+        e.message shouldContain "declares path parameter 'stray'"
     }
 
     @Test
@@ -654,7 +662,7 @@ class TypedInputsTest {
                 json<User>()
             }
         }
-        withClue(e.message) { e.message!!.contains("never declares it as an input") shouldBe true }
+        e.message shouldContain "never declares it as an input"
     }
 
     @Test
@@ -667,7 +675,7 @@ class TypedInputsTest {
                 json<User>()
             }
         }
-        withClue(e.message) { e.message!!.contains("more than once") shouldBe true }
+        e.message shouldContain "more than once"
     }
 
     @Test

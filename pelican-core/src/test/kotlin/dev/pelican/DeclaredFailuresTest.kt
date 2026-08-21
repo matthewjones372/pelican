@@ -1,8 +1,9 @@
 package dev.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import org.junit.jupiter.api.Test
 
@@ -71,7 +72,7 @@ class DeclaredFailuresTest {
         // but the output is a plain JsonOutput, so the handler is the total
         // one and the 404 is still whatever the handler throws.
         ep.errors.size shouldBe 1
-        (ep.output is JsonOutput<*>) shouldBe true
+        ep.output.shouldBeInstanceOf<JsonOutput<*>>()
     }
 
     @Test
@@ -82,7 +83,7 @@ class DeclaredFailuresTest {
                 json<Widget>().orFail(missing, errorJson<Problem>(404, "Also not found"))
             }
         }
-        withClue(clash.message) { clash.message!!.contains("404") shouldBe true }
+        clash.message shouldContain "404"
     }
 
     @Test
@@ -109,7 +110,7 @@ class DeclaredFailuresTest {
 
     @Test
     fun `the failure names itself, so the same type can carry two statuses`() {
-        val (declared, error) = missing(Problem("gone")).let { it as Outcome.Err }
+        val (declared, error) = missing(Problem("gone")) as Outcome.Err
         declared shouldBeSameInstanceAs missing
         error shouldBe Problem("gone")
         (forbidden(Problem("gone")) as Outcome.Err).declared.status shouldBe 403

@@ -182,13 +182,13 @@ abstract class BookmarksContractTest {
         val params = Json.parseToJsonElement(bookmarksSpec().openApiJson())
             .jsonObject["paths"]!!.jsonObject["/bookmarks"]!!
             .jsonObject["get"]!!.jsonObject["parameters"]!!.jsonArray
-            .associateBy { it.jsonObject["name"]!!.jsonPrimitive.content }
+            .associateBy { it.jsonObject.getValue("name").jsonPrimitive.content }
 
-        val limitSchema = params["limit"]!!.jsonObject["schema"]!!.jsonObject
+        val limitSchema = params.getValue("limit").jsonObject.getValue("schema").jsonObject
         limitSchema["minimum"]!!.jsonPrimitive.content shouldBe "1"
         limitSchema["maximum"]!!.jsonPrimitive.content shouldBe "100"
 
-        val tagParam = params["tag"]!!.jsonObject
+        val tagParam = params.getValue("tag").jsonObject
         tagParam["schema"]!!.jsonObject["pattern"]!!.jsonPrimitive.content shouldBe "[a-z0-9-]{1,40}"
         tagParam["example"]!!.jsonPrimitive.content shouldBe "streams"
     }

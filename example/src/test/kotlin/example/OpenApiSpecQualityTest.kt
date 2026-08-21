@@ -5,7 +5,9 @@ import example.bookmarks.bookmarksSpec
 import example.secured.securedSpec
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.maps.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.swagger.v3.parser.OpenAPIV3Parser
 import io.swagger.v3.parser.core.models.ParseOptions
@@ -66,7 +68,7 @@ class OpenApiSpecQualityTest {
             result.messages.orEmpty() shouldBe emptyList()
         }
         withClue("${spec.name}: parsed to nothing at all") {
-            (result.openAPI != null) shouldBe true
+            result.openAPI.shouldNotBeNull()
         }
     }
 
@@ -95,16 +97,16 @@ class OpenApiSpecQualityTest {
         val parsed = parse(spec.json).openAPI
 
         withClue("${spec.name} declared no paths at all") {
-            (parsed.paths.isNotEmpty()) shouldBe true
+            parsed.paths.shouldNotBeEmpty()
         }
         parsed.paths.forEach { (path, item) ->
             val operations = item.readOperationsMap()
             withClue("$path has no operations after parsing") {
-                (operations.isNotEmpty()) shouldBe true
+                operations.shouldNotBeEmpty()
             }
             operations.forEach { (method, operation) ->
                 withClue("$path $method documents no responses") {
-                    (operation.responses.isNotEmpty()) shouldBe true
+                    operation.responses.shouldNotBeEmpty()
                 }
             }
         }

@@ -322,7 +322,7 @@ private fun JsonValue?.asString(): String = (this as? JsonStr)?.value ?: error("
 private fun JsonObj.ref(): String = this["\$ref"].asString()
 
 private fun JsonValue?.asStrings(): List<String> =
-    (this as? JsonArr)?.items?.map { (it as JsonStr).value } ?: emptyList()
+    (this as? JsonArr)?.items?.map { (it as JsonStr).value }.orEmpty()
 
 /**
  * Removes the two differences that carry no meaning: the order of an object's

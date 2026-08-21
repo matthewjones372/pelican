@@ -5,8 +5,9 @@ import dev.pelican.Outcome
 import dev.pelican.errorJson
 import dev.pelican.ok
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.assertions.withClue
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
 /**
@@ -30,6 +31,10 @@ class OutcomeAssertionsTest {
     private val missing: Outcome<NoSuchBookmark, String> =
         bookmarkMissing(NoSuchBookmark(9_999L, "No bookmark 9999"))
 
+    /** The message these assertions are really about — the reason they exist. */
+    private inline fun messageOfFailing(block: () -> Unit): String =
+        shouldThrow<AssertionError>(block).message.shouldNotBeNull()
+
     // ------------------------------------------------------------------ ok
 
     @Test
@@ -39,9 +44,10 @@ class OutcomeAssertionsTest {
 
     @Test
     fun `shouldBeOk on a failure says which failure it got`() {
-        val failure = shouldThrow<AssertionError> { missing.shouldBeOk() }
-        withClue(failure.message!!) { failure.message!!.contains("404") shouldBe true }
-        withClue(failure.message!!) { failure.message!!.contains("No bookmark 9999") shouldBe true }
+        val message = messageOfFailing { missing.shouldBeOk() }
+
+        message shouldContain "404"
+        message shouldContain "No bookmark 9999"
     }
 
     // --------------------------------------------------------------- error
@@ -49,6 +55,7 @@ class OutcomeAssertionsTest {
     @Test
     fun `shouldBeError returns the payload, for chaining onto your own matchers`() {
         val error: NoSuchBookmark = missing.shouldBeError()
+
         error.id shouldBe 9_999L
     }
 
@@ -59,17 +66,15 @@ class OutcomeAssertionsTest {
 
     @Test
     fun `shouldBeError prints both sides when the payload differs`() {
-        val failure = shouldThrow<AssertionError> {
-            missing shouldBeError NoSuchBookmark(1L, "wrong")
-        }
-        withClue(failure.message!!) { failure.message!!.contains("id=1") shouldBe true }
-        withClue(failure.message!!) { failure.message!!.contains("id=9999") shouldBe true }
+        val message = messageOfFailing { missing shouldBeError NoSuchBookmark(1L, "wrong") }
+
+        message shouldContain "id=1"
+        message shouldContain "id=9999"
     }
 
     @Test
     fun `shouldBeError on a success says what came back instead`() {
-        val failure = shouldThrow<AssertionError> { found.shouldBeError() }
-        withClue(failure.message!!) { failure.message!!.contains("succeeded with: Pekko") shouldBe true }
+        messageOfFailing { found.shouldBeError() } shouldContain "succeeded with: Pekko"
     }
 
     // ----------------------------------------------------- which declaration
@@ -78,20 +83,20 @@ class OutcomeAssertionsTest {
     fun `shouldBeFailure tells two failures of the same payload type apart`() {
         // The case equality cannot decide: both carry ApiError, and only the
         // declaration the handler named says which one this is.
-        val payload = ApiError(401, "Nope")
-        val unauthorized: Outcome<ApiError, String> = badKey(payload)
+        val unauthorized: Outcome<ApiError, String> = badKey(ApiError(401, "Nope"))
 
         unauthorized shouldBeFailure badKey
 
-        val failure = shouldThrow<AssertionError> { unauthorized shouldBeFailure forbidden }
-        withClue(failure.message!!) { failure.message!!.contains("error:403") shouldBe true }
-        withClue(failure.message!!) { failure.message!!.contains("error:401") shouldBe true }
+        val message = messageOfFailing { unauthorized shouldBeFailure forbidden }
+
+        message shouldContain "error:403"
+        message shouldContain "error:401"
     }
 
     @Test
     fun `shouldBeFailure on a success says so`() {
         val ok: Outcome<ApiError, String> = ok("fine")
-        val failure = shouldThrow<AssertionError> { ok shouldBeFailure badKey }
-        withClue(failure.message!!) { failure.message!!.contains("succeeded with: fine") shouldBe true }
+
+        messageOfFailing { ok shouldBeFailure badKey } shouldContain "succeeded with: fine"
     }
 }

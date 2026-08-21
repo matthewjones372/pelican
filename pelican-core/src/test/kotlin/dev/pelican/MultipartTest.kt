@@ -4,6 +4,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -112,7 +113,7 @@ class MultipartTest {
         }
 
         failure.status shouldBe 400
-        (failure.detail ?: "") shouldContain "Send 'caption' before it"
+        failure.detail shouldContain "Send 'caption' before it"
     }
 
     @Test
@@ -142,7 +143,7 @@ class MultipartTest {
         // The reader buffers, so this is an upper bound rather than an exact
         // byte count — but it is an upper bound a buffering parser could not
         // meet.
-        withClue("read ${counting.read} of ${text.length}") { (counting.read < 50_000) shouldBe true }
+        withClue("read ${counting.read} of ${text.length}") { counting.read shouldBeLessThan 50_000 }
     }
 
     @Test
@@ -236,8 +237,8 @@ class MultipartTest {
             }
         }
 
-        withClue(failure.message ?: "") {
-            (failure.message ?: "") shouldContain "only the first could be streamed"
+        withClue(failure.message) {
+            failure.message shouldContain "only the first could be streamed"
         }
     }
 
@@ -250,7 +251,7 @@ class MultipartTest {
             }
         }
 
-        (failure.message ?: "") shouldContain "the parts are the body"
+        failure.message shouldContain "the parts are the body"
     }
 
     @Test
@@ -262,7 +263,7 @@ class MultipartTest {
             }
         }
 
-        (failure.message ?: "") shouldContain "more than once"
+        failure.message shouldContain "more than once"
     }
 
     /** Counts what has actually been pulled from the source. */

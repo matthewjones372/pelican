@@ -3,6 +3,8 @@ package dev.pelican.http4k
 import dev.pelican.Api
 import dev.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
+import io.kotest.matchers.comparables.shouldBeGreaterThan
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.net.URI
@@ -65,10 +67,10 @@ class StreamingTimingTest {
             // The stream cannot have finished before the last sleep, so a first
             // row that arrives near the end arrived with it.
             withClue("the test's own premise failed: all $rows rows in ${allRowsMillis}ms") {
-                (allRowsMillis > rows * gapMillis * 0.8) shouldBe true
+                allRowsMillis.toDouble() shouldBeGreaterThan rows * gapMillis * 0.8
             }
             withClue("the first row took ${firstRowMillis}ms of ${allRowsMillis}ms, so it waited for the rest") {
-                (firstRowMillis < allRowsMillis / 2) shouldBe true
+                firstRowMillis shouldBeLessThan allRowsMillis / 2
             }
         } finally {
             server.stop()

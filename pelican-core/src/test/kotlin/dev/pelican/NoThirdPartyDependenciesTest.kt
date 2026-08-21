@@ -1,6 +1,8 @@
 package dev.pelican
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -27,7 +29,7 @@ class NoThirdPartyDependenciesTest {
             .filterNot { entry -> allowed.any { entry.startsWith(it) } }
 
         withClue("pelican-core must have no third-party runtime dependencies, but found: $unexpected") {
-            unexpected.isEmpty() shouldBe true
+            unexpected.shouldBeEmpty()
         }
     }
 
@@ -39,7 +41,7 @@ class NoThirdPartyDependenciesTest {
             "org.apache.pekko.http.javadsl.server.Directives",
         ).forEach { name ->
             withClue("$name is on core's classpath; a dependency crept in") {
-                runCatching { Class.forName(name) }.isFailure shouldBe true
+                shouldThrow<ClassNotFoundException> { Class.forName(name) }
             }
         }
     }

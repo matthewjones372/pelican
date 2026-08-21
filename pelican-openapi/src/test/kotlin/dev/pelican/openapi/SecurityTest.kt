@@ -3,6 +3,7 @@ package dev.pelican.openapi
 import dev.pelican.*
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.nulls.shouldBeNull
@@ -83,7 +84,7 @@ class SecurityTest {
     @Test
     fun `a scheme only a hidden endpoint uses is not published either`() {
         val doc = spec(debugDump).openApi()
-        ("securitySchemes" in (doc / "components").keys()) shouldBe false
+        (doc / "components").keys() shouldNotContain "securitySchemes"
     }
 
     @Test
@@ -121,7 +122,7 @@ class SecurityTest {
         // that is what inheriting the default looks like.
         (doc / "paths" / "/health" / "get" / "summary").shouldBeNull()
         // noSecurity() is an explicit override, and OpenAPI spells it `[]`.
-        (doc / "paths" / "/health" / "get" / "security").arr().isEmpty() shouldBe true
+        (doc / "paths" / "/health" / "get" / "security").arr().shouldBeEmpty()
     }
 
     @Test
@@ -133,8 +134,8 @@ class SecurityTest {
                 text()
             }
         }
-        withClue(e.message) { e.message!!.contains("widgets:delete") shouldBe true }
-        withClue(e.message) { e.message!!.contains("widgets:read") shouldBe true }
+        e.message shouldContain "widgets:delete"
+        e.message shouldContain "widgets:read"
     }
 
     @Test
@@ -204,6 +205,6 @@ class SecurityTest {
         val two = endpoint(noInputs) { get("b"); security(b); text() }
 
         val e = shouldThrow<IllegalStateException> { spec(one, two).openApi() }
-        withClue(e.message) { e.message!!.contains("'auth'") shouldBe true }
+        e.message shouldContain "'auth'"
     }
 }

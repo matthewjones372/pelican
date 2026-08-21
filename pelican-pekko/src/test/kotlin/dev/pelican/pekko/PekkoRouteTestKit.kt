@@ -18,7 +18,7 @@ import org.junit.jupiter.api.extension.ExtensionContext
  * rest of the routing DSL into scope beside the test's own helpers. Held as a
  * field, only `testRoute` and `system` are in reach.
  */
-class PekkoRouteTestKit(private val name: String) : JUnitRouteTestBase(), BeforeAllCallback, AfterAllCallback {
+class PekkoRouteTestKit(name: String) : JUnitRouteTestBase(), BeforeAllCallback, AfterAllCallback {
 
     private val resource = ActorSystemResource(name, ConfigFactory.empty())
 

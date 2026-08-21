@@ -149,6 +149,6 @@ class FormBodyTest {
     fun `a shape a form cannot carry fails when the codec is resolved, not on a request`() {
         val failure = shouldThrow<IllegalStateException> { Schemas.formCodec<String>(typeOf<Nested>()) }
 
-        withClue(failure.message) { (failure.message ?: "") shouldContain "cannot have type 'object'" }
+        failure.message shouldContain "cannot have type 'object'"
     }
 }

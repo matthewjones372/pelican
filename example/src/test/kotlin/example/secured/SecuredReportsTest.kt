@@ -5,8 +5,12 @@ import dev.pelican.openapi.openApiJson
 import dev.pelican.pekko.PelicanServer
 import dev.pelican.pekko.docs.startWithDocs
 import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.maps.shouldContainKey
+import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -125,7 +129,7 @@ class SecuredReportsTest {
                 scheme to scopes.jsonArray.map { it.jsonPrimitive.content }
             }
         } shouldBe listOf("companyIdp" to listOf("reports:read"))
-        operation("/reports", "get").containsKey("security") shouldBe false
+        operation("/reports", "get") shouldNotContainKey "security"
     }
 
     @Test
@@ -143,7 +147,7 @@ class SecuredReportsTest {
 
     @Test
     fun `noSecurity publishes an empty requirement list rather than inheriting`() {
-        operation("/health", "get")["security"]!!.jsonArray.isEmpty() shouldBe true
+        operation("/health", "get")["security"]!!.jsonArray.shouldBeEmpty()
     }
 
     @Test
@@ -158,18 +162,18 @@ class SecuredReportsTest {
     @Test
     fun `the docs page signs in as its own client and is sent back to the redirect it serves`() {
         val page = send("GET", "/api-docs").body()
-        withClue(page) { page.contains("initOAuth") shouldBe true }
-        withClue(page) { page.contains(""""clientId":"reports-docs-ui"""") shouldBe true }
-        withClue(page) { page.contains(""""usePkceWithAuthorizationCodeGrant":true""") shouldBe true }
-        withClue(page) { page.contains(""""audience":"https://api.example.com/reports"""") shouldBe true }
-        withClue(page) { page.contains("oauth2RedirectUrl") shouldBe true }
-        withClue(page) { page.contains(oauth2RedirectPath(DOCS_PATH)) shouldBe true }
+        page shouldContain "initOAuth"
+        page shouldContain """"clientId":"reports-docs-ui""""
+        page shouldContain """"usePkceWithAuthorizationCodeGrant":true"""
+        page shouldContain """"audience":"https://api.example.com/reports""""
+        page shouldContain "oauth2RedirectUrl"
+        page shouldContain oauth2RedirectPath(DOCS_PATH)
 
         // Served by this service, on the same origin as the page — which is the
         // URL the identity provider has to have registered.
         val redirect = send("GET", oauth2RedirectPath(DOCS_PATH))
         redirect.statusCode() shouldBe 200
-        withClue(redirect.body()) { redirect.body().contains("swaggerUIRedirectOauth2") shouldBe true }
+        redirect.body() shouldContain "swaggerUIRedirectOauth2"
     }
 
     // ------------------------------------------------------ the enforcement
@@ -197,14 +201,14 @@ class SecuredReportsTest {
         res.statusCode() shouldBe 200
         // Not a count: the store is shared with the tests below, which file and
         // withdraw reports in whatever order JUnit runs them.
-        withClue(res.body()) { Json.parseToJsonElement(res.body()).jsonArray.isNotEmpty() shouldBe true }
+        withClue(res.body()) { Json.parseToJsonElement(res.body()).jsonArray.shouldNotBeEmpty() }
     }
 
     @Test
     fun `a token without the scope is a 403 naming what is missing`() {
         val res = send("POST", "/reports", """{"title":"Cold start","body":"90s"}""", bearer("demo-reader"))
         res.statusCode() shouldBe 403
-        withClue(res.body()) { res.body().contains("reports:write") shouldBe true }
+        res.body() shouldContain "reports:write"
     }
 
     @Test
@@ -227,7 +231,7 @@ class SecuredReportsTest {
     fun `basic auth reaches the endpoint that only accepts it`() {
         val res = send("GET", "/internal/usage", null, basic("sre", "pager-duty"))
         res.statusCode() shouldBe 200
-        Json.parseToJsonElement(res.body()).jsonObject.containsKey("reports") shouldBe true
+        Json.parseToJsonElement(res.body()).jsonObject shouldContainKey "reports"
     }
 
     @Test
@@ -245,8 +249,8 @@ class SecuredReportsTest {
         // to guess which of the two schemes this endpoint wanted.
         val challenge = res.headers().firstValue("WWW-Authenticate").orElse(null)
         withClue(res.headers().map().toString()) { challenge.shouldNotBeNull() }
-        withClue(challenge) { challenge.contains("Bearer") shouldBe true }
-        withClue(challenge) { challenge.contains("Basic") shouldBe true }
+        challenge shouldContain "Bearer"
+        challenge shouldContain "Basic"
     }
 
     @Test

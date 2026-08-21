@@ -7,6 +7,7 @@ import dev.pelican.jsonBody
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.javadsl.Behaviors
 import org.apache.pekko.http.javadsl.Http
@@ -89,7 +90,7 @@ class ChunkedBodyLimitTest {
         res.statusCode() shouldBe 413
         withClue(res.body()) { res.body() shouldContain "Payload too large" }
         // Refused rather than decoded: none of the payload comes back.
-        withClue(res.body().take(200)) { res.body().contains("xxxx") shouldBe false }
+        withClue(res.body().take(200)) { res.body() shouldNotContain "xxxx" }
     }
 
     @Test

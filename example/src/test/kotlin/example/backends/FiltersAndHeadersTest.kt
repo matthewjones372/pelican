@@ -8,7 +8,11 @@ import dev.pelican.test.apiClient
 import dev.pelican.test.shouldHaveHeader
 import dev.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.string.shouldStartWith
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -57,7 +61,7 @@ class FiltersAndHeadersTest {
         // every endpoint, through the same value the endpoints declared.
         val res = client.response(greet, In2("ada", false)).shouldHaveStatus(200)
         val id = res.header("X-Request-Id")
-        withClue("no generated id in ${res.headers}") { (id != null && id.startsWith("gen-")) shouldBe true }
+        withClue("no generated id in ${res.headers}") { id shouldStartWith "gen-" }
     }
 
     @ParameterizedTest(name = "{0}")
@@ -75,7 +79,7 @@ class FiltersAndHeadersTest {
         // on before any element is encoded.
         val res = client.response(countdown, 3)
         res shouldHaveStatus 200
-        withClue(res.headers.toString()) { (res.header("X-Request-Id") != null) shouldBe true }
+        withClue(res.headers.toString()) { res.header("X-Request-Id").shouldNotBeNull() }
     }
 
     // -------------------------------------------------------------- filters
@@ -85,8 +89,8 @@ class FiltersAndHeadersTest {
     fun `a filter that refuses is a 403, and the handler never runs`(name: String, client: ApiClient) {
         val res = client.response(echo, In2("blocked", Note("should not be echoed")))
         res shouldHaveStatus 403
-        withClue(res.body) { res.body.contains("should not be echoed") shouldBe false }
-        withClue(res.body) { res.body.contains("refused by the gate") shouldBe true }
+        res.body shouldNotContain "should not be echoed"
+        res.body shouldContain "refused by the gate"
     }
 
     @ParameterizedTest(name = "{0}")
@@ -110,9 +114,9 @@ class FiltersAndHeadersTest {
         val res = client.transport.send(huge)
 
         res shouldHaveStatus 413
-        withClue(res.body) { res.body.contains("Payload too large") shouldBe true }
+        res.body shouldContain "Payload too large"
         // Decoding never happened, so nothing about the payload comes back.
-        withClue(res.body.take(200)) { res.body.contains("xxxx") shouldBe false }
+        withClue(res.body.take(200)) { res.body shouldNotContain "xxxx" }
     }
 
     @ParameterizedTest(name = "{0}")
@@ -142,6 +146,6 @@ class FiltersAndHeadersTest {
     fun `all three backends document it identically`() {
         val docs = allBackends.map { it.api().spec().openApiJson() }
         withClue("the three documents differ") { docs.distinct().size shouldBe 1 }
-        withClue("the header is missing from the document") { docs.first().contains("X-Request-Id") shouldBe true }
+        withClue("the header is missing from the document") { docs.first() shouldContain "X-Request-Id" }
     }
 }

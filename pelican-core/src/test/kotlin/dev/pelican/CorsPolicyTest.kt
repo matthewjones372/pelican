@@ -1,13 +1,13 @@
 package dev.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
 
@@ -198,7 +198,7 @@ class CorsPolicyTest {
     fun `a path template matches on shape, whatever the capture holds`() {
         val policy = policy(cors(app))
 
-        (policy.preflight(app, "GET", "/users/not-a-number") is CorsPreflight.Allowed) shouldBe true
+        policy.preflight(app, "GET", "/users/not-a-number").shouldBeInstanceOf<CorsPreflight.Allowed>()
         policy.preflight(app, "GET", "/users/7/orders") shouldBe CorsPreflight.NotPreflight
     }
 }

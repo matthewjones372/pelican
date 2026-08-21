@@ -6,6 +6,7 @@
 package dev.pelican.codegen
 
 import dev.pelican.*
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -182,7 +183,7 @@ class KotlinClientTest {
 
     @Test
     fun `it declares the package it was asked for and is named after the title`() {
-        withClue(client.take(600)) { ("package com.example.widgets" in client) shouldBe true }
+        client shouldContain "package com.example.widgets"
         client shouldContain "class WidgetShopClient("
         client shouldContain """private const val DEFAULT_BASE_URL = "https://widgets.example.com""""
     }
@@ -209,63 +210,56 @@ class KotlinClientTest {
 
     @Test
     fun `path parameters are positional and percent-encoded`() {
-        withClue(client) { ("""request("GET", "/widgets/${'$'}{segment(widgetId)}")""" in client) shouldBe true }
+        client shouldContain """request("GET", "/widgets/${'$'}{segment(widgetId)}")"""
     }
 
     @Test
     fun `query parameters and headers are named parameters with defaults`() {
         // A header name is not a legal Kotlin identifier, so it is camel-cased —
         // mechanically, keeping every part, and mapped back on the way out.
-        withClue(client) {
-            client shouldContain
-                "fun streamWidgets(page: Int? = null, colour: WidgetColour? = null, xTraceId: String? = null)"
-        }
+        client shouldContain
+            "fun streamWidgets(page: Int? = null, colour: WidgetColour? = null, xTraceId: String? = null)"
         client shouldContain """query = listOf("page" to page, "colour" to colour)"""
         client shouldContain """headerParams = listOf("X-Trace-Id" to xTraceId)"""
     }
 
     @Test
     fun `a required parameter has no default, and comes before the optional ones`() {
-        withClue(client) { ("fun createWidget(body: NewWidget, xApiKey: String)" in client) shouldBe true }
+        client shouldContain "fun createWidget(body: NewWidget, xApiKey: String)"
         client shouldContain """headerParams = listOf("X-Api-Key" to xApiKey)"""
     }
 
     @Test
     fun `a json body goes through the codec, a raw body through the stream`() {
-        withClue(client) {
-            ("body = HttpRequest.BodyPublishers.ofString(newWidgetCodec.encodeToString(body)), " +
-                "contentType = \"application/json\"" in client) shouldBe true
-        }
+        client shouldContain
+            "body = HttpRequest.BodyPublishers.ofString(newWidgetCodec.encodeToString(body)), " +
+            "contentType = \"application/json\""
         client shouldContain "fun uploadWidget(body: InputStream): InputStream {"
         client shouldContain "body = HttpRequest.BodyPublishers.ofInputStream { body }"
     }
 
     @Test
     fun `a cookie parameter is a named parameter, and cookies travel as one header`() {
-        withClue(client) { ("fun themed(theme: String? = null)" in client) shouldBe true }
-        withClue(client) { ("""cookies = listOf("theme" to theme)""" in client) shouldBe true }
+        client shouldContain "fun themed(theme: String? = null)"
+        client shouldContain """cookies = listOf("theme" to theme)"""
     }
 
     @Test
     fun `a form body goes through a codec that reads the published schema`() {
-        withClue(client) { ("fun signInWidget(body: NewWidget)" in client) shouldBe true }
-        withClue(client) {
-            ("body = HttpRequest.BodyPublishers.ofString(newWidgetFormCodec.encodeToString(body)), " +
-                "contentType = \"application/x-www-form-urlencoded\"" in client) shouldBe true
-        }
-        withClue(client) {
-            client shouldContain
-                "private val newWidgetFormCodec: BodyCodec<NewWidget> = codecs.formCodec(typeOf<NewWidget>())"
-        }
+        client shouldContain "fun signInWidget(body: NewWidget)"
+        client shouldContain
+            "body = HttpRequest.BodyPublishers.ofString(newWidgetFormCodec.encodeToString(body)), " +
+            "contentType = \"application/x-www-form-urlencoded\""
+        client shouldContain
+            "private val newWidgetFormCodec: BodyCodec<NewWidget> = codecs.formCodec(typeOf<NewWidget>())"
     }
 
     @Test
     fun `multipart parts are parameters, and the file part is the type a handler receives`() {
-        withClue(client) { ("fun importWidgets(label: String, attachment: UploadedFile)" in client) shouldBe true }
-        withClue(client) {
-            ("""multipart = multipart(fields = listOf("label" to label), """ +
-                """files = listOf("attachment" to attachment))""" in client) shouldBe true
-        }
+        client shouldContain "fun importWidgets(label: String, attachment: UploadedFile)"
+        client shouldContain
+            """multipart = multipart(fields = listOf("label" to label), """ +
+            """files = listOf("attachment" to attachment))"""
     }
 
     // ------------------------------------------------------------ responses
@@ -280,15 +274,13 @@ class KotlinClientTest {
 
     @Test
     fun `an empty response returns nothing and opaque bytes return the stream`() {
-        withClue(client) { ("fun deleteWidget(widgetId: Long) {" in client) shouldBe true }
+        client shouldContain "fun deleteWidget(widgetId: Long) {"
         client shouldContain "fun uploadWidget(body: InputStream): InputStream {"
     }
 
     @Test
     fun `a codec is resolved once per payload type, when the client is built`() {
-        withClue(client) {
-            client shouldContain "private val widgetCodec: BodyCodec<Widget> = codecs.codec(typeOf<Widget>())"
-        }
+        client shouldContain "private val widgetCodec: BodyCodec<Widget> = codecs.codec(typeOf<Widget>())"
         Regex("private val widgetCodec").findAll(client).count() shouldBe 1
     }
 
@@ -296,8 +288,7 @@ class KotlinClientTest {
 
     @Test
     fun `declared failures become a sealed type, one member per status`() {
-        withClue(client) {
-            ("""
+        client shouldContain """
             sealed interface CreateWidgetFailure {
                 val status: Int
 
@@ -311,17 +302,15 @@ class KotlinClientTest {
                     override val status: Int get() = 403
                 }
             }
-            """.trimIndent() in client) shouldBe true
-        }
+        """.trimIndent()
     }
 
     @Test
     fun `a fallible call returns an Outcome, and reads the failure that arrived`() {
         client shouldContain "fun getWidget(widgetId: Long): Outcome<GetWidgetFailure, Widget> {"
-        withClue(client) {
-            ("404 -> return Outcome.Err(GetWidgetFailure.NotFound(" +
-                "problemCodec.decodeFromString(response.body())))" in client) shouldBe true
-        }
+        client shouldContain
+            "404 -> return Outcome.Err(GetWidgetFailure.NotFound(" +
+            "problemCodec.decodeFromString(response.body())))"
         client shouldContain "return Outcome.Ok(widgetCodec.decodeFromString(response.body()))"
     }
 
@@ -335,8 +324,7 @@ class KotlinClientTest {
 
     @Test
     fun `a named schema becomes a data class, with optional properties defaulted`() {
-        withClue(client) {
-            ("""
+        client shouldContain """
             data class Widget(
                 val id: Long,
                 val name: String,
@@ -345,8 +333,7 @@ class KotlinClientTest {
                 val colour: WidgetColour,
                 val parent: Widget? = null,
             )
-            """.trimIndent() in client) shouldBe true
-        }
+        """.trimIndent()
     }
 
     @Test
@@ -354,10 +341,10 @@ class KotlinClientTest {
         // `note` is required, so nothing but the union `["string", "null"]` can
         // have made it nullable — and it is a String, not the `Any?` a
         // generator still looking for `nullable: true` would fall back to.
-        withClue(client) { ("val note: String?," in client) shouldBe true }
+        client shouldContain "val note: String?,"
         // `parent` likewise: the anyOf has to resolve to the branch that is not
         // null, or the property would be typed `Any?` and say nothing.
-        withClue(client) { ("val parent: Widget? = null," in client) shouldBe true }
+        client shouldContain "val parent: Widget? = null,"
     }
 
     @Test
@@ -370,7 +357,7 @@ class KotlinClientTest {
 
     @Test
     fun `a hidden endpoint is left out, as it is left out of the document`() {
-        withClue("a hidden endpoint reached the generated client") { ("rebuild" in client) shouldBe false }
+        withClue("a hidden endpoint reached the generated client") { client shouldNotContain "rebuild" }
         spec().kotlinClient("com.example.widgets", includeHidden = true) shouldContain "rebuild"
     }
 
@@ -385,8 +372,8 @@ class KotlinClientTest {
 
     @Test
     fun `neither pekko nor a codec module is on this module's classpath`() {
-        runCatching { Class.forName("org.apache.pekko.http.javadsl.server.Directives") }.isFailure shouldBe true
-        runCatching { Class.forName("com.fasterxml.jackson.databind.ObjectMapper") }.isFailure shouldBe true
+        shouldThrow<ClassNotFoundException> { Class.forName("org.apache.pekko.http.javadsl.server.Directives") }
+        shouldThrow<ClassNotFoundException> { Class.forName("com.fasterxml.jackson.databind.ObjectMapper") }
     }
 
     @Test
