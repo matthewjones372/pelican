@@ -40,8 +40,11 @@ the schema. Swagger UI refuses to send a request the server would reject.
 type. The handler must produce it, and the caller's generated client gets a
 sealed type to match on.
 
-**Tests call endpoints, not URLs.** Rename a parameter and your tests stop
-compiling instead of starting to 404.
+**Tests call endpoints, not URLs — then pin the URLs on purpose.** Behaviour
+tests name endpoint values, so renaming an input stops them compiling instead of
+starting to 404. The client and the server agree by construction, though, which
+is why the wire contract your callers hold is pinned separately, in one line per
+endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
 
 **Swapping backends does not touch your descriptions.** Only the type a
 streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
@@ -53,7 +56,8 @@ streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
 [What the compiler catches](#what-the-compiler-catches) ·
 [Describing endpoints](#describing-endpoints) · [Running a server](#running-a-server) ·
 [Testing](#testing) · [A generated Kotlin client](#a-generated-kotlin-client) ·
-[Backends](#backends) · [What it costs](#what-it-costs) · [Modules](#modules) ·
+[Backends](#backends) · [The same endpoint, by hand](#the-same-endpoint-by-hand) ·
+[What it costs](#what-it-costs) · [Modules](#modules) ·
 [Running the examples](#running-the-examples) · [Known limits](#known-limits)
 
 The reference manual, with the reasoning behind each design decision, is
@@ -509,9 +513,31 @@ app.outcome(placeOrder, input) shouldBeFailure noSuchUser
 ```
 
 These throw plain `AssertionError`, so `pelican-test` needs no matcher library
-of its own and puts none on your classpath. No path strings, no JSON literals.
-Every suite runs twice, in memory and over a real socket, so a difference
-between the two is a real difference in behaviour.
+of its own and puts none on your classpath. Every suite runs twice, in memory
+and over a real socket, so a difference between the two is a real difference in
+behaviour.
+
+## Pinning the URL
+
+Nothing above mentions a path, which is what stops those tests drifting off your
+endpoints — and also what stops them noticing when `"bookmarks"` becomes
+`"books"`. The client builds its request from the same description the server
+routes on, so a rename moves both ends at once: the suite stays green while
+every caller already deployed against the old path starts getting a 404.
+
+The URL and the parameter names are the contract those callers hold, so pin them
+against literals — deliberately repeating what the description says, because a
+copy that does not move is the only thing that can catch the move:
+
+```kotlin
+app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
+app.request(listBookmarks, In2(20, Slug("streams"))) shouldBuild "GET /bookmarks?limit=20&tag=streams"
+app.request(deleteBookmark, In2(1L, key)) shouldBuild "DELETE /bookmarks/1"
+```
+
+`request` builds the call without sending it, so this costs no server and no
+transport. It is the one test in the suite that *should* fail on a rename: a
+red line here is the 404 your callers would have found for you.
 
 ---
 
@@ -597,6 +623,150 @@ which turns a streamed response into a slow one, while `Jetty` does not. Rather
 than ship a default that quietly breaks streaming, `pelican-http4k` binds
 `StreamingSunHttp` (the JDK's server, flushing each frame, no extra dependency).
 Pass any other `ServerConfig` to `start(config = ...)`.
+
+---
+
+# The same endpoint, by hand
+
+One endpoint — `GET /bookmarks/{bookmarkId}`, answering with a `Bookmark` or a
+404 carrying a `NoSuchBookmark`, and appearing in an OpenAPI document. Written
+directly against Pekko HTTP, with the document produced the usual way: swagger
+annotations, scanned at startup.
+
+```kotlin
+data class Bookmark(val id: Long, val url: String, val title: String, val tags: List<String> = emptyList())
+data class NoSuchBookmark(val id: Long, val message: String)
+
+@Path("/bookmarks")                            // read by the scanner; serves nothing
+class BookmarkRoutes : AllDirectives() {
+
+    @GET
+    @Path("/{bookmarkId}")
+    @Operation(
+        summary = "Fetch one bookmark",
+        tags = ["bookmarks"],
+        parameters = [
+            Parameter(
+                name = "bookmarkId",
+                `in` = ParameterIn.PATH,
+                required = true,
+                description = "The bookmark's id",
+                schema = Schema(implementation = Long::class),
+            ),
+        ],
+        responses = [
+            ApiResponse(
+                responseCode = "200",
+                description = "The bookmark",
+                content = [Content(schema = Schema(implementation = Bookmark::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "No bookmark with that id",
+                content = [Content(schema = Schema(implementation = NoSuchBookmark::class))],
+            ),
+        ],
+    )
+    fun getBookmark(): Route =
+        pathPrefix("bookmarks") {
+            path(longSegment()) { id ->
+                get {
+                    val found = Bookmarks.find(id)
+                    if (found != null) complete(StatusCodes.OK, found, Jackson.marshaller())
+                    else complete(
+                        StatusCodes.NOT_FOUND,
+                        NoSuchBookmark(id, "No bookmark $id"),
+                        Jackson.marshaller(),
+                    )
+                }
+            }
+        }
+}
+
+fun main() {
+    val system = ActorSystem.create("bookmarks")
+
+    // The document is a second route, served by swagger-pekko-http's
+    // `SwaggerHttpService` configured with `apiClasses = setOf(BookmarkRoutes::class.java)`.
+    // That list is maintained by hand: add a route and forget to add it here
+    // and the endpoint is simply undocumented. Nothing fails.
+    val routes = Directives.concat(BookmarkRoutes().getBookmark(), apiDocsRoute)
+
+    Http.get(system).newServerAt("localhost", 8080).bind(routes)
+}
+```
+
+The same endpoint with Pelican:
+
+```kotlin
+data class Bookmark(val id: Long, val url: String, val title: String, val tags: List<String> = emptyList())
+data class NoSuchBookmark(val id: Long, val message: String)
+
+val bookmarkId      = pathParam<Long>("bookmarkId", description = "The bookmark's id")
+val bookmarkMissing = errorJson<NoSuchBookmark>(404, "No bookmark with that id")
+
+val getBookmark = endpoint(bookmarkId) {
+    get("bookmarks" / bookmarkId)
+    summary = "Fetch one bookmark"
+    tag("bookmarks")
+    json<Bookmark>() orFail bookmarkMissing
+}
+
+val route = getBookmark handledOrFail { id ->                  // id: Long
+    Bookmarks.find(id)?.let { ok(it) }
+        ?: bookmarkMissing(NoSuchBookmark(id, "No bookmark $id"))
+}
+
+fun main() {
+    Api(listOf(route), codecs = JacksonCodecs, title = "Bookmarks", version = "1.0.0")
+        .startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
+}
+```
+
+## What the second version does not have to keep in step
+
+The length is the least of it. What the first version costs is the number of
+places that say the same thing and are never compared:
+
+**The path is written twice.** `@Path("/bookmarks")` plus `@Path("/{bookmarkId}")`
+for the scanner, `pathPrefix("bookmarks")` plus `path(longSegment())` for the
+server. Change one and the other keeps its old answer — which is exactly the
+drift a document is supposed to protect you from. In the second version there is
+one `get("bookmarks" / bookmarkId)`, and both the route and the document are
+read from it.
+
+**The parameter's name exists only in the annotation.** `longSegment()` is
+positional; nothing connects it to the string `"bookmarkId"`. The document can
+name a parameter the server has never heard of and no build fails.
+
+**The type is declared twice, in two languages.** `Schema(implementation = Long::class)`
+in the annotation, `longSegment()` in the matcher, and the handler's `id` gets
+its type from the second. `pathParam<Long>("bookmarkId")` is all three at once.
+
+**The 404 is a status in one place and a payload in another.** The annotation
+promises a `NoSuchBookmark`; the route is free to complete with anything at all,
+including a bare string or a 500. `orFail bookmarkMissing` puts the failure in
+the endpoint's type, so a handler that does not produce it does not compile —
+and the generated client gets a sealed type to match on.
+
+**Two 404s that mean different things.** `/bookmarks/abc` does not match
+`longSegment()`, so the route is rejected and the caller is told 404 — the same
+answer as a bookmark that does not exist. Pelican decodes against the declared
+codec and answers 400, because "not a number" and "no such bookmark" are not the
+same problem.
+
+**The scanner's class list.** One more hand-maintained list, silent when wrong.
+The second version has one list — the routes you pass to `Api` — and it is the
+list both the server and the document are built from.
+
+None of this is an argument against Pekko HTTP. Pelican runs on it, and the
+route the interpreter builds is the route above with the repetition removed
+rather than replaced. It is an argument about how many copies of one endpoint a
+service keeps, and which of them a compiler is allowed to check.
+
+The block above is illustrative and not part of the build, unlike
+[`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt).
+The Pelican half is the same code as that file, one endpoint of it.
 
 ---
 

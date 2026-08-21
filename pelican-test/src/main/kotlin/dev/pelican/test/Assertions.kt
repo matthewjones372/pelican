@@ -20,6 +20,47 @@ import dev.pelican.Outcome
  * then carry on with whatever matcher library you actually use.
  */
 
+// ------------------------------------------------------------------- requests
+//
+// Every other assertion here is about behaviour, and behaviour is what the
+// typed call is good at: `call(getBookmark, 1L)` says nothing about the URL, so
+// renaming an input breaks compilation rather than quietly starting to 404.
+//
+// That is also its blind spot. The client builds the request from the same
+// description the server routes on, so a rename moves both at once and every
+// typed test stays green — while the callers already deployed against the old
+// path get a 404. The URL and the parameter names are the contract those
+// callers hold; nothing in a typed call pins them.
+//
+// So pin them once, per endpoint, against a literal:
+//
+// ```
+// app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
+// ```
+//
+// This is the one assertion that *should* fail on a rename. `request` builds
+// without sending, so it costs no server and no transport.
+
+/**
+ * Asserts the call an endpoint would send is this request line — the method,
+ * the path and the query string, exactly as a caller would have to write them.
+ *
+ * ```
+ * app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
+ * app.request(listBookmarks, In2(20, Slug("streams"))) shouldBuild "GET /bookmarks?limit=20&tag=streams"
+ * ```
+ */
+infix fun RequestSpec.shouldBuild(expected: String): RequestSpec = apply {
+    val actual = toString()
+    if (actual != expected) {
+        fail(
+            "Expected the call to build `$expected` but it built `$actual`. " +
+                "The difference is what every caller already pointed at the old " +
+                "one would get back as a 404.",
+        )
+    }
+}
+
 // ------------------------------------------------------------------ responses
 
 infix fun ResponseSpec.shouldHaveStatus(expected: Int): ResponseSpec = apply {

@@ -1,10 +1,12 @@
 package example.backends
 
 import dev.pelican.In2
+import dev.pelican.UploadedFile
 import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.openapi.openApiJson
 import dev.pelican.test.ApiClient
 import dev.pelican.test.apiClient
+import dev.pelican.test.shouldBuild
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
+import java.io.ByteArrayInputStream
 
 /**
  * One suite, three interpreters.
@@ -104,6 +107,34 @@ class AllBackendsTest {
     @MethodSource("backends")
     fun `an unknown path is a 404`(name: String, client: ApiClient) {
         client.transport.send(client.request(greet, In2("ada", false)).withPath("/nope")).status shouldBe 404
+    }
+
+    // ------------------------------------------------------------ the contract
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `every backend answers at the URLs the descriptions publish`(name: String, client: ApiClient) {
+        // Every other test here builds its request from the description the
+        // backend also routes on, so the two agree by construction: rename
+        // `"hello"` to `"greetings"` and all of them stay green while every
+        // caller already deployed against `/hello/ada` starts getting a 404.
+        //
+        // These literals are the only thing in the suite that does not move
+        // when a description does. They are the URL a caller was given.
+        val greeting = client.request(greet, In2("ada", false))
+
+        greeting shouldBuild "GET /hello/ada?shout=false"
+        client.request(countdown, 3) shouldBuild "GET /countdown/3"
+        client.request(echo, In2("trace-1", Note("hi"))) shouldBuild "POST /echo"
+        client.request(preferences, In2("fr", "abc123")) shouldBuild "GET /preferences"
+        client.request(signIn, SignIn("ada", remember = true, visits = 3)) shouldBuild "POST /sign-in"
+        val upload = UploadedFile("big.txt", "text/plain", ByteArrayInputStream("hello".toByteArray()))
+        client.request(uploadFile, In2("Big", upload)) shouldBuild "POST /upload"
+
+        // The line above pins what the URL is; this one pins that *this*
+        // backend serves it. Three interpreters agreeing on how to build a
+        // request would be no comfort if one of them routed it elsewhere.
+        client.transport.send(greeting).status shouldBe 200
     }
 
     // ------------------------------------------------------------- the stream

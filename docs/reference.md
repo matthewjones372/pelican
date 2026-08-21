@@ -1248,7 +1248,9 @@ assertEquals(401, app.response(placeOrder, In3(1L, "wrong", CreateOrder("anvil")
 No path strings and no hand-written JSON, which is the point: rename a path
 parameter or change an input's type and the *tests* stop compiling rather than
 starting to 404. Responses are decoded with the same `Codecs` that encoded
-them, so a green test also proves the codec round-trips.
+them, so a green test also proves the codec round-trips. What that does *not*
+cover is the URL itself, which is the contract a caller holds — see [Pinning the
+URL](#pinning-the-url) below.
 
 A body that is not JSON is built from the description too. A cookie parameter
 becomes a `Cookie` header, a form body is encoded against its published schema,
@@ -1284,6 +1286,43 @@ and still gets the typed client.
 
 `ApiClient(HttpClientTransport(url), codecs)` points the same suite at a
 deployed service.
+
+### Pinning the URL
+
+Building the request from the description is what makes a typed call
+type-checked, and it is also the one thing it cannot be evidence about. The
+client injects into the same `Inputs` the server extracts from, so renaming a
+path segment or a query parameter moves both ends together: every typed test
+still passes, the OpenAPI document still agrees with the server, and the callers
+holding the old URL get a 404 that nothing in the suite predicted.
+
+That is not an argument for hand-written URLs everywhere — a suite of them
+drifts off the service and asserts about strings rather than behaviour, which is
+what the typed client exists to stop. It is an argument for writing them down
+*once*, as the contract, separately from the tests that exercise behaviour:
+
+```kotlin
+app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
+app.request(listBookmarks, In2(20, Slug("streams"))) shouldBuild "GET /bookmarks?limit=20&tag=streams"
+app.request(createBookmark, In2(key, created)) shouldBuild "POST /bookmarks"
+app.request(deleteBookmark, In2(1L, key)) shouldBuild "DELETE /bookmarks/1"
+```
+
+`request` builds without sending, so a pin costs no server, no port and no
+transport — the whole API fits in one test. The literal is duplication on
+purpose: a copy that does not move when the description moves is the only thing
+that can catch the move.
+
+`shouldBuild` compares the method, the path and the query string, which is
+exactly what a caller had to type. It says nothing about headers or bodies —
+those are the payload, not the address, and the typed call already checks them
+against the declaration.
+
+The split is worth stating in one line: **behaviour tests should not break on a
+rename, and the contract test should.** `BookmarksContractTest` holds both, and
+`AllBackendsTest` pins the greetings URLs and then sends the pinned call, so
+three interpreters agreeing on how to *build* a request is backed by each one
+answering at the address itself.
 
 ### Asserting on an outcome
 

@@ -11,6 +11,7 @@ import dev.pelican.test.pekko.inMemory
 import dev.pelican.test.shouldBeApiError
 import dev.pelican.test.shouldBeError
 import dev.pelican.test.shouldBeOk
+import dev.pelican.test.shouldBuild
 import dev.pelican.test.shouldHaveContentType
 import dev.pelican.test.shouldHaveNoBody
 import dev.pelican.test.shouldHaveStatus
@@ -68,6 +69,30 @@ abstract class BookmarksContractTest {
         title: String = "Example",
         tags: List<String> = emptyList(),
     ): Bookmark = app.call(createBookmark, In2(key, CreateBookmark(url, title, tags)))
+
+    // -------------------------------------------------------- the wire contract
+    //
+    // Everything below names an endpoint value and never a URL, which is what
+    // keeps it honest about behaviour: rename `bookmarkId` and those tests stop
+    // compiling instead of starting to 404.
+    //
+    // It is also why not one of them would notice `"bookmarks"` becoming
+    // `"books"`. The client builds its request from the same description the
+    // server routes on, so a rename moves both ends at once and the suite stays
+    // green while every caller already deployed against the old path gets a
+    // 404. The URL and the parameter names are the contract those callers hold,
+    // so they are pinned here, once, against literals — the only place in this
+    // file that deliberately repeats what a description says.
+
+    @Test
+    fun `the endpoints are served at the URLs their callers were given`() {
+        app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
+        app.request(listBookmarks, In2(20, Slug("streams"))) shouldBuild "GET /bookmarks?limit=20&tag=streams"
+        app.request(deleteBookmark, In2(1L, key)) shouldBuild "DELETE /bookmarks/1"
+
+        val created = CreateBookmark("https://example.com", "Example", emptyList())
+        app.request(createBookmark, In2(key, created)) shouldBuild "POST /bookmarks"
+    }
 
     // ---------------------------------------------------------------- reads
 
