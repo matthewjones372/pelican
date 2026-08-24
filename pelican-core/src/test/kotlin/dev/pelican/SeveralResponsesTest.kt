@@ -1,6 +1,7 @@
 package dev.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -202,6 +203,72 @@ class SeveralResponsesTest {
     fun `a header on an endpoint's only response is refused when the endpoint is built`() {
         val refused = shouldThrow<IllegalStateException> { placing(json<Order>(status = 201, location)) }
         refused.message shouldContain "Declare them with emits(...)"
+    }
+
+    // -------------------------------------------- which response ok() means
+
+    private val twoWays = created or accepted
+
+    @Test
+    fun `a named response resolves to itself, and its headers travel with it`() {
+        val answer = created(Order(7), location of "/orders/7") as Outcome.Ok
+
+        twoWays.successNamedBy(answer) shouldBeSameInstanceAs created
+        answer.headers shouldBe listOf("Location" to "/orders/7")
+    }
+
+    @Test
+    fun `a bare ok resolves to the first, which is what it has always meant`() {
+        val single = json<Order>(status = 200) or accepted
+
+        single.successNamedBy(ok(Order(1)) as Outcome.Ok) shouldBeSameInstanceAs single.successes.first()
+    }
+
+    /**
+     * The hole this closes. `ok(...)` names no response and so carries no
+     * headers, and `Output.invoke` — the only other way to produce a success —
+     * refuses a required header that was left out. So an endpoint whose first
+     * success promises a `Location` could answer 201 without one, and the
+     * document promised it.
+     */
+    @Test
+    fun `a bare ok is refused where the response it means promises a header`() {
+        val refused = shouldThrow<IllegalStateException> { twoWays.successNamedBy(ok(Order(1)) as Outcome.Ok) }
+
+        withClue(refused.message) {
+            refused.message shouldContain "ok(...)"
+            refused.message shouldContain "Location"
+            refused.message shouldContain "json:201"
+        }
+    }
+
+    @Test
+    fun `an optional header on the first success leaves a bare ok alone`() {
+        val cursor = responseHeader<String>("X-Cursor").optional()
+        val paged = json<Order>(status = 200, cursor) or accepted
+
+        paged.successNamedBy(ok(Order(1)) as Outcome.Ok) shouldBeSameInstanceAs paged.successes.first()
+    }
+
+    /**
+     * The single-success endpoint, which is every endpoint that predates any of
+     * this: a header on an endpoint's only response is already refused when the
+     * endpoint is built, so `ok(value)` cannot reach the check above and nothing
+     * about writing one changed.
+     */
+    @Test
+    fun `a single declared success still takes a bare ok`() {
+        val only = json<Order>(status = 200) orFail badKey
+
+        only.successNamedBy(ok(Order(1)) as Outcome.Ok) shouldBeSameInstanceAs only.successes.first()
+    }
+
+    @Test
+    fun `a response the output never declared is refused wherever it came from`() {
+        val elsewhere = json<Order>(status = 203)
+
+        shouldThrow<IllegalStateException> { twoWays.successNamedBy(elsewhere(Order(1)) as Outcome.Ok) }
+            .message shouldContain "never declared it"
     }
 
     // ------------------------------------------------------------ what is refused

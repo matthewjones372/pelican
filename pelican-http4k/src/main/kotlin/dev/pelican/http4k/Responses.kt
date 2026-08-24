@@ -15,6 +15,7 @@ import dev.pelican.Output
 import dev.pelican.SseOutput
 import dev.pelican.TextOutput
 import dev.pelican.renderError
+import dev.pelican.successNamedBy
 import org.http4k.core.MemoryBody
 import org.http4k.core.MemoryResponse
 import org.http4k.core.Response
@@ -117,19 +118,18 @@ private fun Response.streaming(frames: Sequence<String>): Response =
 /**
  * Renders whichever declared success the handler named.
  *
- * A bare `ok(value)` names none, and means the first — which for the endpoints
- * that declare exactly one success is the only one there is, so this is the
- * same rendering that shape always had.
+ * Which one that is, and whether it is carrying what it promised, is core's
+ * answer rather than this file's — `successNamedBy` — because a bare
+ * `ok(value)` names none and so carries no headers, and three interpreters
+ * deciding separately what that means is three chances to send a response the
+ * document does not describe.
  */
 private fun successResponse(
     out: FallibleOutput<*, *>,
     ok: Outcome.Ok<*>,
     codecs: EndpointCodecs,
 ): Response {
-    val chosen = ok.declared ?: out.successes.first()
-    check(out.successes.any { it === chosen }) {
-        "$chosen was returned by a handler but $out never declared it"
-    }
+    val chosen = out.successNamedBy(ok)
     val response = buildResponse(chosen, ok.value, codecs)
     // Encoded and checked against the declaration when the handler produced
     // the response, so there is nothing left to decide here.

@@ -15,6 +15,7 @@ import dev.pelican.Output
 import dev.pelican.SseOutput
 import dev.pelican.TextOutput
 import dev.pelican.renderError
+import dev.pelican.successNamedBy
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -153,9 +154,11 @@ internal fun jsonArrayFrames(elements: Flow<Any?>, codec: BodyCodec<Any?>): Flow
 /**
  * Renders whichever declared success the handler named.
  *
- * A bare `ok(value)` names none, and means the first — which for the endpoints
- * that declare exactly one success is the only one there is, so this is the
- * same rendering that shape always had.
+ * Which one that is, and whether it is carrying what it promised, is core's
+ * answer rather than this file's — `successNamedBy` — because a bare
+ * `ok(value)` names none and so carries no headers, and three interpreters
+ * deciding separately what that means is three chances to send a response the
+ * document does not describe.
  */
 private suspend fun respondSuccess(
     call: ApplicationCall,
@@ -163,10 +166,7 @@ private suspend fun respondSuccess(
     ok: Outcome.Ok<*>,
     codecs: EndpointCodecs,
 ) {
-    val chosen = ok.declared ?: out.successes.first()
-    check(out.successes.any { it === chosen }) {
-        "$chosen was returned by a handler but $out never declared it"
-    }
+    val chosen = out.successNamedBy(ok)
     // Encoded and checked against the declaration when the handler produced
     // the response, so there is nothing left to decide here. Appended before
     // the body, because writing the body is what commits the response.

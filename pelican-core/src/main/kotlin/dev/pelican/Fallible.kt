@@ -132,6 +132,52 @@ private fun <T : Any> headerValue(headers: List<Pair<String, String>>, header: R
 fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)
 
 /**
+ * Which of this output's declared successes an [Outcome.Ok] names, and the one
+ * place a success is checked against what it promised on the way out.
+ *
+ * The three interpreters share it rather than each resolving
+ * `declared ?: successes.first()` for itself, because the resolution is where
+ * the thing a bare [ok] cannot say becomes visible: it names no response, so it
+ * carries no headers, and the response it means may have declared one it always
+ * sends. [Output.invoke] refuses a required header left out; `ok` never reached
+ * that check, and three copies of this would be three chances for one backend
+ * to send a 201 without the `Location` its document promises.
+ *
+ * Here rather than earlier, and the alternatives are worth naming. Refusing the
+ * *declaration* — no success reachable by a bare `ok` may declare a required
+ * header — would outlaw `json<Order>(201, location) or empty(202)`, which is
+ * the ordinary create-or-accept shape and the one this mechanism exists to make
+ * sayable: the declaration is not the mistake, the handler that does not name
+ * its response is. Nor could `ok` be withheld where the first success promises
+ * a header, since it is a free function handed a payload and never sees the
+ * endpoint. So the answer is a loud 500 on the first request down that branch,
+ * naming the response and the way out, rather than a quiet 201 forever.
+ *
+ * An endpoint with one declared success is untouched, which is every endpoint
+ * written before there was a second: a header on an endpoint's only response is
+ * already refused when the endpoint is built, so there is nothing here to find
+ * and `ok(value)` is what it always was.
+ */
+fun FallibleOutput<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
+    val chosen = ok.declared ?: successes.first()
+    check(successes.any { it === chosen }) {
+        "$chosen was returned by a handler but $this never declared it"
+    }
+
+    val promised = chosen.headers.filter { header ->
+        header.required && ok.headers.none { (name, _) -> name.equals(header.name, ignoreCase = true) }
+    }
+    check(promised.isEmpty()) {
+        "$chosen declares ${promised.joinToString { it.name }} and this response carries no value for " +
+            "${if (promised.size == 1) "it" else "them"}. `ok(...)` names no response, so it carries no " +
+            "headers either: name the response instead, with what it promised — " +
+            "$chosen(value, ${promised.first().name} of ...). Or declare the header as " +
+            "responseHeader(...).optional() if it is only sometimes sent."
+    }
+    return chosen
+}
+
+/**
  * A declared header paired with the value one response is sending it with —
  * `retryAfter of 30L`. See [ErrorOutput.invoke] and [Output.invoke].
  */

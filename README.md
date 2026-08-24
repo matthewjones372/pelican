@@ -369,7 +369,9 @@ submitOrder handledOneOf { (id, key, req) ->
 Naming the declaration is what fixes the status, so `200 Order` and `201 Order`
 stay distinguishable although the payload cannot say which is which. A response
 the endpoint never declared does not compile. `ok(value)` means the first
-declared success, so nothing about a single-response endpoint changed.
+declared success, so nothing about a single-response endpoint changed — and
+where that first success declares a header it always sends, the bare `ok` is
+refused rather than answered without it.
 
 The document publishes both statuses with their own schemas and headers, and the
 generated client hands the caller a sealed type — one member per status, `when`

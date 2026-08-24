@@ -2723,7 +2723,13 @@ success side. Which means everything about it is already familiar:
   asynchronous one on Pekko and http4k.
 - **`ok(value)` names none, and means the first declared success.** With one
   success that is the only one there is, so nothing about a single-response
-  endpoint changed.
+  endpoint changed. Where the response it means declares a header it always
+  sends, a bare `ok` is refused when that response is rendered: naming no
+  response means carrying no header, and a 201 without the `Location` the
+  document promises is the one wrong answer a caller cannot see is wrong. Name
+  the response instead. This is only reachable where there is a choice — a
+  header on an endpoint's *only* response is already refused when the endpoint
+  is built.
 - **A response the endpoint never declared does not compile**, exactly as an
   undeclared failure does not.
 
