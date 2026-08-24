@@ -1,16 +1,16 @@
 # Modules
 
-Linked from the [README](../README.md). What each of the fifteen modules is
+Linked from the [README](../README.md). What each of the sixteen modules is
 for, and what it depends on — the list to read when deciding which ones a
 build actually needs.
 
-Fifteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
+Sixteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
 rather than convention.
 
 | Module | Depends on | Contains |
 |---|---|---|
 | `pelican-core` | **nothing** | endpoint descriptions, plain codecs, a minimal JSON tree |
-| `pelican-jackson` / `pelican-kotlinx` | core + one JSON library | your `Codecs` |
+| `pelican-jackson` / `-kotlinx` / `-jsoniter` | core + one JSON library | your `Codecs` |
 | `pelican-pekko` / `-http4k` / `-ktor` | core + one server library | descriptions → that server's routes |
 | `pelican-*-docs` | its backend, openapi | serves the document and Swagger UI |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 |

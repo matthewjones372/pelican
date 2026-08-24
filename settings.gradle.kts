@@ -20,6 +20,7 @@ include(
     "pelican-import",
     "pelican-jackson",
     "pelican-kotlinx",
+    "pelican-jsoniter",
     "pelican-pekko",
     "pelican-pekko-docs",
     "pelican-http4k",

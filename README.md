@@ -111,7 +111,7 @@ The reference manual, with the reasoning behind each design decision, is
 > yet, so today you install locally — one command, and both work as normal
 > dependencies afterwards.
 
-Not on Maven Central yet. `./gradlew publishToMavenLocal` installs all fifteen
+Not on Maven Central yet. `./gradlew publishToMavenLocal` installs all sixteen
 modules at `dev.pelican:<module>:0.1.0-SNAPSHOT` with sources and javadoc, so
 `mavenLocal()` or `includeBuild` both work today. The Gradle plugin is a build
 of its own and installs the same way:
@@ -651,15 +651,22 @@ network error.
 ```kotlin
 Api(routes, codecs = JacksonCodecs)      // Jackson + swagger-core schemas
 Api(routes, codecs = KotlinxCodecs)      // kotlinx.serialization
+Api(routes, codecs = JsoniterCodecs)     // jsoniter
 Api(routes, codecs = JacksonCodecs(myObjectMapper))
 ```
 
 Descriptions carry a `KType` and nothing else, no serializer and no mapper, so
-swapping libraries touches no endpoint. That the two produce the *same document*
-is a test, over models covering defaults, nullability (including inside a `List`
-or a `Map`, where erasure means only the Kotlin type still knows), enums, maps,
-nesting and recursion. The two shapes where they disagree are named in
-[docs/reference.md](docs/reference.md#what-isnt-here).
+swapping libraries touches no endpoint. That they produce the *same document* is
+a test, over models covering defaults, nullability (including inside a `List` or
+a `Map`, where erasure means only the Kotlin type still knows), enums, maps,
+nesting and recursion. The two shapes where Jackson and kotlinx.serialization
+disagree are named in [docs/reference.md](docs/reference.md#what-isnt-here).
+
+jsoniter is the odd one: it was finished before Kotlin was common, so it has no
+metadata to describe a type with and no idea what a data class is.
+`pelican-jsoniter` binds through the primary constructor instead — which is also
+what its schemas are derived from, so the document and the wire format come from
+one place. Payload types need no annotations and no compiler plugin.
 
 A sealed hierarchy publishes the same way through either: `oneOf` over the
 branches with a `discriminator` and a full `mapping`, so the document says which
@@ -793,7 +800,7 @@ Five things that wanted a page rather than a section, and one benchmark:
 | [A generated Kotlin client](docs/generated-client.md) | What callers who cannot hold the descriptions get instead, and what the generator does with a union, a failure or a stream. |
 | [Importing an OpenAPI document](docs/importing.md) | A document somebody else wrote, read into descriptions: what comes out, what is refused, and how to get past a document you do not own. |
 | [The same endpoints, by hand](docs/by-hand.md) | The same two endpoints written directly against Pekko HTTP, so what the descriptions buy is legible rather than asserted. |
-| [Modules](docs/modules.md) | What each of the fifteen modules is for and what it depends on, for deciding which ones your build needs. |
+| [Modules](docs/modules.md) | What each of the sixteen modules is for and what it depends on, for deciding which ones your build needs. |
 | [What it costs](docs/what-it-costs.md) | The interpreter measured against the hand-written route it replaces, with the baselines that comparison needs. |
 
 ---

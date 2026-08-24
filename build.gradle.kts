@@ -44,6 +44,7 @@ val moduleDescriptions = mapOf(
     "pelican-import" to "An OpenAPI document to endpoint descriptions, as source.",
     "pelican-jackson" to "Jackson codecs and swagger-core schemas for Pelican.",
     "pelican-kotlinx" to "kotlinx.serialization codecs and schemas for Pelican.",
+    "pelican-jsoniter" to "jsoniter codecs and reflection schemas for Pelican.",
     "pelican-pekko" to "Endpoint descriptions to a Pekko HTTP route.",
     "pelican-pekko-docs" to "Serves the OpenAPI document and Swagger UI on Pekko HTTP.",
     "pelican-http4k" to "Endpoint descriptions to an http4k HttpHandler.",
