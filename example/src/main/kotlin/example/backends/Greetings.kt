@@ -1,8 +1,10 @@
 package example.backends
 
 import dev.pelican.Endpoint
+import dev.pelican.LongCodec
 import dev.pelican.StringCodec
 import dev.pelican.UploadedFile
+import dev.pelican.commaSeparated
 import dev.pelican.cookieParam
 import dev.pelican.default
 import dev.pelican.div
@@ -14,7 +16,9 @@ import dev.pelican.jsonBody
 import dev.pelican.nonEmpty
 import dev.pelican.optional
 import dev.pelican.pathParam
+import dev.pelican.positive
 import dev.pelican.queryParam
+import dev.pelican.repeated
 import dev.pelican.responseHeader
 import dev.pelican.textPart
 
@@ -47,6 +51,8 @@ data class Session(val user: String, val remember: Boolean, val visits: Int)
 
 data class Uploaded(val caption: String, val filename: String?, val contentType: String?, val content: String)
 
+data class Filters(val tags: List<String>, val ids: List<Long>, val features: List<String>, val seen: List<String>)
+
 val name = pathParam<String>("name", description = "Who to greet")
 val from = pathParam<Int>("from", description = "Where the countdown starts")
 val shout = queryParam<Boolean>("shout", description = "Upper-case the greeting").default(false)
@@ -61,6 +67,25 @@ val note = jsonBody<Note>(description = "Anything worth saying twice")
  */
 val locale = cookieParam<String>("locale", description = "Which language to answer in").default("en")
 val session = cookieParam<String>("session", description = "An opaque session id").optional()
+
+/*
+ * Four inputs carrying several values each, one per encoding OpenAPI can
+ * describe — and the point of them being here is that the three interpreters
+ * below read all four without any of them saying so.
+ *
+ * Each is optional, so an absent one arrives as `null` rather than as an empty
+ * list. That distinction is the reason the modifier exists: `?tag=` carries no
+ * element, so a list is never empty on the wire, and reading absence as empty
+ * would leave "filtered by nothing" and "did not filter" spelled the same way.
+ */
+val tags = queryParam<String>("tag", description = "Only entries with these tags").repeated().optional()
+val ids = queryParam("id", LongCodec.positive(), description = "Only these ids").commaSeparated().optional()
+val features = headerParam<String>("X-Feature", description = "Feature flags the caller has on")
+    .commaSeparated()
+    .optional()
+val seenBefore = cookieParam<String>("seen", description = "Entries this browser has already been shown")
+    .repeated()
+    .optional()
 
 /** A form, which is what an HTML page posts when nobody has written any JavaScript. */
 val credentials = formBody<SignIn>(description = "The sign-in form, as a browser posts it")
@@ -160,9 +185,23 @@ val uploadFile = endpoint(caption, upload) {
     json<Uploaded>()
 }
 
+/**
+ * Every multi-valued input at once, read back as the lists they were declared
+ * as. `?tag=a&tag=b`, `?id=1,2`, `X-Feature: a,b` and `Cookie: seen=a; seen=b`
+ * all reach the handler as a `List`, and no handler splits a string.
+ */
+val filters = endpoint(tags, ids, features, seenBefore) {
+    get("filters")
+    summary = "Echo back the multi-valued inputs, decoded"
+    operationId = "filters"
+    tag("greetings")
+    emits(requestId)
+    json<Filters>()
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
-    listOf(greet, countdown, echo, preferences, signIn, uploadFile)
+    listOf(greet, countdown, echo, preferences, signIn, uploadFile, filters)
 
 internal fun greetingOf(who: String, shout: Boolean): Greeting {
     val text = "Hello, $who!"
@@ -185,3 +224,16 @@ internal fun sessionOf(form: SignIn) = Session(form.user, form.remember, form.vi
  */
 internal fun uploaded(caption: String, file: UploadedFile) =
     Uploaded(caption, file.filename, file.contentType, file.text())
+
+/**
+ * Absent and empty are told apart in the description and joined together here,
+ * because what this endpoint answers with is a list either way — the endpoint
+ * is what keeps the distinction, and the handler is where a service decides it
+ * no longer needs it.
+ */
+internal fun filtersOf(
+    tags: List<String>?,
+    ids: List<Long>?,
+    features: List<String>?,
+    seen: List<String>?,
+) = Filters(tags.orEmpty(), ids.orEmpty(), features.orEmpty(), seen.orEmpty())

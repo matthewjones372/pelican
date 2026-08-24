@@ -85,6 +85,10 @@ class KotlinClientTest {
     private val newWidget = jsonBody<NewWidget>()
     private val upload = rawBody()
     private val theme = cookieParam<String>("theme").optional()
+    private val tag = queryParam<String>("tag").repeated().optional()
+    private val ids = queryParam<Long>("ids").commaSeparated().optional()
+    private val feature = headerParam<String>("X-Feature").commaSeparated()
+    private val seen = cookieParam<String>("seen").repeated().optional()
     private val widgetForm = formBody<NewWidget>()
     private val label = textPart<String>("label")
     private val attachment = filePart("attachment", contentType = "text/plain")
@@ -153,6 +157,13 @@ class KotlinClientTest {
         json<Widget>()
     }
 
+    /** Every list encoding at once, so one method carries all four spreads. */
+    private val searchWidgets = endpoint(tag, ids, feature, seen) {
+        get("widgets" / "search")
+        operationId = "searchWidgets"
+        json<Widget>()
+    }
+
     private val rebuild = endpoint {
         post("internal" / "rebuild")
         hidden = true
@@ -169,7 +180,7 @@ class KotlinClientTest {
     private fun spec() = ApiSpec(
         endpoints = listOf(
             getWidget, streamWidgets, listWidgets, watchWidgets, createWidget, deleteWidget,
-            uploadWidget, signInWidget, importWidgets, themed, rebuild, unnamed,
+            uploadWidget, signInWidget, importWidgets, themed, searchWidgets, rebuild, unnamed,
         ),
         schemas = WidgetSchemas,
         title = "Widget Shop",
@@ -178,6 +189,27 @@ class KotlinClientTest {
     )
 
     private val client = spec().kotlinClient("com.example.widgets")
+
+    // ------------------------------------------------- more than one value
+
+    @Test
+    fun `a list parameter is a List in the signature, whatever its encoding`() {
+        client shouldContain "fun searchWidgets(xFeature: List<String>, tag: List<String>? = null, " +
+            "ids: List<Long>? = null, seen: List<String>? = null)"
+    }
+
+    @Test
+    fun `a repeated parameter is handed over whole, and spread by the runtime`() {
+        // How many occurrences it becomes is a property of the value, so the
+        // call site says nothing about it and `occurrences` does the spreading.
+        client shouldContain """query = listOf("tag" to tag, "ids" to joined(ids, ","))"""
+        client shouldContain """cookies = listOf("seen" to seen)"""
+    }
+
+    @Test
+    fun `a delimited parameter is joined at the call site, where the separator is known`() {
+        client shouldContain """headerParams = listOf("X-Feature" to joined(xFeature, ","))"""
+    }
 
     // ------------------------------------------------------------ the shape
 

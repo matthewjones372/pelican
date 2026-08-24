@@ -33,6 +33,12 @@ class QueryParam<T> @PublishedApi internal constructor(
     val required: Boolean,
     val default: Any?,
     val description: String? = null,
+    /**
+     * Null for the ordinary case of one value. Otherwise this parameter is
+     * declared as a list, [codec] decodes one element of it, and this says how
+     * the elements are told apart on the wire.
+     */
+    val listStyle: ListStyle? = null,
 ) : ParamKey<T> {
     override fun toString() = "query:$name"
 }
@@ -44,6 +50,12 @@ class HeaderParam<T> @PublishedApi internal constructor(
     val required: Boolean,
     val default: Any?,
     val description: String? = null,
+    /**
+     * Null for the ordinary case of one value. Otherwise this parameter is
+     * declared as a list, [codec] decodes one element of it, and this says how
+     * the elements are told apart on the wire.
+     */
+    val listStyle: ListStyle? = null,
 ) : ParamKey<T> {
     override fun toString() = "header:$name"
 }
@@ -62,6 +74,12 @@ class CookieParam<T> @PublishedApi internal constructor(
     val required: Boolean,
     val default: Any?,
     val description: String? = null,
+    /**
+     * Null for the ordinary case of one value. Otherwise this parameter is
+     * declared as a list, [codec] decodes one element of it, and this says how
+     * the elements are told apart on the wire.
+     */
+    val listStyle: ListStyle? = null,
 ) : ParamKey<T> {
     override fun toString() = "cookie:$name"
 }
@@ -197,26 +215,88 @@ fun <T : Any> cookieParam(name: String, codec: PlainCodec<T>, description: Strin
 /** Makes the parameter optional; reading it yields `null` when absent. */
 @Suppress("UNCHECKED_CAST")
 fun <T : Any> QueryParam<T>.optional(): QueryParam<T?> =
-    QueryParam<T?>(name, codec, required = false, default = null, description = description)
+    QueryParam<T?>(name, codec, required = false, default = null, description, listStyle)
 
 /** Makes the parameter optional, substituting [value] when absent. */
 @Suppress("UNCHECKED_CAST")
 fun <T : Any> QueryParam<T>.default(value: T): QueryParam<T> =
-    QueryParam(name, codec, required = false, default = value, description = description)
+    QueryParam(name, codec, required = false, default = value, description, listStyle)
 
 @Suppress("UNCHECKED_CAST")
 fun <T : Any> HeaderParam<T>.optional(): HeaderParam<T?> =
-    HeaderParam<T?>(name, codec, required = false, default = null, description = description)
+    HeaderParam<T?>(name, codec, required = false, default = null, description, listStyle)
 
 fun <T : Any> HeaderParam<T>.default(value: T): HeaderParam<T> =
-    HeaderParam(name, codec, required = false, default = value, description = description)
+    HeaderParam(name, codec, required = false, default = value, description, listStyle)
 
 @Suppress("UNCHECKED_CAST")
 fun <T : Any> CookieParam<T>.optional(): CookieParam<T?> =
-    CookieParam<T?>(name, codec, required = false, default = null, description = description)
+    CookieParam<T?>(name, codec, required = false, default = null, description, listStyle)
 
 fun <T : Any> CookieParam<T>.default(value: T): CookieParam<T> =
-    CookieParam(name, codec, required = false, default = value, description = description)
+    CookieParam(name, codec, required = false, default = value, description, listStyle)
+
+// ------------------------------------------------------- more than one value
+
+/*
+ * A list parameter is declared by saying how its values are spread, and the
+ * spellings offered differ by location because the encodings that are honest
+ * differ by location. A query string can repeat a name; a header cannot, and
+ * RFC 9110 already says what several values on one header field name mean. So
+ * there is no `Header.repeated()` to write down and then have to explain.
+ *
+ * Order matters, and only one order compiles: `repeated()` turns a
+ * `QueryParam<Int>` into a `QueryParam<List<Int>>`, and `optional()` then
+ * turns that into a `QueryParam<List<Int>?>`. The reverse does not type-check,
+ * which is the check being relied on rather than a message at startup.
+ *
+ * An absent list reads as `null`, not as an empty list, and that is the
+ * decision the rest of this follows from. An empty list on the wire is not
+ * expressible — `?tag=` carries no element — so reading absence as empty would
+ * leave `required` with nothing left to mean, and a handler with no way to
+ * tell "the caller filtered by nothing" from "the caller did not filter".
+ * `.default(emptyList())` is how a description asks for the other reading, in
+ * the one place it is written down.
+ */
+
+/** Several occurrences of the name: `?tag=a&tag=b`. */
+fun <T : Any> QueryParam<T>.repeated(): QueryParam<List<T>> = listed(ListStyle.REPEATED)
+
+/** One occurrence, comma-separated: `?tag=a,b`. */
+fun <T : Any> QueryParam<T>.commaSeparated(): QueryParam<List<T>> = listed(ListStyle.COMMA)
+
+/** One occurrence, space-separated: `?tag=a%20b`. OpenAPI's `spaceDelimited`. */
+fun <T : Any> QueryParam<T>.spaceSeparated(): QueryParam<List<T>> = listed(ListStyle.SPACE)
+
+/** One occurrence, pipe-separated: `?tag=a|b`. OpenAPI's `pipeDelimited`. */
+fun <T : Any> QueryParam<T>.pipeSeparated(): QueryParam<List<T>> = listed(ListStyle.PIPE)
+
+private fun <T : Any> QueryParam<T>.listed(style: ListStyle): QueryParam<List<T>> {
+    require(listStyle == null) { "$this already carries a list of values" }
+    return QueryParam(name, codec, required, default, description, style)
+}
+
+/**
+ * A header carrying several values: `X-Tags: a,b`, or the same values sent on
+ * two header lines, which RFC 9110 defines as meaning the one comma-joined
+ * field. Both are read; the document describes the comma, which is the form
+ * OpenAPI has a name for.
+ */
+fun <T : Any> HeaderParam<T>.commaSeparated(): HeaderParam<List<T>> {
+    require(listStyle == null) { "$this already carries a list of values" }
+    return HeaderParam(name, codec, required, default, description, ListStyle.COMMA)
+}
+
+/**
+ * A cookie carrying several values, as several pairs in the one header:
+ * `Cookie: tag=a; tag=b`. There is no comma-separated spelling, because RFC
+ * 6265 excludes the comma from a cookie value and a `Cookie` header carrying
+ * one is a header the next proxy is entitled to mangle.
+ */
+fun <T : Any> CookieParam<T>.repeated(): CookieParam<List<T>> {
+    require(listStyle == null) { "$this already carries a list of values" }
+    return CookieParam(name, codec, required, default, description, ListStyle.REPEATED)
+}
 
 inline fun <reified T> jsonBody(description: String? = null): JsonBody<T> =
     JsonBody(typeOf<T>(), description)

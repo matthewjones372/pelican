@@ -574,8 +574,10 @@ What it refuses, and what each one would have cost:
 | Two media types for one body or response | `jsonBody<T>()` is a JSON body; there is no form of it meaning "or XML" |
 | `oneOf`, `anyOf` of several shapes, `discriminator` | A union. Kotlin holds one as a sealed hierarchy, and nothing in the document says what to call each branch |
 | `allOf` of several schemas | Merging them would invent a type the document never named |
-| A parameter that is a list or an object | A Pelican input decodes one value from one string |
-| A parameter under `content`, or a non-default `style` | Both describe values with parts, which is the same refusal again |
+| A parameter that is an object, or a list of them | A Pelican input decodes one value from one string. A list *of values* reads fine — see [More than one value](#more-than-one-value) |
+| A parameter under `content` | It carries a whole document rather than a value; that is a request body |
+| `deepObject`, or a `style` and an `explode` that contradict each other | `deepObject` spreads an object over several names, and the rest name a separator that the `explode` beside them makes meaningless |
+| A list constrained by `minItems`, `maxItems` or `uniqueItems` | A refinement narrows what one value decodes to and can say nothing about how many arrived, so the constraint would be republished and enforced by nobody |
 | A failure with both a body and headers | `errorJson<T>(...)` carries one payload. A failure with headers and no body is fine — that one is documented rather than returned |
 | Two file parts in a multipart body | The same rule `endpoint(...)` enforces at class-init: reading stops at the first file so it can be streamed |
 | An operation with its own `servers`, or `callbacks` | A description carries no server of its own, and a callback is the other direction again |
@@ -1289,6 +1291,114 @@ already resolved by `queryParam<T>(...)`. Added: `Instant` (`format:
 date-time`), `LocalDate` (`date`), `LocalDateTime`, `URI` (`uri`) and
 `NonEmptyString` — each with a real 400 for input it cannot parse, rather than
 a 500 from `parse` throwing.
+
+## More than one value
+
+`?tag=a&tag=b`, `?id=1,2`, `X-Feature: beta,dark`. A parameter that carries
+several values is declared by saying how the values are told apart, and what
+one of them decodes to does not change — so the codec, its refinements and the
+schema it publishes are the same ones a single-valued parameter uses.
+
+```kotlin
+val tags   = queryParam<String>("tag", description = "Only these tags").repeated().optional()
+val ids    = queryParam("id", LongCodec.positive()).commaSeparated().optional()
+val sort   = queryParam<String>("sort").pipeSeparated().optional()
+val fields = queryParam<String>("fields").spaceSeparated().optional()
+
+val search = endpoint(tags, ids, sort, fields) {
+    get("orders")
+    ndjson<Order>()
+}
+
+search streamedNow { (tags, ids, sort, fields) ->
+    //                 List<String>?  List<Long>?  List<String>?  List<String>?
+    Source.from(Store.search(tags.orEmpty(), ids.orEmpty()))
+}
+```
+
+The handler receives `List<Long>?`, not a `String` it has to split — and
+`?id=1,0` is a 400 naming the element that failed, because the refinement is on
+the element:
+
+```
+{"status":400,"error":"Invalid parameter","detail":"Cannot decode '0' for 'id': expected a positive value"}
+```
+
+The spelling differs by location, because the encodings that are honest differ
+by location:
+
+| Declared | Wire | OpenAPI |
+|---|---|---|
+| `queryParam<T>(...).repeated()` | `?tag=a&tag=b` | `form`, `explode: true` — the default, so neither keyword is written |
+| `queryParam<T>(...).commaSeparated()` | `?tag=a,b` | `form`, `explode: false` |
+| `queryParam<T>(...).spaceSeparated()` | `?tag=a%20b` | `spaceDelimited` |
+| `queryParam<T>(...).pipeSeparated()` | `?tag=a\|b` | `pipeDelimited` |
+| `headerParam<T>(...).commaSeparated()` | `X-Tags: a,b` | `simple` — the default for a header |
+| `cookieParam<T>(...).repeated()` | `Cookie: tag=a; tag=b` | `form`, `explode: true` — the default for a cookie |
+
+There is no `headerParam(...).repeated()`, and no comma-separated cookie.
+A header field has one name, and RFC 9110 already defines two lines of the same
+field as meaning the one comma-joined field — so a comma-separated header
+*reads* both spellings and there is nothing left for a second declaration to
+say. A cookie is the opposite case: RFC 6265 excludes the comma from a cookie
+value, so the joined form is a header the next proxy is entitled to mangle, and
+repeating the pair is the encoding that survives.
+
+The schema is `type: array` with the element's own schema — refinements
+included — under `items`:
+
+```json
+{ "name": "id", "in": "query", "required": false, "explode": false,
+  "schema": { "type": "array", "items": { "type": "integer", "format": "int64", "exclusiveMinimum": 0 } } }
+```
+
+`style` and `explode` are written only where they differ from what OpenAPI
+already assumes at that location. A reader who meets one of them is therefore
+entitled to conclude that something out of the ordinary is being said, which is
+worth more than spelling out the default everywhere.
+
+### Absent is null, not empty
+
+An absent list reads as `null`; `required` still means the caller has to send
+one. That is the decision the rest follows from, and it is made this way
+because an empty list cannot be sent: `?tag=` carries no element, and neither
+does a header that is not there. Reading absence as the empty list would leave
+`required` with nothing to mean, and a handler with no way to tell "the caller
+filtered by nothing" from "the caller did not filter".
+
+Where a handler does not need the distinction, `.default(emptyList())` says so
+in the one place it is being decided:
+
+```kotlin
+val tags = queryParam<String>("tag").repeated().default(emptyList())   // List<String>
+```
+
+An occurrence carrying nothing contributes no element, so `?tag=` — what a form
+submits for a field nobody filled in — is the same as sending nothing, and
+`?id=1,,2` is `[1, 2]`. A required parameter whose occurrences all turn out
+empty is the same 400 an absent one gives.
+
+Space around a separator is padding rather than content: `X-Feature: beta, dark`
+is two values, because RFC 9110 makes the space optional in every list-bearing
+header and reading `" dark"` as an element would be a decode failure nobody
+could see in the header. An element that really does begin or end with a space
+cannot travel joined at all — `repeated()` is the declaration that carries one.
+
+### Encoding, and the separator
+
+Writing a list is the inverse of reading one, which is what the test client and
+the generated client both do. An element containing the separator its style
+joins on is refused where it is written rather than sent:
+
+```
+'tag' joins its values with ',', and one of them contains it: 'a,b'.
+Declare the parameter as repeated(), or encode the element so that it cannot.
+```
+
+The same goes for an element padded with the space a reader would strip.
+
+The alternative would be a list that came back a different length from the one
+that went out, with nothing downstream able to tell.
 
 ## Cookies
 

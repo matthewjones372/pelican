@@ -254,6 +254,26 @@ private fun plain(value: Any?): String? = when (value) {
     else -> value.toString()
 }
 
+/**
+ * How many times one query parameter or cookie appears on the wire: not at
+ * all when it was left out, once when it carries a value, and once per element
+ * when it was declared as a repeated list.
+ */
+private fun occurrences(value: Any?): List<String> = when (value) {
+    null -> emptyList()
+    is Collection<*> -> value.mapNotNull { plain(it) }
+    else -> listOfNotNull(plain(value))
+}
+
+/**
+ * A list that travels as one occurrence, joined by the separator its
+ * declaration named. Null for an absent parameter and for an empty list
+ * alike: neither has anything to say, and `tags=` is not a shorter way of
+ * saying nothing.
+ */
+private fun joined(values: Collection<*>?, separator: String): String? =
+    values?.mapNotNull { plain(it) }?.takeIf { it.isNotEmpty() }?.joinToString(separator)
+
 private fun urlEncode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
 /** Path segments are encoded more conservatively than query values. */
@@ -383,7 +403,7 @@ class OrdersClient(
         multipart: MultipartContent? = null,
     ): HttpRequest {
         val search = query
-            .mapNotNull { (name, value) -> plain(value)?.let { "${urlEncode(name)}=${urlEncode(it)}" } }
+            .flatMap { (name, value) -> occurrences(value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
             .joinToString("&")
 
         val builder = HttpRequest
@@ -398,7 +418,7 @@ class OrdersClient(
         // One header carries all of them, so an absent optional cookie is simply
         // not written rather than sent empty — the same bargain every other
         // optional parameter makes.
-        val jar = cookies.mapNotNull { (name, value) -> plain(value)?.let { "$name=$it" } }
+        val jar = cookies.flatMap { (name, value) -> occurrences(value).map { "$name=$it" } }
         if (jar.isNotEmpty()) builder.header("Cookie", jar.joinToString("; "))
 
         return builder.build()
@@ -550,8 +570,8 @@ class OrdersClient(
      *
      * `GET /search`
      */
-    fun searchOrders(limit: Int? = null, status: OrderStatus? = null, xTraceId: String? = null): Streamed<Order> {
-        val response = stream(request("GET", "/search", query = listOf("limit" to limit, "status" to status), headerParams = listOf("X-Trace-Id" to xTraceId)))
+    fun searchOrders(limit: Int? = null, status: OrderStatus? = null, item: List<String>? = null, tag: List<String>? = null, sort: List<String>? = null, fields: List<String>? = null, xTraceId: String? = null, xFeature: List<String>? = null, seen: List<Long>? = null): Streamed<Order> {
+        val response = stream(request("GET", "/search", query = listOf("limit" to limit, "status" to status, "item" to joined(item, ","), "tag" to tag, "sort" to joined(sort, "|"), "fields" to joined(fields, " ")), headerParams = listOf("X-Trace-Id" to xTraceId, "X-Feature" to joined(xFeature, ",")), cookies = listOf("seen" to seen)))
         if (!response.succeeded()) failedStream("GET", "/search", response)
         val body = response.body()
         return Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decodeFromString(it) })

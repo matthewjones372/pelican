@@ -22,7 +22,7 @@ private fun request(
     multipart: MultipartContent? = null,
 ): HttpRequest {
     val search = query
-        .mapNotNull { (name, value) -> plain(value)?.let { "${urlEncode(name)}=${urlEncode(it)}" } }
+        .flatMap { (name, value) -> occurrences(value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
         .joinToString("&")
 
     val builder = HttpRequest
@@ -37,7 +37,7 @@ private fun request(
     // One header carries all of them, so an absent optional cookie is simply
     // not written rather than sent empty — the same bargain every other
     // optional parameter makes.
-    val jar = cookies.mapNotNull { (name, value) -> plain(value)?.let { "$name=$it" } }
+    val jar = cookies.flatMap { (name, value) -> occurrences(value).map { "$name=$it" } }
     if (jar.isNotEmpty()) builder.header("Cookie", jar.joinToString("; "))
 
     return builder.build()

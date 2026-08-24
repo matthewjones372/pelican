@@ -25,22 +25,30 @@ object Cookies {
      * them most-specific first — so an earlier value is the more specific one
      * and a later duplicate is the one to drop.
      */
-    fun parse(headers: List<String>): Map<String, String> {
-        return headers
+    fun parse(headers: List<String>): Map<String, String> =
+        parseAll(headers).mapValues { (_, values) -> values.first() }
+
+    fun parse(header: String?): Map<String, String> = parse(listOfNotNull(header))
+
+    /**
+     * The same, keeping every spelling of a name rather than the first.
+     *
+     * A `Cookie` header may repeat a name, and for a cookie declared as a list
+     * that repetition *is* the list — it is the only encoding RFC 6265 leaves
+     * available, since the comma a delimited style would need is not a
+     * character a cookie value may carry. [parse] stays the reading for
+     * everything else, and is defined in terms of this so the two cannot
+     * disagree about what a duplicate means.
+     */
+    fun parseAll(headers: List<String>): Map<String, List<String>> =
+        headers
             .flatMap { it.split(';') }
             .mapNotNull { pair ->
                 val separator = pair.indexOf('=')
                 val name = if (separator > 0) pair.substring(0, separator).trim() else ""
                 if (name.isEmpty()) null else name to unquote(pair.substring(separator + 1).trim())
             }
-            // RFC 6265 orders the more specific cookie first, so the first
-            // spelling of a name is the one to keep — across headers as well
-            // as within one.
-            .distinctBy { it.first }
-            .toMap()
-    }
-
-    fun parse(header: String?): Map<String, String> = parse(listOfNotNull(header))
+            .groupBy({ it.first }, { it.second })
 
     /** The `Cookie` header value carrying these, as a client would send it. */
     fun render(cookies: List<Pair<String, String>>): String =

@@ -30,6 +30,15 @@ internal fun JsonObj.int(key: String): Int? = (this[key] as? JsonNum)?.value?.to
 
 internal fun JsonObj.strings(key: String): List<String> = arr(key).mapNotNull { (it as? JsonStr)?.value }
 
+/**
+ * The type this schema claims, ignoring the `"null"` that only widens one.
+ *
+ * A schema saying two real types is a union, and `Schemas.check` refuses it
+ * before anything here has to decide which of them to believe.
+ */
+internal fun JsonObj.scalarType(): String? = str("type")
+    ?: (this["type"] as? JsonArr)?.items?.mapNotNull { (it as? JsonStr)?.value }?.firstOrNull { it != "null" }
+
 /** The object fields, in document order, or nothing when this is not an object. */
 internal fun JsonValue?.entries(): List<Pair<String, JsonValue>> =
     (this as? JsonObj)?.fields?.map { it.key to it.value }.orEmpty()

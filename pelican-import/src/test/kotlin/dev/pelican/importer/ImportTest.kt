@@ -156,6 +156,78 @@ class ImportTest {
         generated shouldContain """route(Method.HEAD, path("/health"))"""
     }
 
+    // -------------------------------------------------- more than one value
+
+    /**
+     * One operation whose parameters are all lists, so the four encodings and
+     * the three locations are read from one document rather than seven.
+     *
+     * The declarations asserted below are the ones somebody would have written
+     * by hand: the encoding is a modifier on the parameter, not a codec of its
+     * own, because what an element decodes to has not changed.
+     */
+    private val lists = imported(
+        document(
+            """
+            /orders:
+              get:
+                operationId: listOrders
+                parameters:
+                  - name: tag
+                    in: query
+                    schema: { type: array, items: { type: string } }
+                  - name: ids
+                    in: query
+                    explode: false
+                    schema: { type: array, items: { type: integer, minimum: 1 } }
+                  - name: fields
+                    in: query
+                    style: spaceDelimited
+                    schema: { type: array, items: { type: string } }
+                  - name: sort
+                    in: query
+                    style: pipeDelimited
+                    schema: { type: array, default: ["id"], items: { type: string } }
+                  - name: X-Feature
+                    in: header
+                    required: true
+                    schema: { type: array, items: { type: string, example: beta } }
+                  - name: seen
+                    in: cookie
+                    schema: { type: array, items: { type: string } }
+                responses:
+                  "204": { description: ok }
+            """,
+        ),
+    )
+
+    @Test
+    fun `a repeated query parameter is the default encoding, and reads as one`() {
+        lists shouldContain """val tag = queryParam<String>("tag").repeated().optional()"""
+    }
+
+    @Test
+    fun `explode false is the comma, and a constraint on the element still refines it`() {
+        lists shouldContain """val ids = queryParam("ids", IntCodec.atLeast(1)).commaSeparated().optional()"""
+    }
+
+    @Test
+    fun `the delimited styles keep their separators`() {
+        lists shouldContain """val fields = queryParam<String>("fields").spaceSeparated().optional()"""
+        lists shouldContain """val sort = queryParam<String>("sort").pipeSeparated().default(listOf("id"))"""
+    }
+
+    @Test
+    fun `a header list is comma-separated, and a required one says so by having no modifier`() {
+        lists shouldContain """val xFeature = headerParam("X-Feature", """ +
+            """StringCodec.describedAs(example = "beta")).commaSeparated()"""
+    }
+
+    @Test
+    fun `a cookie list is several pairs, which is the only encoding a cookie has`() {
+        lists shouldContain """val seen = cookieParam<String>("seen").repeated().optional()"""
+    }
+
     @Test
     fun `handler stubs are generated only when a backend is named`() {
         val document = File("src/test/resources/bookmarks.yaml")

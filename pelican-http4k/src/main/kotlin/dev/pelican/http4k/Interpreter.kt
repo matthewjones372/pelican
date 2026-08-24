@@ -24,6 +24,7 @@ import dev.pelican.ServerEndpoint
 import dev.pelican.corsPolicy
 import dev.pelican.declaredInputCount
 import dev.pelican.decode
+import dev.pelican.decodeList
 import dev.pelican.handlerFor
 import dev.pelican.requestBodyCodec
 import org.http4k.core.HttpHandler
@@ -214,6 +215,11 @@ private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap
     }
 
     ep.queries.forEach { q ->
+        val style = q.listStyle
+        if (style != null) {
+            put(q, q.decodeList(req.queries(q.name).filterNotNull()))
+            return@forEach
+        }
         val raw = req.query(q.name)
         put(
             q,
@@ -226,6 +232,13 @@ private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap
     }
 
     ep.headerParams.forEach { h ->
+        // `header` returns the first field line; a list is declared as
+        // comma-separated and RFC 9110 says two lines mean the one joined
+        // field, so it is the only case that has to read them all.
+        if (h.listStyle != null) {
+            put(h, h.decodeList(req.headerValues(h.name).filterNotNull()))
+            return@forEach
+        }
         val raw = req.header(h.name)
         put(
             h,
@@ -251,9 +264,13 @@ private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap
 private fun decodeCookies(ep: Endpoint<*, *>, req: Request, into: MutableMap<ParamKey<*>, Any?>) {
     if (ep.cookieParams.isEmpty()) return
 
-    val cookies = Cookies.parse(req.headerValues("Cookie").filterNotNull())
+    val cookies = Cookies.parseAll(req.headerValues("Cookie").filterNotNull())
     ep.cookieParams.forEach { c ->
-        val raw = cookies[c.name]
+        if (c.listStyle != null) {
+            into[c] = c.decodeList(cookies[c.name].orEmpty())
+            return@forEach
+        }
+        val raw = cookies[c.name]?.first()
         into[c] = when {
             raw != null -> c.codec.decode(c.name, raw)
             c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")

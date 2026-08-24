@@ -94,9 +94,69 @@ class StrictnessTest {
         message shouldContain "one of several shapes"
     }
 
+    /*
+     * A list of scalars is describable, and is asserted in `ImportTest`. What
+     * follows is the rest of what an array parameter can say, each refused for
+     * a reason of its own rather than for being an array.
+     */
+
     @Test
-    fun `a list parameter is refused, because an input decodes one value`() {
+    fun `a deepObject parameter is an object spread out, not a list`() {
+        refusing(listParameter("filter", "query", "style: deepObject", "explode: true")) shouldContain
+            "encoded as 'deepObject'"
+    }
+
+    @Test
+    fun `a list of objects is refused, because an element still decodes from one string`() {
         refusing(
+            """
+            /orders:
+              get:
+                operationId: listOrders
+                parameters:
+                  - name: filters
+                    in: query
+                    schema:
+                      type: array
+                      items: { type: object, properties: { name: { type: string } } }
+                responses:
+                  "204": { description: ok }
+            """,
+        ) shouldContain "An element of parameter 'filters' is an object"
+    }
+
+    @Test
+    fun `an exploded header list would need a header field name per value`() {
+        refusing(listParameter("X-Tags", "header", "explode: true")) shouldContain
+            "a header field has one name"
+    }
+
+    @Test
+    fun `a comma-joined cookie list is a cookie value RFC 6265 excludes`() {
+        refusing(listParameter("tags", "cookie", "explode: false")) shouldContain "RFC 6265 excludes the comma"
+    }
+
+    @Test
+    fun `a list in the path has no segment to be`() {
+        refusing(
+            """
+            /orders/{ids}:
+              get:
+                operationId: getOrders
+                parameters:
+                  - name: ids
+                    in: path
+                    required: true
+                    schema: { type: array, items: { type: string } }
+                responses:
+                  "204": { description: ok }
+            """,
+        ) shouldContain "it is in the path"
+    }
+
+    @Test
+    fun `a constraint on the list itself is one nothing would enforce`() {
+        val message = refusing(
             """
             /orders:
               get:
@@ -104,12 +164,48 @@ class StrictnessTest {
                 parameters:
                   - name: tags
                     in: query
-                    schema: { type: array, items: { type: string } }
+                    schema: { type: array, minItems: 1, items: { type: string } }
                 responses:
                   "204": { description: ok }
             """,
-        ) shouldContain "Parameter 'tags' is a list"
+        )
+        message shouldContain "constrains the list itself with minItems"
+        message shouldContain "put the constraint on `items`"
     }
+
+    @Test
+    fun `a style on a parameter with no parts says something it cannot mean`() {
+        refusing(
+            """
+            /orders/{id}:
+              get:
+                operationId: getOrder
+                parameters:
+                  - name: id
+                    in: path
+                    required: true
+                    style: label
+                    schema: { type: string }
+                responses:
+                  "204": { description: ok }
+            """,
+        ) shouldContain "its schema says it has none"
+    }
+
+    /** One array parameter, with whatever [serialisation] the case is about. */
+    private fun listParameter(name: String, location: String, vararg serialisation: String): String =
+        """
+        /orders:
+          get:
+            operationId: listOrders
+            parameters:
+              - name: $name
+                in: $location
+                ${serialisation.joinToString("\n                ")}
+                schema: { type: array, items: { type: string } }
+            responses:
+              "204": { description: ok }
+        """
 
     @Test
     fun `an operation with no operationId has nothing to name the generated value after`() {

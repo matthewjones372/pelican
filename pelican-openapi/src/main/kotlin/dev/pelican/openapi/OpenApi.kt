@@ -85,13 +85,13 @@ private fun parameters(ep: Endpoint<*, *>): List<JsonValue> = buildList {
         add(parameter(p.name, "path", true, p.codec, p.description))
     }
     ep.queries.forEach { q ->
-        add(parameter(q.name, "query", q.required, q.codec, q.description))
+        add(parameter(q.name, "query", q.required, q.codec, q.description, q.listStyle))
     }
     ep.headerParams.forEach { h ->
-        add(parameter(h.name, "header", h.required, h.codec, h.description))
+        add(parameter(h.name, "header", h.required, h.codec, h.description, h.listStyle))
     }
     ep.cookieParams.forEach { c ->
-        add(parameter(c.name, "cookie", c.required, c.codec, c.description))
+        add(parameter(c.name, "cookie", c.required, c.codec, c.description, c.listStyle))
     }
 }
 
@@ -346,13 +346,31 @@ private fun parameter(
     required: Boolean,
     codec: PlainCodec<*>,
     description: String?,
+    listStyle: ListStyle? = null,
 ): JsonObj = jsonObj {
     "name" to name
     "in" to location
     "required" to required
     putIfNotNull("description", description ?: codec.description)
-    putIfNotNull("example", codec.example)
-    put("schema", codec.openApiSchema())
+    // A list's example is an example of its element, and travels inside `items`.
+    if (listStyle == null) putIfNotNull("example", codec.example)
+    listStyle?.let { serialisation(it, location) }
+    put("schema", if (listStyle == null) codec.openApiSchema() else listSchema(codec))
+}
+
+/**
+ * `style` and `explode`, written only where they differ from what OpenAPI
+ * already assumes at this location.
+ *
+ * A repeated query parameter is the default encoding, so the common case
+ * writes neither keyword — which matters because a reader who meets one is
+ * entitled to conclude something unusual is being said, and a generator that
+ * spelled out the default everywhere would spend that signal.
+ */
+private fun JsonObjBuilder.serialisation(style: ListStyle, location: String) {
+    val named = style.styleAt(location)
+    if (named != defaultStyleAt(location)) "style" to named
+    if (style.explode != defaultExplodeFor(named)) "explode" to style.explode
 }
 
 // ------------------------------------------------------------------ security

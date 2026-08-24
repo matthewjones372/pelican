@@ -230,6 +230,10 @@ private fun decodeSegment(path: String, from: Int, to: Int): String {
     return if (encoded) URLDecoder.decode(raw, StandardCharsets.UTF_8) else raw
 }
 
+/** Every field line under this name, in the order they arrived. */
+private fun HttpRequest.headerValues(name: String): List<String> =
+    getHeaders().filter { it.name().equals(name, ignoreCase = true) }.map { it.value() }
+
 @Suppress("UNCHECKED_CAST")
 /**
  * Everything decodable before the body arrives, written into the request's own
@@ -239,7 +243,8 @@ private fun decodeSegment(path: String, from: Int, to: Int): String {
  * it; absent and required, refuse; absent and optional, take the declared
  * default — and they are spelled out per input kind because what "present"
  * means differs: a query parameter and a header are Pekko `Optional`s, a
- * cookie is a lookup in a map core parsed.
+ * cookie is a lookup in a map core parsed, and a parameter declared as a list
+ * is present when at least one occurrence of it carried something.
  */
 private fun decodePlainInputs(
     ep: Endpoint<*, *>,
@@ -252,6 +257,14 @@ private fun decodePlainInputs(
     captures.forEach { (param, raw) -> put(param, param.codec.decode(param.name, raw)) }
 
     ep.queries.forEach { q ->
+        val style = q.listStyle
+        if (style != null) {
+            // Pekko walks the query forwards and prepends, so `getAll` hands
+            // back the occurrences last-first. A list is ordered, and the
+            // order the caller wrote is the one it means.
+            put(q, q.decodeList(query.getAll(q.name).reversed()))
+            return@forEach
+        }
         val raw = query.get(q.name)
         put(
             q,
@@ -264,6 +277,13 @@ private fun decodePlainInputs(
     }
 
     ep.headerParams.forEach { h ->
+        // `getHeader` returns the first field line; a list is declared as
+        // comma-separated and RFC 9110 says two lines mean the one joined
+        // field, so it is the only case that has to read them all.
+        if (h.listStyle != null) {
+            put(h, h.decodeList(req.headerValues(h.name)))
+            return@forEach
+        }
         val raw = req.getHeader(h.name)
         put(
             h,
@@ -275,23 +295,29 @@ private fun decodePlainInputs(
         )
     }
 
-    // Parsed by core, from the header, rather than by Pekko's own `Cookie`
-    // model — so a cookie decodes to the same value on all three backends.
-    // See `Cookies`. Skipped when nothing declared one.
-    if (ep.cookieParams.isNotEmpty()) {
-        val cookies = Cookies.parse(
-            req.getHeaders().filter { it.name().equals("Cookie", ignoreCase = true) }.map { it.value() },
-        )
-        ep.cookieParams.forEach { c ->
-            val raw = cookies[c.name]
-            put(
-                c,
-                when {
-                    raw != null -> c.codec.decode(c.name, raw)
-                    c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
-                    else -> c.default
-                },
-            )
+    decodeCookies(ep, req, into)
+}
+
+/**
+ * Cookies, parsed by core from the header rather than by Pekko's own `Cookie`
+ * model — so a cookie decodes to the same value on all three backends. See
+ * `Cookies`. Skipped when nothing declared one: reading and parsing the header
+ * costs the same whether or not anybody asked for a cookie.
+ */
+private fun decodeCookies(ep: Endpoint<*, *>, req: HttpRequest, into: MutableMap<ParamKey<*>, Any?>) {
+    if (ep.cookieParams.isEmpty()) return
+
+    val cookies = Cookies.parseAll(req.headerValues("Cookie"))
+    ep.cookieParams.forEach { c ->
+        if (c.listStyle != null) {
+            into[c] = c.decodeList(cookies[c.name].orEmpty())
+            return@forEach
+        }
+        val raw = cookies[c.name]?.first()
+        into[c] = when {
+            raw != null -> c.codec.decode(c.name, raw)
+            c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
+            else -> c.default
         }
     }
 }

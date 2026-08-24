@@ -284,6 +284,30 @@ val email = StringCodec.mapOrFail(
 )
 ```
 
+### More than one value
+
+`?tag=a&tag=b`, `?id=1,2`, `X-Feature: beta,dark`. The modifier says how the
+values are told apart; the codec and its refinements are unchanged, because
+what one value decodes to has not changed:
+
+```kotlin
+val tags = queryParam<String>("tag").repeated().optional()          // List<String>?
+val ids  = queryParam("id", LongCodec.positive()).commaSeparated()  // List<Long>
+```
+
+The handler gets a `List<Long>`, not a string it has to split, and `?id=1,0` is
+a 400 naming the element that failed. `spaceSeparated()` and `pipeSeparated()`
+are there too; a header takes `commaSeparated()` and a cookie `repeated()`,
+which are the encodings those two can carry. The document says `type: array`
+with the element's schema — refinements included — under `items`, and writes
+`style`/`explode` only where they differ from OpenAPI's own default for that
+location.
+
+An absent list is `null`, not the empty list: `?tag=` carries no element, so an
+empty list cannot be sent, and reading absence as empty would leave `required`
+with nothing to mean. `.default(emptyList())` is how a description asks for the
+other reading.
+
 ## Declared failures
 
 `orFail` puts the failure in the endpoint's type, so the handler has to produce

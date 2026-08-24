@@ -24,6 +24,7 @@ import dev.pelican.RawBody
 import dev.pelican.ServerEndpoint
 import dev.pelican.corsPolicy
 import dev.pelican.decode
+import dev.pelican.decodeList
 import dev.pelican.handlerFor
 import dev.pelican.requestBodyCodec
 import io.ktor.http.HttpHeaders
@@ -229,6 +230,11 @@ private fun decodePlainInputs(
     }
 
     ep.queries.forEach { q ->
+        val style = q.listStyle
+        if (style != null) {
+            put(q, q.decodeList(call.request.queryParameters.getAll(q.name).orEmpty()))
+            return@forEach
+        }
         val raw = call.request.queryParameters[q.name]
         put(
             q,
@@ -241,6 +247,13 @@ private fun decodePlainInputs(
     }
 
     ep.headerParams.forEach { h ->
+        // The subscript is the first field line; a list is declared as
+        // comma-separated and RFC 9110 says two lines mean the one joined
+        // field, so it is the only case that has to read them all.
+        if (h.listStyle != null) {
+            put(h, h.decodeList(call.request.headers.getAll(h.name).orEmpty()))
+            return@forEach
+        }
         val raw = call.request.headers[h.name]
         put(
             h,
@@ -264,9 +277,13 @@ private fun decodePlainInputs(
 private fun decodeCookies(ep: Endpoint<*, *>, call: ApplicationCall, into: MutableMap<ParamKey<*>, Any?>) {
     if (ep.cookieParams.isEmpty()) return
 
-    val cookies = Cookies.parse(call.request.headers.getAll("Cookie").orEmpty())
+    val cookies = Cookies.parseAll(call.request.headers.getAll("Cookie").orEmpty())
     ep.cookieParams.forEach { c ->
-        val raw = cookies[c.name]
+        if (c.listStyle != null) {
+            into[c] = c.decodeList(cookies[c.name].orEmpty())
+            return@forEach
+        }
+        val raw = cookies[c.name]?.first()
         into[c] = when {
             raw != null -> c.codec.decode(c.name, raw)
             c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")

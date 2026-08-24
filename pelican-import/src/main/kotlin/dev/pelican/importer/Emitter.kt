@@ -1,6 +1,7 @@
 package dev.pelican.importer
 
 import dev.pelican.JsonObj
+import dev.pelican.ListStyle
 import dev.pelican.codegen.KotlinTypes
 import dev.pelican.codegen.kdoc
 import dev.pelican.codegen.kotlinString
@@ -450,7 +451,23 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         } else {
             "$factory(${kotlinString(param.name)}, ${plain.codec}${description(param.description)})"
         }
-        return declared + modifier(param, plain.type)
+        return declared + spread(param) + modifier(param, plain.type)
+    }
+
+    /**
+     * How several values are told apart, where the parameter carries several.
+     *
+     * It comes before `optional()` because that is the only order that
+     * compiles: spreading turns a `QueryParam<Int>` into a
+     * `QueryParam<List<Int>>`, and the modifier below then makes that
+     * nullable.
+     */
+    private fun spread(param: IrParam): String = when (param.listStyle) {
+        null -> ""
+        ListStyle.REPEATED -> ".repeated()"
+        ListStyle.COMMA -> ".commaSeparated()"
+        ListStyle.SPACE -> ".spaceSeparated()"
+        ListStyle.PIPE -> ".pipeSeparated()"
     }
 
     /**
@@ -460,8 +477,16 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
      */
     private fun modifier(param: IrParam, type: String): String = when {
         param.location == "path" || param.required -> ""
-        param.default != null -> ".default(${literal(param.default, type)})"
+        param.default != null -> ".default(${defaultValue(param, type)})"
         else -> ".optional()"
+    }
+
+    /** A default is a value of the declared type, so a list's is a list of them. */
+    private fun defaultValue(param: IrParam, type: String): String {
+        val value = checkNotNull(param.default)
+        if (param.listStyle == null) return literal(value, type)
+        val items = (value as? dev.pelican.JsonArr)?.items.orEmpty()
+        return "listOf(" + items.joinToString { literal(it, type) } + ")"
     }
 
     private fun bodyDeclaration(ep: IrEndpoint, body: IrBody): String {
@@ -586,7 +611,7 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         if (schema["enum"] != null) return Plain(typeFor(schema, context), null)
 
         val format = schema.str("format")
-        val type = when (schema.scalar()) {
+        val type = when (schema.scalarType()) {
             "integer" -> if (format == "int64") "Long" else "Int"
             "number" -> "Double"
             "boolean" -> "Boolean"
@@ -661,11 +686,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         }
         return "jsonObj { $fields }"
     }
-
-    private fun JsonObj.scalar(): String? = str("type")
-        ?: (this["type"] as? dev.pelican.JsonArr)?.items
-            ?.mapNotNull { (it as? dev.pelican.JsonStr)?.value }
-            ?.firstOrNull { it != "null" }
 
     private fun String.qualified(): String? = when (this) {
         "UUID" -> "java.util.UUID"

@@ -1,6 +1,7 @@
 package example.backends
 
 import dev.pelican.In2
+import dev.pelican.In4
 import dev.pelican.UploadedFile
 import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.openapi.openApiJson
@@ -101,6 +102,57 @@ class AllBackendsTest {
 
         res.status shouldBe 400
         res.body shouldContain "Invalid parameter"
+    }
+
+    // ------------------------------------------------- more than one value
+
+    /** Every encoding at once, filled in. */
+    private fun everything(): In4<List<String>?, List<Long>?, List<String>?, List<String>?> = In4(
+        listOf("kotlin", "http"),
+        listOf(1L, 2L),
+        listOf("beta", "dark"),
+        listOf("x", "y"),
+    )
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a list reaches the handler as a list, whichever way it was spread`(name: String, client: ApiClient) {
+        // Repeated query, comma-joined query, comma-joined header and a cookie
+        // sent as two pairs — four encodings, one handler, no splitting.
+        client.call(filters, everything()) shouldBe
+            Filters(listOf("kotlin", "http"), listOf(1L, 2L), listOf("beta", "dark"), listOf("x", "y"))
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `the request is spread the way each declaration says`(name: String, client: ApiClient) {
+        val request = client.request(filters, everything())
+
+        request.target shouldContain "tag=kotlin&tag=http"
+        request.target shouldContain "id=1%2C2"
+        request.headers shouldContain ("X-Feature" to "beta,dark")
+        request.headers shouldContain ("Cookie" to "seen=x; seen=y")
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `an absent list is sent as nothing at all`(name: String, client: ApiClient) {
+        // Which is why absent reads back as null rather than as an empty list:
+        // there is no request here that could have meant the empty one.
+        val request = client.request(filters, In4(null, null, null, null))
+
+        request shouldBuild "GET /filters"
+        request.headers.map { it.first } shouldNotContain "X-Feature"
+        client.transport.send(request).body shouldBe """{"tags":[],"ids":[],"features":[],"seen":[]}"""
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a refinement on the element rejects one bad element`(name: String, client: ApiClient) {
+        val res = client.transport.send(client.request(filters, In4(null, listOf(2L, 0L), null, null)))
+
+        res.status shouldBe 400
+        res.body shouldContain "Cannot decode '0' for 'id'"
     }
 
     @ParameterizedTest(name = "{0}")

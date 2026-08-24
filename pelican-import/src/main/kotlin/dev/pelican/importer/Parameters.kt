@@ -2,6 +2,9 @@ package dev.pelican.importer
 
 import dev.pelican.JsonObj
 import dev.pelican.JsonValue
+import dev.pelican.ListStyle
+import dev.pelican.defaultExplodeFor
+import dev.pelican.defaultStyleAt
 
 /**
  * The inputs that travel outside the body.
@@ -10,11 +13,11 @@ import dev.pelican.JsonValue
  * it, and the operation's own list overrides them by name and location, which
  * is what OpenAPI says and what a reader of the document would assume.
  *
- * The refusals here are all one refusal in different positions. A Pelican
- * input is one string on the wire decoded into one value, so a parameter that
- * is an array, an object, or a whole JSON document under `content` has no
- * description to become — and the generated handler would have to take
- * something the endpoint never decoded.
+ * A parameter here is one value or a list of them, and in either case each
+ * value is one string on the wire decoded into one Kotlin value. What is
+ * refused is what has no such reading: a parameter that is an object, a list
+ * of objects, or a whole JSON document under `content` — the generated handler
+ * would have to take something the endpoint never decoded.
  */
 internal class Parameters(private val reader: Reader, private val operation: Operation) {
 
@@ -55,10 +58,14 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
                     "from one string; take it as a request body instead.",
             )
         }
-        checkSerialisation(param, name, location, path)
 
-        val schema = normaliseSchema(param["schema"] ?: unsupported(path, "Parameter '$name' declares no schema."))
-        checkScalar(schema, name, path)
+        val declared = normaliseSchema(param["schema"] ?: unsupported(path, "Parameter '$name' declares no schema."))
+        val listStyle = serialisation(param, declared, name, location, path)
+
+        // For a list it is the element that becomes a codec, and the array
+        // around it is spelled by the modifier the style chose.
+        val element = if (listStyle == null) declared else itemSchema(declared, name, path)
+        checkScalar(element, name, listStyle != null, path)
 
         val required = param.bool("required")
         if (location == "path" && !required) {
@@ -69,57 +76,178 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
             name = name,
             location = location,
             required = required,
-            schema = schema,
+            schema = element,
             description = param.str("description"),
-            default = schema["default"],
-            example = param.str("example"),
+            default = declared["default"],
+            example = param.str("example") ?: if (listStyle == null) null else element.str("example"),
+            listStyle = listStyle,
         )
     }
 
     /**
-     * Anything but the default encoding is refused rather than approximated.
+     * How the document says this parameter's values reach the wire, as the
+     * style Pelican describes — or null where it carries one value.
      *
-     * `style` and `explode` say how a value spreads across the wire — repeated
-     * keys, bracketed keys, comma-joined. All of them describe values with
-     * parts, which is the case already refused above; saying so here as well
-     * means the message names the keyword the document actually used.
+     * `style` and `explode` are only ever about where the boundaries between
+     * several values are, so a parameter whose schema has no parts and which
+     * sets either of them is saying something it cannot mean, and is refused
+     * rather than read as the default it contradicts.
      */
-    private fun checkSerialisation(param: JsonObj, name: String, location: String, path: JsonPath) {
-        val style = param.str("style")
-        if (style != null && style != defaultStyle[location]) {
-            unsupported(path, "Parameter '$name' is encoded as '$style', and Pelican reads the default encoding.")
+    private fun serialisation(
+        param: JsonObj,
+        schema: JsonObj,
+        name: String,
+        location: String,
+        path: JsonPath,
+    ): ListStyle? {
+        val fallback = defaultStyleAt(location)
+        val style = param.str("style") ?: fallback
+        val explode = if (param["explode"] == null) defaultExplodeFor(style) else param.bool("explode")
+
+        if (schema.scalarType() != "array") {
+            if (style != fallback) {
+                unsupported(
+                    path,
+                    "Parameter '$name' is encoded as '$style', which says how a value with parts is spread out, " +
+                        "and its schema says it has none. Declare it as `type: array`, or drop the `style`.",
+                )
+            }
+            if (param["explode"] != null && explode != defaultExplodeFor(fallback)) {
+                unsupported(path, "Parameter '$name' sets `explode`, which only matters for values with parts.")
+            }
+            return null
         }
-        val explode = param["explode"]
-        if (explode != null && param.bool("explode") != (defaultStyle[location] == "form")) {
-            unsupported(path, "Parameter '$name' sets `explode`, which only matters for values with parts.")
-        }
+
+        return listStyle(style, explode, name, location, path)
     }
 
-    private fun checkScalar(schema: JsonObj, name: String, path: JsonPath) {
-        val type = schema.str("type")
-            ?: (schema["type"] as? dev.pelican.JsonArr)?.items
-                ?.mapNotNull { (it as? dev.pelican.JsonStr)?.value }
-                ?.firstOrNull { it != "null" }
+    /**
+     * The four encodings a list of values has an honest reading as, and the
+     * refusals for the combinations that do not.
+     *
+     * The ones refused here are not gaps: `deepObject` describes an object
+     * spread over several names rather than a list, and the others are a
+     * keyword contradicting the one beside it. Reading either as its nearest
+     * neighbour would publish a document back that no longer said what this
+     * one said.
+     */
+    @Suppress("CyclomaticComplexMethod") // One branch per (location, style, explode) reading; the list is the rule.
+    private fun listStyle(
+        style: String,
+        explode: Boolean,
+        name: String,
+        location: String,
+        path: JsonPath,
+    ): ListStyle = when {
+        location == "path" -> unsupported(
+            path,
+            "Parameter '$name' is a list, and it is in the path. A route matches one segment per capture, " +
+                "so take it as a query parameter, or exclude the operation.",
+        )
+
+        style == "deepObject" -> unsupported(
+            path,
+            "Parameter '$name' is encoded as 'deepObject', which spreads an object over several names. " +
+                "Pelican describes a list of values; take the object as a request body instead.",
+        )
+
+        location == "header" && style != "simple" -> unsupported(
+            path,
+            "Parameter '$name' is a header encoded as '$style', and a header carries its values comma-separated.",
+        )
+
+        location == "header" && explode -> unsupported(
+            path,
+            "Parameter '$name' is a header that sets `explode`, which puts each value under its own name — " +
+                "and a header field has one name. Drop `explode`, or take it as a query parameter.",
+        )
+
+        location == "header" -> ListStyle.COMMA
+
+        location == "cookie" && style != "form" -> unsupported(
+            path,
+            "Parameter '$name' is a cookie encoded as '$style', and a cookie is written as `form`.",
+        )
+
+        location == "cookie" && explode -> ListStyle.REPEATED
+
+        location == "cookie" -> unsupported(
+            path,
+            "Parameter '$name' is a cookie whose values are joined by a comma, and RFC 6265 excludes the comma " +
+                "from a cookie value. Say `explode: true` for one pair per value, or take it as a query parameter.",
+        )
+
+        style == "form" && explode -> ListStyle.REPEATED
+
+        style == "form" -> ListStyle.COMMA
+
+        explode -> unsupported(
+            path,
+            "Parameter '$name' is encoded as '$style' and exploded, which puts each value under its own name " +
+                "and leaves the separator meaning nothing. Drop `explode`, or drop the `style`.",
+        )
+
+        style == "spaceDelimited" -> ListStyle.SPACE
+
+        style == "pipeDelimited" -> ListStyle.PIPE
+
+        else -> unsupported(
+            path,
+            "Parameter '$name' is encoded as '$style', which is not a way Pelican reads a list.",
+        )
+    }
+
+    /** What one element of a list parameter is, which is where its codec comes from. */
+    private fun itemSchema(schema: JsonObj, name: String, path: JsonPath): JsonObj {
+        // A refinement in Pelican narrows what one value decodes to, and there
+        // is nothing it can say about how many of them arrived. `minItems: 1`
+        // would therefore be written into the document again and enforced by
+        // nobody, which is the silent weakening a strict import exists to
+        // rule out. Required already says "at least one" and is enforced.
+        val unenforceable = schema.fields.keys - listKeywords
+        if (unenforceable.isNotEmpty()) {
+            unsupported(
+                path,
+                "Parameter '$name' constrains the list itself with ${unenforceable.joinToString(", ")}. " +
+                    "Pelican refines an element, not the list around it, so nothing would enforce that — " +
+                    "put the constraint on `items`, or exclude the operation.",
+            )
+        }
+        return schema["items"] as? JsonObj
+            ?: unsupported(path, "Parameter '$name' is a list, and its schema does not say what one element is.")
+    }
+
+    /** What a list's own schema may say and still be described in full. */
+    private val listKeywords = setOf("type", "items", "default", "description", "title", "example", "deprecated")
+
+    private fun checkScalar(schema: JsonObj, name: String, ofAList: Boolean, path: JsonPath) {
+        // "Parameter 'tags'" for a scalar, "An element of parameter 'tags'"
+        // for a list — so the position the message names is the position the
+        // reader has to go and change.
+        val subject = if (ofAList) "An element of parameter '$name'" else "Parameter '$name'"
 
         when {
-            type == "array" -> unsupported(
+            schema.scalarType() == "array" -> unsupported(
                 path,
-                "Parameter '$name' is a list. A Pelican input decodes one value from one string; " +
-                    "take a delimited string and split it in the handler, or exclude the operation.",
+                "$subject is itself a list. A parameter carries values, not lists of them; " +
+                    "flatten it in the document, or exclude the operation.",
             )
 
-            type == "object" || schema["properties"] != null -> unsupported(
+            schema.scalarType() == "object" || schema["properties"] != null -> unsupported(
                 path,
-                "Parameter '$name' is an object, and Pelican decodes a parameter from one string.",
+                "$subject is an object, and Pelican decodes a value from one string.",
             )
 
             schema["\$ref"] != null -> unsupported(
                 path,
-                "Parameter '$name' points at a named schema. Named schemas describe bodies here; " +
+                "$subject points at a named schema. Named schemas describe bodies here; " +
                     "a parameter's type is written on the parameter.",
             )
 
-            type == null -> unsupported(path, "Parameter '$name' has a schema that does not say what type it is.")
+            schema.scalarType() == null -> unsupported(
+                path,
+                "$subject has a schema that does not say what type it is.",
+            )
         }
     }
 
@@ -143,13 +271,6 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
     }
 
     private val locations = setOf("path", "query", "header", "cookie")
-
-    private val defaultStyle = mapOf(
-        "path" to "simple",
-        "query" to "form",
-        "header" to "simple",
-        "cookie" to "form",
-    )
 
     private val capturePattern = Regex("\\{([^}]+)}")
 }

@@ -65,21 +65,15 @@ class ApiClient(
 
         // Absent optional inputs are simply not sent, which is what exercises
         // the server's own defaulting rather than duplicating it here.
-        val query = endpoint.queries.mapNotNull { q ->
-            values[q]?.let { q.name to encodePlain(q.codec, it) }
-        }
+        val query = endpoint.queries.flatMap { q -> wire(q.name, q.codec, q.listStyle, values[q]) }
         // Cookies travel as one header, so they are gathered rather than
         // mapped one to one — which is also why an absent optional cookie
         // costs nothing here.
-        val cookies = endpoint.cookieParams.mapNotNull { c ->
-            values[c]?.let { c.name to encodePlain(c.codec, it) }
-        }
+        val cookies = endpoint.cookieParams.flatMap { c -> wire(c.name, c.codec, c.listStyle, values[c]) }
 
         val payload = payload(endpoint, values)
 
-        val headers = endpoint.headerParams.mapNotNull { h ->
-            values[h]?.let { h.name to encodePlain(h.codec, it) }
-        } +
+        val headers = endpoint.headerParams.flatMap { h -> wire(h.name, h.codec, h.listStyle, values[h]) } +
             (if (cookies.isEmpty()) emptyList() else listOf("Cookie" to Cookies.render(cookies))) +
             listOfNotNull(payload.contentType?.let { "Content-Type" to it })
 
@@ -348,6 +342,26 @@ class TextBody(val text: String) : ByteStreamHandle
 
 /** Supplies a [RawBody] input for a client call. */
 fun rawText(text: String): ByteStreamHandle = TextBody(text)
+
+/**
+ * The occurrences one input puts on the wire: none for an absent optional,
+ * one for an ordinary value, and for a list whatever its declared style says —
+ * one per element, or one string with separators in it.
+ *
+ * Written from the declaration rather than from the value's Kotlin type, so a
+ * request built here spreads a list exactly the way the document says the
+ * server will read it back.
+ */
+private fun wire(
+    name: String,
+    codec: PlainCodec<*>,
+    listStyle: ListStyle?,
+    value: Any?,
+): List<Pair<String, String>> = when {
+    value == null -> emptyList()
+    listStyle == null -> listOf(name to encodePlain(codec, value))
+    else -> codec.encodeAll(name, listStyle, value as List<*>).map { name to it }
+}
 
 @Suppress("UNCHECKED_CAST")
 private fun encodePlain(codec: PlainCodec<*>, value: Any): String =

@@ -11,6 +11,7 @@ import dev.pelican.JsonArrayOutput
 import dev.pelican.JsonBody
 import dev.pelican.JsonObj
 import dev.pelican.JsonOutput
+import dev.pelican.ListStyle
 import dev.pelican.MultipartBody
 import dev.pelican.NdjsonOutput
 import dev.pelican.Output
@@ -363,11 +364,18 @@ private class KotlinClientEmitter(
         val headerPairs = mutableListOf<String>()
         val cookiePairs = mutableListOf<String>()
 
-        fun parameter(wire: String, codec: PlainCodec<*>, isRequired: Boolean, pairs: MutableList<String>) {
+        fun parameter(
+            wire: String,
+            codec: PlainCodec<*>,
+            isRequired: Boolean,
+            listStyle: ListStyle?,
+            pairs: MutableList<String>,
+        ) {
             val name = unique(memberName(wire), taken)
-            val type = plainType(codec, types, wire)
+            val element = plainType(codec, types, wire)
+            val type = if (listStyle == null) element else "List<$element>"
             if (isRequired) required += "$name: $type" else optional += "$name: $type? = null"
-            pairs += "${kotlinString(wire)} to $name"
+            pairs += "${kotlinString(wire)} to ${occurrences(name, listStyle)}"
         }
 
         val bodyName = unique("body", taken)
@@ -395,7 +403,7 @@ private class KotlinClientEmitter(
             is MultipartBody -> {
                 val fields = mutableListOf<String>()
                 val files = mutableListOf<String>()
-                input.textParts.forEach { parameter(it.name, it.codec, it.required, fields) }
+                input.textParts.forEach { parameter(it.name, it.codec, it.required, null, fields) }
                 input.fileParts.forEach { part ->
                     val name = unique(memberName(part.name), taken)
                     if (part.required) required += "$name: UploadedFile"
@@ -416,9 +424,9 @@ private class KotlinClientEmitter(
             null -> null
         }
 
-        ep.queries.forEach { parameter(it.name, it.codec, it.required, queryPairs) }
-        ep.headerParams.forEach { parameter(it.name, it.codec, it.required, headerPairs) }
-        ep.cookieParams.forEach { parameter(it.name, it.codec, it.required, cookiePairs) }
+        ep.queries.forEach { parameter(it.name, it.codec, it.required, it.listStyle, queryPairs) }
+        ep.headerParams.forEach { parameter(it.name, it.codec, it.required, it.listStyle, headerPairs) }
+        ep.cookieParams.forEach { parameter(it.name, it.codec, it.required, it.listStyle, cookiePairs) }
 
         val arguments = buildList {
             add(kotlinString(ep.method.name))
@@ -434,6 +442,20 @@ private class KotlinClientEmitter(
             request = "request(${arguments.joinToString(", ")})",
         )
     }
+
+    /**
+     * What the caller's argument contributes to `request(...)`.
+     *
+     * A repeated list is handed over whole and spread by the runtime, since
+     * how many occurrences it becomes is a property of the value. A delimited
+     * one is joined here, because the separator is a property of the
+     * *declaration* and the runtime has no way to see it from a `List`.
+     */
+    private fun occurrences(name: String, listStyle: ListStyle?): String =
+        when (val separator = listStyle?.separator) {
+            null -> name
+            else -> "joined($name, ${kotlinString(separator.toString())})"
+        }
 
     private fun pathExpression(ep: Endpoint<*, *>, names: Map<PathParam<*>, String>): String {
         val template = ep.pathSpec.segments.joinToString("/", "/") { segment ->

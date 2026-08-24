@@ -24,6 +24,30 @@ val apiKey = headerParam(
     StringCodec.nonEmpty().describedAs("Required credential", example = "let-me-in"),
 )
 
+/*
+ * Inputs that carry more than one value, one per encoding OpenAPI can
+ * describe. The modifier says how the values are told apart on the wire; what
+ * one of them decodes to is still the codec's business, so `item` is refined
+ * exactly as a single-valued parameter would be.
+ *
+ * All of them are optional, and an absent one arrives as `null` rather than as
+ * an empty list: `?item=` carries no element, so a list is never empty on the
+ * wire, and reading absence as empty would leave "matched nothing" and "did
+ * not filter" spelled the same way.
+ */
+val itemFilter = queryParam("item", StringCodec.nonEmpty(), description = "Only these items")
+    .commaSeparated()
+    .optional()
+val tagFilter = queryParam<String>("tag", description = "Only orders carrying these tags").repeated().optional()
+val sortBy = queryParam<String>("sort", description = "Sort keys, most significant first").pipeSeparated().optional()
+val fieldMask = queryParam<String>("fields", description = "Return only these fields").spaceSeparated().optional()
+val features = headerParam<String>("X-Feature", description = "Feature flags the caller has on")
+    .commaSeparated()
+    .optional()
+val seenOrders = cookieParam<Long>("seen", description = "Orders this browser has already been shown")
+    .repeated()
+    .optional()
+
 val newOrder = jsonBody<CreateOrder>(description = "The order to place")
 val rawUpload = rawBody(description = "Anything; it is never buffered")
 
@@ -156,8 +180,9 @@ val searchOrders = endpoint {
     summary = "Lens-style: the handler reads inputs from the Params bag"
     operationId = "searchOrders"
     tag("diagnostics")
-    query(limit, statusFilter)
-    header(traceId)
+    query(limit, statusFilter, itemFilter, tagFilter, sortBy, fieldMask)
+    header(traceId, features)
+    cookie(seenOrders)
     ndjson<Order>()
 }
 

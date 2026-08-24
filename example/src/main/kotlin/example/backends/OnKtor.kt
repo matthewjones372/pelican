@@ -41,6 +41,8 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
     signIn handledNow { form -> sessionOf(form) },
 
     uploadFile handledNow { (caption, file) -> uploaded(caption, file) },
+
+    filters handledNow { (tags, ids, features, seen) -> filtersOf(tags, ids, features, seen) },
 )
 
 fun ktorApi(): Api = greetingsApi(ktorRoutes)

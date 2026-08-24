@@ -80,9 +80,13 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
         body.toSource().mapMaterializedValue { NotUsed.getInstance() }
     },
 
-    // The lens-style endpoint reads its inputs from the bag by key.
+    // The lens-style endpoint reads its inputs from the bag by key — including
+    // the multi-valued ones, which arrive as the `List<String>?` they were
+    // declared as rather than as a string somebody has to split.
     searchOrders streamedNow { p ->
+        val items = p[itemFilter].orEmpty().toSet()
         Source.from(Store.orders(userId = 1, limit = p[limit], status = p[statusFilter]))
+            .filter { order -> items.isEmpty() || order.item in items }
     },
 )
 

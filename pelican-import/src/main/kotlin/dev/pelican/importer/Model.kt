@@ -2,6 +2,7 @@ package dev.pelican.importer
 
 import dev.pelican.JsonObj
 import dev.pelican.JsonValue
+import dev.pelican.ListStyle
 
 /*
  * What an imported document looks like once the OpenAPI-shaped noise is gone.
@@ -53,11 +54,17 @@ internal class IrParam(
     val name: String,
     val location: String,
     val required: Boolean,
+    /**
+     * The schema for one value. For a list that is the element's, since the
+     * array around it is said by [listStyle] rather than by a schema.
+     */
     val schema: JsonObj,
     val description: String?,
     val default: JsonValue?,
     /** What the document offers as a sample value, for the ones that are strings. */
     val example: String?,
+    /** Null where the parameter carries one value; otherwise how several are spread. */
+    val listStyle: ListStyle? = null,
 )
 
 internal sealed class IrBody {

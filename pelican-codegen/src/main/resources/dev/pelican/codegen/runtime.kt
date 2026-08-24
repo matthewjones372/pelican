@@ -221,6 +221,26 @@ private fun plain(value: Any?): String? = when (value) {
     else -> value.toString()
 }
 
+/**
+ * How many times one query parameter or cookie appears on the wire: not at
+ * all when it was left out, once when it carries a value, and once per element
+ * when it was declared as a repeated list.
+ */
+private fun occurrences(value: Any?): List<String> = when (value) {
+    null -> emptyList()
+    is Collection<*> -> value.mapNotNull { plain(it) }
+    else -> listOfNotNull(plain(value))
+}
+
+/**
+ * A list that travels as one occurrence, joined by the separator its
+ * declaration named. Null for an absent parameter and for an empty list
+ * alike: neither has anything to say, and `tags=` is not a shorter way of
+ * saying nothing.
+ */
+private fun joined(values: Collection<*>?, separator: String): String? =
+    values?.mapNotNull { plain(it) }?.takeIf { it.isNotEmpty() }?.joinToString(separator)
+
 private fun urlEncode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
 /** Path segments are encoded more conservatively than query values. */

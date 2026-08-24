@@ -14,6 +14,10 @@ class DecodeFailure(
  * Codec for a value that travels as a single string: a path segment, a query
  * parameter or a header. Carries just enough metadata to also describe itself
  * in OpenAPI.
+ *
+ * A parameter carrying several values is still described by one of these: what
+ * an element decodes to is the same question, and only where the boundaries
+ * between the values sit is new. See [ListStyle].
  */
 interface PlainCodec<T : Any> {
     /** OpenAPI primitive type: "string", "integer", "number", "boolean". */
