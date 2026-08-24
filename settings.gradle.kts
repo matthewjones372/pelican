@@ -31,4 +31,8 @@ include(
     "pelican-test-pekko",
     "pelican-test-http4k",
     "example",
+    // Not a library and not an example: a JMH harness, run only when asked
+    // for. See benchmarks/build.gradle.kts for why it is not a source set in
+    // `example`.
+    "benchmarks",
 )

@@ -187,28 +187,8 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach { exclude("example/impo
 
 tasks.named("compileTestKotlin") { dependsOn("generateImportedEndpoints") }
 
-// The benchmark is a test that takes ten seconds and asserts nothing, so it is
-// off unless asked for: `./gradlew :example:test -Dbenchmark=true --tests "*OverheadBenchmark*"`.
-val benchmarking = providers.systemProperty("benchmark").getOrElse("false") == "true"
-
-tasks.withType<Test>().configureEach {
-    systemProperty("benchmark", if (benchmarking) "true" else "false")
-
-    // `-Dprofile=true` alongside it records a flight recording of the run, so
-    // "where does the overhead go" is answered by the JVM rather than guessed.
-    if (providers.systemProperty("profile").getOrElse("false") == "true") {
-        val recording = layout.buildDirectory.file("benchmark.jfr").get().asFile
-        jvmArgs(
-            "-XX:StartFlightRecording=settings=profile,filename=$recording,dumponexit=true",
-            "-XX:+UnlockDiagnosticVMOptions",
-            "-XX:+DebugNonSafepoints",
-        )
-    }
-}
-
-// Coverage instrumentation rewrites bytecode, and it rewrites more of Pelican
-// than of a hand-written route — which is exactly the comparison the benchmark
-// makes. Measuring through it would report the agent, not the library.
-if (benchmarking) {
-    kover { currentProject { instrumentation { disabledForAll.set(true) } } }
-}
+// The benchmarks used to live here, as tests that looped and timed behind a
+// `-Dbenchmark=true` switch. They are a JMH harness in `:benchmarks` now, which
+// took the flight-recording flag and the coverage-agent exemption with them —
+// JMH forks its own JVMs, so there is no test task left for an agent to attach
+// to. `./gradlew :benchmarks:jmh`.

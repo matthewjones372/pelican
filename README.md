@@ -46,9 +46,10 @@ Change the path parameter's type, the response type or the declared error, and
 the handler stops compiling.
 
 Interpreting a description is not free, and what it costs is measured rather
-than argued about — a few hundred nanoseconds against a route someone tuned by
-hand, and cheaper than the idiomatic one. The numbers, and the two baselines
-they need, are in [what it costs](docs/what-it-costs.md).
+than argued about — 75ns a request against an http4k route someone tuned by
+hand, 131ns against a Pekko one, and cheaper than the idiomatic version of
+either. The numbers, the error bars they came with and the baselines they need
+are in [what it costs](docs/what-it-costs.md).
 
 ## Why you might want this
 
@@ -799,7 +800,7 @@ Five things that wanted a page rather than a section, and one benchmark:
 | [Importing an OpenAPI document](docs/importing.md) | A document somebody else wrote, read into descriptions: what comes out, what is refused, and how to get past a document you do not own. |
 | [The same endpoints, by hand](docs/by-hand.md) | The same two endpoints written directly against Pekko HTTP, so what the descriptions buy is legible rather than asserted. |
 | [Modules](docs/modules.md) | What each of the sixteen modules is for and what it depends on, for deciding which ones your build needs. |
-| [What it costs](docs/what-it-costs.md) | The interpreter measured against the hand-written route it replaces, with the baselines that comparison needs. |
+| [What it costs](docs/what-it-costs.md) | The interpreter measured by JMH against the hand-written routes it replaces, with the baselines that comparison needs and the error bars it came with. |
 
 ---
 

@@ -28,6 +28,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-test-http4k` | test, http4k | the in-memory transport, on http4k |
 | `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
 | `example` | core, openapi, jackson, all three backends | the orders, bookmarks, greetings and secured services |
+| `benchmarks` | core, jackson, pekko, http4k, JMH | the interpreter measured against hand-written routes. Not published, not run by `build`. |
 
 The layering is load-bearing, not decorative, and each edge is a test:
 
@@ -3171,9 +3172,11 @@ generated client is called with one against a running server.
 
 Two smaller things. The Pekko route tests run through Pekko's own route
 testkit, behind a JUnit 5 extension in `PekkoRouteTestKit` — the testkit drives
-its `ActorSystem` from a JUnit 4 `@Rule`, which Jupiter does not run. And
-`OverheadBenchmark` measures what the interpreter costs against a hand-written
-http4k route; see [What it costs](what-it-costs.md).
+its `ActorSystem` from a JUnit 4 `@Rule`, which Jupiter does not run. And the
+`benchmarks` module measures what the interpreter costs against hand-written
+http4k and Pekko routes. It is a JMH harness rather than a test — forked,
+warmed and blackholed, with allocation read off `-prof gc` — and `build` never
+runs it; see [What it costs](what-it-costs.md).
 
 ## Run it
 
@@ -3185,6 +3188,7 @@ http4k route; see [What it costs](what-it-costs.md).
 ./gradlew :example:generateOrdersDocument  # spec, no server
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ./gradlew :example:generateImportedEndpoints  # the document, read back as descriptions
+./gradlew :benchmarks:jmh           # the JMH benchmarks: about six minutes, never run by `build`
 ```
 
 ```bash

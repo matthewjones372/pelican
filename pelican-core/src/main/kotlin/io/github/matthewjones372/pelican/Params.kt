@@ -58,7 +58,8 @@ class Params(
     // touch either of these maps — no filter sets an attribute, no handler
     // sets a header — and two empty LinkedHashMaps per request was a
     // measurable part of what the interpreter allocates over a hand-written
-    // route. See OverheadBenchmark, which measures allocation as well as time.
+    // route. See Http4kOverheadBenchmark in `benchmarks`, which reports
+    // allocation per request as well as time.
     //
     // Neither map was ever synchronised, and this does not change that: a
     // Params belongs to one request. Where that request crosses a thread —
