@@ -373,6 +373,8 @@ several successful responses the same way, so `200 Order` beside `202 Accepted`
 is describable — and the handler names the one it is producing:
 
 ```kotlin
+val orderAt = responseHeader<String>("Location", description = "Where the placed order lives")
+
 val orderPlaced = json<Order>(status = 201, orderAt)   // `Location`, on this response only
 val orderQueued = json<Queued>(status = 202)
 
