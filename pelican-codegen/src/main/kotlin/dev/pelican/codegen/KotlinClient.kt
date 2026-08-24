@@ -19,6 +19,7 @@ import dev.pelican.PathParam
 import dev.pelican.PathSegment
 import dev.pelican.PlainCodec
 import dev.pelican.RawBody
+import dev.pelican.ResponseHeader
 import dev.pelican.SchemaRegistry
 import dev.pelican.SecurityRequirement
 import dev.pelican.SseOutput
@@ -323,9 +324,10 @@ private class KotlinClientEmitter(
             appendLine("when (response.statusCode()) {")
             declared.failures.forEach { failure ->
                 val payload = decodeExpression(failure.type, if (streamed) "drain(response)" else "response.body()")
+                val headers = failure.headers.joinToString("") { ", ${headerRead(it)}" }
                 appendLine(
                     "    ${failure.status} -> return Outcome.Err(" +
-                        "${failureType(ep, declared)}.${failureMember(failure.status)}($payload))",
+                        "${failureType(ep, declared)}.${failureMember(failure.status)}($payload$headers))",
                 )
             }
             appendLine("}")
@@ -540,7 +542,9 @@ private class KotlinClientEmitter(
     /**
      * The sealed type an endpoint's declared failures become. One member per
      * declared status, named after it, carrying the payload that status was
-     * declared with.
+     * declared with — and a property per header that status was declared to
+     * send, so a `Retry-After` reaches the caller as a number rather than as
+     * something to go and dig out of the response.
      */
     private fun failureType(ep: Endpoint<*, *>, out: FallibleOutput<*, *>): String {
         val name = typeName(ep.operationName) + "Failure"
@@ -552,7 +556,8 @@ private class KotlinClientEmitter(
                 appendLine()
                 appendLine(kdoc(failure.description, "    "))
                 val body = typeFor(failure.type)
-                appendLine("    data class ${failureMember(failure.status)}(val body: $body) : $name {")
+                val properties = listOf("val body: $body") + failure.headers.map(::headerProperty)
+                appendLine("    data class ${failureMember(failure.status)}(${properties.joinToString()}) : $name {")
                 appendLine("        override val status: Int get() = ${failure.status}")
                 appendLine("    }")
             }
@@ -560,6 +565,20 @@ private class KotlinClientEmitter(
         }
         return name
     }
+
+    /**
+     * Nullable whatever the declaration says, because this is the reading end:
+     * a server that promised a header and left it off is something the caller
+     * has to be able to see, and a client that threw would have replaced the
+     * failure it was handed with one of its own. The same reason every other
+     * unmodelled thing degrades here rather than failing.
+     */
+    private fun headerProperty(header: ResponseHeader<*>): String =
+        "val ${memberName(header.name)}: ${headerType(header.codec)}?"
+
+    /** The header off the response, parsed to the type the declaration gives it. */
+    private fun headerRead(header: ResponseHeader<*>): String =
+        "response.header(${kotlinString(header.name)})${headerParse(headerType(header.codec))}"
 
     // ------------------------------------------------------------ odds and ends
 
@@ -633,6 +652,36 @@ private fun failureMember(status: Int): String = when (status) {
     503 -> "ServiceUnavailable"
     504 -> "GatewayTimeout"
     else -> "Status$status"
+}
+
+/**
+ * A response header's Kotlin type.
+ *
+ * The four scalar kinds and String, rather than [plainType]'s reading, which
+ * also mints an enum for a constrained parameter. An enum is right on the way
+ * *out*, where the caller picks a value the client then writes as a string; on
+ * the way back in it would mean matching a string the server chose against the
+ * constants the document listed, and a header that did not match would leave
+ * the client holding no value for a failure that did arrive.
+ */
+private fun headerType(codec: PlainCodec<*>): String = when (codec.openApiType) {
+    "integer" -> if (codec.openApiFormat == "int64") "Long" else "Int"
+    "number" -> "Double"
+    "boolean" -> "Boolean"
+    else -> "String"
+}
+
+/**
+ * Total parses only: a `Retry-After` carrying something that is not a number
+ * comes back null rather than throwing, for the same reason the property is
+ * nullable at all.
+ */
+private fun headerParse(type: String): String = when (type) {
+    "Long" -> "?.toLongOrNull()"
+    "Int" -> "?.toIntOrNull()"
+    "Double" -> "?.toDoubleOrNull()"
+    "Boolean" -> "?.toBooleanStrictOrNull()"
+    else -> ""
 }
 
 /** A literal path segment inside a Kotlin string template. */

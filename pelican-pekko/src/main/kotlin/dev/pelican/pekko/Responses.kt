@@ -117,6 +117,9 @@ private fun failureResponse(
     return HttpResponse.create()
         .withStatus(StatusCodes.get(declared.status))
         .withEntity(HttpEntities.create(ContentTypes.APPLICATION_JSON, codec.encodeToString(err.error)))
+        // Encoded and checked against the declaration when the handler
+        // produced the failure, so there is nothing left to decide here.
+        .addHeaders(err.headers.map { (name, value) -> RawHeader.create(name, value) })
 }
 
 @Suppress("UNCHECKED_CAST")

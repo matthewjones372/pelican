@@ -338,6 +338,25 @@ placeOrder handledOrFail { (id, key, req) ->
 
 Give the failures a sealed supertype and that `when` is exhaustive too.
 
+A failure can carry response headers as well as a payload — a `Retry-After` on a
+429 being the usual pair. They are declared on the failure rather than with
+`emits(...)`, because they belong to that one response:
+
+```kotlin
+val retryAfter = responseHeader<Long>("Retry-After", "Seconds to wait")
+val throttled  = errorJson<ApiError>(429, "Too many requests", retryAfter)
+
+json<Order>(status = 201).orFail(badApiKey, noSuchUser, throttled)
+
+throttled(ApiError(429, "Slow down"), retryAfter of 30L)
+```
+
+The value is typed by the header's own codec, a header the failure never
+declared throws, and a required one left out throws too — at the call, which is
+the one place the declaration and the value are both in hand. Mark it
+`.optional()` for a header that is only sometimes sent. A failure that declares
+no headers is returned exactly as before.
+
 ## Streaming
 
 ```kotlin
@@ -404,8 +423,14 @@ placeOrder handledNow { req ->
 Declaring the header puts it in the document with its schema, its description
 and whether it is always sent, and it is also the only thing `setHeader` will
 accept: passing an undeclared header throws rather than shipping an undocumented
-one. `Retry-After` on a declared 429 goes out through
-`errorResponse(429, "...", retryAfter)`.
+one.
+
+`emits(...)` describes the *success* response, and a header on it may be set on
+any response the endpoint sends — which is right for a correlation id and wrong
+for a `Retry-After`. A header belonging to one failure is declared on that
+failure instead: `errorResponse(429, "...", retryAfter)` for one that is only
+documented, and `errorJson<ApiError>(429, "...", retryAfter)` for one the
+handler returns — see [Declared failures](#declared-failures).
 
 Every handler lambda has the request's `Params` as its receiver whatever its
 input style, so a typed handler reaches `setHeader` without giving up its typed
@@ -576,6 +601,10 @@ app.outcome(getBookmark, 9_999L).shouldBeError()                    // NoSuchBoo
 // When two failures share a payload type, equality cannot tell them apart, so
 // assert on the declaration the handler named, which is what fixed the status.
 app.outcome(placeOrder, input) shouldBeFailure noSuchUser
+
+// A header the failure declared comes back on the failure, decoded by the same
+// codec that wrote it.
+(app.outcome(placeOrder, input) as Outcome.Err)[retryAfter] shouldBe 30L
 ```
 
 These throw plain `AssertionError`, so `pelican-test` needs no matcher library
@@ -643,8 +672,9 @@ val orders = client.listOrders(1L, limit = 3)          // Streamed<Order>, as th
 when (val result = client.placeOrder(1L, CreateOrder("anvil"), xApiKey = key)) {
     is Outcome.Ok  -> result.value                     // Order
     is Outcome.Err -> when (val failure = result.failure) {   // exhaustive
-        is PlaceOrderFailure.Unauthorized -> retryWith(freshKey())
-        is PlaceOrderFailure.NotFound     -> null
+        is PlaceOrderFailure.Unauthorized   -> retryWith(freshKey())
+        is PlaceOrderFailure.NotFound       -> null
+        is PlaceOrderFailure.TooManyRequests -> sleep(failure.retryAfter)   // Long?
     }
 }
 ```
@@ -656,7 +686,10 @@ empty. A streaming endpoint hands back a `Streamed<T>`, a `Sequence` over the
 open connection decoded as elements land, and a file part is streamed into the
 request so a large upload is never held in memory. Declared failures become a
 sealed type per endpoint: add a failure, regenerate, and the calls that do not
-handle it stop compiling.
+handle it stop compiling. A failure that declares response headers carries them
+as properties, typed from the schema the document publishes — nullable, because
+this is the reading end and a client that threw over a header would have thrown
+away the failure it was handed.
 
 The generated file needs `pelican-core`, which has no dependencies of its own,
 and a `Codecs` chosen by the caller. Transport is the JDK's `HttpClient`. The

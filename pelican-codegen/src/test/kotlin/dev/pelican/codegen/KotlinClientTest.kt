@@ -96,6 +96,9 @@ class KotlinClientTest {
     private val noSuchWidget = errorJson<Problem>(404, "No widget with that id")
     private val notYours = errorJson<Problem>(403, "Someone else's widget")
 
+    private val retryAfter = responseHeader<Long>("Retry-After", "Seconds to wait")
+    private val throttled = errorJson<Problem>(429, "Too many requests", retryAfter)
+
     private val getWidget = endpoint(widgetId) {
         get("widgets" / widgetId)
         summary = "Fetch a widget"
@@ -172,6 +175,12 @@ class KotlinClientTest {
     }
 
     /** No operationId: both interpreters fall back to the derived name. */
+    private val pokeWidget = endpoint(widgetId) {
+        post("widgets" / widgetId / "poke")
+        operationId = "pokeWidget"
+        json<Widget>() orFail throttled
+    }
+
     private val unnamed = endpoint(widgetId) {
         get("widgets" / widgetId / "history")
         json<Widget>()
@@ -181,6 +190,7 @@ class KotlinClientTest {
         endpoints = listOf(
             getWidget, streamWidgets, listWidgets, watchWidgets, createWidget, deleteWidget,
             uploadWidget, signInWidget, importWidgets, themed, searchWidgets, rebuild, unnamed,
+            pokeWidget,
         ),
         schemas = WidgetSchemas,
         title = "Widget Shop",
@@ -344,6 +354,25 @@ class KotlinClientTest {
             "404 -> return Outcome.Err(GetWidgetFailure.NotFound(" +
             "problemCodec.decodeFromString(response.body())))"
         client shouldContain "return Outcome.Ok(widgetCodec.decodeFromString(response.body()))"
+    }
+
+    /**
+     * A failure that declares a header gets a property for it, typed from the
+     * schema the document publishes — so a caller reads `retryAfter` off the
+     * failure rather than going back to the response for a string to parse.
+     *
+     * Nullable, and parsed with the total form: this is the reading end, and a
+     * client that threw over a header would have thrown away the failure it was
+     * handed.
+     */
+    @Test
+    fun `a failure declaring a header carries it, typed, on the generated failure`() {
+        client shouldContain
+            "data class TooManyRequests(val body: Problem, val retryAfter: Long?) : PokeWidgetFailure {"
+        client shouldContain
+            "429 -> return Outcome.Err(PokeWidgetFailure.TooManyRequests(" +
+            "problemCodec.decodeFromString(response.body()), " +
+            """response.header("Retry-After")?.toLongOrNull()))"""
     }
 
     @Test

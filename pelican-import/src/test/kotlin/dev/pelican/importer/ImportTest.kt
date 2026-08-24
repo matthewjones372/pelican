@@ -48,6 +48,44 @@ class ImportTest {
         bookmarks shouldNotContain "errorJson<Any"
     }
 
+    /**
+     * The pair the import used to refuse: a 429 with a problem body *and* a
+     * `Retry-After`. It is one declaration — the payload and the header on the
+     * same `errorJson`, which is what the handler returns and what the document
+     * publishes again.
+     */
+    @Test
+    fun `a failure carrying both a body and a header is one declared failure`() {
+        val throttling = imported(
+            document(
+                """
+                /orders:
+                  get:
+                    operationId: listOrders
+                    responses:
+                      "200":
+                        description: ok
+                        content:
+                          application/json:
+                            schema: { type: object, properties: { id: { type: integer } } }
+                      "429":
+                        description: Slow down
+                        headers:
+                          Retry-After:
+                            required: true
+                            schema: { type: integer, format: int64 }
+                        content:
+                          application/json:
+                            schema: { type: object, properties: { message: { type: string } } }
+                """,
+            ),
+        )
+
+        throttling shouldContain """val retryAfter = responseHeader<Long>("Retry-After")"""
+        throttling shouldContain """errorJson<ListOrdersFailure>(429, "Slow down", retryAfter)"""
+        throttling shouldContain "orFail listOrdersFailureTooManyRequests"
+    }
+
     @Test
     fun `a response header is a value the handler may set`() {
         bookmarks shouldContain """val location = responseHeader<String>("Location", "Where the new bookmark lives")"""

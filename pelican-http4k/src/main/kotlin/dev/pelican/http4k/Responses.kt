@@ -134,12 +134,18 @@ private fun failureResponse(
         "$declared carries ${declared.type} but the handler returned ${err.error?.let { it::class }}"
     }
     val codec = checkNotNull(codecs.failures[declared]) { "No codec was resolved for $declared" }
-    return jsonResponse(declared.status, codec.encodeToString(err.error))
+    // Encoded and checked against the declaration when the handler produced
+    // the failure, so there is nothing left to decide here.
+    return jsonResponse(declared.status, codec.encodeToString(err.error), err.headers)
 }
 
 /** One JSON response, one allocation of each thing it is made of. */
-private fun jsonResponse(status: Int, body: String): Response =
-    MemoryResponse(statusOf(status), JSON_HEADERS, MemoryBody(body))
+private fun jsonResponse(status: Int, body: String, extra: List<Pair<String, String>> = emptyList()): Response =
+    MemoryResponse(
+        statusOf(status),
+        if (extra.isEmpty()) JSON_HEADERS else JSON_HEADERS + extra,
+        MemoryBody(body),
+    )
 
 // The content type of a JSON or text response is the same list every time.
 // Built once rather than per request: the list and the pair inside it are two

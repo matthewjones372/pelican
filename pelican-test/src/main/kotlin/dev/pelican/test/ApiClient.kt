@@ -225,6 +225,14 @@ class ApiClient(
      * A status the endpoint never declared still throws [ApiCallFailed]: the
      * point is to assert on the contract, so a response from outside it is a
      * finding rather than a value to inspect.
+     *
+     * The headers the failure declared come back on it, decoded by their own
+     * codecs:
+     *
+     * ```
+     * val err = app.outcome(placeOrder, input) as Outcome.Err
+     * err[retryAfter] shouldBe 30L
+     * ```
      */
     @Suppress("UNCHECKED_CAST")
     fun <I, E, T> outcome(endpoint: Endpoint<I, Fallible<E, T>>, input: I): Outcome<E, T> {
@@ -234,8 +242,19 @@ class ApiClient(
 
         val declared = out.failures.firstOrNull { it.status == res.status }
         return when {
-            declared != null -> declared(codecs.codec<Any?>(declared.type).decodeFromString(res.body) as E)
+            // Built rather than produced by invoking the declaration, which
+            // would apply the server's bargain to the client: a required
+            // header the server left off is a thing a test asserts about the
+            // response, not a reason for the client to throw instead of
+            // handing back the failure that did arrive.
+            declared != null -> Outcome.Err(
+                declared,
+                codecs.codec<Any?>(declared.type).decodeFromString(res.body) as E,
+                declared.headers.mapNotNull { h -> res.header(h.name)?.let { h.name to it } },
+            )
+
             res.isSuccess -> Outcome.Ok(decodeSuccess(endpoint, out.success, res) as T)
+
             else -> throw ApiCallFailed(endpoint, req, res)
         }
     }

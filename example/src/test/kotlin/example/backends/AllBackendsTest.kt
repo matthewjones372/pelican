@@ -2,18 +2,27 @@ package example.backends
 
 import dev.pelican.In2
 import dev.pelican.In4
+import dev.pelican.Outcome
 import dev.pelican.UploadedFile
 import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.openapi.openApiJson
 import dev.pelican.test.ApiClient
 import dev.pelican.test.apiClient
+import dev.pelican.test.shouldBeFailure
 import dev.pelican.test.shouldBuild
+import dev.pelican.test.shouldHaveContentType
+import dev.pelican.test.shouldHaveHeader
+import dev.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -205,6 +214,54 @@ class AllBackendsTest {
         )
     }
 
+    // --------------------------------------------- a failure that carries a header
+
+    /**
+     * The 429 `echo` declares carries a payload *and* a `Retry-After`, and both
+     * halves have to survive every backend: the body is written by the
+     * configured codec as the declared type, and the header goes on that same
+     * response.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a declared failure carries its payload and its header`(name: String, client: ApiClient) {
+        val res = client.response(echo, In2(null, Note(FLOOD)))
+
+        res shouldHaveStatus 429
+        res shouldHaveContentType "application/json"
+        res.shouldHaveHeader("Retry-After", "5")
+        res.body shouldContain "Slow down"
+    }
+
+    /**
+     * And read back through the descriptions rather than off the wire: the
+     * failure is the one the endpoint declared, and its header comes back as
+     * the `Long` the declaration says it is rather than as the string it
+     * travelled as.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `and hands the header back typed, on the failure itself`(name: String, client: ApiClient) {
+        val refused = client.outcome(echo, In2(null, Note(FLOOD)))
+
+        refused shouldBeFailure tooMuch
+        (refused as Outcome.Err)[retryAfter] shouldBe 5L
+    }
+
+    /**
+     * The reason the header is declared on the failure rather than with
+     * `emits(...)`: it belongs to the 429 and to nothing else, so the success
+     * the same handler produces cannot carry it.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a header declared on a failure is absent from the success`(name: String, client: ApiClient) {
+        val res = client.response(echo, In2(null, Note("hello")))
+
+        res shouldHaveStatus 200
+        withClue(res.headers.toString()) { res.header("Retry-After").shouldBeNull() }
+    }
+
     // ------------------------------------------------------------- the document
 
     @ParameterizedTest(name = "{0}")
@@ -217,6 +274,30 @@ class AllBackendsTest {
 
         withClue(document.take(300)) { document shouldContain "\"operationId\": \"greet\"" }
         withClue(document.take(300)) { document shouldContain "\"/hello/{name}\"" }
+    }
+
+    /**
+     * The failure's header, in the document, on the response that carries it —
+     * published from the same declaration the handler supplied the value
+     * through, so the 429 a caller reads about and the 429 it gets are
+     * describing one another.
+     */
+    @Test
+    fun `the failure's header is documented on the failure, not on the success`() {
+        val responses = Json.parseToJsonElement(pekkoApi().spec().openApiJson())
+            .jsonObject["paths"]!!.jsonObject["/echo"]!!.jsonObject["post"]!!.jsonObject["responses"]!!.jsonObject
+
+        val header = responses["429"]!!.jsonObject["headers"]!!.jsonObject["Retry-After"]!!.jsonObject
+        header["required"]!!.jsonPrimitive.content.toBoolean() shouldBe true
+        header["schema"]!!.jsonObject["format"]!!.jsonPrimitive.content shouldBe "int64"
+
+        // With a body beside it, which is the pair that used to have no
+        // description at all.
+        responses["429"]!!.jsonObject["content"]!!.jsonObject.keys shouldBe setOf("application/json")
+
+        withClue("Retry-After leaked onto the success response") {
+            responses["200"]!!.jsonObject["headers"]!!.jsonObject.keys shouldBe setOf("X-Request-Id")
+        }
     }
 
     // ------------------------------------------------------------- and together

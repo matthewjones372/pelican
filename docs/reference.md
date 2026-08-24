@@ -624,7 +624,6 @@ What it refuses, and what each one would have cost:
 | A parameter under `content` | It carries a whole document rather than a value; that is a request body |
 | `deepObject`, or a `style` and an `explode` that contradict each other | `deepObject` spreads an object over several names, and the rest name a separator that the `explode` beside them makes meaningless |
 | A list constrained by `minItems`, `maxItems` or `uniqueItems` | A refinement narrows what one value decodes to and can say nothing about how many arrived, so the constraint would be republished and enforced by nobody |
-| A failure with both a body and headers | `errorJson<T>(...)` carries one payload. A failure with headers and no body is fine — that one is documented rather than returned |
 | Two file parts in a multipart body | The same rule `endpoint(...)` enforces at class-init: reading stops at the first file so it can be streamed |
 | An operation with its own `servers`, or `callbacks` | A description carries no server of its own, and a callback is the other direction again |
 | `webhooks` | Calls the service makes rather than answers. Nothing here describes those, and dropping them would generate a client missing half of what the document offers |
@@ -1096,6 +1095,15 @@ header a proxy in front expects — `setRawHeader(name, value)` says so out loud
 Headers a handler set go on whatever response comes back, including an error
 response. A correlation id that vanished exactly when something went wrong
 would be a correlation id worth nothing.
+
+That is also why a header belonging to *one* response is not declared with
+`emits(...)`. A `Retry-After` named there would be documented on the success and
+settable on every response the endpoint sends, so the first handler to set it
+before returning a 201 ships an undocumented header on an order that was placed.
+A header that belongs to one failure is declared on that failure instead —
+`errorResponse(429, "...", retryAfter)` for a failure that is only documented,
+and `errorJson<T>(429, "...", retryAfter)` for one the handler returns. See
+[Declared failures](#declared-failures).
 
 `ApiException` carries its own headers for failures raised deep in a handler,
 where no endpoint description is to hand — which is what `unauthorized(challenge
@@ -1885,6 +1893,70 @@ when (val result = app.outcome(getBookmark, 9_999L)) {
 }
 ```
 
+### A failure that carries headers
+
+A 429 is a body saying what happened and a header saying when to come back, and
+both halves are part of the same response. The headers are listed on the
+declaration, and the handler supplies their values where it returns the failure:
+
+```kotlin
+val retryAfter = responseHeader<Long>("Retry-After", "Seconds to wait")
+val throttled  = errorJson<ApiError>(429, "Too many requests", retryAfter)
+
+val placeOrder = endpoint(userId, apiKey, newOrder) {
+    post("users" / userId / "orders")
+    json<Order>(status = 201).orFail(badApiKey, noSuchUser, throttled)
+}
+
+placeOrder handledOrFail { (id, key, req) ->
+    when {
+        key != expected -> badApiKey(ApiError(401, "Bad API key"))
+        overQuota(id)   -> throttled(ApiError(429, "Slow down"), retryAfter of 30L)
+        else            -> ok(Store.create(id, req))
+    }
+}
+```
+
+`retryAfter of 30L` is typed by the header's own codec — a `Retry-After`
+declared as a `Long` takes a `Long`, and `retryAfter of "soon"` does not
+compile. The values go on the *failure* rather than through `setHeader` for the
+reason above: `setHeader` writes onto the request, and the interpreters put what
+it wrote on whatever response comes back, so a header meant for the 429 would
+have followed the 201 out of the same handler.
+
+Three things are checked when the failure is produced:
+
+- a header this failure never declared throws, the same bargain `setHeader`
+  makes;
+- a **required** header the call left out throws, naming it. This is stricter
+  than the success path, where a missing required header is reported by
+  `missingRequiredHeaders()` and not enforced — and it can be, because the two
+  are not the same situation. A handler setting headers one at a time is never
+  finished until the response is built, so nothing can tell mid-handler whether
+  a promise is broken or merely not kept yet. This call is the whole answer, so
+  everything needed to tell is in hand. The failed call is a 500 rather than a
+  429 with nothing to act on;
+- `responseHeader(...).optional()` is how a description says a header is only
+  sometimes sent. Leaving that one out is fine, and it is simply not sent.
+
+The arity is additive: a failure that declares no headers is returned as it
+always was, `noSuchUser(ApiError(404, "No user $id"))`.
+
+It reaches every interpreter. All three backends write the headers on that
+response and no other; `pelican-openapi` publishes them under that status
+alongside its body; a generated client reads them back as properties on the
+typed failure; and `app.outcome(...)` hands them back decoded:
+
+```kotlin
+val refused = app.outcome(placeOrder, input) as Outcome.Err
+refused.error shouldBe ApiError(429, "Slow down")
+refused[retryAfter] shouldBe 30L
+```
+
+Nullable on the reading end, whatever the document promised: a server that left
+a required header off is a finding for the test to make, not a reason for a
+client to throw away the failure that did arrive.
+
 What this does **not** cover, honestly:
 
 - **Throwing still works, and is still unchecked.** `notFound(...)` and any
@@ -1896,6 +1968,13 @@ What this does **not** cover, honestly:
   undocumented status.
 - **The success status is not in the type.** `json<Order>(status = 201)` and
   `json<Order>()` are the same type to a handler.
+- **A declared failure's headers are checked at the call, not by the compiler.**
+  `throttled(problem)` with the `Retry-After` left out compiles and throws where
+  it is produced. Making it a compile error would mean an `ErrorOutput` typed by
+  the headers it declares — one type per arity — and `orFail(a, b, c)` holds its
+  failures in one list, so every one of those types would have to erase back to
+  the same thing to go in it. The check would have to be repeated at the point
+  it was erased, which is the check that is already there.
 
 ## How streaming stays backend-agnostic
 

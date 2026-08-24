@@ -393,10 +393,15 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     private fun failureName(ep: IrEndpoint, failure: IrFailure): String {
         val schema = failure.schema ?: error("A failure with no payload has no name")
         val type = typeFor(schema, typeName(ep.operationId) + "Failure")
-        val key = "failure:${failure.status}:$type:${failure.description}"
+        // The headers are part of the key, not just of the declaration: two
+        // 404s carrying the same payload are one value, and two 429s that
+        // differ in what they send back are not.
+        val headers = failure.headers.joinToString("") { ", ${headerName(it)}" }
+        val key = "failure:${failure.status}:$type:${failure.description}:$headers"
         return named.getOrPut(key) {
             val name = unique(memberName(type + reason(failure.status)), taken)
-            failures[name] = "val $name = errorJson<$type>(${failure.status}, ${kotlinString(failure.description)})"
+            failures[name] =
+                "val $name = errorJson<$type>(${failure.status}, ${kotlinString(failure.description)}$headers)"
             name
         }
     }

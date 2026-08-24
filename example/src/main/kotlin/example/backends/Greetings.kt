@@ -1,7 +1,9 @@
 package example.backends
 
+import dev.pelican.ApiError
 import dev.pelican.Endpoint
 import dev.pelican.LongCodec
+import dev.pelican.Outcome
 import dev.pelican.StringCodec
 import dev.pelican.UploadedFile
 import dev.pelican.commaSeparated
@@ -9,12 +11,16 @@ import dev.pelican.cookieParam
 import dev.pelican.default
 import dev.pelican.div
 import dev.pelican.endpoint
+import dev.pelican.errorJson
 import dev.pelican.filePart
 import dev.pelican.formBody
 import dev.pelican.headerParam
 import dev.pelican.jsonBody
 import dev.pelican.nonEmpty
+import dev.pelican.of
+import dev.pelican.ok
 import dev.pelican.optional
+import dev.pelican.orFail
 import dev.pelican.pathParam
 import dev.pelican.positive
 import dev.pelican.queryParam
@@ -109,6 +115,20 @@ val upload = filePart("file", contentType = "text/plain", description = "The fil
  */
 val requestId = responseHeader<String>("X-Request-Id", description = "Correlates this answer with the server's log")
 
+/**
+ * A header belonging to one *failure* rather than to the endpoint.
+ *
+ * [requestId] above is declared with `emits(...)`, so it is documented on the
+ * success response and any handler here may set it. This one is declared on
+ * the 429 below and nowhere else: it is documented on that response alone, the
+ * handler supplies its value when it returns that failure, and a successful
+ * echo therefore cannot carry it.
+ */
+val retryAfter = responseHeader<Long>("Retry-After", description = "Seconds to wait before saying it again")
+
+/** The pair a 429 nearly always is: a body saying what happened, a header saying when to come back. */
+val tooMuch = errorJson<ApiError>(429, "The caller is being asked to slow down", retryAfter)
+
 /** A plain JSON response. */
 val greet = endpoint(name, shout) {
     get("hello" / name)
@@ -148,7 +168,7 @@ val echo = endpoint(traceId, note) {
     emits(requestId)
     errorResponse(403, "Refused by the gate filter")
     errorResponse(413, "The body was larger than this service will read")
-    json<Echoed>()
+    json<Echoed>() orFail tooMuch
 }
 
 /** What the caller's cookies say, read back as the types they were declared as. */
@@ -211,6 +231,25 @@ internal fun greetingOf(who: String, shout: Boolean): Greeting {
 internal fun tick(seq: Int) = Tick(seq, at = "T-minus-$seq")
 
 internal fun echoed(trace: String?, note: Note) = Echoed(note.text, trace)
+
+/** The note that this service refuses to repeat; see [echoOrRefuse]. */
+internal const val FLOOD = "flood"
+
+/** How long the refusal says to wait. */
+private const val WAIT_SECONDS = 5L
+
+/**
+ * Either the echo or the declared 429, with the `Retry-After` that failure
+ * promised.
+ *
+ * What decides it is the note rather than a counter, deliberately. A real
+ * limiter has state, and this suite asks three servers the same question in
+ * whatever order the runner feels like — an answer that depended on which one
+ * was asked first would be a test of the runner.
+ */
+internal fun echoOrRefuse(trace: String?, note: Note): Outcome<ApiError, Echoed> =
+    if (note.text == FLOOD) tooMuch(ApiError(429, "Slow down"), retryAfter of WAIT_SECONDS)
+    else ok(echoed(trace, note))
 
 internal fun preferencesOf(locale: String, session: String?) = Preferences(locale, session)
 

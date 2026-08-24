@@ -3,6 +3,7 @@ package example.backends
 import dev.pelican.Api
 import dev.pelican.ServerEndpoint
 import dev.pelican.pekko.handledNow
+import dev.pelican.pekko.handledOrFail
 import dev.pelican.pekko.start
 import dev.pelican.pekko.streamedNow
 import org.apache.pekko.stream.javadsl.Source
@@ -27,7 +28,10 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
             .map { seq -> tick(seq) }
     },
 
-    echo handledNow { (trace, note) -> echoed(trace, note) },
+    // The one endpoint here that declares a failure, so this is the binder
+    // that demands an `Outcome` — and the 429 it may answer with carries a
+    // `Retry-After`, on all three backends, from the one description.
+    echo handledOrFail { (trace, note) -> echoOrRefuse(trace, note) },
 
     preferences handledNow { (locale, session) -> preferencesOf(locale, session) },
 

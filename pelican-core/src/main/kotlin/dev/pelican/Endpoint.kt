@@ -8,7 +8,11 @@ class ErrorSpec @PublishedApi internal constructor(
     val status: Int,
     val description: String,
     val type: KType?,
-    /** Headers this failure carries — `Retry-After` on a 429, chiefly. */
+    /**
+     * Headers this failure carries — `Retry-After` on a 429, chiefly. Set
+     * either way it is declared: by `errorResponse(...)` for a failure that is
+     * only documented, and by `errorJson(...)` for one a handler returns.
+     */
     val headers: List<ResponseHeader<*>> = emptyList(),
 )
 
@@ -215,9 +219,16 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
      * A failure the handler names has to be nameable, so one shared by several
      * endpoints is better declared as a top-level `val` with the [errorJson]
      * function of the same name.
+     *
+     * [headers] are the ones this failure sends with its payload — a
+     * `Retry-After` on a 429. They are documented on that response, and the
+     * handler supplies their values when it returns the failure.
      */
-    inline fun <reified T> errorJson(status: Int, description: String): ErrorOutput<T> =
-        addError(ErrorOutput(status, typeOf<T>(), description))
+    inline fun <reified T> errorJson(
+        status: Int,
+        description: String,
+        vararg headers: ResponseHeader<*>,
+    ): ErrorOutput<T> = addError(ErrorOutput(status, typeOf<T>(), description, headers.toList()))
 
     @PublishedApi
     internal fun <T> addError(failure: ErrorOutput<T>): ErrorOutput<T> {

@@ -35,26 +35,150 @@ class Fallible<E, T> private constructor()
  *     }
  * }
  * ```
+ *
+ * A failure that declares headers is invoked with their values as well; see
+ * [ErrorOutput.invoke].
  */
 sealed interface Outcome<out E, out T> {
     data class Ok<T>(val value: T) : Outcome<Nothing, T>
 
     /** [declared] is the failure the endpoint listed; it supplies the status. */
-    data class Err<E>(val declared: ErrorOutput<E>, val error: E) : Outcome<E, Nothing>
+    data class Err<E>(
+        val declared: ErrorOutput<E>,
+        val error: E,
+        /**
+         * The headers [declared] carries, already encoded, in the order it
+         * declared them.
+         *
+         * One field, written by [ErrorOutput.invoke] on the way out and filled
+         * from the response on the way back in — so the value a handler sent
+         * and the value a client reads are the same field of the same type,
+         * rather than two readings that could disagree.
+         */
+        val headers: List<Pair<String, String>> = emptyList(),
+    ) : Outcome<E, Nothing> {
+        /**
+         * One header back, decoded by its own codec:
+         *
+         * ```
+         * val refused = app.outcome(placeOrder, input) as Outcome.Err
+         * refused[retryAfter]        // Long?
+         * ```
+         *
+         * Null when it did not arrive. Nullable rather than throwing because
+         * this is also what a *client* reads: a server that promised a header
+         * and left it off is a finding for the test to make, not a reason to
+         * lose the failure that did arrive.
+         */
+        @Suppress("UNCHECKED_CAST")
+        operator fun <T : Any> get(header: ResponseHeader<T>): T? =
+            headers.firstOrNull { (name, _) -> name.equals(header.name, ignoreCase = true) }
+                ?.let { (_, raw) -> header.codec.decode(header.name, raw) as T }
+    }
 }
 
 fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)
 
-/** One declared failure: a status, a payload type, and what it means. */
+/**
+ * A declared header paired with the value one failure is sending it with —
+ * `retryAfter of 30L`. See [ErrorOutput.invoke].
+ */
+class HeaderValue internal constructor(
+    internal val header: ResponseHeader<*>,
+    private val value: Any,
+) {
+    /** By the header's own codec, so the wire carries what the schema describes. */
+    @Suppress("UNCHECKED_CAST")
+    internal fun encoded(): String = (header.codec as PlainCodec<Any>).encode(value)
+}
+
+/**
+ * Supplies a declared failure's header, typed by the header's own declaration:
+ * a `Retry-After` declared as a `Long` takes a `Long` and nothing else.
+ *
+ * An infix pair rather than a `Pair`, because `to` would type the value as
+ * `Any` and let `retryAfter to "soon"` compile — which is the whole of what
+ * declaring the header was for.
+ */
+infix fun <T : Any> ResponseHeader<T>.of(value: T): HeaderValue = HeaderValue(this, value)
+
+/**
+ * One declared failure: a status, a payload type, what it means, and the
+ * headers it sends alongside the payload.
+ */
 class ErrorOutput<E> @PublishedApi internal constructor(
     val status: Int,
     val type: KType,
     val description: String,
+    /**
+     * Declared here rather than with `emits(...)`, which is the *success*
+     * response's list: a `Retry-After` named there would be documented on the
+     * 200 and permitted on every response the endpoint sends, which is exactly
+     * how one ends up on a success nobody meant to throttle.
+     */
+    val headers: List<ResponseHeader<*>> = emptyList(),
 ) {
-    /** Produces this failure. The payload type is checked against the declaration. */
-    operator fun invoke(error: E): Outcome<E, Nothing> = Outcome.Err(this, error)
+    init {
+        val clashes = headers.groupBy { it.name.lowercase() }.filterValues { it.size > 1 }.keys
+        require(clashes.isEmpty()) { "error:$status declares the header(s) $clashes more than once" }
+    }
 
-    internal fun spec() = ErrorSpec(status, description, type)
+    /**
+     * Produces this failure, with a value for each header it declared:
+     *
+     * ```
+     * val throttled = errorJson<ApiError>(429, "Too many requests", retryAfter)
+     *
+     * throttled(ApiError(429, "Slow down"), retryAfter of 30L)
+     * ```
+     *
+     * A failure declaring no headers is invoked as it always was, with the
+     * payload alone.
+     *
+     * The payload type is checked against the declaration, and so are the
+     * headers: one this failure never declared, or a required one left out,
+     * throws here. That is stricter than [Params.setHeader], which reports a
+     * missing required header rather than failing on it — and it can be,
+     * because the two cases are not alike. A handler setting headers one at a
+     * time is never finished until the response is built, so nothing can tell
+     * mid-handler whether a promise is broken or merely not kept yet; this
+     * call *is* the whole answer, so everything needed to tell is in hand.
+     */
+    operator fun invoke(error: E, vararg values: HeaderValue): Outcome<E, Nothing> =
+        Outcome.Err(this, error, encode(values))
+
+    /**
+     * In declaration order rather than the order the call happened to list
+     * them, so two handlers returning the same failure put the same response
+     * on the wire.
+     */
+    private fun encode(supplied: Array<out HeaderValue>): List<Pair<String, String>> {
+        supplied.forEach { given ->
+            if (headers.none { it === given.header }) {
+                error(
+                    "${given.header.name} was sent with $this, which never declared it. " +
+                        "List it on errorJson(...) beside the status, or set it with setHeader " +
+                        "if it belongs on every response this endpoint sends.",
+                )
+            }
+        }
+        return headers.mapNotNull { declared ->
+            val given = supplied.firstOrNull { it.header === declared }
+            when {
+                given != null -> declared.name to given.encoded()
+
+                declared.required -> error(
+                    "$this declares ${declared.name} and this call left it out. " +
+                        "Pass ${declared.name} with the payload, or declare it as " +
+                        "responseHeader(...).optional() if it is only sometimes sent.",
+                )
+
+                else -> null
+            }
+        }
+    }
+
+    internal fun spec() = ErrorSpec(status, description, type, headers)
 
     override fun toString() = "error:$status"
 }
@@ -63,9 +187,15 @@ class ErrorOutput<E> @PublishedApi internal constructor(
  * Declares a failure response carrying [E] as a JSON body, outside an endpoint
  * block so a handler can name it. The same function exists on
  * [EndpointBuilder] for failures declared inline.
+ *
+ * Any [headers] listed here are documented on that response and are the only
+ * ones the failure may be sent with.
  */
-inline fun <reified E> errorJson(status: Int, description: String): ErrorOutput<E> =
-    ErrorOutput(status, typeOf<E>(), description)
+inline fun <reified E> errorJson(
+    status: Int,
+    description: String,
+    vararg headers: ResponseHeader<*>,
+): ErrorOutput<E> = ErrorOutput(status, typeOf<E>(), description, headers.toList())
 
 /**
  * A success output paired with the failures a handler may return instead.

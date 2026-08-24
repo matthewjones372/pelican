@@ -149,13 +149,37 @@ class GeneratedKotlinClientTest {
         val denied = client.placeOrder(1L, CreateOrder("anvil", 2), xApiKey = "wrong")
         when (val failure = (denied as Outcome.Err).failure) {
             is PlaceOrderFailure.Unauthorized -> failure.body.error shouldBe "Bad API key"
-            is PlaceOrderFailure.NotFound -> error("wrong failure: $failure")
+
+            is PlaceOrderFailure.NotFound, is PlaceOrderFailure.TooManyRequests ->
+                error("wrong failure: $failure")
         }
 
         val missing = client.placeOrder(999L, CreateOrder("anvil"), xApiKey = "let-me-in") as Outcome.Err
         withClue("${missing.failure}") {
             missing.failure.shouldBeInstanceOf<PlaceOrderFailure.NotFound>()
         }
+    }
+
+    /**
+     * The header the 429 declares, read back as the `Long` it was declared as.
+     *
+     * Nothing here parses a response: `retryAfter` is a property of the
+     * generated failure because the *document* said that response carries that
+     * header, with that schema — so a service that stopped sending it, or
+     * started sending something else, is a regeneration away from breaking
+     * this line rather than a caller away from a surprise.
+     */
+    @Test
+    fun `a declared failure hands back the header it was declared to carry`() {
+        val refused = client.placeOrder(
+            1L,
+            CreateOrder("anvil", quantity = 5_000),
+            xApiKey = "let-me-in",
+        ) as Outcome.Err
+
+        val failure = refused.failure.shouldBeInstanceOf<PlaceOrderFailure.TooManyRequests>()
+        failure.body.status shouldBe 429
+        failure.retryAfter shouldBe 30L
     }
 
     @Test

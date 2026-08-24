@@ -131,21 +131,14 @@ internal class Responses(private val reader: Reader, private val operation: Oper
             )
         }
         val schema = (body as? JsonObj)?.get("schema")?.let(::normaliseSchema)
-        val headers = headers(response, path)
 
-        // A declared failure is a value the handler returns, and that value is
-        // a payload and nothing else: `errorJson<T>(...)` has nowhere to put a
-        // `Retry-After`. A failure with headers and no body is fine — that one
-        // is documented rather than returned — so this is only the pair.
-        if (schema != null && headers.isNotEmpty()) {
-            unsupported(
-                path / "headers",
-                "The $status response carries both a body and the header(s) " +
-                    "${headers.joinToString { it.name }}. A declared failure carries one payload; " +
-                    "a documented failure with no payload can carry headers.",
-            )
-        }
-        return IrFailure(status, schema, description, headers)
+        // Both at once is describable: `errorJson<T>(status, ..., retryAfter)`
+        // declares the payload and the headers together, and the handler
+        // supplies a value for each header when it returns the failure. This
+        // used to be refused, and a 429 with a problem body and a `Retry-After`
+        // — the commonest failure in any document with rate limiting in it —
+        // was the whole of what the refusal cost.
+        return IrFailure(status, schema, description, headers(response, path))
     }
 
     private fun headers(response: JsonObj, path: JsonPath): List<IrResponseHeader> =

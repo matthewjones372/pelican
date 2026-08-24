@@ -388,6 +388,11 @@ sealed interface PlaceOrderFailure {
     data class NotFound(val body: ApiError) : PlaceOrderFailure {
         override val status: Int get() = 404
     }
+
+    /** Too much asked for at once */
+    data class TooManyRequests(val body: ApiError, val retryAfter: Long?) : PlaceOrderFailure {
+        override val status: Int get() = 429
+    }
 }
 
 /** What `payOrder` declares it can fail with. */
@@ -477,6 +482,13 @@ class OrdersClient(
 
     private fun HttpResponse<*>.succeeded(): Boolean = statusCode() in 200..299
 
+    /**
+     * One header off the response, as the string it travelled as. Null when it was
+     * not sent — which the declared failures below carry through, rather than
+     * insisting on a header the server may have had nothing to say about.
+     */
+    private fun HttpResponse<*>.header(name: String): String? = headers().firstValue(name).orElse(null)
+
     private fun failed(method: String, path: String, response: HttpResponse<String>): Nothing =
         throw ApiCallFailed(response.statusCode(), method, path, response.body())
 
@@ -564,6 +576,7 @@ class OrdersClient(
         when (response.statusCode()) {
             401 -> return Outcome.Err(PlaceOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body())))
             404 -> return Outcome.Err(PlaceOrderFailure.NotFound(apiErrorCodec.decodeFromString(response.body())))
+            429 -> return Outcome.Err(PlaceOrderFailure.TooManyRequests(apiErrorCodec.decodeFromString(response.body()), response.header("Retry-After")?.toLongOrNull()))
         }
         if (!response.succeeded()) failed("POST", "/users/{userId}/orders", response)
         return Outcome.Ok(orderCodec.decodeFromString(response.body()))

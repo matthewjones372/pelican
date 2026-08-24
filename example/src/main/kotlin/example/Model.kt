@@ -92,6 +92,16 @@ object Store {
             .take(limit)
             .toList()
 
+    /**
+     * What one order may ask for before the service says come back later. A
+     * real limiter counts requests over time; this one reads the order, so
+     * that asking twice gets the same answer twice.
+     */
+    const val BURST_LIMIT = 50
+
+    /** What the `Retry-After` on that refusal says. */
+    const val RETRY_AFTER_SECONDS = 30L
+
     fun create(userId: Long, req: CreateOrder): Order =
         Order(nextOrderId++, userId, req.item, req.quantity, OrderStatus.PENDING)
 

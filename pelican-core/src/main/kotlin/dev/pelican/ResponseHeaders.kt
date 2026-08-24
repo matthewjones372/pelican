@@ -23,6 +23,10 @@ package dev.pelican
  * Setting one the endpoint never declared throws, so the document and the wire
  * cannot disagree about which headers exist — the same bargain [ParamKey]
  * makes on the way in.
+ *
+ * The same value declares a header on a *declared failure*, where it belongs
+ * to that one response rather than to the endpoint and travels with the
+ * failure the handler returns; see [ErrorOutput.invoke].
  */
 class ResponseHeader<T> @PublishedApi internal constructor(
     val name: String,

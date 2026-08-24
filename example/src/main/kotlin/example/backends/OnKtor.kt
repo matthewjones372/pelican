@@ -3,6 +3,7 @@ package example.backends
 import dev.pelican.Api
 import dev.pelican.ServerEndpoint
 import dev.pelican.ktor.handledNow
+import dev.pelican.ktor.handledOrFail
 import dev.pelican.ktor.start
 import dev.pelican.ktor.streamedNow
 import kotlinx.coroutines.delay
@@ -34,7 +35,10 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
         }
     },
 
-    echo handledNow { (trace, note) -> echoed(trace, note) },
+    // The one endpoint here that declares a failure, so this is the binder
+    // that demands an `Outcome` — and the 429 it may answer with carries a
+    // `Retry-After`, on all three backends, from the one description.
+    echo handledOrFail { (trace, note) -> echoOrRefuse(trace, note) },
 
     preferences handledNow { (locale, session) -> preferencesOf(locale, session) },
 

@@ -171,6 +171,10 @@ private suspend fun respondFailure(
         "$declared carries ${declared.type} but the handler returned ${err.error?.let { it::class }}"
     }
     val codec = checkNotNull(codecs.failures[declared]) { "No codec was resolved for $declared" }
+    // Encoded and checked against the declaration when the handler produced
+    // the failure, so there is nothing left to decide here. Appended before
+    // the body, because writing the body is what commits the response.
+    err.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
     call.respondText(
         codec.encodeToString(err.error),
         ContentType.Application.Json,

@@ -51,6 +51,13 @@ private fun stream(request: HttpRequest): HttpResponse<InputStream> =
 
 private fun HttpResponse<*>.succeeded(): Boolean = statusCode() in 200..299
 
+/**
+ * One header off the response, as the string it travelled as. Null when it was
+ * not sent — which the declared failures below carry through, rather than
+ * insisting on a header the server may have had nothing to say about.
+ */
+private fun HttpResponse<*>.header(name: String): String? = headers().firstValue(name).orElse(null)
+
 private fun failed(method: String, path: String, response: HttpResponse<String>): Nothing =
     throw ApiCallFailed(response.statusCode(), method, path, response.body())
 

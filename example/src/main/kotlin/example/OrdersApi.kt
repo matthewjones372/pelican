@@ -4,6 +4,7 @@ import dev.pelican.Api
 import dev.pelican.ApiError
 import dev.pelican.ServerEndpoint
 import dev.pelican.jackson.JacksonCodecs
+import dev.pelican.of
 import dev.pelican.ok
 import dev.pelican.pekko.*
 import dev.pelican.pekko.docs.Docs
@@ -51,10 +52,21 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
             .throttle(1, Duration.ofMillis(50))
     },
 
+    // The 429 declares a `Retry-After`, so returning it means supplying one.
+    // Leaving it out is not a document quietly disagreeing with the wire: it
+    // throws where the failure is produced, which is the one place the
+    // declaration and the value are both in hand.
     placeOrder handledOrFail { (id, key, req) ->
         when {
             key != "let-me-in" -> badApiKey(ApiError(401, "Bad API key"))
+
             Store.user(id) == null -> noSuchUser(ApiError(404, "No user $id"))
+
+            req.quantity > Store.BURST_LIMIT -> throttled(
+                ApiError(429, "At most ${Store.BURST_LIMIT} of anything in one order"),
+                retryAfter of Store.RETRY_AFTER_SECONDS,
+            )
+
             else -> ok(Store.create(id, req))
         }
     },

@@ -80,6 +80,21 @@ val importFile = filePart("file", contentType = "text/csv", description = "One o
 val noSuchUser = errorJson<ApiError>(404, "No user with that id")
 val badApiKey = errorJson<ApiError>(401, "Missing or bad API key")
 
+/**
+ * A failure that carries a header as well as a payload: the body says what
+ * happened and the header says when to come back, which is what a 429 nearly
+ * always is.
+ *
+ * The header is declared on the failure rather than with `emits(...)`, and
+ * that is the whole distinction: `emits` describes the *success* response and
+ * permits a header on every response the endpoint sends, so a `Retry-After`
+ * declared there would be documented on the 201 and settable on an order that
+ * was placed.
+ */
+val retryAfter = responseHeader<Long>("Retry-After", description = "Seconds to wait before trying again")
+
+val throttled = errorJson<ApiError>(429, "Too much asked for at once", retryAfter)
+
 // --------------------------------------------------------------- endpoints
 //
 // endpoint(...) declares the input list once. It registers each parameter for
@@ -138,9 +153,10 @@ val placeOrder = endpoint(userId, apiKey, newOrder) {
     summary = "Place an order"
     operationId = "placeOrder"
     tag("orders")
-    // Two failures, same payload type, different statuses. The handler names
-    // the one it is returning, so the status comes from the declaration.
-    json<Order>(status = 201).orFail(badApiKey, noSuchUser)
+    // Three failures, all carrying ApiError, under three statuses. The handler
+    // names the one it is returning, so the status comes from the declaration —
+    // and the 429 carries a `Retry-After` the handler has to supply.
+    json<Order>(status = 201).orFail(badApiKey, noSuchUser, throttled)
 }
 
 /**
