@@ -52,7 +52,7 @@ dependencies {
  * three tasks below are what the plugin would have contributed, minus a
  * dependency whose latest release predates the Gradle this build runs on.
  */
-val jmhGenerator: Configuration by configurations.creating
+val jmhGenerator = configurations.register("jmhGenerator")
 
 dependencies { jmhGenerator("org.openjdk.jmh:jmh-generator-bytecode:$jmhVersion") }
 
@@ -90,7 +90,7 @@ val toolchainLauncher = toolchains.launcherFor { languageVersion.set(benchmarkJd
  * had written them — which is how you get stubs for methods that are not
  * benchmarks. The extra second is worth not debugging that.
  */
-val generateBenchmarkStubs by tasks.registering(JavaExec::class) {
+val generateBenchmarkStubs = tasks.register<JavaExec>("generateBenchmarkStubs") {
     description = "Generates JMH's benchmark stubs from the compiled Kotlin"
     mainClass.set("org.openjdk.jmh.generators.bytecode.JmhBytecodeGenerator")
     classpath(jmhGenerator, benchmarkRuntimeClasspath)
@@ -117,7 +117,7 @@ val generateBenchmarkStubs by tasks.registering(JavaExec::class) {
     }
 }
 
-val compileBenchmarkStubs by tasks.registering(JavaCompile::class) {
+val compileBenchmarkStubs = tasks.register<JavaCompile>("compileBenchmarkStubs") {
     description = "Compiles the generated JMH stubs"
     dependsOn(generateBenchmarkStubs)
     source(generatedStubSources)
@@ -149,7 +149,7 @@ val compileBenchmarkStubs by tasks.registering(JavaCompile::class) {
  * used to carry, and improves on it: JMH records each fork separately and
  * knows which part of the run was warmup.
  */
-val jmh by tasks.registering(JavaExec::class) {
+val jmh = tasks.register<JavaExec>("jmh") {
     group = "verification"
     description = "Runs the JMH benchmarks (about six minutes; nothing else depends on it)"
     dependsOn(compileBenchmarkStubs)
