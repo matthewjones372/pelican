@@ -5,6 +5,7 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.SetProperty
 import javax.inject.Inject
 
 /**
@@ -33,10 +34,13 @@ import javax.inject.Inject
 abstract class PelicanExtension {
     abstract val clients: NamedDomainObjectContainer<ClientSpec>
     abstract val documents: NamedDomainObjectContainer<DocumentSpec>
+    abstract val endpoints: NamedDomainObjectContainer<EndpointsSpec>
 
     fun clients(action: org.gradle.api.Action<NamedDomainObjectContainer<ClientSpec>>) = action.execute(clients)
 
     fun documents(action: org.gradle.api.Action<NamedDomainObjectContainer<DocumentSpec>>) = action.execute(documents)
+
+    fun endpoints(action: org.gradle.api.Action<NamedDomainObjectContainer<EndpointsSpec>>) = action.execute(endpoints)
 }
 
 /**
@@ -110,6 +114,70 @@ abstract class DocumentSpec @Inject constructor(private val name: String) : Spec
 
     /** Defaults to `build/generated/pelican/<name>/openapi.<format>`. */
     abstract val outputFile: RegularFileProperty
+}
+
+/**
+ * One set of endpoint descriptions, generated *from* an OpenAPI document.
+ *
+ * The other entries here read a compiled `ApiSpec` and write something else.
+ * This one reads a document somebody else wrote — so it has no `specClass` and
+ * no `specFunction`, and its classpath needs `pelican-import` rather than the
+ * consumer's own code.
+ *
+ * ```kotlin
+ * pelican {
+ *     endpoints {
+ *         create("orders") {
+ *             document.set(layout.projectDirectory.file("orders.yaml"))
+ *             packageName.set("com.example.orders")
+ *         }
+ *     }
+ * }
+ * ```
+ */
+abstract class EndpointsSpec @Inject constructor(private val name: String) : org.gradle.api.Named {
+    override fun getName(): String = name
+
+    /** The OpenAPI document to read. JSON or YAML; 2.0, 3.0 and 3.1 are all read. */
+    abstract val document: RegularFileProperty
+
+    /** The package the generated file declares, and the directories it lands in. */
+    abstract val packageName: Property<String>
+
+    /**
+     * Operations to leave out, by `operationId`.
+     *
+     * The import is strict: an operation using something Pelican cannot
+     * describe fails the build rather than generating an endpoint that says
+     * less than the document does. This is where the ones you have decided to
+     * live without are written down, so that the next one to appear fails
+     * rather than joining them quietly.
+     */
+    abstract val exclude: SetProperty<String>
+
+    fun exclude(vararg operationIds: String) {
+        exclude.addAll(*operationIds)
+    }
+
+    /**
+     * The backend to generate handler stubs against — `pekko`, `http4k` or
+     * `ktor` — or unset for none.
+     *
+     * The stubs are written once and never overwritten: after the first run
+     * they are the service, not generated code.
+     */
+    abstract val handlers: Property<String>
+
+    /**
+     * The source root written into. Defaults to
+     * `build/generated/pelican/<name>`; point it at a real source root to have
+     * the descriptions become files in the repository. Either way the
+     * generated endpoints file is rewritten on every run.
+     */
+    abstract val outputDir: DirectoryProperty
+
+    /** What the import runs against. `pelican-import` has to be on it. */
+    abstract val classpath: ConfigurableFileCollection
 }
 
 enum class DocumentFormat(internal val extension: String) {

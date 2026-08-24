@@ -109,6 +109,32 @@ class ReflectionTest {
         written.readText().trim() shouldBe "Orders|example|Internal|https://elsewhere.test|true"
     }
 
+    @Test
+    fun `imports a document into a source root`(@TempDir dir: File) {
+        val document = File(dir, "openapi.yaml").apply { writeText("openapi: 3.1.0") }
+        val written = Pelican.writeEndpoints(
+            loader,
+            document,
+            dir,
+            "com.example.orders",
+            "orders",
+            setOf("b", "a"),
+            "pekko",
+        )
+
+        written shouldBe listOf(File(dir, "com/example/orders/OrdersEndpoints.kt"))
+        (written.single() as File).readText().trim() shouldBe
+            "openapi.yaml|com.example.orders|orders|a+b|pekko"
+    }
+
+    @Test
+    fun `names the module to add when the importer is not on the classpath`(@TempDir dir: File) {
+        val empty = java.net.URLClassLoader(emptyArray(), ClassLoader.getPlatformClassLoader())
+        shouldThrow<PelicanFailure> {
+            Pelican.writeEndpoints(empty, dir, dir, "com.example", "orders", emptySet(), null)
+        }.message.orEmpty() shouldContain "pelican-import"
+    }
+
     /** No servers and no `baseUrl` is allowed: the caller passes one instead. */
     @Test
     fun `leaves the base URL unset when there is nothing to default to`(@TempDir dir: File) {

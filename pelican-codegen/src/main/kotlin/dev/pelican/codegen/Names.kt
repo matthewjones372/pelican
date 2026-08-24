@@ -22,6 +22,17 @@ private val locals = setOf("request", "response", "body", "reader", "codecs", "h
 
 private val wordBoundary = Regex("[^A-Za-z0-9]+")
 
+/**
+ * Whether a name can be written in Kotlin at all, in backticks if it has to
+ * be. The JVM forbids these five characters in a member name, and no amount of
+ * quoting gets them back.
+ */
+fun isWritable(value: String): Boolean =
+    value.isNotEmpty() && value.none { it in ".;[]/<>" }
+
+/** [value] as Kotlin writes it: bare where it is an identifier, in backticks where it is not. */
+fun asWritten(value: String): String = if (isIdentifier(value)) value else "`$value`"
+
 /** A parameter or property name: `X-Api-Key` -> `xApiKey`, `limit` -> `limit`. */
 fun memberName(raw: String): String {
     val parts = raw.split(wordBoundary).filter { it.isNotEmpty() }
@@ -40,13 +51,13 @@ fun typeName(raw: String): String {
     return if (name.first().isDigit()) "_$name" else name
 }
 
-internal fun isIdentifier(value: String): Boolean =
+fun isIdentifier(value: String): Boolean =
     value.isNotEmpty() &&
         (value.first().isLetter() || value.first() == '_') &&
         value.all { it.isLetterOrDigit() || it == '_' } &&
         value !in keywords
 
-internal fun kotlinString(value: String): String = buildString {
+fun kotlinString(value: String): String = buildString {
     append('"')
     value.forEach { c ->
         when {
@@ -63,7 +74,7 @@ internal fun kotlinString(value: String): String = buildString {
 }
 
 /** A KDoc block, kept on one line when the text is one line. */
-internal fun kdoc(text: String, indent: String): String {
+fun kdoc(text: String, indent: String): String {
     val lines = text.trim().lines().map { it.trim() }
 
     // `*/` inside the comment would end it early and break the file.
@@ -77,11 +88,11 @@ internal fun kdoc(text: String, indent: String): String {
     }
 }
 
-internal fun indent(text: String, prefix: String): String =
+fun indent(text: String, prefix: String): String =
     text.lines().joinToString("\n") { if (it.isBlank()) it else prefix + it }
 
 /** Makes [name] unique against everything already [taken]. */
-internal fun unique(name: String, taken: MutableSet<String>): String {
+fun unique(name: String, taken: MutableSet<String>): String {
     var candidate = name
     var n = 2
     while (!taken.add(candidate)) {

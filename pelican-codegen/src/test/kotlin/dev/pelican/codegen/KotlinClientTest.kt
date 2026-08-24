@@ -353,6 +353,42 @@ class KotlinClientTest {
         client shouldContain "enum class WidgetColour { RED, GREEN }"
     }
 
+    /**
+     * A constant is written exactly as the wire spells it, in backticks where
+     * Kotlin needs them. `EnumCodec` matches on the constant's name, so
+     * renaming `in-progress` to `IN_PROGRESS` would need a codec-specific
+     * annotation to map it back — which is the one thing these declarations
+     * are meant to work without.
+     */
+    @Test
+    fun `an enum keeps a constant the wire uses, in backticks where it has to`() {
+        val jobs = object : SchemaSource {
+            override fun schema(type: KType, components: SchemaComponents): JsonObj {
+                if (!components.isRegistered("Job")) {
+                    components.register("Job", jsonObj {
+                        "type" to "object"
+                        put("properties", jsonObj {
+                            put("state", jsonObj {
+                                "type" to "string"
+                                put("enum", jsonStrings(listOf("queued", "in-progress")))
+                            })
+                        })
+                        put("required", jsonStrings(listOf("state")))
+                    })
+                }
+                return components.ref("Job")
+            }
+        }
+        val getJob = endpoint {
+            get("jobs")
+            operationId = "getJob"
+            json<Widget>()
+        }
+
+        ApiSpec(listOf(getJob), jobs, title = "Jobs").kotlinClient("com.example.jobs") shouldContain
+            "enum class JobState { queued, `in-progress` }"
+    }
+
     // ------------------------------------------------------------ hidden
 
     @Test

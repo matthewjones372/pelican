@@ -1,0 +1,362 @@
+package dev.pelican.importer
+
+import dev.pelican.JsonObj
+import dev.pelican.JsonStr
+import dev.pelican.JsonValue
+import java.io.File
+
+/**
+ * A document, read as endpoint descriptions.
+ *
+ * The version differences are gone before this starts: [Swagger2] turns a 2.0
+ * document into a 3.x one and [normaliseSchemas] turns 3.0's spelling of
+ * nullability into 3.1's, so what is read here is one shape. What is left is
+ * the mapping proper, and its only interesting decision is what to refuse.
+ *
+ * Refusing is per operation and it is recorded rather than thrown, so one run
+ * reports every operation that cannot be described. See [Problems].
+ */
+internal class Reader(private val options: ImportOptions) {
+
+    private val problems = Problems()
+    private lateinit var document: JsonObj
+
+    fun read(file: File): IrApi {
+        document = normalise(Document.read(file))
+
+        val components = document.obj("components")?.obj("schemas") ?: JsonObj(emptyMap())
+        val declared = JsonObj(components.fields.mapValues { (_, schema) -> normaliseSchema(schema) })
+
+        val operations = operations()
+        val endpoints = operations.mapNotNull { operation ->
+            try {
+                endpoint(operation)
+            } catch (e: Unsupported) {
+                problems.record(operation.label, operation.id, e.path, e.message)
+                null
+            }
+        }
+        problems.failIfAny(options.name)
+
+        val schemas = used(endpoints, declared)
+
+        val info = document.obj("info")
+        val required = document.arr("security").let { requirements(it, JsonPath.root / "security") }
+        return IrApi(
+            title = info?.str("title") ?: "API",
+            version = info?.str("version") ?: "1.0.0",
+            description = info?.str("description"),
+            servers = servers(),
+            security = required,
+            schemes = schemes(required + endpoints.flatMap { it.security.orEmpty() }),
+            schemas = schemas,
+            endpoints = endpoints,
+        )
+    }
+
+    /**
+     * The named schemas the imported endpoints actually reach, checked.
+     *
+     * Only the ones reached: a document's `components` is a library, and a
+     * type nobody uses is not worth failing an import over — nor worth
+     * generating a Kotlin class for. Excluding an operation therefore excludes
+     * the schemas only it used, which is what makes the exclude list a way
+     * through a document with one unmodellable corner.
+     *
+     * Reached and unmodellable is a different matter, and it fails the import
+     * outright rather than per operation: a `oneOf` under `Order` is not one
+     * operation's problem, and no list of operations to leave out would be the
+     * honest answer to it.
+     */
+    private fun used(endpoints: List<IrEndpoint>, declared: JsonObj): JsonObj {
+        val reachable = Schemas.reachable(endpoints.flatMap { it.schemas() }, declared)
+        val schemas = JsonObj(declared.fields.filterKeys { it in reachable })
+        schemas.fields.forEach { (name, schema) ->
+            try {
+                Schemas.check(schema, JsonPath.root / "components" / "schemas" / name)
+            } catch (e: Unsupported) {
+                throw ImportFailure(
+                    "The schema `$name` cannot become a Kotlin type, and the operations using it " +
+                        "would all have to go with it:\n\n    at ${e.path}\n    ${e.message}",
+                    e,
+                )
+            }
+        }
+        return schemas
+    }
+
+    // ------------------------------------------------------------- the document
+
+    private fun normalise(raw: JsonObj): JsonObj = when {
+        raw.str("swagger")?.startsWith("2.") == true -> Swagger2.convert(raw)
+
+        raw.str("openapi") != null -> raw
+
+        else -> throw ImportFailure(
+            "This is not an OpenAPI document: it has neither an `openapi` field nor a `swagger` one.",
+        )
+    }.also { document ->
+        // 3.1 webhooks are operations with no route: nothing calls them, the
+        // service is called *by* them. Pelican describes what a caller can
+        // request, so there is nothing here for them to become — and dropping
+        // them silently would generate a client missing half of what the
+        // document offers.
+        if (document.obj("webhooks")?.fields?.isNotEmpty() == true) {
+            throw ImportFailure(
+                "This document declares webhooks, which describe calls the service makes rather than " +
+                    "calls it answers. Pelican has no description for those; import the document without them.",
+            )
+        }
+    }
+
+    private fun servers(): List<String> = document.arr("servers").mapIndexedNotNull { i, server ->
+        val obj = server as? JsonObj ?: return@mapIndexedNotNull null
+        val url = obj.str("url") ?: return@mapIndexedNotNull null
+        // A templated URL carries its own defaults, and the defaults are what
+        // the document says the server is when nobody chooses. Substituting
+        // them is reading the document, not guessing at it.
+        obj.obj("variables").entries().fold(url) { substituted, (name, variable) ->
+            val default = (variable as? JsonObj)?.str("default")
+                ?: throw ImportFailure("servers[$i] uses {$name}, which declares no default")
+            substituted.replace("{$name}", default)
+        }
+    }
+
+    /**
+     * The schemes something actually requires.
+     *
+     * A document's `securitySchemes` is a list of what is available, and a
+     * scheme nothing points at does not reach the document Pelican writes back
+     * out — core collects those from the requirements, so that a scheme cannot
+     * be declared and left unused. Emitting the unused ones here would put a
+     * value in the generated file whose only effect is to be unused.
+     */
+    private fun schemes(required: List<IrRequirement>): List<IrScheme> {
+        val declared = document.obj("components")?.obj("securitySchemes")
+        val wanted = required.map { it.scheme }.toSet()
+
+        (wanted - declared.entries().map { it.first }.toSet()).forEach { name ->
+            throw ImportFailure(
+                "Something requires the security scheme '$name', and the document never declares it.",
+            )
+        }
+        return declared.entries().filter { (name, _) -> name in wanted }.map { (name, raw) ->
+            val path = JsonPath.root / "components" / "securitySchemes" / name
+            val scheme = deref(raw, path).first
+            when (val type = scheme.str("type")) {
+                "apiKey" -> IrScheme.ApiKey(
+                    name,
+                    scheme.str("in") ?: "header",
+                    scheme.str("name") ?: name,
+                    scheme.str("description"),
+                )
+
+                "http" -> IrScheme.Http(
+                    name,
+                    scheme.str("scheme") ?: "bearer",
+                    scheme.str("bearerFormat"),
+                    scheme.str("description"),
+                )
+
+                "openIdConnect" -> IrScheme.OpenId(
+                    name,
+                    scheme.str("openIdConnectUrl").orEmpty(),
+                    scheme.str("description"),
+                )
+
+                "oauth2" -> IrScheme.OAuth2(name, flows(scheme), scheme.str("description"))
+
+                else -> throw ImportFailure("$path declares an unknown security scheme type '$type'")
+            }
+        }
+    }
+
+    private fun flows(scheme: JsonObj): List<IrFlow> = scheme.obj("flows").entries().map { (kind, raw) ->
+        val flow = raw as? JsonObj ?: JsonObj(emptyMap())
+        IrFlow(
+            kind = kind,
+            authorizationUrl = flow.str("authorizationUrl"),
+            tokenUrl = flow.str("tokenUrl"),
+            refreshUrl = flow.str("refreshUrl"),
+            scopes = flow.obj("scopes")?.stringMap().orEmpty(),
+        )
+    }
+
+    // ------------------------------------------------------------- operations
+
+    /**
+     * Every operation in the document, named and in document order.
+     *
+     * The name is the `operationId` and it is required here, unlike in the
+     * document. Pelican names the generated value, the generated client's
+     * method and the handler stub after it; deriving one from the method and
+     * the path instead would produce `getOrdersByOrderIdItems`, and would
+     * rename half the generated file the day somebody reorganises a route.
+     */
+    private fun operations(): List<Operation> {
+        val unnamed = mutableListOf<String>()
+        val seen = LinkedHashMap<String, String>()
+        val duplicated = LinkedHashSet<String>()
+
+        val found = document.obj("paths").entries().flatMap { (template, rawItem) ->
+            val itemPath = JsonPath.root / "paths" / template
+            val item = deref(rawItem, itemPath).first
+            val shared = item.arr("parameters")
+
+            methods.mapNotNull { method ->
+                val operation = item.obj(method) ?: return@mapNotNull null
+                val path = itemPath / method
+                val id = operation.str("operationId")
+                if (id == null) {
+                    unnamed += "${method.uppercase()} $template"
+                    return@mapNotNull null
+                }
+                if (seen.put(id, "${method.uppercase()} $template") != null) duplicated += id
+                Operation(id, method, template, operation, shared, path)
+            }
+        }
+
+        if (unnamed.isNotEmpty()) throw ImportFailure(unnamedMessage(unnamed))
+        if (duplicated.isNotEmpty()) {
+            throw ImportFailure(
+                "Two operations share the operationId ${duplicated.joinToString()}. " +
+                    "Each one names a generated value, so they have to differ.",
+            )
+        }
+        return found.filterNot { it.id in options.exclude }
+    }
+
+    private fun unnamedMessage(unnamed: List<String>) = buildString {
+        appendLine("${unnamed.size} operation(s) have no operationId:")
+        appendLine()
+        unnamed.forEach { appendLine("    $it") }
+        appendLine()
+        append(
+            "An operationId is what the generated endpoint value, the client method and the handler " +
+                "are named after. Add one to each, and the names stay put when the routes move.",
+        )
+    }
+
+    private fun endpoint(operation: Operation): IrEndpoint {
+        val path = operation.path
+        val node = operation.node
+
+        if (node.obj("callbacks")?.fields?.isNotEmpty() == true) {
+            unsupported(path / "callbacks", "This operation declares callbacks, which Pelican cannot describe.")
+        }
+        if (node.arr("servers").isNotEmpty()) {
+            unsupported(
+                path / "servers",
+                "This operation is served from somewhere other than the rest of the document, and an " +
+                    "endpoint description carries no server of its own.",
+            )
+        }
+
+        if (operation.method == "trace") {
+            unsupported(path, "TRACE is not a method Pelican routes.")
+        }
+
+        val params = Parameters(this, operation).read()
+        val responses = Responses(this, operation).read()
+
+        val described = IrEndpoint(
+            operationId = operation.id,
+            method = operation.method.uppercase(),
+            path = operation.template,
+            summary = node.str("summary"),
+            description = node.str("description"),
+            tags = node.strings("tags"),
+            deprecated = node.bool("deprecated"),
+            params = params,
+            body = Bodies(this, operation).read(),
+            success = responses.success,
+            failures = responses.failures,
+            responseHeaders = responses.successHeaders,
+            security = if (node["security"] == null) null else requirements(node.arr("security"), path / "security"),
+        )
+
+        described.schemas().forEach { Schemas.check(it, path) }
+        return described
+    }
+
+    // ---------------------------------------------------------------- shared
+
+    /**
+     * Requirements as Pelican reads them: a list of alternatives, each naming
+     * one scheme.
+     *
+     * OpenAPI's inner object is an *and* — two schemes, both required — and
+     * there is nothing in an endpoint description that says that. It is rare
+     * enough to be worth refusing rather than approximating: an endpoint
+     * documented as needing either of two credentials, when it needs both, is
+     * a client that fails at runtime with a correct-looking document.
+     */
+    fun requirements(entries: List<JsonValue>, path: JsonPath): List<IrRequirement> =
+        entries.mapIndexedNotNull { i, entry ->
+            val fields = (entry as? JsonObj)?.fields.orEmpty()
+            when (fields.size) {
+                0 -> null
+
+                // `{}` — this alternative is "no credential at all".
+                1 -> fields.entries.first().let { (scheme, scopes) ->
+                    IrRequirement(
+                        scheme,
+                        (scopes as? dev.pelican.JsonArr)?.items.orEmpty().mapNotNull { scope ->
+                            (scope as? JsonStr)?.value
+                        },
+                    )
+                }
+
+                else -> unsupported(
+                    path / i,
+                    "This requires ${fields.keys.joinToString(" and ")} together. " +
+                        "An endpoint description lists alternatives, not combinations.",
+                )
+            }
+        }
+
+    /**
+     * Follows a local `$ref` to what it points at.
+     *
+     * Only the ones that are not schemas: a schema reference is a *name*, and
+     * the generated Kotlin is named after it, so those are left standing and
+     * read by the type generator. Everything else — a shared parameter, a
+     * shared response — has no name in the generated source, so it is resolved
+     * here and the rest of the reader never learns it was shared.
+     */
+    fun deref(node: JsonValue?, path: JsonPath): Pair<JsonObj, JsonPath> {
+        var here = node as? JsonObj ?: JsonObj(emptyMap())
+        var where = path
+        val visited = mutableSetOf<String>()
+        while (true) {
+            val ref = here.str("\$ref") ?: return here to where
+            if (!visited.add(ref)) unsupported(where, "$ref refers to itself.")
+            if (!ref.startsWith("#/")) {
+                unsupported(where, "$ref was not resolved, which should not happen after bundling.")
+            }
+            val steps = ref.removePrefix("#/").split('/').map { it.replace("~1", "/").replace("~0", "~") }
+            var target: JsonValue = document
+            steps.forEach { step ->
+                target = (target as? JsonObj)?.get(step)
+                    ?: unsupported(where, "$ref points at nothing in this document.")
+            }
+            here = target as? JsonObj ?: unsupported(where, "$ref does not point at an object.")
+            where = steps.fold(JsonPath.root) { p, step -> p / step }
+        }
+    }
+
+    private val methods = listOf("get", "put", "post", "delete", "options", "head", "patch", "trace")
+}
+
+/** One operation and where it was found, so a failure can say which. */
+internal class Operation(
+    val id: String,
+    val method: String,
+    val template: String,
+    val node: JsonObj,
+    /** The path item's own parameters, which apply to every operation on it. */
+    val shared: List<JsonValue>,
+    val path: JsonPath,
+) {
+    val label: String get() = "$id (${method.uppercase()} $template)"
+}

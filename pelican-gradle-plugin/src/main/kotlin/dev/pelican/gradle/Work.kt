@@ -3,6 +3,7 @@ package dev.pelican.gradle
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.SetProperty
 import org.gradle.workers.WorkAction
 import org.gradle.workers.WorkParameters
 import java.io.File
@@ -24,6 +25,15 @@ internal interface ClientParameters : SpecParameters {
     val clientName: Property<String>
     val baseUrl: Property<String>
     val includeHidden: Property<Boolean>
+    val outputDir: DirectoryProperty
+}
+
+internal interface EndpointsParameters : WorkParameters {
+    val document: RegularFileProperty
+    val packageName: Property<String>
+    val entryName: Property<String>
+    val exclude: SetProperty<String>
+    val handlers: Property<String>
     val outputDir: DirectoryProperty
 }
 
@@ -63,6 +73,21 @@ internal abstract class CheckClientWork : WorkAction<ClientParameters> {
         } finally {
             scratch.deleteRecursively()
         }
+    }
+}
+
+internal abstract class GenerateEndpointsWork : WorkAction<EndpointsParameters> {
+    override fun execute() {
+        val written = Pelican.writeEndpoints(
+            javaClass.classLoader,
+            parameters.document.get().asFile,
+            parameters.outputDir.get().asFile,
+            parameters.packageName.get(),
+            parameters.entryName.get(),
+            parameters.exclude.get(),
+            parameters.handlers.orNull,
+        )
+        written.forEach { logger.lifecycle("Wrote $it") }
     }
 }
 

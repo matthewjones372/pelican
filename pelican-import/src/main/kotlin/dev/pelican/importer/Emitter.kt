@@ -1,0 +1,779 @@
+package dev.pelican.importer
+
+import dev.pelican.JsonObj
+import dev.pelican.codegen.KotlinTypes
+import dev.pelican.codegen.kdoc
+import dev.pelican.codegen.kotlinString
+import dev.pelican.codegen.memberName
+import dev.pelican.codegen.typeName
+import dev.pelican.codegen.unique
+
+/**
+ * Endpoint descriptions, written out as Kotlin.
+ *
+ * What comes out is meant to be read, not just compiled: inputs as named
+ * values at the top, payload types under them, and one `endpoint(...)` per
+ * operation in the order the document listed them. It is the file somebody
+ * would have written by hand from the same document, which matters because
+ * they are going to be reading it for as long as they call the API.
+ *
+ * Declaration order is load-bearing. Top-level values in Kotlin initialise in
+ * source order, so an endpoint naming a failure declared below it would read a
+ * null at class-init time. Inputs, failures and schemes therefore all come
+ * before the endpoints that use them.
+ */
+internal class Emitter(private val api: IrApi, private val options: ImportOptions) {
+
+    private val types = KotlinTypes()
+    private val taken = mutableSetOf<String>()
+
+    /** Declaration text, in the order it will be written. */
+    private val schemes = LinkedHashMap<String, String>()
+    private val inputs = LinkedHashMap<String, String>()
+    private val headers = LinkedHashMap<String, String>()
+    private val failures = LinkedHashMap<String, String>()
+
+    /** What a repeated declaration is already called: same key, same value. */
+    private val named = LinkedHashMap<String, String>()
+
+    /** Anything the generated file needs that `dev.pelican.*` does not carry. */
+    private val imports = sortedSetOf("kotlin.reflect.KClass", "kotlin.reflect.KType")
+
+    /**
+     * Schemas the document wrote out where they were used, under the name the
+     * type generator gave each one.
+     *
+     * The generated schema source needs them: a response whose schema was
+     * written inline has no name in `components` to look up, and re-deriving
+     * it from the Kotlin class is the thing being avoided.
+     */
+    private val inlineSchemas = LinkedHashMap<String, JsonObj>()
+
+    /**
+     * The Kotlin type a schema becomes, remembering the ones the document did
+     * not name. Every path to the type generator goes through here, so nothing
+     * can acquire a name the generated schema source has not heard of.
+     */
+    private fun typeFor(schema: JsonObj, context: String): String {
+        val name = types.type(schema, context)
+        if (schema["\$ref"] == null && bareType.matches(name)) inlineSchemas[name] = schema
+        return name
+    }
+
+    fun emit(): Map<String, String> {
+        types.declareAll(api.schemas)
+        api.schemes.forEach { scheme -> schemes[schemeName(scheme)] = schemeDeclaration(scheme) }
+
+        // Before the file is assembled: writing an endpoint is what declares
+        // the inputs, failures and payload types it names.
+        val endpoints = api.endpoints.map { it to endpoint(it) }
+
+        return buildMap {
+            put(options.name.capitalise() + ENDPOINTS_FILE_SUFFIX, endpointsFile(endpoints.map { it.second }))
+            options.handlers?.let { put(options.name.capitalise() + HANDLERS_FILE_SUFFIX, handlersFile(it)) }
+        }
+    }
+
+    // ------------------------------------------------------------------ files
+
+    private fun endpointsFile(endpoints: List<String>): String = buildString {
+        appendLine(banner)
+        appendLine("package ${options.packageName}")
+        appendLine()
+        appendLine("import dev.pelican.*")
+        imports.forEach { appendLine("import $it") }
+        appendLine()
+        section("security", schemes.values)
+        section("inputs", inputs.values)
+        section("response headers", headers.values)
+        section("failures", failures.values)
+        section("payloads", types.declarations())
+        section("the payload schemas", listOf(schemaSource()))
+        section("endpoints", endpoints)
+
+        appendLine(rule("the api"))
+        appendLine()
+        appendLine(kdoc("Every endpoint this document described, in the order it described them.", ""))
+        appendLine("val ${memberName(options.name)}Endpoints: List<Endpoint<*, *>> = listOf(")
+        api.endpoints.forEach { appendLine("    ${endpointName(it)},") }
+        appendLine(")")
+        appendLine()
+        appendLine(spec())
+    }
+
+    /**
+     * The document's own schemas, as a `SchemaSource` in the generated file.
+     *
+     * It is what makes an imported description self-contained: the spec can be
+     * published, and a client generated from it, with no codec module present
+     * — and what a caller reads is what the document said rather than a codec's
+     * reading of the classes generated from it.
+     */
+    private fun schemaSource(): String {
+        val blob = jsonObjOf(
+            "schemas" to api.schemas,
+            "names" to JsonObj(api.schemas.fields.keys.associate { typeName(it) to dev.pelican.JsonStr(it) }),
+            "inline" to JsonObj(inlineSchemas.toMap()),
+        )
+        return resource("schemas.kt")
+            .replace("%NAME%", schemasName)
+            .replace("%SPEC%", "${memberName(options.name)}Spec")
+            .replace("%DOCUMENT%", chunks(blob.render()))
+    }
+
+    /** The blob, in pieces small enough to be string constants. */
+    private fun chunks(json: String): String = json.chunked(CHUNK)
+        .joinToString("\n") { "        ${kotlinString(it)}," }
+
+    private val schemasName get() = typeName(options.name) + "Schemas"
+
+    private fun resource(name: String): String =
+        Emitter::class.java.getResourceAsStream(name)
+            ?.use { it.reader().readText() }
+            ?: error("$name is missing from pelican-import's resources")
+
+    private fun spec(): String = buildString {
+        appendLine(
+            kdoc(
+                """
+                    The description half of the API: what `pelican-openapi` reads to write
+                    the document back out, and what `pelican-codegen` reads to generate a
+                    client.
+
+                    The no-argument form carries the document's own schemas, so it needs
+                    no codec module and publishes what the document said. Pass a codec's
+                    schema source instead — `%SPEC%(JacksonCodecs)` — to have the payload
+                    types described from the Kotlin classes, which is what a service that
+                    has since edited them wants.
+                """.trimIndent().replace("%SPEC%", "${memberName(options.name)}Spec"),
+                "",
+            ),
+        )
+        appendLine("fun ${memberName(options.name)}Spec(): ApiSpec = ${memberName(options.name)}Spec($schemasName)")
+        appendLine()
+        appendLine("fun ${memberName(options.name)}Spec(schemas: SchemaSource): ApiSpec = ApiSpec(")
+        appendLine("    endpoints = ${memberName(options.name)}Endpoints,")
+        appendLine("    schemas = schemas,")
+        appendLine("    title = ${kotlinString(api.title)},")
+        appendLine("    version = ${kotlinString(api.version)},")
+        api.description?.let { appendLine("    description = ${kotlinString(it)},") }
+        if (api.servers.isNotEmpty()) {
+            appendLine("    servers = listOf(${api.servers.joinToString { kotlinString(it) }}),")
+        }
+        if (api.security.isNotEmpty()) {
+            appendLine("    security = listOf(${api.security.joinToString { requirement(it) }}),")
+        }
+        append(")")
+    }
+
+    /**
+     * The handlers, once, as a starting point.
+     *
+     * Every one of them is a `TODO()`, which is the honest state of a service
+     * nobody has written yet: it compiles, it routes, and it throws the moment
+     * a request reaches something unimplemented. The file is written once and
+     * never overwritten — see [Import.write] — because after the first run it
+     * is not generated code any more.
+     */
+    private fun handlersFile(backend: Backend): String = buildString {
+        appendLine(stubBanner)
+        appendLine("package ${options.packageName}")
+        appendLine()
+        appendLine("import dev.pelican.*")
+        appendLine("import ${backend.packageName}.*")
+        appendLine()
+        appendLine("val ${memberName(options.name)}Handlers: List<ServerEndpoint> = listOf(")
+        api.endpoints.forEach { ep ->
+            val body = "{ ${arguments(ep)}TODO(${kotlinString(ep.operationId)}) }"
+            appendLine("    ${endpointName(ep)} ${binder(ep)} $body,")
+        }
+        appendLine(")")
+    }
+
+    private fun binder(ep: IrEndpoint): String = when {
+        ep.success is IrSuccess.Bytes -> "bytesNow"
+        streams(ep) && ep.failures.any { it.schema != null } -> "streamedOrFail"
+        streams(ep) -> "streamedNow"
+        ep.failures.any { it.schema != null } -> "handledOrFail"
+        ep.success is IrSuccess.Empty -> "handledWith"
+        else -> "handledNow"
+    }
+
+    private fun streams(ep: IrEndpoint) = ep.success is IrSuccess.Ndjson || ep.success is IrSuccess.Sse
+
+    /** The handler's parameter, named after the inputs it decodes. */
+    private fun arguments(ep: IrEndpoint): String {
+        val keys = keysOf(ep)
+        return when {
+            keys.isEmpty() || keys.size > TUPLE_LIMIT -> ""
+            keys.size == 1 -> "${keys.single()} -> "
+            else -> "(${keys.joinToString()}) -> "
+        }
+    }
+
+    // -------------------------------------------------------------- endpoints
+
+    private fun endpoint(ep: IrEndpoint): String = buildString {
+        val keys = keysOf(ep)
+        ep.description?.let { appendLine(kdoc(it, "")) }
+            ?: ep.summary?.let { appendLine(kdoc(it, "")) }
+
+        appendLine("val ${endpointName(ep)} = ${declaration(keys)} {")
+        body(ep, keys).forEach { appendLine("    $it") }
+        append("}")
+    }
+
+    /** The block's statements, in the order the DSL reads best in. */
+    private fun body(ep: IrEndpoint, keys: List<String>): List<String> = buildList {
+        add(route(ep))
+        ep.summary?.let { add("summary = ${kotlinString(it)}") }
+        ep.description?.let { add("description = ${kotlinString(it)}") }
+        add("operationId = ${kotlinString(ep.operationId)}")
+        if (ep.tags.isNotEmpty()) add("tag(${ep.tags.joinToString { kotlinString(it) }})")
+        if (ep.deprecated) add("deprecated = true")
+        if (keys.size > TUPLE_LIMIT) addAll(lensInputs(ep))
+        addAll(security(ep))
+        if (ep.responseHeaders.isNotEmpty()) {
+            add("emits(${ep.responseHeaders.joinToString { headerName(it) }})")
+        }
+        ep.failures.filter { it.schema == null }.forEach { add(errorResponse(it)) }
+        add(output(ep))
+    }
+
+    /**
+     * `endpoint(a, b)` while the inputs fit in a tuple, and the lens form past
+     * that. Six is where core stops having an overload, and it is where a
+     * destructured handler stops being readable anyway; past it the handler
+     * takes the whole bag and reads it by key.
+     */
+    private fun declaration(keys: List<String>): String = when {
+        keys.isEmpty() -> "endpoint(noInputs)"
+        keys.size <= TUPLE_LIMIT -> "endpoint(${keys.joinToString()})"
+        else -> "endpoint"
+    }
+
+    private fun lensInputs(ep: IrEndpoint): List<String> = buildList {
+        listOf("query" to "query", "header" to "header", "cookie" to "cookie").forEach { (location, call) ->
+            val declared = ep.params.filter { it.location == location }
+            if (declared.isNotEmpty()) add("$call(${declared.joinToString { inputName(it) }})")
+        }
+        when (val body = ep.body) {
+            is IrBody.Multipart -> add("part(${body.parts.joinToString { partName(it) }})")
+            null -> Unit
+            else -> add("body(${bodyName(ep)})")
+        }
+    }
+
+    private fun route(ep: IrEndpoint): String {
+        val path = pathExpression(ep)
+        val method = ep.method.lowercase()
+        return if (method in routeMethods) "$method($path)" else "route(Method.${ep.method}, path($path))"
+    }
+
+    /**
+     * The path as core's `/` operator writes it: literals as strings, captures
+     * as the input value that decodes them. An all-literal route stays one
+     * string, because `get("orders" / "recent")` says nothing `get("/orders/recent")`
+     * does not.
+     */
+    private fun pathExpression(ep: IrEndpoint): String {
+        val segments = ep.path.split('/').filter { it.isNotEmpty() }
+        if (segments.none { it.startsWith("{") }) return kotlinString(ep.path)
+
+        val parts = segments.map { segment ->
+            if (segment.startsWith("{")) {
+                val name = segment.trim('{', '}')
+                inputName(ep.params.first { it.location == "path" && it.name == name })
+            } else {
+                kotlinString(segment)
+            }
+        }
+        // `path(x)` lifts a leading capture, which the `/` operator cannot do
+        // on its own: a route is a `PathSpec`, and one capture is not.
+        val head = if (segments.first().startsWith("{")) "path(${parts.first()})" else parts.first()
+        return (listOf(head) + parts.drop(1)).joinToString(" / ")
+    }
+
+    private fun security(ep: IrEndpoint): List<String> = when {
+        ep.security == null -> emptyList()
+
+        ep.security.isEmpty() -> listOf("noSecurity()")
+
+        else -> ep.security.map { requirement ->
+            val scopes = requirement.scopes.joinToString("") { ", ${kotlinString(it)}" }
+            "security(${schemeName(requirement.scheme)}$scopes)"
+        }
+    }
+
+    private fun requirement(requirement: IrRequirement): String {
+        val scopes = requirement.scopes.joinToString { kotlinString(it) }
+        return "${schemeName(requirement.scheme)}.requires($scopes)"
+    }
+
+    private fun errorResponse(failure: IrFailure): String {
+        val headers = failure.headers.joinToString("") { ", ${headerName(it)}" }
+        return "errorResponse(${failure.status}, ${kotlinString(failure.description)}$headers)"
+    }
+
+    // ---------------------------------------------------------------- outputs
+
+    private fun output(ep: IrEndpoint): String {
+        val success = successOutput(ep)
+        val declared = ep.failures.filter { it.schema != null }.map { failureName(ep, it) }
+        return when {
+            declared.isEmpty() -> success
+            declared.size == 1 -> "$success orFail ${declared.single()}"
+            else -> "$success.orFail(${declared.joinToString()})"
+        }
+    }
+
+    private fun successOutput(ep: IrEndpoint): String {
+        val context = typeName(ep.operationId) + "Response"
+        return when (val success = ep.success) {
+            is IrSuccess.Json -> "json<${typeFor(success.schema, context)}>(${status(success.status, 200)})"
+
+            is IrSuccess.Ndjson -> "ndjson<${typeFor(success.schema, context)}>(${status(success.status, 200)})"
+
+            is IrSuccess.Sse -> "sse<${typeFor(success.schema, context)}>(${status(success.status, 200)})"
+
+            is IrSuccess.Text -> "text(${status(success.status, 200)})"
+
+            is IrSuccess.Empty -> "empty(${status(success.status, 204)})"
+
+            is IrSuccess.Bytes -> {
+                val mediaType = if (success.mediaType == OCTET_STREAM) "" else kotlinString(success.mediaType)
+                val status = status(success.status, 200)
+                "bytes(${listOf(mediaType, status).filter { it.isNotEmpty() }.joinToString()})"
+            }
+        }
+    }
+
+    /** A status the same as the output's own default is left unsaid. */
+    private fun status(status: Int, default: Int) = if (status == default) "" else "status = $status"
+
+    // ----------------------------------------------------------------- names
+
+    private fun endpointName(ep: IrEndpoint): String =
+        named.getOrPut("endpoint:${ep.operationId}") { unique(memberName(ep.operationId), taken) }
+
+    private fun schemeName(scheme: IrScheme): String = schemeName(scheme.name)
+
+    private fun schemeName(name: String): String = named.getOrPut("scheme:$name") {
+        // A scheme called `bearerAuth` and the builder that makes one are the
+        // same word, and a value shadowing the function that produced it reads
+        // as a mistake even where it compiles.
+        val candidate = memberName(name).let { if (it in builders) it + "Scheme" else it }
+        unique(candidate, taken)
+    }
+
+    private fun headerName(header: IrResponseHeader): String {
+        val key = "header:${header.name}:${header.required}:${header.example}:${header.schema.render()}"
+        return named.getOrPut(key) {
+            val name = unique(memberName(header.name), taken)
+            val plain = plain(header.schema, typeName(header.name)).exampled(header.example)
+            val declared = if (plain.codec == null) {
+                "responseHeader<${plain.type}>(${kotlinString(header.name)}${description(header.description)})"
+            } else {
+                "responseHeader(${kotlinString(header.name)}, ${plain.codec}${description(header.description)})"
+            }
+            headers[name] = "val $name = $declared" + if (header.required) "" else ".optional()"
+            name
+        }
+    }
+
+    private fun failureName(ep: IrEndpoint, failure: IrFailure): String {
+        val schema = failure.schema ?: error("A failure with no payload has no name")
+        val type = typeFor(schema, typeName(ep.operationId) + "Failure")
+        val key = "failure:${failure.status}:$type:${failure.description}"
+        return named.getOrPut(key) {
+            val name = unique(memberName(type + reason(failure.status)), taken)
+            failures[name] = "val $name = errorJson<$type>(${failure.status}, ${kotlinString(failure.description)})"
+            name
+        }
+    }
+
+    private fun keysOf(ep: IrEndpoint): List<String> = buildList {
+        val captures = Regex("\\{([^}]+)}").findAll(ep.path).map { it.groupValues[1] }.toList()
+        captures.forEach { capture ->
+            add(inputName(ep.params.first { it.location == "path" && it.name == capture }))
+        }
+        listOf("query", "header", "cookie").forEach { location ->
+            ep.params.filter { it.location == location }.forEach { add(inputName(it)) }
+        }
+        when (val body = ep.body) {
+            is IrBody.Multipart -> body.parts.forEach { add(partName(it)) }
+            null -> Unit
+            else -> add(bodyName(ep))
+        }
+    }
+
+    private fun inputName(param: IrParam): String {
+        val declaration = inputDeclaration(param)
+        return named.getOrPut("input:${param.location}:${param.name}:$declaration") {
+            val name = unique(memberName(param.name), taken)
+            inputs[name] = "val $name = $declaration"
+            name
+        }
+    }
+
+    private fun bodyName(ep: IrEndpoint): String {
+        val body = ep.body ?: error("No body to name")
+        val declaration = bodyDeclaration(ep, body)
+        return named.getOrPut("body:$declaration") {
+            val name = unique(memberName(typeName(ep.operationId) + "Body"), taken)
+            inputs[name] = "val $name = $declaration"
+            name
+        }
+    }
+
+    private fun partName(part: IrPart): String {
+        val declaration = partDeclaration(part)
+        return named.getOrPut("part:${part.name}:$declaration") {
+            val name = unique(memberName(part.name), taken)
+            inputs[name] = "val $name = $declaration"
+            name
+        }
+    }
+
+    // ---------------------------------------------------------- declarations
+
+    private fun inputDeclaration(param: IrParam): String {
+        val factory = when (param.location) {
+            "path" -> "pathParam"
+            "query" -> "queryParam"
+            "header" -> "headerParam"
+            else -> "cookieParam"
+        }
+        val plain = plain(param.schema, typeName(param.name)).exampled(param.example)
+        val declared = if (plain.codec == null) {
+            "$factory<${plain.type}>(${kotlinString(param.name)}${description(param.description)})"
+        } else {
+            "$factory(${kotlinString(param.name)}, ${plain.codec}${description(param.description)})"
+        }
+        return declared + modifier(param, plain.type)
+    }
+
+    /**
+     * `optional()` and `default(...)` are how an input says it may be left
+     * out, and a path parameter can say neither — a route with a hole in it
+     * does not match.
+     */
+    private fun modifier(param: IrParam, type: String): String = when {
+        param.location == "path" || param.required -> ""
+        param.default != null -> ".default(${literal(param.default, type)})"
+        else -> ".optional()"
+    }
+
+    private fun bodyDeclaration(ep: IrEndpoint, body: IrBody): String {
+        val context = typeName(ep.operationId) + "Request"
+        return when (body) {
+            is IrBody.Json -> "jsonBody<${typeFor(body.schema, context)}>(${describedBy(body.description)})"
+            is IrBody.Form -> "formBody<${typeFor(body.schema, context)}>(${describedBy(body.description)})"
+            is IrBody.Raw -> "rawBody(${describedBy(body.description)})"
+            is IrBody.Multipart -> error("A multipart body is declared by its parts")
+        }
+    }
+
+    private fun partDeclaration(part: IrPart): String = when (part) {
+        is IrPart.File -> {
+            val contentType = part.contentType?.let { ", contentType = ${kotlinString(it)}" }.orEmpty()
+            "filePart(${kotlinString(part.name)}$contentType${namedDescription(part.description)})" +
+                if (part.required) "" else ".optional()"
+        }
+
+        is IrPart.Text -> {
+            val plain = plain(part.schema, typeName(part.name))
+            val declared = if (plain.codec == null) {
+                "textPart<${plain.type}>(${kotlinString(part.name)}${description(part.description)})"
+            } else {
+                "textPart(${kotlinString(part.name)}, ${plain.codec}${description(part.description)})"
+            }
+            declared + if (part.required) "" else ".optional()"
+        }
+    }
+
+    private fun schemeDeclaration(scheme: IrScheme): String {
+        val shared = buildList {
+            add("name = ${kotlinString(scheme.name)}")
+            scheme.description?.let { add("description = ${kotlinString(it)}") }
+        }
+        val call = when (scheme) {
+            is IrScheme.ApiKey -> apiKey(scheme, shared)
+            is IrScheme.Http -> http(scheme, shared)
+            is IrScheme.OpenId -> call("openIdConnect", listOf(kotlinString(scheme.url)) + shared)
+            is IrScheme.OAuth2 -> oauth2(scheme, shared)
+        }
+        return "val ${schemeName(scheme)} = $call"
+    }
+
+    private fun apiKey(scheme: IrScheme.ApiKey, shared: List<String>): String {
+        val builder = when (scheme.location) {
+            "query" -> "apiKeyQuery"
+            "cookie" -> "apiKeyCookie"
+            else -> "apiKeyHeader"
+        }
+        return call(builder, listOf(kotlinString(scheme.paramName)) + shared)
+    }
+
+    private fun http(scheme: IrScheme.Http, shared: List<String>): String = when (scheme.scheme) {
+        "basic" -> call("basicAuth", shared)
+
+        // The default is "JWT", so a scheme that says nothing has to say so:
+        // left off, the generated document would claim a bearer format the
+        // original never mentioned.
+        "bearer" -> call(
+            "bearerAuth",
+            listOf("bearerFormat = ${scheme.bearerFormat?.let(::kotlinString) ?: "null"}") + shared,
+        )
+
+        else -> call("httpAuth", listOf(kotlinString(scheme.scheme)) + shared)
+    }
+
+    private fun oauth2(scheme: IrScheme.OAuth2, shared: List<String>): String {
+        val flows = scheme.flows.map { flow ->
+            val arguments = buildList {
+                flow.authorizationUrl?.let { add("authorizationUrl = ${kotlinString(it)}") }
+                flow.tokenUrl?.let { add("tokenUrl = ${kotlinString(it)}") }
+                flow.refreshUrl?.let { add("refreshUrl = ${kotlinString(it)}") }
+                add("scopes = ${scopes(flow.scopes)}")
+            }
+            flowBuilder(flow.kind) to arguments
+        }
+
+        // One flow is the common case and reads as one call. Several have to
+        // be built as flow values and handed over together, which is the shape
+        // core offers for exactly this.
+        return if (flows.size == 1) {
+            val (builder, arguments) = flows.single()
+            call(builder, arguments + shared)
+        } else {
+            val listed = flows.joinToString(",\n        ") { (builder, arguments) -> call(builder, arguments) }
+            call("oauth2", listOf("listOf(\n        $listed,\n    )") + shared)
+        }
+    }
+
+    private fun scopes(scopes: Map<String, String>): String {
+        if (scopes.isEmpty()) return "emptyMap()"
+        return "mapOf(${scopes.entries.joinToString { "${kotlinString(it.key)} to ${kotlinString(it.value)}" }})"
+    }
+
+    private fun flowBuilder(kind: String) = when (kind) {
+        "implicit" -> "oauth2Implicit"
+        "password" -> "oauth2Password"
+        "clientCredentials" -> "oauth2ClientCredentials"
+        else -> "oauth2AuthorizationCode"
+    }
+
+    private fun call(builder: String, arguments: List<String>) = "$builder(${arguments.joinToString()})"
+
+    // ------------------------------------------------------- values on the wire
+
+    /**
+     * A schema for a value that travels as one string, as the Kotlin type it
+     * decodes to and the codec that decodes it.
+     *
+     * A codec is only written out when there is something to say beyond the
+     * type — a constraint, or a format core has no reified type for. Without
+     * one the declaration is `queryParam<Int>("limit")`, which is what somebody
+     * would have written, and core resolves the codec from the type.
+     *
+     * Constraints become refinements rather than comments, because a
+     * refinement is both: `atLeast(1)` rejects a zero *and* documents
+     * `minimum: 1`, so the imported endpoint enforces what the document
+     * promised rather than merely restating it.
+     */
+    private fun plain(schema: JsonObj, context: String): Plain {
+        if (schema["enum"] != null) return Plain(typeFor(schema, context), null)
+
+        val format = schema.str("format")
+        val type = when (schema.scalar()) {
+            "integer" -> if (format == "int64") "Long" else "Int"
+            "number" -> "Double"
+            "boolean" -> "Boolean"
+            else -> stringType(format)
+        }
+        type.qualified()?.let { imports += it }
+
+        val refinements = refinements(schema, type)
+        val extra = schema.without("default").facets()
+        if (refinements.isEmpty() && extra.isEmpty) return Plain(type, null)
+
+        val facets = if (extra.isEmpty) "" else ".withFacets(${json(extra)})"
+        return Plain(type, codecs.getValue(type) + facets + refinements.joinToString(""))
+    }
+
+    /**
+     * The same value, carrying the sample the document offered.
+     *
+     * An example belongs to the *type* in Pelican rather than to one use of
+     * it, which is `describedAs`. Writing it out forces the codec form even
+     * where nothing else needed one — a reified `queryParam<Int>("limit")` has
+     * nowhere to hang it.
+     */
+    private fun Plain.exampled(example: String?): Plain {
+        if (example == null) return this
+        val base = codec ?: codecs.getValue(type)
+        return Plain(type, "$base.describedAs(example = ${kotlinString(example)})")
+    }
+
+    private fun stringType(format: String?): String = when (format) {
+        "uuid" -> "UUID"
+        "date" -> "LocalDate"
+        "date-time" -> "Instant"
+        "uri" -> "URI"
+        else -> "String"
+    }
+
+    private fun refinements(schema: JsonObj, type: String): List<String> = buildList {
+        schema.int("minLength")?.let { add(".minLength($it)") }
+        schema.int("maxLength")?.let { add(".maxLength($it)") }
+        schema.str("pattern")?.let { add(".matching(Regex(${kotlinString(it)}))") }
+        (schema["minimum"] as? dev.pelican.JsonNum)?.let { add(".atLeast(${number(it.value, type)})") }
+        (schema["maximum"] as? dev.pelican.JsonNum)?.let { add(".atMost(${number(it.value, type)})") }
+    }
+
+    /**
+     * What the schema says that a codec and its refinements do not carry: an
+     * unmodelled `format`, a `multipleOf`, a `minItems`. Carried through as
+     * facets so the document a generated service publishes still says it —
+     * unenforced, exactly as it was unenforced in the document this came from.
+     */
+    private fun JsonObj.facets(): JsonObj = JsonObj(
+        fields.filterKeys { it !in carried }
+            .let { kept -> if (str("format") in knownFormats) kept - "format" else kept },
+    )
+
+    private fun number(value: Number, type: String) = when (type) {
+        "Long" -> "${value}L"
+        "Double" -> if ("." in value.toString()) "$value" else "$value.0"
+        else -> "$value"
+    }
+
+    /** A facet object as the builder that writes it. Values only: no nesting reaches here. */
+    private fun json(facets: JsonObj): String {
+        val fields = facets.fields.entries.joinToString("; ") { (key, value) ->
+            when (value) {
+                is dev.pelican.JsonStr -> "${kotlinString(key)} to ${kotlinString(value.value)}"
+                is dev.pelican.JsonNum -> "${kotlinString(key)} to ${value.value}"
+                is dev.pelican.JsonBool -> "${kotlinString(key)} to ${value.value}"
+                else -> "put(${kotlinString(key)}, parseJson(${kotlinString(value.render())}))"
+            }
+        }
+        return "jsonObj { $fields }"
+    }
+
+    private fun JsonObj.scalar(): String? = str("type")
+        ?: (this["type"] as? dev.pelican.JsonArr)?.items
+            ?.mapNotNull { (it as? dev.pelican.JsonStr)?.value }
+            ?.firstOrNull { it != "null" }
+
+    private fun String.qualified(): String? = when (this) {
+        "UUID" -> "java.util.UUID"
+        "LocalDate" -> "java.time.LocalDate"
+        "Instant" -> "java.time.Instant"
+        "URI" -> "java.net.URI"
+        else -> null
+    }
+
+    private val codecs = mapOf(
+        "String" to "StringCodec",
+        "Int" to "IntCodec",
+        "Long" to "LongCodec",
+        "Double" to "DoubleCodec",
+        "Boolean" to "BooleanCodec",
+        "UUID" to "UuidCodec",
+        "LocalDate" to "LocalDateCodec",
+        "Instant" to "InstantCodec",
+        "URI" to "UriCodec",
+    )
+
+    /** Schema keywords a codec, a refinement or the declaration itself already carries. */
+    private val carried = setOf(
+        "type", "enum", "description", "title", "example", "examples", "deprecated", "readOnly",
+        "writeOnly", "minLength", "maxLength", "pattern", "minimum", "maximum", "default",
+    )
+
+    private val knownFormats = setOf("uuid", "date", "date-time", "uri", "int32", "int64", "double", "float")
+
+    // ---------------------------------------------------------------- pieces
+
+    private fun description(text: String?) = text?.let { ", ${kotlinString(it)}" }.orEmpty()
+
+    private fun namedDescription(text: String?) =
+        if (text == null) "" else ", description = ${kotlinString(text)}"
+
+    private fun describedBy(text: String?) = if (text == null) "" else kotlinString(text)
+
+    private fun literal(value: dev.pelican.JsonValue, type: String): String = when (type) {
+        "String" -> kotlinString((value as? dev.pelican.JsonStr)?.value.orEmpty())
+        "Long" -> "${value.render()}L"
+        else -> value.render()
+    }
+
+    private fun reason(status: Int): String = reasons[status] ?: "Status$status"
+
+    private fun StringBuilder.section(title: String, declarations: Collection<String>) {
+        if (declarations.isEmpty()) return
+        appendLine(rule(title))
+        appendLine()
+        declarations.forEach {
+            appendLine(it)
+            appendLine()
+        }
+    }
+
+    private fun rule(title: String): String {
+        val dashes = RULE_WIDTH - title.length
+        return "// " + "-".repeat(maxOf(dashes, 1)) + " $title"
+    }
+
+    private fun String.capitalise() = replaceFirstChar { it.uppercaseChar() }
+
+    private val banner = """
+        // Generated from an OpenAPI document by pelican-import. Do not edit: the
+        // task that wrote it will write it again, and the document is where the
+        // change belongs.
+    """.trimIndent()
+
+    private val stubBanner = """
+        // Started from an OpenAPI document by pelican-import, and yours from here.
+        // Written once — the import task will not overwrite it — so the handlers
+        // filled in below survive the next run.
+    """.trimIndent()
+
+    private val routeMethods = setOf("get", "post", "put", "patch", "delete")
+
+    /** Builder names a scheme value must not shadow; see [schemeName]. */
+    private val builders = setOf(
+        "bearerAuth", "basicAuth", "httpAuth", "apiKeyHeader", "apiKeyQuery", "apiKeyCookie",
+        "openIdConnect", "oauth2", "oauth2AuthorizationCode", "oauth2ClientCredentials",
+        "oauth2Implicit", "oauth2Password",
+    )
+
+    private val reasons = mapOf(
+        400 to "BadRequest",
+        401 to "Unauthorized",
+        403 to "Forbidden",
+        404 to "NotFound",
+        409 to "Conflict",
+        410 to "Gone",
+        422 to "Unprocessable",
+        429 to "TooManyRequests",
+        500 to "ServerError",
+        503 to "Unavailable",
+    )
+}
+
+/** A wire value as Kotlin sees it: the type, and the codec when one is needed. */
+private class Plain(val type: String, val codec: String?)
+
+/** A Kotlin type name and nothing else: not `List<Order>`, not `Order?`, not `String`. */
+private val bareType = Regex("[A-Z][A-Za-z0-9_]*")
+
+/** Well inside the JVM's 64KB ceiling on a string constant, with room for escapes. */
+private const val CHUNK = 8_000
+
+private const val OCTET_STREAM = "application/octet-stream"
+
+private const val TUPLE_LIMIT = 6
+private const val RULE_WIDTH = 68

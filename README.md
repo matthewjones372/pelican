@@ -61,6 +61,7 @@ streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
 [What the compiler catches](#what-the-compiler-catches) ·
 [Describing endpoints](#describing-endpoints) · [Running a server](#running-a-server) ·
 [Testing](#testing) · [A generated Kotlin client](#a-generated-kotlin-client) ·
+[Importing a document](#importing-an-openapi-document) ·
 [Backends](#backends) · [The same endpoints, by hand](#the-same-endpoints-by-hand) ·
 [What it costs](#what-it-costs) · [Modules](#modules) ·
 [Running the examples](#running-the-examples) · [Known limits](#known-limits)
@@ -70,7 +71,7 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-Not on Maven Central yet. `./gradlew publishToMavenLocal` installs all fourteen
+Not on Maven Central yet. `./gradlew publishToMavenLocal` installs all fifteen
 modules at `dev.pelican:<module>:0.1.0-SNAPSHOT` with sources and javadoc, so
 `mavenLocal()` or `includeBuild` both work today. The Gradle plugin is a build
 of its own and installs the same way:
@@ -636,6 +637,90 @@ call itself.
 
 ---
 
+# Importing an OpenAPI document
+
+The other direction, for the two cases where the descriptions are not yours to
+write first: calling somebody else's API, and building a service against a spec
+that was agreed before the code.
+
+```kotlin
+pelican {
+    endpoints {
+        create("orders") {
+            document.set(layout.projectDirectory.file("orders.yaml"))
+            packageName.set("com.example.orders")
+            handlers.set("pekko")            // optional: a stub per operation
+        }
+    }
+}
+```
+
+`./gradlew generateOrdersEndpoints` writes `OrdersEndpoints.kt`: the inputs as
+values, the payload types as data classes, one `endpoint(...)` per operation,
+and an `ordersSpec(schemas)` holding the lot. It is the file you would have
+written by hand from that document, and it reads like one:
+
+```kotlin
+val bookmarkId = pathParam<Long>("bookmarkId")
+val limit = queryParam("limit", IntCodec.atLeast(1).atMost(100), "How many to return").default(20)
+
+val problemNotFound = errorJson<Problem>(404, "No bookmark with that id")
+
+/** Fetch one bookmark */
+val getBookmark = endpoint(bookmarkId) {
+    get("bookmarks" / bookmarkId)
+    summary = "Fetch one bookmark"
+    operationId = "getBookmark"
+    json<Bookmark>() orFail problemNotFound
+}
+```
+
+The generated file also carries the document's own schemas, so `ordersSpec()`
+takes no arguments and needs no JSON library: reading a document, describing
+it, and generating a client for it is a path with no codec on it at all. Point
+`generateOrdersClient` at `ordersSpec` for a typed client of somebody else's
+API, or bind the endpoints to handlers and serve it. `ordersSpec(JacksonCodecs)`
+is the same descriptions with the payload types described from the generated
+Kotlin classes instead, which is what a service that has since edited them
+wants. `handlers.set("pekko")` writes the second
+file — one `TODO()` per operation, in the right binder for each output kind —
+and never overwrites it again, because after the first run it is your service
+rather than generated code.
+
+JSON or YAML, and 3.1, 3.0 and Swagger 2.0 alike: a 2.0 document and its 3.0
+twin generate the same descriptions, which is the claim `VersionsTest` makes.
+References to other files are followed and the schemas they name keep those
+names; references to another *host* are refused, because a build that fetches a
+URL to know what to generate cannot be reproduced.
+
+**The import is strict.** An operation using something Pelican cannot describe
+— two success statuses, two media types for one body, a `oneOf`, a `default`
+response — fails the build naming the operation, the place in the document and
+the way out, rather than generating an endpoint whose type says less than the
+document does. That is the right default for a document you own, and an
+obstacle in one you do not, so operations you have decided to live without are
+listed by `operationId`:
+
+```kotlin
+create("orders") {
+    document.set(file("orders.yaml"))
+    packageName.set("com.example.orders")
+    exclude("uploadReceipt", "searchAnything")
+}
+```
+
+Written down in the build, reviewed once, and — this is the point of a list
+rather than a switch — the fourth such operation to appear still fails.
+Excluding one also excludes the schemas only it reached, so a `oneOf` in a
+corner of the document costs that corner and nothing else.
+
+This repository imports its own document on every build: `:example` publishes
+`openapi.json` from its endpoint values, generates descriptions back out of it,
+compiles them, and compares what those publish against what it started with.
+See `ImportedOrdersTest`.
+
+---
+
 # Backends
 
 The backend is a choice about handlers. Bind the same endpoint values with
@@ -1030,7 +1115,7 @@ agent rather than the library, which cost an afternoon to notice.
 
 # Modules
 
-Fourteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
+Fifteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
 rather than convention.
 
 | Module | Depends on | Contains |
@@ -1041,7 +1126,8 @@ rather than convention.
 | `pelican-*-docs` | its backend, openapi | serves the document and Swagger UI |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
-| `pelican-gradle-plugin` | **nothing** | `dev.pelican`: both generators, as Gradle tasks |
+| `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
+| `pelican-gradle-plugin` | **nothing** | `dev.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-pekko` / `-http4k` | test + that backend | the in-memory transport |
 
@@ -1058,7 +1144,7 @@ library. The full breakdown is in
 # Running the examples
 
 ```bash
-./gradlew build                          # all modules, 630 tests
+./gradlew build                          # all modules, 694 tests
 ./gradlew :example:runReadmeExample      # the service above, on :8080
 ./gradlew :example:run                   # the fuller orders API (streaming, SSE, raw bodies)
 ./gradlew :example:runBackends           # all three backends at once, on :8080-:8082
@@ -1091,7 +1177,15 @@ reasoning behind each, is in [docs/reference.md](docs/reference.md#what-isnt-her
   the file so the handler gets a live stream. A second part is a startup failure
   and a text part after the file is a 400. `rawBody()` is there for an envelope
   you would rather parse yourself.
-- **No content negotiation.** One output media type per endpoint.
+- **No content negotiation.** One output media type per endpoint. This is also
+  the commonest reason an import refuses an operation: a document offering JSON
+  or XML is offering two decodes of one request, and there is no description
+  that means either.
+- **Importing is all-or-nothing per operation.** A document Pelican cannot fully
+  describe fails the build rather than generating a weaker endpoint. The way
+  through is an `exclude` list of `operationId`s in the build file, which is
+  deliberately per-operation and reviewable — see
+  [Importing an OpenAPI document](#importing-an-openapi-document).
 - **Six typed inputs, then the lens form.** `endpoint(a..f)` is the largest tuple
   overload. Past that, `endpoint { }` reads `Params` by key at the cost of the
   compile-time guarantee. Two adjacent inputs of the same primitive type can also
@@ -1110,7 +1204,7 @@ reasoning behind each, is in [docs/reference.md](docs/reference.md#what-isnt-her
 
 Kotlin 2.2.20 · Pekko 1.6.0 · Pekko HTTP 1.4.0 · http4k 6.22.0.0 · Ktor 3.5.2 ·
 Jackson 2.22.2 · swagger-core 2.2.54 · kotlinx.serialization 1.9.0 ·
-slf4j-api 2.0.17 · JDK 21 · Gradle 8.14.3
+slf4j-api 2.0.17 · snakeyaml-engine 2.10 · JDK 21 · Gradle 8.14.3
 
 http4k is pinned to the last release built against Kotlin 2.2.20. A newer one
 ships stdlib metadata this compiler will not read, so bump both together.

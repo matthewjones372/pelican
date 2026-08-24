@@ -63,7 +63,8 @@ gradlePlugin {
             id = "dev.pelican"
             implementationClass = "dev.pelican.gradle.PelicanPlugin"
             displayName = "Pelican"
-            description = "Generates a Kotlin client and an OpenAPI document from Pelican endpoint descriptions."
+            description = "Generates a Kotlin client and an OpenAPI document from endpoint descriptions, " +
+                "and endpoint descriptions from a document."
             tags.set(listOf("openapi", "kotlin", "codegen", "pelican"))
         }
     }
@@ -93,7 +94,10 @@ java {
 publishing.publications.withType<MavenPublication>().configureEach {
     pom {
         name.set("pelican-gradle-plugin")
-        description.set("Generates a Kotlin client and an OpenAPI document from Pelican endpoint descriptions.")
+        description.set(
+            "Generates a Kotlin client and an OpenAPI document from Pelican endpoint descriptions, " +
+                "and endpoint descriptions from an OpenAPI document.",
+        )
         url.set("https://github.com/matthewjones372/pelican")
         licenses {
             license {

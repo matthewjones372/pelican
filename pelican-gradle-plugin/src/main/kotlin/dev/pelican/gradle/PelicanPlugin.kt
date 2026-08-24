@@ -49,8 +49,14 @@ class PelicanPlugin : Plugin<Project> {
             document.classpath.from(defaultClasspath)
         }
 
+        pelican.endpoints.configureEach { endpoints ->
+            endpoints.outputDir.convention(project.defaultOutput(endpoints.name))
+            endpoints.classpath.from(defaultClasspath)
+        }
+
         pelican.clients.all { client -> project.register(client) }
         pelican.documents.all { document -> project.register(document) }
+        pelican.endpoints.all { endpoints -> project.register(endpoints) }
     }
 
     // ----------------------------------------------------------------------
@@ -108,6 +114,37 @@ class PelicanPlugin : Plugin<Project> {
             // only wired up for a client somebody commits.
             if (!ours) {
                 tasks.matching { task -> task.name == "check" }.configureEach { task -> task.dependsOn(check) }
+            }
+        }
+    }
+
+    private fun Project.register(endpoints: EndpointsSpec) {
+        val name = endpoints.name.replaceFirstChar { it.uppercase() }
+
+        val generate = tasks.register("generate${name}Endpoints", GenerateEndpointsTask::class.java) { task ->
+            task.description = "Generates the ${endpoints.name} endpoint descriptions from an OpenAPI document"
+            task.classpath.from(endpoints.classpath)
+            task.document.set(endpoints.document)
+            task.packageName.set(endpoints.packageName)
+            task.entryName.set(endpoints.name)
+            task.exclude.set(endpoints.exclude)
+            task.handlers.set(endpoints.handlers)
+            task.outputDir.set(endpoints.outputDir)
+        }
+
+        // The same rule the client task follows: a directory inside `build/`
+        // is this task's own, and anywhere else is a source root somebody
+        // commits — where a tracked output would make every compile depend on
+        // regenerating.
+        afterEvaluate {
+            val ours = endpoints.outputDir.get().asFile.isInside(layout.buildDirectory.get().asFile)
+            generate.configure { task ->
+                task.cleanOutput.set(ours)
+                if (ours) {
+                    task.outputs.dir(endpoints.outputDir)
+                } else {
+                    task.outputs.upToDateWhen { false }
+                }
             }
         }
     }

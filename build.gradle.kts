@@ -41,6 +41,7 @@ val moduleDescriptions = mapOf(
     "pelican-core" to "Endpoint descriptions as values. No dependencies.",
     "pelican-openapi" to "Endpoint descriptions to an OpenAPI 3.1.0 document.",
     "pelican-codegen" to "Endpoint descriptions to a Kotlin client, as source.",
+    "pelican-import" to "An OpenAPI document to endpoint descriptions, as source.",
     "pelican-jackson" to "Jackson codecs and swagger-core schemas for Pelican.",
     "pelican-kotlinx" to "kotlinx.serialization codecs and schemas for Pelican.",
     "pelican-pekko" to "Endpoint descriptions to a Pekko HTTP route.",
@@ -149,10 +150,10 @@ subprojects {
                 // Spotless reformatted it the gate would fail for good: the
                 // generator emits the unformatted text.
                 "src/test/kotlin/example/generated/**/*.kt",
-                // String templates that the code generator reads at runtime.
-                // They are `.kt` for editor highlighting only; some are
-                // fragments and do not parse standalone.
-                "src/main/resources/dev/pelican/codegen/*.kt",
+                // String templates the generators read at runtime. They are
+                // `.kt` for editor highlighting only; some are fragments, and
+                // some carry placeholders that do not parse standalone.
+                "src/main/resources/dev/pelican/*/*.kt",
             )
             ktlint(ktlintVersion).editorConfigOverride(ktlintOverrides)
         }

@@ -23,6 +23,7 @@ internal object Pelican {
     private const val CLIENT = "dev.pelican.codegen.KotlinClientKt"
     private const val OPEN_API = "dev.pelican.openapi.OpenApiKt"
     private const val YAML = "dev.pelican.openapi.YamlKt"
+    private const val IMPORT = "dev.pelican.importer.ImportKt"
 
     /** Calls the named no-argument function and returns whatever it produced. */
     fun spec(loader: ClassLoader, className: String, functionName: String): Any {
@@ -89,6 +90,34 @@ internal object Pelican {
             baseUrl ?: firstServer(spec),
             includeHidden,
         ) as File
+    }
+
+    /**
+     * Generates endpoint descriptions from a document, and returns what it
+     * wrote. Unlike everything else here it loads no spec: the input is a file
+     * the consumer wrote or published, not code they compiled.
+     */
+    @Suppress("LongParameterList")
+    fun writeEndpoints(
+        loader: ClassLoader,
+        document: File,
+        sourceRoot: File,
+        packageName: String,
+        name: String,
+        exclude: Set<String>,
+        handlers: String?,
+    ): List<*> {
+        val importer = load(loader, IMPORT, "pelican-import")
+        val method = importer.getMethod(
+            "importEndpoints",
+            File::class.java,
+            File::class.java,
+            String::class.java,
+            String::class.java,
+            Set::class.java,
+            String::class.java,
+        )
+        return method.invokeUnwrapped(null, document, sourceRoot, packageName, name, exclude, handlers) as List<*>
     }
 
     /** The document, rendered the way the entry asked for. */

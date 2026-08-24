@@ -13,6 +13,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-core` | **nothing** | endpoint descriptions, plain-value codecs, a minimal JSON tree. No HTTP library, no JSON library. |
 | `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 document, in JSON or YAML |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
+| `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-kotlinx` | core, kotlinx.serialization | the alternative `Codecs` |
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
@@ -24,7 +25,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
 | `pelican-test-http4k` | test, http4k | the in-memory transport, on http4k |
-| `pelican-gradle-plugin` | **nothing** | the `dev.pelican` Gradle plugin: the two generators above, as tasks |
+| `pelican-gradle-plugin` | **nothing** | the `dev.pelican` Gradle plugin: every generator above, as tasks |
 | `example` | core, openapi, jackson, all three backends | the orders, bookmarks, greetings and secured services |
 
 The layering is load-bearing, not decorative, and each edge is a test:
@@ -43,6 +44,14 @@ The layering is load-bearing, not decorative, and each edge is a test:
   `org.apache.pekko` is absent: a second backend sharing a server library with
   the first would be no evidence that the abstractions in core hold.
 - `pelican-ktor` asserts all three: no `pelican-openapi`, no Pekko, no http4k.
+- `pelican-import` depends on `pelican-codegen` rather than on core directly,
+  and shares its schema-to-Kotlin generator outright. A client generated from a
+  document and a client generated from endpoint values should not disagree
+  about what an `Order` looks like, and the only way to guarantee that is for
+  both to be the same code. Its parser is snakeyaml-engine and nothing else:
+  YAML 1.2 is a superset of JSON, so one dependency reads both, and what it
+  produces is turned straight into core's `JsonValue` — the same type
+  `pelican-openapi` writes documents out of.
 - `pelican-test` asserts that no server library and no matcher library is on its
   runtime classpath. This module was the hole in the story for a while: it
   declared `api(project(":pelican-pekko"))` for the sake of one in-memory
@@ -388,9 +397,22 @@ pelican {
 }
 ```
 
-Each entry names its tasks — `generateOrdersDocument`, `generateOrdersClient`
-and `checkOrdersClient` — so a module talking to three services generates three
-clients without three build scripts.
+There is a third kind of entry, going the other way:
+
+```kotlin
+pelican {
+    endpoints {
+        create("orders") {
+            document.set(layout.projectDirectory.file("orders.yaml"))
+            packageName.set("com.example.orders")
+        }
+    }
+}
+```
+
+Each entry names its tasks — `generateOrdersDocument`, `generateOrdersClient`,
+`checkOrdersClient`, `generateOrdersEndpoints` — so a module talking to three
+services generates three clients without three build scripts.
 
 It is not on the Gradle Plugin Portal yet:
 `./gradlew -p pelican-gradle-plugin publishToMavenLocal` installs it, and
@@ -431,6 +453,25 @@ and Gradle's are not the same Jackson.
 | `outputDir` | clients | `build/generated/pelican/<name>` |
 | `format` | documents | `JSON`; `YAML` writes the same document the other way |
 | `outputFile` | documents | `build/generated/pelican/<name>/openapi.<format>` |
+| `document` | endpoints | — required: the OpenAPI document to read |
+| `packageName` | endpoints | — required |
+| `exclude` | endpoints | empty: `operationId`s to leave out. See below |
+| `handlers` | endpoints | unset: `pekko`, `http4k` or `ktor` writes stubs |
+| `outputDir` | endpoints | `build/generated/pelican/<name>` |
+
+An `endpoints` entry has no `specClass` or `specFunction`, which is the whole
+difference between the two directions stated as a property list: it reads a
+document rather than compiled descriptions, so there is no spec for it to load.
+Its `classpath` needs `pelican-import` on it rather than the module's own code —
+usually a configuration of its own, since nothing the module *runs* needs the
+importer:
+
+```kotlin
+val pelicanImport: Configuration by configurations.creating
+dependencies { pelicanImport("dev.pelican:pelican-import:0.1.0-SNAPSHOT") }
+
+pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
+```
 
 ### Where the output goes, and what that changes
 
@@ -458,6 +499,226 @@ Both generators are ordinary functions, and a build that would rather call them
 itself still can: `spec.openApiJson()`, `spec.openApiYaml()` and
 `spec.writeKotlinClient(sourceRoot, packageName)`. The plugin is those calls
 with the classpath, the up-to-date checks and the staleness gate already wired.
+
+## Importing an OpenAPI document
+
+Every other module here reads endpoint values and writes something else.
+`pelican-import` is the one that reads a document somebody else wrote, and
+writes the values. Two situations want it: calling an API you do not own, and
+building a service against a spec agreed before the code.
+
+Both get the same file. What is generated describes an API and does not run
+one — no server library is named in it — so the descriptions serve a generated
+client and a server equally, and the choice is made afterwards by what you do
+with them.
+
+### What comes out
+
+```
+pelican { endpoints { create("orders") { document.set(file("orders.yaml")); packageName.set("com.example.orders") } } }
+```
+
+`generateOrdersEndpoints` writes `OrdersEndpoints.kt`: security schemes, then
+inputs, then response headers, then declared failures, then the payload types,
+then the schemas those came from, then one `endpoint(...)` per operation, then
+the list of them and two `ordersSpec()` functions holding the lot.
+
+The order is load-bearing rather than tidy. Top-level values in Kotlin
+initialise in source order, so an endpoint naming a failure declared below it
+would read a null at class-init time — everything an endpoint mentions is
+declared above it.
+
+### The schemas come too
+
+`ordersSpec()` takes no argument, and that is not a convenience. The generated
+file carries the document's schemas verbatim, as a `SchemaSource` of its own,
+so an imported description publishes the document it was imported from — and a
+client can be generated from it with no JSON library present anywhere in the
+build. A codec re-deriving those schemas from the generated Kotlin classes
+would produce something very close and not the same thing, and every difference
+would be the imported document quietly saying something the original did not.
+
+`ordersSpec(JacksonCodecs)` is the same descriptions with the payload types
+described from the classes instead. That is the one to reach for once the
+classes are the source of truth — a service that has edited them since the
+import, and whose document should say what it now serves.
+
+It is also what makes the round trip below worth running: with the document's
+own schemas, the two documents are the same document.
+
+Payload types come from the same generator the client generator uses, so an
+imported `Order` and a generated client's `Order` cannot drift apart. A
+constraint in the document becomes a refinement rather than a comment:
+`minimum: 1` on a query parameter is `IntCodec.atLeast(1)`, which rejects a
+zero *and* documents `minimum: 1` when the document is published again.
+
+### Strict, and why
+
+An operation that uses something Pelican cannot describe fails the import. It
+does not generate an endpoint with `Any?` in it and a note.
+
+The reason is what the two halves are for. A generated client answering "I do
+not model this" with `Any?` is still a working client, and honest about what it
+knows — that is why `pelican-codegen` degrades rather than fails. An *import*
+degrading produces something else: a handler taking `Any?`, a document that no
+longer says what the original said, and no sign that anything was lost. The
+import is the moment the two descriptions are supposed to be the same one, and
+a silent weakening at exactly that moment is the failure mode worth ruling out.
+
+What it refuses, and what each one would have cost:
+
+| In the document | Why there is no description for it |
+|---|---|
+| Two 2xx responses | An endpoint's output is one type and one status. `200 Order` beside `202 Accepted` is a runtime distinction a handler makes, and picking either loses it |
+| A `default` response | "And anything else." An endpoint declares the statuses it answers with by name |
+| Two media types for one body or response | `jsonBody<T>()` is a JSON body; there is no form of it meaning "or XML" |
+| `oneOf`, `anyOf` of several shapes, `discriminator` | A union. Kotlin holds one as a sealed hierarchy, and nothing in the document says what to call each branch |
+| `allOf` of several schemas | Merging them would invent a type the document never named |
+| A parameter that is a list or an object | A Pelican input decodes one value from one string |
+| A parameter under `content`, or a non-default `style` | Both describe values with parts, which is the same refusal again |
+| A failure with both a body and headers | `errorJson<T>(...)` carries one payload. A failure with headers and no body is fine — that one is documented rather than returned |
+| Two file parts in a multipart body | The same rule `endpoint(...)` enforces at class-init: reading stops at the first file so it can be streamed |
+| An operation with its own `servers`, or `callbacks` | A description carries no server of its own, and a callback is the other direction again |
+| `webhooks` | Calls the service makes rather than answers. Nothing here describes those, and dropping them would generate a client missing half of what the document offers |
+| A `$ref` to another host | See below |
+
+Each failure names the operation, the position in the document, and what to do.
+They are collected rather than thrown one at a time — the decision a reader has
+to make is one decision about the whole list — with one problem reported per
+operation, since the rest of what an operation says is being read through the
+first thing that could not be described.
+
+### The exclude list
+
+Strict is the right default for a document you own and an obstacle in one you
+do not, so there is a way through, and it is deliberately not a switch:
+
+```kotlin
+create("orders") {
+    document.set(file("orders.yaml"))
+    packageName.set("com.example.orders")
+    exclude("uploadReceipt", "searchAnything")
+}
+```
+
+Per operation, by `operationId`, written in the build file and reviewed once. A
+global `lenient = true` would have been less typing and would have answered a
+different question — it says "and whatever else turns up", where this says
+"these two, and the third one still fails".
+
+Excluding an operation also excludes the schemas only it reached. `components`
+is a library, and a type nobody uses is not worth failing an import over, nor
+worth generating a class for — so a `oneOf` in one corner of a document costs
+that corner and nothing else. A `oneOf` inside a schema the *rest* of the
+document uses is a different matter, and fails outright: no list of operations
+to leave out would be an honest answer to it.
+
+### operationId is required
+
+The document says it is optional. The import does not, and reports every
+operation missing one rather than deriving names.
+
+An `operationId` names the generated endpoint value, the generated client's
+method and the handler stub — the three things a caller and a maintainer type.
+Derived from the method and the path they would be `getUsersByUserIdOrders`,
+and they would all change the day somebody reorganises a route, which is a
+rename of half the generated file caused by an edit that changed no contract.
+Adding `operationId` to a document you own is a small edit that makes the
+generated names yours.
+
+### References
+
+References to other files are followed. A schema pulled in from another file
+keeps the name it had there, so a spec split across files generates the names
+its author chose rather than names invented from where each type happened to be
+used — and a local `#/...` inside a pulled-in file is read against *that* file,
+which is the bug worth knowing about in anything that merges documents.
+
+References to another host are refused. Following one would mean a build that
+fetches a URL to know what to generate: a different result on a different day,
+a failure offline, and untrusted content reaching a code generator. Bundle the
+document first, or vendor the file it needs beside it.
+
+### Three dialects, one shape
+
+3.1, 3.0 and Swagger 2.0 are all read. 2.0 is converted first — bodies are
+parameters there, media types hang off the operation, schemas live under
+`definitions` — and 3.0's `nullable: true` becomes 3.1's `"null"` among the
+types, which is the spelling everything downstream reads. A 2.0 document and
+its 3.0 twin generate identical descriptions; `VersionsTest` asserts exactly
+that, because it is the claim the module makes.
+
+Nothing is decided in the conversion that the mapping would decide differently.
+A 2.0 operation that `produces` two media types becomes a response offering
+two, and is refused there — the same fact about the same operation gets the
+same message it would have got in a 3.x document.
+
+### The judgement calls
+
+Three places where the document does not say enough, and something had to be
+chosen:
+
+- **A JSON array is read as one document, not a stream.** Pelican can describe
+  either and they document identically as `type: array`. Reading a response
+  whole is the safe half: a handler returning a list works for a caller
+  streaming it, and a streaming handler does not work for a caller expecting a
+  whole document.
+- **A templated server URL is substituted with its declared defaults.** That is
+  reading the document rather than guessing at it — the default is what the
+  document says the server is when nobody chooses.
+- **A response with no `description` gets the status's reason phrase.** The
+  field is required by the spec, and a missing one is not worth failing over.
+
+### Handler stubs
+
+`handlers.set("pekko")` — or `http4k`, or `ktor` — writes a second file with
+one `TODO()` per operation, bound with the right binder for each output kind:
+`handledOrFail` where failures are declared, `streamedNow` for NDJSON and SSE,
+`bytesNow` for a byte stream, `handledWith` where there is no body. It compiles
+immediately and throws the moment a request reaches something unwritten, which
+is the honest state of a service nobody has written yet.
+
+It is written once and never overwritten. After the first run it is not
+generated code any more. Inside `build/` the whole directory belongs to the
+task and is emptied on each run, so the write-once rule only protects a source
+root you chose.
+
+### Generated source in a source root
+
+Pointing `outputDir` at a source root works the same way it does for the
+client: the directory is not a tracked output, and the file is one you commit.
+Linters will find it, though, and a generated file is not the place to argue
+with them — this repository excludes its own generated import from detekt in
+one line, and the path is the one *inside* the source root rather than the
+`build/generated` one a reader expects:
+
+```kotlin
+tasks.withType<dev.detekt.gradle.Detekt>().configureEach { exclude("com/example/orders/**") }
+```
+
+### The round trip
+
+`:example` does this on every build. It publishes `openapi.json` from its
+endpoint values, generates descriptions back out of it, compiles them into its
+test source set, and compares what those descriptions publish against the
+document it started with. Three things are checked at once, and the quietest is
+the compiler: generated Kotlin that does not compile fails here rather than in
+somebody's project.
+
+It is compared twice. Once through `JacksonCodecs`, where the payload schemas
+on the far side are re-derived from the *generated* Kotlin classes — the claim
+being that the types that came out describe the payloads that went in — and
+once through the imported document's own schemas, where the two documents are
+compared whole: every path, every parameter, every schema, down to the examples
+and the `minimum` on a query parameter.
+
+Two things are left out of the second comparison, and both are worth knowing.
+Key order, because a JSON object is a map and the two documents are built by
+walking different things. And what a *successful* response is called: Pelican
+writes that from the output kind — "A newline-delimited JSON stream", "No
+content" — so it is not something an endpoint carries, and the one endpoint
+whose streamed JSON array came back as a whole one differs there. That is the
+judgement call above, showing up exactly where it should.
 
 ## Hiding an endpoint
 
@@ -1521,7 +1782,7 @@ is the socket test, minus the socket.
 
 ## What the build checks
 
-Five gates beyond the tests, each of which exists because a claim in this
+Six gates beyond the tests, each of which exists because a claim in this
 document would otherwise be unverified.
 
 **detekt**, on the type-resolving `detektMain`/`detektTest` tasks rather than
@@ -1572,6 +1833,13 @@ produce. It is on `check`, so a change to an endpoint that nobody regenerated
 for stops the build rather than being noticed by whoever compiles the client
 next.
 
+**ImportedOrdersTest** closes the loop the other way. The document this build
+publishes is imported back into endpoint descriptions, compiled into the
+example's test source set, and asked to publish a document of its own; the two
+contracts are compared. It is the only test either direction has that the other
+one cannot fake, and the compiler is doing half the work — generated Kotlin
+that does not compile fails the build here.
+
 Two smaller things. The Pekko route tests run through Pekko's own route
 testkit, behind a JUnit 5 extension in `PekkoRouteTestKit` — the testkit drives
 its `ActorSystem` from a JUnit 4 `@Rule`, which Jupiter does not run. And
@@ -1581,12 +1849,13 @@ http4k route; see [What it costs](../README.md#what-it-costs).
 ## Run it
 
 ```bash
-./gradlew build                     # 630 tests across all modules and the plugin
+./gradlew build                     # 694 tests across all modules and the plugin
 ./gradlew :example:run              # server on :8080, on Pekko
 ./gradlew :example:runHttp4k        # the same service on :8080, on http4k
 ./gradlew :example:runBackends      # the small example on all three backends at once
 ./gradlew :example:generateOrdersDocument  # spec, no server
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
+./gradlew :example:generateImportedEndpoints  # the document, read back as descriptions
 ```
 
 ```bash
@@ -1620,7 +1889,14 @@ open  localhost:8080/api-docs                                 # Swagger UI
   parameter; the extended, charset-tagged spelling is not decoded.
 - **OpenAPI 3.0.** The emitter writes 3.1.0 and nothing else. The reasoning,
   and what to do if your tooling only reads 3.0, are under
-  [Moving from 3.0.3 to 3.1.0](#moving-from-303-to-310).
+  [Moving from 3.0.3 to 3.1.0](#moving-from-303-to-310). The *importer* reads
+  3.1, 3.0 and Swagger 2.0 alike, which is a different question: reading an old
+  document costs one normalising pass, and writing one would cost a second
+  emitter that could not be faithful anyway.
+- **A lenient import.** `pelican-import` refuses an operation it cannot fully
+  describe rather than generating a weaker one, and the way through is a
+  per-operation `exclude` list. There is no global switch, on purpose — see
+  [Importing an OpenAPI document](#importing-an-openapi-document).
 - **More than six typed inputs.** `endpoint(a..f)` is the largest overload;
   past that the lens form takes the whole `Params`.
 - **A fourth server backend.** `pelican-ktor` was the third, and cost what

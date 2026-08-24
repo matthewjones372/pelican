@@ -17,6 +17,7 @@ include(
     "pelican-core",
     "pelican-openapi",
     "pelican-codegen",
+    "pelican-import",
     "pelican-jackson",
     "pelican-kotlinx",
     "pelican-pekko",

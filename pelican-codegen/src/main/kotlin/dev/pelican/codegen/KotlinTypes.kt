@@ -15,7 +15,7 @@ import dev.pelican.PlainCodec
  * the generated payload types in step with the *documented* ones rather than
  * with a second opinion about the same Kotlin classes.
  */
-internal class KotlinTypes {
+class KotlinTypes {
 
     private val declarations = LinkedHashMap<String, String>()
     private val declaring = mutableSetOf<String>()
@@ -138,7 +138,7 @@ internal class KotlinTypes {
 
     private fun enumClass(name: String, constants: List<String>): String {
         enums.putIfAbsent(constants, name)
-        return "enum class $name { ${constants.joinToString(", ")} }"
+        return enumDeclaration(name, constants)
     }
 
     /** Reuses the enum already generated for these constants, or declares one. */
@@ -146,19 +146,31 @@ internal class KotlinTypes {
         enums[constants]?.let { return it }
         val name = unique(typeName(context), taken)
         enums[constants] = name
-        declarations[name] = "enum class $name { ${constants.joinToString(", ")} }"
+        declarations[name] = enumDeclaration(name, constants)
         return name
     }
 
     /**
+     * A constant is written exactly as the document spells it, in backticks
+     * where it has to be: `in-progress` is a legal enum constant name in
+     * Kotlin, and `EnumCodec` matches on the constant's name, so the wire
+     * value and the Kotlin name stay the same string. Renaming it to
+     * `IN_PROGRESS` would need a codec-specific annotation to map back, which
+     * is exactly what these declarations are meant to do without.
+     */
+    private fun enumDeclaration(name: String, constants: List<String>): String =
+        "enum class $name { ${constants.joinToString(", ") { asWritten(it) }} }"
+
+    /**
      * The constants of a string enum, or null when this is not one — including
-     * when a constant is not a legal Kotlin name, in which case the value stays
-     * a `String` rather than being renamed into something that no longer matches.
+     * when a constant cannot be written as a Kotlin name at all, in which case
+     * the value stays a `String` rather than being renamed into something that
+     * no longer matches.
      */
     private fun stringConstants(obj: JsonObj): List<String>? {
         val values = (obj["enum"] as? JsonArr)?.items?.takeIf { it.isNotEmpty() } ?: return null
         val strings = values.mapNotNull { (it as? JsonStr)?.value }
-        if (strings.size != values.size || strings.any { !isIdentifier(it) }) return null
+        if (strings.size != values.size || strings.any { !isWritable(it) }) return null
         return strings
     }
 
