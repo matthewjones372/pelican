@@ -7,15 +7,18 @@ import dev.pelican.http4k.bytesNow
 import dev.pelican.http4k.docs.Docs
 import dev.pelican.http4k.docs.startWithDocs
 import dev.pelican.http4k.handledNow
+import dev.pelican.http4k.handledOneOf
 import dev.pelican.http4k.handledOrFail
 import dev.pelican.http4k.handledWith
 import dev.pelican.http4k.streamedNow
 import dev.pelican.http4k.streamedOrFail
 import dev.pelican.http4k.toStream
 import dev.pelican.jackson.JacksonCodecs
+import dev.pelican.of
 import dev.pelican.ok
 import dev.pelican.unauthorized
 import example.ImportResult
+import example.Queued
 import example.Store
 import example.Tick
 import example.badApiKey
@@ -26,6 +29,9 @@ import example.importOrders
 import example.limit
 import example.listOrders
 import example.noSuchUser
+import example.orderAt
+import example.orderPlaced
+import example.orderQueued
 import example.payOrder
 import example.placeOrder
 import example.placeOrderForm
@@ -33,6 +39,7 @@ import example.reindex
 import example.searchOrders
 import example.statusFilter
 import example.streamOrders
+import example.submitOrder
 import example.watchOrders
 
 /**
@@ -79,6 +86,22 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
             key != "let-me-in" -> badApiKey(ApiError(401, "Bad API key"))
             Store.user(id) == null -> noSuchUser(ApiError(404, "No user $id"))
             else -> ok(Store.create(id, req))
+        }
+    },
+
+    // The same two successes and one failure as the Pekko binding, in the same
+    // words: naming a response is core's business, not a backend's.
+    submitOrder handledOneOf { (id, key, req) ->
+        when {
+            key != "let-me-in" -> badApiKey(ApiError(401, "Bad API key"))
+
+            req.quantity > Store.BURST_LIMIT ->
+                orderQueued(Queued("ticket-$id-${req.item}", position = req.quantity))
+
+            else -> {
+                val order = Store.create(id, req)
+                orderPlaced(order, orderAt of "/users/$id/orders/${order.id}")
+            }
         }
     },
 

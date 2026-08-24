@@ -18,20 +18,51 @@ class StrictnessTest {
     private fun refusing(paths: String): String =
         shouldThrow<ImportFailure> { imported(document(paths)) }.message.orEmpty()
 
+    /**
+     * The refusal this used to be is the one thing on the list that stopped
+     * being true, so the test that pinned it now pins the opposite: two 2xx
+     * read, both declared, and a handler that names the one it is producing.
+     */
     @Test
-    fun `two successful responses are two answers to a question with one`() {
+    fun `two successful responses become two declared responses`() {
+        val source = imported(
+            document(
+                """
+                /orders:
+                  post:
+                    operationId: placeOrder
+                    responses:
+                      "200": { description: Placed }
+                      "202": { description: Queued }
+                """,
+            ),
+        )
+        source shouldContain "empty(status = 200) or empty(status = 202)"
+    }
+
+    /**
+     * A stream is produced in the server library's own type, which is the half
+     * of "several responses" core cannot reach — so this one is still refused,
+     * and says which way out is available.
+     */
+    @Test
+    fun `a streamed response beside another 2xx is a response nothing could produce`() {
         val message = refusing(
             """
             /orders:
-              post:
-                operationId: placeOrder
+              get:
+                operationId: listOrders
                 responses:
-                  "200": { description: Placed }
+                  "200":
+                    description: A stream
+                    content:
+                      application/x-ndjson: { schema: { type: object, properties: { id: { type: integer } } } }
                   "202": { description: Queued }
             """,
         )
-        message shouldContain "placeOrder (POST /orders)"
-        message shouldContain "Two successful responses are documented (200, 202)"
+        message shouldContain "listOrders (GET /orders)"
+        message shouldContain "The 200 response streams"
+        message shouldContain "Document the stream as the only 2xx"
     }
 
     @Test
@@ -234,13 +265,13 @@ class StrictnessTest {
                 operationId: a
                 responses:
                   "200": { description: ok }
-                  "201": { description: also ok }
+                  default: { description: anything else }
             /b:
               get:
                 operationId: b
                 responses:
                   "200": { description: ok }
-                  "202": { description: also ok }
+                  default: { description: anything else }
             """,
         )
         message shouldContain "2 operations cannot be described"
@@ -258,7 +289,7 @@ class StrictnessTest {
                 operationId: a
                 responses:
                   "200": { description: ok }
-                  "201": { description: also ok }
+                  default: { description: anything else }
             /b:
               get:
                 operationId: b

@@ -284,7 +284,7 @@ internal class Reader(private val options: ImportOptions) {
             deprecated = node.bool("deprecated"),
             params = params,
             body = Bodies(this, operation).read(),
-            success = responses.success,
+            successes = responses.successes,
             failures = responses.failures,
             responseHeaders = responses.successHeaders,
             security = if (node["security"] == null) null else requirements(node.arr("security"), path / "security"),

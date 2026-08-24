@@ -145,18 +145,30 @@ private fun requestBody(ep: Endpoint<*, *>, schemas: SchemaSource, components: S
         null -> null
     }
 
-/** The success response the output describes, and one per declared failure. */
+/**
+ * One entry per successful response the output describes, and one per declared
+ * failure.
+ *
+ * An endpoint declaring `200 Order` beside `202 Accepted` publishes both, each
+ * with its own schema and its own media type — which is exactly what OpenAPI's
+ * `responses` map is for, and what made "one 2xx" a limitation of this library
+ * rather than of the format.
+ *
+ * `emits(...)` headers go on every success, being the endpoint's promise; a
+ * header declared on one response goes on that one alone.
+ */
 private fun responses(ep: Endpoint<*, *>, schemas: SchemaSource, components: SchemaComponents): JsonObj = jsonObj {
-    val out = ep.output
-    put(out.status.toString(), jsonObj {
-        "description" to successDescription(out)
-        responseHeaders(ep.responseHeaders)?.let { put("headers", it) }
-        val media = out.mediaType
-        val schema = schemaOf(out, schemas, components)
-        if (media != null && schema != null) {
-            put("content", jsonObj { put(media, jsonObj { put("schema", schema) }) })
-        }
-    })
+    successesOf(ep.output).forEach { out ->
+        put(out.status.toString(), jsonObj {
+            "description" to successDescription(out)
+            responseHeaders(ep.responseHeaders + out.headers)?.let { put("headers", it) }
+            val media = out.mediaType
+            val schema = schemaOf(out, schemas, components)
+            if (media != null && schema != null) {
+                put("content", jsonObj { put(media, jsonObj { put("schema", schema) }) })
+            }
+        })
+    }
     ep.errors.forEach { err ->
         put(err.status.toString(), jsonObj {
             "description" to err.description
@@ -170,6 +182,10 @@ private fun responses(ep: Endpoint<*, *>, schemas: SchemaSource, components: Sch
         })
     }
 }
+
+/** The successful responses an output describes: several where it names them, else itself. */
+private fun successesOf(out: Output<*>): List<Output<*>> =
+    if (out is FallibleOutput<*, *>) out.successes else listOf(out)
 
 private fun operation(
     ep: Endpoint<*, *>,

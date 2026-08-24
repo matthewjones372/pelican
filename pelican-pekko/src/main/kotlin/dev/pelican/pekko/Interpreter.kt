@@ -110,20 +110,25 @@ internal class EndpointCodecs(
     val body: BodyCodec<Any?>?,
     val payload: BodyCodec<Any?>?,
     /**
-     * One per declared failure, keyed by identity — two failures can carry the
-     * same payload type under different statuses, so the declaration is the
-     * key rather than the type.
+     * One per declared response — success or failure — keyed by identity. Two
+     * responses can carry the same payload type under different statuses, so
+     * the declaration is the key rather than the type.
      */
-    val failures: Map<ErrorOutput<*>, BodyCodec<Any?>> = emptyMap(),
-)
+    val alternatives: Map<Any, BodyCodec<Any?>> = emptyMap(),
+) {
+    /** The codec for whichever response a handler named; [payload] is the first success's. */
+    fun payloadFor(out: Output<*>): BodyCodec<Any?>? = alternatives[out] ?: payload
+}
 
 private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = EndpointCodecs(
     body = codecs.requestBodyCodec(bodyInput),
     payload = output.payloadType?.let { codecs.codec(it) },
-    failures = (output as? FallibleOutput<*, *>)
-        ?.failures
-        ?.associateTo(java.util.IdentityHashMap()) { it to codecs.codec<Any?>(it.type) }
-        .orEmpty(),
+    alternatives = (output as? FallibleOutput<*, *>)?.let { declared ->
+        (
+            declared.successes.mapNotNull { s -> s.payloadType?.let { s as Any to codecs.codec<Any?>(it) } } +
+                declared.failures.map { f -> f as Any to codecs.codec<Any?>(f.type) }
+            ).associateTo(java.util.IdentityHashMap<Any, BodyCodec<Any?>>()) { it }
+    }.orEmpty(),
 )
 
 /**

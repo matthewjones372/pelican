@@ -86,6 +86,53 @@ class ImportTest {
         throttling shouldContain "orFail listOrdersFailureTooManyRequests"
     }
 
+    /**
+     * The refusal this replaced: `200 Order` beside `202 Accepted` was two
+     * answers to a question an endpoint could give one answer to. Both are read
+     * now, and the header on the 201 belongs to the 201 — where a
+     * single-response operation puts its headers on `emits(...)`, because there
+     * they are the endpoint's.
+     */
+    @Test
+    fun `two successful responses become two declared responses, each with its own headers`() {
+        val submitting = imported(
+            document(
+                """
+                /orders:
+                  post:
+                    operationId: submitOrder
+                    responses:
+                      "201":
+                        description: Placed
+                        headers:
+                          Location:
+                            required: true
+                            schema: { type: string }
+                        content:
+                          application/json:
+                            schema: { type: object, properties: { id: { type: integer } } }
+                      "202":
+                        description: Queued
+                        content:
+                          application/json:
+                            schema: { type: object, properties: { ticket: { type: string } } }
+                      "401":
+                        description: Bad API key
+                        content:
+                          application/json:
+                            schema: { type: object, properties: { message: { type: string } } }
+                """,
+            ),
+        )
+
+        submitting shouldContain """val location = responseHeader<String>("Location")"""
+        submitting shouldContain "json<SubmitOrderResponse>(status = 201, location) or " +
+            "json<SubmitOrderResponse2>(status = 202) orFail submitOrderFailureUnauthorized"
+        // The endpoint's own list stays empty: neither header is a promise the
+        // whole operation makes.
+        submitting shouldNotContain "emits("
+    }
+
     @Test
     fun `a response header is a value the handler may set`() {
         bookmarks shouldContain """val location = responseHeader<String>("Location", "Where the new bookmark lives")"""

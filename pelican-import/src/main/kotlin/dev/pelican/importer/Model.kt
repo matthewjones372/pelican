@@ -41,7 +41,8 @@ internal class IrEndpoint(
     val deprecated: Boolean,
     val params: List<IrParam>,
     val body: IrBody?,
-    val success: IrSuccess,
+    /** Every documented 2xx, in status order. The first is what a bare `ok(...)` means. */
+    val successes: List<IrSuccess>,
     val failures: List<IrFailure>,
     val responseHeaders: List<IrResponseHeader>,
     /** Null means "whatever the document requires"; empty means deliberately public. */
@@ -96,16 +97,68 @@ internal sealed class IrPart {
     ) : IrPart()
 }
 
-/** The one 2xx response, as the output that describes it. */
+/**
+ * One 2xx response, as the output that describes it.
+ *
+ * [headers] are the ones belonging to this response alone, and are empty for an
+ * operation with a single success — there they are the endpoint's, and travel
+ * as [IrEndpoint.responseHeaders]. See `Responses.read`.
+ */
 internal sealed class IrSuccess {
     abstract val status: Int
+    abstract val headers: List<IrResponseHeader>
 
-    class Json(override val status: Int, val schema: JsonObj) : IrSuccess()
-    class Ndjson(override val status: Int, val schema: JsonObj) : IrSuccess()
-    class Sse(override val status: Int, val schema: JsonObj) : IrSuccess()
-    class Text(override val status: Int) : IrSuccess()
-    class Bytes(override val status: Int, val mediaType: String) : IrSuccess()
-    class Empty(override val status: Int) : IrSuccess()
+    class Json(
+        override val status: Int,
+        val schema: JsonObj,
+        override val headers: List<IrResponseHeader> = emptyList(),
+    ) : IrSuccess()
+
+    class Ndjson(
+        override val status: Int,
+        val schema: JsonObj,
+        override val headers: List<IrResponseHeader> = emptyList(),
+    ) : IrSuccess()
+
+    class Sse(
+        override val status: Int,
+        val schema: JsonObj,
+        override val headers: List<IrResponseHeader> = emptyList(),
+    ) : IrSuccess()
+
+    class Text(
+        override val status: Int,
+        override val headers: List<IrResponseHeader> = emptyList(),
+    ) : IrSuccess()
+
+    class Bytes(
+        override val status: Int,
+        val mediaType: String,
+        override val headers: List<IrResponseHeader> = emptyList(),
+    ) : IrSuccess()
+
+    class Empty(
+        override val status: Int,
+        override val headers: List<IrResponseHeader> = emptyList(),
+    ) : IrSuccess()
+}
+
+/** Whether producing this response means handing over a stream rather than a value. */
+internal fun IrSuccess.streams(): Boolean =
+    this is IrSuccess.Ndjson || this is IrSuccess.Sse || this is IrSuccess.Bytes
+
+/**
+ * The same response with the headers it carries. Read after the response
+ * itself, because whether they belong here or to the endpoint depends on how
+ * many successes there turned out to be.
+ */
+internal fun IrSuccess.with(headers: List<IrResponseHeader>): IrSuccess = when (this) {
+    is IrSuccess.Json -> IrSuccess.Json(status, schema, headers)
+    is IrSuccess.Ndjson -> IrSuccess.Ndjson(status, schema, headers)
+    is IrSuccess.Sse -> IrSuccess.Sse(status, schema, headers)
+    is IrSuccess.Text -> IrSuccess.Text(status, headers)
+    is IrSuccess.Bytes -> IrSuccess.Bytes(status, mediaType, headers)
+    is IrSuccess.Empty -> IrSuccess.Empty(status, headers)
 }
 
 /** A documented non-2xx. One with a JSON body becomes a typed failure; one without is documented only. */
@@ -171,14 +224,17 @@ internal fun IrEndpoint.schemas(): List<JsonObj> = buildList {
         is IrBody.Multipart -> declared.parts.filterIsInstance<IrPart.Text>().forEach { add(it.schema) }
         is IrBody.Raw, null -> Unit
     }
-    when (val answered = success) {
-        is IrSuccess.Json -> add(answered.schema)
-        is IrSuccess.Ndjson -> add(answered.schema)
-        is IrSuccess.Sse -> add(answered.schema)
-        else -> Unit
+    successes.forEach { answered ->
+        when (answered) {
+            is IrSuccess.Json -> add(answered.schema)
+            is IrSuccess.Ndjson -> add(answered.schema)
+            is IrSuccess.Sse -> add(answered.schema)
+            else -> Unit
+        }
     }
     failures.forEach { failure -> failure.schema?.let { add(it) } }
     responseHeaders.forEach { add(it.schema) }
+    successes.flatMap { it.headers }.forEach { add(it.schema) }
     failures.flatMap { it.headers }.forEach { add(it.schema) }
 }
 

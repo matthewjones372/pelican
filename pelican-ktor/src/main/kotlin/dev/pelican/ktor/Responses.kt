@@ -63,14 +63,15 @@ internal suspend fun respond(
     // Every output carrying a payload type had its codec resolved when the
     // routes were built, so a null here is a bug in that resolution rather
     // than anything a request can provoke.
-    fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payload) { "No codec was resolved for $out" }
+    fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
 
-    // A declared failure is rendered by the configured codec, as its own
-    // declared type — this is the response the document promised, rather than
-    // the framework's generic ApiError.
+    // The handler named one of the endpoint's declared responses, and that
+    // declaration supplies the status, the media type and the type the body is
+    // written as — so this is the response the document promised, rather than
+    // whichever one happened to be first.
     if (out is FallibleOutput<*, *>) {
         return when (val outcome = value as Outcome<*, *>) {
-            is Outcome.Ok<*> -> respond(call, out.success, outcome.value, codecs)
+            is Outcome.Ok<*> -> respondSuccess(call, out, outcome, codecs)
             is Outcome.Err<*> -> respondFailure(call, out, outcome, codecs)
         }
     }
@@ -150,6 +151,30 @@ internal fun jsonArrayFrames(elements: Flow<Any?>, codec: BodyCodec<Any?>): Flow
     }
 
 /**
+ * Renders whichever declared success the handler named.
+ *
+ * A bare `ok(value)` names none, and means the first — which for the endpoints
+ * that declare exactly one success is the only one there is, so this is the
+ * same rendering that shape always had.
+ */
+private suspend fun respondSuccess(
+    call: ApplicationCall,
+    out: FallibleOutput<*, *>,
+    ok: Outcome.Ok<*>,
+    codecs: EndpointCodecs,
+) {
+    val chosen = ok.declared ?: out.successes.first()
+    check(out.successes.any { it === chosen }) {
+        "$chosen was returned by a handler but $out never declared it"
+    }
+    // Encoded and checked against the declaration when the handler produced
+    // the response, so there is nothing left to decide here. Appended before
+    // the body, because writing the body is what commits the response.
+    ok.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
+    respond(call, chosen, ok.value, codecs)
+}
+
+/**
  * Renders one declared failure.
  *
  * The status comes from the declaration the handler named rather than from the
@@ -170,7 +195,7 @@ private suspend fun respondFailure(
     check(cls == null || cls.isInstance(err.error)) {
         "$declared carries ${declared.type} but the handler returned ${err.error?.let { it::class }}"
     }
-    val codec = checkNotNull(codecs.failures[declared]) { "No codec was resolved for $declared" }
+    val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
     // Encoded and checked against the declaration when the handler produced
     // the failure, so there is nothing left to decide here. Appended before
     // the body, because writing the body is what commits the response.

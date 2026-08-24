@@ -17,6 +17,8 @@ import example.generated.OrdersClient
 import example.generated.Outcome
 import example.generated.PlaceOrderFailure
 import example.generated.StreamOrdersFailure
+import example.generated.SubmitOrderFailure
+import example.generated.SubmitOrderResult
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
 import io.kotest.matchers.comparables.shouldBeLessThan
@@ -180,6 +182,45 @@ class GeneratedKotlinClientTest {
         val failure = refused.failure.shouldBeInstanceOf<PlaceOrderFailure.TooManyRequests>()
         failure.body.status shouldBe 429
         failure.retryAfter shouldBe 30L
+    }
+
+    /**
+     * The two successes, as the caller has to meet them.
+     *
+     * `submitOrder` returns a `SubmitOrderResult`, not an `Order` — so the
+     * caller cannot read the 201's payload without having said which response
+     * it is looking at, and the `when` below is exhaustive. Declare a third 2xx
+     * on the endpoint, regenerate, and this stops compiling, which is the point
+     * of the sealed type: the alternative was the two payloads' common
+     * supertype, and `Any` would have compiled and said nothing.
+     */
+    @Test
+    fun `an endpoint that answers two ways makes the caller say which one it got`() {
+        val placed = client.submitOrder(1L, CreateOrder("anvil", quantity = 2), xApiKey = "let-me-in")
+
+        when (val result = (placed as Outcome.Ok).value) {
+            is SubmitOrderResult.Created -> {
+                result.body.item shouldBe "anvil"
+                // The `Location` is a property because the *document* said the
+                // 201 carries it — and only the 201 does.
+                result.location.shouldNotBeNull() shouldContain "/users/1/orders/"
+            }
+
+            is SubmitOrderResult.Accepted -> error("expected the order to be placed, not queued")
+        }
+
+        val queued = client.submitOrder(1L, CreateOrder("anvil", quantity = 5_000), xApiKey = "let-me-in")
+        val taken = (queued as Outcome.Ok).value.shouldBeInstanceOf<SubmitOrderResult.Accepted>()
+        taken.body.position shouldBe 5_000
+        taken.status shouldBe 202
+    }
+
+    /** And the failure side is unchanged by there being two successes beside it. */
+    @Test
+    fun `a failure declared beside two successes still arrives as a failure`() {
+        val denied = client.submitOrder(1L, CreateOrder("anvil"), xApiKey = "wrong") as Outcome.Err
+
+        denied.failure.shouldBeInstanceOf<SubmitOrderFailure.Unauthorized>().body.error shouldBe "Bad API key"
     }
 
     @Test

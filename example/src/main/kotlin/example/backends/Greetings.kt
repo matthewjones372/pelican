@@ -15,11 +15,13 @@ import dev.pelican.errorJson
 import dev.pelican.filePart
 import dev.pelican.formBody
 import dev.pelican.headerParam
+import dev.pelican.json
 import dev.pelican.jsonBody
 import dev.pelican.nonEmpty
 import dev.pelican.of
 import dev.pelican.ok
 import dev.pelican.optional
+import dev.pelican.or
 import dev.pelican.orFail
 import dev.pelican.pathParam
 import dev.pelican.positive
@@ -129,6 +131,30 @@ val retryAfter = responseHeader<Long>("Retry-After", description = "Seconds to w
 /** The pair a 429 nearly always is: a body saying what happened, a header saying when to come back. */
 val tooMuch = errorJson<ApiError>(429, "The caller is being asked to slow down", retryAfter)
 
+/**
+ * Where a newly remembered greeting lives.
+ *
+ * Declared on the 201 below and on nothing else, for the same reason
+ * [retryAfter] is declared on the 429: a `Location` on the 200 would be
+ * pointing at something that was already there, and [requestId]'s `emits(...)`
+ * would have permitted exactly that.
+ */
+val greetingAt = responseHeader<String>("Location", "Where the remembered greeting lives")
+
+/*
+ * Two successful answers to one question, and the case a payload type cannot
+ * settle: both carry a `Greeting`, so what tells them apart is which one the
+ * handler named. Declared as values rather than inside the block below,
+ * because a response a handler names has to be nameable — the same reason a
+ * failure shared between endpoints is declared as a value.
+ */
+
+/** The service already knew this greeting; nothing was written. */
+val alreadyKnown = json<Greeting>(status = 200)
+
+/** It did not, and now does. The `Location` says where. */
+val newlyLearned = json<Greeting>(status = 201, greetingAt)
+
 /** A plain JSON response. */
 val greet = endpoint(name, shout) {
     get("hello" / name)
@@ -169,6 +195,27 @@ val echo = endpoint(traceId, note) {
     errorResponse(403, "Refused by the gate filter")
     errorResponse(413, "The body was larger than this service will read")
     json<Echoed>() orFail tooMuch
+}
+
+/**
+ * The endpoint that answers two ways.
+ *
+ * `newlyLearned or alreadyKnown` is the whole declaration: an
+ * `Endpoint<In2<String, Note>, Fallible<Nothing, Greeting>>`, whose binder
+ * demands a handler returning an `Outcome` — so a 200 this endpoint never
+ * declared does not compile, exactly as an undeclared failure does not.
+ *
+ * `emits(requestId)` sits beside it and is the endpoint's own header, set by a
+ * filter on whichever response comes back. The `Location` belongs to the 201
+ * alone. Both readings reach the document, on the responses that carry them.
+ */
+val remember = endpoint(name, note) {
+    put("greetings" / name)
+    summary = "Remember a greeting, saying whether it was new"
+    operationId = "remember"
+    tag("greetings")
+    emits(requestId)
+    newlyLearned or alreadyKnown
 }
 
 /** What the caller's cookies say, read back as the types they were declared as. */
@@ -221,7 +268,7 @@ val filters = endpoint(tags, ids, features, seenBefore) {
 
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
-    listOf(greet, countdown, echo, preferences, signIn, uploadFile, filters)
+    listOf(greet, countdown, echo, remember, preferences, signIn, uploadFile, filters)
 
 internal fun greetingOf(who: String, shout: Boolean): Greeting {
     val text = "Hello, $who!"
@@ -250,6 +297,27 @@ private const val WAIT_SECONDS = 5L
 internal fun echoOrRefuse(trace: String?, note: Note): Outcome<ApiError, Echoed> =
     if (note.text == FLOOD) tooMuch(ApiError(429, "Slow down"), retryAfter of WAIT_SECONDS)
     else ok(echoed(trace, note))
+
+/** The names this service already knows. See [rememberGreeting]. */
+private val known = setOf("ada", "grace")
+
+/**
+ * Either of [remember]'s two successes, with the `Location` the 201 promised.
+ *
+ * What decides it is the name rather than what has been stored, deliberately,
+ * and for the reason [echoOrRefuse] gives: three servers answer this suite in
+ * whatever order the runner picks, so an answer that depended on which one was
+ * asked first would be a test of the runner.
+ *
+ * Both alternatives carry a `Greeting`, so the value cannot say which response
+ * this is — invoking the declaration is what does, and it is what fixes the
+ * status on all three backends.
+ */
+internal fun rememberGreeting(who: String, note: Note): Outcome<Nothing, Greeting> {
+    val greeting = Greeting(note.text, language = "en")
+    return if (who in known) alreadyKnown(greeting)
+    else newlyLearned(greeting, greetingAt of "/hello/$who")
+}
 
 internal fun preferencesOf(locale: String, session: String?) = Preferences(locale, session)
 

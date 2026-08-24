@@ -195,10 +195,10 @@ class ApiClient(
     }
 
     /**
-     * As [call], for an endpoint that declares its failures: hands back the
+     * As [call], for an endpoint that declares alternatives: hands back the
      * success value and throws [ApiCallFailed] on anything else, so a test
-     * about the happy path reads the same whether failures are declared or
-     * not. Use [outcome] when the failure is the subject.
+     * about the happy path reads the same whether alternatives are declared or
+     * not. Use [outcome] when *which* response came back is the subject.
      */
     @JvmName("callFallible")
     @Suppress("UNCHECKED_CAST")
@@ -207,8 +207,28 @@ class ApiClient(
         val res = transport.send(req)
         if (!res.isSuccess) throw ApiCallFailed(endpoint, req, res)
         val out = endpoint.output as FallibleOutput<E, T>
-        return decodeSuccess(endpoint, out.success, res) as T
+        return decodeSuccess(endpoint, chosenSuccess(out, res), res) as T
     }
+
+    /**
+     * Which declared success this response is, read the only way a caller can
+     * read it: by status. Two 2xx sharing one is refused where the output is
+     * declared, so at most one can match.
+     *
+     * With a single declared success there is nothing to choose, and this
+     * answers with it whatever status arrived — which is what a
+     * single-response endpoint always did, and a change in the status is a
+     * finding for `response(...)` to make rather than a decode that stops
+     * happening. Where there *is* a choice, a 2xx from outside the declared set
+     * is a response nothing could name, so it says so.
+     */
+    private fun <E, T> chosenSuccess(out: FallibleOutput<E, T>, res: ResponseSpec): Output<out T> =
+        out.successes.singleOrNull()
+            ?: out.successes.firstOrNull { it.status == res.status }
+            ?: error(
+                "The server answered ${res.status}, which is not one of the successes declared " +
+                    "(${out.successes.joinToString { it.status.toString() }}).",
+            )
 
     /**
      * Sends a call to an endpoint that declares its failures, and decodes
@@ -253,7 +273,17 @@ class ApiClient(
                 declared.headers.mapNotNull { h -> res.header(h.name)?.let { h.name to it } },
             )
 
-            res.isSuccess -> Outcome.Ok(decodeSuccess(endpoint, out.success, res) as T)
+            // Which success it was travels back on the value, so a test can
+            // assert on the alternative and not merely on the payload — two
+            // successes carrying one type is the case equality cannot settle.
+            res.isSuccess -> {
+                val chosen = chosenSuccess(out, res)
+                Outcome.Ok(
+                    decodeSuccess(endpoint, chosen, res) as T,
+                    @Suppress("UNCHECKED_CAST") (chosen as Output<T>),
+                    chosen.headers.mapNotNull { h -> res.header(h.name)?.let { h.name to it } },
+                )
+            }
 
             else -> throw ApiCallFailed(endpoint, req, res)
         }

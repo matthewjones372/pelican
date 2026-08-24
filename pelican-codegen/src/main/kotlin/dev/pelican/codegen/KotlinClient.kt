@@ -191,6 +191,14 @@ private class KotlinClientEmitter(
     /** Sealed failure declarations, keyed by name so the order stays stable. */
     private val failures = LinkedHashMap<String, String>()
 
+    /**
+     * The same, for an endpoint that declares several successful responses.
+     * Kept apart from [failures] because a caller reaches them differently: a
+     * failure arrives on the `Err` side of an `Outcome` and one of these is the
+     * value the call produced.
+     */
+    private val results = LinkedHashMap<String, String>()
+
     fun emit(): String {
         // Every payload type is resolved first, so the component registry is
         // complete before any of it is turned into a declaration.
@@ -200,7 +208,7 @@ private class KotlinClientEmitter(
                 is FormBody<*> -> schema(body.type)
                 else -> null
             }
-            payloadType(ep.output)?.let { schema(it) }
+            declaredSuccesses(ep).forEach { out -> out.payloadType?.let { schema(it) } }
             declaredFailures(ep).forEach { schema(it.type) }
         }
         types.declareAll(components.all())
@@ -226,17 +234,23 @@ private class KotlinClientEmitter(
                 appendLine()
                 appendLine(declarations.joinToString("\n\n"))
             }
-            if (failures.isNotEmpty()) {
-                appendLine()
-                appendLine(banner("declared failures"))
-                appendLine()
-                appendLine(
+            append(
+                section(
+                    "declared responses",
+                    results,
+                    "// One sealed type per endpoint that answers with more than one 2xx, so a\n" +
+                        "// `when` over what the call produced is exhaustive — and so that a 200 and\n" +
+                        "// a 201 carrying the same payload stay two different things to a caller.",
+                ),
+            )
+            append(
+                section(
+                    "declared failures",
+                    failures,
                     "// One sealed type per endpoint that declares its failures, so a `when`\n" +
                         "// over the failure side of an Outcome is exhaustive.",
-                )
-                appendLine()
-                appendLine(failures.values.joinToString("\n\n"))
-            }
+                ),
+            )
 
             appendLine()
             appendLine(banner("client"))
@@ -258,6 +272,17 @@ private class KotlinClientEmitter(
             appendLine("}")
         }
     }
+
+    /** One banner and the declarations under it, or nothing where there are none. */
+    private fun section(title: String, declarations: Map<String, String>, note: String): String =
+        if (declarations.isEmpty()) "" else buildString {
+            appendLine()
+            appendLine(banner(title))
+            appendLine()
+            appendLine(note)
+            appendLine()
+            appendLine(declarations.values.joinToString("\n\n"))
+        }
 
     private fun header(): String =
         """
@@ -290,20 +315,25 @@ private class KotlinClientEmitter(
     private fun method(ep: Endpoint<*, *>): String {
         val call = call(ep)
         val name = memberName(ep.operationName)
-        val out = ep.output
-        val declared = out as? FallibleOutput<*, *>
-        val success = declared?.success ?: out
+        val successes = declaredSuccesses(ep)
+        val failures = declaredFailures(ep)
 
-        val returns = when {
-            declared != null -> "Outcome<${failureType(ep, declared)}, ${successType(success)}>"
-            else -> successType(success)
-        }
+        // Several successes become a sealed type of their own, so a caller has
+        // to say which one it is looking at. One success is what it always
+        // was — the value itself, with no wrapper to unpick.
+        val produces =
+            if (successes.size > 1) resultType(ep, successes) else successType(successes.single())
+
+        // The `Outcome` is the *failure* side's doing. An endpoint that answers
+        // two ways and declares no failure hands back the sealed type directly,
+        // rather than an `Outcome` whose `Err` branch nothing could reach.
+        val returns = if (failures.isEmpty()) produces else "Outcome<${failureType(ep, failures)}, $produces>"
         val signature = "    fun $name(${call.parameters})" + if (returns == "Unit") " {" else ": $returns {"
 
         return buildString {
             appendLine(doc(ep))
             appendLine(signature)
-            appendLine(indent(body(ep, call, success, declared), "        "))
+            appendLine(indent(body(ep, call, successes), "        "))
             append("    }")
         }
     }
@@ -311,23 +341,24 @@ private class KotlinClientEmitter(
     private fun body(
         ep: Endpoint<*, *>,
         call: Call,
-        out: Output<*>,
-        declared: FallibleOutput<*, *>?,
+        successes: List<Output<*>>,
     ): String = buildString {
         val method = kotlinString(ep.method.name)
         val template = kotlinString(ep.pathSpec.template)
+        val out = successes.first()
         val streamed = isStream(out) || out is ByteStreamOutput
+        val failures = declaredFailures(ep)
 
         appendLine("val response = ${if (streamed) "stream" else "text"}(${call.request})")
 
-        if (declared != null) {
+        if (failures.isNotEmpty()) {
             appendLine("when (response.statusCode()) {")
-            declared.failures.forEach { failure ->
+            failures.forEach { failure ->
                 val payload = decodeExpression(failure.type, if (streamed) "drain(response)" else "response.body()")
                 val headers = failure.headers.joinToString("") { ", ${headerRead(it)}" }
                 appendLine(
                     "    ${failure.status} -> return Outcome.Err(" +
-                        "${failureType(ep, declared)}.${failureMember(failure.status)}($payload$headers))",
+                        "${failureType(ep, failures)}.${failureMember(failure.status)}($payload$headers))",
                 )
             }
             appendLine("}")
@@ -335,6 +366,11 @@ private class KotlinClientEmitter(
 
         val fail = if (streamed) "failedStream" else "failed"
         appendLine("if (!response.succeeded()) $fail($method, $template, response)")
+
+        if (successes.size > 1) {
+            append(chosenByStatus(ep, successes, failures, "$fail($method, $template, response)"))
+            return@buildString
+        }
 
         val produced = when {
             isStream(out) -> {
@@ -354,16 +390,55 @@ private class KotlinClientEmitter(
         }
 
         when {
-            produced == null && declared != null -> append("return Outcome.Ok(Unit)")
+            produced == null && failures.isNotEmpty() -> append("return Outcome.Ok(Unit)")
 
             produced == null -> Unit
 
             // 204: there is nothing to hand back
-            declared != null -> append("return Outcome.Ok($produced)")
+            failures.isNotEmpty() -> append("return Outcome.Ok($produced)")
 
             else -> append("return $produced")
         }
     }.trimEnd()
+
+    /**
+     * Which declared success came back, read the only way a caller can read
+     * it: by status. Two 2xx sharing one is refused where the output is
+     * declared, so at most one branch can match — and a 2xx outside the set
+     * fails the call rather than being taken for the nearest one, because the
+     * endpoint never described it.
+     */
+    private fun chosenByStatus(
+        ep: Endpoint<*, *>,
+        successes: List<Output<*>>,
+        failures: List<ErrorOutput<*>>,
+        otherwise: String,
+    ): String = buildString {
+        appendLine("return when (response.statusCode()) {")
+        successes.forEach { success ->
+            appendLine("    ${success.status} -> ${wrap(resultExpression(ep, successes, success), failures)}")
+        }
+        appendLine("    else -> $otherwise")
+        append("}")
+    }
+
+    /** The `Outcome.Ok` wrapper, where there is a failure side for it to be the other half of. */
+    private fun wrap(expression: String, failures: List<ErrorOutput<*>>): String =
+        if (failures.isEmpty()) expression else "Outcome.Ok($expression)"
+
+    /** One member of an endpoint's result type, built from the response body and its headers. */
+    private fun resultExpression(ep: Endpoint<*, *>, successes: List<Output<*>>, success: Output<*>): String {
+        val name = "${resultType(ep, successes)}.${successMember(success.status)}"
+        val arguments = listOfNotNull(bodyExpression(success)) + success.headers.map(::headerRead)
+        return if (arguments.isEmpty()) name else "$name(${arguments.joinToString()})"
+    }
+
+    /** What this response's body decodes to, or null where it carries none. */
+    private fun bodyExpression(out: Output<*>): String? = when (out) {
+        is JsonOutput<*> -> decodeExpression(out.type, "response.body()")
+        is TextOutput -> "response.body()"
+        else -> null
+    }
 
     // ------------------------------------------------------------ signatures
 
@@ -531,13 +606,56 @@ private class KotlinClientEmitter(
         else -> if (isStream(out)) "Streamed<${typeFor(elementType(out))}>" else "Unit"
     }
 
-    private fun payloadType(out: Output<*>): KType? = when (out) {
-        is FallibleOutput<*, *> -> payloadType(out.success)
-        else -> out.payloadType
-    }
+    /** The successful responses this endpoint declares: several where it names them, else its output. */
+    private fun declaredSuccesses(ep: Endpoint<*, *>): List<Output<*>> =
+        (ep.output as? FallibleOutput<*, *>)?.successes ?: listOf(ep.output)
 
     private fun declaredFailures(ep: Endpoint<*, *>): List<ErrorOutput<*>> =
         (ep.output as? FallibleOutput<*, *>)?.failures.orEmpty()
+
+    /**
+     * The sealed type an endpoint's several successes become. One member per
+     * declared status, named after it, carrying that status's payload and a
+     * property per header it was declared to send — the same shape [failureType]
+     * builds, because it is the same problem: a status the caller has to name
+     * before it can read what came with it.
+     *
+     * A `when` over this is exhaustive, so an endpoint that later declares a
+     * third 2xx stops the callers that do not handle it from compiling. That is
+     * the whole reason it is a sealed type rather than the payloads' common
+     * supertype: `Any` would compile everywhere and say nothing.
+     */
+    private fun resultType(ep: Endpoint<*, *>, successes: List<Output<*>>): String {
+        val name = typeName(ep.operationName) + "Result"
+        results[name] = buildString {
+            appendLine(kdoc("What `${memberName(ep.operationName)}` answers with.", ""))
+            appendLine("sealed interface $name {")
+            appendLine("    val status: Int")
+            successes.forEach { success ->
+                appendLine()
+                val properties = listOfNotNull(bodyProperty(success)) + success.headers.map(::headerProperty)
+                val member = successMember(success.status)
+                // A response with no body and no headers has nothing to hold,
+                // and Kotlin has no data class without a property — so it is
+                // the one value it will ever be.
+                val declaration =
+                    if (properties.isEmpty()) "data object $member"
+                    else "data class $member(${properties.joinToString()})"
+                appendLine("    $declaration : $name {")
+                appendLine("        override val status: Int get() = ${success.status}")
+                appendLine("    }")
+            }
+            append("}")
+        }
+        return name
+    }
+
+    /** What this response carries, as a property, or null where it carries no body. */
+    private fun bodyProperty(out: Output<*>): String? = when (out) {
+        is JsonOutput<*> -> "val body: ${typeFor(out.type)}"
+        is TextOutput -> "val body: String"
+        else -> null
+    }
 
     /**
      * The sealed type an endpoint's declared failures become. One member per
@@ -546,13 +664,13 @@ private class KotlinClientEmitter(
      * send, so a `Retry-After` reaches the caller as a number rather than as
      * something to go and dig out of the response.
      */
-    private fun failureType(ep: Endpoint<*, *>, out: FallibleOutput<*, *>): String {
+    private fun failureType(ep: Endpoint<*, *>, declared: List<ErrorOutput<*>>): String {
         val name = typeName(ep.operationName) + "Failure"
         failures[name] = buildString {
             appendLine(kdoc("What `${memberName(ep.operationName)}` declares it can fail with.", ""))
             appendLine("sealed interface $name {")
             appendLine("    val status: Int")
-            out.failures.forEach { failure ->
+            declared.forEach { failure ->
                 appendLine()
                 appendLine(kdoc(failure.description, "    "))
                 val body = typeFor(failure.type)
@@ -625,6 +743,18 @@ private class KotlinClientEmitter(
 }
 
 // ------------------------------------------------------------------ helpers
+
+/** The member name for a declared success's status: 202 -> `Accepted`. */
+private fun successMember(status: Int): String = when (status) {
+    200 -> "Ok"
+    201 -> "Created"
+    202 -> "Accepted"
+    203 -> "NonAuthoritative"
+    204 -> "NoContent"
+    205 -> "ResetContent"
+    206 -> "PartialContent"
+    else -> "Status$status"
+}
 
 /** The member name for a declared failure's status: 404 -> `NotFound`. */
 private fun failureMember(status: Int): String = when (status) {

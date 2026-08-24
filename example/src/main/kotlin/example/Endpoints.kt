@@ -95,6 +95,28 @@ val retryAfter = responseHeader<Long>("Retry-After", description = "Seconds to w
 
 val throttled = errorJson<ApiError>(429, "Too much asked for at once", retryAfter)
 
+/**
+ * Where a newly placed order lives — declared on the 201 below and on nothing
+ * else, for exactly the reason [retryAfter] is declared on the 429. `emits(...)`
+ * would have documented it on the 202 as well, which is a `Location` for an
+ * order that does not have one yet.
+ */
+val orderAt = responseHeader<String>("Location", description = "Where the placed order lives")
+
+/*
+ * Two successful answers to one question, declared as values so the handler can
+ * name the one it is producing — the same reason the failures above are values.
+ * They carry different payload types, so `submitOrder`'s success type is their
+ * common supertype; the generated client turns them into a sealed pair and the
+ * caller has to say which it is looking at.
+ */
+
+/** The order was placed there and then. */
+val orderPlaced = json<Order>(status = 201, orderAt)
+
+/** It was taken but not placed; the ticket is how to ask about it. */
+val orderQueued = json<Queued>(status = 202)
+
 // --------------------------------------------------------------- endpoints
 //
 // endpoint(...) declares the input list once. It registers each parameter for
@@ -157,6 +179,23 @@ val placeOrder = endpoint(userId, apiKey, newOrder) {
     // names the one it is returning, so the status comes from the declaration —
     // and the 429 carries a `Retry-After` the handler has to supply.
     json<Order>(status = 201).orFail(badApiKey, noSuchUser, throttled)
+}
+
+/**
+ * The same question with two right answers: placed, or taken and queued.
+ *
+ * `orderPlaced or orderQueued` puts both in the endpoint's type, so the binder
+ * demands a handler returning an `Outcome` and a status this endpoint never
+ * declared does not compile — the bargain `orFail` already made, with the word
+ * "fail" taken out of it. `orFail` sits beside it because a bad key is still a
+ * bad key.
+ */
+val submitOrder = endpoint(userId, apiKey, newOrder) {
+    post("users" / userId / "orders" / "submit")
+    summary = "Place an order, or take it for later when it is too large to place now"
+    operationId = "submitOrder"
+    tag("orders")
+    orderPlaced or orderQueued orFail badApiKey
 }
 
 /**
@@ -238,6 +277,6 @@ val reindex = endpoint(apiKey) {
 
 /** Everything above, in one list, so the server and the docs cannot drift. */
 val allEndpoints: List<Endpoint<*, *>> = listOf(
-    getUser, streamOrders, watchOrders, listOrders, placeOrder, placeOrderForm, importOrders,
+    getUser, streamOrders, watchOrders, listOrders, placeOrder, submitOrder, placeOrderForm, importOrders,
     payOrder, cancelOrder, echo, searchOrders, reindex,
 )

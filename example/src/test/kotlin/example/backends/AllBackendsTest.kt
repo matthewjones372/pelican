@@ -9,6 +9,7 @@ import dev.pelican.openapi.openApiJson
 import dev.pelican.test.ApiClient
 import dev.pelican.test.apiClient
 import dev.pelican.test.shouldBeFailure
+import dev.pelican.test.shouldBeResponse
 import dev.pelican.test.shouldBuild
 import dev.pelican.test.shouldHaveContentType
 import dev.pelican.test.shouldHaveHeader
@@ -17,6 +18,7 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -187,6 +189,7 @@ class AllBackendsTest {
         greeting shouldBuild "GET /hello/ada?shout=false"
         client.request(countdown, 3) shouldBuild "GET /countdown/3"
         client.request(echo, In2("trace-1", Note("hi"))) shouldBuild "POST /echo"
+        client.request(remember, In2("ada", Note("Hello, ada!"))) shouldBuild "PUT /greetings/ada"
         client.request(preferences, In2("fr", "abc123")) shouldBuild "GET /preferences"
         client.request(signIn, SignIn("ada", remember = true, visits = 3)) shouldBuild "POST /sign-in"
         val upload = UploadedFile("big.txt", "text/plain", ByteArrayInputStream("hello".toByteArray()))
@@ -262,6 +265,61 @@ class AllBackendsTest {
         withClue(res.headers.toString()) { res.header("Retry-After").shouldBeNull() }
     }
 
+    // --------------------------------------------- an endpoint that answers two ways
+
+    /**
+     * `remember` declares `200 Greeting` beside `201 Greeting`. Both carry the
+     * same payload type, so nothing in the value says which response it is —
+     * the handler names one, and every backend has to answer with that status
+     * rather than with the endpoint's first.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `each declared success gets its own status`(name: String, client: ApiClient) {
+        client.response(remember, In2("ada", Note("Hello again"))) shouldHaveStatus 200
+        client.response(remember, In2("zoe", Note("Hello, zoe!"))) shouldHaveStatus 201
+    }
+
+    /**
+     * And the header declared on the 201 goes on the 201 — the same bargain
+     * the 429's `Retry-After` makes, on the success side.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a header declared on one success is absent from the other`(name: String, client: ApiClient) {
+        client.response(remember, In2("zoe", Note("hi"))).shouldHaveHeader("Location", "/hello/zoe")
+
+        val known = client.response(remember, In2("ada", Note("hi")))
+        withClue(known.headers.toString()) { known.header("Location").shouldBeNull() }
+    }
+
+    /**
+     * `emits(...)` is still the endpoint's own list, so the filter's
+     * `X-Request-Id` reaches both responses while the `Location` reaches one.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `the endpoint's own header still reaches every response`(name: String, client: ApiClient) {
+        listOf("ada", "zoe").forEach { who ->
+            client.response(remember, In2(who, Note("hi"))).header("X-Request-Id").shouldNotBeNull()
+        }
+    }
+
+    /**
+     * Read back through the descriptions rather than off the wire: which
+     * response arrived is the declaration the handler named, not the status
+     * as a number and not the payload, which is identical either way.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `and which success it was comes back typed`(name: String, client: ApiClient) {
+        val made = client.outcome(remember, In2("zoe", Note("Hello, zoe!")))
+        (made shouldBeResponse newlyLearned) shouldBe Greeting("Hello, zoe!", "en")
+        (made as Outcome.Ok)[greetingAt] shouldBe "/hello/zoe"
+
+        client.outcome(remember, In2("ada", Note("Hello, zoe!"))) shouldBeResponse alreadyKnown
+    }
+
     // ------------------------------------------------------------- the document
 
     @ParameterizedTest(name = "{0}")
@@ -282,6 +340,24 @@ class AllBackendsTest {
      * through, so the 429 a caller reads about and the 429 it gets are
      * describing one another.
      */
+
+    /**
+     * Both 2xx published, each with its own schema and its own headers — which
+     * is what OpenAPI's `responses` map was always able to say, and what this
+     * library could not until an endpoint could declare two.
+     */
+    @Test
+    fun `both successful responses are published, with the header on the one that carries it`() {
+        val responses = Json.parseToJsonElement(pekkoApi().spec().openApiJson())
+            .jsonObject["paths"]!!.jsonObject["/greetings/{name}"]!!
+            .jsonObject["put"]!!.jsonObject["responses"]!!.jsonObject
+
+        responses.keys shouldBe setOf("201", "200")
+        responses["201"]!!.jsonObject["headers"]!!.jsonObject.keys shouldBe setOf("X-Request-Id", "Location")
+        responses["200"]!!.jsonObject["headers"]!!.jsonObject.keys shouldBe setOf("X-Request-Id")
+        responses["200"]!!.jsonObject["content"]!!.jsonObject.keys shouldBe setOf("application/json")
+    }
+
     @Test
     fun `the failure's header is documented on the failure, not on the success`() {
         val responses = Json.parseToJsonElement(pekkoApi().spec().openApiJson())

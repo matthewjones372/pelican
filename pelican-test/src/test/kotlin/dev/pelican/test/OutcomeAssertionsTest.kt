@@ -3,6 +3,7 @@ package dev.pelican.test
 import dev.pelican.ApiError
 import dev.pelican.Outcome
 import dev.pelican.errorJson
+import dev.pelican.json
 import dev.pelican.ok
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -98,5 +99,36 @@ class OutcomeAssertionsTest {
         val ok: Outcome<ApiError, String> = ok("fine")
 
         messageOfFailing { ok shouldBeFailure badKey } shouldContain "succeeded with: fine"
+    }
+
+    // ------------------------------------------------------ which success
+
+    private val remembered = json<String>(status = 200)
+    private val learned = json<String>(status = 201)
+
+    @Test
+    fun `shouldBeResponse tells two successes of the same payload type apart`() {
+        // The same case again, on the other side: both responses carry a
+        // String, and only the declaration the handler named says which is
+        // which.
+        val created: Outcome<ApiError, String> = learned("Pekko")
+
+        (created shouldBeResponse learned) shouldBe "Pekko"
+
+        val message = messageOfFailing { created shouldBeResponse remembered }
+
+        message shouldContain "json:200"
+        message shouldContain "json:201"
+    }
+
+    @Test
+    fun `shouldBeResponse on a failure says which failure it got instead`() {
+        messageOfFailing { missing shouldBeResponse remembered } shouldContain "404"
+    }
+
+    /** `ok(...)` names none, and a test asking which one got a straight answer. */
+    @Test
+    fun `shouldBeResponse on an unnamed success says nothing was named`() {
+        messageOfFailing { found shouldBeResponse remembered } shouldContain "declared as (none)"
     }
 }

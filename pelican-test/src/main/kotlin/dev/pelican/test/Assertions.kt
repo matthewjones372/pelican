@@ -3,6 +3,7 @@ package dev.pelican.test
 import dev.pelican.ApiError
 import dev.pelican.ErrorOutput
 import dev.pelican.Outcome
+import dev.pelican.Output
 
 /*
  * Assertions for the things every endpoint test asserts on.
@@ -157,6 +158,30 @@ infix fun <E, T> Outcome<E, T>.shouldBeFailure(expected: ErrorOutput<out E>): E 
         else fail(
             "Expected the failure declared as $expected but the handler returned " +
                 "the one declared as $declared, carrying: $error",
+        )
+}
+
+/**
+ * Asserts the call came back as the success this endpoint declared *under this
+ * name*, and returns the value — the assertion to make when an endpoint
+ * declares more than one 2xx, since a `200 Order` and a `201 Order` carry the
+ * same payload type and equality cannot separate them:
+ *
+ * ```
+ * app.outcome(placeOrder, input) shouldBeResponse accepted
+ * ```
+ */
+infix fun <E, T> Outcome<E, T>.shouldBeResponse(expected: Output<*>): T = when (this) {
+    is Outcome.Err -> fail(
+        "Expected the response declared as $expected but the endpoint returned its declared " +
+            "${declared.status} failure: $error",
+    )
+
+    is Outcome.Ok ->
+        if (declared === expected) value
+        else fail(
+            "Expected the response declared as $expected but the handler returned " +
+                "the one declared as ${declared ?: "(none)"}, carrying: $value",
         )
 }
 

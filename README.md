@@ -41,9 +41,10 @@ a `Long`. No `Params` bag, no casting, no `String.toLong()` in every handler.
 value, so the same regex that validates a request also appears as `pattern` in
 the schema. Swagger UI refuses to send a request the server would reject.
 
-**Errors are part of the signature.** `orFail` puts a failure in the endpoint's
-type. The handler must produce it, and the caller's generated client gets a
-sealed type to match on.
+**Every response an endpoint can send is part of the signature.** `orFail` puts
+a failure in the endpoint's type and `or` puts a second success there — a
+`200 Order` beside a `202 Accepted`. The handler names the one it is producing,
+and the caller's generated client gets a sealed type to match on either way.
 
 **Tests call endpoints, not URLs — then pin the URLs on purpose.** Behaviour
 tests name endpoint values, so renaming an input stops them compiling instead of
@@ -356,6 +357,45 @@ declared throws, and a required one left out throws too — at the call, which i
 the one place the declaration and the value are both in hand. Mark it
 `.optional()` for a header that is only sometimes sent. A failure that declares
 no headers is returned exactly as before.
+
+## More than one successful response
+
+A failure is one *alternative*, not a special kind of thing. `or` declares
+several successful responses the same way, so `200 Order` beside `202 Accepted`
+is describable — and the handler names the one it is producing:
+
+```kotlin
+val orderPlaced = json<Order>(status = 201, orderAt)   // `Location`, on this response only
+val orderQueued = json<Queued>(status = 202)
+
+val submitOrder = endpoint(userId, apiKey, newOrder) {
+    post("users" / userId / "orders" / "submit")
+    orderPlaced or orderQueued orFail badApiKey
+}
+
+submitOrder handledOneOf { (id, key, req) ->
+    when {
+        key != expected -> badApiKey(ApiError(401, "Bad API key"))
+        tooBig(req)     -> orderQueued(Queued(ticket(id), position = req.quantity))
+        else            -> {
+            val order = Store.create(id, req)
+            orderPlaced(order, orderAt of "/users/$id/orders/${order.id}")
+        }
+    }
+}
+```
+
+Naming the declaration is what fixes the status, so `200 Order` and `201 Order`
+stay distinguishable although the payload cannot say which is which. A response
+the endpoint never declared does not compile. `ok(value)` means the first
+declared success, so nothing about a single-response endpoint changed.
+
+The document publishes both statuses with their own schemas and headers, and the
+generated client hands the caller a sealed type — one member per status, `when`
+over it exhaustive. Two responses cannot share a status, and a *streamed*
+alternative is refused: producing one means handing over the backend's own
+stream type, so a stream is still a success and still the only one. See
+[More than one successful response](docs/reference.md#more-than-one-successful-response).
 
 ## Streaming
 
@@ -1286,10 +1326,15 @@ reasoning behind each, is in [docs/reference.md](docs/reference.md#what-isnt-her
   the file so the handler gets a live stream. A second part is a startup failure
   and a text part after the file is a 400. `rawBody()` is there for an envelope
   you would rather parse yourself.
-- **No content negotiation.** One output media type per endpoint. This is also
-  the commonest reason an import refuses an operation: a document offering JSON
-  or XML is offering two decodes of one request, and there is no description
-  that means either.
+- **No content negotiation.** One media type per response. An endpoint may
+  answer two statuses two ways, but nothing reads `Accept` to choose between two
+  renderings of the same response — which is also the commonest reason an import
+  refuses an operation: a document offering JSON or XML is offering two decodes
+  of one request, and there is no description that means either.
+- **A streamed response is the only success it can be.** An endpoint declaring
+  several 2xx names the one it is producing, and producing a stream means
+  handing over the backend's own type, which core cannot name. `ndjson<Order>()
+  orFail noSuchUser` is unchanged; `ndjson<Order>() or empty(202)` is refused.
 - **Importing is all-or-nothing per operation.** A document Pelican cannot fully
   describe fails the build rather than generating a weaker endpoint. The way
   through is an `exclude` list of `operationId`s in the build file, which is

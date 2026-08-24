@@ -200,13 +200,26 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     }
 
     private fun binder(ep: IrEndpoint): String = when {
+        // Several 2xx means the handler names the one it is producing, whether
+        // or not any failure is typed — that is the binder taking an `Outcome`,
+        // under the name that reads right when the alternatives are successes.
+        ep.successes.size > 1 -> "handledOneOf"
+
         ep.success is IrSuccess.Bytes -> "bytesNow"
+
         streams(ep) && ep.failures.any { it.schema != null } -> "streamedOrFail"
+
         streams(ep) -> "streamedNow"
+
         ep.failures.any { it.schema != null } -> "handledOrFail"
+
         ep.success is IrSuccess.Empty -> "handledWith"
+
         else -> "handledNow"
     }
+
+    /** The first documented 2xx, which for every shape but [binder]'s first branch is the only one. */
+    private val IrEndpoint.success: IrSuccess get() = successes.first()
 
     private fun streams(ep: IrEndpoint) = ep.success is IrSuccess.Ndjson || ep.success is IrSuccess.Sse
 
@@ -327,27 +340,52 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     // ---------------------------------------------------------------- outputs
 
     private fun output(ep: IrEndpoint): String {
-        val success = successOutput(ep)
+        val successes = ep.successes.map { successOutput(ep, it) }
+        val success = successes.joinToString(" or ")
         val declared = ep.failures.filter { it.schema != null }.map { failureName(ep, it) }
         return when {
             declared.isEmpty() -> success
+
+            // `a or b orFail x` groups left to right, so the infix spelling
+            // needs no help; the vararg one is a call on the *last* output
+            // unless the alternatives are bracketed first.
             declared.size == 1 -> "$success orFail ${declared.single()}"
-            else -> "$success.orFail(${declared.joinToString()})"
+
+            successes.size == 1 -> "$success.orFail(${declared.joinToString()})"
+
+            else -> "($success).orFail(${declared.joinToString()})"
         }
     }
 
-    private fun successOutput(ep: IrEndpoint): String {
+    private fun successOutput(ep: IrEndpoint, success: IrSuccess): String {
         val context = typeName(ep.operationId) + "Response"
-        return when (val success = ep.success) {
-            is IrSuccess.Json -> "json<${typeFor(success.schema, context)}>(${status(success.status, 200)})"
+        // Headers belonging to this response rather than to the endpoint, which
+        // is a list only an operation documenting several 2xx has — see
+        // `Responses.read`.
+        val headers = success.headers.joinToString("") { ", ${headerName(it)}" }
+
+        // The status is written out whenever headers follow it, default or
+        // not: they are a vararg behind it, and `json<T>(location)` would be
+        // offering a header where the status goes.
+        val arguments = { status: String ->
+            when {
+                headers.isEmpty() -> status
+                status.isEmpty() -> "status = ${success.status}$headers"
+                else -> status + headers
+            }
+        }
+
+        return when (success) {
+            is IrSuccess.Json ->
+                "json<${typeFor(success.schema, context)}>(${arguments(status(success.status, 200))})"
 
             is IrSuccess.Ndjson -> "ndjson<${typeFor(success.schema, context)}>(${status(success.status, 200)})"
 
             is IrSuccess.Sse -> "sse<${typeFor(success.schema, context)}>(${status(success.status, 200)})"
 
-            is IrSuccess.Text -> "text(${status(success.status, 200)})"
+            is IrSuccess.Text -> "text(${arguments(status(success.status, 200))})"
 
-            is IrSuccess.Empty -> "empty(${status(success.status, 204)})"
+            is IrSuccess.Empty -> "empty(${arguments(status(success.status, 204))})"
 
             is IrSuccess.Bytes -> {
                 val mediaType = if (success.mediaType == OCTET_STREAM) "" else kotlinString(success.mediaType)

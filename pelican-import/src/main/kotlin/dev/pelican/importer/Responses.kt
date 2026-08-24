@@ -5,20 +5,21 @@ import dev.pelican.JsonObj
 /**
  * What an operation answers with.
  *
- * An endpoint has one success and a list of declared failures, so that is what
- * the responses have to become: the lowest documented 2xx is the success, and
- * every other documented status is a failure the handler may return and the
- * caller may match on.
+ * Every documented 2xx becomes a declared success and every other documented
+ * status a failure the handler may return and the caller may match on — which
+ * is one for one what `endpoint(...)` can now say, since a handler names the
+ * response it is producing.
  *
- * Two 2xx responses are refused rather than resolved. `200 Order` beside
- * `202 Accepted` is a real distinction the handler makes at runtime, and an
- * endpoint's output type is one thing — picking either one would generate a
- * handler that cannot say what the document says it says.
+ * `200 Order` beside `202 Accepted` used to be refused here, for the good
+ * reason that an endpoint's output was one type and one status and picking
+ * either lost the distinction. It is not refused any more; what is left of that
+ * refusal is the pair below, which is genuinely unsayable rather than merely
+ * unsaid.
  */
 internal class Responses(private val reader: Reader, private val operation: Operation) {
 
     class Result(
-        val success: IrSuccess,
+        val successes: List<IrSuccess>,
         val failures: List<IrFailure>,
         val successHeaders: List<IrResponseHeader>,
     )
@@ -41,27 +42,45 @@ internal class Responses(private val reader: Reader, private val operation: Oper
             status to node
         }
 
-        val successes = byStatus.filter { (status, _) -> status in successful }
-        if (successes.isEmpty()) {
+        val documented = byStatus.filter { (status, _) -> status in successful }
+        if (documented.isEmpty()) {
             unsupported(at, "No 2xx response is documented, so nothing says what a successful call returns.")
         }
-        if (successes.size > 1) {
-            unsupported(
-                at,
-                "Two successful responses are documented (${successes.joinToString { it.first.toString() }}). " +
-                    "An endpoint's output is one type and one status.",
-            )
+
+        val successes = documented.map { (status, node) ->
+            val (response, path) = reader.deref(node, at / status.toString())
+            success(status, response, path) to headers(response, path)
         }
 
-        val (status, rawSuccess) = successes.single()
-        val (success, successPath) = reader.deref(rawSuccess, at / status.toString())
+        // A streamed response is produced by handing over the backend's own
+        // stream type, and naming one alternative among several is done in
+        // core, which cannot name it — so a stream is describable as the one
+        // success and not as one of two.
+        if (successes.size > 1) {
+            val streamed = successes.map { it.first }.filter { it.streams() }
+            if (streamed.isNotEmpty()) {
+                unsupported(
+                    at,
+                    "The ${streamed.joinToString { it.status.toString() }} response streams, and this " +
+                        "operation documents ${successes.size} successful responses. An endpoint that " +
+                        "answers several ways names the one it is producing, and a stream is produced in " +
+                        "the server library's own type. Document the stream as the only 2xx, or move the " +
+                        "other statuses to an operation of their own.",
+                )
+            }
+        }
 
         return Result(
-            success = success(status, success, successPath),
+            // A header on the only success is the endpoint's own — that is what
+            // `emits(...)` says, and it is where a single-response import has
+            // always put it. With several, each response carries its own, since
+            // that is the only reading under which a `Location` on the 201 stays
+            // off the 200.
+            successes = successes.map { (success, own) -> if (successes.size == 1) success else success.with(own) },
             failures = byStatus.filterNot { it.first in successful }.map { (code, node) ->
                 failure(code, at / code.toString(), node)
             },
-            successHeaders = headers(success, successPath),
+            successHeaders = if (successes.size == 1) successes.single().second else emptyList(),
         )
     }
 

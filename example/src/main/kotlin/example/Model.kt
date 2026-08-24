@@ -30,6 +30,9 @@ data class Order(
 
 data class CreateOrder(val item: String, val quantity: Int = 1)
 
+/** What a caller gets instead of an [Order] when the order was taken but not placed. */
+data class Queued(val ticket: String, val position: Int)
+
 data class Tick(val seq: Int, val label: String)
 
 /**

@@ -24,6 +24,7 @@ import dev.pelican.test.pekko.inMemory
 import dev.pelican.test.rawText
 import dev.pelican.test.shouldBeFailure
 import dev.pelican.test.shouldBeOk
+import dev.pelican.test.shouldBeResponse
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
@@ -208,6 +209,39 @@ abstract class ClientContractTest {
         val placed = app.outcome(placeOrder, In3(1L, "let-me-in", CreateOrder("rope"))).shouldBeOk()
         placed.item shouldBe "rope"
         app.response(placeOrder, In3(1L, "let-me-in", CreateOrder("rope"))).status shouldBe 201
+    }
+
+    // ------------------------------------------------ more than one success
+    //
+    // submitOrder declares two, carrying different payload types, with a
+    // failure beside them. The handler names the response it is producing, so
+    // the status comes from the declaration exactly as it does on the failure
+    // side — and the client reads it back the same way.
+
+    @Test
+    fun `each declared success comes back as itself, under its own status`() {
+        val placed = app.outcome(submitOrder, In3(1L, "let-me-in", CreateOrder("anvil", 3)))
+        placed shouldBeResponse orderPlaced
+        app.response(submitOrder, In3(1L, "let-me-in", CreateOrder("anvil", 3))).status shouldBe 201
+
+        val queued = app.outcome(submitOrder, In3(1L, "let-me-in", CreateOrder("anvil", 5_000)))
+        queued shouldBeResponse orderQueued shouldBe Queued("ticket-1-anvil", position = 5_000)
+        app.response(submitOrder, In3(1L, "let-me-in", CreateOrder("anvil", 5_000))).status shouldBe 202
+    }
+
+    /** The `Location` belongs to the 201 and to nothing else, `emits(...)` not being involved. */
+    @Test
+    fun `the header declared on one success is absent from the other`() {
+        app.response(submitOrder, In3(1L, "let-me-in", CreateOrder("anvil")))
+            .header("Location").shouldNotBeNull() shouldContain "/users/1/orders/"
+
+        app.response(submitOrder, In3(1L, "let-me-in", CreateOrder("anvil", 5_000)))
+            .header("Location") shouldBe null
+    }
+
+    @Test
+    fun `a failure declared beside two successes is still a failure`() {
+        app.outcome(submitOrder, In3(1L, "wrong", CreateOrder("anvil"))) shouldBeFailure badApiKey
     }
 
     @Test

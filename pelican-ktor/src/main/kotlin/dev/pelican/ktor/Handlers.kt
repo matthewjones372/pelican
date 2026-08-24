@@ -78,6 +78,23 @@ infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOrFail(
     f: suspend Params.(I) -> Outcome<E, T>,
 ): ServerEndpoint = ServerEndpoint(this) { p -> p.launch { p.f(inputs.extract(p)) } }
 
+// ------------------------------------------------------------- several successes
+//
+// The same binder under the name that reads right when the alternatives are
+// not failures. An endpoint declaring `200 Order` beside `202 Accepted` is an
+// `Endpoint<I, Fallible<Nothing, Any>>` — the shape above with an empty failure
+// side — and a handler for it names the response it is producing by invoking
+// the declaration, exactly as it names a failure.
+//
+// Two names for one signature rather than one name for both, because
+// `handledOrFail` on an endpoint that declares no failure at all reads as a
+// mistake, and the call site is where the name is read.
+
+/** Binds an endpoint that answers with one of several declared responses. */
+infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOneOf(
+    f: suspend Params.(I) -> Outcome<E, T>,
+): ServerEndpoint = handledOrFail(f)
+
 /** Binds a streaming endpoint that may fail before the first element. */
 infix fun <I, E : Any, T> Endpoint<I, Fallible<E, StreamOf<T>>>.streamedOrFail(
     f: suspend Params.(I) -> Outcome<E, Flow<T>>,

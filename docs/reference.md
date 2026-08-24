@@ -612,7 +612,7 @@ What it refuses, and what each one would have cost:
 
 | In the document | Why there is no description for it |
 |---|---|
-| Two 2xx responses | An endpoint's output is one type and one status. `200 Order` beside `202 Accepted` is a runtime distinction a handler makes, and picking either loses it |
+| A streamed 2xx beside another 2xx | Both are read where both are values — see [More than one successful response](#more-than-one-successful-response) — but naming one alternative is what produces it, and a stream is produced in the server library's own type, which core cannot name. Document the stream as the only 2xx, or move the other statuses to an operation of their own |
 | A `default` response | "And anything else." An endpoint declares the statuses it answers with by name |
 | Two media types for one body or response | `jsonBody<T>()` is a JSON body; there is no form of it meaning "or XML" |
 | `oneOf` of several shapes with no `discriminator` | A union nothing says how to read. The decoder would have to try each branch and take the first that parsed, which is wrong on the first payload two branches both accept. Where you know the missing fact, `discriminator(...)` in the build file states it — see [below](#the-discriminator-a-document-did-not-write-down) |
@@ -1999,6 +1999,12 @@ overloaded, because a lambda's return type is inferred *after* overload
 resolution, and `(I) -> T` cannot be told apart from `(I) -> Outcome<E, T>` at
 the call site.
 
+A failure is one *alternative* rather than the only kind. The same machinery
+declares several successful responses — see
+[More than one successful response](#more-than-one-successful-response), whose
+`handledOneOf` is this binder under the name that reads right when the
+alternatives are not failures.
+
 Streaming works the same way: `ndjson<Order>() orFail noSuchUser` is a
 `Fallible<ApiError, StreamOf<Order>>`, which is a failure decided before the
 first element rather than mid-stream.
@@ -2086,7 +2092,10 @@ What this does **not** cover, honestly:
   checks it at response time and answers 500 rather than sending an
   undocumented status.
 - **The success status is not in the type.** `json<Order>(status = 201)` and
-  `json<Order>()` are the same type to a handler.
+  `json<Order>()` are the same type to a handler. Where an endpoint declares
+  both, naming the one it is producing is what tells them apart — see
+  [More than one successful response](#more-than-one-successful-response) — but
+  that is identity at runtime, not a distinction the compiler makes.
 - **A declared failure's headers are checked at the call, not by the compiler.**
   `throttled(problem)` with the `Retry-After` left out compiles and throws where
   it is produced. Making it a compile error would mean an `ErrorOutput` typed by
@@ -2094,6 +2103,149 @@ What this does **not** cover, honestly:
   failures in one list, so every one of those types would have to erase back to
   the same thing to go in it. The check would have to be repeated at the point
   it was erased, which is the check that is already there.
+
+## More than one successful response
+
+`200 Order` beside `202 Accepted` is an ordinary REST shape — create-or-accept,
+sync-or-async, `200 Updated` beside `201 Created` — and it was the largest thing
+this library could not say. An endpoint's output was one type and one status, so
+a document declaring both failed the import and a hand-written endpoint could
+not describe one.
+
+It is the same mechanism as `orFail`, with the word "fail" taken out of it.
+Declare each response as a value, list them with `or`, and the handler produces
+one by invoking it:
+
+```kotlin
+val orderAt = responseHeader<String>("Location", "Where the placed order lives")
+
+val orderPlaced = json<Order>(status = 201, orderAt)
+val orderQueued = json<Queued>(status = 202)
+
+val submitOrder = endpoint(userId, apiKey, newOrder) {
+    post("users" / userId / "orders" / "submit")
+    orderPlaced or orderQueued orFail badApiKey
+}
+```
+
+```kotlin
+submitOrder handledOneOf { (id, key, req) ->
+    when {
+        key != expected -> badApiKey(ApiError(401, "Bad API key"))
+
+        tooBigToPlaceNow(req) -> orderQueued(Queued(ticket(id), position = req.quantity))
+
+        else -> {
+            val order = Store.create(id, req)
+            orderPlaced(order, orderAt of "/users/$id/orders/${order.id}")
+        }
+    }
+}
+```
+
+`submitOrder` is an `Endpoint<In3<Long, String, CreateOrder>, Fallible<ApiError, Any>>`
+— the same shape `orFail` alone produces, with more than one thing on the
+success side. Which means everything about it is already familiar:
+
+- **Invoking the declaration is what fixes the status**, so `json<Order>(200)`
+  and `json<Order>(201)` stay distinguishable although a payload cannot tell
+  them apart. Identity, not type — the answer `ErrorOutput` already gave for two
+  failures carrying one type.
+- **`handledOneOf` is `handledOrFail` under the name that reads right** when the
+  alternatives are not failures. Same signature, same `Outcome`; two names
+  because `handledOrFail` on an endpoint that declares no failure reads as a
+  mistake, and the call site is where a name is read. `handledByOneOf` is the
+  asynchronous one on Pekko and http4k.
+- **`ok(value)` names none, and means the first declared success.** With one
+  success that is the only one there is, so nothing about a single-response
+  endpoint changed.
+- **A response the endpoint never declared does not compile**, exactly as an
+  undeclared failure does not.
+
+The alternatives are declared as *values* rather than inside the block, because
+a response a handler names has to be nameable — the same reason a failure shared
+between endpoints is a top-level `val`. `json`, `text` and `empty` exist at top
+level for this, spelled identically to the `EndpointBuilder` members, as
+`errorJson` already is. Inside a block the member wins, so `json<Order>()` there
+is the call it always was.
+
+### A header on one response and not the other
+
+A `Location` belongs to the 201. Declared with `emits(...)` it would be
+documented on the 202 as well — a `Location` for an order that does not have one
+yet — so it goes on the response that carries it, and the handler supplies its
+value where it produces that response:
+
+```kotlin
+orderPlaced(order, orderAt of "/users/$id/orders/${order.id}")
+```
+
+The same three checks a declared failure's headers get: a header this response
+never declared throws, a required one left out throws naming it, and
+`responseHeader(...).optional()` is how a description says it is only sometimes
+sent. `emits(...)` still means what it meant — the endpoint's own promise,
+settable with `setHeader` from anywhere, documented on every successful
+response.
+
+Declared on an endpoint's *only* response, a header is refused when the endpoint
+is built: the handler for one response returns the payload alone and never sees
+the declaration, so nothing could supply it.
+
+### What a caller sees
+
+`pelican-openapi` publishes one entry per declared 2xx, each with its own schema,
+its own media type and its own headers — which is what OpenAPI's `responses` map
+always could say.
+
+`pelican-codegen` gives the endpoint a sealed type of its own, one member per
+status, exactly as it already does for declared failures:
+
+```kotlin
+sealed interface SubmitOrderResult {
+    val status: Int
+    data class Created(val body: Order, val location: String?) : SubmitOrderResult
+    data class Accepted(val body: Queued) : SubmitOrderResult
+}
+```
+
+so a `when` over what the call produced is exhaustive, and a third 2xx added to
+the endpoint stops the callers that do not handle it from compiling. Handing
+back the payloads' common supertype instead would have compiled everywhere and
+said nothing. The `Outcome` wrapper is the *failure* side's doing: an endpoint
+that answers two ways and declares no failure returns the sealed type directly.
+
+`pelican-test` reads it back through the descriptions:
+
+```kotlin
+val placed = app.outcome(submitOrder, input)
+placed shouldBeResponse orderPlaced
+(placed as Outcome.Ok)[orderAt] shouldBe "/users/1/orders/7"
+```
+
+`pelican-import` reads several 2xx into the descriptions and writes them out as
+`or`, with each response's headers on that response. The refusal it used to make
+is gone.
+
+### What stays refused
+
+- **Two responses sharing a status**, success or failure. The status is the only
+  thing separating two responses on the wire — it is what a test client, a
+  generated client and a browser all match on — so a second 200 is a response no
+  reader could pick out. Refused where the output is declared, naming the status.
+- **A streamed alternative among several.** `ndjson<Order>() or empty(202)` is
+  refused: naming a response is what produces it, and producing a stream means
+  handing over the backend's own type — a `Source`, a `Flow`, a `Sequence` —
+  which core cannot name. The alternative would be an `invoke` per backend with
+  the element type unchecked, which is three copies of the one thing the phantom
+  marker exists to avoid. A stream is still a success; it is just the only one,
+  and `ndjson<Order>() orFail noSuchUser` is unchanged — a failure decided before
+  the first element, as before.
+
+Two 2xx with *different media types* are not refused: `json<Order>() or
+text(status = 202)` publishes `application/json` under 200 and `text/plain`
+under 202, which is one content map per status and exactly what the format is
+for. What could not be told apart is two responses under one status, and that is
+the refusal above.
 
 ## How streaming stays backend-agnostic
 
@@ -2457,7 +2609,14 @@ open  localhost:8080/api-docs                                 # Swagger UI
 - **A Ktor wiring of the *orders* example.** The small `example/backends/`
   service runs on all three; the larger orders service is bound on Pekko and
   http4k only, and `ClientContractTest` runs against those two.
-- **Content negotiation** — one output media type per endpoint.
+- **Content negotiation** — one media type per response. An endpoint may answer
+  two statuses two ways, but nothing reads `Accept` to choose between two
+  renderings of the *same* response.
+- **A streamed response among several.** An endpoint declaring more than one 2xx
+  names the one it is producing, and producing a stream means handing over the
+  backend's own type, which core cannot name. A stream is still a success; it is
+  just the only one. See
+  [More than one successful response](#more-than-one-successful-response).
 - **Per-endpoint CORS, and the newer preflight extensions.** The policy is one
   value on the `Api`; `Access-Control-Allow-Private-Network` and friends are not
   emitted.

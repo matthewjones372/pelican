@@ -71,6 +71,24 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
         }
     },
 
+    // Two successes and a failure on one endpoint. `ok(...)` is not used here:
+    // with more than one success, saying which is the whole point, and the
+    // status comes from the declaration that was named rather than from the
+    // payload — which is what lets a 202 carry a different type from the 201.
+    submitOrder handledOneOf { (id, key, req) ->
+        when {
+            key != "let-me-in" -> badApiKey(ApiError(401, "Bad API key"))
+
+            req.quantity > Store.BURST_LIMIT ->
+                orderQueued(Queued("ticket-$id-${req.item}", position = req.quantity))
+
+            else -> {
+                val order = Store.create(id, req)
+                orderPlaced(order, orderAt of "/users/$id/orders/${order.id}")
+            }
+        }
+    },
+
     placeOrderForm handledNow { (id, req) -> Store.create(id, req) },
 
     // The upload arrives as a stream. Counting lines never holds the file, and

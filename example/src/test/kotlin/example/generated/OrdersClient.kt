@@ -313,6 +313,11 @@ data class CreateOrder(
     val quantity: Int? = null,
 )
 
+data class Queued(
+    val ticket: String,
+    val position: Int,
+)
+
 data class ImportResult(
     val label: String,
     val filename: String? = null,
@@ -349,6 +354,25 @@ data class Receipt(
 )
 
 enum class OrderStatus { PENDING, SHIPPED, DELIVERED, CANCELLED }
+
+// ------------------------------------------------------ declared responses
+
+// One sealed type per endpoint that answers with more than one 2xx, so a
+// `when` over what the call produced is exhaustive — and so that a 200 and
+// a 201 carrying the same payload stay two different things to a caller.
+
+/** What `submitOrder` answers with. */
+sealed interface SubmitOrderResult {
+    val status: Int
+
+    data class Created(val body: Order, val location: String?) : SubmitOrderResult {
+        override val status: Int get() = 201
+    }
+
+    data class Accepted(val body: Queued) : SubmitOrderResult {
+        override val status: Int get() = 202
+    }
+}
 
 // ------------------------------------------------------- declared failures
 
@@ -392,6 +416,16 @@ sealed interface PlaceOrderFailure {
     /** Too much asked for at once */
     data class TooManyRequests(val body: ApiError, val retryAfter: Long?) : PlaceOrderFailure {
         override val status: Int get() = 429
+    }
+}
+
+/** What `submitOrder` declares it can fail with. */
+sealed interface SubmitOrderFailure {
+    val status: Int
+
+    /** Missing or bad API key */
+    data class Unauthorized(val body: ApiError) : SubmitOrderFailure {
+        override val status: Int get() = 401
     }
 }
 
@@ -504,6 +538,7 @@ class OrdersClient(
     private val orderCodec: BodyCodec<Order> = codecs.codec(typeOf<Order>())
     private val tickCodec: BodyCodec<Tick> = codecs.codec(typeOf<Tick>())
     private val createOrderCodec: BodyCodec<CreateOrder> = codecs.codec(typeOf<CreateOrder>())
+    private val queuedCodec: BodyCodec<Queued> = codecs.codec(typeOf<Queued>())
     private val importResultCodec: BodyCodec<ImportResult> = codecs.codec(typeOf<ImportResult>())
     private val paymentMethodCodec: BodyCodec<PaymentMethod> = codecs.codec(typeOf<PaymentMethod>())
     private val receiptCodec: BodyCodec<Receipt> = codecs.codec(typeOf<Receipt>())
@@ -580,6 +615,24 @@ class OrdersClient(
         }
         if (!response.succeeded()) failed("POST", "/users/{userId}/orders", response)
         return Outcome.Ok(orderCodec.decodeFromString(response.body()))
+    }
+
+    /**
+     * Place an order, or take it for later when it is too large to place now
+     *
+     * `POST /users/{userId}/orders/submit`
+     */
+    fun submitOrder(userId: Long, body: CreateOrder, xApiKey: String): Outcome<SubmitOrderFailure, SubmitOrderResult> {
+        val response = text(request("POST", "/users/${segment(userId)}/orders/submit", headerParams = listOf("X-Api-Key" to xApiKey), body = HttpRequest.BodyPublishers.ofString(createOrderCodec.encodeToString(body)), contentType = "application/json"))
+        when (response.statusCode()) {
+            401 -> return Outcome.Err(SubmitOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body())))
+        }
+        if (!response.succeeded()) failed("POST", "/users/{userId}/orders/submit", response)
+        return when (response.statusCode()) {
+            201 -> Outcome.Ok(SubmitOrderResult.Created(orderCodec.decodeFromString(response.body()), response.header("Location")))
+            202 -> Outcome.Ok(SubmitOrderResult.Accepted(queuedCodec.decodeFromString(response.body())))
+            else -> failed("POST", "/users/{userId}/orders/submit", response)
+        }
     }
 
     /**

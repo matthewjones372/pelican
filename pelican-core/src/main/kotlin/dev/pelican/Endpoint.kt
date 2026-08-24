@@ -239,9 +239,16 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     // ------------------------------------------------------------ outputs
 
-    /** A single JSON value. Handler produces `T`. */
-    inline fun <reified T> json(status: Int = 200): JsonOutput<T> =
-        JsonOutput(status, typeOf<T>())
+    /**
+     * A single JSON value. Handler produces `T`.
+     *
+     * [headers] belong to *this* response rather than to the endpoint, and are
+     * only nameable where the handler names the response it is producing —
+     * which is to say where the endpoint declares more than one. Use
+     * `emits(...)` for a header every response carries.
+     */
+    inline fun <reified T> json(status: Int = 200, vararg headers: ResponseHeader<*>): JsonOutput<T> =
+        JsonOutput(status, typeOf<T>(), headers.toList())
 
     /** Newline-delimited JSON. Handler produces the backend's stream of `T`. */
     inline fun <reified T> ndjson(status: Int = 200): NdjsonOutput<T> =
@@ -263,9 +270,13 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun bytes(mediaType: String = "application/octet-stream", status: Int = 200): ByteStreamOutput =
         ByteStreamOutput(status, mediaType)
 
-    fun text(status: Int = 200): TextOutput = TextOutput(status)
+    /** Plain text. [headers] as on [json]. */
+    fun text(status: Int = 200, vararg headers: ResponseHeader<*>): TextOutput =
+        TextOutput(status, headers.toList())
 
-    fun empty(status: Int = 204): EmptyOutput = EmptyOutput(status)
+    /** No body at all — a 204, or the `202 Accepted` beside a `200`. [headers] as on [json]. */
+    fun empty(status: Int = 204, vararg headers: ResponseHeader<*>): EmptyOutput =
+        EmptyOutput(status, headers.toList())
 }
 
 /**
@@ -474,6 +485,33 @@ private fun validate(ep: Endpoint<*, *>) {
         .keys
     if (headerClashes.isNotEmpty()) {
         error("$ep declares the response header(s) $headerClashes more than once")
+    }
+
+    validateResponseHeaders(ep)
+}
+
+/**
+ * A header declared on one response is supplied where that response is named,
+ * and a handler only names a response when there is more than one to choose
+ * between. Declared on an endpoint's *only* output it is a promise nothing
+ * could keep — the handler returns the payload alone and never sees the
+ * declaration — so it is refused here rather than published and never sent.
+ */
+private fun validateResponseHeaders(ep: Endpoint<*, *>) {
+    val declared = ep.output.let { if (it is FallibleOutput<*, *>) it.successes else listOf(it) }
+
+    if (ep.output !is FallibleOutput<*, *> && ep.output.headers.isNotEmpty()) {
+        error(
+            "$ep declares ${ep.output.headers.joinToString { it.name }} on its only response, and a handler " +
+                "for a single response returns the payload alone, so nothing could supply them. " +
+                "Declare them with emits(...) and set them with setHeader, or declare a second response " +
+                "so the handler names the one it is producing.",
+        )
+    }
+
+    declared.forEach { response ->
+        val clashes = response.headers.groupBy { it.name.lowercase() }.filterValues { it.size > 1 }.keys
+        if (clashes.isNotEmpty()) error("$ep declares the header(s) $clashes on $response more than once")
     }
 }
 
