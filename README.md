@@ -612,6 +612,14 @@ document that leaves it out is not vague — OpenAPI reads the missing mapping a
 "the value is the schema name", so every client generated from it would send
 `BankTransfer` and be rejected.
 
+A hierarchy nested inside another publishes flat, through either, because
+neither JSON library puts two type ids on a payload: a class two levels down
+travels under the outermost discriminator with its own name. The nesting is a
+Kotlin relation and stays one. A *document* that spreads the type over two
+properties is refused rather than imported into a hierarchy that would decode
+nothing — see
+[docs/reference.md](docs/reference.md#two-levels-of-hierarchy).
+
 ---
 
 # Testing

@@ -115,6 +115,14 @@ private fun inherited(name: String?, schema: JsonObj, components: JsonObj): Comp
         val mapped = mapping.entries.firstOrNull { it.value == child }?.key
         Branch(mapped ?: child, JsonObj(mapOf(REF to JsonStr(child))), child, mapped, i)
     }
+
+    val nested = branches.filter { branch ->
+        branch.ref?.let { ref -> (components[ref] as? JsonObj).isHierarchy(components, ref) } == true
+    }
+    if (nested.isNotEmpty()) {
+        return Composed.Undescribable("discriminator", nestedHierarchy(property, nested.map { it.wire }))
+    }
+
     return Composed.Union(property, branches)
 }
 
@@ -142,7 +150,29 @@ private fun union(schema: JsonObj, branches: List<JsonObj>, components: JsonObj)
     val repeated = read.groupBy { it.wire }.filterValues { it.size > 1 }.keys
     if (repeated.isNotEmpty()) return Composed.Undescribable("oneOf", repeatedValues(property, repeated))
 
+    val nested = read.filter { branch -> resolve(branch.schema, components).isHierarchy(components, branch.ref) }
+    if (nested.isNotEmpty()) {
+        return Composed.Undescribable("oneOf", nestedHierarchy(property, nested.map { it.wire }))
+    }
+
     return Composed.Union(property, read)
+}
+
+/**
+ * Whether this schema is itself a hierarchy — either spelling — asked of a
+ * branch of another one.
+ *
+ * One level of look-ahead and no recursion, deliberately. Asking [composed] the
+ * question instead would be the same question again one level down, and two
+ * hierarchies that name each other as branches would ask it forever; this
+ * answers "is there another level below this one", which is all a union above
+ * needs to know, and any depth below is caught by the same check at that level.
+ */
+private fun JsonObj?.isHierarchy(components: JsonObj, name: String?): Boolean {
+    if (this == null) return false
+    if ((this["discriminator"] as? JsonObj)?.get("propertyName") == null) return false
+    if (realBranches("oneOf").size > 1) return true
+    return name != null && components.fields.values.any { (it as? JsonObj)?.extends(name) == true }
 }
 
 /**
@@ -291,3 +321,32 @@ private fun unnamed(index: Int, property: String): String =
 private fun repeatedValues(property: String, values: Collection<String>): String =
     "A union whose branches share a `$property` of ${values.joinToString(", ") { "`$it`" }}. Two branches " +
         "selected by one value is a document a decoder cannot follow."
+
+/**
+ * A hierarchy inside a hierarchy, which is a Kotlin shape and not a wire one.
+ *
+ * `sealed interface Inner : Outer` is a declaration Kotlin has, and both codecs
+ * hold it — but neither puts *two* type ids on a payload, and both say so
+ * deliberately. Jackson resolves the declared base type's id and no other,
+ * refused as an extension since 2013 (jackson-databind#2957);
+ * kotlinx.serialization makes a second `@JsonClassDiscriminator` under the same
+ * hierarchy a compile error, and flattens a nested sealed hierarchy to one
+ * discriminator naming the leaf. So a document that spreads the type over two
+ * properties describes a payload neither library writes or reads, and a sealed
+ * interface extending another would generate cleanly and decode nothing.
+ *
+ * The flattening is what both libraries do, so the flattening is what the
+ * document should say — which is also what this repository's own two codecs
+ * publish for a nested hierarchy, and therefore what a round trip through here
+ * meets.
+ */
+private fun nestedHierarchy(property: String, branches: Collection<String>): String {
+    val named = branches.joinToString(", ") { "`$it`" }
+    val subject =
+        if (branches.size == 1) "branch $named is itself a union" else "branches $named are themselves unions"
+    return "A union whose $subject. The type of a payload would be spread over two properties — `$property` " +
+        "here and another below — and no JSON library reads a type at two levels: Jackson resolves one, and " +
+        "kotlinx.serialization flattens the levels into one. Write the hierarchy flat instead: one `oneOf` " +
+        "listing every leaf schema, and one `discriminator` whose `mapping` names each of them. The level " +
+        "in between can stay a type in your own code; what it cannot be is a second value on the wire."
+}

@@ -10,6 +10,7 @@ import dev.pelican.JsonValue
 import dev.pelican.jsonArr
 import dev.pelican.jsonObj
 import dev.pelican.jsonStrings
+import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
 
 /**
@@ -39,6 +40,16 @@ import kotlin.reflect.KClass
  * every branch that inherits it; leaving the `allOf` in place instead would
  * point each branch back at a parent that is now a `oneOf` of those same
  * branches, which is a document nothing can resolve.
+ *
+ * A hierarchy under a hierarchy is published flat, for the same reason and with
+ * the same answer: Jackson resolves the declared base type's type id and no
+ * other, following `@JsonSubTypes` transitively to find what it selects. So a
+ * leaf two levels down is chosen by the root's property under its own name, and
+ * the level between them is a Kotlin relation with nothing on the wire. The
+ * document says exactly that — one `oneOf` over the leaves — which is also what
+ * `KotlinxCodecs` publishes for the same classes, kotlinx.serialization
+ * flattening a sealed hierarchy the same way. The two levels of `@JsonTypeInfo`
+ * that would be needed to say anything else are refused; see [nestedTypeInfo].
  */
 internal fun unionsRewritten(schemas: Map<String, JsonObj>, classes: Map<String, KClass<*>>): Map<String, JsonObj> {
     val hierarchies = Hierarchies(schemas, classes + parentsPointedAt(schemas, classes))
@@ -84,7 +95,7 @@ private class Union(val property: String, val branches: List<Branch>)
 
 private class Branch(val wire: String, val component: String)
 
-private class Hierarchies(private val schemas: Map<String, JsonObj>, classes: Map<String, KClass<*>>) {
+private class Hierarchies(private val schemas: Map<String, JsonObj>, private val classes: Map<String, KClass<*>>) {
 
     /**
      * The class a branch is, back to the name it was described under.
@@ -119,15 +130,15 @@ private class Hierarchies(private val schemas: Map<String, JsonObj>, classes: Ma
         unionOf(name, schemas.getValue(name), kClass)?.let { name to it }
     }.toMap()
 
-    /** Branch component -> the hierarchy it belongs to. */
-    private val parentOf: Map<String, String> =
-        unions.flatMap { (parent, union) -> union.branches.map { it.component to parent } }.toMap()
+    /** Every component that is a branch of some hierarchy. */
+    private val branches: Set<String> =
+        unions.values.flatMap { union -> union.branches.map { it.component } }.toSet()
 
     val none: Boolean get() = unions.isEmpty()
 
     fun rewrite(name: String, schema: JsonObj): JsonObj = when {
         name in unions -> parent(schema, unions.getValue(name))
-        name in parentOf -> branch(name, schema)
+        name in branches -> branch(name, schema)
         else -> schema
     }
 
@@ -160,9 +171,14 @@ private class Hierarchies(private val schemas: Map<String, JsonObj>, classes: Ma
      * repository generates from that document has.
      */
     private fun branch(name: String, schema: JsonObj): JsonObj {
-        val carried = discriminatorsAbove(name)
-        val properties = (inheritedProperties(name) + schema.ownProperties()) - carried
-        val required = (inheritedRequired(name) + schema.ownRequired()) - carried
+        val above = above(name)
+        val carried = above.mapNotNull { unions[it]?.property }.toSet()
+        val inherited = above.mapNotNull { schemas[it] }
+        val properties = (
+            inherited.fold(emptyMap<String, JsonValue>()) { all, level -> all + level.ownProperties() } +
+                schema.ownProperties()
+            ) - carried
+        val required = (inherited.flatMap { it.ownRequired() } + schema.ownRequired()).toSet() - carried
 
         // Whatever else the branch carried — a description, a title, an example
         // — kept as it was. Only the four keys this rewrites are rebuilt.
@@ -178,29 +194,25 @@ private class Hierarchies(private val schemas: Map<String, JsonObj>, classes: Ma
     }
 
     /**
-     * The properties a branch inherits, outermost hierarchy first.
+     * The described types above this branch, outermost first.
      *
-     * Walked rather than read off the branch, because swagger-core wrote them
-     * on the parent and left the branch pointing at it — and a hierarchy whose
-     * branches are themselves hierarchies has a parent in the middle that ends
-     * up holding nothing, so its share has to travel two levels down.
+     * Taken from the classes rather than from the hierarchies, because a
+     * middle level is not a branch of anything — it is flattened away by
+     * [leaves] — and its share of the properties still has to reach the leaf
+     * that will be on the wire. The class chain is the one place that relation
+     * survives the flattening.
      */
-    private fun inheritedProperties(name: String): Map<String, JsonValue> {
-        val parent = parentOf[name] ?: return emptyMap()
-        val schema = schemas[parent] ?: return emptyMap()
-        return inheritedProperties(parent) + schema.ownProperties()
-    }
+    private fun above(name: String): List<String> {
+        val kClass = classes[name] ?: return emptyList()
 
-    private fun inheritedRequired(name: String): Set<String> {
-        val parent = parentOf[name] ?: return emptySet()
-        val schema = schemas[parent] ?: return emptySet()
-        return inheritedRequired(parent) + schema.ownRequired()
-    }
+        // Each parent's own ancestors before the parent itself, so the list
+        // reads outermost first and a property declared high up is overwritten
+        // by a level that redeclares it rather than the other way round.
+        fun walk(type: Class<*>): List<String> =
+            (type.interfaces.toList() + listOfNotNull(type.superclass))
+                .flatMap { parent -> walk(parent) + listOfNotNull(nameOf[parent.kotlin]) }
 
-    /** Every property name that a `discriminator` above this branch claims. */
-    private fun discriminatorsAbove(name: String): Set<String> {
-        val parent = parentOf[name] ?: return emptySet()
-        return discriminatorsAbove(parent) + setOfNotNull(unions[parent]?.property)
+        return walk(kClass.java).distinct()
     }
 
     /**
@@ -211,20 +223,26 @@ private class Hierarchies(private val schemas: Map<String, JsonObj>, classes: Ma
      * left exactly as they wrote it. A `@JsonTypeInfo` Jackson *does* act on is
      * the case this exists for, and the shapes of it OpenAPI cannot describe
      * are refused rather than published as something else — see [refuse].
+     *
+     * A `@JsonSubTypes` under a hierarchy is a hierarchy too, on the same
+     * property: Jackson walks the annotation transitively and registers what it
+     * finds under the *root's* type id, so a middle level's branches are
+     * selected by the root's property, and the middle level itself is selected
+     * by nothing. That is why the type info is looked for above as well as
+     * here.
      */
     private fun unionOf(name: String, schema: JsonObj, kClass: KClass<*>): Union? {
-        val typeInfo = kClass.java.getAnnotation(JsonTypeInfo::class.java) ?: return null
+        val declared = kClass.java.getAnnotation(JsonTypeInfo::class.java)
+        val inherited = typeInfoAbove(kClass)
+        if (declared != null && inherited != null) refuse(name, ownTypeInfoUnder(inherited.second))
+        val typeInfo = declared ?: inherited?.first ?: return null
         val subtypes = kClass.java.getAnnotation(JsonSubTypes::class.java)?.value?.toList()
-            ?: refuse(name, NO_SUBTYPES)
+            ?: if (declared != null) refuse(name, NO_SUBTYPES) else return null
 
         if (typeInfo.include !in CARRIED_AS_A_PROPERTY) refuse(name, notAProperty(typeInfo.include))
         if (typeInfo.use !in NAMEABLE) refuse(name, notNameable(typeInfo.use))
 
-        val branches = subtypes.map { subtype ->
-            val component = nameOf[subtype.value]
-                ?: refuse(name, unresolved(subtype.value))
-            Branch(wireName(typeInfo.use, subtype), component)
-        }
+        val branches = leaves(name, typeInfo.use, subtypes, setOf(kClass))
 
         // swagger-core's reading of the same annotation, preferred over the
         // annotation's own field because it is what the rest of the schema was
@@ -237,6 +255,61 @@ private class Hierarchies(private val schemas: Map<String, JsonObj>, classes: Ma
         if (repeated.isNotEmpty()) refuse(name, repeatedValues(property, repeated))
 
         return Union(property, branches)
+    }
+
+    /**
+     * The classes a payload can actually be, with the middle levels walked
+     * through rather than published.
+     *
+     * Jackson resolves one type id and one only — the declared base type's —
+     * and finds subtypes through `@JsonSubTypes` transitively, so a leaf two
+     * levels down is selected by the root's property under its own name and the
+     * level between them is never a value on the wire at all. Listing that
+     * level as a branch is what this used to do, and it published a document
+     * saying payloads carry `kind: "electronic"` for a service that writes
+     * `kind: "card"` — the confidently-wrong document this file exists to stop.
+     *
+     * [seen] is the classes on the way down to here — the path, not everything
+     * met so far — so a `@JsonSubTypes` that points back up is a refusal with a
+     * class name in it rather than a stack overflow inside a build. Two
+     * branches that legitimately reach one class are a different complaint, and
+     * the repeated-value check above is where it is made.
+     */
+    private fun leaves(
+        root: String,
+        use: JsonTypeInfo.Id,
+        subtypes: List<JsonSubTypes.Type>,
+        seen: Set<KClass<*>>,
+    ): List<Branch> = subtypes.flatMap { subtype ->
+        val kClass = subtype.value
+        if (kClass in seen) refuse(root, circular(kClass))
+        if (kClass.java.getAnnotation(JsonTypeInfo::class.java) != null) refuse(root, nestedTypeInfo(kClass, root))
+
+        val below = kClass.java.getAnnotation(JsonSubTypes::class.java)?.value?.toList()
+        when {
+            below == null && kClass.cannotBeAPayload() -> refuse(root, abstractBranch(kClass))
+
+            below == null -> listOf(Branch(wireName(use, subtype), nameOf[kClass] ?: refuse(root, unresolved(kClass))))
+
+            // A concrete class that is also a level of the hierarchy is both a
+            // branch and a parent, and publishing it would mean a `oneOf`
+            // branch that is itself a `oneOf` — a payload whose type is spread
+            // over two values, which nothing reads back. See [concreteLevel].
+            !kClass.cannotBeAPayload() -> refuse(root, concreteLevel(kClass))
+
+            else -> leaves(root, use, below, seen + kClass)
+        }
+    }
+
+    /** The nearest `@JsonTypeInfo` above [kClass], with the component that carries it. */
+    private fun typeInfoAbove(kClass: KClass<*>): Pair<JsonTypeInfo, String>? {
+        (kClass.java.interfaces.toList() + listOfNotNull(kClass.java.superclass)).forEach { parent ->
+            parent.getAnnotation(JsonTypeInfo::class.java)?.let { typeInfo ->
+                return typeInfo to (nameOf[parent.kotlin] ?: parent.simpleName)
+            }
+            typeInfoAbove(parent.kotlin)?.let { return it }
+        }
+        return null
     }
 }
 
@@ -266,6 +339,17 @@ private fun JsonObj.ownRequired(): Set<String> = buildSet {
 private fun JsonObj.parts(): List<JsonObj> =
     (this["allOf"] as? JsonArr)?.items.orEmpty().filterIsInstance<JsonObj>().filter { it[REF] == null } +
         listOf(this)
+
+/**
+ * Whether nothing on the wire can be this class, which is what makes it a level
+ * of a hierarchy rather than a branch of one.
+ *
+ * Asked of the JVM rather than of `KClass.isAbstract`, which answers false for
+ * a `sealed interface` — sealed is its own modality in Kotlin — and would have
+ * made the one shape this is here for look like a concrete branch.
+ */
+private fun KClass<*>.cannotBeAPayload(): Boolean =
+    java.isInterface || java.modifiers and Modifier.ABSTRACT != 0
 
 private fun reference(component: String): JsonObj = jsonObj { REF to REFERENCE + component }
 
@@ -326,4 +410,50 @@ private fun unresolved(subtype: KClass<*>): String =
 
 private fun repeatedValues(property: String, values: Collection<String>): String =
     "two of its branches carry the same `$property` of ${values.joinToString(", ") { "`$it`" }}. Jackson " +
-        "reads whichever it registered last; give each branch a name of its own."
+        "reads whichever it registered last; give each branch a name of its own. A name repeated across " +
+        "two levels of one hierarchy reads the same way, since Jackson flattens the levels into one set."
+
+/**
+ * The two refusals a nested hierarchy earns, and the reason there is no
+ * document for either.
+ *
+ * Jackson resolves the *declared* base type's type id and nothing else:
+ * `@JsonSubTypes` is followed transitively, so a leaf below a middle level is
+ * still selected by the root's property under its own name, but a second
+ * `@JsonTypeInfo` on that middle level is ignored on the way in and preferred
+ * on the way out. A hierarchy annotated at two levels therefore writes one type
+ * id and reads a different one — `JacksonCodecs` cannot round-trip its own
+ * payloads through it — and no document describes that, because there is
+ * nothing coherent to describe. It has been a wontfix in jackson-databind since
+ * 2013; see FasterXML/jackson-databind#2957 and the four issues it collects.
+ *
+ * The way out is the flattening Jackson already does: one `@JsonTypeInfo`, at
+ * the root, and `@JsonSubTypes` at every level below it. The nesting stays in
+ * the Kotlin, where it is a real relation between types; it stops being a
+ * second value on the wire, which it never was.
+ */
+private fun nestedTypeInfo(branch: KClass<*>, root: String): String =
+    "its branch `${branch.simpleName}` carries a `@JsonTypeInfo` of its own. Jackson reads one type id " +
+        "per payload — the one the declared type asks for — so `${branch.simpleName}`'s is ignored when a " +
+        "`$root` is read and preferred when one is written, and a payload written here does not come back. " +
+        "Remove it and leave `@JsonSubTypes` alone: the branches below it are already selected by `$root`'s " +
+        "property, under their own names, and that is what gets published."
+
+private fun ownTypeInfoUnder(root: String): String =
+    "it carries a `@JsonTypeInfo` and so does `$root` above it. Jackson reads one type id per payload, so " +
+        "the two disagree about which property carries it. Keep the one on `$root` and remove this one; the " +
+        "`@JsonSubTypes` here still names the branches, and they are published under `$root`'s property."
+
+private fun concreteLevel(kClass: KClass<*>): String =
+    "its branch `${kClass.simpleName}` is a payload in its own right and also a level of the hierarchy, " +
+        "with `@JsonSubTypes` under it. It would have to be published as a branch that is itself a choice " +
+        "of branches, and a payload whose type is spread over two values is one nothing reads back. Make " +
+        "it abstract, so it is a level and not a payload, or move its subtypes up beside it."
+
+private fun abstractBranch(kClass: KClass<*>): String =
+    "its branch `${kClass.simpleName}` is abstract and lists no `@JsonSubTypes` of its own, so no payload " +
+        "can be one. Name the concrete branches under it, or leave it out of the hierarchy."
+
+private fun circular(kClass: KClass<*>): String =
+    "`${kClass.simpleName}` appears twice on the way down its own `@JsonSubTypes`. A hierarchy that " +
+        "contains itself has no set of branches to publish."

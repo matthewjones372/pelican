@@ -12,6 +12,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
@@ -103,33 +104,94 @@ class UnionSchemasTest {
     // --------------------------------------------------------------- nesting
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
-    @JsonSubTypes(JsonSubTypes.Type(value = Wallet::class, name = "wallet"))
+    @JsonSubTypes(
+        JsonSubTypes.Type(value = Coins::class, name = "coins"),
+        JsonSubTypes.Type(value = Wallet::class, name = "wallet"),
+    )
     sealed interface Method {
         val currency: String
     }
 
-    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "issuer")
-    @JsonSubTypes(JsonSubTypes.Type(value = PhoneWallet::class, name = "phone"))
-    sealed interface Wallet : Method
+    data class Coins(override val currency: String) : Method
 
-    data class PhoneWallet(override val currency: String, val device: String) : Wallet
+    /** A level of the hierarchy and not a payload: `@JsonSubTypes`, no `@JsonTypeInfo`. */
+    @JsonSubTypes(JsonSubTypes.Type(value = PhoneWallet::class, name = "phone"))
+    sealed interface Wallet : Method {
+        val issuer: String
+    }
+
+    data class PhoneWallet(
+        override val currency: String,
+        override val issuer: String,
+        val device: String,
+    ) : Wallet
 
     /**
-     * A hierarchy whose branch is itself a hierarchy. The middle one keeps
-     * nothing of its own, so what the outer one declared has to travel two
-     * levels to reach the class that will actually be on the wire.
+     * A hierarchy whose branch is itself a hierarchy, published as the one
+     * choice Jackson actually offers.
+     *
+     * Jackson follows `@JsonSubTypes` transitively and resolves the *declared*
+     * type's type id and no other, so a `PhoneWallet` travels as
+     * `kind: "phone"` and nothing on any wire is ever a `Wallet`. Listing
+     * `Wallet` as a branch of `Method` — which is what this used to publish —
+     * put a value in the document that the service never writes and never
+     * accepts.
      */
     @Test
-    fun `a hierarchy under a hierarchy pushes what it inherited all the way down`() {
+    fun `a hierarchy under a hierarchy is published flat, under the names Jackson selects`() {
         val described = schemas(typeOf<Method>())
 
-        (described["Method"] as JsonObj).refs("oneOf") shouldBe listOf("Wallet")
-        (described["Wallet"] as JsonObj).refs("oneOf") shouldBe listOf("PhoneWallet")
-        val leaf = described["PhoneWallet"] as JsonObj
-        (leaf["properties"] as JsonObj).fields.keys shouldBe setOf("currency", "device")
-        withClue("both discriminators are the hierarchies', not the leaf's") {
-            leaf.strings("required").toSet() shouldBe setOf("currency", "device")
+        withClue("`wallet` names a level, and a level is not a payload") {
+            (described["Method"] as JsonObj).mapping() shouldBe mapOf(
+                "coins" to JsonStr("#/components/schemas/Coins"),
+                "phone" to JsonStr("#/components/schemas/PhoneWallet"),
+            )
         }
+        val leaf = described["PhoneWallet"] as JsonObj
+        withClue("what each level above declared travels all the way down to the class on the wire") {
+            (leaf["properties"] as JsonObj).fields.keys shouldBe setOf("currency", "issuer", "device")
+        }
+        leaf["allOf"] shouldBe null
+    }
+
+    /**
+     * The middle level, described as the payloads it can hold.
+     *
+     * It is not dropped, because a property or a body typed as it would leave a
+     * `$ref` pointing at nothing. What it is *not* is a branch of `Method`: it
+     * is a second reading of the same discriminator over a narrower set, which
+     * is exactly what the Kotlin says.
+     */
+    @Test
+    fun `the level between is described by the leaves it stands for`() {
+        val wallet = schemas(typeOf<Method>())["Wallet"] as JsonObj
+
+        wallet.refs("oneOf") shouldBe listOf("PhoneWallet")
+        (wallet["discriminator"] as JsonObj)["propertyName"] shouldBe JsonStr("kind")
+        wallet.mapping() shouldBe mapOf("phone" to JsonStr("#/components/schemas/PhoneWallet"))
+    }
+
+    /**
+     * The document against the wire, which is the only comparison that settles
+     * it.
+     *
+     * Everything above asserts on what gets published; this asserts that a
+     * payload of the deepest class carries exactly the one type id the
+     * published `mapping` names, and comes back as the class it started as.
+     * Without it the flattening would be a claim about Jackson rather than a
+     * fact about it.
+     */
+    @Test
+    fun `a payload two levels down carries the one type id the document published`() {
+        val codec = JacksonCodecs.codec<Method>(typeOf<Method>())
+        val phone = PhoneWallet(currency = "GBP", issuer = "monzo", device = "pixel")
+
+        val written = codec.encodeToString(phone)
+        written shouldContain """"kind":"phone""""
+        withClue("`wallet` is a Kotlin relation; nothing puts it on a payload") {
+            written shouldNotContain "wallet"
+        }
+        codec.decodeFromString(written) shouldBe phone
     }
 
     // -------------------------------------------------------------- the name
@@ -213,6 +275,76 @@ class UnionSchemasTest {
         val failure = shouldThrow<IllegalStateException> { schemas(typeOf<Repeated>()) }
 
         failure.message.orEmpty() shouldContain "`same`"
+    }
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
+    @JsonSubTypes(JsonSubTypes.Type(value = Layered::class, name = "layered"))
+    sealed interface Doubled
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "issuer")
+    @JsonSubTypes(JsonSubTypes.Type(value = DeepLeaf::class, name = "deep"))
+    sealed interface Layered : Doubled
+
+    data class DeepLeaf(val a: String) : Layered
+
+    /**
+     * The one nesting there is no document for, and the reason the flattening
+     * above is the whole of what is supported.
+     *
+     * Jackson reads the declared type's type id and ignores every other, so
+     * `Doubled`'s `kind` is what a read looks for and `Twice`'s `issuer` is
+     * what a write puts there: `JacksonCodecs` cannot read back its own
+     * payloads. There is no coherent document for that, and the refusal says
+     * which annotation to delete.
+     */
+    @Test
+    fun `a second JsonTypeInfo below the root is refused, and the message says which to remove`() {
+        val failure = shouldThrow<IllegalStateException> { schemas(typeOf<Doubled>()) }.message.orEmpty()
+
+        failure shouldContain "Layered"
+        failure shouldContain "one type id per payload"
+        withClue("the way out is the annotation Jackson already acts on") {
+            failure shouldContain "@JsonSubTypes"
+        }
+    }
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
+    @JsonSubTypes(JsonSubTypes.Type(value = Middle::class, name = "middle"))
+    sealed interface Both
+
+    @JsonSubTypes(JsonSubTypes.Type(value = Under::class, name = "under"))
+    open class Middle(val a: String) : Both
+
+    class Under(val b: String) : Middle("")
+
+    /**
+     * A class that is both a payload and a level. Published as it stands it
+     * would be a `oneOf` branch that is itself a `oneOf`, which is the document
+     * shape `pelican-import` refuses on the way back in — so it is refused on
+     * the way out too, rather than written by one half of this repository and
+     * rejected by the other.
+     */
+    @Test
+    fun `a concrete class that is also a level of the hierarchy is refused`() {
+        val failure = shouldThrow<IllegalStateException> { schemas(typeOf<Both>()) }.message.orEmpty()
+
+        failure shouldContain "Middle"
+        failure shouldContain "spread over two values"
+        failure shouldContain "Make it abstract"
+    }
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
+    @JsonSubTypes(JsonSubTypes.Type(value = Empty::class, name = "empty"))
+    sealed interface Hollow
+
+    sealed interface Empty : Hollow
+
+    @Test
+    fun `a level with nothing under it is refused, since no payload can be one`() {
+        val failure = shouldThrow<IllegalStateException> { schemas(typeOf<Hollow>()) }.message.orEmpty()
+
+        failure shouldContain "Empty"
+        failure shouldContain "no payload can be one"
     }
 
     // ------------------------------------------------------------- fixtures

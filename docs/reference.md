@@ -620,6 +620,7 @@ What it refuses, and what each one would have cost:
 | `allOf` of schemas that disagree about a property | Merging would have to pick a winner, and the generated class would then accept payloads the document rejects |
 | A `discriminator` with no branches to discriminate | Neither spelling of a hierarchy is there: no `oneOf` listing the branches, and no schema declaring an `allOf` of this one |
 | A union branch nothing selects | Written inline, unmapped, and declaring no `const` for the discriminator property. A class no payload can reach would be a contract nobody wrote |
+| A `oneOf` branch that is itself a discriminated `oneOf` | Two type properties on one payload, and no JSON library reads a type at two levels — see [Two levels of hierarchy](#two-levels-of-hierarchy). Write one `oneOf` over the leaf schemas with one `discriminator` |
 | `not` | A schema defined by what it excludes. There is no Kotlin type for "anything but this" |
 | A parameter that is an object, or a list of them | A Pelican input decodes one value from one string. A list *of values* reads fine — see [More than one value](#more-than-one-value) |
 | A parameter under `content` | It carries a whole document rather than a value; that is a request body |
@@ -699,6 +700,51 @@ reach would be inventing a contract.
 The discriminator property itself is *not* a property of the branch classes.
 The hierarchy carries it. Two places holding one value is two places for them
 to disagree, and kotlinx.serialization refuses the pair outright.
+
+#### Two levels of hierarchy
+
+Kotlin has `sealed interface Electronic : Payment`, and it is a perfectly
+ordinary thing to write. What it is *not* is a second value on the wire, and a
+document that says otherwise is refused:
+
+```yaml
+Payment:
+  oneOf: [{ $ref: '#/components/schemas/Cash' }, { $ref: '#/components/schemas/Electronic' }]
+  discriminator: { propertyName: kind, mapping: { cash: '...Cash', electronic: '...Electronic' } }
+Electronic:
+  oneOf: [{ $ref: '#/components/schemas/Card' }, { $ref: '#/components/schemas/Bank' }]
+  discriminator: { propertyName: type, mapping: { card: '...Card', bank: '...Bank' } }
+```
+
+That describes `{"kind": "electronic", "type": "card", ...}` — the payload's
+type spread over two properties — and neither JSON library reads one. Jackson
+resolves the *declared* type's type id and no other; a second `@JsonTypeInfo`
+below the root is ignored on the way in and preferred on the way out, so a
+service annotated that way cannot read back what it wrote. It has been a
+wontfix in jackson-databind since 2013, restated four times, most recently on
+[#2957](https://github.com/FasterXML/jackson-databind/issues/2957).
+kotlinx.serialization goes further and makes a second `@JsonClassDiscriminator`
+under one hierarchy a compile error, because
+[its own documentation](https://kotlinlang.org/api/kotlinx.serialization/kotlinx-serialization-json/kotlinx.serialization.json/-json-class-discriminator/)
+says a hierarchy has exactly one; a nested sealed hierarchy is flattened
+instead, its `SealedClassSerializer` registering the subclasses of a sealed
+subclass as its own.
+
+So the refusal is not a gap. A sealed interface extending another would have
+generated cleanly and decoded nothing, which is the silent weakening the whole
+import is arranged against. What both libraries *do* is flatten, and the
+flattening is what the document should say:
+
+```yaml
+Payment:
+  oneOf: [{ $ref: '...Cash' }, { $ref: '...Card' }, { $ref: '...Bank' }]
+  discriminator: { propertyName: kind, mapping: { cash: '...Cash', card: '...Card', bank: '...Bank' } }
+```
+
+One level, every leaf reachable, and the Kotlin nesting — if the classes want
+it — kept on the Kotlin side where it costs the wire nothing. That is what both
+of this repository's codecs publish for a nested hierarchy; see
+[The publishing direction](#the-publishing-direction).
 
 #### `codec`
 
@@ -909,7 +955,20 @@ list, a branch of another hierarchy — not only for one an operation names at t
 top. `KotlinAwareModelResolver` records the pairing as each type is resolved,
 which is the only place both halves are ever in one hand.
 
-Four shapes are refused rather than published as something they are not, each
+A hierarchy under a hierarchy publishes flat, and that is the same decision one
+level further down. Jackson follows `@JsonSubTypes` transitively but resolves
+the *declared* type's type id and no other, so a class two levels down travels
+under the root's property with its own name — `kind: "card"`, never
+`kind: "electronic"` and never a second property beside it. The document says
+exactly that: one `oneOf` over the leaves, and the level between them described
+by the leaves it stands for rather than listed as a branch nothing can be.
+kotlinx.serialization flattens a nested sealed hierarchy the same way, so the
+two codecs still publish one shape. The nesting stays in the Kotlin, which is
+where it was ever real; the reasoning, and what happens to a document that says
+otherwise, are under
+[Two levels of hierarchy](#two-levels-of-hierarchy).
+
+Seven shapes are refused rather than published as something they are not, each
 naming the class:
 
 | `@JsonTypeInfo` says | Why there is no document for it |
@@ -917,7 +976,10 @@ naming the class:
 | `include` is anything but `As.PROPERTY` or `As.EXISTING_PROPERTY` | The type is not a property of the payload — it is a wrapper object, an array position, an external field — and a `discriminator` can only name a property |
 | `use` is anything but `Id.NAME` or `Id.CLASS` | Neither gives each branch a name that can be written down. `Id.DEDUCTION` puts nothing on the wire at all |
 | No `@JsonSubTypes` beside it | The document would declare a type property and never say which values it takes. Jackson needs the list too |
-| Two branches with one name | Two branches selected by one value is a payload no decoder can place |
+| Two branches with one name | Two branches selected by one value is a payload no decoder can place, at one level of a hierarchy or across two |
+| A second `@JsonTypeInfo` below the root | Jackson reads one type id per payload: the inner one is ignored when the root is read and preferred when a branch is written, so the service cannot read back what it wrote. Keep the root's and leave `@JsonSubTypes` alone |
+| A concrete class that also carries `@JsonSubTypes` | It is a payload and a level at once, so the document would need a `oneOf` branch that is itself a `oneOf` — the shape `pelican-import` refuses on the way in. Make it abstract, or move its subtypes up beside it |
+| An abstract branch with no `@JsonSubTypes` of its own | No payload can be one, so the value naming it selects nothing |
 
 A sealed hierarchy is also the one payload type in the example that carries an
 annotation: see `PaymentMethod` in `example/src/main/kotlin/example/Model.kt`,
@@ -2642,14 +2704,17 @@ open  localhost:8080/api-docs                                 # Swagger UI
   carry, so closing them means teaching the walker to recognise a set and to
   name an instantiation. Not written; a service that stays on one codec sees
   neither.
-- **A hierarchy nested inside another, on the way back in.** `JacksonCodecs`
-  publishes one faithfully — a branch that is itself a `oneOf`, with what the
-  outer hierarchy declared pushed down to the classes that carry it on the wire.
-  `pelican-import` reads the branches back but not the link between the two
-  levels: the inner sealed interface comes back as a hierarchy of its own rather
-  than as a branch of the outer one. A `sealed interface` extending another is
-  the declaration that is missing, and nothing else about the payload is. Two
-  levels of hierarchy is rare enough that this is recorded rather than fixed.
+- **A payload whose type is spread over two properties.** A `oneOf` branch that
+  is itself a discriminated `oneOf` — `kind: "electronic"` above and
+  `type: "card"` below — is refused on the way in, and refused on the way out
+  where the annotations say it. Not a gap: neither JSON library reads a type at
+  two levels, both say so on purpose, and `sealed interface Inner : Outer` would
+  have generated cleanly and decoded nothing. A *Kotlin* hierarchy nested inside
+  another is fine and travels flat — one discriminator, the leaf's own name —
+  which is what both codecs now publish and what imports back. The whole of the
+  reasoning is under
+  [Two levels of hierarchy](#two-levels-of-hierarchy); what the intermediate
+  level costs is its own name on the wire, which it never had.
 - **`anyOf` of several branches, and `not`.** Both are still refused, and the
   reasoning is in "What it refuses" above rather than here: neither is a gap
   waiting to be filled, they are shapes with no faithful Kotlin.

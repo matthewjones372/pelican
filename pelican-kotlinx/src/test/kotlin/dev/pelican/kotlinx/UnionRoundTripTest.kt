@@ -178,17 +178,151 @@ class UnionRoundTripTest {
         generated shouldNotContain "val kind:"
     }
 
+    // -------------------------------------------------------- two levels up
+
+    /**
+     * A hierarchy whose branch is itself a hierarchy, in both codecs, and the
+     * flat twin of each.
+     *
+     * The nesting is a Kotlin relation and nothing else. Neither library puts
+     * two type ids on a payload: kotlinx.serialization flattens a nested sealed
+     * hierarchy to one discriminator naming the leaf — and makes a second
+     * `@JsonClassDiscriminator` under one hierarchy a compile error — while
+     * Jackson resolves the declared type's id only, following `@JsonSubTypes`
+     * transitively to find what it selects. So the middle level names no value,
+     * and the flat twins below are what a reader of the published document gets
+     * back.
+     *
+     * The twins are the point of the fixture. Asserting that the nested
+     * hierarchy writes `kind: "card"` proves what one codec does; decoding that
+     * same string into the *flat* class proves the document published from the
+     * nesting describes the payload the nesting produces.
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    @Serializable
+    @JsonClassDiscriminator("kind")
+    sealed interface Wallet
+
+    @Serializable
+    @SerialName("coins")
+    data class Coins(val amount: Long) : Wallet
+
+    @Serializable
+    sealed interface Electronic : Wallet
+
+    @Serializable
+    @SerialName("card")
+    data class WalletCard(val number: String) : Electronic
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Serializable
+    @JsonClassDiscriminator("kind")
+    sealed interface FlatWallet
+
+    @Serializable
+    @SerialName("card")
+    data class FlatCard(val number: String) : FlatWallet
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
+    @JsonSubTypes(
+        JsonSubTypes.Type(value = JsonCoins::class, name = "json_coins"),
+        JsonSubTypes.Type(value = JsonElectronic::class, name = "json_electronic"),
+    )
+    sealed interface JsonWallet
+
+    data class JsonCoins(val amount: Long) : JsonWallet
+
+    @JsonSubTypes(JsonSubTypes.Type(value = JsonWalletCard::class, name = "json_wallet_card"))
+    sealed interface JsonElectronic : JsonWallet
+
+    data class JsonWalletCard(val number: String) : JsonElectronic
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
+    @JsonSubTypes(JsonSubTypes.Type(value = JsonFlatCard::class, name = "json_wallet_card"))
+    sealed interface JsonFlatWallet
+
+    data class JsonFlatCard(val number: String) : JsonFlatWallet
+
+    @Test
+    fun `kotlinx writes a leaf two levels down under the outermost discriminator`() {
+        val nested = KotlinxCodecs.codec<Wallet>(typeOf<Wallet>())
+        val flat = KotlinxCodecs.codec<FlatWallet>(typeOf<FlatWallet>())
+
+        val written = nested.encodeToString(WalletCard("4111"))
+        written shouldContain """"kind":"card""""
+        withClue("`Electronic` is a Kotlin relation; nothing selects it on the wire") {
+            written shouldNotContain "Electronic"
+        }
+        nested.decodeFromString(written) shouldBe WalletCard("4111")
+        withClue("the flat hierarchy the document describes reads the nested one's payload") {
+            flat.decodeFromString(written) shouldBe FlatCard("4111")
+        }
+    }
+
+    @Test
+    fun `jackson writes a leaf two levels down under the outermost discriminator`() {
+        val nested = JacksonCodecs.codec<JsonWallet>(typeOf<JsonWallet>())
+        val flat = JacksonCodecs.codec<JsonFlatWallet>(typeOf<JsonFlatWallet>())
+
+        val written = nested.encodeToString(JsonWalletCard("4111"))
+        written shouldContain """"kind":"json_wallet_card""""
+        written shouldNotContain "json_electronic"
+        nested.decodeFromString(written) shouldBe JsonWalletCard("4111")
+        flat.decodeFromString(written) shouldBe JsonFlatCard("4111")
+    }
+
+    @Test
+    fun `both codecs publish a nested hierarchy as the one flat choice it is`() {
+        val kotlinx = schemasOf(KotlinxCodecs, "Wallet")["Wallet"] as JsonObj
+        val jackson = schemasOf(JacksonCodecs, "JsonWallet")["JsonWallet"] as JsonObj
+
+        (kotlinx["discriminator"] as JsonObj).mapping().keys shouldBe setOf("coins", "card")
+        (jackson["discriminator"] as JsonObj).mapping().keys shouldBe
+            setOf("json_coins", "json_wallet_card")
+        withClue("no branch of either is a choice of its own; two type ids is what nothing reads") {
+            kotlinx.refs("oneOf").forEach { branch ->
+                (schemasOf(KotlinxCodecs, "Wallet")[branch] as JsonObj)["oneOf"] shouldBe null
+            }
+            jackson.refs("oneOf").forEach { branch ->
+                (schemasOf(JacksonCodecs, "JsonWallet")[branch] as JsonObj)["oneOf"] shouldBe null
+            }
+        }
+    }
+
+    @Test
+    fun `the document a nested hierarchy published imports back as one flat hierarchy`(@TempDir directory: File) {
+        val generated = reimported(JacksonCodecs, "JsonWallet", directory)
+
+        generated shouldContain "sealed interface JsonWallet"
+        generated shouldContain """JsonSubTypes.Type(value = JsonWalletCard::class, name = "json_wallet_card")"""
+        withClue("the level between held nothing on the wire, so nothing comes back for it") {
+            generated shouldNotContain "JsonElectronic"
+        }
+    }
+
     // ------------------------------------------------------------- fixtures
 
     private fun specFor(source: SchemaSource, payload: String): ApiSpec {
-        val described = if (payload == "Payment") {
-            endpoint(jsonBody<Payment>()) {
+        val described = when (payload) {
+            "Payment" -> endpoint(jsonBody<Payment>()) {
                 post("payments")
                 operationId = "pay"
                 empty(status = 204)
             }
-        } else {
-            endpoint(jsonBody<JsonPayment>()) {
+
+            "Wallet" -> endpoint(jsonBody<Wallet>()) {
+                post("payments")
+                operationId = "pay"
+                empty(status = 204)
+            }
+
+            "JsonWallet" -> endpoint(jsonBody<JsonWallet>()) {
+                post("payments")
+                operationId = "pay"
+                empty(status = 204)
+            }
+
+            else -> endpoint(jsonBody<JsonPayment>()) {
                 post("payments")
                 operationId = "pay"
                 empty(status = 204)
@@ -211,6 +345,8 @@ class UnionRoundTripTest {
         document.writeText(specFor(source, payload).openApi().render())
         return Import.kotlin(document, ImportOptions("app", "payments")).values.single()
     }
+
+    private fun JsonObj.mapping(): Map<String, JsonValue> = (this["mapping"] as JsonObj).fields
 
     private fun JsonObj.refs(key: String): List<String> =
         (this[key] as? JsonArr)?.items.orEmpty()

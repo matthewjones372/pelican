@@ -402,6 +402,99 @@ class UnionsTest {
         message shouldContain "components.schemas.Payment.anyOf"
     }
 
+    /**
+     * A hierarchy inside a hierarchy: two discriminator properties on one
+     * payload, which is the one union shape neither codec reads.
+     *
+     * `sealed interface Electronic : Payment` is a declaration Kotlin has and
+     * both codecs hold — what neither does is put two type ids on a payload.
+     * Generating it would compile and decode nothing, which is exactly the
+     * silent weakening this module refuses.
+     */
+    @Test
+    fun `a union whose branch is itself a union is refused, and the message says how to flatten it`() {
+        val message = refusing(
+            """
+            openapi: 3.1.0
+            info: { title: Payments, version: "1.0.0" }
+            components:
+              schemas:
+                Cash: { type: object, properties: { amount: { type: integer } }, required: [amount] }
+                Card: { type: object, properties: { number: { type: string } }, required: [number] }
+                Bank: { type: object, properties: { iban: { type: string } }, required: [iban] }
+                Electronic:
+                  oneOf:
+                    - { ${'$'}ref: '#/components/schemas/Card' }
+                    - { ${'$'}ref: '#/components/schemas/Bank' }
+                  discriminator:
+                    propertyName: type
+                    mapping: { card: '#/components/schemas/Card', bank: '#/components/schemas/Bank' }
+                Payment:
+                  oneOf:
+                    - { ${'$'}ref: '#/components/schemas/Cash' }
+                    - { ${'$'}ref: '#/components/schemas/Electronic' }
+                  discriminator:
+                    propertyName: kind
+                    mapping: { cash: '#/components/schemas/Cash', electronic: '#/components/schemas/Electronic' }
+            paths:
+              /payments:
+                post:
+                  operationId: pay
+                  requestBody:
+                    content:
+                      application/json:
+                        schema: { ${'$'}ref: '#/components/schemas/Payment' }
+                  responses:
+                    "204": { description: ok }
+            """,
+        )
+
+        message shouldContain "components.schemas.Payment.oneOf"
+        message shouldContain "`electronic`"
+        message shouldContain "spread over two properties"
+        message shouldContain "one `oneOf` listing every leaf schema"
+    }
+
+    /** The same nesting in the spelling 3.0 had for a hierarchy, refused the same way. */
+    @Test
+    fun `a nested hierarchy written as 3_0 wrote one is refused too`() {
+        val message = refusing(
+            """
+            openapi: 3.1.0
+            info: { title: Payments, version: "1.0.0" }
+            components:
+              schemas:
+                Payment:
+                  properties: { kind: { type: string } }
+                  discriminator: { propertyName: kind }
+                Electronic:
+                  allOf:
+                    - { ${'$'}ref: '#/components/schemas/Payment' }
+                    - type: object
+                      properties: { type: { type: string } }
+                  discriminator: { propertyName: type }
+                Card:
+                  allOf:
+                    - { ${'$'}ref: '#/components/schemas/Electronic' }
+                    - type: object
+                      properties: { number: { type: string } }
+            paths:
+              /payments:
+                post:
+                  operationId: pay
+                  requestBody:
+                    content:
+                      application/json:
+                        schema: { ${'$'}ref: '#/components/schemas/Payment' }
+                  responses:
+                    "204": { description: ok }
+            """,
+        )
+
+        message shouldContain "branch `Electronic` is itself a union"
+        message shouldContain "components.schemas.Payment.discriminator"
+    }
+
     @Test
     fun `a discriminator with no branches beneath it names the shape the document should have`() {
         val message = refusing(
