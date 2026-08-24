@@ -663,6 +663,14 @@ and a `Codecs` chosen by the caller. Transport is the JDK's `HttpClient`. The
 example checks its generated client into the repo and runs the suite against a
 real server, so a test fails if the file drifts from the descriptions.
 
+A `oneOf` in the spec becomes a sealed interface, and that is the one payload
+shape no JSON library can read off the Kotlin alone: which property carries the
+branch, and what string selects each one, has to be written down. So those
+declarations are annotated for one library, and `codec.set("kotlinx")` on the
+client entry chooses which — the same setting an `endpoints` entry takes,
+because a client's bodies are read by the same library the service's are. Unset
+is Jackson, and a spec with no union generates the same client either way.
+
 `ordersSpec().writeKotlinClient(sourceRoot, packageName = "com.example.orders")`
 is the same thing without the build task, for a build that would rather make the
 call itself.

@@ -8,6 +8,10 @@ import java.io.File
  * As with the client generator above it, what it writes is a record of what it
  * was handed — the plugin's half of the job is the arguments, and the
  * generated Kotlin is asserted in that module's own tests and in `:example`.
+ *
+ * The arity a previous release published is in `dev.pelican.older.importer`
+ * rather than here; see the note on the client fake for why the two cannot
+ * share a class.
  */
 @Suppress("LongParameterList")
 fun importEndpoints(
@@ -29,13 +33,3 @@ fun importEndpoints(
         },
     )
 }
-
-/** The arity an older release published, kept so the plugin's fallback has something to find. */
-fun importEndpoints(
-    document: File,
-    sourceRoot: File,
-    packageName: String,
-    name: String,
-    exclude: Set<String>,
-    handlers: String?,
-): List<File> = importEndpoints(document, sourceRoot, packageName, name, exclude, handlers, null)

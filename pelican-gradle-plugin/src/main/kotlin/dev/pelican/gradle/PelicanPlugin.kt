@@ -73,6 +73,7 @@ class PelicanPlugin : Plugin<Project> {
             task.clientName.set(client.clientName)
             task.baseUrl.set(client.baseUrl)
             task.includeHidden.set(client.includeHidden)
+            task.codec.set(client.codec)
             task.outputDir.set(client.outputDir)
         }
 
@@ -85,6 +86,7 @@ class PelicanPlugin : Plugin<Project> {
             task.clientName.set(client.clientName)
             task.baseUrl.set(client.baseUrl)
             task.includeHidden.set(client.includeHidden)
+            task.codec.set(client.codec)
             task.outputDir.set(client.outputDir)
         }
 

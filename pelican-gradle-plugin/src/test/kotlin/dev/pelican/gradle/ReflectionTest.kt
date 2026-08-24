@@ -93,20 +93,37 @@ class ReflectionTest {
     @Test
     fun `falls back to the client name and base URL the library would have used`(@TempDir dir: File) {
         val spec = Pelican.spec(loader, "dev.pelican.gradle.SpecsKt", "ordersSpec")
-        val written = Pelican.writeClient(loader, spec, dir, "example.generated", null, null, false)
+        val written = Pelican.writeClient(loader, spec, dir, "example.generated", null, null, false, null)
 
         written shouldBe File(dir, "example/generated/OrdersClient.kt")
-        // title | package | client | base URL | hidden
-        written.readText().trim() shouldBe "Orders|example.generated|OrdersClient|https://orders.test|false"
+        // title | package | client | base URL | hidden | codec
+        written.readText().trim() shouldBe "Orders|example.generated|OrdersClient|https://orders.test|false|JACKSON"
     }
 
     @Test
     fun `passes what the entry set instead`(@TempDir dir: File) {
         val spec = Pelican.spec(loader, "dev.pelican.gradle.SpecsKt", "ordersSpec")
-        val written = Pelican.writeClient(loader, spec, dir, "example", "Internal", "https://elsewhere.test", true)
+        val written =
+            Pelican.writeClient(loader, spec, dir, "example", "Internal", "https://elsewhere.test", true, "kotlinx")
 
         written shouldBe File(dir, "example/Internal.kt")
-        written.readText().trim() shouldBe "Orders|example|Internal|https://elsewhere.test|true"
+        written.readText().trim() shouldBe "Orders|example|Internal|https://elsewhere.test|true|KOTLINX"
+    }
+
+    /**
+     * The build file says `kotlinx` and the library declares `KOTLINX`. The
+     * plugin holds the enum's name and not its constants, so the matching is
+     * the only place the two spellings meet.
+     */
+    @Test
+    fun `names the codecs the library offers when the entry names one it does not`(@TempDir dir: File) {
+        val spec = Pelican.spec(loader, "dev.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.writeClient(loader, spec, dir, "example", null, null, false, "gson")
+        }
+
+        failure.message.orEmpty() shouldContain "No codec called 'gson'"
+        failure.message.orEmpty() shouldContain "JACKSON, KOTLINX"
     }
 
     @Test
@@ -140,8 +157,64 @@ class ReflectionTest {
     @Test
     fun `leaves the base URL unset when there is nothing to default to`(@TempDir dir: File) {
         val spec = Pelican.spec(loader, "dev.pelican.gradle.SpecsKt", "serverlessSpec")
-        val written = Pelican.writeClient(loader, spec, dir, "example", null, null, false)
+        val written = Pelican.writeClient(loader, spec, dir, "example", null, null, false, null)
 
-        written.readText().trim() shouldBe "Orders|example|OrdersClient|null|false"
+        written.readText().trim() shouldBe "Orders|example|OrdersClient|null|false|JACKSON"
+    }
+
+    // ------------------------------------------------- an older library
+
+    /**
+     * The other half of every lookup above: a `pelican-codegen` or a
+     * `pelican-import` published before the codec setting existed.
+     *
+     * Both are whole library versions standing in their own packages, and the
+     * tests reach them through the seam that takes a resolved class. Naming the
+     * class is the only way to have two versions on one test classpath — and
+     * without two versions the fallback would be a branch nothing ever takes,
+     * which is a fallback that has already stopped working and not said so.
+     */
+    private val olderCodegen = Class.forName("dev.pelican.older.codegen.KotlinClientKt")
+    private val olderImporter = Class.forName("dev.pelican.older.importer.ImportKt")
+    private val apiSpec = Class.forName("dev.pelican.ApiSpec")
+
+    @Test
+    fun `writes a client through the arity an older library published`(@TempDir dir: File) {
+        val spec = Pelican.spec(loader, "dev.pelican.gradle.SpecsKt", "ordersSpec")
+        val written =
+            Pelican.writeClient(olderCodegen, apiSpec, spec, dir, "example", null, null, false, null)
+
+        written shouldBe File(dir, "example/OrdersClient.kt")
+        written.readText().trim() shouldBe "Orders|example|OrdersClient|https://orders.test|false"
+    }
+
+    @Test
+    fun `says which library is too old to carry the codec the entry set`(@TempDir dir: File) {
+        val spec = Pelican.spec(loader, "dev.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.writeClient(olderCodegen, apiSpec, spec, dir, "example", null, null, false, "kotlinx")
+        }
+
+        failure.message.orEmpty() shouldContain "pelican-codegen"
+        failure.message.orEmpty() shouldContain "takes no codec"
+    }
+
+    @Test
+    fun `imports through the arity an older library published`(@TempDir dir: File) {
+        val document = File(dir, "openapi.yaml").apply { writeText("openapi: 3.1.0") }
+        val written =
+            Pelican.writeEndpoints(olderImporter, document, dir, "com.example", "orders", setOf("a"), "ktor", null)
+
+        (written.single() as File).readText().trim() shouldBe "openapi.yaml|com.example|orders|a|ktor"
+    }
+
+    @Test
+    fun `says which importer is too old to carry the codec the entry set`(@TempDir dir: File) {
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.writeEndpoints(olderImporter, dir, dir, "com.example", "orders", emptySet(), null, "kotlinx")
+        }
+
+        failure.message.orEmpty() shouldContain "pelican-import"
+        failure.message.orEmpty() shouldContain "takes no codec"
     }
 }

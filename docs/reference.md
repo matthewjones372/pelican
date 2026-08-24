@@ -457,6 +457,7 @@ and Gradle's are not the same Jackson.
 | `clientName` | clients | the spec's title: `Orders` → `OrdersClient` |
 | `baseUrl` | clients | the spec's first server |
 | `includeHidden` | clients | `false` — hidden endpoints are left out, as they are left out of the document |
+| `codec` | clients | unset: `jackson`. `kotlinx` annotates the payload types for the other library. See below |
 | `outputDir` | clients | `build/generated/pelican/<name>` |
 | `format` | documents | `JSON`; `YAML` writes the same document the other way |
 | `outputFile` | documents | `build/generated/pelican/<name>/openapi.<format>` |
@@ -464,6 +465,7 @@ and Gradle's are not the same Jackson.
 | `packageName` | endpoints | — required |
 | `exclude` | endpoints | empty: `operationId`s to leave out. See below |
 | `handlers` | endpoints | unset: `pekko`, `http4k` or `ktor` writes stubs |
+| `codec` | endpoints | unset: `jackson`. The same setting a client entry takes. See below |
 | `outputDir` | endpoints | `build/generated/pelican/<name>` |
 
 An `endpoints` entry has no `specClass` or `specFunction`, which is the whole
@@ -500,12 +502,45 @@ That is how this repository generates its own example client — into
 `GeneratedKotlinClientTest`, with `checkOrdersClient` on `check` so it cannot
 drift.
 
+### Which codec the client is annotated for
+
+A generated client is otherwise free of any JSON library: the payload types are
+plain declarations, and the `Codecs` is the caller's, passed to the constructor
+the way a server is handed one. A sealed hierarchy is the exception, for the
+reason it is the exception everywhere in this document — nothing in `sealed
+interface Payment` says which property carries the branch or what string
+selects each one — so a spec with a `oneOf` in it makes the client generator
+name a library:
+
+```kotlin
+create("orders") {
+    specClass.set("com.example.OrdersSpecKt")
+    packageName.set("com.example.orders")
+    codec.set("kotlinx")   // or "jackson", the default
+}
+```
+
+The setting is `endpoints`' one, spelled and defaulted the same way, because it
+is the same decision made in two places: a client generated for a service on
+kotlinx.serialization and annotated for Jackson is a client whose payload types
+that service cannot read. A spec with no union generates the same file either
+way, and `kotlinx` is not free in the same way `jackson` is — it has no
+reflective fallback, so every generated payload type carries `@Serializable`.
+
+`pelican-kotlinx`'s `GeneratedClientUnionTest` is what stands behind that
+claim: it generates a client for a kotlinx service, builds a payload out of the
+discriminator and branch names the *generated file* declares, and decodes it
+with the real `KotlinxCodecs`.
+
 ### Without the plugin
 
 Both generators are ordinary functions, and a build that would rather call them
 itself still can: `spec.openApiJson()`, `spec.openApiYaml()` and
-`spec.writeKotlinClient(sourceRoot, packageName)`. The plugin is those calls
-with the classpath, the up-to-date checks and the staleness gate already wired.
+`spec.writeKotlinClient(sourceRoot, packageName)` — the last of which takes
+`codec = CodecAnnotations.KOTLINX` as a second arity rather than a defaulted
+parameter, so that the signature the plugin looks up by name does not move
+under an older plugin. The plugin is those calls with the classpath, the
+up-to-date checks and the staleness gate already wired.
 
 ## Importing an OpenAPI document
 
@@ -682,6 +717,11 @@ document with no union generates the same file either way — nothing is written
 unless a hierarchy is generated. `kotlinx` is not free in the same way:
 kotlinx.serialization has no reflective fallback, so choosing it puts
 `@Serializable` on every generated payload type.
+
+A `clients` entry takes the same setting under the same name; see "Which codec
+the client is annotated for" above. One decision, one spelling — a service that
+imports its descriptions and publishes a client for them chooses its library
+once and says so twice.
 
 #### The other spelling
 
@@ -2241,11 +2281,6 @@ open  localhost:8080/api-docs                                 # Swagger UI
   than as a branch of the outer one. A `sealed interface` extending another is
   the declaration that is missing, and nothing else about the payload is. Two
   levels of hierarchy is rare enough that this is recorded rather than fixed.
-- **A `codec` for the generated *client*.** `pelican-import` takes one, so an
-  imported union can be annotated for either library. `writeKotlinClient` does
-  not: a generated client's payload types are always annotated for Jackson.
-  Nothing else in a generated client needs an annotation, so this only matters
-  for a spec with a union in it, read by a service on kotlinx.serialization.
 - **`anyOf` of several branches, and `not`.** Both are still refused, and the
   reasoning is in "What it refuses" above rather than here: neither is a gap
   waiting to be filled, they are shapes with no faithful Kotlin.

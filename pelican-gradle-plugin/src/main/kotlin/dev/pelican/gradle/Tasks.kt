@@ -94,6 +94,10 @@ abstract class GenerateKotlinClientTask : SpecTask() {
     @get:Input
     abstract val includeHidden: Property<Boolean>
 
+    @get:Input
+    @get:Optional
+    abstract val codec: Property<String>
+
     /**
      * Not `@OutputDirectory` here. Whether the directory is an output Gradle
      * tracks is decided when the task is registered, because pointing this at
@@ -123,6 +127,7 @@ abstract class GenerateKotlinClientTask : SpecTask() {
             it.clientName.set(clientName)
             it.baseUrl.set(baseUrl)
             it.includeHidden.set(includeHidden)
+            it.codec.set(codec)
             it.outputDir.set(target)
         }
     }
@@ -151,6 +156,10 @@ abstract class CheckKotlinClientTask : SpecTask() {
     @get:Input
     abstract val includeHidden: Property<Boolean>
 
+    @get:Input
+    @get:Optional
+    abstract val codec: Property<String>
+
     /**
      * Read, never written — the generated copy goes to a temporary directory
      * and the two are compared there. The task declares no outputs and so
@@ -173,6 +182,7 @@ abstract class CheckKotlinClientTask : SpecTask() {
             it.clientName.set(clientName)
             it.baseUrl.set(baseUrl)
             it.includeHidden.set(includeHidden)
+            it.codec.set(codec)
             it.outputDir.set(outputDir)
         }
     }

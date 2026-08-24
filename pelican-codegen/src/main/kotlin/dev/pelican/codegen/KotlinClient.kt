@@ -79,13 +79,19 @@ import kotlin.reflect.KType
  *   defaults to the spec's first server. With neither, the caller must pass one.
  * @param includeHidden hidden endpoints are left out, as they are left out of
  *   the document. Generating an internal client is what this switch is for.
+ * @param codec which JSON library the payload types are annotated for. It is
+ *   the same choice, spelled the same way, that `ImportOptions.codec` makes for
+ *   an imported description, and it matters for exactly one shape: a sealed
+ *   hierarchy, which neither library can read off the Kotlin alone. A spec with
+ *   no union generates the same file either way.
  */
 fun ApiSpec.kotlinClient(
     packageName: String,
     clientName: String = defaultClientName(title),
     baseUrl: String? = servers.firstOrNull(),
     includeHidden: Boolean = false,
-): String = KotlinClientEmitter(this, packageName, clientName, baseUrl.orEmpty(), includeHidden).emit()
+    codec: CodecAnnotations = CodecAnnotations.JACKSON,
+): String = KotlinClientEmitter(this, packageName, clientName, baseUrl.orEmpty(), includeHidden, codec).emit()
 
 /**
  * Writes the client into [sourceRoot], under the directories [packageName]
@@ -107,6 +113,7 @@ fun ApiSpec.writeKotlinClient(
     clientName: String = defaultClientName(title),
     baseUrl: String? = servers.firstOrNull(),
     includeHidden: Boolean = false,
+    codec: CodecAnnotations = CodecAnnotations.JACKSON,
 ): Path {
     val directory = packageName.split('.')
         .filter { it.isNotEmpty() }
@@ -114,18 +121,38 @@ fun ApiSpec.writeKotlinClient(
 
     Files.createDirectories(directory)
     val file = directory.resolve("$clientName.kt")
-    Files.writeString(file, kotlinClient(packageName, clientName, baseUrl, includeHidden))
+    Files.writeString(file, kotlinClient(packageName, clientName, baseUrl, includeHidden, codec))
     return file
 }
 
-/** As above, for callers holding a [File] — Gradle's `layout`, chiefly. */
+/**
+ * As above, for callers holding a [File] — Gradle's `layout`, chiefly.
+ *
+ * This is the one signature the Gradle plugin looks up by name rather than
+ * calling, so [codec] is declared as a second arity rather than as a defaulted
+ * parameter on the first. A default would compile to one seven-argument method
+ * and leave the six-argument one existing nowhere, so a plugin release and a
+ * library release would have to arrive together — which is the coupling the
+ * reflective lookup exists to avoid. `importEndpoints` is the same bargain,
+ * made for the same reason.
+ */
 fun ApiSpec.writeKotlinClient(
     sourceRoot: File,
     packageName: String,
     clientName: String = defaultClientName(title),
     baseUrl: String? = servers.firstOrNull(),
     includeHidden: Boolean = false,
-): File = writeKotlinClient(sourceRoot.toPath(), packageName, clientName, baseUrl, includeHidden).toFile()
+    codec: CodecAnnotations,
+): File = writeKotlinClient(sourceRoot.toPath(), packageName, clientName, baseUrl, includeHidden, codec).toFile()
+
+/** The arity published before [codec] existed, and the default it stood for. */
+fun ApiSpec.writeKotlinClient(
+    sourceRoot: File,
+    packageName: String,
+    clientName: String = defaultClientName(title),
+    baseUrl: String? = servers.firstOrNull(),
+    includeHidden: Boolean = false,
+): File = writeKotlinClient(sourceRoot, packageName, clientName, baseUrl, includeHidden, CodecAnnotations.JACKSON)
 
 /** `Orders` -> `OrdersClient`; anything unusable falls back to `ApiClient`. */
 fun defaultClientName(title: String): String {
@@ -141,10 +168,11 @@ private class KotlinClientEmitter(
     private val clientName: String,
     private val baseUrl: String,
     includeHidden: Boolean,
+    codec: CodecAnnotations,
 ) {
     private val endpoints = spec.endpoints.filter { includeHidden || !it.hidden }
     private val components = SchemaRegistry()
-    private val types = KotlinTypes()
+    private val types = KotlinTypes(codec)
 
     /** Resolved once per type: asking twice would register the component twice. */
     private val schemas = LinkedHashMap<KType, JsonObj>()

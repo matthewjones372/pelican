@@ -504,7 +504,7 @@ class KotlinClientTest {
 
     data class Payment(val kind: String)
 
-    private val paymentClient = ApiSpec(
+    private val paymentSpec = ApiSpec(
         endpoints = listOf(
             endpoint(jsonBody<Payment>()) {
                 post("payments")
@@ -516,7 +516,9 @@ class KotlinClientTest {
         title = "Payments",
         version = "1.0.0",
         servers = listOf("https://payments.example.com"),
-    ).kotlinClient("com.example.payments")
+    )
+
+    private val paymentClient = paymentSpec.kotlinClient("com.example.payments")
 
     @Test
     fun `a oneOf with a discriminator becomes a sealed interface and a class per branch`() {
@@ -539,5 +541,55 @@ class KotlinClientTest {
         paymentClient shouldContain "import com.fasterxml.jackson.annotation.JsonTypeInfo"
         paymentClient shouldContain """JsonSubTypes.Type(value = Card::class, name = "card")"""
         client shouldNotContain "com.fasterxml.jackson"
+    }
+
+    /**
+     * Which library those annotations are for is the caller's, as it is for an
+     * imported description. A client generated for a service on
+     * kotlinx.serialization and annotated for Jackson is a client whose payload
+     * types that service's own codec cannot read — the two settings are one
+     * decision, so they are spelled and defaulted the same way.
+     */
+    @Test
+    fun `the codec chooses which library the hierarchy is annotated for`() {
+        val kotlinx = paymentSpec.kotlinClient("com.example.payments", codec = CodecAnnotations.KOTLINX)
+
+        kotlinx shouldContain "@JsonClassDiscriminator(\"kind\")"
+        kotlinx shouldContain "@SerialName(\"card\")"
+        kotlinx shouldContain "import kotlinx.serialization.Serializable"
+        withClue("nothing generated for kotlinx may reach for the other library") {
+            kotlinx shouldNotContain "com.fasterxml.jackson"
+        }
+    }
+
+    /**
+     * kotlinx.serialization has no reflective fallback, so the annotation is
+     * not confined to the hierarchy the way Jackson's is: a payload type that
+     * is nobody's branch still has to carry `@Serializable` or nothing can
+     * decode it.
+     */
+    @Test
+    fun `and every payload type it generates is serializable, hierarchy or not`() {
+        val kotlinx = spec().kotlinClient("com.example.widgets", codec = CodecAnnotations.KOTLINX)
+
+        kotlinx shouldContain "@Serializable\ndata class Widget("
+        client shouldNotContain "@Serializable"
+    }
+
+    @Test
+    fun `writing the file carries the codec the caller chose`() {
+        val root = Files.createTempDirectory("pelican-client")
+        try {
+            val written = paymentSpec.writeKotlinClient(root, "com.example.payments", codec = CodecAnnotations.KOTLINX)
+            written.readText() shouldContain "@JsonClassDiscriminator(\"kind\")"
+
+            // The arity without it stands for the default rather than for
+            // something else, which is the only thing that makes it safe to
+            // keep as the signature an older plugin looks up.
+            val default = paymentSpec.writeKotlinClient(root.toFile(), "com.example.payments")
+            default.readText() shouldContain "@JsonTypeInfo"
+        } finally {
+            root.toFile().deleteRecursively()
+        }
     }
 }

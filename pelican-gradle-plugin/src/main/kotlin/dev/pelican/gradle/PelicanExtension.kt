@@ -93,6 +93,20 @@ abstract class ClientSpec @Inject constructor(private val name: String) : SpecSo
     abstract val includeHidden: Property<Boolean>
 
     /**
+     * Which codec the generated payload types are annotated for — `jackson`
+     * or `kotlinx` — or unset for Jackson. The same setting `endpoints` takes,
+     * spelled the same way, because it is the same decision: a generated
+     * client's bodies are read by the same library the service's are.
+     *
+     * It matters for one shape and no others. A `oneOf` becomes a sealed
+     * interface, and nothing in `sealed interface Payment` says which property
+     * carries the branch or what string selects each one; that has to be
+     * written down, and the two libraries spell it differently. A spec without
+     * a union generates the same client either way.
+     */
+    abstract val codec: Property<String>
+
+    /**
      * The source root written into — the generator lays out the package
      * directories underneath it. Defaults to
      * `build/generated/pelican/<name>`, which nothing checks in.

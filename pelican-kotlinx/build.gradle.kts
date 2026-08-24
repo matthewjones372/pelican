@@ -19,4 +19,10 @@ dependencies {
     // be @Serializable: the round trip is only a round trip if both halves are
     // present, and this is the module where the kotlinx half can exist.
     testImplementation(project(":pelican-import"))
+
+    // And GeneratedClientUnionTest generates a client for a kotlinx service and
+    // decodes the payload its declarations describe. Same reason again: a
+    // generated hierarchy is only readable if something reads it, and the
+    // reader has to sit beside a compiled @Serializable twin.
+    testImplementation(project(":pelican-codegen"))
 }
