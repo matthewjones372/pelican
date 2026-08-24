@@ -33,7 +33,7 @@ internal class Reader(private val options: ImportOptions) {
         // read is one document with its discriminators stated rather than a
         // document and a list of corrections to remember while reading it.
         val hints = Hints(options.discriminators)
-        document = hints.applyTo(normalise(Document.read(file)))
+        document = hints.applyTo(normalise(Document.read(file, Remote.forImport(options))))
 
         val components = document.obj("components")?.obj("schemas") ?: JsonObj(emptyMap())
         declared = JsonObj(components.fields.mapValues { (_, schema) -> normaliseSchema(schema) })

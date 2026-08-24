@@ -220,6 +220,64 @@ abstract class EndpointsSpec @Inject constructor(private val name: String) : org
     }
 
     /**
+     * The hosts a `$ref` in the document may be fetched from, as origins.
+     *
+     * Set through [allowRemote] rather than written as a set, so the build
+     * file reads as a statement about one host.
+     */
+    abstract val allowRemote: SetProperty<String>
+
+    /**
+     * Allows a `$ref` to another host — one host, on purpose, in writing.
+     *
+     * ```kotlin
+     * allowRemote("https://schemas.example.com")
+     * ```
+     *
+     * A remote `$ref` is refused by default and the reasoning stands: a build
+     * that fetches a URL to know what to generate produces different code on a
+     * different day, fails offline, and hands a code generator whatever the
+     * far end is serving this morning. This does not overturn that. It moves
+     * the decision to somebody who can make it, once, per host — the same
+     * shape [exclude] and [discriminator] have — and pairs it with a
+     * [lockfile], which turns "whatever the far end is serving" back into a
+     * fixed input: every URL reached and the hash of what came back are
+     * recorded, committed, and checked on every later build.
+     *
+     * An entry is an *origin* and not a URL prefix, because a prefix match is
+     * how an allowlist is got past: `https://good.example` is a prefix of
+     * `https://good.example.evil.test`. A bare `example.com` means https —
+     * the only scheme fetched without being asked for — and `http://` has to
+     * be written out, which is what makes plain HTTP a line in a review rather
+     * than a default nobody noticed.
+     *
+     * Redirects are never followed, to an allowed host or otherwise. A host
+     * that can redirect is a host that can move the document somewhere nobody
+     * reviewed; the failure names the URL it gave, to be written into the
+     * `$ref` instead.
+     */
+    fun allowRemote(vararg origins: String) {
+        allowRemote.addAll(*origins)
+    }
+
+    /**
+     * Where the URL and hash of every fetched document is recorded. Defaults
+     * to `<document>.refs.lock` beside the document.
+     *
+     * Commit it. It is the whole of what makes a build that fetches
+     * reproducible: a document behind one of those URLs changing fails the
+     * build, naming the URL and both hashes, rather than quietly generating
+     * different code. `update<Name>EndpointsLock` is what rewrites it, and it
+     * refuses to change a hash it already holds without `--accept-changes`.
+     *
+     * The fetched documents themselves are cached in a `.d` directory beside
+     * it, named by their own hash. Committing that too is optional and it is
+     * the difference between a build that needs the network and one that does
+     * not: with the cache, no request is made at all.
+     */
+    abstract val lockfile: RegularFileProperty
+
+    /**
      * The backend to generate handler stubs against — `pekko`, `http4k` or
      * `ktor` — or unset for none.
      *

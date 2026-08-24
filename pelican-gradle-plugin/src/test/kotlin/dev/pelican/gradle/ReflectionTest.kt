@@ -139,20 +139,54 @@ class ReflectionTest {
             "pekko",
             "kotlinx",
             mapOf("Payment" to "kind", "Order/properties/payment" to "type"),
+            setOf("https://schemas.test"),
+            File(dir, "orders.refs.lock"),
         )
 
         written shouldBe listOf(File(dir, "com/example/orders/OrdersEndpoints.kt"))
         (written.single() as File).readText().trim() shouldBe
             "openapi.yaml|com.example.orders|orders|a+b|pekko|kotlinx|" +
-            "Order/properties/payment=type+Payment=kind"
+            "Order/properties/payment=type+Payment=kind|https://schemas.test|orders.refs.lock"
     }
 
     @Test
     fun `names the module to add when the importer is not on the classpath`(@TempDir dir: File) {
         val empty = java.net.URLClassLoader(emptyArray(), ClassLoader.getPlatformClassLoader())
         shouldThrow<PelicanFailure> {
-            Pelican.writeEndpoints(empty, dir, dir, "com.example", "orders", emptySet(), null, null, emptyMap())
+            Pelican.writeEndpoints(
+                empty,
+                dir,
+                dir,
+                "com.example",
+                "orders",
+                emptySet(),
+                null,
+                null,
+                emptyMap(),
+                emptySet(),
+                null,
+            )
         }.message.orEmpty() shouldContain "pelican-import"
+    }
+
+    @Test
+    fun `writes the lockfile through the function the library publishes`(@TempDir dir: File) {
+        val document = File(dir, "openapi.yaml").apply { writeText("openapi: 3.1.0") }
+        val lockfile = File(dir, "orders.refs.lock")
+
+        Pelican.updateLock(loader, document, lockfile, "orders", setOf("https://schemas.test"), true) shouldBe
+            listOf("Wrote $lockfile")
+        lockfile.readText().trim() shouldBe "openapi.yaml|orders|https://schemas.test|true"
+    }
+
+    @Test
+    fun `says which importer has no lockfile to write`(@TempDir dir: File) {
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.updateLock(previousImporter, dir, File(dir, "x.lock"), "orders", setOf("https://a.test"), false)
+        }
+
+        failure.message.orEmpty() shouldContain "pelican-import"
+        failure.message.orEmpty() shouldContain "older than remote references"
     }
 
     /** No servers and no `baseUrl` is allowed: the caller passes one instead. */
@@ -177,12 +211,15 @@ class ReflectionTest {
      * fallback that has already stopped working and not said so.
      *
      * The client generator falls back one step and so has one older version.
-     * The importer falls back two — past the discriminator hints, then past
-     * the codec — so it has two: `older`, which still takes the codec, and
-     * `oldest`, from before it. Comparatives rather than version numbers,
-     * because what decides a fallback is the order and not the release.
+     * The importer falls back three — past the remote allowlist, then past the
+     * discriminator hints, then past the codec — so it has three: `previous`,
+     * which still takes the hints, `older`, which still takes the codec, and
+     * `oldest`, from before it. Names for the order rather than version
+     * numbers, because what decides a fallback is the order and not the
+     * release.
      */
     private val olderCodegen = Class.forName("dev.pelican.older.codegen.KotlinClientKt")
+    private val previousImporter = Class.forName("dev.pelican.previous.importer.ImportKt")
     private val olderImporter = Class.forName("dev.pelican.older.importer.ImportKt")
     private val oldestImporter = Class.forName("dev.pelican.oldest.importer.ImportKt")
     private val apiSpec = Class.forName("dev.pelican.ApiSpec")
@@ -208,7 +245,59 @@ class ReflectionTest {
         failure.message.orEmpty() shouldContain "takes no codec"
     }
 
-    /** One step down: no hints, and the codec still carried rather than dropped. */
+    /** One step down: no allowlist, and the hints still carried rather than dropped. */
+    @Test
+    fun `imports through the arity published before remote references`(@TempDir dir: File) {
+        val document = File(dir, "openapi.yaml").apply { writeText("openapi: 3.1.0") }
+        val written = Pelican.writeEndpoints(
+            previousImporter,
+            document,
+            dir,
+            "com.example",
+            "orders",
+            setOf("a"),
+            "ktor",
+            "kotlinx",
+            mapOf("Payment" to "kind"),
+            emptySet(),
+            null,
+        )
+
+        (written.single() as File).readText().trim() shouldBe
+            "openapi.yaml|com.example|orders|a|ktor|kotlinx|Payment=kind"
+    }
+
+    /**
+     * The guard with the most riding on it. An importer from before the
+     * lockfile has no hash check in it either, so stepping down to it with
+     * hosts allowed would not merely drop a setting — it would fetch URLs and
+     * generate from whatever came back, which is the one thing the whole
+     * arrangement is arranged against.
+     */
+    @Test
+    fun `says which importer is too old to carry the remote allowlist`(@TempDir dir: File) {
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.writeEndpoints(
+                previousImporter,
+                dir,
+                dir,
+                "com.example",
+                "orders",
+                emptySet(),
+                null,
+                null,
+                emptyMap(),
+                setOf("https://schemas.test"),
+                File(dir, "orders.refs.lock"),
+            )
+        }
+
+        failure.message.orEmpty() shouldContain "`allowRemote(...)` is set"
+        failure.message.orEmpty() shouldContain "pelican-import"
+        failure.message.orEmpty() shouldContain "takes no allowlist"
+    }
+
+    /** Two steps down: no hints, and the codec still carried rather than dropped. */
     @Test
     fun `imports through the arity published before the discriminator hints`(@TempDir dir: File) {
         val document = File(dir, "openapi.yaml").apply { writeText("openapi: 3.1.0") }
@@ -222,6 +311,8 @@ class ReflectionTest {
             "ktor",
             "kotlinx",
             emptyMap(),
+            emptySet(),
+            null,
         )
 
         (written.single() as File).readText().trim() shouldBe "openapi.yaml|com.example|orders|a|ktor|kotlinx"
@@ -246,6 +337,8 @@ class ReflectionTest {
                 null,
                 null,
                 mapOf("Payment" to "kind"),
+                emptySet(),
+                null,
             )
         }
 
@@ -268,6 +361,8 @@ class ReflectionTest {
             "ktor",
             null,
             emptyMap(),
+            emptySet(),
+            null,
         )
 
         (written.single() as File).readText().trim() shouldBe "openapi.yaml|com.example|orders|a|ktor"
@@ -286,6 +381,8 @@ class ReflectionTest {
                 null,
                 "kotlinx",
                 emptyMap(),
+                emptySet(),
+                null,
             )
         }
 

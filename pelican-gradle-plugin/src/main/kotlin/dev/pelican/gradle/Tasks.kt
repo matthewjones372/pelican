@@ -10,12 +10,14 @@ import org.gradle.api.provider.SetProperty
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.UntrackedTask
+import org.gradle.api.tasks.options.Option
 import org.gradle.work.DisableCachingByDefault
 import org.gradle.workers.WorkerExecutor
 import javax.inject.Inject
@@ -215,6 +217,30 @@ abstract class GenerateEndpointsTask : PelicanTask() {
     @get:Input
     abstract val discriminators: MapProperty<String, String>
 
+    /** The hosts a `$ref` may be fetched from. See `EndpointsSpec.allowRemote`. */
+    @get:Input
+    abstract val allowRemote: SetProperty<String>
+
+    /** `@Internal` because the lockfile need not exist; [remoteInputs] is what Gradle snapshots. */
+    @get:Internal
+    abstract val lockfile: RegularFileProperty
+
+    /**
+     * The lockfile and the cache beside it, as inputs.
+     *
+     * A file collection rather than `@InputFile`, because neither is there
+     * until a host is allowed and the update task has run — and an
+     * `@InputFile` that is missing fails the build before the task can say
+     * anything useful about why. They are still declared: what the import
+     * generates depends on the bytes those hold, and a task that read them
+     * without saying so would report up to date over a lockfile somebody had
+     * just edited.
+     */
+    @get:InputFiles
+    @get:Optional
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val remoteInputs: ConfigurableFileCollection
+
     @get:Input
     @get:Optional
     abstract val handlers: Property<String>
@@ -249,9 +275,62 @@ abstract class GenerateEndpointsTask : PelicanTask() {
             it.entryName.set(entryName)
             it.exclude.set(exclude)
             it.discriminators.set(discriminators)
+            it.allowRemote.set(allowRemote)
+            it.lockfile.set(lockfile)
             it.handlers.set(handlers)
             it.codec.set(codec)
             it.outputDir.set(outputDir)
+        }
+    }
+}
+
+/**
+ * Rewrites the lockfile of remote `$ref`s from what the allowed hosts are
+ * serving now.
+ *
+ * The one task here that trusts the network, and it is a task of its own for
+ * exactly that reason: nothing depends on it, `build` does not reach it, and
+ * it has to be typed. "Just re-run the update task" is how a hash check gets
+ * neutered, so a hash that is already recorded will not change without
+ * `--accept-changes` as well — adding a URL nobody had locked is free and
+ * shows in the diff, and *changing* one is the event the lockfile exists for.
+ */
+@UntrackedTask(because = "It fetches: what the far end says now is the answer, by definition")
+abstract class UpdateEndpointsLockTask : PelicanTask() {
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val document: RegularFileProperty
+
+    @get:Internal
+    abstract val lockfile: RegularFileProperty
+
+    @get:Input
+    abstract val allowRemote: SetProperty<String>
+
+    /** The name the failures spell the entry and this task with. */
+    @get:Input
+    abstract val entryName: Property<String>
+
+    @get:Internal
+    abstract val acceptChanges: Property<Boolean>
+
+    @Option(
+        option = "accept-changes",
+        description = "Record a new hash for a URL already in the lockfile. Read what changed first.",
+    )
+    fun acceptChanges() {
+        acceptChanges.set(true)
+    }
+
+    @TaskAction
+    fun update() {
+        queue().submit(UpdateLockWork::class.java) {
+            it.document.set(document)
+            it.lockfile.set(lockfile)
+            it.allowRemote.set(allowRemote)
+            it.entryName.set(entryName)
+            it.acceptChanges.set(acceptChanges.getOrElse(false))
         }
     }
 }

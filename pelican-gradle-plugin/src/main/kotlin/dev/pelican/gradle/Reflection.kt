@@ -48,6 +48,12 @@ internal object Pelican {
     /** The `discriminator(...)` entry, named as the build file writes it. */
     private const val HINTS = "discriminator(...)"
 
+    /** The `allowRemote(...)` entry, likewise. */
+    private const val REMOTE = "allowRemote(...)"
+
+    /** The function that rewrites the lockfile, named as `pelican-import` publishes it. */
+    private const val UPDATES_LOCK = "updateRemoteLock"
+
     /** Calls the named no-argument function and returns whatever it produced. */
     fun spec(loader: ClassLoader, className: String, functionName: String): Any {
         val type = specClass(loader, className, functionName)
@@ -208,6 +214,8 @@ internal object Pelican {
         handlers: String?,
         codec: String?,
         discriminators: Map<String, String>,
+        allowRemote: Set<String>,
+        lockfile: File?,
     ): List<*> = writeEndpoints(
         load(loader, IMPORT, "pelican-import"),
         document,
@@ -218,10 +226,12 @@ internal object Pelican {
         handlers,
         codec,
         discriminators,
+        allowRemote,
+        lockfile,
     )
 
     /** The same, against a `pelican-import` already resolved; see [writeClient]. */
-    @Suppress("LongParameterList")
+    @Suppress("LongParameterList", "ReturnCount")
     fun writeEndpoints(
         importer: Class<*>,
         document: File,
@@ -232,13 +242,16 @@ internal object Pelican {
         handlers: String?,
         codec: String?,
         discriminators: Map<String, String>,
+        allowRemote: Set<String>,
+        lockfile: File?,
     ): List<*> {
-        // The bargain `writeClient` makes, one step longer. The arity this
+        // The bargain `writeClient` makes, two steps longer. The arity this
         // plugin knows about and the arity the library on the consumer's
         // classpath offers are allowed to differ — that is the whole point of
-        // looking the function up rather than compiling against it. Three
-        // releases are reachable here: one that takes the discriminator hints,
-        // one before them that still takes the codec, and one before that.
+        // looking the function up rather than compiling against it. Four
+        // releases are reachable here: one that takes the remote allowlist and
+        // its lockfile, one before it that takes the discriminator hints, one
+        // before them that still takes the codec, and one before that.
         //
         // Newest first, and a fallback is only taken when the setting it
         // cannot carry was not made. Falling back past a setting somebody made
@@ -247,6 +260,29 @@ internal object Pelican {
         // same one `writeClient` raises, written once so the two cannot come
         // to disagree about what to say.
         val text = String::class.java
+
+        val withRemote = importEndpoints(importer, text, text, Map::class.java, Set::class.java, File::class.java)
+        if (withRemote != null) {
+            return withRemote.invokeUnwrapped(
+                null,
+                document,
+                sourceRoot,
+                packageName,
+                name,
+                exclude,
+                handlers,
+                codec,
+                discriminators,
+                allowRemote,
+                lockfile,
+            ) as List<*>
+        }
+        // Guarded harder than the rest, because this is the one setting whose
+        // absence is a *security* difference rather than a missing annotation:
+        // an importer with no lockfile in its signature has no hash check
+        // either, and falling back to it would fetch and generate from
+        // whatever came back.
+        if (allowRemote.isNotEmpty()) refuse(tooOld(REMOTE, IMPORT_MODULE, IMPORTS, "no allowlist"))
 
         val withHints = importEndpoints(importer, text, text, Map::class.java)
         if (withHints != null) {
@@ -262,21 +298,73 @@ internal object Pelican {
                 discriminators,
             ) as List<*>
         }
-        if (discriminators.isNotEmpty()) throw PelicanFailure(tooOld(HINTS, IMPORT_MODULE, IMPORTS, "no hints"))
+        if (discriminators.isNotEmpty()) refuse(tooOld(HINTS, IMPORT_MODULE, IMPORTS, "no hints"))
 
         val withCodec = importEndpoints(importer, text, text)
         if (withCodec != null) {
             return withCodec
                 .invokeUnwrapped(null, document, sourceRoot, packageName, name, exclude, handlers, codec) as List<*>
         }
-        if (codec != null) throw PelicanFailure(tooOld("codec", IMPORT_MODULE, IMPORTS, "no codec"))
+        if (codec != null) refuse(tooOld("codec", IMPORT_MODULE, IMPORTS, "no codec"))
 
-        val oldest = importEndpoints(importer, text)
-            ?: throw PelicanFailure(
-                "`${importer.name}` has no `importEndpoints` this plugin knows how to call. The " +
-                    "`pelican-import` on this task's classpath is not one this plugin supports.",
-            )
+        val oldest = importEndpoints(importer, text) ?: refuse(
+            "`${importer.name}` has no `importEndpoints` this plugin knows how to call. The " +
+                "`$IMPORT_MODULE` on this task's classpath is not one this plugin supports.",
+        )
         return oldest.invokeUnwrapped(null, document, sourceRoot, packageName, name, exclude, handlers) as List<*>
+    }
+
+    /**
+     * Rewrites the lockfile of remote references, and returns the lines
+     * describing what changed.
+     *
+     * No fallback ladder under this one, and deliberately so: an importer
+     * without it has no lockfile at all, so there is nothing older for it to
+     * mean. The refusal says which module to upgrade, which is the only useful
+     * answer.
+     */
+    @Suppress("LongParameterList")
+    fun updateLock(
+        loader: ClassLoader,
+        document: File,
+        lockfile: File,
+        name: String,
+        allowRemote: Set<String>,
+        acceptChanges: Boolean,
+    ): List<*> = updateLock(
+        load(loader, IMPORT, IMPORT_MODULE),
+        document,
+        lockfile,
+        name,
+        allowRemote,
+        acceptChanges,
+    )
+
+    /** The same, against a `pelican-import` already resolved; see [writeClient]. */
+    @Suppress("LongParameterList")
+    fun updateLock(
+        importer: Class<*>,
+        document: File,
+        lockfile: File,
+        name: String,
+        allowRemote: Set<String>,
+        acceptChanges: Boolean,
+    ): List<*> {
+        val method = runCatching {
+            importer.getMethod(
+                UPDATES_LOCK,
+                File::class.java,
+                File::class.java,
+                String::class.java,
+                Set::class.java,
+                Boolean::class.javaPrimitiveType,
+            )
+        }.getOrNull() ?: refuse(
+            "`${importer.name}` has no `$UPDATES_LOCK`. The `$IMPORT_MODULE` on this task's classpath is " +
+                "older than remote references, so there is no lockfile for this task to write. Upgrade " +
+                "$IMPORT_MODULE, or remove the `$REMOTE` entry.",
+        )
+        return method.invokeUnwrapped(null, document, lockfile, name, allowRemote, acceptChanges) as List<*>
     }
 
     /** `importEndpoints` with these trailing parameters after the five every arity takes, or null. */
@@ -366,6 +454,16 @@ internal object Pelican {
         throw e.targetException
     }
 }
+
+/**
+ * Refusing, said the way every refusal here says it.
+ *
+ * A `Nothing` return rather than a `throw` at each site: half the lookups
+ * below are a ladder of guards, and a guard reads as one statement — `if the
+ * library cannot carry this, say so` — where a branch with a throw in it reads
+ * as control flow somebody has to follow.
+ */
+internal fun refuse(message: String): Nothing = throw PelicanFailure(message)
 
 /** Carries a message written for whoever has to fix it, and nothing else. */
 internal class PelicanFailure(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

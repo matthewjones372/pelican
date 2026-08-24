@@ -36,9 +36,19 @@ internal interface EndpointsParameters : WorkParameters {
     val entryName: Property<String>
     val exclude: SetProperty<String>
     val discriminators: MapProperty<String, String>
+    val allowRemote: SetProperty<String>
+    val lockfile: RegularFileProperty
     val handlers: Property<String>
     val codec: Property<String>
     val outputDir: DirectoryProperty
+}
+
+internal interface LockParameters : WorkParameters {
+    val document: RegularFileProperty
+    val lockfile: RegularFileProperty
+    val allowRemote: SetProperty<String>
+    val entryName: Property<String>
+    val acceptChanges: Property<Boolean>
 }
 
 internal interface DocumentParameters : SpecParameters {
@@ -92,8 +102,30 @@ internal abstract class GenerateEndpointsWork : WorkAction<EndpointsParameters> 
             parameters.handlers.orNull,
             parameters.codec.orNull,
             parameters.discriminators.get(),
+            parameters.allowRemote.get(),
+            parameters.lockfile.asFile.orNull,
         )
         written.forEach { logger.lifecycle("Wrote $it") }
+    }
+}
+
+/**
+ * What the update task ran, said out loud.
+ *
+ * Every line is printed rather than counted, because the reader of this output
+ * is deciding whether to commit what it just wrote — and "3 references
+ * updated" is not something anybody can review.
+ */
+internal abstract class UpdateLockWork : WorkAction<LockParameters> {
+    override fun execute() {
+        Pelican.updateLock(
+            javaClass.classLoader,
+            parameters.document.get().asFile,
+            parameters.lockfile.get().asFile,
+            parameters.entryName.get(),
+            parameters.allowRemote.get(),
+            parameters.acceptChanges.get(),
+        ).forEach { line -> logger.lifecycle(line.toString()) }
     }
 }
 

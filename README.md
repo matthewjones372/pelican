@@ -828,6 +828,27 @@ References to other files are followed and the schemas they name keep those
 names; references to another *host* are refused, because a build that fetches a
 URL to know what to generate cannot be reproduced.
 
+Where the document is published in pieces by somebody else and rewriting their
+`$ref`s would fork their spec, the host can be named — and naming it pins what
+it served rather than trusting it every morning:
+
+```kotlin
+create("orders") {
+    document.set(file("orders.yaml"))
+    packageName.set("com.example.orders")
+    allowRemote("https://schemas.example.com")
+}
+```
+
+`updateOrdersEndpointsLock` writes `orders.refs.lock` — every URL reached,
+transitively, with the SHA-256 of the bytes that came back — and
+`orders.refs.lock.d/`, the documents themselves. Commit both and the build
+makes no request at all; a document that changes upstream fails the next update
+naming both hashes, and `--accept-changes` is what records it. https only
+unless `http://` is written out, redirects never followed, and nothing read
+that is not in the lockfile. The whole of it is under
+[References](docs/reference.md#references).
+
 A `oneOf` with a `discriminator` comes back as a sealed interface and one data
 class per branch, annotated so that Jackson or kotlinx.serialization can
 actually read it — `codec.set("kotlinx")` chooses which. Branches are named

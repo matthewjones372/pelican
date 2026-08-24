@@ -52,6 +52,18 @@ class PelicanPlugin : Plugin<Project> {
         pelican.endpoints.configureEach { endpoints ->
             endpoints.outputDir.convention(project.defaultOutput(endpoints.name))
             endpoints.classpath.from(defaultClasspath)
+            // Beside the document rather than under `build/`: it is a checked-in
+            // input, it is reviewed in the same diff as the `$ref` that made it
+            // necessary, and a lockfile inside the build directory would be a
+            // lockfile `clean` deletes.
+            endpoints.lockfile.convention(
+                endpoints.document.map { document ->
+                    val file = document.asFile
+                    project.layout.projectDirectory.file(
+                        File(file.parentFile, "${file.name.substringBeforeLast('.')}.refs.lock").absolutePath,
+                    )
+                },
+            )
         }
 
         pelican.clients.all { client -> project.register(client) }
@@ -131,9 +143,26 @@ class PelicanPlugin : Plugin<Project> {
             task.entryName.set(endpoints.name)
             task.exclude.set(endpoints.exclude)
             task.discriminators.set(endpoints.discriminators)
+            task.allowRemote.set(endpoints.allowRemote)
+            task.lockfile.set(endpoints.lockfile)
+            task.remoteInputs.from(endpoints.lockfile, endpoints.lockfile.map { cacheOf(it.asFile) })
             task.handlers.set(endpoints.handlers)
             task.codec.set(endpoints.codec)
             task.outputDir.set(endpoints.outputDir)
+        }
+
+        // Registered whether or not a host is allowed, and it costs nothing to:
+        // a task nothing depends on is configured lazily and never runs. What
+        // it buys is that somebody who has just written `allowRemote(...)` finds
+        // the task that fills the lockfile by asking `tasks`, rather than by
+        // reading the failure and then the manual.
+        tasks.register("update${name}EndpointsLock", UpdateEndpointsLockTask::class.java) { task ->
+            task.description = "Records the URL and hash of every remote \$ref the ${endpoints.name} document reaches"
+            task.classpath.from(endpoints.classpath)
+            task.document.set(endpoints.document)
+            task.lockfile.set(endpoints.lockfile)
+            task.allowRemote.set(endpoints.allowRemote)
+            task.entryName.set(endpoints.name)
         }
 
         // The same rule the client task follows: a directory inside `build/`
@@ -178,6 +207,18 @@ class PelicanPlugin : Plugin<Project> {
     }
 
     private fun Project.defaultOutput(name: String) = layout.buildDirectory.dir("generated/pelican/$name")
+
+    /**
+     * Where `pelican-import` caches what it fetched: a `.d` directory beside
+     * the lockfile.
+     *
+     * The rule is spelled here as well as in the library, and one line of
+     * duplication is the cheaper half of the trade. The alternative was an
+     * entry point on `pelican-import` existing only to be asked where its own
+     * cache is — which is a signature to keep compatible forever, for a
+     * question whose answer is a suffix.
+     */
+    private fun cacheOf(lockfile: File) = File(lockfile.parentFile, lockfile.name + ".d")
 
     private fun Project.mainSourceSet(): SourceSet =
         extensions.getByType(JavaPluginExtension::class.java).sourceSets.getByName(SourceSet.MAIN_SOURCE_SET_NAME)

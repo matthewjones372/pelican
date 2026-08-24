@@ -675,7 +675,7 @@ What it refuses, and what each one would have cost:
 | Two file parts in a multipart body | The same rule `endpoint(...)` enforces at class-init: reading stops at the first file so it can be streamed |
 | `callbacks` | A call the service makes back to the caller, which is the other direction again |
 | `webhooks` | Calls the service makes rather than answers. Nothing here describes those, and dropping them would generate a client missing half of what the document offers |
-| A `$ref` to another host | See below |
+| A `$ref` to another host | A build that fetches a URL to know what to generate cannot be reproduced. Bundle or vendor the document — or name the host on purpose and pin what it served, which is [below](#allowing-a-host-on-purpose) |
 
 Each failure names the operation, the position in the document, and what to do.
 They are collected rather than thrown one at a time — the decision a reader has
@@ -1091,6 +1091,176 @@ References to another host are refused. Following one would mean a build that
 fetches a URL to know what to generate: a different result on a different day,
 a failure offline, and untrusted content reaching a code generator. Bundle the
 document first, or vendor the file it needs beside it.
+
+That reasoning is not overturned by anything below, and it stays the default:
+a `$ref` to another host fails an import that has said nothing about it.
+
+#### Allowing a host on purpose
+
+Sometimes neither bundling nor vendoring is available — the document is
+published in pieces by somebody else, and rewriting their `$ref`s is a fork of
+their spec you now maintain. So the host can be named, and naming it is a line
+in the build file rather than a switch:
+
+```kotlin
+create("orders") {
+    document.set(file("orders.yaml"))
+    packageName.set("com.example.orders")
+    allowRemote("https://schemas.example.com")
+}
+```
+
+Per host, reviewed once, in the same block and the same spirit as `exclude`
+and `discriminator`. What it does *not* do is make the build trust that host
+every morning. It makes it trust what that host served once:
+
+```
+orders.refs.lock          the URL and hash of every document fetched — commit it
+orders.refs.lock.d/       the documents themselves, named by their hash — commit it too, or not
+```
+
+`updateOrdersEndpointsLock` writes both. Every later build reads the lockfile,
+and a URL whose bytes no longer hash to what is recorded **fails**, naming the
+URL and both hashes, rather than generating different code from a document
+somebody else edited.
+
+##### The entry is an origin, not a URL prefix
+
+`example.com`, `https://example.com`, `http://mirror.internal:8080`. A prefix
+match is how an allowlist is got past — `https://good.example` is a prefix of
+`https://good.example.evil.test` — so scheme, host and port are compared, and
+a path in the entry is refused because a path is not a boundary the far end
+respects.
+
+A bare host means **https**, the only scheme fetched without being asked for.
+`http://` has to be written out. That is not a hoop: an internal mirror with no
+certificate is a real thing, and the point is that plain HTTP appears in a diff
+as a decision rather than as a default nobody noticed.
+
+##### Redirects are never followed
+
+Not to another host, and not to the allowed one either. A host that can
+redirect is a host that can move the document out of the list the build allows,
+which is an allowlist the far end gets to rewrite. Following a *same-origin*
+redirect would have been safe and is still not done, because refusing buys
+something: the `$ref` ends up naming the URL the document really lives at,
+which is the URL the lockfile should have recorded in the first place. The
+failure names the `Location` it was given.
+
+##### Transitive references
+
+A fetched document referring to its neighbour is the ordinary shape of a
+published spec, so the closure is followed. A relative `$ref` is read against
+the document it was written in — `./common.yaml` beside
+`https://host/specs/api.yaml` is `https://host/specs/common.yaml` — and every
+URL reached, at any depth, is checked against the allowlist and gets its own
+line in the lockfile. A fetched document naming a *second* host is followed
+only if that host was allowed too.
+
+That is what makes the review surface the whole of what the build reads, rather
+than only the first hop.
+
+##### What is hashed, and where it goes
+
+The bytes that arrived. Not the parsed tree re-rendered, not the YAML with its
+whitespace settled: a hash over a normalised form records what this module's
+parser understood rather than what the far end sent, so two different byte
+streams would share a hash — and the day the parser starts reading one of them
+differently, the lockfile would already have said they were the same document.
+Hashing the bytes is also what lets a cached copy be checked without parsing
+it.
+
+The lockfile is one line per URL, sorted by URL so that a diff shows the URL
+that moved at the start of the line, under a header saying what the file is:
+
+```
+# Pelican remote reference lock. Commit this file.
+#
+# Every URL the `orders` import fetched, and the SHA-256 of the bytes that came back.
+# A build checks each one and fails if it no longer matches, rather than generating
+# different code. Regenerate with `updateOrdersEndpointsLock`.
+#
+# <url>  sha256:<hex>
+https://schemas.example.com/common.yaml  sha256:3b8f…
+https://schemas.example.com/errors.yaml  sha256:9ac1…
+```
+
+Sorted rather than in the order the document was walked: walk order is where a
+`$ref` happened to sit, and moving one between operations would rewrite the
+whole file without changing a fact in it.
+
+Beside it, `orders.refs.lock.d/` holds the fetched documents themselves, each
+named by its own hash. Content-addressed rather than named after its URL,
+because the lockfile already pairs the two — and a URL turned into a filename
+is a URL that has to be escaped, which is a path-traversal question nobody
+should have to answer to run a build. A changed document shows in the diff as
+one file gone and one arrived, which is what it is.
+
+##### Offline builds
+
+Commit the `.d` directory and the build makes no request at all. The cache is
+read first, hashed, and checked against the lockfile — so CI with no network
+generates exactly what the last person to run the update task reviewed.
+
+Leaving it out of the repository also works, and is a different trade: the
+lockfile still makes the build reproducible, but the build then needs the host
+to answer. The failure for an unreachable host says which of the two you are
+in.
+
+Note the consequence of reading the cache first: with the cache committed, a
+document changing upstream does *not* fail the build, because the build never
+looks. That is the correct order — the pinned copy is the input — and noticing
+upstream drift is the update task's job, which is exactly when somebody is
+looking.
+
+##### Updating the lockfile
+
+```
+./gradlew updateOrdersEndpointsLock
+./gradlew updateOrdersEndpointsLock --accept-changes
+```
+
+Nothing depends on this task; `build` does not reach it. It prints one line per
+URL added, changed or dropped, because the person reading that output is
+deciding whether to commit it, and "3 references updated" is not something
+anybody can review.
+
+Adding a URL nobody had recorded is free — it is new review surface either way,
+and it shows up in the diff as such. **Changing** a hash already in the file is
+the supply-chain event the lockfile exists for, so it refuses without
+`--accept-changes`, printing every URL with its old and new hash. "Just re-run
+the update task" is how a hash check gets neutered; this is the second
+deliberate word that stops it being a reflex.
+
+##### When it refuses
+
+Each names the position in the document and what to do:
+
+| What happened | What it says |
+|---|---|
+| A remote `$ref` and no `allowRemote` | The original refusal, plus the third way out: name the host on purpose, and every URL it reaches is recorded with a hash you commit |
+| A host the build file did not name | Which hosts it does allow, and the `allowRemote(...)` line that would add this one |
+| An allowed host reached over plain HTTP | That the host is allowed over https only, and how to say `http://` on purpose if that is what is meant |
+| Any other scheme | That only https is fetched — a `file:` or `data:` URL is not a document a build reads |
+| A credential in the URL | That the URL would be written into a committed lockfile. The URL itself is *not* repeated back; a refusal is read in consoles, CI logs and issue trackers |
+| The host cannot be reached | The underlying error, and that a committed cache needs no network at all |
+| Anything but 200 | The status, and that a document a build reads has to be there every time |
+| A redirect | The status and the `Location`, and to write that URL into the `$ref` — whether or not its host is allowed |
+| Not a document | The parser's own message, which names the line, prefixed with which `$ref` reached it. An HTML sign-in page lands here |
+| A fragment naming nothing | The same "nothing at that pointer" a file on disk gets. It fails during the update too, so the lockfile is never written from a document nobody could read |
+| A URL not in the lockfile | That nothing is fetched which has not been recorded, and the task that records it |
+| A cached file that does not hash to its own name | That the cached copy was edited or corrupted, and to delete it and update |
+| A lockfile line that is not one | The line number and the shape a line has |
+
+##### What has *not* changed
+
+There is no path that fetches and uses content without checking it against a
+recorded hash. The update task is the single exception and it is a task of its
+own, run on purpose, guarded again for the case that matters. An older
+`pelican-import` on the task's classpath — one whose `importEndpoints` has no
+allowlist in its signature, and therefore no hash check either — is not fallen
+back to while a host is allowed; the plugin refuses and says which module to
+upgrade.
 
 ### Three dialects, one shape
 

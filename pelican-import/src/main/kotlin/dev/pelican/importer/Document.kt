@@ -12,6 +12,7 @@ import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import java.io.File
+import java.net.URI
 
 /**
  * Reading a document off disk, as one self-contained tree.
@@ -22,33 +23,48 @@ import java.io.File
  * reading and writing the same shape rather than two models of it.
  *
  * References to other files are resolved here rather than left to whatever
- * reads the tree next, and references to other *hosts* are refused. A build
- * that fetches a URL to know what to compile is a build that compiles
- * something different depending on the network, and the failure mode of that
- * is a generated client nobody can reproduce.
+ * reads the tree next, and references to other *hosts* are refused unless the
+ * build file named the host. A build that fetches a URL to know what to
+ * compile is a build that compiles something different depending on the
+ * network, and the failure mode of that is a generated client nobody can
+ * reproduce — so where fetching is allowed at all, [Remote] is what makes the
+ * fetched half a fixed input again.
  */
 internal object Document {
 
     /** Reads [file] and everything it references, as one tree with only local refs left. */
-    fun read(file: File): JsonObj {
+    fun read(file: File, remote: Remote): JsonObj {
         val root = parse(file)
-        val bundle = Bundle(root)
-        val bundled = bundle.walk(root, null, file.canonicalFile.parentFile, JsonPath.root) as JsonObj
+        val bundle = Bundle(root, FileSource(file.canonicalFile), remote)
+        val bundled = bundle.walk(root, null, JsonPath.root) as JsonObj
         return bundle.finish(bundled)
     }
 
     fun parse(file: File): JsonObj {
         if (!file.isFile) throw ImportFailure("No such file: $file")
+        return parse(file.readText(), file.toString())
+    }
+
+    /**
+     * The same parse for text that never was a file.
+     *
+     * [label] is what a failure calls it — a path for a file, a URL for a
+     * fetched document. One parser for both, because a document that arrived
+     * over HTTP is read by exactly the same rules as one on disk: a second
+     * reading of YAML would be a second place for duplicate keys to become
+     * last-one-wins.
+     */
+    fun parse(text: String, label: String): JsonObj {
         val loaded = try {
-            Load(settings).loadFromString(file.readText())
+            Load(settings).loadFromString(text)
         } catch (e: YamlEngineException) {
             // snakeyaml throws its own hierarchy for a malformed document, and
             // the message it carries names the line — which is the whole of
             // what a reader needs, so it is passed on rather than summarised.
-            throw ImportFailure("$file is not valid YAML or JSON: ${e.message}", e)
+            throw ImportFailure("$label is not valid YAML or JSON: ${e.message}", e)
         }
         return loaded.toJson() as? JsonObj
-            ?: throw ImportFailure("$file does not hold an object at its root, so it is not an OpenAPI document")
+            ?: throw ImportFailure("$label does not hold an object at its root, so it is not an OpenAPI document")
     }
 
     /**
@@ -107,6 +123,61 @@ internal class JsonPath private constructor(private val parent: JsonPath?, priva
 }
 
 /**
+ * Where a value was read from, and what a `$ref` written inside it means.
+ *
+ * A file on disk and a fetched URL answer the same two questions — what does
+ * a reference written here resolve to, and what does a failure call this — so
+ * they answer them behind one type. Keeping them apart would have meant a
+ * second walk of the tree for the fetched half, and the two walks would
+ * eventually come to disagree about how a `#/...` inside a pulled-in document
+ * is read: the bug this type exists to make impossible.
+ */
+internal sealed class Source {
+
+    /** Identity: what "hoisted once" and "already visiting" are keyed by, and what a message says. */
+    abstract val id: String
+
+    /** The last segment without its extension, for a reference to a whole document. */
+    abstract val stem: String
+
+    /** What [ref] names, read from here — or a refusal saying why it is not read. */
+    abstract fun sibling(ref: String, path: JsonPath, remote: Remote): Source
+
+    abstract fun read(remote: Remote, path: JsonPath): JsonObj
+
+    override fun toString(): String = id
+}
+
+internal class FileSource(private val file: File) : Source() {
+    override val id: String = file.path
+    override val stem: String = file.name.substringBeforeLast('.')
+
+    override fun sibling(ref: String, path: JsonPath, remote: Remote): Source =
+        // A remote reference written in a local document has to be absolute:
+        // there is no host for a relative one to be relative to.
+        if (remote.isRemote(ref)) {
+            remote.source(ref, null, path)
+        } else {
+            FileSource(File(file.parentFile, ref).canonicalFile)
+        }
+
+    override fun read(remote: Remote, path: JsonPath): JsonObj = Document.parse(file)
+}
+
+internal class UrlSource(private val uri: URI) : Source() {
+    override val id: String = uri.toString()
+    override val stem: String = uri.path.orEmpty().substringAfterLast('/').substringBeforeLast('.')
+
+    // Relative and absolute alike: `./common.yaml` beside a fetched document
+    // is another document on that host, and it is checked against the
+    // allowlist exactly as the first one was. A fetched document naming a
+    // second host is followed only where the build file named that host too.
+    override fun sibling(ref: String, path: JsonPath, remote: Remote): Source = remote.source(ref, uri, path)
+
+    override fun read(remote: Remote, path: JsonPath): JsonObj = remote.document(uri, path)
+}
+
+/**
  * The `$ref`s that point out of this file, resolved into it.
  *
  * A reference to another file's schema is hoisted into `components/schemas`
@@ -116,8 +187,8 @@ internal class JsonPath private constructor(private val parent: JsonPath?, priva
  * from where each type happened to be used. Everything else is inlined where
  * it stood.
  */
-private class Bundle(root: JsonObj) {
-    /** (file, pointer) -> the name it was hoisted under, so one type is hoisted once. */
+private class Bundle(root: JsonObj, private val rootSource: Source, private val remote: Remote) {
+    /** (document, pointer) -> the name it was hoisted under, so one type is hoisted once. */
     private val hoisted = LinkedHashMap<String, String>()
     private val added = LinkedHashMap<String, JsonValue>()
     private val taken = ((root["components"] as? JsonObj)?.get("schemas") as? JsonObj)
@@ -140,84 +211,79 @@ private class Bundle(root: JsonObj) {
     }
 
     /**
-     * [source] is the file this value was read from, or null for the document
-     * itself. It is what makes a local `#/...` inside a pulled-in file mean
-     * what it said there: after bundling, that pointer would otherwise be read
-     * against the root document, where it names either nothing or — worse —
-     * something else of the same name.
+     * [source] is where this value was read from, or null for the document
+     * itself. It is what makes a local `#/...` inside a pulled-in document
+     * mean what it said there: after bundling, that pointer would otherwise be
+     * read against the root document, where it names either nothing or —
+     * worse — something else of the same name.
      */
-    fun walk(value: JsonValue, source: File?, dir: File, path: JsonPath): JsonValue = when (value) {
-        is JsonArr -> JsonArr(value.items.mapIndexed { i, item -> walk(item, source, dir, path / i) })
+    fun walk(value: JsonValue, source: Source?, path: JsonPath): JsonValue = when (value) {
+        is JsonArr -> JsonArr(value.items.mapIndexed { i, item -> walk(item, source, path / i) })
 
         is JsonObj -> {
             val ref = (value["\$ref"] as? JsonStr)?.value
             if (ref == null) {
-                JsonObj(value.fields.mapValues { (key, field) -> walk(field, source, dir, path / key) })
+                JsonObj(value.fields.mapValues { (key, field) -> walk(field, source, path / key) })
             } else {
-                resolve(ref, source, dir, path)
+                resolve(ref, source, path)
             }
         }
 
         else -> value
     }
 
-    private fun resolve(ref: String, source: File?, dir: File, path: JsonPath): JsonValue {
+    private fun resolve(ref: String, source: Source?, path: JsonPath): JsonValue {
         if (ref.startsWith("#")) {
+            // Written as local, and local to a document that is not this one.
             if (source == null) return JsonObj(mapOf("\$ref" to JsonStr(ref)))
-            // Written as local, and local to a file that is not this one.
-            return resolve("${source.name}$ref", null, source.parentFile, path)
+            return pull(source, ref.removePrefix("#"), ref, path)
         }
 
-        if (remote.containsMatchIn(ref)) {
-            throw ImportFailure(
-                "$path refers to $ref, which is on another host. Remote references are not followed: " +
-                    "a build that fetches a URL to know what to generate cannot be reproduced. " +
-                    "Bundle the document first, or vendor the file it needs beside it.",
-            )
-        }
+        val (where, pointer) = ref.split("#", limit = 2).let { it[0] to it.getOrNull(1).orEmpty() }
+        return pull((source ?: rootSource).sibling(where, path, remote), pointer, ref, path)
+    }
 
-        val (fileName, pointer) = ref.split("#", limit = 2).let { it[0] to it.getOrNull(1).orEmpty() }
-        val target = File(dir, fileName).canonicalFile
-        val key = "$target#$pointer"
+    private fun pull(target: Source, pointer: String, ref: String, path: JsonPath): JsonValue {
+        val key = "${target.id}#$pointer"
         hoisted[key]?.let { return JsonObj(mapOf("\$ref" to JsonStr("#/components/schemas/$it"))) }
 
         if (key in visiting) {
-            throw ImportFailure("$path refers to $ref, which refers back to itself through another file")
+            throw ImportFailure("$path refers to $ref, which refers back to itself through another document")
         }
         visiting += key
 
-        val document = Document.parse(target)
+        val document = target.read(remote, path)
         val subtree = pointerInto(document, pointer, ref, path)
         val name = hoistedName(pointer, target)
 
         return if (name == null) {
             // Not a named schema anywhere: inlined where it stood, which is
             // what a reader of the merged document would expect to see.
-            walk(subtree, target, target.parentFile, path).also { visiting -= key }
+            walk(subtree, target, path).also { visiting -= key }
         } else {
             val unique = unique(name)
             // Registered before recursing, so a schema that refers to itself
-            // through a file boundary lands on the name already reserved.
+            // across a document boundary lands on the name already reserved.
             hoisted[key] = unique
-            added[unique] = walk(subtree, target, target.parentFile, path)
+            added[unique] = walk(subtree, target, path)
             visiting -= key
             JsonObj(mapOf("\$ref" to JsonStr("#/components/schemas/$unique")))
         }
     }
 
     /**
-     * What to call a schema pulled in from another file: the name it had
-     * there, or the file's own name when the whole file is one schema. Null
-     * for a reference to something that is not a schema — a shared parameter
-     * or response — which is inlined instead.
+     * What to call a schema pulled in from another document: the name it had
+     * there, or the document's own name when the whole of it is one schema.
+     * Null for a reference to something that is not a schema — a shared
+     * parameter or response — which is inlined instead.
      */
-    private fun hoistedName(pointer: String, target: File): String? {
+    private fun hoistedName(pointer: String, target: Source): String? {
         val steps = pointer.trim('/').split('/').filter { it.isNotEmpty() }
         val section = steps.getOrNull(steps.size - 2)
         val underSchemas = section == "schemas" || section == "definitions"
         return when {
             underSchemas -> typeName(unescape(steps.last()))
-            steps.isEmpty() -> typeName(target.name.substringBeforeLast('.'))
+            steps.isEmpty() -> typeName(target.stem)
             else -> null
         }
     }
@@ -247,6 +313,4 @@ private class Bundle(root: JsonObj) {
 
     /** RFC 6901: `~1` is a slash and `~0` a tilde, in that order. */
     private fun unescape(step: String) = step.replace("~1", "/").replace("~0", "~")
-
-    private val remote = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://|^//")
 }

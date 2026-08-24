@@ -12,6 +12,11 @@ import org.junit.jupiter.api.Test
  * decision worth testing: a build that fetches a URL to know what to generate
  * produces different code on a different day, and no amount of convenience is
  * worth a generated client nobody can reproduce.
+ *
+ * It is the default rather than the only answer — `allowRemote` names a host
+ * on purpose and a lockfile pins what it served — and `RemoteReferencesTest`
+ * is where that bargain is asserted. What is asserted here is that nobody who
+ * has not made it gets any of it.
  */
 class ReferencesTest {
 
@@ -103,6 +108,10 @@ class ReferencesTest {
         val message = shouldThrow<ImportFailure> { imported(document) }.message.orEmpty()
         message shouldContain "on another host"
         message shouldContain "cannot be reproduced"
+        // Three ways out and not two: the refusal points at the one that keeps
+        // the reference, so nobody has to find it by reading the manual.
+        message shouldContain "Bundle the document first"
+        message shouldContain "allowRemote"
     }
 
     @Test
