@@ -17,21 +17,31 @@ plugins {
     id("com.gradle.plugin-publish") version "2.1.1"
     // Central, via the Portal. It wraps `maven-publish` and `signing`.
     id("com.vanniktech.maven.publish") version "0.37.0"
+    // The same tag this repository's other build reads. An included build is
+    // still the same working tree, so both land on the same version.
+    id("pl.allegro.tech.build.axion-release") version "1.21.3"
 }
 
-// The Maven coordinate, not the package name. `io.github.matthewjones372.pelican` would need
-// pelican.dev verified on the Central Portal, and the Plugin Portal holds a
-// plugin id to the same standard; this one is verified by the GitHub account
-// it names. The Kotlin packages stay `io.github.matthewjones372.pelican`, which nothing checks.
+scmVersion {
+    // An included build does not look above its own directory for `.git`, and
+    // axion answers with its default version rather than failing when it finds
+    // none — which would have published the plugin as 0.1.0-SNAPSHOT off a
+    // release tag. Point it at the repository both builds actually live in.
+    repository { directory.set(file("..").absolutePath) }
+    tag { prefix.set("v") }
+    // Plain `0.1.0-SNAPSHOT` off a tag rather than axion's default, which
+    // decorates it with the branch name. The README tells a contributor to
+    // install locally and depend on the version; that version should not
+    // change with the branch they happen to be on.
+    versionCreator("simple")
+}
+
+// The namespace verified on the Central Portal. The Plugin Portal holds a
+// plugin id to the same standard, so the id below shares the prefix rather
+// than claiming one this account cannot prove it owns.
 group = "io.github.matthewjones372"
 
-// One source of truth for the version: the root build's own gradle.properties.
-// An included build does not inherit them, and a second copy here would be a
-// second thing to forget.
-version = file("../gradle.properties").readLines()
-    .first { it.startsWith("pelicanVersion=") }
-    .substringAfter('=')
-    .trim()
+version = scmVersion.version
 
 kotlin { jvmToolchain(21) }
 
@@ -97,17 +107,6 @@ publishing {
 }
 
 mavenPublishing {
-    // Signed when a key is supplied and not otherwise, so a contributor can
-    // build and install without one; CI supplies it. The plugin takes the same
-    // switch as a gradle property, and a value set that way is already final by
-    // the time this runs — which is what the second half of the condition is
-    // for.
-    if (providers.gradleProperty("signingInMemoryKey").isPresent &&
-        !providers.gradleProperty("signAllPublications").isPresent
-    ) {
-        signAllPublications()
-    }
-
     // The platform to use when `com.gradle.plugin-publish` is also applied. It
     // publishes the plugin marker as well as the jar, with sources and javadoc.
     configure(com.vanniktech.maven.publish.GradlePublishPlugin())

@@ -4,6 +4,10 @@ plugins {
     id("com.diffplug.spotless") version "8.10.0"
     id("dev.detekt") version "2.0.0-alpha.6" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.9"
+    // The version comes from the nearest `v` tag rather than a property, so
+    // cutting a release is `git tag v0.1.0 && git push --tags` and nothing
+    // else. An untagged commit is a -SNAPSHOT of the next one.
+    id("pl.allegro.tech.build.axion-release") version "1.21.3"
     // So the root project has `check`/`build`, and the scripts formatted here
     // are covered by a plain `./gradlew build` like everything else.
     base
@@ -12,6 +16,18 @@ plugins {
     // here directly.
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
 }
+
+scmVersion {
+    tag { prefix.set("v") }
+    // Plain `0.1.0-SNAPSHOT` off a tag rather than axion's default, which
+    // decorates it with the branch name. The README tells a contributor to
+    // install locally and depend on the version; that version should not
+    // change with the branch they happen to be on.
+    versionCreator("simple")
+}
+
+// Read once, at configuration time: `scmVersion.version` shells out to git.
+val scmVer: String = scmVersion.version
 
 /**
  * ktlint rather than ktfmt: ktfmt reflows, and this codebase is hand-laid-out
@@ -106,11 +122,10 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     repositories { mavenCentral() }
 
-    // The Maven coordinate, which is not the package name: `io.github.matthewjones372.pelican`
-    // would need pelican.dev verified on the Central Portal, and this one is
-    // verified by the GitHub account it names.
+    // The namespace verified on the Central Portal, against the GitHub
+    // account it names.
     group = "io.github.matthewjones372"
-    version = providers.gradleProperty("pelicanVersion").get()
+    version = scmVer
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
         jvmToolchain(21)
@@ -173,17 +188,6 @@ subprojects {
         apply(plugin = "com.vanniktech.maven.publish")
 
         extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
-            // Signed when a key is supplied and not otherwise, so a contributor
-            // can build and install without one; CI supplies it. The plugin
-            // takes the same switch as a gradle property, and a value set that
-            // way is already final by the time this runs — which is what the
-            // second half of the condition is for.
-            if (providers.gradleProperty("signingInMemoryKey").isPresent &&
-                !providers.gradleProperty("signAllPublications").isPresent
-            ) {
-                signAllPublications()
-            }
-
             // Sources are not an optional extra for a library someone else has
             // to debug, and Maven Central will not accept a release without a
             // javadoc jar. Kotlin has no javadoc to put in one — an empty jar

@@ -107,8 +107,7 @@ The reference manual, with the reasoning behind each design decision, is
 ## Install
 
 All sixteen modules are on Maven Central under `io.github.matthewjones372`,
-with sources and an empty javadoc jar — the coordinate is the group the
-namespace is verified against; the Kotlin packages are `io.github.matthewjones372.pelican`.
+with sources and an empty javadoc jar.
 
 ```kotlin
 dependencies {
@@ -128,7 +127,10 @@ plugins { id("io.github.matthewjones372.pelican") version "0.1.0" }
 
 To build against unreleased changes instead, `./gradlew publishToMavenLocal`
 installs the modules and `./gradlew -p pelican-gradle-plugin publishToMavenLocal`
-the plugin; `mavenLocal()` or `includeBuild` both work.
+the plugin; `mavenLocal()` or `includeBuild` both work. The version there is
+whatever the working tree is between tags — `0.1.0-SNAPSHOT` on an untagged
+commit after `v0.1.0` — because it comes from the nearest tag rather than from
+a number written down anywhere.
 
 ## Your first endpoint
 
