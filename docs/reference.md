@@ -2435,10 +2435,19 @@ holds it. Two consequences follow, and both are enforced rather than hoped for:
   satisfies the rule by putting its last `<input type="file">` last, and both
   clients here write the parts in the server's own reading order whatever order
   they were declared in.
-- **One streamed part per endpoint, declared after the buffered ones.** A second
-  could only be reached by holding the first, and holding one silently is what a
-  streaming upload exists not to do — so declaring two is a startup failure that
-  names `bufferedFile` as the way out.
+- **One streamed part per endpoint, declared last.** A second could only be
+  reached by holding the first, and holding one silently is what a streaming
+  upload exists not to do — so declaring two is a startup failure that names
+  `bufferedFile` as the way out.
+- **Nothing is declared after it** — not a second file, and not a text part
+  either. Declaration order is what a caller reads the envelope's order off, so
+  a part listed after the streamed one is one an HTML form or a `curl` would
+  send where nothing reads it. On the wire a *required* part missing that way is
+  a 400 that says why; an optional one is quieter still — the handler simply
+  gets its default, and neither end can see that the caller sent something else.
+  The description is refused when the endpoint is built, naming the parts that
+  follow. The two clients here reorder rather than write such a request, which
+  saves them and not whoever is reading the description for themselves.
 
 The size limit works the way it does for `rawBody()`: the streamed part is
 exempt, because nothing holds it whole. An upload larger than the limit is
@@ -3146,8 +3155,9 @@ open  localhost:8080/api-docs                                 # Swagger UI
 - **More than one *streamed* file part on a multipart endpoint, or one that is
   not last.** The part is handed over as a live stream, so reading stops at it:
   a second could only be reached by holding the first, and anything sent after
-  it is never seen. Both are refused out loud — the first when the endpoint is
-  built, the second as a 400 naming the part it wanted. Holding a file *is*
+  it is never seen. Both are refused out loud when the endpoint is built — the
+  second naming whatever was declared after the stream, of whatever kind — and a
+  request that puts a part after it anyway is a 400 naming the part it wanted. Holding a file *is*
   sayable, with `bufferedFile(name, maxBytes = ...)`, which is what makes an
   ordinary two-file upload form describable; see
   [Multipart uploads](#multipart-uploads).

@@ -430,8 +430,10 @@ reading stops there. A companion file that has to arrive alongside it is
 declared `bufferedFile("thumbnail", maxBytes = 256 * 1024)` — held in memory,
 within a bound the declaration has to name — so a two-file upload form is
 describable and what it costs is written where it is chosen.
-A text part sent after the streamed file is a 400 that says so, and an HTML form
-satisfies the rule by putting its `<input type="file">` last.
+A part *declared* after the streamed file is refused when the endpoint is built,
+since declaration order is what a caller reads the envelope's order off; one
+merely *sent* after it is a 400 that says so. An HTML form satisfies the rule by
+putting its `<input type="file">` last.
 
 ## Response headers
 

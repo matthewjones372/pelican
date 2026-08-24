@@ -194,6 +194,39 @@ class StrictnessTest {
         source shouldContain """filePart("document""""
     }
 
+    /**
+     * A property map has no order a caller can observe, so a document is free
+     * to list its text parts after its file — and `endpoint(...)` is not, since
+     * reading stops at the streamed part. The import decides the order rather
+     * than passing the document's on and emitting a declaration that refuses
+     * itself when the generated file is loaded.
+     */
+    @Test
+    fun `a text part listed after the file is emitted before it`() {
+        val source = imported(
+            document(
+                """
+                /orders/import:
+                  post:
+                    operationId: importOrders
+                    requestBody:
+                      content:
+                        multipart/form-data:
+                          schema:
+                            type: object
+                            properties:
+                              caption: { type: string }
+                              document: { type: string, format: binary }
+                              notes: { type: string }
+                    responses:
+                      "204": { description: ok }
+                """,
+            ),
+        )
+
+        source shouldContain "endpoint(caption, notes, document)"
+    }
+
     @Test
     fun `a document that published no bound gets one written out rather than defaulted`() {
         val source = imported(

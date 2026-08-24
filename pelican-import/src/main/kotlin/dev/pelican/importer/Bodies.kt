@@ -164,10 +164,11 @@ internal class Bodies(private val reader: Reader, private val operation: Operati
             else IrPart.File(it.name, it.contentType, it.required, it.description, DEFAULT_BUFFERED_PART_BYTES)
         }
 
-        // Declared last, because `endpoint(...)` refuses a streamed part with a
-        // buffered one after it and both generated clients write the parts in
-        // declaration order. A property map has no order a caller can observe,
-        // so this reorders nothing a reader of the document was relying on.
+        // Declared last, because `endpoint(...)` refuses a streamed part with
+        // anything declared after it: reading stops there, so the declaration
+        // would describe an envelope no server could read. A property map has
+        // no order a caller can observe, so this reorders nothing a reader of
+        // the document was relying on.
         return decided.filterNot { it === streamed } + listOfNotNull(streamed)
     }
 }

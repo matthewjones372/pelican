@@ -247,9 +247,10 @@ class MultipartTest {
 
     @Test
     fun `a streamed part declared before a buffered one fails when built`() {
-        // Reading stops at the streamed part, and both clients here write the
-        // parts in declaration order — so this is a description whose own
-        // client could only produce requests its own server refuses.
+        // Reading stops at the streamed part, so this is a description that
+        // describes an envelope no server could read. The two clients here
+        // reorder rather than write it — `partsInWireOrder` — which saves them
+        // and not the caller reading the description for itself.
         val failure = shouldThrow<IllegalStateException> {
             endpoint(filePart("document"), bufferedFile("thumbnail", maxBytes = 64)) {
                 post("upload")
@@ -258,6 +259,39 @@ class MultipartTest {
         }
 
         withClue(failure.message) { failure.message shouldContain "Declare it last" }
+    }
+
+    @Test
+    fun `a text part declared after the streamed one fails when built as well`() {
+        // The rule is about the part reading stops at, not about which kind of
+        // part follows it: a caller writing the parts in the order the
+        // description lists them puts 'notes' where nothing reads it.
+        val failure = shouldThrow<IllegalStateException> {
+            endpoint(textPart<String>("caption"), filePart("upload"), textPart<String>("notes").optional()) {
+                post("uploads")
+                text()
+            }
+        }
+
+        withClue(failure.message) {
+            failure.message shouldContain "'notes'"
+            failure.message shouldContain "Declare it last"
+        }
+    }
+
+    /**
+     * Why that description is worth refusing rather than leaving to the
+     * request: an *optional* part that arrives after the streamed one is not a
+     * 400 like a required one, it is a default. The caller sent a value, the
+     * handler was given something else, and nothing between them can tell.
+     */
+    @Test
+    fun `an optional part sent after the file part is silently its default`() {
+        val values = decode(
+            envelope(text("caption", "Holiday"), upload("file", "a.txt", "hello"), text("notes", "Too late")),
+        )
+
+        values[notes].shouldBeNull()
     }
 
     @Test

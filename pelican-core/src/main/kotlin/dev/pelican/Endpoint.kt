@@ -613,7 +613,7 @@ private fun validate(ep: Endpoint<*, *>) {
         val partClashes = body.parts.groupBy { it.name }.filterValues { it.size > 1 }.keys
         if (partClashes.isNotEmpty()) error("$ep declares the multipart part(s) $partClashes more than once")
 
-        validateFileParts(ep, body)
+        validateParts(ep, body)
     }
 
     // `default` is one key in OpenAPI's response map, so a second declaration
@@ -653,7 +653,7 @@ private fun validate(ep: Endpoint<*, *>) {
  * Both messages name `bufferedFile` because that is the way out, and it is a
  * way out that did not exist when this was simply "one file part".
  */
-private fun validateFileParts(ep: Endpoint<*, *>, body: MultipartBody) {
+private fun validateParts(ep: Endpoint<*, *>, body: MultipartBody) {
     val streamed = body.fileParts.filter { it.streamed }
     if (streamed.size > 1) {
         error(
@@ -664,14 +664,24 @@ private fun validateFileParts(ep: Endpoint<*, *>, body: MultipartBody) {
         )
     }
 
-    // Both clients here write the parts in declaration order, so a buffered
-    // part declared after the streamed one is one they would send where no
-    // server could read it.
-    val last = body.fileParts.lastOrNull()
-    if (streamed.size == 1 && last !== streamed.single()) {
+    // Declaration order is what a caller reads the envelope's order off: an
+    // HTML form, a curl invocation, any generator that is not this one. The
+    // two clients here reorder to protect themselves — `partsInWireOrder` —
+    // which is a mitigation, not a licence for the description to describe a
+    // request no server could read.
+    //
+    // Any part, not only a file. A text part after the streamed one is read by
+    // nobody either, and where it is optional that is the quieter half: a
+    // required part missing is a 400 that says why, and an optional one is a
+    // default nothing between the caller and the handler can see it got.
+    val stream = streamed.singleOrNull() ?: return
+    val after = body.parts.dropWhile { it !== stream }.drop(1)
+    if (after.isNotEmpty()) {
         error(
-            "$ep declares the streamed file part '${streamed.single().name}' before the buffered part " +
-                "'${last?.name}', and reading stops at the streamed one. Declare it last.",
+            "$ep declares ${after.joinToString { "'${it.name}'" }} after the streamed file part " +
+                "'${stream.name}', and reading stops at the streamed one. Declare it last — a part that " +
+                "has to come after it is a text part moved in front of it, or a bufferedFile(name, " +
+                "maxBytes = ...), which is read as it arrives at the price of saying what holding it costs.",
         )
     }
 }
