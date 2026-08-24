@@ -43,17 +43,26 @@ jobs:
         run: ./gradlew publishToMavenCentral --no-configuration-cache
 
       # The Gradle plugin is a build of its own, so the root build's publish
-      # tasks do not reach it. It goes to both places: Central for anyone
-      # resolving it as a dependency, and the Plugin Portal for `plugins { }`.
-      - name: Publish the Gradle plugin
+      # tasks do not reach it.
+      - name: Publish the Gradle plugin to Maven Central
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+        run: >
+          ./gradlew -p pelican-gradle-plugin publishToMavenCentral
+          --no-configuration-cache
+
+      # The Plugin Portal is where `plugins { id(...) }` resolves from without
+      # a `pluginManagement` block. It needs an account the library release
+      # does not, so a missing key skips this rather than failing the release
+      # that already reached Central.
+      - name: Publish the Gradle plugin to the Gradle Plugin Portal
+        if: ${{ secrets.GRADLE_PUBLISH_KEY != '' }}
+        env:
           GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
           GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
         run: >
-          ./gradlew -p pelican-gradle-plugin
-          publishToMavenCentral publishPlugins
+          ./gradlew -p pelican-gradle-plugin publishPlugins
           --no-configuration-cache
