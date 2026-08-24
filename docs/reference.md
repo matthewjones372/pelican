@@ -572,8 +572,12 @@ What it refuses, and what each one would have cost:
 | Two 2xx responses | An endpoint's output is one type and one status. `200 Order` beside `202 Accepted` is a runtime distinction a handler makes, and picking either loses it |
 | A `default` response | "And anything else." An endpoint declares the statuses it answers with by name |
 | Two media types for one body or response | `jsonBody<T>()` is a JSON body; there is no form of it meaning "or XML" |
-| `oneOf`, `anyOf` of several shapes, `discriminator` | A union. Kotlin holds one as a sealed hierarchy, and nothing in the document says what to call each branch |
-| `allOf` of several schemas | Merging them would invent a type the document never named |
+| `oneOf` of several shapes with no `discriminator` | A union nothing says how to read. The decoder would have to try each branch and take the first that parsed, which is wrong on the first payload two branches both accept |
+| `anyOf` of several shapes | A payload may satisfy two `anyOf` branches at once and a Kotlin value is one class or the other, so a sealed hierarchy would say something narrower than the document does |
+| `allOf` of schemas that disagree about a property | Merging would have to pick a winner, and the generated class would then accept payloads the document rejects |
+| A `discriminator` with no branches to discriminate | Neither spelling of a hierarchy is there: no `oneOf` listing the branches, and no schema declaring an `allOf` of this one |
+| A union branch nothing selects | Written inline, unmapped, and declaring no `const` for the discriminator property. A class no payload can reach would be a contract nobody wrote |
+| `not` | A schema defined by what it excludes. There is no Kotlin type for "anything but this" |
 | A parameter that is an object, or a list of them | A Pelican input decodes one value from one string. A list *of values* reads fine — see [More than one value](#more-than-one-value) |
 | A parameter under `content` | It carries a whole document rather than a value; that is a request body |
 | `deepObject`, or a `style` and an `explode` that contradict each other | `deepObject` spreads an object over several names, and the rest name a separator that the `explode` beside them makes meaningless |
@@ -589,6 +593,129 @@ They are collected rather than thrown one at a time — the decision a reader ha
 to make is one decision about the whole list — with one problem reported per
 operation, since the rest of what an operation says is being read through the
 first thing that could not be described.
+
+### Unions
+
+A `oneOf` with a `discriminator` becomes a sealed interface and one data class
+per branch:
+
+```yaml
+Payment:
+  oneOf:
+    - { $ref: '#/components/schemas/Card' }
+    - { $ref: '#/components/schemas/Bank' }
+  discriminator:
+    propertyName: kind
+    mapping:
+      card: '#/components/schemas/Card'
+      bank_transfer: '#/components/schemas/Bank'
+```
+
+```kotlin
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
+@JsonSubTypes(
+    JsonSubTypes.Type(value = Card::class, name = "card"),
+    JsonSubTypes.Type(value = BankTransfer::class, name = "bank_transfer"),
+)
+sealed interface Payment
+
+data class Card(val number: String) : Payment
+data class BankTransfer(val iban: String) : Payment
+```
+
+The `discriminator` is what makes this possible, and its absence is what is
+still refused. Kotlin can hold a union either way; a *decoder* cannot. Without
+one it would have to try each branch and keep the first that parsed, which is
+wrong on the first payload two branches both accept — and wrong silently.
+
+#### What each branch is called
+
+In this order, and every one of them read out of the document so that the same
+document generates the same names every time:
+
+1. **The `discriminator.mapping` key.** It is the one name the document gives
+   the branch *as a branch*, and it is the word a reader matching on the wire
+   value already has in their head. Where the key and the referenced component
+   disagree — `card` pointing at `CardPayment` — the key wins and the component
+   is generated under it, so there is still exactly one Kotlin type per schema.
+   A key that would collide with another component's name is left alone: one
+   schema with two names is what is being avoided, and two schemas with one
+   name is worse.
+2. **The referenced component's name**, for a union whose mapping is implicit.
+3. **`<Parent>Variant<n>`**, positional, for a branch the document wrote out
+   inline and named neither way. Positional so that it does not move when a
+   sibling's properties change.
+
+The value on the wire is a separate thing and is never derived: it is the
+mapping key, or the component name an implicit mapping selects, or a `const`
+the inline branch declares for the discriminator property. A branch with none
+of those is refused — nothing selects it, and generating a class no payload can
+reach would be inventing a contract.
+
+The discriminator property itself is *not* a property of the branch classes.
+The hierarchy carries it. Two places holding one value is two places for them
+to disagree, and kotlinx.serialization refuses the pair outright.
+
+#### `codec`
+
+The annotations above are the one thing in a generated file that belongs to a
+particular JSON library, because they are the one thing the Kotlin cannot say
+on its own. Which library they are for is a setting:
+
+```kotlin
+create("orders") {
+    document.set(file("orders.yaml"))
+    packageName.set("com.example.orders")
+    codec.set("kotlinx")   // or "jackson", the default
+}
+```
+
+Jackson by default, because `pelican-jackson` is the default codec module. A
+document with no union generates the same file either way — nothing is written
+unless a hierarchy is generated. `kotlinx` is not free in the same way:
+kotlinx.serialization has no reflective fallback, so choosing it puts
+`@Serializable` on every generated payload type.
+
+#### The other spelling
+
+OpenAPI 3.0 had no way to list a hierarchy's branches, so it wrote the relation
+the other way up: a parent carrying the `discriminator`, and one child per
+branch declaring `allOf: [$ref parent, ...]`. That is read too, by looking for
+the schemas that point at the parent — it is what swagger-core still emits for
+an annotated Jackson hierarchy, which means it is what a document *this*
+library publishes from Kotlin classes says. See "The publishing direction"
+below.
+
+Without an explicit `mapping`, the value that selects a branch is the branch's
+own schema name, which is what OpenAPI defines an implicit mapping to be.
+
+### `allOf`
+
+`allOf` of several schemas is flattened into the one class they describe
+together, named for the enclosing schema or the property it sat under. Where
+two of them declare the same property differently the import fails, naming the
+properties: merging would have to pick a winner, and the class that came out
+would accept payloads the document rejects.
+
+### The publishing direction
+
+The two codecs do not publish a sealed hierarchy the same way, and only one of
+them round-trips through the import above.
+
+`KotlinxCodecs` writes `oneOf` with a `discriminator` and a full `mapping`. It
+can, because a kotlinx descriptor carries the serial name of every branch —
+`@SerialName("card")` is right there — so the document can say which value
+picks which schema.
+
+`JacksonCodecs` describes types with swagger-core, and swagger-core writes the
+3.0 spelling: a parent holding the `discriminator`, and a child per branch
+built with `allOf`. It also writes no `mapping`, because the names in
+`@JsonSubTypes` do not reach the schema model. The import reads that shape
+back, so the trip closes — but by OpenAPI's rule the value selecting a branch
+is then the branch's schema name. Where a `@JsonSubTypes.Type(name = ...)`
+differs from its class's name, the published document does not say so and
+nothing downstream can know. Keep the two the same, or publish with
+`KotlinxCodecs`.
 
 ### The exclude list
 
@@ -610,8 +737,8 @@ different question — it says "and whatever else turns up", where this says
 
 Excluding an operation also excludes the schemas only it reached. `components`
 is a library, and a type nobody uses is not worth failing an import over, nor
-worth generating a class for — so a `oneOf` in one corner of a document costs
-that corner and nothing else. A `oneOf` inside a schema the *rest* of the
+worth generating a class for — so an `anyOf` in one corner of a document costs
+that corner and nothing else. An `anyOf` inside a schema the *rest* of the
 document uses is a different matter, and fails outright: no list of operations
 to leave out would be an honest answer to it.
 
@@ -2041,9 +2168,21 @@ open  localhost:8080/api-docs                                 # Swagger UI
   carry, so closing them means teaching the walker to recognise a set and to
   name an instantiation. Not written; a service that stays on one codec sees
   neither.
-- **`oneOf` for sealed hierarchies** — they emit a bare `object`. swagger-core
-  does understand `@JsonTypeInfo`, so the Jackson side may do better than this
-  already; it is untested, so it is listed as missing.
+- **`discriminator.mapping` on the Jackson side.** `KotlinxCodecs` publishes a
+  sealed hierarchy as a `oneOf` with a `discriminator` and a full `mapping`;
+  swagger-core publishes the 3.0 spelling and no mapping at all, because the
+  names in `@JsonSubTypes` do not reach its schema model. Both are read back by
+  `pelican-import`, so the round trip closes either way — but a
+  `@JsonSubTypes.Type(name = ...)` that differs from its class's name is a fact
+  the Jackson-published document does not carry. See "The publishing direction".
+- **A `codec` for the generated *client*.** `pelican-import` takes one, so an
+  imported union can be annotated for either library. `writeKotlinClient` does
+  not: a generated client's payload types are always annotated for Jackson.
+  Nothing else in a generated client needs an annotation, so this only matters
+  for a spec with a union in it, read by a service on kotlinx.serialization.
+- **`anyOf` of several branches, and `not`.** Both are still refused, and the
+  reasoning is in "What it refuses" above rather than here: neither is a gap
+  waiting to be filled, they are shapes with no faithful Kotlin.
 - **405 vs 404 fidelity is the router's, not Pelican's** — a wrong method on a
   known path answers 405 on http4k, whose router separates "no such path" from
   "not that method", and 404 on Ktor, whose router does not. On Pekko it is 405

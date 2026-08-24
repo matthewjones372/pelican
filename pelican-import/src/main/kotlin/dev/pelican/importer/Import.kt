@@ -1,5 +1,6 @@
 package dev.pelican.importer
 
+import dev.pelican.codegen.CodecAnnotations
 import java.io.File
 
 /**
@@ -59,8 +60,15 @@ object Import {
  * build an [ImportOptions] first would put this module's constructor in the
  * plugin's hands, which is the coupling being avoided.
  *
- * [handlers] is a [Backend] name, or null for no handler stubs.
+ * [handlers] is a [Backend] name, or null for no handler stubs; [codec] is a
+ * [CodecAnnotations] name, or null for the default.
+ *
+ * Both arities are declared rather than one with a default, because what the
+ * plugin looks up is a signature: a defaulted parameter would leave the older
+ * one existing only as a synthetic bridge, and a plugin release and a library
+ * release would have to arrive together.
  */
+@Suppress("LongParameterList") // Every parameter is one entry in the build file's `endpoints { }` block.
 fun importEndpoints(
     document: File,
     sourceRoot: File,
@@ -68,12 +76,20 @@ fun importEndpoints(
     name: String,
     exclude: Set<String>,
     handlers: String?,
+    codec: String?,
 ): List<File> = Import.write(
     document,
     ImportOptions(
         packageName = packageName,
         name = name,
         exclude = exclude,
+        codec = codec?.let { chosen ->
+            CodecAnnotations.entries.firstOrNull { it.name.equals(chosen, ignoreCase = true) }
+                ?: throw ImportFailure(
+                    "No codec called '$chosen'. It is one of " +
+                        CodecAnnotations.entries.joinToString { it.name } + ".",
+                )
+        } ?: CodecAnnotations.JACKSON,
         handlers = handlers?.let { backend ->
             Backend.entries.firstOrNull { it.name.equals(backend, ignoreCase = true) }
                 ?: throw ImportFailure(
@@ -83,6 +99,15 @@ fun importEndpoints(
     ),
     sourceRoot,
 )
+
+fun importEndpoints(
+    document: File,
+    sourceRoot: File,
+    packageName: String,
+    name: String,
+    exclude: Set<String>,
+    handlers: String?,
+): List<File> = importEndpoints(document, sourceRoot, packageName, name, exclude, handlers, null)
 
 /**
  * What to generate.
@@ -106,6 +131,23 @@ class ImportOptions(
      * joining them.
      */
     val exclude: Set<String> = emptySet(),
+
+    /**
+     * Which codec the generated payload types are annotated for.
+     *
+     * It costs a document with no union nothing: no annotation is written
+     * unless a sealed hierarchy is generated, and nothing else in the file has
+     * ever needed one. A union is the exception — `sealed interface Payment`
+     * does not say which property carries the branch or what string selects
+     * each one, and the two libraries spell that differently — so the file is
+     * annotated for whichever one will be reading the bodies.
+     *
+     * Jackson by default, because `pelican-jackson` is the default codec
+     * module. Choosing kotlinx.serialization is not free in the same way: it
+     * has no reflective fallback, so every generated payload type carries
+     * `@Serializable` under it.
+     */
+    val codec: CodecAnnotations = CodecAnnotations.JACKSON,
 
     /**
      * The backend to generate handler stubs for, or null for none.

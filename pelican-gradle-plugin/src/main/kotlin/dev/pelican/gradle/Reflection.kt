@@ -106,8 +106,49 @@ internal object Pelican {
         name: String,
         exclude: Set<String>,
         handlers: String?,
+        codec: String?,
     ): List<*> {
         val importer = load(loader, IMPORT, "pelican-import")
+
+        // The arity this plugin knows about and the arity the library on the
+        // consumer's classpath offers are allowed to differ — that is the whole
+        // point of looking the function up rather than compiling against it. An
+        // older `pelican-import` has no `codec` parameter, and refusing to
+        // import at all because of a setting nobody made would be the coupling
+        // this file exists to avoid.
+        val withCodec = runCatching {
+            importer.getMethod(
+                "importEndpoints",
+                File::class.java,
+                File::class.java,
+                String::class.java,
+                String::class.java,
+                Set::class.java,
+                String::class.java,
+                String::class.java,
+            )
+        }.getOrNull()
+
+        if (withCodec != null) {
+            return withCodec.invokeUnwrapped(
+                null,
+                document,
+                sourceRoot,
+                packageName,
+                name,
+                exclude,
+                handlers,
+                codec,
+            ) as List<*>
+        }
+
+        if (codec != null) {
+            throw PelicanFailure(
+                "`codec` is set, and the `pelican-import` on this task's classpath is older than it: its " +
+                    "`importEndpoints` takes no codec. Upgrade pelican-import, or remove the setting.",
+            )
+        }
+
         val method = importer.getMethod(
             "importEndpoints",
             File::class.java,

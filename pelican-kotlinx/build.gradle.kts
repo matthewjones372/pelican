@@ -13,4 +13,10 @@ dependencies {
     // @Serializable — which only this module's compiler plugin can produce.
     testImplementation(project(":pelican-openapi"))
     testImplementation(project(":pelican-jackson"))
+
+    // UnionRoundTripTest publishes a sealed hierarchy and reads the document
+    // back. It needs the importer for the same reason it needs the models to
+    // be @Serializable: the round trip is only a round trip if both halves are
+    // present, and this is the module where the kotlinx half can exist.
+    testImplementation(project(":pelican-import"))
 }

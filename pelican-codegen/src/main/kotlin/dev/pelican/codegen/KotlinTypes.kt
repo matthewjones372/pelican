@@ -5,6 +5,24 @@ import dev.pelican.JsonObj
 import dev.pelican.JsonStr
 import dev.pelican.JsonValue
 import dev.pelican.PlainCodec
+import dev.pelican.emptyJsonObj
+
+/**
+ * Which codec the generated declarations are annotated for.
+ *
+ * A sealed hierarchy is the one shape a JSON library cannot read off the
+ * Kotlin classes alone: nothing in `sealed interface Payment` says which
+ * property carries the branch, or what string selects each one. That has to be
+ * written down, and the two libraries spell it differently — so the file is
+ * annotated for one of them, chosen where the codec itself is chosen.
+ *
+ * [JACKSON] is the default because Jackson is the default codec module, and
+ * because it costs a document with no union nothing at all: no annotation is
+ * written unless one is generated. [KOTLINX] is not free in the same way —
+ * kotlinx.serialization has no reflective fallback, so every generated payload
+ * type carries `@Serializable` under it.
+ */
+enum class CodecAnnotations { JACKSON, KOTLINX }
 
 /**
  * Schemas in, Kotlin declarations out.
@@ -14,40 +32,159 @@ import dev.pelican.PlainCodec
  * JSON Schema and nothing else. It never sees a `KType`, which is what keeps
  * the generated payload types in step with the *documented* ones rather than
  * with a second opinion about the same Kotlin classes.
+ *
+ * Declarations are registered first and written last. A union is what forces
+ * that: a `oneOf` reached halfway through a document decides that a class
+ * declared near the top belongs to a hierarchy, and a generator that had
+ * already written that class out would have no way to say so.
  */
-class KotlinTypes {
+class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.JACKSON) {
 
-    private val declarations = LinkedHashMap<String, String>()
+    private val declarations = LinkedHashMap<String, Shape>()
     private val declaring = mutableSetOf<String>()
 
     /** Constants -> the enum already generated for them, so one enum serves many uses. */
     private val enums = LinkedHashMap<List<String>, String>()
     private val taken = mutableSetOf<String>()
 
-    fun declarations(): List<String> = declarations.values.toList()
+    /**
+     * Shapes written where they were used, under the name they were hoisted
+     * to. Rendering is a fixed point — see [settle] — and a hoist that named a
+     * second class on the second pass would never reach one.
+     */
+    private val inlined = LinkedHashMap<String, String>()
+
+    /** Component name -> the Kotlin name a `discriminator.mapping` gave it instead. */
+    private val renames = LinkedHashMap<String, String>()
+
+    /** Class name -> the hierarchies it is a branch of. */
+    private val hierarchies = LinkedHashMap<String, MutableList<Adoption>>()
+
+    /** What the generated file has to import for the annotations written into it. */
+    private val imports = sortedSetOf<String>()
+
+    private var components: JsonObj = emptyJsonObj
+
+    fun declarations(): List<String> = settle()
+
+    /**
+     * Imports the declarations need. Written after [declarations], which is
+     * when an annotation first exists to need one.
+     */
+    fun imports(): Set<String> = imports.toSet()
 
     /** Declares every named component the spec's schema source registered. */
     fun declareAll(components: JsonObj) {
+        this.components = components
+        collectRenames(components)
         components.fields.forEach { (name, schema) -> declare(name, schema as JsonObj) }
+        // Settled here as well as at the end, so that the names a document's
+        // own components take are taken before anything written inline can
+        // claim one.
+        settle()
     }
 
+    /** What the generated file calls a component the document named. */
+    fun kotlinName(component: String): String = renames[component] ?: typeName(component)
+
+    // ------------------------------------------------------------ registering
+
     private fun declare(rawName: String, schema: JsonObj): String {
-        val name = typeName(rawName)
+        val name = kotlinName(rawName)
         // Reserved before recursing, so a type that refers to itself terminates.
         if (name in declarations || name in declaring) return name
         declaring += name
         taken += name
-
-        val constants = stringConstants(schema)
-        val properties = schema["properties"] as? JsonObj
-        declarations[name] = when {
-            properties != null && !properties.isEmpty -> dataClass(name, schema, properties)
-            constants != null -> enumClass(name, constants)
-            else -> "typealias $name = ${type(schema, name)}"
-        }
-
+        declarations[name] = shapeOf(name, rawName, schema)
         declaring -= name
         return name
+    }
+
+    private fun shapeOf(name: String, documentName: String, schema: JsonObj): Shape {
+        when (val composed = composed(schema, components, documentName)) {
+            is Composed.Union -> return hierarchy(name, composed)
+            is Composed.Merged -> return Shape.Klass(composed.schema)
+            else -> Unit
+        }
+        val properties = schema["properties"] as? JsonObj
+        val constants = stringConstants(schema)
+        return when {
+            properties != null && !properties.isEmpty -> Shape.Klass(schema)
+
+            // Remembered against its constants as well as its name, so a
+            // property spelling the same enum inline reuses this one.
+            constants != null -> Shape.Enum(constants).also { enums.putIfAbsent(constants, name) }
+
+            else -> Shape.Alias(schema)
+        }
+    }
+
+    /**
+     * The sealed interface, and the class each branch becomes.
+     *
+     * A branch that is a reference does not get a class of its own: the
+     * component already is that class, and it is taught here that it belongs
+     * to a hierarchy. Two classes for one schema would decode the same payload
+     * into two unrelated Kotlin types.
+     */
+    private fun hierarchy(name: String, union: Composed.Union): Shape {
+        val branches = union.branches.map { branch ->
+            val target = branch.ref?.let { ref -> (components[ref] as? JsonObj)?.let { declare(ref, it) } }
+                ?: declare(unique(branch.name(name), taken), branch.schema)
+            hierarchies.getOrPut(target) { mutableListOf() } += Adoption(name, union.discriminator, branch.wire)
+            target to branch.wire
+        }
+        return Shape.Sealed(union.discriminator, branches)
+    }
+
+    /**
+     * The renames a `discriminator.mapping` asks for, read before anything is
+     * declared: `mapping: { card: '#/components/schemas/CardPayment' }` says
+     * that this document calls that branch `card`, and the generated class is
+     * called `Card` wherever it is used.
+     *
+     * A key that would collide with a component's own name is left alone. One
+     * schema with two Kotlin names is the thing being avoided, and two schemas
+     * with one name is worse.
+     */
+    private fun collectRenames(components: JsonObj) {
+        val declared = components.fields.keys.map { typeName(it) }.toSet()
+        components.fields.forEach { (component, schema) ->
+            val union = composed(schema as? JsonObj ?: return@forEach, components, component) as? Composed.Union
+            union?.branches?.forEach { branch ->
+                val ref = branch.ref ?: return@forEach
+                val name = branch.name("")
+                if (name != typeName(ref) && name !in declared) renames.putIfAbsent(ref, name)
+            }
+        }
+    }
+
+    // -------------------------------------------------------------- rendering
+
+    /**
+     * Every declaration written out, and written again until nothing changes.
+     *
+     * Rendering a class resolves its property types, and resolving a type can
+     * declare another — an inline object, an enum, a union hoisted out of a
+     * property — which in turn can tell an already-written class which
+     * hierarchy it belongs to. One pass would leave that class out of its own
+     * union; the fixed point is what makes the order the document happened to
+     * be written in stop mattering.
+     */
+    private fun settle(): List<String> {
+        var written = emptyMap<String, String>()
+        while (true) {
+            val next = declarations.keys.toList().associateWith { render(it) }
+            if (next == written) return next.values.toList()
+            written = next
+        }
+    }
+
+    private fun render(name: String): String = when (val shape = declarations.getValue(name)) {
+        is Shape.Enum -> enumDeclaration(name, shape.constants)
+        is Shape.Alias -> "typealias $name = ${type(shape.schema, name)}"
+        is Shape.Klass -> dataClass(name, shape.schema)
+        is Shape.Sealed -> sealedInterface(name, shape)
     }
 
     /** A schema fragment as a Kotlin type expression. [context] names anything hoisted out of it. */
@@ -58,17 +195,26 @@ class KotlinTypes {
     }
 
     private fun base(obj: JsonObj, context: String): String {
-        val named = (obj["\$ref"] as? JsonStr)?.let { typeName(it.value.substringAfterLast('/')) }
+        val named = (obj["\$ref"] as? JsonStr)?.let { kotlinName(it.value.substringAfterLast('/')) }
             ?: stringConstants(obj)?.let { enumFor(context, it) }
+            // A union or a merge written where it was used has to be hoisted:
+            // neither is a type expression, and both are a declaration.
+            ?: hoistComposed(obj, context)
             ?: (obj["allOf"] as? JsonArr)?.items?.singleOrNull()?.let { type(it, context) }
             // `anyOf` of one real branch and a null one is how 3.1 spells a
             // nullable reference; the null branch is already accounted for by
-            // `admitsNull`, so what is left is the type. Anything richer is a
-            // union this generator does not model, and falls through below.
+            // `admitsNull`, so what is left is the type. Anything richer is
+            // read by `composed` above, or is a union this generator does not
+            // model and falls through below.
             ?: obj.anyOfBranches()?.singleOrNull()?.let { type(it, context) }
         if (named != null) return named
 
         return scalarType(obj, context)
+    }
+
+    private fun hoistComposed(obj: JsonObj, context: String): String? = when (composed(obj, components)) {
+        is Composed.Union, is Composed.Merged -> hoist(context, obj)
+        else -> null
     }
 
     private fun scalarType(obj: JsonObj, context: String): String = when (obj.scalarType()) {
@@ -101,7 +247,7 @@ class KotlinTypes {
             // An inline object needs a name to be a Kotlin type at all, so it is
             // hoisted to one built from where it appeared: Order.shipping ->
             // OrderShipping.
-            return declare(unique(typeName(context), taken), obj)
+            return hoist(context, obj)
         }
         return when (val additional = obj["additionalProperties"]) {
             is JsonObj -> "Map<String, ${type(additional, context + "Value")}>"
@@ -109,44 +255,112 @@ class KotlinTypes {
         }
     }
 
-    private fun dataClass(name: String, schema: JsonObj, properties: JsonObj): String {
+    private fun hoist(context: String, obj: JsonObj): String =
+        inlined.getOrPut("$context ${obj.render()}") { declare(unique(typeName(context), taken), obj) }
+
+    private fun dataClass(name: String, schema: JsonObj): String {
+        val adoptions = hierarchies[name].orEmpty()
+        // The hierarchy carries the discriminator, so the branch does not: two
+        // places holding one value is two places for them to disagree, and
+        // kotlinx.serialization refuses the pair outright.
+        val carried = adoptions.map { it.discriminator }.toSet()
+        val properties = ((schema["properties"] as? JsonObj)?.fields).orEmpty() - carried
         val required = (schema["required"] as? JsonArr)?.items.orEmpty()
             .mapNotNull { (it as? JsonStr)?.value }
             .toSet()
 
         return buildString {
             (schema["description"] as? JsonStr)?.let { appendLine(kdoc(it.value, "")) }
-            appendLine("data class $name(")
-            properties.fields.forEach { (property, propertySchema) ->
-                ((propertySchema as? JsonObj)?.get("description") as? JsonStr)?.let {
-                    appendLine(kdoc(it.value, "    "))
+            annotationsFor(adoptions).forEach { appendLine(it) }
+            if (properties.isEmpty()) {
+                append("class $name")
+            } else {
+                appendLine("data class $name(")
+                properties.forEach { (property, propertySchema) ->
+                    append(propertyDeclaration(name, property, propertySchema, property in required))
                 }
-                val declared = type(propertySchema, name + typeName(property))
-                // An optional property is nullable with a default here, because
-                // Kotlin has no other way to say "may be left out".
-                val optional = property !in required
-                val kotlinType = if (optional && !declared.endsWith("?")) "$declared?" else declared
-                // The wire name is kept exactly, backticked where it has to be —
-                // renaming it would need a codec-specific annotation, and this
-                // file is meant to work with whichever codec you pass it.
-                val propertyName = if (isIdentifier(property)) property else "`$property`"
-                appendLine("    val $propertyName: $kotlinType${if (optional) " = null" else ""},")
+                append(")")
             }
-            append(")")
+            append(adoptions.map { it.hierarchy }.distinct().joinToString().prefixed(" : "))
         }
     }
 
-    private fun enumClass(name: String, constants: List<String>): String {
-        enums.putIfAbsent(constants, name)
-        return enumDeclaration(name, constants)
+    private fun propertyDeclaration(
+        owner: String,
+        property: String,
+        schema: JsonValue,
+        required: Boolean,
+    ): String = buildString {
+        ((schema as? JsonObj)?.get("description") as? JsonStr)?.let { appendLine(kdoc(it.value, "    ")) }
+        val declared = type(schema, owner + typeName(property))
+        // An optional property is nullable with a default here, because
+        // Kotlin has no other way to say "may be left out".
+        val kotlinType = if (!required && !declared.endsWith("?")) "$declared?" else declared
+        // The wire name is kept exactly, backticked where it has to be —
+        // renaming it would need a codec-specific annotation on every
+        // property that was renamed, where the only annotations this
+        // generator writes are the ones a sealed hierarchy cannot be read
+        // without.
+        val propertyName = if (isIdentifier(property)) property else "`$property`"
+        appendLine("    val $propertyName: $kotlinType${if (required) "" else " = null"},")
     }
+
+    /**
+     * What the sealed interface has to say to be readable: which property
+     * carries the branch, and which string selects each one. Both are written
+     * out rather than derived, because both are the document's and neither is
+     * recoverable from the Kotlin.
+     */
+    private fun sealedInterface(name: String, shape: Shape.Sealed): String = buildString {
+        appendLine(kdoc(hierarchyDoc(shape), ""))
+        when (annotations) {
+            CodecAnnotations.JACKSON -> {
+                imports += JACKSON_ANNOTATIONS
+                appendLine(
+                    "@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, " +
+                        "include = JsonTypeInfo.As.PROPERTY, property = ${kotlinString(shape.discriminator)})",
+                )
+                appendLine("@JsonSubTypes(")
+                shape.branches.forEach { (branch, wire) ->
+                    appendLine("    JsonSubTypes.Type(value = $branch::class, name = ${kotlinString(wire)}),")
+                }
+                appendLine(")")
+            }
+
+            CodecAnnotations.KOTLINX -> {
+                imports += KOTLINX_ANNOTATIONS
+                appendLine("@OptIn(ExperimentalSerializationApi::class)")
+                appendLine("@Serializable")
+                appendLine("@JsonClassDiscriminator(${kotlinString(shape.discriminator)})")
+            }
+        }
+        append("sealed interface $name")
+    }
+
+    private fun hierarchyDoc(shape: Shape.Sealed): String =
+        "One of ${shape.branches.joinToString(", ") { (branch, _) -> "[$branch]" }}, " +
+            "told apart by `${shape.discriminator}`."
+
+    /**
+     * The annotations a branch class carries. Under Jackson there are none —
+     * the hierarchy names its branches, so the branch does not have to name
+     * itself — and under kotlinx.serialization every generated class needs
+     * `@Serializable` whether or not it is one.
+     */
+    private fun annotationsFor(adoptions: List<Adoption>): List<String> =
+        if (annotations != CodecAnnotations.KOTLINX) {
+            emptyList()
+        } else {
+            imports += SERIALIZABLE
+            listOf("@Serializable") + adoptions.take(1).map { "@SerialName(${kotlinString(it.wire)})" }
+        }
 
     /** Reuses the enum already generated for these constants, or declares one. */
     private fun enumFor(context: String, constants: List<String>): String {
         enums[constants]?.let { return it }
         val name = unique(typeName(context), taken)
         enums[constants] = name
-        declarations[name] = enumDeclaration(name, constants)
+        declarations[name] = Shape.Enum(constants)
         return name
     }
 
@@ -158,8 +372,12 @@ class KotlinTypes {
      * `IN_PROGRESS` would need a codec-specific annotation to map back, which
      * is exactly what these declarations are meant to do without.
      */
-    private fun enumDeclaration(name: String, constants: List<String>): String =
-        "enum class $name { ${constants.joinToString(", ") { asWritten(it) }} }"
+    private fun enumDeclaration(name: String, constants: List<String>): String {
+        val declared = "enum class $name { ${constants.joinToString(", ") { asWritten(it) }} }"
+        if (annotations != CodecAnnotations.KOTLINX) return declared
+        imports += SERIALIZABLE
+        return "@Serializable\n$declared"
+    }
 
     /**
      * The constants of a string enum, or null when this is not one — including
@@ -208,7 +426,34 @@ class KotlinTypes {
     }
 }
 
+/** What a declaration knows about itself before the file is written. */
+private sealed interface Shape {
+    class Klass(val schema: JsonObj) : Shape
+    class Alias(val schema: JsonObj) : Shape
+    class Enum(val constants: List<String>) : Shape
+    class Sealed(val discriminator: String, val branches: List<Pair<String, String>>) : Shape
+}
+
+/** A class's membership of one hierarchy, and the value that selects it there. */
+private class Adoption(val hierarchy: String, val discriminator: String, val wire: String)
+
+private fun String.prefixed(prefix: String) = if (isEmpty()) "" else prefix + this
+
 private val NULL_TYPE = JsonStr("null")
+
+private val JACKSON_ANNOTATIONS = listOf(
+    "com.fasterxml.jackson.annotation.JsonSubTypes",
+    "com.fasterxml.jackson.annotation.JsonTypeInfo",
+)
+
+private val KOTLINX_ANNOTATIONS = listOf(
+    "kotlinx.serialization.ExperimentalSerializationApi",
+    "kotlinx.serialization.SerialName",
+    "kotlinx.serialization.Serializable",
+    "kotlinx.serialization.json.JsonClassDiscriminator",
+)
+
+private val SERIALIZABLE = listOf("kotlinx.serialization.SerialName", "kotlinx.serialization.Serializable")
 
 /** A path, query or header value, which always travels as a string, as a Kotlin type. */
 internal fun plainType(codec: PlainCodec<*>, types: KotlinTypes, context: String): String {

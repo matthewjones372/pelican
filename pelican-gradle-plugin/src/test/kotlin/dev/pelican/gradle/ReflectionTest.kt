@@ -120,18 +120,19 @@ class ReflectionTest {
             "orders",
             setOf("b", "a"),
             "pekko",
+            "kotlinx",
         )
 
         written shouldBe listOf(File(dir, "com/example/orders/OrdersEndpoints.kt"))
         (written.single() as File).readText().trim() shouldBe
-            "openapi.yaml|com.example.orders|orders|a+b|pekko"
+            "openapi.yaml|com.example.orders|orders|a+b|pekko|kotlinx"
     }
 
     @Test
     fun `names the module to add when the importer is not on the classpath`(@TempDir dir: File) {
         val empty = java.net.URLClassLoader(emptyArray(), ClassLoader.getPlatformClassLoader())
         shouldThrow<PelicanFailure> {
-            Pelican.writeEndpoints(empty, dir, dir, "com.example", "orders", emptySet(), null)
+            Pelican.writeEndpoints(empty, dir, dir, "com.example", "orders", emptySet(), null, null)
         }.message.orEmpty() shouldContain "pelican-import"
     }
 

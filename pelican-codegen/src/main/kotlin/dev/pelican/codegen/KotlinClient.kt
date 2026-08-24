@@ -177,17 +177,20 @@ private class KotlinClientEmitter(
         types.declareAll(components.all())
 
         val methods = endpoints.joinToString("\n\n") { method(it) }
+        // Written out before the imports, because an annotation the payload
+        // types turned out to need is an import the file has to declare.
+        val declarations = types.declarations()
 
         return buildString {
             appendLine(header())
             appendLine()
             appendLine("package $packageName")
             appendLine()
-            appendLine(IMPORTS)
+            val declared = IMPORTS.lines().filter { it.isNotBlank() } + types.imports().map { "import $it" }
+            appendLine(declared.sorted().joinToString("\n"))
             appendLine()
             appendLine(resource("runtime.kt").trim())
 
-            val declarations = types.declarations()
             if (declarations.isNotEmpty()) {
                 appendLine()
                 appendLine(banner("payloads"))

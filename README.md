@@ -717,11 +717,20 @@ References to other files are followed and the schemas they name keep those
 names; references to another *host* are refused, because a build that fetches a
 URL to know what to generate cannot be reproduced.
 
+A `oneOf` with a `discriminator` comes back as a sealed interface and one data
+class per branch, annotated so that Jackson or kotlinx.serialization can
+actually read it — `codec.set("kotlinx")` chooses which. Branches are named
+from the `discriminator.mapping` key, then the referenced component, then
+`<Parent>Variant<n>`, all read out of the document so that the same document
+generates the same names every time. An `allOf` of several schemas is flattened
+into one class, and refused rather than resolved where two of them disagree
+about a property.
+
 **The import is strict.** An operation using something Pelican cannot describe
-— two success statuses, two media types for one body, a `oneOf`, a `default`
-response — fails the build naming the operation, the place in the document and
-the way out, rather than generating an endpoint whose type says less than the
-document does. That is the right default for a document you own, and an
+— two success statuses, two media types for one body, a `oneOf` with nothing
+saying which branch a payload is, a `default` response — fails the build naming
+the operation, the place in the document and the way out, rather than
+generating an endpoint whose type says less than the document does. That is the right default for a document you own, and an
 obstacle in one you do not, so operations you have decided to live without are
 listed by `operationId`:
 
@@ -735,7 +744,7 @@ create("orders") {
 
 Written down in the build, reviewed once, and — this is the point of a list
 rather than a switch — the fourth such operation to appear still fails.
-Excluding one also excludes the schemas only it reached, so a `oneOf` in a
+Excluding one also excludes the schemas only it reached, so an `anyOf` in a
 corner of the document costs that corner and nothing else.
 
 This repository imports its own document on every build: `:example` publishes

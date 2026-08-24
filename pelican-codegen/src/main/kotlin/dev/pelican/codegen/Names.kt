@@ -43,6 +43,33 @@ fun memberName(raw: String): String {
     return if (legal in keywords || legal in locals) "${legal}_" else legal
 }
 
+/**
+ * What one branch of a union is called, in the order the document is willing
+ * to say it.
+ *
+ * 1. [mapped] — the `discriminator.mapping` key that selects the branch. It is
+ *    the one name the document gives this branch *as a branch*, and it is the
+ *    word a reader matching on the wire value already has in their head.
+ * 2. [ref] — the component the branch points at, for a union whose mapping is
+ *    implicit.
+ * 3. `<Parent>Variant<n>`, positional, for a branch written inline under a
+ *    parent that named it neither way.
+ *
+ * All three are functions of the document alone, so the same document
+ * generates the same names every time. That matters more than any one of them
+ * being the prettiest: these names end up in a caller's source, and a name
+ * that moved between two runs of the same generator would be a rename nobody
+ * made.
+ *
+ * A mapping key that is itself a reference — some documents write the whole
+ * `#/components/schemas/X` as the key — is not a name, and falls through to
+ * the one the reference already has.
+ */
+fun branchName(parent: String, index: Int, mapped: String?, ref: String?): String =
+    typeName(mapped?.takeIf { it.readsAsAName() } ?: ref ?: "${parent}Variant${index + 1}")
+
+private fun String.readsAsAName(): Boolean = none { it == '/' || it == '#' } && typeName(this) != "Value"
+
 /** A type name: `order status` and `order-status` both become `OrderStatus`. */
 fun typeName(raw: String): String {
     val parts = raw.split(wordBoundary).filter { it.isNotEmpty() }

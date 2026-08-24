@@ -467,4 +467,77 @@ class KotlinClientTest {
         // make every regeneration a diff nobody can review.
         spec().kotlinClient("com.example.widgets") shouldBe client
     }
+
+    // -------------------------------------------------------------- unions
+
+    /**
+     * A discriminated union, kept apart from [WidgetSchemas] because it is the
+     * one payload shape that costs the generated file an import — see below.
+     */
+    object PaymentSchemas : SchemaSource {
+        override fun schema(type: KType, components: SchemaComponents): JsonObj {
+            if (!components.isRegistered("Payment")) {
+                components.register("Card", jsonObj {
+                    "type" to "object"
+                    put("properties", jsonObj { put("number", jsonObj { "type" to "string" }) })
+                    put("required", jsonStrings(listOf("number")))
+                })
+                components.register("Bank", jsonObj {
+                    "type" to "object"
+                    put("properties", jsonObj { put("iban", jsonObj { "type" to "string" }) })
+                    put("required", jsonStrings(listOf("iban")))
+                })
+                components.register("Payment", jsonObj {
+                    put("oneOf", jsonArr(listOf(components.ref("Card"), components.ref("Bank"))))
+                    put("discriminator", jsonObj {
+                        "propertyName" to "kind"
+                        put("mapping", jsonObj {
+                            "card" to "#/components/schemas/Card"
+                            "bank" to "#/components/schemas/Bank"
+                        })
+                    })
+                })
+            }
+            return components.ref("Payment")
+        }
+    }
+
+    data class Payment(val kind: String)
+
+    private val paymentClient = ApiSpec(
+        endpoints = listOf(
+            endpoint(jsonBody<Payment>()) {
+                post("payments")
+                operationId = "pay"
+                empty(status = 204)
+            },
+        ),
+        schemas = PaymentSchemas,
+        title = "Payments",
+        version = "1.0.0",
+        servers = listOf("https://payments.example.com"),
+    ).kotlinClient("com.example.payments")
+
+    @Test
+    fun `a oneOf with a discriminator becomes a sealed interface and a class per branch`() {
+        paymentClient shouldContain "sealed interface Payment"
+        paymentClient shouldContain "data class Card("
+        paymentClient shouldContain "data class Bank("
+        paymentClient shouldContain ") : Payment"
+    }
+
+    /**
+     * The exception to the rule the test above it states. Every other payload
+     * type is a plain declaration a reflective codec can read; a sealed
+     * hierarchy is not, because nothing in it says which property carries the
+     * branch or what string selects each one. The annotations that do say it
+     * are Jackson's — the default codec module's — and they are written only
+     * when there is a hierarchy to write them for.
+     */
+    @Test
+    fun `and it is the one thing that puts a codec's annotations in the file`() {
+        paymentClient shouldContain "import com.fasterxml.jackson.annotation.JsonTypeInfo"
+        paymentClient shouldContain """JsonSubTypes.Type(value = Card::class, name = "card")"""
+        client shouldNotContain "com.fasterxml.jackson"
+    }
 }

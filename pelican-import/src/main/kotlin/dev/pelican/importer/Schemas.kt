@@ -4,6 +4,8 @@ import dev.pelican.JsonArr
 import dev.pelican.JsonObj
 import dev.pelican.JsonStr
 import dev.pelican.JsonValue
+import dev.pelican.codegen.Composed
+import dev.pelican.codegen.composed
 
 /**
  * What a schema has to say to become a Kotlin type.
@@ -13,51 +15,37 @@ import dev.pelican.JsonValue
  * That is the right answer *there*: a client that generates is better than a
  * client that does not, and `Any?` is honest about what it knows.
  *
- * It is the wrong answer here. An import that turned a `oneOf` into `Any?`
- * would produce a handler taking `Any?`, a document that no longer says what
- * the original said, and no sign that anything was lost. So the shapes that
- * would degrade are refused before the generator ever sees them, and the ones
- * that are genuinely unconstrained — an empty schema, a free-form object — are
- * let through, because `Any?` and `Map<String, Any?>` are what those mean.
+ * It is the wrong answer here. An import that turned a union into `Any?` would
+ * produce a handler taking `Any?`, a document that no longer says what the
+ * original said, and no sign that anything was lost. So the shapes that would
+ * degrade are refused before the generator ever sees them, and the ones that
+ * are genuinely unconstrained — an empty schema, a free-form object — are let
+ * through, because `Any?` and `Map<String, Any?>` are what those mean.
+ *
+ * The composed shapes are read by `pelican-codegen` rather than here, and by
+ * exactly the function that generates them. Two readings of one `oneOf` is one
+ * reading too many: the day they disagreed, this would accept a document the
+ * generator then quietly degraded, which is the failure mode the whole module
+ * is arranged against.
  */
 internal object Schemas {
 
-    fun check(schema: JsonValue?, path: JsonPath) {
+    fun check(schema: JsonValue?, path: JsonPath, components: JsonObj, name: String? = null) {
         val obj = schema as? JsonObj ?: return
 
         when {
-            obj["oneOf"] != null -> unsupported(
-                path / "oneOf",
-                "A value that is one of several shapes. Kotlin can hold that as a sealed hierarchy, " +
-                    "and nothing in the document says which name each branch should have — so this is " +
-                    "one to write by hand and describe with a schema of your own.",
-            )
-
             obj["not"] != null -> unsupported(path / "not", "A schema defined by what it excludes.")
-
-            obj["discriminator"] != null -> unsupported(
-                path / "discriminator",
-                "A discriminated union, which needs the sealed hierarchy a `oneOf` would.",
-            )
-
-            obj.arr("allOf").size > 1 -> unsupported(
-                path / "allOf",
-                "Several schemas merged into one. Merging them here would invent a type the document " +
-                    "never named; declare the merged shape in the document instead.",
-            )
-
-            obj.branches().size > 1 -> unsupported(
-                path / "anyOf",
-                "A value that is any of several shapes, which is a union by another name.",
-            )
 
             obj.types().size > 1 -> unsupported(
                 path / "type",
                 "A value that is ${obj.types().joinToString(" or ")}, and a Kotlin property is one of them.",
             )
+
+            else -> (composed(obj, components, name) as? Composed.Undescribable)
+                ?.let { unsupported(path / it.keyword, it.reason) }
         }
 
-        nestedIn(obj).forEach { (key, nested) -> check(nested, path / key) }
+        nestedIn(obj).forEach { (key, nested) -> check(nested, path / key, components) }
     }
 
     /** Every named schema [roots] reach, directly or through another. */
@@ -67,14 +55,37 @@ internal object Schemas {
         roots.filterNotNull().forEach { pending += it }
 
         while (pending.isNotEmpty()) {
-            val here = pending.removeFirst()
-            val obj = here as? JsonObj ?: continue
-            (obj["\$ref"] as? JsonStr)?.value?.substringAfterLast('/')?.let { name ->
-                if (found.add(name)) components[name]?.let { pending += it }
-            }
+            val obj = pending.removeFirst() as? JsonObj ?: continue
+            (obj["\$ref"] as? JsonStr)?.value?.substringAfterLast('/')
+                ?.let { follow(it, components, found, pending) }
             nestedIn(obj).forEach { (_, nested) -> pending += nested }
         }
         return found
+    }
+
+    /**
+     * One name, and the branches of the hierarchy it turns out to be.
+     *
+     * A hierarchy written the way 3.0 wrote one points upwards only: each
+     * branch references the parent and the parent references nothing. Reached
+     * through the parent, the branches would be dropped as unused, and the
+     * sealed interface generated from it would have no classes under it.
+     */
+    private fun follow(
+        name: String,
+        components: JsonObj,
+        found: MutableSet<String>,
+        pending: ArrayDeque<JsonValue>,
+    ) {
+        if (!found.add(name)) return
+        components[name]?.let { pending += it }
+        branchesOf(name, components).forEach { follow(it, components, found, pending) }
+    }
+
+    private fun branchesOf(name: String, components: JsonObj): List<String> {
+        val schema = components[name] as? JsonObj ?: return emptyList()
+        val union = composed(schema, components, name) as? Composed.Union ?: return emptyList()
+        return union.branches.mapNotNull { it.ref }
     }
 
     /** The schemas inside this one, with the key each sat under for the path. */
@@ -87,10 +98,6 @@ internal object Schemas {
             obj.arr(key).forEachIndexed { i, nested -> add("$key[$i]" to nested) }
         }
     }
-
-    /** The `anyOf` branches that say something other than "or null". */
-    private fun JsonObj.branches(): List<JsonValue> =
-        arr("anyOf").filterNot { (it as? JsonObj)?.str("type") == "null" }
 
     /** The types this schema claims, ignoring the `"null"` that only widens one. */
     private fun JsonObj.types(): List<String> = when (val type = this["type"]) {

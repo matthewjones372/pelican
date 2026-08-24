@@ -169,6 +169,18 @@ abstract class EndpointsSpec @Inject constructor(private val name: String) : org
     abstract val handlers: Property<String>
 
     /**
+     * Which codec the generated payload types are annotated for — `jackson`
+     * or `kotlinx` — or unset for Jackson.
+     *
+     * It matters for one shape and no others. A `oneOf` becomes a sealed
+     * interface, and nothing in `sealed interface Payment` says which property
+     * carries the branch or what string selects each one; that has to be
+     * written down, and the two libraries spell it differently. A document
+     * without a union generates the same file either way.
+     */
+    abstract val codec: Property<String>
+
+    /**
      * The source root written into. Defaults to
      * `build/generated/pelican/<name>`; point it at a real source root to have
      * the descriptions become files in the repository. Either way the

@@ -1,7 +1,9 @@
 package dev.pelican.kotlinx
 
 import dev.pelican.JsonObj
+import dev.pelican.JsonStr
 import dev.pelican.SchemaComponents
+import dev.pelican.jsonArr
 import dev.pelican.jsonObj
 import dev.pelican.jsonStrings
 import dev.pelican.orNull
@@ -10,6 +12,7 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.json.JsonClassDiscriminator
 
 /**
  * Turns kotlinx.serialization descriptors into OpenAPI schemas.
@@ -20,7 +23,11 @@ import kotlinx.serialization.descriptors.StructureKind
  * swagger-core produces for the Jackson side, which is what lets the two
  * documents be compared.
  */
-internal class DescriptorSchemas(private val components: SchemaComponents) {
+internal class DescriptorSchemas(
+    private val components: SchemaComponents,
+    /** What the configured `Json` calls the discriminator when a class does not say. */
+    private val discriminator: String = "type",
+) {
 
     /** Names currently being built, so a recursive type terminates at its ref. */
     private val inProgress = mutableSetOf<String>()
@@ -67,13 +74,53 @@ internal class DescriptorSchemas(private val components: SchemaComponents) {
 
         StructureKind.CLASS -> named(desc) { classSchema(desc) }
 
-        is PolymorphicKind -> jsonObj {
+        PolymorphicKind.SEALED -> named(desc) { union(desc) }
+
+        // An open hierarchy is not a closed union: the subclasses are whatever
+        // was registered in a module at runtime, and a `oneOf` listing the ones
+        // this JVM happens to know would be a narrower document than the code.
+        PolymorphicKind.OPEN -> jsonObj {
             "type" to "object"
             "description" to "polymorphic: ${desc.serialName}"
         }
 
         else -> jsonObj { "type" to "object" }
     }
+
+    /**
+     * A sealed hierarchy as the union it is: `oneOf` over the branches, with
+     * the `discriminator` saying which property tells them apart and which
+     * value picks each one.
+     *
+     * Written out rather than left implicit because the mapping is the half a
+     * reader cannot recover. `@SerialName("card")` on a class called `Card` is
+     * the difference between a document another tool can decode and one it can
+     * only guess at — and `pelican-import` reads exactly this shape back.
+     *
+     * A sealed descriptor carries its branches under element 1, which is
+     * kotlinx's own framing of `{ "type": ..., "value": ... }`; the element
+     * *names* there are the serial names, which is what travels.
+     */
+    private fun union(desc: SerialDescriptor): JsonObj {
+        val branches = desc.getElementDescriptor(1)
+        val refs = (0 until branches.elementsCount).map { i ->
+            branches.getElementName(i) to schemaFor(branches.getElementDescriptor(i))
+        }
+        val mapping = refs.associate { (name, ref) -> name to (ref["${'$'}ref"] ?: JsonStr(name)) }
+        return jsonObj {
+            put("oneOf", jsonArr(refs.map { (_, ref) -> ref }))
+            put(
+                "discriminator",
+                jsonObj {
+                    "propertyName" to discriminatorOf(desc)
+                    put("mapping", JsonObj(mapping))
+                },
+            )
+        }
+    }
+
+    private fun discriminatorOf(desc: SerialDescriptor): String =
+        desc.annotations.filterIsInstance<JsonClassDiscriminator>().firstOrNull()?.discriminator ?: discriminator
 
     /** Registers [body] under the descriptor's short name and returns a ref to it. */
     private fun named(desc: SerialDescriptor, body: () -> JsonObj): JsonObj {

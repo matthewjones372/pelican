@@ -21,11 +21,18 @@ internal class Reader(private val options: ImportOptions) {
     private val problems = Problems()
     private lateinit var document: JsonObj
 
+    /**
+     * The document's own named schemas, normalised. Reading a composed schema
+     * means resolving the references it is composed of, so the check needs the
+     * library as well as the schema in front of it.
+     */
+    private var declared: JsonObj = JsonObj(emptyMap())
+
     fun read(file: File): IrApi {
         document = normalise(Document.read(file))
 
         val components = document.obj("components")?.obj("schemas") ?: JsonObj(emptyMap())
-        val declared = JsonObj(components.fields.mapValues { (_, schema) -> normaliseSchema(schema) })
+        declared = JsonObj(components.fields.mapValues { (_, schema) -> normaliseSchema(schema) })
 
         val operations = operations()
         val endpoints = operations.mapNotNull { operation ->
@@ -73,7 +80,7 @@ internal class Reader(private val options: ImportOptions) {
         val schemas = JsonObj(declared.fields.filterKeys { it in reachable })
         schemas.fields.forEach { (name, schema) ->
             try {
-                Schemas.check(schema, JsonPath.root / "components" / "schemas" / name)
+                Schemas.check(schema, JsonPath.root / "components" / "schemas" / name, declared, name)
             } catch (e: Unsupported) {
                 throw ImportFailure(
                     "The schema `$name` cannot become a Kotlin type, and the operations using it " +
@@ -275,7 +282,7 @@ internal class Reader(private val options: ImportOptions) {
             security = if (node["security"] == null) null else requirements(node.arr("security"), path / "security"),
         )
 
-        described.schemas().forEach { Schemas.check(it, path) }
+        described.schemas().forEach { Schemas.check(it, path, declared) }
         return described
     }
 

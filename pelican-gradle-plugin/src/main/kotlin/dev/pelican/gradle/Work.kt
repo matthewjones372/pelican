@@ -34,6 +34,7 @@ internal interface EndpointsParameters : WorkParameters {
     val entryName: Property<String>
     val exclude: SetProperty<String>
     val handlers: Property<String>
+    val codec: Property<String>
     val outputDir: DirectoryProperty
 }
 
@@ -86,6 +87,7 @@ internal abstract class GenerateEndpointsWork : WorkAction<EndpointsParameters> 
             parameters.entryName.get(),
             parameters.exclude.get(),
             parameters.handlers.orNull,
+            parameters.codec.orNull,
         )
         written.forEach { logger.lifecycle("Wrote $it") }
     }

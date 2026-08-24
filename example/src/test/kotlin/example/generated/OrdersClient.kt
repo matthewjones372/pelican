@@ -293,8 +293,6 @@ data class ApiError(
     val detail: String? = null,
 )
 
-enum class OrderStatus { PENDING, SHIPPED, DELIVERED, CANCELLED }
-
 data class Order(
     val id: Long,
     val userId: Long,
@@ -319,6 +317,8 @@ data class ImportResult(
     val lines: Int,
     val session: String? = null,
 )
+
+enum class OrderStatus { PENDING, SHIPPED, DELIVERED, CANCELLED }
 
 // ------------------------------------------------------- declared failures
 

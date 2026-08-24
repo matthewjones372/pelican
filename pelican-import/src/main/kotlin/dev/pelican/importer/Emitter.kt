@@ -25,7 +25,7 @@ import dev.pelican.codegen.unique
  */
 internal class Emitter(private val api: IrApi, private val options: ImportOptions) {
 
-    private val types = KotlinTypes()
+    private val types = KotlinTypes(options.codec)
     private val taken = mutableSetOf<String>()
 
     /** Declaration text, in the order it will be written. */
@@ -78,6 +78,12 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     // ------------------------------------------------------------------ files
 
     private fun endpointsFile(endpoints: List<String>): String = buildString {
+        // Written out before the imports it is put under: a sealed hierarchy
+        // is the one payload type that needs an annotation, and an annotation
+        // is an import.
+        val payloads = types.declarations()
+        imports += types.imports()
+
         appendLine(banner)
         appendLine("package ${options.packageName}")
         appendLine()
@@ -88,7 +94,7 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         section("inputs", inputs.values)
         section("response headers", headers.values)
         section("failures", failures.values)
-        section("payloads", types.declarations())
+        section("payloads", payloads)
         section("the payload schemas", listOf(schemaSource()))
         section("endpoints", endpoints)
 
@@ -113,7 +119,9 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     private fun schemaSource(): String {
         val blob = jsonObjOf(
             "schemas" to api.schemas,
-            "names" to JsonObj(api.schemas.fields.keys.associate { typeName(it) to dev.pelican.JsonStr(it) }),
+            "names" to JsonObj(
+                api.schemas.fields.keys.associate { types.kotlinName(it) to dev.pelican.JsonStr(it) },
+            ),
             "inline" to JsonObj(inlineSchemas.toMap()),
         )
         return resource("schemas.kt")

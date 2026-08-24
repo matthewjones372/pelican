@@ -35,7 +35,8 @@ class KotlinxCodecs(private val json: Json) : Codecs {
     }
 
     override fun schema(type: KType, components: SchemaComponents): JsonObj =
-        DescriptorSchemas(components).schemaFor(serializer(type).descriptor)
+        DescriptorSchemas(components, json.configuration.classDiscriminator)
+            .schemaFor(serializer(type).descriptor)
 
     companion object Default : Codecs by KotlinxCodecs(defaultJson())
 }

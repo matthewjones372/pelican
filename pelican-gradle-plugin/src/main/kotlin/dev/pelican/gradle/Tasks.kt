@@ -204,6 +204,10 @@ abstract class GenerateEndpointsTask : PelicanTask() {
     @get:Optional
     abstract val handlers: Property<String>
 
+    @get:Input
+    @get:Optional
+    abstract val codec: Property<String>
+
     /** The name the generated file and its `<name>Spec()` function are built from. */
     @get:Input
     abstract val entryName: Property<String>
@@ -230,6 +234,7 @@ abstract class GenerateEndpointsTask : PelicanTask() {
             it.entryName.set(entryName)
             it.exclude.set(exclude)
             it.handlers.set(handlers)
+            it.codec.set(codec)
             it.outputDir.set(outputDir)
         }
     }
