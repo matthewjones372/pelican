@@ -642,10 +642,12 @@ Each entry names its tasks — `generateOrdersDocument`, `generateOrdersClient`,
 `checkOrdersClient`, `generateOrdersEndpoints` — so a module talking to three
 services generates three clients without three build scripts.
 
-It is not on the Gradle Plugin Portal yet:
-`./gradlew -p pelican-gradle-plugin publishToMavenLocal` installs it, and
-`pluginManagement { repositories { mavenLocal(); gradlePluginPortal() } }` in
-`settings.gradle.kts` is what lets a build resolve it from there.
+It publishes to Maven Central rather than the Gradle Plugin Portal, and
+`plugins { }` does not look there by default, so
+`pluginManagement { repositories { mavenCentral(); gradlePluginPortal() } }` in
+`settings.gradle.kts` is what lets a build resolve it. To run an unreleased
+build of the plugin instead, `./gradlew -p pelican-gradle-plugin
+publishToMavenLocal` installs it and `mavenLocal()` in the same block finds it.
 
 ### How it finds the spec
 

@@ -9,8 +9,9 @@
 
 **Type-safe HTTP for Kotlin.** Describe an endpoint once, as a value.
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.matthewjones372/pelican-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core)
 [![build](https://github.com/matthewjones372/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
-[![Kotlin 2.2.20](https://img.shields.io/badge/Kotlin-2.2.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Kotlin 2.4.10](https://img.shields.io/badge/Kotlin-2.4.10-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1-6BA539?logo=openapiinitiative&logoColor=white)](https://spec.openapis.org/oas/v3.1.0)
 [![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
@@ -119,10 +120,22 @@ dependencies {
 }
 ```
 
-The Gradle plugin is `io.github.matthewjones372.pelican`, on the Gradle Plugin
-Portal, so `plugins { }` resolves it with no `pluginManagement` block:
+The Gradle plugin is `io.github.matthewjones372.pelican`. It publishes to Maven
+Central rather than the Gradle Plugin Portal, and `plugins { }` does not look
+there by default — so the build needs telling once:
 
 ```kotlin
+// settings.gradle.kts
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+```
+
+```kotlin
+// build.gradle.kts
 plugins { id("io.github.matthewjones372.pelican") version "0.1.0" }
 ```
 
