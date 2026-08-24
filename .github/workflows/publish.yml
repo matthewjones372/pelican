@@ -11,6 +11,18 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+
+    # Job-level rather than per-step: the credentials are the same for every
+    # step that needs any of them, and a step's `if:` can read `env` — where it
+    # cannot read `secrets`, which is what the Plugin Portal step below turns on.
+    env:
+      ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+      ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+      ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+      GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
+      GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,21 +47,11 @@ jobs:
       # it is a click there: a staged bundle can be dropped, a released one is
       # permanent. Set `mavenCentralAutomaticPublishing` to skip the click.
       - name: Publish the modules to Maven Central
-        env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
         run: ./gradlew publishToMavenCentral --no-configuration-cache
 
       # The Gradle plugin is a build of its own, so the root build's publish
       # tasks do not reach it.
       - name: Publish the Gradle plugin to Maven Central
-        env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
         run: >
           ./gradlew -p pelican-gradle-plugin publishToMavenCentral
           --no-configuration-cache
@@ -59,10 +61,7 @@ jobs:
       # does not, so a missing key skips this rather than failing the release
       # that already reached Central.
       - name: Publish the Gradle plugin to the Gradle Plugin Portal
-        if: ${{ secrets.GRADLE_PUBLISH_KEY != '' }}
-        env:
-          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
-          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
+        if: env.GRADLE_PUBLISH_KEY != ''
         run: >
           ./gradlew -p pelican-gradle-plugin publishPlugins
           --no-configuration-cache
