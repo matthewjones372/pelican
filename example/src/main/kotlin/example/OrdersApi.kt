@@ -139,6 +139,11 @@ fun ordersApi(): Api = Api(
     title = "Orders",
     version = "1.0.0",
     description = "A Kotlin-first Pekko HTTP service, described as values.",
+    // Declared on the served API as well as on the spec, because it is a fact
+    // about the service rather than about the document: this is a call it
+    // makes. Nothing here routes it — see `WebhooksTest` in pelican-core.
+    webhooks = allWebhooks,
+
     // No `servers` entry on purpose. Swagger UI's "Try it out" calls the URLs
     // listed there, and a hardcoded one pins every call to that exact origin —
     // so opening the page on 127.0.0.1 while the spec says localhost makes each

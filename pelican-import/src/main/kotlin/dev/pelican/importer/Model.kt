@@ -19,6 +19,7 @@ import dev.pelican.ListStyle
  * types a client generator produces cannot drift apart.
  */
 
+@Suppress("LongParameterList") // A document, field for field: every parameter is one of them.
 internal class IrApi(
     val title: String,
     val version: String,
@@ -28,7 +29,21 @@ internal class IrApi(
     val schemes: List<IrScheme>,
     val schemas: JsonObj,
     val endpoints: List<IrEndpoint>,
+    /** The document's `webhooks`: calls the service sends, keyed by name rather than by path. */
+    val webhooks: List<IrWebhook>,
 )
+
+/**
+ * One entry of the document's `webhooks`.
+ *
+ * The operation inside is an [IrEndpoint] like any other, because that is what
+ * the document holds there — a Path Item Object, read by the same reader. What
+ * the name replaces is the path: [IrEndpoint.path] is empty for one of these,
+ * and nothing downstream asks it for a route.
+ */
+internal class IrWebhook(val name: String, val operation: IrEndpoint) {
+    override fun toString() = "webhook $name (${operation.method})"
+}
 
 @Suppress("LongParameterList") // A description record, as core's Endpoint is: every parameter is a facet.
 internal class IrEndpoint(

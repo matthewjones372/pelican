@@ -479,7 +479,12 @@ class OrdersClient(
      *
      * [origin] is this client's own base URL, except for a method the document said
      * is served somewhere else: those pass the host that operation's `servers`
-     * block named, since that is where the service answers it.
+     * block named, since that is where the service answers it. A webhook passes the
+     * subscriber's URL, which nothing in the document could have known.
+     *
+     * [standingHeaders] defaults to the ones this client sends with everything —
+     * and a webhook passes none, because those are the credential the client
+     * presents to the API and a subscriber's endpoint is not the API.
      */
     private fun request(
         method: String,
@@ -491,6 +496,7 @@ class OrdersClient(
         contentType: String? = null,
         multipart: MultipartContent? = null,
         origin: String = base,
+        standingHeaders: Map<String, String> = headers(),
     ): HttpRequest {
         val search = query
             .flatMap { (name, value) -> occurrences(value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
@@ -502,7 +508,7 @@ class OrdersClient(
             .method(method, multipart?.publisher ?: body)
 
         (multipart?.contentType ?: contentType)?.let { builder.header("Content-Type", it) }
-        headers().forEach { (name, value) -> builder.header(name, value) }
+        standingHeaders.forEach { (name, value) -> builder.header(name, value) }
         headerParams.forEach { (name, value) -> plain(value)?.let { builder.header(name, it) } }
 
         // One header carries all of them, so an absent optional cookie is simply
@@ -709,5 +715,29 @@ class OrdersClient(
         if (!response.succeeded()) failedStream("GET", "/search", response)
         val body = response.body()
         return Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decodeFromString(it) })
+    }
+
+    // ----------------------------------------------------------- webhooks sent
+
+    // One per webhook the document declares: the call this service makes to a
+    // subscriber, rather than one a caller makes to it. The destination is the
+    // first argument because the document does not know it — a subscriber does.
+
+    /**
+     * Sent to a subscriber when an order is placed
+     *
+     * `POST` to [url] — the `orderPlaced` webhook, which this service sends.
+     *
+     * The destination is a subscriber's, so this client's base URL is not used —
+     * and neither are its standing headers, which are the credential it presents
+     * to the API. A subscriber is not the API. What a receiver expects is declared
+     * on the webhook and arrives here as a parameter.
+     *
+     * The response below is the one the *receiver* sends back, which is the part of
+     * this description nobody publishing it controls.
+     */
+    fun orderPlaced(url: String, body: Order, xSignature: String) {
+        val response = text(request("POST", "", origin = url, standingHeaders = emptyMap(), headerParams = listOf("X-Signature" to xSignature), body = HttpRequest.BodyPublishers.ofString(orderCodec.encodeToString(body)), contentType = "application/json"))
+        if (!response.succeeded()) failed("POST", url, response)
     }
 }

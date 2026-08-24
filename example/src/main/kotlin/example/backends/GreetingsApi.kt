@@ -57,6 +57,12 @@ fun greetingsApi(
     // Every description in `greetingEndpoints` must be bound above. Leaving one
     // out is a startup failure rather than a documented 404.
     covers = covers,
+
+    // The call this service sends. Nothing above binds it and nothing below
+    // routes it: the three interpreters build their routes from `endpoints`,
+    // and a webhook goes to a URL a subscriber registered rather than to a path
+    // here. It reaches the document and the generated sender, and stops there.
+    webhooks = greetingWebhooks,
 )
 
 /** What [stamping] worked out, for anything downstream that wants it. */

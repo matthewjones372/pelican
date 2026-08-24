@@ -174,6 +174,17 @@ private class KotlinClientEmitter(
     codec: CodecAnnotations,
 ) {
     private val endpoints = spec.endpoints.filter { includeHidden || !it.hidden }
+
+    /**
+     * The calls this service *sends*, generated as senders on the same class.
+     *
+     * The same reading of the same descriptions: a webhook's method is built by
+     * [method] from the same [call] that builds an endpoint's, because "turn a
+     * description into an outbound HTTP call" is what this generator already
+     * does and a webhook is that description pointed the other way. What differs
+     * is two arguments to `request(...)` — see [call].
+     */
+    private val webhooks = spec.webhooks.filter { includeHidden || !it.operation.hidden }
     private val components = SchemaRegistry()
     private val types = KotlinTypes(codec)
 
@@ -204,7 +215,7 @@ private class KotlinClientEmitter(
     fun emit(): String {
         // Every payload type is resolved first, so the component registry is
         // complete before any of it is turned into a declaration.
-        endpoints.forEach { ep ->
+        (endpoints + webhooks.map { it.operation }).forEach { ep ->
             when (val body = ep.bodyInput) {
                 is JsonBody<*> -> schema(body.type)
                 is FormBody<*> -> schema(body.type)
@@ -216,6 +227,7 @@ private class KotlinClientEmitter(
         types.declareAll(components.all())
 
         val methods = endpoints.joinToString("\n\n") { method(it) }
+        val senders = webhooks.joinToString("\n\n") { method(it.operation) }
         // Written out before the imports, because an annotation the payload
         // types turned out to need is an import the file has to declare.
         val declarations = types.declarations()
@@ -286,8 +298,23 @@ private class KotlinClientEmitter(
             }
             appendLine()
             appendLine(methods)
+            append(sendersSection(senders))
             appendLine("}")
         }
+    }
+
+    /** The senders under their own banner, or nothing where the document declares no webhook. */
+    private fun sendersSection(senders: String): String = if (senders.isEmpty()) "" else buildString {
+        appendLine()
+        appendLine(indent(banner("webhooks sent"), "    "))
+        appendLine()
+        appendLine(
+            "    // One per webhook the document declares: the call this service makes to a\n" +
+                "    // subscriber, rather than one a caller makes to it. The destination is the\n" +
+                "    // first argument because the document does not know it — a subscriber does.",
+        )
+        appendLine()
+        appendLine(senders)
     }
 
     /** One banner and the declarations under it, or nothing where there are none. */
@@ -361,25 +388,17 @@ private class KotlinClientEmitter(
         successes: List<Output<*>>,
     ): String = buildString {
         val method = kotlinString(ep.method.name)
-        val template = kotlinString(ep.pathSpec.template)
+        // What an unexpected status is reported against. A webhook has no path,
+        // so it is the URL the caller sent it to — which is the only thing about
+        // that call worth naming in the failure.
+        val template = call.target ?: kotlinString(ep.pathSpec.template)
         val out = successes.first()
         val streamed = isStream(out) || out is ByteStreamOutput
         val failures = declaredFailures(ep)
 
         appendLine("val response = ${if (streamed) "stream" else "text"}(${call.request})")
 
-        if (failures.isNotEmpty()) {
-            appendLine("when (response.statusCode()) {")
-            failures.forEach { failure ->
-                val payload = decodeExpression(failure.type, if (streamed) "drain(response)" else "response.body()")
-                val headers = failure.headers.joinToString("") { ", ${headerRead(it)}" }
-                appendLine(
-                    "    ${failure.status} -> return Outcome.Err(" +
-                        "${failureType(ep, failures)}.${failureMember(failure.status)}($payload$headers))",
-                )
-            }
-            appendLine("}")
-        }
+        if (failures.isNotEmpty()) appendLine(declaredFailureBranches(ep, failures, streamed))
 
         val fail = if (streamed) "failedStream" else "failed"
         appendLine("if (!response.succeeded()) $fail($method, $template, response)")
@@ -417,6 +436,30 @@ private class KotlinClientEmitter(
             else -> append("return $produced")
         }
     }.trimEnd()
+
+    /**
+     * The declared failures, matched on status before anything else is read.
+     *
+     * Ahead of the success path because a declared failure is not a failed call:
+     * it is one of the answers the endpoint said it gives, and the caller gets
+     * it on the `Err` side rather than as a throw.
+     */
+    private fun declaredFailureBranches(
+        ep: Endpoint<*, *>,
+        failures: List<ErrorOutput<*>>,
+        streamed: Boolean,
+    ): String = buildString {
+        appendLine("when (response.statusCode()) {")
+        failures.forEach { failure ->
+            val payload = decodeExpression(failure.type, if (streamed) "drain(response)" else "response.body()")
+            val headers = failure.headers.joinToString("") { ", ${headerRead(it)}" }
+            appendLine(
+                "    ${failure.status} -> return Outcome.Err(" +
+                    "${failureType(ep, failures)}.${failureMember(failure.status)}($payload$headers))",
+            )
+        }
+        append("}")
+    }
 
     /**
      * Which declared success came back, read the only way a caller can read
@@ -459,8 +502,16 @@ private class KotlinClientEmitter(
 
     // ------------------------------------------------------------ signatures
 
-    /** What the method declares, and the `request(...)` call that fills it in. */
-    private class Call(val parameters: String, val request: String)
+    /**
+     * What the method declares, and the `request(...)` call that fills it in.
+     *
+     * [target] is the parameter holding a webhook's destination, or null for an
+     * endpoint — whose destination is a path this client already knows. It is
+     * carried here because the call is built in one place and read in two: a
+     * failed webhook send names the URL it went to, there being no path worth
+     * naming.
+     */
+    private class Call(val parameters: String, val request: String, val target: String? = null)
 
     // Assembles one client method from one description: the parameter list,
     // the naming that keeps it collision-free, the body, and the call. The
@@ -476,6 +527,13 @@ private class KotlinClientEmitter(
 
         val required = mutableListOf<String>()
         val optional = mutableListOf<String>()
+
+        // A webhook goes wherever a subscriber registered, so the destination is
+        // an argument rather than something the description could carry. Named
+        // first, so a declared header called `url` becomes `url2` rather than
+        // shadowing it.
+        val target = if (ep.webhookName == null) null else unique("url", taken)
+        target?.let { required += "$it: String" }
 
         pathNames.forEach { (param, name) ->
             required += "$name: ${plainType(param.codec, types, param.name)}"
@@ -555,13 +613,27 @@ private class KotlinClientEmitter(
 
         val arguments = buildList {
             add(kotlinString(ep.method.name))
-            add(pathExpression(ep, pathNames))
+            // A webhook has no path: the URL it was given is the whole address,
+            // and appending anything to it would be this client inventing a
+            // route on a host it does not own.
+            add(if (target == null) pathExpression(ep, pathNames) else kotlinString(""))
             // An operation the document said is served elsewhere is called
             // there, not at this client's base URL. Baked in rather than
             // offered as a parameter: it is what the description says, the same
             // way the path is, and a caller who wants to point the whole client
             // somewhere else has `baseUrl` for that.
-            operationOrigin(ep)?.let { add("origin = ${kotlinString(it)}") }
+            if (target == null) {
+                operationOrigin(ep)?.let { add("origin = ${kotlinString(it)}") }
+            } else {
+                add("origin = $target")
+                // The standing headers are what this client presents to the
+                // API — a bearer token, most often — and a subscriber's
+                // endpoint is not the API. Sending them would hand the
+                // service's own credential to a third party who asked for a
+                // notification. What a receiver wants instead is declared as a
+                // header on the webhook, and arrives as a typed parameter.
+                add("standingHeaders = emptyMap()")
+            }
             if (queryPairs.isNotEmpty()) add("query = listOf(${queryPairs.joinToString(", ")})")
             if (headerPairs.isNotEmpty()) add("headerParams = listOf(${headerPairs.joinToString(", ")})")
             if (cookiePairs.isNotEmpty()) add("cookies = listOf(${cookiePairs.joinToString(", ")})")
@@ -571,6 +643,7 @@ private class KotlinClientEmitter(
         return Call(
             parameters = (required + optional).joinToString(", "),
             request = "request(${arguments.joinToString(", ")})",
+            target = target,
         )
     }
 
@@ -754,11 +827,32 @@ private class KotlinClientEmitter(
             ep.summary?.let { add(it) }
             ep.description?.takeIf { it != ep.summary }?.let { add(""); add(it) }
             add("")
-            add("`${ep.method.name} ${ep.pathSpec.template}`")
-            // Said here because it is the surprise: every other method on this
-            // class goes to the base URL the caller passed, and this one does
-            // not, whatever they passed.
-            operationOrigin(ep)?.let { add("Served from $it, which this operation declares rather than the API.") }
+            if (ep.webhookName == null) {
+                add("`${ep.method.name} ${ep.pathSpec.template}`")
+                // Said here because it is the surprise: every other method on
+                // this class goes to the base URL the caller passed, and this
+                // one does not, whatever they passed.
+                operationOrigin(ep)?.let {
+                    add("Served from $it, which this operation declares rather than the API.")
+                }
+            } else {
+                add("`${ep.method.name}` to [url] — the `${ep.webhookName}` webhook, which this service sends.")
+                add("")
+                // Hand-wrapped: `kdoc` writes one line per line it is given, and
+                // a paragraph handed over whole would come out as one very long
+                // one in somebody's editor.
+                addAll(
+                    listOf(
+                        "The destination is a subscriber's, so this client's base URL is not used —",
+                        "and neither are its standing headers, which are the credential it presents",
+                        "to the API. A subscriber is not the API. What a receiver expects is declared",
+                        "on the webhook and arrives here as a parameter.",
+                        "",
+                        "The response below is the one the *receiver* sends back, which is the part of",
+                        "this description nobody publishing it controls.",
+                    ),
+                )
+            }
             requirements(ep)?.let { add(it) }
             if (ep.deprecated) { add(""); add("@deprecated") }
         }
@@ -770,7 +864,11 @@ private class KotlinClientEmitter(
      * Pelican — the generated client sends what you give it and checks nothing.
      */
     private fun requirements(ep: Endpoint<*, *>): String? {
-        val required: List<SecurityRequirement> = ep.security ?: spec.security
+        // A webhook inherits nothing: the document's requirement is what a
+        // caller of *this* API presents, and a webhook is presented to a
+        // subscriber. Where it says nothing, nothing is known.
+        val required: List<SecurityRequirement> =
+            if (ep.webhookName != null) ep.security.orEmpty() else ep.security ?: spec.security
         if (required.isEmpty()) return null
         return "Requires: " + required.joinToString(", or ") { requirement ->
             requirement.scheme.name +

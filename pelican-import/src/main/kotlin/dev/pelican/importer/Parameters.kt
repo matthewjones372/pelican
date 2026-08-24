@@ -266,6 +266,16 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
             unsupported(operation.path, "The route captures {$it}, and no parameter declares it.")
         }
         (declared - captures.toSet()).forEach {
+            // A webhook has no template at all rather than one missing a
+            // capture, and saying so is the difference between an edit somebody
+            // can make and a message about an empty string.
+            if (operation.webhookName != null) {
+                unsupported(
+                    operation.path,
+                    "Path parameter '$it' is declared on a webhook, and a webhook has no path: it is sent " +
+                        "to a URL a subscriber registered. Carry it in the body or in a header instead.",
+                )
+            }
             unsupported(operation.path, "Path parameter '$it' is declared, and ${operation.template} has no {$it}.")
         }
     }

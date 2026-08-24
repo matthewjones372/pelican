@@ -32,9 +32,70 @@ class ApiSpec(
      * What every endpoint requires unless it says otherwise. An endpoint that
      * declares its own `security(...)` replaces this; one that calls
      * `noSecurity()` opts out of it.
+     *
+     * Not inherited by a [Webhook]: see [webhooks].
      */
     val security: List<SecurityRequirement> = emptyList(),
-)
+
+    /**
+     * The calls this service *sends* — OpenAPI 3.1's `webhooks`, published
+     * under that key and generated as senders rather than as routes.
+     *
+     * A list rather than a `Map<String, Endpoint>`, although the document is
+     * keyed by name. A map's key would be a second place the name lives, and a
+     * bare [Endpoint] as its value is exactly the thing that must not be
+     * routable — `mapOf("orderPlaced" to someEndpoint)` would make a route into
+     * a webhook and back again by moving it between two fields. A [Webhook] is
+     * a value that knows which it is.
+     *
+     * Neither [servers] nor [security] reaches them, and the specification is
+     * silent on both: 3.1 says root `servers` gives "connectivity information
+     * to a target server" and root `security` applies "across the API", and
+     * neither can mean a webhook, whose request goes to a URL a subscriber
+     * chose and carries whatever credential *that* subscriber asked for. A
+     * webhook therefore says what it requires or says nothing, and nothing is
+     * published where it said nothing rather than a `security: []` claiming a
+     * receiver wants no credential.
+     */
+    val webhooks: List<Webhook> = emptyList(),
+) {
+    init {
+        refuseWebhooksAmong(endpoints)
+        refuseRepeatedWebhooks(webhooks)
+    }
+}
+
+/**
+ * A webhook's operation put where routes go, refused at the point the two lists
+ * are handed over together.
+ *
+ * It is the one way a webhook could still reach a router, since [Webhook.operation]
+ * has to be public for the document and the client generator to read it. Bound
+ * to a handler it would be served at `/` on this service, which is neither what
+ * the description says nor a route anybody wrote — so it fails here, where the
+ * mistake is visible, rather than by quietly answering.
+ */
+private fun refuseWebhooksAmong(endpoints: List<Endpoint<*, *>>) {
+    val webhooks = endpoints.mapNotNull { it.webhookName }
+    require(webhooks.isEmpty()) {
+        "The webhook(s) ${webhooks.joinToString()} are listed as endpoints, and a webhook is a call this " +
+            "service sends rather than one it answers: it has no path, so binding it would serve it at `/`. " +
+            "Pass them as `webhooks = listOf(...)` instead."
+    }
+}
+
+/** Two entries for one name and method would be one key in the document, and the second would win. */
+private fun refuseRepeatedWebhooks(webhooks: List<Webhook>) {
+    val clashes = webhooks
+        .groupBy { it.name to it.operation.method }
+        .filterValues { it.size > 1 }
+        .keys
+    require(clashes.isEmpty()) {
+        "Two webhooks are declared for " + clashes.joinToString { (name, method) -> "$name ($method)" } +
+            ", and the document has one entry per name and method — the second would replace the first. " +
+            "Several methods under one name are fine; two of the same are not."
+    }
+}
 
 /**
  * An endpoint bound to an implementation.
@@ -161,9 +222,18 @@ class Api(
      * is a startup failure instead of a mystery.
      */
     val covers: List<Endpoint<*, *>> = emptyList(),
+
+    /**
+     * The calls this service sends. Documented and generated, never routed —
+     * see [ApiSpec.webhooks], and note that the three interpreters build their
+     * routes from [endpoints] and have no reason to read this at all.
+     */
+    val webhooks: List<Webhook> = emptyList(),
 ) {
     init {
         val bound = endpoints.map { it.endpoint }
+        refuseWebhooksAmong(bound)
+        refuseRepeatedWebhooks(webhooks)
 
         // Two handlers on one route: the second is unreachable, because the
         // router stops at the first match. Always a mistake, and a silent one.
@@ -192,6 +262,7 @@ class Api(
         description = description,
         servers = servers,
         security = security,
+        webhooks = webhooks,
     )
 }
 

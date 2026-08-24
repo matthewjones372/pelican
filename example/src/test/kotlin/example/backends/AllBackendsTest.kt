@@ -401,6 +401,35 @@ class AllBackendsTest {
         client.transport.send(request).status shouldBe 200
     }
 
+    // ---------------------------------------------------------- and not routed
+
+    /**
+     * The webhook, on the three servers that must never answer it.
+     *
+     * `greetingRecorded` is a call this service *sends*, so it has no path —
+     * and the only URL a pathless description could be served at is `/`. All
+     * three interpreters build their routes from `Api.endpoints` and a webhook
+     * is not in that list, so all three 404. Asserted rather than reasoned
+     * about: this is the claim the whole design rests on, and it is one that
+     * would fail quietly.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a webhook is not routed by any backend`(name: String, client: ApiClient) {
+        val send = client.request(echo, In2(null, Note("recorded"))).withPath("/")
+
+        client.transport.send(send).status shouldBe 404
+    }
+
+    /** And yet it is published, which is the other half of the same claim. */
+    @Test
+    fun `and the document declares it, under webhooks rather than under paths`() {
+        val document = Json.parseToJsonElement(pekkoApi().spec().openApiJson()).jsonObject
+
+        document["webhooks"]!!.jsonObject.keys shouldBe setOf("greetingRecorded")
+        document["paths"]!!.jsonObject.keys shouldNotContain "/"
+    }
+
     @Test
     fun `and the document says where it is served, on the operation`() {
         val operation = Json.parseToJsonElement(pekkoApi().spec().openApiJson())

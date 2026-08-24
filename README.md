@@ -484,6 +484,43 @@ Every handler lambda has the request's `Params` as its receiver whatever its
 input style, so a typed handler reaches `setHeader` without giving up its typed
 inputs.
 
+## Webhooks
+
+OpenAPI 3.1's `webhooks` are the calls a service *sends* rather than answers. An
+endpoint description was never a route — it is a method, some inputs and an
+output — so a webhook is the same description read in the other direction:
+
+```kotlin
+val orderPlaced = webhook("orderPlaced") {
+    body(orderPlacedEvent)
+    header(hookSignature)
+    summary = "Sent to a subscriber when an order is placed"
+    empty(status = 204)
+}
+
+Api(endpoints = ordersRoutes, codecs = JacksonCodecs, webhooks = listOf(orderPlaced))
+```
+
+There is no path, because the path belongs to whoever subscribed: `webhook(...)`
+takes the name OpenAPI files it under and the method, and writing a route or a
+`servers(...)` is refused where it is written. The document publishes it under
+`webhooks`, and a generated client grows a sender for it:
+
+```kotlin
+client.orderPlaced(url = subscriber.callbackUrl, body = order, xSignature = sign(order))
+```
+
+The destination is the first argument because the document does not know it, and
+the client's standing headers are deliberately not sent with it — those are the
+credential it presents to the API, and a subscriber is not the API.
+
+**A webhook is never routed.** It lives in a field of its own on `Api`, the
+three interpreters build their routes from `endpoints`, and binding one as a
+handler fails at construction rather than quietly serving `POST /`. The `204`
+above is what the *receiver* is expected to answer with, which is the one part
+of the description nobody publishing it controls. See
+[the reference](docs/reference.md#webhooks-the-calls-the-service-sends).
+
 ---
 
 # Running a server
@@ -752,6 +789,10 @@ read replica — is called there. `servers("https://uploads.example.com")` on an
 endpoint reaches the document and the generated method, which sends that one
 call to that host whatever base URL the client was given. Routing ignores it
 entirely: a server serves what it serves, and no description moves a request.
+
+A `webhook(...)` becomes a sender rather than a call: `orderPlaced(url, body,
+xSignature)`, with the destination first because the document does not know it.
+See [Webhooks](#webhooks).
 
 The generated file needs `pelican-core`, which has no dependencies of its own,
 and a `Codecs` chosen by the caller. Transport is the JDK's `HttpClient`. The
@@ -1389,6 +1430,13 @@ reasoning behind each, is in [docs/reference.md](docs/reference.md#what-isnt-her
   overload. Past that, `endpoint { }` reads `Params` by key at the cost of the
   compile-time guarantee. Two adjacent inputs of the same primitive type can also
   be swapped by mistake; a value class and `map`/`mapOrFail` fixes it.
+- **`callbacks` are not described; `webhooks` are.** A callback is a request
+  made *during* an operation, to a URL pulled out of that operation's own
+  payload by a runtime expression, and nothing here evaluates one. A webhook is
+  one call to a URL a subscriber registered, which a description can say and a
+  generated sender can make — see [Webhooks](#webhooks). A webhook you
+  *receive* needs nothing special: it arrives at a path on your service, so it
+  is an ordinary `endpoint(...)`.
 - **405 vs 404 fidelity is the router's, not Pelican's.** A wrong method on a
   known path is 405 on http4k, 404 on Ktor, and either on Pekko depending on
   what else is declared. `MethodMismatchTest` and `KtorInterpreterTest` pin it.

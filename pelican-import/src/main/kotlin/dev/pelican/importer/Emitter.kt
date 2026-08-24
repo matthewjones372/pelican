@@ -63,21 +63,31 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     fun emit(): Map<String, String> {
         types.declareAll(api.schemas)
-        api.schemes.forEach { scheme -> schemes[schemeName(scheme)] = schemeDeclaration(scheme) }
+        api.schemes.forEach { scheme ->
+            val name = schemeName(scheme)
+            schemes[name] = "val $name = ${schemeCall(scheme)}"
+        }
 
         // Before the file is assembled: writing an endpoint is what declares
         // the inputs, failures and payload types it names.
         val endpoints = api.endpoints.map { it to endpoint(it) }
+        // After the endpoints, so a payload type shared with a route is named
+        // by the route that used it first — the document listed `paths` first
+        // too, and a reader comparing the two will look there.
+        val webhooks = api.webhooks.map { it to webhook(it) }
 
         return buildMap {
-            put(options.name.capitalise() + ENDPOINTS_FILE_SUFFIX, endpointsFile(endpoints.map { it.second }))
+            put(
+                options.name.capitalise() + ENDPOINTS_FILE_SUFFIX,
+                endpointsFile(endpoints.map { it.second }, webhooks.map { it.second }),
+            )
             options.handlers?.let { put(options.name.capitalise() + HANDLERS_FILE_SUFFIX, handlersFile(it)) }
         }
     }
 
     // ------------------------------------------------------------------ files
 
-    private fun endpointsFile(endpoints: List<String>): String = buildString {
+    private fun endpointsFile(endpoints: List<String>, webhooks: List<String>): String = buildString {
         // Written out before the imports it is put under: a sealed hierarchy
         // is the one payload type that needs an annotation, and an annotation
         // is an import.
@@ -97,6 +107,7 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         section("payloads", payloads)
         section("the payload schemas", listOf(schemaSource()))
         section("endpoints", endpoints)
+        section("webhooks", webhooks)
 
         appendLine(rule("the api"))
         appendLine()
@@ -105,6 +116,24 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         api.endpoints.forEach { appendLine("    ${endpointName(it)},") }
         appendLine(")")
         appendLine()
+        if (api.webhooks.isNotEmpty()) {
+            appendLine(
+                kdoc(
+                    """
+                        Every webhook this document declared: the calls the service sends.
+
+                        Described here and routed nowhere. A webhook goes to a URL a subscriber
+                        registered, so there is no path on this side for one to answer at — which
+                        is why they are a list of their own rather than more endpoints.
+                    """.trimIndent(),
+                    "",
+                ),
+            )
+            appendLine("val ${memberName(options.name)}Webhooks: List<Webhook> = listOf(")
+            api.webhooks.forEach { appendLine("    ${endpointName(it.operation)},") }
+            appendLine(")")
+            appendLine()
+        }
         appendLine(spec())
     }
 
@@ -171,6 +200,9 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         }
         if (api.security.isNotEmpty()) {
             appendLine("    security = listOf(${api.security.joinToString { requirement(it) }}),")
+        }
+        if (api.webhooks.isNotEmpty()) {
+            appendLine("    webhooks = ${memberName(options.name)}Webhooks,")
         }
         append(")")
     }
@@ -245,9 +277,30 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         append("}")
     }
 
+    /**
+     * A call the document says the service sends.
+     *
+     * The same block as an endpoint's, minus the two lines that would describe
+     * a URL — there is no route to write, and the method is what `webhook(...)`
+     * takes instead. The inputs are declared inside whatever there are of them:
+     * the tuple form of `endpoint(...)` exists to type a handler's parameter,
+     * and nothing binds a handler to one of these.
+     */
+    private fun webhook(hook: IrWebhook): String = buildString {
+        val ep = hook.operation
+        ep.description?.let { appendLine(kdoc(it, "")) }
+            ?: ep.summary?.let { appendLine(kdoc(it, "")) }
+
+        // POST is what `webhook(...)` assumes, so the common case says nothing.
+        val method = if (ep.method == "POST") "" else ", method = Method.${ep.method}"
+        appendLine("val ${endpointName(ep)} = webhook(${kotlinString(hook.name)}$method) {")
+        body(ep, keys = emptyList(), webhook = true).forEach { appendLine("    $it") }
+        append("}")
+    }
+
     /** The block's statements, in the order the DSL reads best in. */
-    private fun body(ep: IrEndpoint, keys: List<String>): List<String> = buildList {
-        add(route(ep))
+    private fun body(ep: IrEndpoint, keys: List<String>, webhook: Boolean = false): List<String> = buildList {
+        if (!webhook) add(route(ep))
         // Under the route, because it qualifies it: this is the operation whose
         // path is served somewhere other than the rest of the document.
         if (ep.servers.isNotEmpty()) add("servers(${ep.servers.joinToString { kotlinString(it) }})")
@@ -256,7 +309,7 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         add("operationId = ${kotlinString(ep.operationId)}")
         if (ep.tags.isNotEmpty()) add("tag(${ep.tags.joinToString { kotlinString(it) }})")
         if (ep.deprecated) add("deprecated = true")
-        if (keys.size > TUPLE_LIMIT) addAll(lensInputs(ep))
+        if (webhook || keys.size > TUPLE_LIMIT) addAll(lensInputs(ep))
         addAll(security(ep))
         if (ep.responseHeaders.isNotEmpty()) {
             add("emits(${ep.responseHeaders.joinToString { headerName(it) }})")
@@ -595,80 +648,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         }
     }
 
-    private fun schemeDeclaration(scheme: IrScheme): String {
-        val shared = buildList {
-            add("name = ${kotlinString(scheme.name)}")
-            scheme.description?.let { add("description = ${kotlinString(it)}") }
-        }
-        val call = when (scheme) {
-            is IrScheme.ApiKey -> apiKey(scheme, shared)
-            is IrScheme.Http -> http(scheme, shared)
-            is IrScheme.OpenId -> call("openIdConnect", listOf(kotlinString(scheme.url)) + shared)
-            is IrScheme.OAuth2 -> oauth2(scheme, shared)
-        }
-        return "val ${schemeName(scheme)} = $call"
-    }
-
-    private fun apiKey(scheme: IrScheme.ApiKey, shared: List<String>): String {
-        val builder = when (scheme.location) {
-            "query" -> "apiKeyQuery"
-            "cookie" -> "apiKeyCookie"
-            else -> "apiKeyHeader"
-        }
-        return call(builder, listOf(kotlinString(scheme.paramName)) + shared)
-    }
-
-    private fun http(scheme: IrScheme.Http, shared: List<String>): String = when (scheme.scheme) {
-        "basic" -> call("basicAuth", shared)
-
-        // The default is "JWT", so a scheme that says nothing has to say so:
-        // left off, the generated document would claim a bearer format the
-        // original never mentioned.
-        "bearer" -> call(
-            "bearerAuth",
-            listOf("bearerFormat = ${scheme.bearerFormat?.let(::kotlinString) ?: "null"}") + shared,
-        )
-
-        else -> call("httpAuth", listOf(kotlinString(scheme.scheme)) + shared)
-    }
-
-    private fun oauth2(scheme: IrScheme.OAuth2, shared: List<String>): String {
-        val flows = scheme.flows.map { flow ->
-            val arguments = buildList {
-                flow.authorizationUrl?.let { add("authorizationUrl = ${kotlinString(it)}") }
-                flow.tokenUrl?.let { add("tokenUrl = ${kotlinString(it)}") }
-                flow.refreshUrl?.let { add("refreshUrl = ${kotlinString(it)}") }
-                add("scopes = ${scopes(flow.scopes)}")
-            }
-            flowBuilder(flow.kind) to arguments
-        }
-
-        // One flow is the common case and reads as one call. Several have to
-        // be built as flow values and handed over together, which is the shape
-        // core offers for exactly this.
-        return if (flows.size == 1) {
-            val (builder, arguments) = flows.single()
-            call(builder, arguments + shared)
-        } else {
-            val listed = flows.joinToString(",\n        ") { (builder, arguments) -> call(builder, arguments) }
-            call("oauth2", listOf("listOf(\n        $listed,\n    )") + shared)
-        }
-    }
-
-    private fun scopes(scopes: Map<String, String>): String {
-        if (scopes.isEmpty()) return "emptyMap()"
-        return "mapOf(${scopes.entries.joinToString { "${kotlinString(it.key)} to ${kotlinString(it.value)}" }})"
-    }
-
-    private fun flowBuilder(kind: String) = when (kind) {
-        "implicit" -> "oauth2Implicit"
-        "password" -> "oauth2Password"
-        "clientCredentials" -> "oauth2ClientCredentials"
-        else -> "oauth2AuthorizationCode"
-    }
-
-    private fun call(builder: String, arguments: List<String>) = "$builder(${arguments.joinToString()})"
-
     // ------------------------------------------------------- values on the wire
 
     /**
@@ -880,3 +859,85 @@ private const val OCTET_STREAM = "application/octet-stream"
 
 private const val TUPLE_LIMIT = 6
 private const val RULE_WIDTH = 68
+
+// ------------------------------------------------------ security schemes
+
+/**
+ * A security scheme as the builder call that makes one.
+ *
+ * Text, like everything else down here, once the *name* the value is bound to
+ * is somebody else's problem: the emitter mints that, because it has to stay
+ * unique against every other declaration in the file.
+ */
+private fun schemeCall(scheme: IrScheme): String {
+    val shared = buildList {
+        add("name = ${kotlinString(scheme.name)}")
+        scheme.description?.let { add("description = ${kotlinString(it)}") }
+    }
+    return when (scheme) {
+        is IrScheme.ApiKey -> apiKey(scheme, shared)
+        is IrScheme.Http -> http(scheme, shared)
+        is IrScheme.OpenId -> call("openIdConnect", listOf(kotlinString(scheme.url)) + shared)
+        is IrScheme.OAuth2 -> oauth2(scheme, shared)
+    }
+}
+
+private fun apiKey(scheme: IrScheme.ApiKey, shared: List<String>): String {
+    val builder = when (scheme.location) {
+        "query" -> "apiKeyQuery"
+        "cookie" -> "apiKeyCookie"
+        else -> "apiKeyHeader"
+    }
+    return call(builder, listOf(kotlinString(scheme.paramName)) + shared)
+}
+
+private fun http(scheme: IrScheme.Http, shared: List<String>): String = when (scheme.scheme) {
+    "basic" -> call("basicAuth", shared)
+
+    // The default is "JWT", so a scheme that says nothing has to say so:
+    // left off, the generated document would claim a bearer format the
+    // original never mentioned.
+    "bearer" -> call(
+        "bearerAuth",
+        listOf("bearerFormat = ${scheme.bearerFormat?.let(::kotlinString) ?: "null"}") + shared,
+    )
+
+    else -> call("httpAuth", listOf(kotlinString(scheme.scheme)) + shared)
+}
+
+private fun oauth2(scheme: IrScheme.OAuth2, shared: List<String>): String {
+    val flows = scheme.flows.map { flow ->
+        val arguments = buildList {
+            flow.authorizationUrl?.let { add("authorizationUrl = ${kotlinString(it)}") }
+            flow.tokenUrl?.let { add("tokenUrl = ${kotlinString(it)}") }
+            flow.refreshUrl?.let { add("refreshUrl = ${kotlinString(it)}") }
+            add("scopes = ${scopes(flow.scopes)}")
+        }
+        flowBuilder(flow.kind) to arguments
+    }
+
+    // One flow is the common case and reads as one call. Several have to
+    // be built as flow values and handed over together, which is the shape
+    // core offers for exactly this.
+    return if (flows.size == 1) {
+        val (builder, arguments) = flows.single()
+        call(builder, arguments + shared)
+    } else {
+        val listed = flows.joinToString(",\n        ") { (builder, arguments) -> call(builder, arguments) }
+        call("oauth2", listOf("listOf(\n        $listed,\n    )") + shared)
+    }
+}
+
+private fun scopes(scopes: Map<String, String>): String {
+    if (scopes.isEmpty()) return "emptyMap()"
+    return "mapOf(${scopes.entries.joinToString { "${kotlinString(it.key)} to ${kotlinString(it.value)}" }})"
+}
+
+private fun flowBuilder(kind: String) = when (kind) {
+    "implicit" -> "oauth2Implicit"
+    "password" -> "oauth2Password"
+    "clientCredentials" -> "oauth2ClientCredentials"
+    else -> "oauth2AuthorizationCode"
+}
+
+private fun call(builder: String, arguments: List<String>) = "$builder(${arguments.joinToString()})"

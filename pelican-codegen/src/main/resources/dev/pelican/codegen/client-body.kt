@@ -4,7 +4,12 @@
  *
  * [origin] is this client's own base URL, except for a method the document said
  * is served somewhere else: those pass the host that operation's `servers`
- * block named, since that is where the service answers it.
+ * block named, since that is where the service answers it. A webhook passes the
+ * subscriber's URL, which nothing in the document could have known.
+ *
+ * [standingHeaders] defaults to the ones this client sends with everything —
+ * and a webhook passes none, because those are the credential the client
+ * presents to the API and a subscriber's endpoint is not the API.
  */
 private fun request(
     method: String,
@@ -16,6 +21,7 @@ private fun request(
     contentType: String? = null,
     multipart: MultipartContent? = null,
     origin: String = base,
+    standingHeaders: Map<String, String> = headers(),
 ): HttpRequest {
     val search = query
         .flatMap { (name, value) -> occurrences(value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
@@ -27,7 +33,7 @@ private fun request(
         .method(method, multipart?.publisher ?: body)
 
     (multipart?.contentType ?: contentType)?.let { builder.header("Content-Type", it) }
-    headers().forEach { (name, value) -> builder.header(name, value) }
+    standingHeaders.forEach { (name, value) -> builder.header(name, value) }
     headerParams.forEach { (name, value) -> plain(value)?.let { builder.header(name, it) } }
 
     // One header carries all of them, so an absent optional cookie is simply

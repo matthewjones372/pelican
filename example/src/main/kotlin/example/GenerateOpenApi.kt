@@ -22,4 +22,8 @@ fun ordersSpec(): ApiSpec = ApiSpec(
     version = "1.0.0",
     description = "A Kotlin-first Pekko HTTP service, described as values.",
     servers = listOf("http://localhost:8080"),
+    // The calls the service sends. They are published under `webhooks` and
+    // generated as senders on the client, and no interpreter ever sees them —
+    // which is what `webhooks = ` being a field of its own is for.
+    webhooks = allWebhooks,
 )

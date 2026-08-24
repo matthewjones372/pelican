@@ -128,6 +128,32 @@ class ImportedOrdersTest {
     }
 
     /**
+     * The webhook makes the trip too, and lands where it cannot be served.
+     *
+     * The comparison above already covers the document — `webhooks` is part of
+     * it — so what this adds is the Kotlin in between: the importer wrote a
+     * `webhook(...)` rather than an endpoint, and the list it went into is the
+     * one no interpreter reads. An import that quietly turned it into a route
+     * would publish an identical document and serve `POST /`.
+     */
+    @Test
+    fun `a webhook comes back as a webhook, and not as a route`() {
+        val imported = importedSpec()
+
+        imported.webhooks.map { it.name } shouldBe listOf("orderPlaced")
+        imported.webhooks.single().operation.pathSpec.segments shouldBe emptyList()
+        imported.endpoints.none { it.webhookName != null } shouldBe true
+    }
+
+    /** And a client generated from it grows the sender, pointed at nobody in particular. */
+    @Test
+    fun `the sender generated from the imported webhook takes the subscriber's url`(@TempDir directory: File) {
+        val written = importedSpec().writeKotlinClient(directory, "example.imported.webhookclient")
+
+        written.readText() shouldContain "fun orderPlaced(url: String, body: Order, xSignature: String)"
+    }
+
+    /**
      * The other half of what an imported document is for: a client for
      * somebody else's API, generated from descriptions nobody wrote.
      *

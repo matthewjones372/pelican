@@ -308,7 +308,7 @@ class FallibleOutput<E, T> internal constructor(
 }
 
 /** Whether producing this output means handing over a stream rather than a value. */
-private fun Output<*>.streams(): Boolean =
+internal fun Output<*>.streams(): Boolean =
     this is NdjsonOutput<*> || this is SseOutput<*> || this is JsonArrayOutput<*> || this is ByteStreamOutput
 
 /**

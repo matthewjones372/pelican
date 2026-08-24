@@ -49,9 +49,18 @@ fun ApiSpec.openApi(): JsonObj {
         byMethod[ep.method.name.lowercase()] = operation(ep, schemas, components)
     }
 
+    // Hidden means unpublished wherever it is written, so a webhook says it the
+    // same way an endpoint does.
+    val sent = webhooks.filterNot { it.operation.hidden }
+
     // Schemes are collected from the requirements that reference them, so a
     // scheme cannot be declared and left unused, or used and left undeclared.
-    val schemes = securitySchemesOf(security + documented.flatMap { it.security.orEmpty() })
+    // A webhook's requirement counts: it is the credential this service presents
+    // to a subscriber, and a scheme reached only that way is still reached.
+    val schemes = securitySchemesOf(
+        security + documented.flatMap { it.security.orEmpty() } +
+            sent.flatMap { it.operation.security.orEmpty() },
+    )
 
     return jsonObj {
         "openapi" to "3.1.0"
@@ -65,6 +74,9 @@ fun ApiSpec.openApi(): JsonObj {
         })
         if (servers.isNotEmpty()) put("servers", serverList(servers))
         put("paths", JsonObj(paths.mapValues { (_, ops) -> JsonObj(ops.toMap()) }))
+        // After `paths` and before `components`, which is the order the
+        // specification lists the fields in — a document is read by people too.
+        if (sent.isNotEmpty()) put("webhooks", webhookItems(sent, schemas, components))
         if (security.isNotEmpty()) put("security", requirements(security))
         put("components", jsonObj {
             put("schemas", components.all())
@@ -84,6 +96,33 @@ fun ApiSpec.openApiJson(): String = openApi().renderPretty()
  */
 private fun serverList(urls: List<String>): JsonArr =
     jsonArr(urls.map { url -> jsonObj { "url" to url } })
+
+/**
+ * `webhooks`: the calls the service sends, keyed by name rather than by path.
+ *
+ * The value under each name is a Path Item Object, the same object `paths` is
+ * made of, and the operation inside it is written by the same [operation]
+ * function — a webhook is one of these read in the other direction, and a
+ * second emitter for it would be the first one with the arrows reversed.
+ *
+ * Grouped by name because OpenAPI files the methods of one name together, and
+ * two Pelican webhooks sharing a name are two methods of one item. What is
+ * missing on purpose is `servers`: 3.1 says nothing about how a webhook relates
+ * to the document's, and a Server Object here would be this document naming a
+ * host that belongs to whoever subscribed.
+ */
+private fun webhookItems(
+    webhooks: List<Webhook>,
+    schemas: SchemaSource,
+    components: SchemaComponents,
+): JsonObj {
+    val items = LinkedHashMap<String, MutableMap<String, JsonValue>>()
+    webhooks.forEach { hook ->
+        items.getOrPut(hook.name) { LinkedHashMap() }[hook.operation.method.name.lowercase()] =
+            operation(hook.operation, schemas, components)
+    }
+    return JsonObj(items.mapValues { (_, ops) -> JsonObj(ops.toMap()) })
+}
 
 /** Every declared input that travels outside the body, in the order a reader expects them. */
 private fun parameters(ep: Endpoint<*, *>): List<JsonValue> = buildList {

@@ -286,3 +286,41 @@ val allEndpoints: List<Endpoint<*, *>> = listOf(
     getUser, streamOrders, watchOrders, listOrders, placeOrder, submitOrder, placeOrderForm, importOrders,
     payOrder, cancelOrder, echo, searchOrders, reindex,
 )
+
+// ----------------------------------------------------------------- webhooks
+
+/** What the receiver checks the body against, so a notification cannot be forged. */
+val hookSignature = headerParam(
+    "X-Signature",
+    StringCodec.nonEmpty().describedAs("HMAC-SHA256 of the body", example = "sha256=abc123"),
+)
+
+/** The event body, which is the order as it stood when it was placed. */
+val orderPlacedEvent = jsonBody<Order>(description = "The order that was just placed")
+
+/**
+ * The one description in this file that is not a route.
+ *
+ * A webhook is a call this service *sends*: a subscriber registers a URL out of
+ * band, and this says what arrives there. Everything about the description is
+ * the same — a method, a body, headers, a response — except that there is no
+ * path, because the path is the subscriber's and this document has never seen
+ * it. So nothing binds a handler to it and nothing routes it; what reads it is
+ * the document, under `webhooks`, and the generated client, which grows a
+ * `orderPlaced(url, body, signature)` that sends one.
+ *
+ * The `204` is what the *receiver* is expected to answer with. That is the one
+ * part of this description nobody publishing it controls, and it is why a
+ * webhook's response is worth reading as a hint rather than as a promise.
+ */
+val orderPlacedHook = webhook("orderPlaced") {
+    body(orderPlacedEvent)
+    header(hookSignature)
+    summary = "Sent to a subscriber when an order is placed"
+    operationId = "orderPlaced"
+    tag("orders")
+    empty(status = 204)
+}
+
+/** The calls this service makes, kept apart from the ones it answers. */
+val allWebhooks: List<Webhook> = listOf(orderPlacedHook)

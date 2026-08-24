@@ -6,6 +6,7 @@ import dev.pelican.LongCodec
 import dev.pelican.Outcome
 import dev.pelican.StringCodec
 import dev.pelican.UploadedFile
+import dev.pelican.Webhook
 import dev.pelican.commaSeparated
 import dev.pelican.cookieParam
 import dev.pelican.default
@@ -29,6 +30,7 @@ import dev.pelican.queryParam
 import dev.pelican.repeated
 import dev.pelican.responseHeader
 import dev.pelican.textPart
+import dev.pelican.webhook
 
 /*
  * One description, three servers.
@@ -280,6 +282,34 @@ val filters = endpoint(tags, ids, features, seenBefore) {
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(greet, countdown, echo, remember, preferences, signIn, uploadFile, filters)
+
+/**
+ * What a subscriber signs the notification with. An ordinary header input: a
+ * webhook says what it carries the way an endpoint says what it expects.
+ */
+val hookSignature = headerParam<String>("X-Signature", description = "HMAC of the body, so a receiver can trust it")
+
+/**
+ * The one description here that is not a route.
+ *
+ * A webhook is the same shape as everything above — a method, a body, a
+ * response — pointed the other way: this service *sends* it, to a URL somebody
+ * subscribed with, and the response is what that subscriber answers. So there
+ * is no path to write and nothing on this side to bind, which is exactly what
+ * `AllBackendsTest` holds all three interpreters to: it reaches the document
+ * and no server routes it.
+ */
+val greetingRecorded = webhook("greetingRecorded") {
+    body(note)
+    header(hookSignature)
+    summary = "Sent to a subscriber when a greeting is remembered"
+    description = "The 204 is what the subscriber is expected to answer with, not what this service returns."
+    tag("greetings")
+    empty(status = 204)
+}
+
+/** The calls this service makes, kept apart from the ones it answers for the same reason. */
+val greetingWebhooks: List<Webhook> = listOf(greetingRecorded)
 
 internal fun greetingOf(who: String, shout: Boolean): Greeting {
     val text = "Hello, $who!"

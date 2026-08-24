@@ -78,8 +78,22 @@ class Endpoint<I, R> internal constructor(
      * has to pick one, and the document's order is the document's answer.
      */
     val servers: List<String>,
+
+    /**
+     * The name of the [Webhook] this describes, or null — which is what every
+     * endpoint that is a route says.
+     *
+     * A description of a call the service *sends* is the same description read
+     * in the other direction, so it is one of these rather than a second model.
+     * What the name is for is telling the two apart afterwards: [Api] refuses to
+     * bind one, so a webhook cannot become a route by being put in the wrong
+     * list, and [operationName] derives a name from it rather than from a path
+     * that is deliberately empty.
+     */
+    val webhookName: String? = null,
 ) {
-    override fun toString() = "$method ${pathSpec.template}"
+    override fun toString() =
+        if (webhookName == null) "$method ${pathSpec.template}" else "webhook $webhookName ($method)"
 }
 
 /** Receiver for the [endpoint] DSL. */
@@ -498,7 +512,33 @@ private fun <I, R> describe(
     return build(inputs, b, out)
 }
 
-private fun <I, R> build(inputs: Inputs<I>, b: EndpointBuilder, out: Output<R>): Endpoint<I, R> {
+/**
+ * The same, for the description of a call the service sends. It goes through
+ * [build] rather than beside it because a webhook is an endpoint description —
+ * the differences are the two lines below and the checks [webhook] runs after,
+ * and a second builder would have been the whole DSL copied to change them.
+ *
+ * The lens inputs are not a limitation being worked around: see [webhook].
+ */
+internal fun <R> describeWebhook(
+    name: String,
+    method: Method,
+    block: EndpointBuilder.() -> Output<R>,
+): Endpoint<Params, R> {
+    val b = EndpointBuilder(lensInputs.keys)
+    // Set before the block, so that a block calling `post(...)` overwrites it
+    // and is caught saying what it may not say, rather than silently winning.
+    b.method = method
+    val out = b.block()
+    return build(lensInputs, b, out, webhookName = name)
+}
+
+private fun <I, R> build(
+    inputs: Inputs<I>,
+    b: EndpointBuilder,
+    out: Output<R>,
+    webhookName: String? = null,
+): Endpoint<I, R> {
     // A failure declared outside the block — a top-level val shared by several
     // endpoints — is documented here, when the output that names it is seen.
     // One declared with errorJson(...) inside the block is already recorded.
@@ -539,6 +579,7 @@ private fun <I, R> build(inputs: Inputs<I>, b: EndpointBuilder, out: Output<R>):
         hidden = b.hidden,
         security = b.securityRequirements?.toList(),
         servers = b.serverUrls.toList(),
+        webhookName = webhookName,
     ).also(::validate)
 }
 
@@ -642,7 +683,7 @@ private fun validateResponseHeaders(ep: Endpoint<*, *>) {
  * the other cannot be looking at two different names for the same endpoint.
  */
 val Endpoint<*, *>.operationName: String
-    get() = operationId ?: derivedOperationName(method, pathSpec)
+    get() = operationId ?: webhookName ?: derivedOperationName(method, pathSpec)
 
 private fun derivedOperationName(method: Method, pathSpec: PathSpec): String {
     val parts = pathSpec.segments.map {

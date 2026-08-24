@@ -361,22 +361,35 @@ class StrictnessTest {
         generated shouldNotContain "Dropped"
     }
 
+    /**
+     * `callbacks` and `webhooks` were refused together, and only one of them
+     * still is. The difference is where the request goes: a webhook is one call
+     * to a URL a subscriber registered, which a description can say and a sender
+     * can make — see [WebhooksTest]. A callback is a request the service makes
+     * *during* an operation, to a URL taken out of that operation's own
+     * parameters through a runtime expression, and there is nothing in an
+     * endpoint description that evaluates `{$request.body#/callbackUrl}`.
+     */
     @Test
-    fun `webhooks describe calls the service makes, which is the other direction again`() {
+    fun `callbacks are a call made during an operation, which nothing here describes`() {
         shouldThrow<ImportFailure> {
             imported(
-                """
-                openapi: 3.1.0
-                info: { title: T, version: "1" }
-                webhooks:
-                  orderPlaced:
-                    post:
-                      operationId: orderPlaced
-                      responses:
-                        "204": { description: ok }
-                paths: {}
-                """,
+                document(
+                    """
+                    /orders:
+                      post:
+                        operationId: placeOrder
+                        callbacks:
+                          onDone:
+                            '{${'$'}request.body#/callbackUrl}':
+                              post:
+                                responses:
+                                  "204": { description: ok }
+                        responses:
+                          "204": { description: ok }
+                    """,
+                ),
             )
-        }.message.orEmpty() shouldContain "webhooks"
+        }.message.orEmpty() shouldContain "callbacks"
     }
 }

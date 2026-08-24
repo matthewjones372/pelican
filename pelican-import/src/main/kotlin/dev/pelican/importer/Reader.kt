@@ -38,22 +38,22 @@ internal class Reader(private val options: ImportOptions) {
         val components = document.obj("components")?.obj("schemas") ?: JsonObj(emptyMap())
         declared = JsonObj(components.fields.mapValues { (_, schema) -> normaliseSchema(schema) })
 
-        val operations = operations()
-        val endpoints = operations.mapNotNull { operation ->
-            try {
-                endpoint(operation)
-            } catch (e: Unsupported) {
-                problems.record(operation.label, operation.id, e.path, e.message)
-                null
-            }
+        val found = operations()
+        val endpoints = found.routes.mapNotNull { describe(it) }
+        // Kept apart from the routes from here on: the two are read the same
+        // way and mean opposite directions, and every reader downstream has to
+        // be told which of the two it is holding.
+        val sent = found.webhooks.mapNotNull { (name, operation) ->
+            describe(operation)?.let { IrWebhook(name, it) }
         }
         problems.failIfAny(options.name)
 
-        val schemas = used(endpoints, declared)
+        val described = endpoints + sent.map { it.operation }
+        val schemas = used(described, declared)
         // Checked here rather than at the top, because "did this hint matter"
         // is a question about what came out, not about what went in: a hint on
         // a schema only an excluded operation reached has changed nothing.
-        hints.failIfUnused(listOf(schemas) + endpoints.flatMap { it.schemas() })
+        hints.failIfUnused(listOf(schemas) + described.flatMap { it.schemas() })
 
         val info = document.obj("info")
         val required = document.arr("security").let { requirements(it, JsonPath.root / "security") }
@@ -63,10 +63,29 @@ internal class Reader(private val options: ImportOptions) {
             description = info?.str("description"),
             servers = servers(),
             security = required,
-            schemes = schemes(required + endpoints.flatMap { it.security.orEmpty() }),
+            // A webhook's requirement counts towards the schemes: it is the
+            // credential this service presents to a subscriber, and a scheme
+            // reached only that way is still a scheme the document declares.
+            schemes = schemes(required + described.flatMap { it.security.orEmpty() }),
             schemas = schemas,
             endpoints = endpoints,
+            webhooks = sent,
         )
+    }
+
+    /**
+     * One operation as a description, or null with the reason recorded.
+     *
+     * Recorded rather than thrown so that one run reports every operation that
+     * could not be described — see [Problems]. Shared by the two passes because
+     * the refusals are the same refusals: a webhook is read by the same reader
+     * that reads a route, which is the whole reason it can be imported at all.
+     */
+    private fun describe(operation: Operation): IrEndpoint? = try {
+        endpoint(operation)
+    } catch (e: Unsupported) {
+        problems.record(operation.label, operation.id, e.path, e.message)
+        null
     }
 
     /**
@@ -110,18 +129,6 @@ internal class Reader(private val options: ImportOptions) {
         else -> throw ImportFailure(
             "This is not an OpenAPI document: it has neither an `openapi` field nor a `swagger` one.",
         )
-    }.also { document ->
-        // 3.1 webhooks are operations with no route: nothing calls them, the
-        // service is called *by* them. Pelican describes what a caller can
-        // request, so there is nothing here for them to become — and dropping
-        // them silently would generate a client missing half of what the
-        // document offers.
-        if (document.obj("webhooks")?.fields?.isNotEmpty() == true) {
-            throw ImportFailure(
-                "This document declares webhooks, which describe calls the service makes rather than " +
-                    "calls it answers. Pelican has no description for those; import the document without them.",
-            )
-        }
     }
 
     private fun servers(): List<String> = serverUrls(document, "servers")
@@ -214,6 +221,9 @@ internal class Reader(private val options: ImportOptions) {
 
     // ------------------------------------------------------------- operations
 
+    /** The routes under `paths`, and the calls under `webhooks` by the name each is filed under. */
+    private class Found(val routes: List<Operation>, val webhooks: List<Pair<String, Operation>>)
+
     /**
      * Every operation in the document, named and in document order.
      *
@@ -222,49 +232,85 @@ internal class Reader(private val options: ImportOptions) {
      * method and the handler stub after it; deriving one from the method and
      * the path instead would produce `getOrdersByOrderIdItems`, and would
      * rename half the generated file the day somebody reorganises a route.
+     *
+     * One pass over both sections, because that requirement is about the
+     * document as a whole: a webhook and a route are two values in one
+     * generated file, so an id shared between them is a clash whichever section
+     * each sits in. Everything else about a webhook is a Path Item Object,
+     * which is why the same reader reads both.
      */
-    private fun operations(): List<Operation> {
-        val unnamed = mutableListOf<String>()
-        val seen = LinkedHashMap<String, String>()
-        val duplicated = LinkedHashSet<String>()
+    private fun operations(): Found {
+        val naming = Naming()
 
-        val found = document.obj("paths").entries().flatMap { (template, rawItem) ->
-            val itemPath = JsonPath.root / "paths" / template
-            val item = deref(rawItem, itemPath).first
-            val shared = item.arr("parameters")
-
-            methods.mapNotNull { method ->
-                val operation = item.obj(method) ?: return@mapNotNull null
-                val path = itemPath / method
-                val id = operation.str("operationId")
-                if (id == null) {
-                    unnamed += "${method.uppercase()} $template"
-                    return@mapNotNull null
-                }
-                if (seen.put(id, "${method.uppercase()} $template") != null) duplicated += id
-                Operation(id, method, template, operation, shared, path)
-            }
+        val routes = document.obj("paths").entries().flatMap { (template, rawItem) ->
+            item(rawItem, JsonPath.root / "paths" / template, template, null, naming)
+        }
+        // A webhook is filed under a name and has no path at all, so the
+        // template it is read with is empty: there is nothing for a route to be
+        // built from, and every reader after this one is told so by that.
+        val sent = document.obj("webhooks").entries().flatMap { (name, rawItem) ->
+            item(rawItem, JsonPath.root / "webhooks" / name, "", name, naming).map { name to it }
         }
 
-        if (unnamed.isNotEmpty()) throw ImportFailure(unnamedMessage(unnamed))
-        if (duplicated.isNotEmpty()) {
-            throw ImportFailure(
-                "Two operations share the operationId ${duplicated.joinToString()}. " +
-                    "Each one names a generated value, so they have to differ.",
-            )
-        }
-        return found.filterNot { it.id in options.exclude }
+        naming.failIfAny()
+        return Found(
+            routes.filterNot { it.id in options.exclude },
+            sent.filterNot { (_, operation) -> operation.id in options.exclude },
+        )
     }
 
-    private fun unnamedMessage(unnamed: List<String>) = buildString {
-        appendLine("${unnamed.size} operation(s) have no operationId:")
-        appendLine()
-        unnamed.forEach { appendLine("    $it") }
-        appendLine()
-        append(
-            "An operationId is what the generated endpoint value, the client method and the handler " +
-                "are named after. Add one to each, and the names stay put when the routes move.",
-        )
+    /** One Path Item Object's operations, wherever the item was filed. */
+    private fun item(
+        rawItem: JsonValue,
+        itemPath: JsonPath,
+        template: String,
+        webhookName: String?,
+        naming: Naming,
+    ): List<Operation> {
+        val item = deref(rawItem, itemPath).first
+        val shared = item.arr("parameters")
+
+        return methods.mapNotNull { method ->
+            val operation = item.obj(method) ?: return@mapNotNull null
+            val id = operation.str("operationId")
+            val where =
+                if (webhookName == null) "${method.uppercase()} $template"
+                else "webhook $webhookName (${method.uppercase()})"
+            if (id == null) {
+                naming.unnamed(where)
+                return@mapNotNull null
+            }
+            naming.named(id, where)
+            Operation(id, method, template, operation, shared, itemPath / method, webhookName)
+        }
+    }
+
+    /**
+     * The operationIds the document declared, and the two ways they can be
+     * wrong. Both are collected across the whole document rather than thrown at
+     * the first, for the reason [Problems] collects: the reader's answer is one
+     * list of edits to make.
+     */
+    private class Naming {
+        private val missing = mutableListOf<String>()
+        private val seen = LinkedHashMap<String, String>()
+        private val duplicated = LinkedHashSet<String>()
+
+        fun unnamed(where: String) { missing += where }
+
+        fun named(id: String, where: String) {
+            if (seen.put(id, where) != null) duplicated += id
+        }
+
+        fun failIfAny() {
+            if (missing.isNotEmpty()) throw ImportFailure(unnamedMessage(missing))
+            if (duplicated.isNotEmpty()) {
+                throw ImportFailure(
+                    "Two operations share the operationId ${duplicated.joinToString()}. " +
+                        "Each one names a generated value, so they have to differ.",
+                )
+            }
+        }
     }
 
     private fun endpoint(operation: Operation): IrEndpoint {
@@ -281,6 +327,8 @@ internal class Reader(private val options: ImportOptions) {
 
         val params = Parameters(this, operation).read()
         val responses = Responses(this, operation).read()
+
+        if (operation.webhookName != null) checkWebhook(operation, responses)
 
         val described = IrEndpoint(
             operationId = operation.id,
@@ -303,6 +351,40 @@ internal class Reader(private val options: ImportOptions) {
 
         described.schemas().forEach { Schemas.check(it, path, declared) }
         return described
+    }
+
+    /**
+     * What a webhook may say that a route may, and does not mean here.
+     *
+     * `servers` on a webhook is the one worth spelling out. OpenAPI is silent
+     * on what it would mean — a webhook is sent to a URL a subscriber
+     * registered out of band, and this document has never seen it — so reading
+     * it as a destination would be inventing a rule, and dropping it would be
+     * the silent weakening this importer refuses everywhere else. It is recorded
+     * per operation, so `exclude` is the way past it.
+     *
+     * A streamed response is refused for the reason core refuses to describe
+     * one: a webhook's response comes back from the subscriber, and nothing on
+     * this side consumes a stream from a subscriber.
+     */
+    private fun checkWebhook(operation: Operation, responses: Responses.Result) {
+        if (operation.node.arr("servers").isNotEmpty()) {
+            unsupported(
+                operation.path / "servers",
+                "This webhook declares servers, and a webhook is sent to the URL a subscriber registered " +
+                    "rather than to a host this document names. There is nothing for the URL here to mean.",
+            )
+        }
+
+        val streamed = responses.successes.filter { it.streams() }
+        if (streamed.isNotEmpty()) {
+            unsupported(
+                operation.path / "responses",
+                "The ${streamed.joinToString { it.status.toString() }} response streams, and this is a " +
+                    "webhook: the response is what the *subscriber* sends back to a call this service made, " +
+                    "and nothing here consumes a stream from a subscriber.",
+            )
+        }
     }
 
     // ---------------------------------------------------------------- shared
@@ -383,6 +465,21 @@ internal class Operation(
     /** The path item's own parameters, which apply to every operation on it. */
     val shared: List<JsonValue>,
     val path: JsonPath,
+    /** The `webhooks` key this was filed under, or null for a route under `paths`. */
+    val webhookName: String? = null,
 ) {
-    val label: String get() = "$id (${method.uppercase()} $template)"
+    val label: String get() =
+        if (webhookName == null) "$id (${method.uppercase()} $template)"
+        else "$id (webhook $webhookName, ${method.uppercase()})"
+}
+
+private fun unnamedMessage(unnamed: List<String>) = buildString {
+    appendLine("${unnamed.size} operation(s) have no operationId:")
+    appendLine()
+    unnamed.forEach { appendLine("    $it") }
+    appendLine()
+    append(
+        "An operationId is what the generated endpoint value, the client method and the handler " +
+            "are named after. Add one to each, and the names stay put when the routes move.",
+    )
 }

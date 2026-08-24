@@ -58,8 +58,20 @@ class ApiClient(
      * which is a worse answer than ignoring a field that is documentation. A
      * generated client honours it, because a client calling somebody else's
      * service is the reading that has to.
+     *
+     * A webhook's operation is refused outright rather than merely unhelpful.
+     * It has no path, so this would build `POST /` and assert about a 404 —
+     * and the service under test does not serve webhooks, because nothing
+     * serves them. Sending one is a generated client's job; see
+     * `dev.pelican.Webhook`.
      */
     fun <I> request(endpoint: Endpoint<I, *>, input: I): RequestSpec {
+        require(endpoint.webhookName == null) {
+            "${endpoint.webhookName} is a webhook: a call this service sends, to a URL a subscriber " +
+                "registered. There is no route here to ask for it, so there is nothing for a test client " +
+                "to call. Assert on the document, or on the sender a generated client provides."
+        }
+
         val values = endpoint.inputs.inject(input)
 
         val path = "/" + endpoint.pathSpec.segments.joinToString("/") { segment ->

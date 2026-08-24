@@ -324,9 +324,10 @@ through `withFacets`; write `examples: [...]` there instead. Nothing here
 synthesises an `examples` array for you, because the only example Pelican knows
 about belongs to the parameter and is already on it.
 
-`webhooks` and the top-level `$self` are 3.1 features and are not emitted.
-There is no endpoint description that means "webhook", so there would be
-nothing to derive one from.
+`webhooks` is a 3.1 feature and *is* emitted, from the `webhooks` a spec
+carries — see [Webhooks](#webhooks-the-calls-the-service-sends). The top-level
+`$self` is not: it names the document's own retrieval URI, and nothing in a set
+of endpoint descriptions says where the document will be published.
 
 **There is no way to ask for 3.0 output, and that is deliberate.** A version
 argument would have to reach the schema sources, because nullability is spelled
@@ -425,6 +426,136 @@ and a live transport is pointed at the one server the suite is asserting about.
 Following a per-operation URL would send one call in the suite to a host nothing
 is running. A generated client honours it because it calls a service somebody
 else runs; a test client calls the service under test.
+
+## Webhooks: the calls the service sends
+
+OpenAPI 3.1 added a top-level `webhooks` map — operations the provider *sends*
+rather than serves. A subscriber registers a URL out of band, and the document
+says what will arrive there. Pelican describes one with `webhook(...)`:
+
+```kotlin
+val orderPlacedEvent = jsonBody<Order>(description = "The order that was just placed")
+val hookSignature = headerParam<String>("X-Signature")
+
+val orderPlaced = webhook("orderPlaced") {
+    body(orderPlacedEvent)
+    header(hookSignature)
+    summary = "Sent to a subscriber when an order is placed"
+    empty(status = 204)
+}
+
+ApiSpec(endpoints = allEndpoints, schemas = JacksonCodecs, webhooks = listOf(orderPlaced))
+Api(endpoints = ordersRoutes, codecs = JacksonCodecs, webhooks = listOf(orderPlaced))
+```
+
+An `Endpoint` was already a description rather than a route: a method, inputs,
+outputs, and no mention of a server. A webhook is that same description read in
+the other direction, which is why the block is the same block — the same
+`body(...)`, `header(...)`, `query(...)`, the same declared failures, the same
+`security(...)`. What it is not is a route.
+
+### A webhook has no path, and that is the whole design
+
+`webhook(...)` takes a name and a method, and there is no `post("...")` to call.
+The name is the identity — it is the key OpenAPI files the operation under, and
+what the generated sender is called. The path is *the subscriber's*, and this
+document has never seen it, so there is nothing here to write down. Writing one
+anyway is refused where it is written:
+
+```kotlin
+webhook("orderPlaced") { post("hooks" / "orders"); empty(status = 204) }
+// The webhook 'orderPlaced' declares the path /hooks/orders, and a webhook has none
+```
+
+So is `servers(...)`, for the same reason: the host it reaches belongs to
+whoever subscribed. The destination is supplied when the call is *sent*, by
+whoever is sending it.
+
+### It cannot be served
+
+`webhooks` is a field of its own on `Api` and `ApiSpec`, beside `endpoints` and
+not among them. The three interpreters build their routes from `endpoints`, so
+there is nothing for them to look at. Two more things hold the line:
+
+- A `Webhook`'s operation carries a `webhookName`, and `Api(...)` and
+  `ApiSpec(...)` refuse one in the endpoints list. `Webhook.operation` is public
+  because `pelican-openapi` and `pelican-codegen` are separate modules and have
+  to read it — Kotlin's `internal` stops at the module boundary — so `webhook
+  handledNow { ... }` will compile. It fails at construction, naming the
+  webhook, rather than quietly serving `POST /`.
+- `AllBackendsTest` asserts the 404 on Pekko, http4k and Ktor, and the same
+  suite asserts the document still declares it. The alternative was a second
+  description model with its own inputs, outputs and DSL — the same code with
+  the arrows reversed, and every future feature written twice.
+
+`pelican-test`'s `ApiClient` refuses one too. `Webhook.operation` is an
+`Endpoint<*, *>`, so `client.call(...)` will not take it — a star projection
+cannot be passed where the input type has to be known — and the check
+underneath is there for anyone who casts past that. A test client calls the
+service under test, and the service under test does not serve webhooks.
+
+### What is generated
+
+The client generator grows one method per webhook, on the same class and out of
+the same emitter that writes the endpoint methods:
+
+```kotlin
+fun orderPlaced(url: String, body: Order, xSignature: String) {
+    val response = text(request("POST", "", origin = url, standingHeaders = emptyMap(), ...))
+    if (!response.succeeded()) failed("POST", url, response)
+}
+```
+
+The destination is the first parameter because the document does not know it.
+Nothing is appended to it — the URL a subscriber gave is the whole address, and
+a client inventing a path on somebody else's host would be a bug. And the
+client's standing `headers()` are deliberately *not* sent: those are the
+credential it presents to the API, and a subscriber is not the API. What a
+receiver wants instead is declared on the webhook and arrives as a typed
+parameter, as `X-Signature` does above.
+
+### The response is the receiver's
+
+The output model is reused as it stands, because reading a receiver's response
+is reading a response. What changes is *who* is promising it — a subscriber the
+document's author does not control — so a declared 204 says what a receiver is
+expected to do rather than what this service guarantees, and a declared failure
+is a hint rather than a contract. The generated sender reads it exactly as it
+reads any response, `Outcome` and all.
+
+One output kind is refused. `ndjson<T>()`, `sse<T>()`, `jsonArray<T>()` and
+`bytes()` are declared in terms of `StreamOf`/`ByteStream`, phantom markers
+whose only job is to type a *handler* that produces the stream in the backend's
+own type. A webhook has no handler on this side, so the marker would stand for
+something that cannot exist — and on the reading end it would leave a sender
+holding an open connection to a subscriber. Declare what a receiver returns: an
+`empty(204)`, or a small `json<T>()`.
+
+### `servers` and `security` are not inherited
+
+The specification is silent on both, and the silence is not an oversight worth
+guessing past. Root `servers` gives "connectivity information to a target
+server" and root `security` applies "across the API" — neither can mean a
+webhook, whose request goes to a URL a subscriber chose and carries whatever
+credential *that* subscriber asked for.
+
+So a webhook inherits neither. It says what it requires with `security(...)` or
+says nothing, and where it said nothing the document says nothing: a
+`security: []` would have claimed the receiver wants no credential, which is a
+claim nobody made. A scheme that only a webhook requires is still declared under
+`components.securitySchemes`, since schemes are collected from the requirements
+that reach them.
+
+### Importing them
+
+A document's `webhooks` is read into `webhook(...)` declarations and a
+`<name>Webhooks` list, and the round trip closes: `:example` publishes a
+document with one in it, imports it, and compares the two documents on every
+build. Two refusals are specific to this direction, both recorded per operation
+so `exclude` gets you past them: `servers` under a webhook, which has no
+reading, and a streamed response, for the reason above. An `operationId` is
+required exactly as it is for a route, and the two share a namespace — both
+become top-level values in one generated file.
 
 ## The Gradle plugin
 
@@ -673,8 +804,9 @@ What it refuses, and what each one would have cost:
 | `deepObject`, or a `style` and an `explode` that contradict each other | `deepObject` spreads an object over several names, and the rest name a separator that the `explode` beside them makes meaningless |
 | A list constrained by `minItems`, `maxItems` or `uniqueItems` | A refinement narrows what one value decodes to and can say nothing about how many arrived, so the constraint would be republished and enforced by nobody |
 | Two file parts in a multipart body | The same rule `endpoint(...)` enforces at class-init: reading stops at the first file so it can be streamed |
-| `callbacks` | A call the service makes back to the caller, which is the other direction again |
-| `webhooks` | Calls the service makes rather than answers. Nothing here describes those, and dropping them would generate a client missing half of what the document offers |
+| `callbacks` | A request the service makes *during* an operation, to a URL taken out of that operation's own payload through a runtime expression — `{$request.body#/callbackUrl}`. Nothing in an endpoint description evaluates one. A `webhooks` entry is the case that *is* imported: one call, to a URL a subscriber registered, which a description can say and a sender can make |
+| `servers` under a webhook | A webhook is sent to the URL a subscriber registered, and OpenAPI says nothing about what a Server Object beside it would mean. See [Webhooks](#webhooks-the-calls-the-service-sends) |
+| A streamed response on a webhook | The response is what the *subscriber* sends back to a call this service made, and nothing here consumes a stream from a subscriber |
 | A `$ref` to another host | A build that fetches a URL to know what to generate cannot be reproduced. Bundle or vendor the document — or name the host on purpose and pin what it served, which is [below](#allowing-a-host-on-purpose) |
 
 Each failure names the operation, the position in the document, and what to do.
@@ -2923,6 +3055,16 @@ open  localhost:8080/api-docs                                 # Swagger UI
   [Importing an OpenAPI document](#importing-an-openapi-document).
 - **More than six typed inputs.** `endpoint(a..f)` is the largest overload;
   past that the lens form takes the whole `Params`.
+- **`callbacks`.** A request made *during* an operation, to a URL taken out of
+  that operation's own payload through a runtime expression, and nothing in an
+  endpoint description evaluates one. Its neighbour in the specification, a
+  top-level `webhooks` entry, *is* described and generated — one call to a URL a
+  subscriber registered. See
+  [Webhooks](#webhooks-the-calls-the-service-sends).
+- **A binder for the receiving end of somebody else's webhook.** There is
+  nothing to add: a webhook you receive arrives at a path on your own service,
+  so it is an ordinary `endpoint(...)` with a handler. `webhook(...)` is for the
+  half you send.
 - **A fourth server backend.** `pelican-ktor` was the third, and cost what
   `pelican-http4k` cost: the binders above, a request-to-`Params` step and a
   response writer, in about 500 lines including the comments.
