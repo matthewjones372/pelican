@@ -28,6 +28,11 @@ getBookmark handledOrFail { id ->                    // id: Long, already decode
 Change the path parameter's type, the response type or the declared error, and
 the handler stops compiling.
 
+Interpreting a description is not free, and what it costs is measured rather
+than argued about — a few hundred nanoseconds against a route someone tuned by
+hand, and cheaper than the idiomatic one. The numbers, and the two baselines
+they need, are in [what it costs](docs/what-it-costs.md).
+
 ## Why you might want this
 
 **Your docs cannot drift.** The OpenAPI document is generated from the endpoint
@@ -58,17 +63,34 @@ streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
 
 ## Contents
 
-[Install](#install) · [A whole service, in one file](#a-whole-service-in-one-file) ·
-[What the compiler catches](#what-the-compiler-catches) ·
-[Describing endpoints](#describing-endpoints) · [Running a server](#running-a-server) ·
-[Testing](#testing) · [A generated Kotlin client](#a-generated-kotlin-client) ·
-[Importing a document](#importing-an-openapi-document) ·
-[Backends](#backends) · [The same endpoints, by hand](#the-same-endpoints-by-hand) ·
-[What it costs](#what-it-costs) · [Modules](#modules) ·
-[Running the examples](#running-the-examples) · [Known limits](#known-limits)
+**[Getting started](#getting-started)** — [Install](#install) ·
+[Your first endpoint](#your-first-endpoint) ·
+[What the compiler catches](#what-the-compiler-catches)
+
+**[Describing endpoints](#describing-endpoints)** —
+[Inputs and validation](#inputs-and-validation) ·
+[Declared failures](#declared-failures) ·
+[More than one successful response](#more-than-one-successful-response) ·
+[Streaming](#streaming) · [Cookies, forms and uploads](#cookies-forms-and-uploads) ·
+[Response headers](#response-headers) · [Webhooks](#webhooks)
+
+**[Serving, testing, sharing](#serving-testing-sharing)** —
+[Running a server](#running-a-server) · [Testing](#testing) ·
+[A generated Kotlin client](#a-generated-kotlin-client) ·
+[Importing a document](#importing-an-openapi-document) · [Backends](#backends)
+
+**[Appendix](#appendix)** —
+[A whole service, in one file](#a-whole-service-in-one-file) ·
+[The same endpoints, by hand](#the-same-endpoints-by-hand) ·
+[Modules](#modules) · [Running the examples](#running-the-examples) ·
+[Versions](#versions)
 
 The reference manual, with the reasoning behind each design decision, is
 [docs/reference.md](docs/reference.md).
+
+---
+
+# Getting started
 
 ## Install
 
@@ -95,128 +117,56 @@ either — so until it is, tell the build where to find it:
 pluginManagement { repositories { mavenLocal(); gradlePluginPortal() } }
 ```
 
-## A whole service, in one file
+## Your first endpoint
 
-Models, inputs, endpoints, handlers, store, server and docs. This block lives in
-the repo as [`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt),
-so it compiles on every build. Run it with `./gradlew :example:runReadmeExample`.
+One endpoint, the server that serves it, and the two things worth asserting
+about it. Everything here is compiled — it is
+[`FirstEndpoint.kt`](example/src/main/kotlin/example/hello/FirstEndpoint.kt) in
+the example module, so the front page cannot drift from what runs.
 
 ```kotlin
-import dev.pelican.*
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.pekko.*
-import dev.pelican.pekko.docs.Docs
-import dev.pelican.pekko.docs.startWithDocs
-import org.apache.pekko.stream.javadsl.Source
+data class Greeting(val message: String)
 
-// ---------------------------------------------------------------- 1. models
+val who = pathParam<String>("who", description = "Who to greet")
 
-data class Bookmark(val id: Long, val url: String, val title: String, val tags: List<String> = emptyList())
-data class CreateBookmark(val url: String, val title: String, val tags: List<String> = emptyList())
-data class NoSuchBookmark(val id: Long, val message: String)
-
-// ---------------------------------------------------------------- 2. inputs
-//
-// Declared once as values, and reused by the route, the decoder, the document
-// and the test client. Refinements are enforced *and* documented.
-
-@JvmInline value class Slug(val value: String)
-
-val slug = StringCodec
-    .matching(Regex("[a-z0-9-]{1,40}"), "a slug: lowercase letters, digits and dashes")
-    .map(::Slug, Slug::value)
-    .describedAs("A URL-safe tag", example = "streams")
-
-val bookmarkId  = pathParam<Long>("bookmarkId", description = "The bookmark's id")
-val limit       = queryParam("limit", IntCodec.between(1, 100), description = "How many to return").default(20)
-val tag         = queryParam("tag", slug, description = "Only bookmarks with this tag").optional()
-val apiKey      =
-    headerParam("X-Api-Key", StringCodec.nonEmpty().describedAs("The caller's API key", example = "let-me-in"))
-val newBookmark = jsonBody<CreateBookmark>(description = "The bookmark to save")
-
-val bookmarkMissing = errorJson<NoSuchBookmark>(404, "No bookmark with that id")
-val badKey          = errorJson<ApiError>(401, "Missing or bad API key")
-
-// ------------------------------------------------------------- 3. endpoints
-//
-// This section imports `dev.pelican` and nothing else. No Pekko, no Jackson.
-// These are descriptions: they do no work and hold no handler.
-
-val getBookmark = endpoint(bookmarkId) {
-    get("bookmarks" / bookmarkId)
-    summary = "Fetch one bookmark"
-    tag("bookmarks")
-    json<Bookmark>() orFail bookmarkMissing
+val greet = endpoint(who) {
+    get("hello" / who)
+    summary = "Greet somebody by name"
+    json<Greeting>()
 }
 
-val listBookmarks = endpoint(limit, tag) {
-    get("bookmarks")
-    summary = "List bookmarks, newest first"
-    tag("bookmarks")
-    jsonArray<Bookmark>()            // chunked `[{...},{...}]`, flushed as produced
-}
-
-val createBookmark = endpoint(apiKey, newBookmark) {
-    post("bookmarks")
-    summary = "Save a bookmark"
-    tag("bookmarks")
-    json<Bookmark>(status = 201) orFail badKey
-}
-
-// ----------------------------------------------------------------- 4. store
-
-object Bookmarks {
-    private val saved = mutableListOf(Bookmark(1, "https://pekko.apache.org", "Pekko", listOf("streams")))
-    private var nextId = 2L
-
-    fun find(id: Long) = saved.firstOrNull { it.id == id }
-    fun list(limit: Int, tag: Slug?) = saved.filter { tag == null || tag.value in it.tags }.take(limit)
-    fun add(req: CreateBookmark) = Bookmark(nextId++, req.url, req.title, req.tags).also { saved += it }
-}
-
-// -------------------------------------------------------------- 5. handlers
-//
-// The only place that knows a stream is a `Source`. Every parameter arrives
-// decoded and typed, in the order the endpoint declared it.
-
-val routes = listOf(
-    getBookmark handledOrFail { id ->                       // id: Long
-        Bookmarks.find(id)?.let { ok(it) }
-            ?: bookmarkMissing(NoSuchBookmark(id, "No bookmark $id"))
-    },
-
-    listBookmarks streamedNow { (max, tag) ->               // max: Int, tag: Slug?
-        Source.from(Bookmarks.list(max, tag))
-    },
-
-    createBookmark handledOrFail { (key, req) ->            // key: String, req: CreateBookmark
-        if (key != "let-me-in") badKey(ApiError(401, "Bad API key"))
-        else ok(Bookmarks.add(req))
-    },
+fun greetings() = Api(
+    endpoints = listOf(greet handledNow { name -> Greeting("Hello, $name!") }),
+    codecs = JacksonCodecs,
+    title = "Greetings",
+    version = "1.0.0",
 )
 
-// ---------------------------------------------------------------- 6. server
-
 fun main() {
-    val api = Api(routes, codecs = JacksonCodecs, title = "Bookmarks", version = "1.0.0")
-    val server = api.startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
-    println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
+    greetings().startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
 }
 ```
 
-Swagger UI is at `/api-docs` and the document at `/openapi.json`. Both are
-generated from the values above.
+`./gradlew :example:runFirstEndpoint` serves it on `:8080`, with Swagger UI at
+`/api-docs` built from the same value — there is no second file describing this
+endpoint, and nothing scanned an annotation to find it.
 
-```bash
-curl localhost:8080/bookmarks/1          # {"id":1,"url":"https://pekko.apache.org",...}
-curl localhost:8080/bookmarks/42         # 404 {"id":42,"message":"No bookmark 42"}
-curl 'localhost:8080/bookmarks?limit=0'  # 400, naming the constraint it broke
-open localhost:8080/api-docs             # Swagger UI
+The test names the endpoint rather than the URL, and then pins the URL on
+purpose, because those are two different promises: one to your own code, one to
+your callers.
+
+```kotlin
+private val app = greetings().inMemory("first-endpoint")
+
+app.call(greet, "world") shouldBe Greeting("Hello, world!")
+app.request(greet, "world") shouldBuild "GET /hello/world"
 ```
 
----
+Rename `who`, change `Greeting`, or add a declared failure, and the handler and
+the first assertion stop compiling. The second keeps answering a different
+question: whether the URL your callers hold still exists.
 
-# What the compiler catches
+## What the compiler catches
 
 Each of these came from feeding the mistake to the compiler:
 
@@ -535,7 +485,9 @@ of the description nobody publishing it controls. See
 
 ---
 
-# Running a server
+# Serving, testing, sharing
+
+## Running a server
 
 ```kotlin
 ordersApi().start(port = 8080)                                  // endpoints only
@@ -555,34 +507,57 @@ created it: whoever made a system is who ends it. `toRoute(system)` is still
 there for a service that concatenates Pelican's route with its own and binds
 the result itself.
 
-## Filters
+### Filters
 
-```kotlin
-Api(routes, JacksonCodecs, filters = listOf(requireToken, rateLimit))
-```
+A filter runs around every handler and sees the request with its inputs already
+decoded — `p[reportId]` is a `Long`, not a string to parse again. Rejecting is
+throwing: `unauthorized()`, `forbidden()`, `tooManyRequests(retryAfterSeconds = 3600)`,
+so a refusal is rendered by the code that renders every other failure, on all
+three backends.
 
-A filter runs around every handler, outermost first, and sees the request with
-its inputs already decoded. Rejecting is throwing: `unauthorized()`,
-`forbidden()`, `tooManyRequests(retryAfterSeconds = 30)`, so a refusal is
-rendered by the code that renders every other failure, on all three backends.
-What the filter works out goes into an attribute:
+What a filter works out goes into an *attribute*, which is how it reaches the
+handler without becoming an input the document would have to declare:
 
 ```kotlin
 val caller = attribute<Caller>("caller")
 
 val requireToken = before { p ->
-    p[caller] = Tokens.check(p) ?: unauthorized("Present a bearer token")
+    val presented = p[authorization]?.removePrefix("Bearer ")
+    p[caller] = tokens[presented] ?: unauthorized("Present a bearer token")
 }
 
-getReport handledNow { id -> Reports.visibleTo(p[caller], id) }
+val rateLimit = before { p ->
+    val who = p[caller]                              // already there: requireToken ran first
+    if (who.plan == "free" && seen(who).incrementAndGet() > 100) {
+        tooManyRequests("100 requests an hour on the free plan", retryAfterSeconds = 3600)
+    }
+}
 ```
 
-`:example:runSecured` takes this to its conclusion: one filter that reads
+Register them once, outermost first — that ordering is why `rateLimit` can read
+what `requireToken` established:
+
+```kotlin
+Api(endpoints, JacksonCodecs, filters = listOf(requireToken, rateLimit))
+```
+
+And the handler reads the attribute off its receiver. There is no second check
+here, and no way for this handler to have skipped the first:
+
+```kotlin
+getReport handledNow { (id, _) -> Report(id, "Q3", visibleTo = this[caller].subject) }
+```
+
+That whole example is
+[`FilterExample.kt`](example/src/main/kotlin/example/filters/FilterExample.kt),
+compiled on every build.
+
+`:example:runSecured` takes the idea to its conclusion: one filter that reads
 `endpoint.security`, the same list that drew the padlock in Swagger UI, and holds
 the caller to it. Add an endpoint with `security(idp, "reports:admin")` and it is
 covered before it is bound, with no second list to keep up to date.
 
-## Unhandled exceptions
+### Unhandled exceptions
 
 ```
 500 {"status":500,"error":"Internal server error","detail":"Reference: f3ef2bdef43b"}
@@ -601,7 +576,7 @@ the stack trace, with the reference in both so they join up. Set
 fields your log aggregator wants. Declared failures are unaffected: a 404 you
 described still carries the payload you described.
 
-## Size limits and startup checks
+### Size limits and startup checks
 
 ```kotlin
 Api(
@@ -622,7 +597,7 @@ documented endpoint that answers 404. Binding two handlers to the same route,
 where the second could never be reached, fails at startup with no opting in at
 all.
 
-## CORS
+### CORS
 
 ```kotlin
 Api(routes, JacksonCodecs, cors = cors("https://app.example.com"))
@@ -646,7 +621,7 @@ name, so a browser gains permission to send it the moment it is described. The
 headers go on error responses too, so a browser shows your 400 instead of a bare
 network error.
 
-## Choosing a JSON library
+### Choosing a JSON library
 
 ```kotlin
 Api(routes, codecs = JacksonCodecs)      // Jackson + swagger-core schemas
@@ -677,9 +652,7 @@ properties is refused rather than imported into a hierarchy that would decode
 nothing — see
 [docs/reference.md](docs/reference.md#two-levels-of-hierarchy).
 
----
-
-# Testing
+## Testing
 
 `pelican-test` interprets the same descriptions a third way, as a client.
 
@@ -717,7 +690,7 @@ of its own and puts none on your classpath. Every suite runs twice, in memory
 and over a real socket, so a difference between the two is a real difference in
 behaviour.
 
-## Pinning the URL
+### Pinning the URL
 
 Nothing above mentions a path, which is what stops those tests drifting off your
 endpoints — and also what stops them noticing when `"bookmarks"` becomes
@@ -739,9 +712,7 @@ app.request(deleteBookmark, In2(1L, key)) shouldBuild "DELETE /bookmarks/1"
 transport. It is the one test in the suite that *should* fail on a rename: a
 red line here is the 404 your callers would have found for you.
 
----
-
-# A generated Kotlin client
+## A generated Kotlin client
 
 Callers who cannot hold the descriptions, because they are in another repository
 or on another release cycle, get a file generated from them instead. It is a
@@ -823,9 +794,7 @@ is Jackson, and a spec with no union generates the same client either way.
 is the same thing without the build task, for a build that would rather make the
 call itself.
 
----
-
-# Importing an OpenAPI document
+## Importing an OpenAPI document
 
 The other direction, for the two cases where the descriptions are not yours to
 write first: calling somebody else's API, and building a service against a spec
@@ -964,9 +933,7 @@ This repository imports its own document on every build: `:example` publishes
 compiles them, and compares what those publish against what it started with.
 See `ImportedOrdersTest`.
 
----
-
-# Backends
+## Backends
 
 The backend is a choice about handlers. Bind the same endpoint values with
 another module's binders and the only thing that changes is the type a streaming
@@ -1010,7 +977,128 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 ---
 
-# The same endpoints, by hand
+# Appendix
+
+## A whole service, in one file
+
+Models, inputs, endpoints, handlers, store, server and docs. This block lives in
+the repo as [`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt),
+so it compiles on every build. Run it with `./gradlew :example:runReadmeExample`.
+
+```kotlin
+import dev.pelican.*
+import dev.pelican.jackson.JacksonCodecs
+import dev.pelican.pekko.*
+import dev.pelican.pekko.docs.Docs
+import dev.pelican.pekko.docs.startWithDocs
+import org.apache.pekko.stream.javadsl.Source
+
+// ---------------------------------------------------------------- 1. models
+
+data class Bookmark(val id: Long, val url: String, val title: String, val tags: List<String> = emptyList())
+data class CreateBookmark(val url: String, val title: String, val tags: List<String> = emptyList())
+data class NoSuchBookmark(val id: Long, val message: String)
+
+// ---------------------------------------------------------------- 2. inputs
+//
+// Declared once as values, and reused by the route, the decoder, the document
+// and the test client. Refinements are enforced *and* documented.
+
+@JvmInline value class Slug(val value: String)
+
+val slug = StringCodec
+    .matching(Regex("[a-z0-9-]{1,40}"), "a slug: lowercase letters, digits and dashes")
+    .map(::Slug, Slug::value)
+    .describedAs("A URL-safe tag", example = "streams")
+
+val bookmarkId  = pathParam<Long>("bookmarkId", description = "The bookmark's id")
+val limit       = queryParam("limit", IntCodec.between(1, 100), description = "How many to return").default(20)
+val tag         = queryParam("tag", slug, description = "Only bookmarks with this tag").optional()
+val apiKey      =
+    headerParam("X-Api-Key", StringCodec.nonEmpty().describedAs("The caller's API key", example = "let-me-in"))
+val newBookmark = jsonBody<CreateBookmark>(description = "The bookmark to save")
+
+val bookmarkMissing = errorJson<NoSuchBookmark>(404, "No bookmark with that id")
+val badKey          = errorJson<ApiError>(401, "Missing or bad API key")
+
+// ------------------------------------------------------------- 3. endpoints
+//
+// This section imports `dev.pelican` and nothing else. No Pekko, no Jackson.
+// These are descriptions: they do no work and hold no handler.
+
+val getBookmark = endpoint(bookmarkId) {
+    get("bookmarks" / bookmarkId)
+    summary = "Fetch one bookmark"
+    tag("bookmarks")
+    json<Bookmark>() orFail bookmarkMissing
+}
+
+val listBookmarks = endpoint(limit, tag) {
+    get("bookmarks")
+    summary = "List bookmarks, newest first"
+    tag("bookmarks")
+    jsonArray<Bookmark>()            // chunked `[{...},{...}]`, flushed as produced
+}
+
+val createBookmark = endpoint(apiKey, newBookmark) {
+    post("bookmarks")
+    summary = "Save a bookmark"
+    tag("bookmarks")
+    json<Bookmark>(status = 201) orFail badKey
+}
+
+// ----------------------------------------------------------------- 4. store
+
+object Bookmarks {
+    private val saved = mutableListOf(Bookmark(1, "https://pekko.apache.org", "Pekko", listOf("streams")))
+    private var nextId = 2L
+
+    fun find(id: Long) = saved.firstOrNull { it.id == id }
+    fun list(limit: Int, tag: Slug?) = saved.filter { tag == null || tag.value in it.tags }.take(limit)
+    fun add(req: CreateBookmark) = Bookmark(nextId++, req.url, req.title, req.tags).also { saved += it }
+}
+
+// -------------------------------------------------------------- 5. handlers
+//
+// The only place that knows a stream is a `Source`. Every parameter arrives
+// decoded and typed, in the order the endpoint declared it.
+
+val routes = listOf(
+    getBookmark handledOrFail { id ->                       // id: Long
+        Bookmarks.find(id)?.let { ok(it) }
+            ?: bookmarkMissing(NoSuchBookmark(id, "No bookmark $id"))
+    },
+
+    listBookmarks streamedNow { (max, tag) ->               // max: Int, tag: Slug?
+        Source.from(Bookmarks.list(max, tag))
+    },
+
+    createBookmark handledOrFail { (key, req) ->            // key: String, req: CreateBookmark
+        if (key != "let-me-in") badKey(ApiError(401, "Bad API key"))
+        else ok(Bookmarks.add(req))
+    },
+)
+
+// ---------------------------------------------------------------- 6. server
+
+fun main() {
+    val api = Api(routes, codecs = JacksonCodecs, title = "Bookmarks", version = "1.0.0")
+    val server = api.startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
+    println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
+}
+```
+
+Swagger UI is at `/api-docs` and the document at `/openapi.json`. Both are
+generated from the values above.
+
+```bash
+curl localhost:8080/bookmarks/1          # {"id":1,"url":"https://pekko.apache.org",...}
+curl localhost:8080/bookmarks/42         # 404 {"id":42,"message":"No bookmark 42"}
+curl 'localhost:8080/bookmarks?limit=0'  # 400, naming the constraint it broke
+open localhost:8080/api-docs             # Swagger UI
+```
+
+## The same endpoints, by hand
 
 Two endpoints. `GET /bookmarks/{bookmarkId}` answers with a `Bookmark` or a 404
 carrying a `NoSuchBookmark`. `GET /bookmarks` takes a `limit` that defaults to
@@ -1218,7 +1306,7 @@ fun main() {
 }
 ```
 
-## What the second version does not have to keep in step
+### What the second version does not have to keep in step
 
 The length is the least of it. What the first version costs is the number of
 places that say the same thing and are never compared:
@@ -1289,76 +1377,7 @@ The Pekko block is illustrative and not part of the build, unlike
 [`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt).
 The Pelican half is that file, two endpoints of it.
 
----
-
-# What it costs
-
-A description has to be interpreted, and that is not free. What it costs is
-measured rather than argued about:
-[`OverheadBenchmark`](example/src/test/kotlin/example/OverheadBenchmark.kt)
-serves one endpoint twice — once described with Pelican and interpreted onto
-http4k, once written directly against http4k's own routing — and compares them.
-Both decode a path parameter and an optional query parameter, and both encode
-the same object with the same Jackson mapper, so what is left in the difference
-is the interpreter.
-
-| against | per request |
-|---|---|
-| http4k written the ordinary way | **0-35ns, 112 bytes** |
-| http4k with the response hand-tuned | ~150ns, ~400 bytes |
-| Pekko, idiomatic (`PathMatchers` + `parameterOptional`) | 95ns and 1.4KB *faster* |
-| Pekko, `PathMatchers` with the query read off the request | level on time, ~570 bytes lighter |
-| Pekko, one directive and both read off the request | ~140ns, ~950 bytes |
-
-Two baselines each, because one would flatter. An http4k `Response` is immutable, so
-the idiomatic `Response(status).header(...).body(...)` copies it at each step —
-three responses and two header lists where one of each will do. Pelican builds
-it in one construction, which is worth about 300 bytes a request and is most of
-why the first row is what it is. The second row is the honest comparison
-against someone who has done the same thing by hand.
-
-Pelican beating an idiomatic Pekko route is not a claim that the library is
-faster than the server it runs on — it is a claim about `parameterOptional`,
-which costs about 100ns and 900 bytes a request. Take that one directive out
-and a hand-written route draws level; write the whole thing as a single
-`extractRequest` that reads the path and query itself — which is what the
-interpreter does — and the hand-written version is ~140ns ahead, where you
-would expect it to be. Three Pekko rows rather than one because the first
-number on its own would leave the wrong impression.
-[`PekkoOverheadBenchmark`](example/src/test/kotlin/example/PekkoOverheadBenchmark.kt)
-seals every route with `Route.function(system)`, so none of them pays for a
-socket.
-
-Reading a body is the other half of the story, and the one where Pekko's
-streams actually turn: `toStrict` materialises. A POST with a JSON body costs
-~11µs on this backend whoever writes the route — two orders of magnitude more
-than the routing above — and the interpreter is about a microsecond *under* a
-hand-written `extractStrictEntity`, because it asks Pekko for the cheaper of
-two reads when the request declared its length. See
-[`ChunkedBodyLimitTest`](pelican-pekko/src/test/kotlin/dev/pelican/pekko/ChunkedBodyLimitTest.kt)
-for why the other read still exists.
-
-For scale: a loopback socket round trip is tens of microseconds and a database
-call is milliseconds, so on a realistic endpoint this is a fraction of a
-percent. It does not grow with the endpoint either — the cost is the
-per-request bag of decoded values, the `Params` around it and the response, and
-none of those scale with how many inputs are declared or how big the payload
-is. An endpoint that decodes nothing pays much the same as one that decodes
-two, which on the smaller absolute numbers of an empty endpoint reads as a
-larger ratio.
-
-```bash
-./gradlew :example:test -Dbenchmark=true --tests "*OverheadBenchmark*"   # both
-```
-
-It is not JMH: one JVM, no forks, no blackholes. Treat the ratio as sound and
-the absolute numbers as indicative. It runs only when asked for, and turns the
-coverage agent off for itself — measuring through instrumentation reports the
-agent rather than the library, which cost an afternoon to notice.
-
----
-
-# Modules
+## Modules
 
 Fifteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
 rather than convention.
@@ -1384,9 +1403,7 @@ absent, and `pelican-test` asserts it drags in no server library and no matcher
 library. The full breakdown is in
 [docs/reference.md](docs/reference.md#modules).
 
----
-
-# Running the examples
+## Running the examples
 
 ```bash
 ./gradlew build                          # all modules: tests, detekt, spotless, coverage
@@ -1403,66 +1420,7 @@ library. The full breakdown is in
 plugin, and they start nothing: `pelican-openapi` and `pelican-codegen` depend
 on core alone, so neither needs an HTTP library present.
 
----
-
-# Known limits
-
-The ones most likely to affect whether Pelican fits. The full list, with the
-reasoning behind each, is in [docs/reference.md](docs/reference.md#what-isnt-here).
-
-- **Security schemes are documented, not enforced.** `security(scheme, "scope")`
-  describes what a caller must present and draws the padlock; checking the token
-  is yours. `:example:runSecured` is one filter, derived from `endpoint.security`,
-  that covers every endpoint including ones added later.
-- **OpenAPI 3.1 only.** JSON Schema 2020-12, `type: ["string", "null"]` where 3.0
-  wrote `nullable: true`, numeric exclusive bounds. There is no switch back, and
-  tooling that reads only 3.0 is not served. See the
-  [migration note](docs/reference.md#moving-from-303-to-310).
-- **One *streamed* file part per multipart endpoint, and it goes last.** Reading
-  stops there so the handler gets a live stream. A second streamed part is a
-  startup failure and a text part after it is a 400. Any number of parts may be
-  held in memory instead — `bufferedFile("thumbnail", maxBytes = 256 * 1024)` —
-  which is what makes a two-file upload form describable, and the bound is
-  required so that what it costs is visible where it is chosen.
-- **No response negotiation.** One media type per response, and nothing reads
-  `Accept` to choose between two renderings of one. A *request* body may declare
-  several encodings of one payload — `formBody<Order>() or jsonBody<Order>()`,
-  picked by `Content-Type`, 415 for anything else — but a different schema under
-  each media type is several payloads, and a handler is given one value of one
-  type.
-- **A streamed response is the only success it can be.** An endpoint declaring
-  several 2xx names the one it is producing, and producing a stream means
-  handing over the backend's own type, which core cannot name. `ndjson<Order>()
-  orFail noSuchUser` is unchanged; `ndjson<Order>() or empty(202)` is refused.
-- **Importing is all-or-nothing per operation.** A document Pelican cannot fully
-  describe fails the build rather than generating a weaker endpoint. The way
-  through is an `exclude` list of `operationId`s in the build file, which is
-  deliberately per-operation and reviewable — or, for an undiscriminated
-  `oneOf` specifically, a per-schema `discriminator(...)` that states the fact
-  the document left out rather than losing the operation. See
-  [Importing an OpenAPI document](#importing-an-openapi-document).
-- **Six typed inputs, then the lens form.** `endpoint(a..f)` is the largest tuple
-  overload. Past that, `endpoint { }` reads `Params` by key at the cost of the
-  compile-time guarantee. Two adjacent inputs of the same primitive type can also
-  be swapped by mistake; a value class and `map`/`mapOrFail` fixes it.
-- **`callbacks` are not described; `webhooks` are.** A callback is a request
-  made *during* an operation, to a URL pulled out of that operation's own
-  payload by a runtime expression, and nothing here evaluates one. A webhook is
-  one call to a URL a subscriber registered, which a description can say and a
-  generated sender can make — see [Webhooks](#webhooks). A webhook you
-  *receive* needs nothing special: it arrives at a path on your service, so it
-  is an ordinary `endpoint(...)`.
-- **405 vs 404 fidelity is the router's, not Pelican's.** A wrong method on a
-  known path is 405 on http4k, 404 on Ktor, and either on Pekko depending on
-  what else is declared. `MethodMismatchTest` and `KtorInterpreterTest` pin it.
-- **The generated client is a file, not a live binding.** Regenerate it when the
-  descriptions change. A test comparing the checked-in file to a fresh one is
-  the cheapest guard. Point its `Codecs` at `JsonInclude.Include.NON_NULL`, or
-  an optional body property sends `null` where the server expected absence.
-
----
-
-# Versions
+## Versions
 
 Kotlin 2.2.20 · Pekko 1.6.0 · Pekko HTTP 1.4.0 · http4k 6.22.0.0 · Ktor 3.5.2 ·
 Jackson 2.22.2 · swagger-core 2.2.54 · kotlinx.serialization 1.9.0 ·

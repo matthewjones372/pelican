@@ -94,6 +94,14 @@ tasks.register<JavaExec>("runBackends") {
     mainClass.set("example.backends.MainKt")
 }
 
+/** The README's "Your first endpoint", kept runnable for the same reason. */
+tasks.register<JavaExec>("runFirstEndpoint") {
+    group = "application"
+    description = "Runs the one-endpoint example from the README"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.hello.FirstEndpointKt")
+}
+
 /** The README's example, kept runnable so the front page cannot drift. */
 tasks.register<JavaExec>("runReadmeExample") {
     group = "application"

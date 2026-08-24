@@ -3105,7 +3105,7 @@ Two smaller things. The Pekko route tests run through Pekko's own route
 testkit, behind a JUnit 5 extension in `PekkoRouteTestKit` — the testkit drives
 its `ActorSystem` from a JUnit 4 `@Rule`, which Jupiter does not run. And
 `OverheadBenchmark` measures what the interpreter costs against a hand-written
-http4k route; see [What it costs](../README.md#what-it-costs).
+http4k route; see [What it costs](what-it-costs.md).
 
 ## Run it
 
