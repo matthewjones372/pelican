@@ -1,13 +1,30 @@
+<div align="center">
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pelican-mark-dark.svg">
-  <img src="docs/assets/pelican-mark-light.svg" width="56" height="56" alt="">
+  <img src="docs/assets/pelican-mark-light.svg" width="88" height="88" alt="">
 </picture>
 
 # Pelican
 
-Type-safe HTTP for Kotlin. You describe an endpoint once, as a value. Pelican
-turns that one description into the server route, the OpenAPI document, a test
-client, and a generated Kotlin client for your callers.
+**Type-safe HTTP for Kotlin.** Describe an endpoint once, as a value.
+
+[![build](https://github.com/matthewjones372/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
+[![Kotlin 2.2.20](https://img.shields.io/badge/Kotlin-2.2.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1-6BA539?logo=openapiinitiative&logoColor=white)](https://spec.openapis.org/oas/v3.1.0)
+[![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
+[Getting started](#getting-started) · [Describing endpoints](#describing-endpoints) ·
+[Serving and testing](#serving-and-testing) · [Reference manual](docs/reference.md)
+
+</div>
+
+---
+
+You describe an endpoint once, as a value. Pelican turns that one description
+into the server route, the OpenAPI document, a test client, and a generated
+Kotlin client for your callers — there is no second source of truth, because
+there is no second description.
 
 Runs on Pekko HTTP, http4k or Ktor. Roughly what tapir is for Scala, scoped to
 what Kotlin's type system can express without implicits.
@@ -89,6 +106,11 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
+> [!NOTE]
+> Pre-release. Nothing is published to Maven Central or the Gradle Plugin Portal
+> yet, so today you install locally — one command, and both work as normal
+> dependencies afterwards.
+
 Not on Maven Central yet. `./gradlew publishToMavenLocal` installs all fifteen
 modules at `dev.pelican:<module>:0.1.0-SNAPSHOT` with sources and javadoc, so
 `mavenLocal()` or `includeBuild` both work today. The Gradle plugin is a build
@@ -142,7 +164,11 @@ fun main() {
 }
 ```
 
-`./gradlew :example:runFirstEndpoint` serves it on `:8080`, with Swagger UI at
+> [!TIP]
+> `./gradlew :example:runFirstEndpoint` serves this on `:8080` — the endpoint and
+> a Swagger UI page for it, from the one value above.
+
+It serves on `:8080`, with Swagger UI at
 `/api-docs` built from the same value — there is no second file describing this
 endpoint, and nothing scanned an annotation to find it.
 
@@ -757,22 +783,14 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 Five things that wanted a page rather than a section, and one benchmark:
 
-- **[A whole service, in one file](docs/a-whole-service.md)** — models, inputs,
-  endpoints, handlers, store, server and docs, all of it at once. Compiled on
-  every build as `ReadmeExample.kt`.
-- **[A generated Kotlin client](docs/generated-client.md)** — what callers who
-  cannot hold the descriptions get instead, and what the generator does with a
-  union, a failure or a stream.
-- **[Importing an OpenAPI document](docs/importing.md)** — a document somebody
-  else wrote, read into descriptions: what comes out, what is refused, and the
-  two settings that get you past a document you do not own.
-- **[The same endpoints, by hand](docs/by-hand.md)** — the same two endpoints
-  written directly against Pekko HTTP, so what the descriptions buy is legible
-  rather than asserted.
-- **[Modules](docs/modules.md)** — what each of the fifteen modules is for and
-  what it depends on, for deciding which ones your build needs.
-- **[What it costs](docs/what-it-costs.md)** — the interpreter measured against
-  the hand-written route it replaces, with the baselines that comparison needs.
+| Page | What it answers |
+|---|---|
+| [A whole service, in one file](docs/a-whole-service.md) | What all of it looks like at once — models, inputs, endpoints, handlers, store, server, docs. Compiled every build as `ReadmeExample.kt`. |
+| [A generated Kotlin client](docs/generated-client.md) | What callers who cannot hold the descriptions get instead, and what the generator does with a union, a failure or a stream. |
+| [Importing an OpenAPI document](docs/importing.md) | A document somebody else wrote, read into descriptions: what comes out, what is refused, and how to get past a document you do not own. |
+| [The same endpoints, by hand](docs/by-hand.md) | The same two endpoints written directly against Pekko HTTP, so what the descriptions buy is legible rather than asserted. |
+| [Modules](docs/modules.md) | What each of the fifteen modules is for and what it depends on, for deciding which ones your build needs. |
+| [What it costs](docs/what-it-costs.md) | The interpreter measured against the hand-written route it replaces, with the baselines that comparison needs. |
 
 ---
 
