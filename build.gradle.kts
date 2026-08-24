@@ -7,8 +7,10 @@ plugins {
     // So the root project has `check`/`build`, and the scripts formatted here
     // are covered by a plain `./gradlew build` like everything else.
     base
-    `maven-publish`
-    signing
+    // Publishing to the Central Portal, which is the only way in since OSSRH
+    // closed. It wraps `maven-publish` and `signing`, so neither is applied
+    // here directly.
+    id("com.vanniktech.maven.publish") version "0.37.0" apply false
 }
 
 /**
@@ -104,7 +106,10 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     repositories { mavenCentral() }
 
-    group = "dev.pelican"
+    // The Maven coordinate, which is not the package name: `io.github.matthewjones372.pelican`
+    // would need pelican.dev verified on the Central Portal, and this one is
+    // verified by the GitHub account it names.
+    group = "io.github.matthewjones372"
     version = providers.gradleProperty("pelicanVersion").get()
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
@@ -154,7 +159,7 @@ subprojects {
                 // String templates the generators read at runtime. They are
                 // `.kt` for editor highlighting only; some are fragments, and
                 // some carry placeholders that do not parse standalone.
-                "src/main/resources/dev/pelican/*/*.kt",
+                "src/main/resources/io/github/matthewjones372/pelican/*/*.kt",
             )
             ktlint(ktlintVersion).editorConfigOverride(ktlintOverrides)
         }
@@ -165,46 +170,57 @@ subprojects {
     }
 
     if (name in publishedModules) {
-        apply(plugin = "maven-publish")
-        apply(plugin = "signing")
+        apply(plugin = "com.vanniktech.maven.publish")
 
-        // Sources and javadoc are not optional extras for a library someone
-        // else has to debug — and Maven Central will not accept a release
-        // without them.
-        extensions.configure<JavaPluginExtension> {
-            withSourcesJar()
-            withJavadocJar()
+        extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
+            // Signed when a key is supplied and not otherwise, so a contributor
+            // can build and install without one; CI supplies it. The plugin
+            // takes the same switch as a gradle property, and a value set that
+            // way is already final by the time this runs — which is what the
+            // second half of the condition is for.
+            if (providers.gradleProperty("signingInMemoryKey").isPresent &&
+                !providers.gradleProperty("signAllPublications").isPresent
+            ) {
+                signAllPublications()
+            }
+
+            // Sources are not an optional extra for a library someone else has
+            // to debug, and Maven Central will not accept a release without a
+            // javadoc jar. Kotlin has no javadoc to put in one — an empty jar
+            // is what `withJavadocJar()` produced here too — so this says so
+            // rather than shipping a jar that looks like it holds something.
+            configure(
+                com.vanniktech.maven.publish.KotlinJvm(
+                    javadocJar = com.vanniktech.maven.publish.JavadocJar.Empty(),
+                    sourcesJar = true,
+                ),
+            )
+
+            pom {
+                name.set(this@subprojects.name)
+                description.set(moduleDescriptions[this@subprojects.name] ?: "Part of Pelican.")
+                url.set("https://github.com/matthewjones372/pelican")
+                licenses {
+                    license {
+                        name.set("The Apache License, Version 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("matthewjones372")
+                        name.set("Matt Jones")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/matthewjones372/pelican")
+                    connection.set("scm:git:https://github.com/matthewjones372/pelican.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/matthewjones372/pelican.git")
+                }
+            }
         }
 
         extensions.configure<PublishingExtension> {
-            publications {
-                create<MavenPublication>("maven") {
-                    from(components["java"])
-                    pom {
-                        name.set(this@subprojects.name)
-                        description.set(moduleDescriptions[this@subprojects.name] ?: "Part of Pelican.")
-                        url.set("https://github.com/matthewjones372/pelican")
-                        licenses {
-                            license {
-                                name.set("The Apache License, Version 2.0")
-                                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                            }
-                        }
-                        developers {
-                            developer {
-                                id.set("matthewjones372")
-                                name.set("Matt Jones")
-                            }
-                        }
-                        scm {
-                            url.set("https://github.com/matthewjones372/pelican")
-                            connection.set("scm:git:https://github.com/matthewjones372/pelican.git")
-                            developerConnection.set("scm:git:ssh://git@github.com/matthewjones372/pelican.git")
-                        }
-                    }
-                }
-            }
-
             repositories {
                 // `./gradlew publishToMavenLocal` for a local try-out, and
                 // `publishAllPublicationsToLocalRepository` for something to
@@ -213,18 +229,6 @@ subprojects {
                     name = "local"
                     url = rootProject.layout.buildDirectory.dir("repo").get().asFile.toURI()
                 }
-            }
-        }
-
-        extensions.configure<SigningExtension> {
-            // Unsigned for a local publish, signed when a key is supplied —
-            // so a contributor can build and install without one.
-            val key = providers.gradleProperty("signingInMemoryKey").orNull
-            val password = providers.gradleProperty("signingInMemoryKeyPassword").orNull
-            isRequired = key != null
-            if (key != null) {
-                useInMemoryPgpKeys(key, password)
-                sign(extensions.getByType<PublishingExtension>().publications)
             }
         }
     }

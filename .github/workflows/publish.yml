@@ -21,21 +21,34 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Publish
-        # Set these in the repository's secrets before the first release.
+      # The same gate a pull request goes through. A release that cannot build
+      # is worth finding out about before it is on Maven Central for good.
+      - name: Build and test
+        run: ./gradlew build --stacktrace
+
+      # Uploads a bundle to the Central Portal and leaves it staged. Releasing
+      # it is a click there: a staged bundle can be dropped, a released one is
+      # permanent. Set `mavenCentralAutomaticPublishing` to skip the click.
+      - name: Publish the modules to Maven Central
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: ./gradlew publish --no-configuration-cache
+        run: ./gradlew publishToMavenCentral --no-configuration-cache
 
-      # The Gradle plugin is a build of its own, so the root build's `publish`
-      # does not reach it.
+      # The Gradle plugin is a build of its own, so the root build's publish
+      # tasks do not reach it. It goes to both places: Central for anyone
+      # resolving it as a dependency, and the Plugin Portal for `plugins { }`.
       - name: Publish the Gradle plugin
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: ./gradlew -p pelican-gradle-plugin publish --no-configuration-cache
+          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
+          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
+        run: >
+          ./gradlew -p pelican-gradle-plugin
+          publishToMavenCentral publishPlugins
+          --no-configuration-cache

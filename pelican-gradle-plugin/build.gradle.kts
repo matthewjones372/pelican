@@ -12,11 +12,18 @@ plugins {
     // configuration — a build of its own should not mean standards of its own.
     id("com.diffplug.spotless") version "8.10.0"
     id("dev.detekt") version "2.0.0-alpha.6"
-    `maven-publish`
-    signing
+    // The Plugin Portal is where `plugins { id(...) }` resolves from without a
+    // `pluginManagement` block, so the plugin goes to both it and Central.
+    id("com.gradle.plugin-publish") version "2.1.1"
+    // Central, via the Portal. It wraps `maven-publish` and `signing`.
+    id("com.vanniktech.maven.publish") version "0.37.0"
 }
 
-group = "dev.pelican"
+// The Maven coordinate, not the package name. `io.github.matthewjones372.pelican` would need
+// pelican.dev verified on the Central Portal, and the Plugin Portal holds a
+// plugin id to the same standard; this one is verified by the GitHub account
+// it names. The Kotlin packages stay `io.github.matthewjones372.pelican`, which nothing checks.
+group = "io.github.matthewjones372"
 
 // One source of truth for the version: the root build's own gradle.properties.
 // An included build does not inherit them, and a second copy here would be a
@@ -60,8 +67,8 @@ gradlePlugin {
     vcsUrl.set("https://github.com/matthewjones372/pelican.git")
     plugins {
         create("pelican") {
-            id = "dev.pelican"
-            implementationClass = "dev.pelican.gradle.PelicanPlugin"
+            id = "io.github.matthewjones372.pelican"
+            implementationClass = "io.github.matthewjones372.pelican.gradle.PelicanPlugin"
             displayName = "Pelican"
             description = "Generates a Kotlin client and an OpenAPI document from endpoint descriptions, " +
                 "and endpoint descriptions from a document."
@@ -79,6 +86,9 @@ tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 publishing {
     repositories {
+        // `./gradlew -p pelican-gradle-plugin publishToMavenLocal` for a local
+        // try-out, and `publishAllPublicationsToLocalRepository` for something
+        // to inspect without installing it.
         maven {
             name = "local"
             url = file("../build/repo").toURI()
@@ -86,12 +96,22 @@ publishing {
     }
 }
 
-java {
-    withSourcesJar()
-    withJavadocJar()
-}
+mavenPublishing {
+    // Signed when a key is supplied and not otherwise, so a contributor can
+    // build and install without one; CI supplies it. The plugin takes the same
+    // switch as a gradle property, and a value set that way is already final by
+    // the time this runs — which is what the second half of the condition is
+    // for.
+    if (providers.gradleProperty("signingInMemoryKey").isPresent &&
+        !providers.gradleProperty("signAllPublications").isPresent
+    ) {
+        signAllPublications()
+    }
 
-publishing.publications.withType<MavenPublication>().configureEach {
+    // The platform to use when `com.gradle.plugin-publish` is also applied. It
+    // publishes the plugin marker as well as the jar, with sources and javadoc.
+    configure(com.vanniktech.maven.publish.GradlePublishPlugin())
+
     pom {
         name.set("pelican-gradle-plugin")
         description.set(
@@ -116,17 +136,5 @@ publishing.publications.withType<MavenPublication>().configureEach {
             connection.set("scm:git:https://github.com/matthewjones372/pelican.git")
             developerConnection.set("scm:git:ssh://git@github.com/matthewjones372/pelican.git")
         }
-    }
-}
-
-signing {
-    // Unsigned for a local publish, signed when a key is supplied — the same
-    // arrangement the library modules have.
-    val key = providers.gradleProperty("signingInMemoryKey").orNull
-    val password = providers.gradleProperty("signingInMemoryKeyPassword").orNull
-    isRequired = key != null
-    if (key != null) {
-        useInMemoryPgpKeys(key, password)
-        sign(publishing.publications)
     }
 }
