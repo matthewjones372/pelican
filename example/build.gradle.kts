@@ -56,7 +56,7 @@ dependencies {
  * set, so a task reading that source set's classpath would be waiting for
  * itself.
  */
-val pelicanImport: Configuration by configurations.creating
+val pelicanImport = configurations.register("pelicanImport")
 
 dependencies { pelicanImport(project(":pelican-import")) }
 
