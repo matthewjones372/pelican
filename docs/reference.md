@@ -2588,7 +2588,10 @@ refused[retryAfter] shouldBe 30L
 
 Nullable on the reading end, whatever the document promised: a server that left
 a required header off is a finding for the test to make, not a reason for a
-client to throw away the failure that did arrive.
+client to throw away the failure that did arrive. A header that arrived and
+does not decode — `Retry-After: soon` under a `responseHeader<Long>` — reads
+null for the same reason, which is also how a generated client's header
+properties have always parsed.
 
 What this does **not** cover, honestly:
 

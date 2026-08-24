@@ -85,6 +85,22 @@ class FailureHeadersTest {
         err[quota].shouldBeNull()
     }
 
+    /**
+     * The reading end again, and the case that loses the failure just as
+     * thoroughly as an absent header does: a server that promised a `Long` and
+     * sent `soon`.
+     */
+    @Test
+    fun `a header that arrived but does not decode reads as null rather than throwing`() {
+        // What the client builds from a response, header and all.
+        val err = Outcome.Err(throttled, Problem("slow-down"), listOf("Retry-After" to "soon"))
+
+        err[retryAfter].shouldBeNull()
+        // The point of it being null: the failure that did arrive survives to
+        // be asserted on.
+        err.error shouldBe Problem("slow-down")
+    }
+
     @Test
     fun `the same header cannot be declared twice on one failure`() {
         val clash = shouldThrow<IllegalArgumentException> {

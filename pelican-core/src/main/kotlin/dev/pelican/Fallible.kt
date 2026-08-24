@@ -67,7 +67,7 @@ sealed interface Outcome<out E, out T> {
         /** As [Err.headers]: encoded on the way out, filled from the response on the way back. */
         val headers: List<Pair<String, String>> = emptyList(),
     ) : Outcome<Nothing, T> {
-        /** One header back, decoded by its own codec. Null when it did not arrive. */
+        /** One header back, decoded by its own codec. Null when it did not arrive, or did not decode. */
         operator fun <H : Any> get(header: ResponseHeader<H>): H? = headerValue(headers, header)
     }
 
@@ -94,10 +94,12 @@ sealed interface Outcome<out E, out T> {
          * refused[retryAfter]        // Long?
          * ```
          *
-         * Null when it did not arrive. Nullable rather than throwing because
-         * this is also what a *client* reads: a server that promised a header
-         * and left it off is a finding for the test to make, not a reason to
-         * lose the failure that did arrive.
+         * Null when it did not arrive, and equally when it arrived as
+         * something its codec cannot read. Nullable rather than throwing
+         * because this is also what a *client* reads: a server that promised a
+         * header and then left it off, or sent `Retry-After: soon`, is a
+         * finding for the test to make, not a reason to lose the failure that
+         * did arrive.
          */
         operator fun <T : Any> get(header: ResponseHeader<T>): T? = headerValue(headers, header)
     }
@@ -107,11 +109,24 @@ sealed interface Outcome<out E, out T> {
  * Shared by both sides of an [Outcome], because "read one declared header back
  * off this response" is one question and two readings of it would be two
  * answers.
+ *
+ * A value that arrived and does not decode is null, not a throw: this is the
+ * reading end, and a `Retry-After: soon` loses the response it came on exactly
+ * as thoroughly as a `Retry-After` nobody sent. The generated client already
+ * parses its headers totally for that reason; a throw here would be core
+ * answering the same question differently, and answering it by replacing what
+ * the caller was asking about with a fault of the reader's own.
  */
 @Suppress("UNCHECKED_CAST")
 private fun <T : Any> headerValue(headers: List<Pair<String, String>>, header: ResponseHeader<T>): T? =
     headers.firstOrNull { (name, _) -> name.equals(header.name, ignoreCase = true) }
-        ?.let { (_, raw) -> header.codec.decode(header.name, raw) as T }
+        ?.let { (_, raw) ->
+            try {
+                header.codec.decode(header.name, raw) as T
+            } catch (_: DecodeFailure) {
+                null
+            }
+        }
 
 /** The first declared success, carrying [value]. */
 fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)

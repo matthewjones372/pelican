@@ -2,6 +2,7 @@ package dev.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeSameInstanceAs
@@ -174,6 +175,22 @@ class SeveralResponsesTest {
         val page = json<Order>(status = 200, cursor)
 
         (page(Order(1)) as Outcome.Ok).headers.shouldBeEmpty()
+    }
+
+    /**
+     * The reading end, where an [Outcome] is built from a response rather than
+     * by a handler: a header that arrived unreadable is as absent as one that
+     * never arrived, and neither is a reason to lose the response it came on.
+     */
+    @Test
+    fun `a header that arrived but does not decode reads as null, on a success as on a failure`() {
+        val count = responseHeader<Int>("X-Count")
+        val listed = json<Order>(status = 200, count)
+
+        val answer = Outcome.Ok(Order(1), listed, listOf("X-Count" to "many"))
+
+        answer[count].shouldBeNull()
+        answer.value shouldBe Order(1)
     }
 
     /**
