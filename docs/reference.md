@@ -16,6 +16,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-kotlinx` | core, kotlinx.serialization | the alternative `Codecs` |
+| `pelican-jsoniter` | core, jsoniter, kotlin-reflect | a third `Codecs`, bound and described through the primary constructor |
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and Swagger UI over HTTP |
 | `pelican-http4k` | core, http4k-core | descriptions → an http4k `HttpHandler`, plus a server that streams |
@@ -25,7 +26,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
 | `pelican-test-http4k` | test, http4k | the in-memory transport, on http4k |
-| `pelican-gradle-plugin` | **nothing** | the `dev.pelican` Gradle plugin: every generator above, as tasks |
+| `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
 | `example` | core, openapi, jackson, all three backends | the orders, bookmarks, greetings and secured services |
 | `benchmarks` | core, jackson, pekko, http4k, JMH | the interpreter measured against hand-written routes. Not published, not run by `build`. |
 
@@ -194,7 +195,7 @@ codec is resolved when the `Api` is assembled, which is why switching JSON
 libraries is one line in one file and touches no endpoint:
 
 ```kotlin
-Api(routes, codecs = JacksonCodecs)              // or KotlinxCodecs
+Api(routes, codecs = JacksonCodecs)              // or KotlinxCodecs, or JsoniterCodecs
 ApiSpec(endpoints, schemas = JacksonCodecs)      // docs need only the schema half
 ```
 
@@ -214,10 +215,12 @@ Codecs are resolved **once per endpoint when the route is built**, never per
 request — `KType` → `JavaType` reflection is not cheap. It also means a missing
 or unusable codec is a startup failure rather than a surprise on first traffic.
 
-That the two implementations agree is a test, not a claim: `CodecAgreementTest`
-generates one document through each and compares them, over models covering
-defaults, nullability, enums, maps, nesting and recursion. It also round-trips a
-value encoded by one codec through the other.
+That the implementations agree is a test, not a claim: `CodecAgreementTest`
+generates one document through Jackson and one through kotlinx.serialization and
+compares them, over models covering defaults, nullability, enums, maps, nesting
+and recursion. It also round-trips a value encoded by one codec through the
+other. `JsoniterAgreementTest` makes the same comparison for the third module,
+against Jackson, over models carrying no annotation of any kind.
 
 A sealed hierarchy is the one payload type neither library can read off the
 Kotlin — nothing in `sealed interface PaymentMethod` says which property carries
@@ -226,12 +229,51 @@ annotations that make it readable, `@JsonTypeInfo`/`@JsonSubTypes` for Jackson
 and `@Serializable`/`@SerialName` for kotlinx.serialization. Both publish the
 result the same way; see [The publishing direction](#the-publishing-direction).
 
-Pass your own mapper or `Json` when the defaults do not fit:
+Pass your own mapper, `Json` or jsoniter config when the defaults do not fit:
 
 ```kotlin
 Api(routes, codecs = JacksonCodecs(myObjectMapper))
 Api(routes, codecs = KotlinxCodecs(myJson))
+Api(routes, codecs = JsoniterCodecs(jsoniterConfig { escapeUnicode(false) }))
 ```
+
+### jsoniter, and what a library that never met Kotlin needs
+
+`pelican-jsoniter` is the third module and the one whose library has no
+serialization metadata to read: jsoniter was finished in 2018, describes no
+types, and binds a JSON object the way its era did — construct the bean, then
+set a field per property. A Kotlin data class survives neither half of that. Its
+constructor takes every property at once, and that constructor is the only thing
+that knows which properties have defaults, so a field-at-a-time binder does not
+fail on `data class Line(val sku: String, val quantity: Int = 1)` — it returns
+`quantity = 0`, which is a wrong order rather than a rejected one.
+
+So the binding is done in the module, over `kotlin.reflect`, and handed to
+jsoniter through the two hooks its `Extension` interface offers. A payload type
+is read by collecting the properties that arrived and calling the primary
+constructor once, with `callBy` — the one call that applies Kotlin's defaults. A
+property that is missing and merely nullable becomes null; a property that is
+missing with neither a default nor a null to fall back on is an error naming the
+property. Everything else — the parser, the printer, collections, maps, numbers,
+strings — stays jsoniter's.
+
+The schemas come from the same constructor, which is the point: there is no
+second metadata system here to drift from the first. `java.time` values and
+`UUID`s travel as the strings the document says they do, because jsoniter has no
+reading of them at all and would otherwise publish `string` and write an object.
+A sealed hierarchy travels under a `type` discriminator carrying the branch's
+own name, described as a `oneOf` with a full `mapping`, so it publishes the same
+shape as the other two modules — with no annotations to declare it, since there
+is no annotation this library reads.
+
+Three things are worth knowing before choosing it. The library has been
+unmaintained since 2018. The config must come from `jsoniterConfig { }`: a plain
+jsoniter `Config` parses perfectly well and binds a data class wrongly, so
+`JsoniterCodecs` refuses one at assembly rather than serving quiet nonsense. And
+a payload type with type parameters — `Page<Order>` — is refused too, in both
+directions and in the document: nothing carries the argument to where the
+binding happens, so jsoniter would read an `Order` back as a map. Both other
+codec modules bind that shape properly, and the message says so.
 
 ## Getting the OpenAPI docs
 
@@ -246,7 +288,7 @@ Three ways, all reading the same descriptions.
 
 ```kotlin
 // the whole build script
-plugins { id("dev.pelican") }
+plugins { id("io.github.matthewjones372.pelican") }
 
 pelican {
     documents {
@@ -276,8 +318,8 @@ spec.openApi()          // JsonObj — core's own tree, if you want to post-proc
 **Served by the running app** — opt in with `pelican-pekko-docs`:
 
 ```kotlin
-import dev.pelican.pekko.docs.Docs
-import dev.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 
 ordersApi().start(port = 8080)              // endpoints only; no OpenAPI code on the classpath
 ordersApi().startWithDocs(port = 8080)      // plus /openapi.json and /docs
@@ -564,7 +606,7 @@ The document and the client are both readings of the same values, and both are
 build tasks:
 
 ```kotlin
-plugins { id("dev.pelican") version "0.1.0-SNAPSHOT" }
+plugins { id("io.github.matthewjones372.pelican") version "0.1.0" }
 
 pelican {
     documents {
@@ -657,7 +699,7 @@ importer:
 
 ```kotlin
 val pelicanImport: Configuration by configurations.creating
-dependencies { pelicanImport("dev.pelican:pelican-import:0.1.0-SNAPSHOT") }
+dependencies { pelicanImport("io.github.matthewjones372:pelican-import:0.1.0") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
@@ -1748,7 +1790,7 @@ Now:
 ```
 
 ```
-ERROR dev.pelican.pekko - Unhandled failure in POST /reports [ref f3ef2bdef43b]
+ERROR io.github.matthewjones372.pelican.pekko - Unhandled failure in POST /reports [ref f3ef2bdef43b]
 java.sql.SQLException: connection to db-primary.internal:5432 refused
 ```
 

@@ -1,6 +1,6 @@
 package example.backends
 
-import dev.pelican.Api
+import io.github.matthewjones372.pelican.Api
 
 /**
  * A backend, reduced to what anything outside it needs: bind the shared

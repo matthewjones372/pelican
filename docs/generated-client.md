@@ -8,7 +8,7 @@ or on another release cycle, get a file generated from them instead. It is a
 Gradle task: no `main` to write, no `JavaExec` to wire.
 
 ```kotlin
-plugins { id("dev.pelican") version "0.1.0-SNAPSHOT" }
+plugins { id("io.github.matthewjones372.pelican") version "0.1.0" }
 
 pelican {
     clients {

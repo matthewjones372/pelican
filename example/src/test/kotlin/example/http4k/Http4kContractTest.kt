@@ -1,11 +1,11 @@
 package example.http4k
 
-import dev.pelican.http4k.PelicanServer
-import dev.pelican.http4k.start
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.test.ApiClient
-import dev.pelican.test.apiClient
 import example.ClientContractTest
+import io.github.matthewjones372.pelican.http4k.PelicanServer
+import io.github.matthewjones372.pelican.http4k.start
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.test.ApiClient
+import io.github.matthewjones372.pelican.test.apiClient
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.comparables.shouldBeLessThan

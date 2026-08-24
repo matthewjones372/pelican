@@ -1,12 +1,6 @@
 package example
 
 import com.fasterxml.jackson.annotation.JsonInclude
-import dev.pelican.UploadedFile
-import dev.pelican.codegen.kotlinClient
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.jackson.defaultMapper
-import dev.pelican.pekko.PelicanServer
-import dev.pelican.pekko.start
 import example.generated.BankTransfer
 import example.generated.Card
 import example.generated.CreateOrder
@@ -19,6 +13,12 @@ import example.generated.PlaceOrderFailure
 import example.generated.StreamOrdersFailure
 import example.generated.SubmitOrderFailure
 import example.generated.SubmitOrderResult
+import io.github.matthewjones372.pelican.UploadedFile
+import io.github.matthewjones372.pelican.codegen.kotlinClient
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jackson.defaultMapper
+import io.github.matthewjones372.pelican.pekko.PelicanServer
+import io.github.matthewjones372.pelican.pekko.start
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll

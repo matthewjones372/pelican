@@ -1,9 +1,9 @@
 package example.backends
 
-import dev.pelican.openapi.Docs
-import dev.pelican.http4k.docs.startWithDocs as startHttp4kWithDocs
-import dev.pelican.ktor.docs.startWithDocs as startKtorWithDocs
-import dev.pelican.pekko.docs.startWithDocs as startPekkoWithDocs
+import io.github.matthewjones372.pelican.openapi.Docs
+import io.github.matthewjones372.pelican.http4k.docs.startWithDocs as startHttp4kWithDocs
+import io.github.matthewjones372.pelican.ktor.docs.startWithDocs as startKtorWithDocs
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs as startPekkoWithDocs
 
 /**
  * All three servers at once, so the same endpoints can be curled side by side.

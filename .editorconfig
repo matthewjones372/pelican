@@ -33,7 +33,7 @@ max_line_length = 120
 ij_kotlin_allow_trailing_comma = true
 ij_kotlin_allow_trailing_comma_on_call_site = true
 
-# `import dev.pelican.*` is deliberate: the point of pelican-core is that an
+# `import io.github.matthewjones372.pelican.*` is deliberate: the point of pelican-core is that an
 # endpoint description is written with a vocabulary of top-level values, and
 # the example sources are meant to read that way.
 ktlint_standard_no-wildcard-imports = disabled

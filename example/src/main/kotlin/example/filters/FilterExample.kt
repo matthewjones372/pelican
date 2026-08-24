@@ -11,20 +11,20 @@ package example.filters
  * what. This file is the smaller version that fits on a page.
  */
 
-import dev.pelican.Api
-import dev.pelican.Filter
-import dev.pelican.attribute
-import dev.pelican.before
-import dev.pelican.div
-import dev.pelican.endpoint
-import dev.pelican.headerParam
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.json
-import dev.pelican.optional
-import dev.pelican.pathParam
-import dev.pelican.pekko.handledNow
-import dev.pelican.tooManyRequests
-import dev.pelican.unauthorized
+import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.attribute
+import io.github.matthewjones372.pelican.before
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.headerParam
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.json
+import io.github.matthewjones372.pelican.optional
+import io.github.matthewjones372.pelican.pathParam
+import io.github.matthewjones372.pelican.pekko.handledNow
+import io.github.matthewjones372.pelican.tooManyRequests
+import io.github.matthewjones372.pelican.unauthorized
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 

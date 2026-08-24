@@ -1,11 +1,11 @@
-import dev.pelican.gradle.DocumentFormat
+import io.github.matthewjones372.pelican.gradle.DocumentFormat
 
 plugins {
     application
     // The build's own plugin, included from pluginManagement in settings.gradle.kts.
     // The example applies it by id exactly as a consumer would, which is what
     // keeps the plugin honest: if generation breaks, this build breaks.
-    id("dev.pelican")
+    id("io.github.matthewjones372.pelican")
 }
 
 dependencies {

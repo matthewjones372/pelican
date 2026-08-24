@@ -12,19 +12,36 @@ plugins {
     // configuration — a build of its own should not mean standards of its own.
     id("com.diffplug.spotless") version "8.10.0"
     id("dev.detekt") version "2.0.0-alpha.6"
-    `maven-publish`
-    signing
+    // The Plugin Portal is where `plugins { id(...) }` resolves from without a
+    // `pluginManagement` block, so the plugin goes to both it and Central.
+    id("com.gradle.plugin-publish") version "2.1.1"
+    // Central, via the Portal. It wraps `maven-publish` and `signing`.
+    id("com.vanniktech.maven.publish") version "0.37.0"
+    // The same tag this repository's other build reads. An included build is
+    // still the same working tree, so both land on the same version.
+    id("pl.allegro.tech.build.axion-release") version "1.21.3"
 }
 
-group = "dev.pelican"
+scmVersion {
+    // An included build does not look above its own directory for `.git`, and
+    // axion answers with its default version rather than failing when it finds
+    // none — which would have published the plugin as 0.1.0-SNAPSHOT off a
+    // release tag. Point it at the repository both builds actually live in.
+    repository { directory.set(file("..").absolutePath) }
+    tag { prefix.set("v") }
+    // Plain `0.1.0-SNAPSHOT` off a tag rather than axion's default, which
+    // decorates it with the branch name. The README tells a contributor to
+    // install locally and depend on the version; that version should not
+    // change with the branch they happen to be on.
+    versionCreator("simple")
+}
 
-// One source of truth for the version: the root build's own gradle.properties.
-// An included build does not inherit them, and a second copy here would be a
-// second thing to forget.
-version = file("../gradle.properties").readLines()
-    .first { it.startsWith("pelicanVersion=") }
-    .substringAfter('=')
-    .trim()
+// The namespace verified on the Central Portal. The Plugin Portal holds a
+// plugin id to the same standard, so the id below shares the prefix rather
+// than claiming one this account cannot prove it owns.
+group = "io.github.matthewjones372"
+
+version = scmVersion.version
 
 kotlin { jvmToolchain(21) }
 
@@ -60,8 +77,8 @@ gradlePlugin {
     vcsUrl.set("https://github.com/matthewjones372/pelican.git")
     plugins {
         create("pelican") {
-            id = "dev.pelican"
-            implementationClass = "dev.pelican.gradle.PelicanPlugin"
+            id = "io.github.matthewjones372.pelican"
+            implementationClass = "io.github.matthewjones372.pelican.gradle.PelicanPlugin"
             displayName = "Pelican"
             description = "Generates a Kotlin client and an OpenAPI document from endpoint descriptions, " +
                 "and endpoint descriptions from a document."
@@ -79,6 +96,9 @@ tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 publishing {
     repositories {
+        // `./gradlew -p pelican-gradle-plugin publishToMavenLocal` for a local
+        // try-out, and `publishAllPublicationsToLocalRepository` for something
+        // to inspect without installing it.
         maven {
             name = "local"
             url = file("../build/repo").toURI()
@@ -86,12 +106,11 @@ publishing {
     }
 }
 
-java {
-    withSourcesJar()
-    withJavadocJar()
-}
+mavenPublishing {
+    // The platform to use when `com.gradle.plugin-publish` is also applied. It
+    // publishes the plugin marker as well as the jar, with sources and javadoc.
+    configure(com.vanniktech.maven.publish.GradlePublishPlugin())
 
-publishing.publications.withType<MavenPublication>().configureEach {
     pom {
         name.set("pelican-gradle-plugin")
         description.set(
@@ -116,17 +135,5 @@ publishing.publications.withType<MavenPublication>().configureEach {
             connection.set("scm:git:https://github.com/matthewjones372/pelican.git")
             developerConnection.set("scm:git:ssh://git@github.com/matthewjones372/pelican.git")
         }
-    }
-}
-
-signing {
-    // Unsigned for a local publish, signed when a key is supplied — the same
-    // arrangement the library modules have.
-    val key = providers.gradleProperty("signingInMemoryKey").orNull
-    val password = providers.gradleProperty("signingInMemoryKeyPassword").orNull
-    isRequired = key != null
-    if (key != null) {
-        useInMemoryPgpKeys(key, password)
-        sign(publishing.publications)
     }
 }

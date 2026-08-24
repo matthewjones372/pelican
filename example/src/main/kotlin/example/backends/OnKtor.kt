@@ -1,12 +1,12 @@
 package example.backends
 
-import dev.pelican.Api
-import dev.pelican.ServerEndpoint
-import dev.pelican.ktor.handledNow
-import dev.pelican.ktor.handledOneOf
-import dev.pelican.ktor.handledOrFail
-import dev.pelican.ktor.start
-import dev.pelican.ktor.streamedNow
+import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.ktor.handledNow
+import io.github.matthewjones372.pelican.ktor.handledOneOf
+import io.github.matthewjones372.pelican.ktor.handledOrFail
+import io.github.matthewjones372.pelican.ktor.start
+import io.github.matthewjones372.pelican.ktor.streamedNow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 

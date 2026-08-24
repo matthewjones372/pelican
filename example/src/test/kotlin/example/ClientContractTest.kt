@@ -1,31 +1,31 @@
 package example
 
-import dev.pelican.Api
-import dev.pelican.ApiError
-import dev.pelican.In2
-import dev.pelican.In3
-import dev.pelican.In4
-import dev.pelican.In5
-import dev.pelican.Outcome
-import dev.pelican.Params
-import dev.pelican.UploadedFile
-import dev.pelican.div
-import dev.pelican.endpoint
-import dev.pelican.errorJson
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.orFail
-import dev.pelican.pekko.PelicanServer
-import dev.pelican.pekko.handledOrFail
-import dev.pelican.pekko.start
-import dev.pelican.test.ApiCallFailed
-import dev.pelican.test.ApiClient
-import dev.pelican.test.pekko.InMemoryTransport
-import dev.pelican.test.pekko.client
-import dev.pelican.test.pekko.inMemory
-import dev.pelican.test.rawText
-import dev.pelican.test.shouldBeFailure
-import dev.pelican.test.shouldBeOk
-import dev.pelican.test.shouldBeResponse
+import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.In2
+import io.github.matthewjones372.pelican.In3
+import io.github.matthewjones372.pelican.In4
+import io.github.matthewjones372.pelican.In5
+import io.github.matthewjones372.pelican.Outcome
+import io.github.matthewjones372.pelican.Params
+import io.github.matthewjones372.pelican.UploadedFile
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.errorJson
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.orFail
+import io.github.matthewjones372.pelican.pekko.PelicanServer
+import io.github.matthewjones372.pelican.pekko.handledOrFail
+import io.github.matthewjones372.pelican.pekko.start
+import io.github.matthewjones372.pelican.test.ApiCallFailed
+import io.github.matthewjones372.pelican.test.ApiClient
+import io.github.matthewjones372.pelican.test.pekko.InMemoryTransport
+import io.github.matthewjones372.pelican.test.pekko.client
+import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.rawText
+import io.github.matthewjones372.pelican.test.shouldBeFailure
+import io.github.matthewjones372.pelican.test.shouldBeOk
+import io.github.matthewjones372.pelican.test.shouldBeResponse
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
@@ -409,7 +409,7 @@ class UndeclaredFailureTest {
 
     private fun apiThatReturnsAStrayFailure(
         exposeInternalErrors: Boolean = false,
-        onServerError: ((String, dev.pelican.Endpoint<*, *>?, Throwable) -> Unit)? = null,
+        onServerError: ((String, io.github.matthewjones372.pelican.Endpoint<*, *>?, Throwable) -> Unit)? = null,
     ) = Api(
         endpoints = listOf(fetchUser handledOrFail { strayFailure(ApiError(410, "nope")) }),
         codecs = JacksonCodecs,

@@ -1,9 +1,9 @@
 package example.secured
 
-import dev.pelican.openapi.oauth2RedirectPath
-import dev.pelican.openapi.openApiJson
-import dev.pelican.pekko.PelicanServer
-import dev.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
+import io.github.matthewjones372.pelican.openapi.openApiJson
+import io.github.matthewjones372.pelican.pekko.PelicanServer
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain

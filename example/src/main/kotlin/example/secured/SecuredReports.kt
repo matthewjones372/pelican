@@ -1,13 +1,13 @@
 package example.secured
 
-import dev.pelican.*
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.openapi.DocsOAuth
-import dev.pelican.openapi.oauth2RedirectPath
-import dev.pelican.openapi.openApiJson
-import dev.pelican.pekko.*
-import dev.pelican.pekko.docs.Docs
-import dev.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.DocsOAuth
+import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
+import io.github.matthewjones372.pelican.openapi.openApiJson
+import io.github.matthewjones372.pelican.pekko.*
+import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import org.apache.pekko.stream.javadsl.Source
 import java.util.Base64
 

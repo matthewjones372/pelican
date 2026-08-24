@@ -1,15 +1,15 @@
 package example
 
-import dev.pelican.*
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.openapi.DocsOAuth
-import dev.pelican.openapi.openApiJson
-import dev.pelican.pekko.PelicanServer
-import dev.pelican.pekko.docs.Docs
-import dev.pelican.pekko.docs.startWithDocs
-import dev.pelican.pekko.handledNow
-import dev.pelican.pekko.handledOrFail
-import dev.pelican.pekko.start
+import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.DocsOAuth
+import io.github.matthewjones372.pelican.openapi.openApiJson
+import io.github.matthewjones372.pelican.pekko.PelicanServer
+import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.pekko.handledNow
+import io.github.matthewjones372.pelican.pekko.handledOrFail
+import io.github.matthewjones372.pelican.pekko.start
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain

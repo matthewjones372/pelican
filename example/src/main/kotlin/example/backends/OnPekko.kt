@@ -1,12 +1,12 @@
 package example.backends
 
-import dev.pelican.Api
-import dev.pelican.ServerEndpoint
-import dev.pelican.pekko.handledNow
-import dev.pelican.pekko.handledOneOf
-import dev.pelican.pekko.handledOrFail
-import dev.pelican.pekko.start
-import dev.pelican.pekko.streamedNow
+import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.pekko.handledNow
+import io.github.matthewjones372.pelican.pekko.handledOneOf
+import io.github.matthewjones372.pelican.pekko.handledOrFail
+import io.github.matthewjones372.pelican.pekko.start
+import io.github.matthewjones372.pelican.pekko.streamedNow
 import org.apache.pekko.stream.javadsl.Source
 import java.time.Duration
 
