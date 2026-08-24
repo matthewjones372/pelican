@@ -2143,10 +2143,20 @@ could ban `mutableListOf` outright now that the stdlib resolves again, but that
 was never the claim: what matters is whether the mutation escapes. A builder
 that fills a local list and hands back a read-only view is the shape half of
 `Endpoint.kt` is written in, so the claim lives in a test that reads the
-sources. It is a ratchet, not a ban: sixteen files
-accumulate into a mutable collection and hand back something immutable, which
-is what a builder is, and each is listed with why. What it stops is the next
-file quietly starting.
+sources. It is a ratchet, not a ban: sixteen files accumulate into a mutable
+collection and hand back something immutable, which is what a builder is, and
+each is listed with why. What it stops is the next file quietly starting.
+
+A test that reads files has to say which ones. The eleven library modules it
+judges are listed in `pelican-core/build.gradle.kts`, which declares their
+`src/main/kotlin` directories as inputs of `:pelican-core:test` and hands the
+same list to the test as a system property — one list, snapshotted by Gradle
+and walked by the test. Before that the test found the sources itself and
+Gradle had no idea it read anything: the task stayed up-to-date over a changed
+source file, and a violation rode several green builds, visible only under
+`--rerun-tasks`. The paths are content-hashed with relative path sensitivity,
+which is as loose as it can safely go — the gate is a regex over raw text, so
+it reads a comment exactly as it reads code.
 
 **Kover**, aggregated across modules rather than per-module — a line in
 `pelican-core` is exercised by the tests in `pelican-pekko` as often as by its

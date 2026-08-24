@@ -2,7 +2,9 @@ package dev.pelican
 
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.comparables.shouldBeGreaterThan
+import io.kotest.matchers.nulls.shouldNotBeNull
 import org.junit.jupiter.api.Test
 import java.io.File
 
@@ -22,6 +24,13 @@ import java.io.File
  * ceremonious. What the list stops is the *next* file quietly starting to do
  * it — a new mutable accumulator has to be argued for here, in writing, before
  * the build goes green again.
+ *
+ * Which sources it judges is not decided here: the build hands them over, and
+ * declares the same directories as inputs of the task that runs this test. It
+ * used to find them itself, by resolving the repository root from the working
+ * directory, and Gradle had no way to know that this test read anything at all
+ * — so a violation rode several green builds and only surfaced under
+ * `--rerun-tasks`. See `pelican-core/build.gradle.kts`.
  */
 class FunctionalStyleTest {
 
@@ -67,32 +76,55 @@ class FunctionalStyleTest {
             "an IdentityHashMap of declared failure to codec, resolved once when the route is built",
     )
 
-    /** The library modules. The example is a service, and holds its store in a map on purpose. */
-    private val modules = listOf(
-        "pelican-core", "pelican-openapi", "pelican-codegen", "pelican-jackson", "pelican-kotlinx",
-        "pelican-pekko", "pelican-http4k", "pelican-ktor",
-        "pelican-test", "pelican-test-pekko", "pelican-test-http4k",
-    )
-
     private val accumulators = Regex(
         """\b(mutableListOf|mutableMapOf|mutableSetOf""" +
             """|LinkedHashMap|LinkedHashSet|IdentityHashMap|ArrayList|HashMap|HashSet)\s*[(<]""",
     )
 
-    private fun repoRoot(): File {
-        val here = File("").absoluteFile
-        return if (here.name == "pelican-core") here.parentFile else here
+    /** Absent means the build's wiring is gone, which is the failure this test cannot survive. */
+    private fun handedOver(name: String): String {
+        val value = System.getProperty(name)
+        withClue("the build must pass -D$name; see pelican-core/build.gradle.kts") { value.shouldNotBeNull() }
+        return value!!
     }
 
-    /**
-     * `src/main/kotlin` only. `pelican-codegen/src/main/resources` holds `.kt`
-     * files that are templates the generator reads at runtime — they are text,
-     * not this build's source, and Spotless skips them for the same reason.
-     */
-    private fun mainSources(): List<File> = modules
-        .map { File(repoRoot(), "$it/src/main/kotlin") }
-        .filter { it.isDirectory }
+    private fun repoRoot(): File = File(handedOver("pelican.style.repoRoot"))
+
+    private fun sourceRoots(): List<File> = handedOver("pelican.style.sources")
+        .split(File.pathSeparator)
+        .filter { it.isNotBlank() }
+        .map(::File)
+
+    private fun mainSources(): List<File> = sourceRoots()
         .flatMap { it.walkTopDown().filter { file -> file.isFile && file.extension == "kt" }.toList() }
+
+    /**
+     * The wiring, asserted rather than assumed.
+     *
+     * A test can see the properties the build passed it; it cannot see the
+     * task's declared inputs, and those two lines are one decision — they are
+     * written together in `build.gradle.kts` and say so. What this catches is
+     * the regression that actually happened: the gate reading a tree nobody
+     * told Gradle about. Delete the wiring and this fails immediately, rather
+     * than the gate quietly reverting to guessing where the sources are.
+     */
+    @Test
+    fun `the build hands this test the sources it judges`() {
+        val roots = sourceRoots()
+        withClue("the build named no source roots at all") { roots.shouldNotBeEmpty() }
+
+        val missing = roots.filterNot { it.isDirectory }
+        withClue("the build named source roots that are not there: $missing") { missing.shouldBeEmpty() }
+
+        val outside = roots.filterNot { it.absoluteFile.startsWith(repoRoot().absoluteFile) }
+        withClue("a source root sits outside ${repoRoot()}, so the paths below cannot be keys: $outside") {
+            outside.shouldBeEmpty()
+        }
+
+        withClue("only ${mainSources().size} files were handed over; the gate is judging almost nothing") {
+            mainSources().size shouldBeGreaterThan 20
+        }
+    }
 
     @Test
     fun `mutable collections are built only where a builder was meant to be`() {
@@ -101,10 +133,6 @@ class FunctionalStyleTest {
             .filter { accumulators.containsMatchIn(it.readText()) }
             .map { it.relativeTo(root).path }
             .toSortedSet()
-
-        withClue("the source tree was not found; this test reads files, and looked in $root") {
-            mainSources().size shouldBeGreaterThan 20
-        }
 
         val unexpected = found - builders.keys
         withClue("a mutable accumulator appeared outside a builder: $unexpected") {
