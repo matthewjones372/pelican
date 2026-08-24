@@ -80,7 +80,7 @@ kover {
 }
 
 dependencies {
-    subprojects.forEach { kover(it) }
+    subprojects.forEach { kover(project(it.path)) }
 }
 
 // A floor nobody runs is not a floor: `./gradlew build` checks it.

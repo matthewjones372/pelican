@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonMapperBuilder
 import dev.pelican.*
 import io.swagger.v3.core.converter.AnnotatedType
 import io.swagger.v3.core.converter.ModelConverters
@@ -91,12 +91,15 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
  * lenient about unknown fields, and writing dates as strings rather than
  * epoch numbers.
  */
-fun defaultMapper(): ObjectMapper = jacksonObjectMapper().apply {
-    registerModule(JavaTimeModule())
-    disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-    disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-    setSerializationInclusion(JsonInclude.Include.ALWAYS)
-}
+fun defaultMapper(): ObjectMapper = jacksonMapperBuilder()
+    .addModule(JavaTimeModule())
+    .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+    .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+    // Values and contents alike: a null field is written as `null` rather than
+    // dropped, because an absent field and a null one mean different things to
+    // a document that says the field is nullable.
+    .defaultPropertyInclusion(JsonInclude.Value.construct(JsonInclude.Include.ALWAYS, JsonInclude.Include.ALWAYS))
+    .build()
 
 // ------------------------------------------------- swagger Schema -> JsonObj
 
