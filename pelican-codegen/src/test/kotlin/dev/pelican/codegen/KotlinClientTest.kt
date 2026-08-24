@@ -220,13 +220,18 @@ class KotlinClientTest {
     fun `a repeated parameter is handed over whole, and spread by the runtime`() {
         // How many occurrences it becomes is a property of the value, so the
         // call site says nothing about it and `occurrences` does the spreading.
-        client shouldContain """query = listOf("tag" to tag, "ids" to joined(ids, ","))"""
+        client shouldContain """query = listOf("tag" to tag, "ids" to joined("ids", ids, ","))"""
         client shouldContain """cookies = listOf("seen" to seen)"""
     }
 
+    /**
+     * The wire name travels with it because the refusal is written for whoever
+     * passed the list, and `xFeature` is not what they would look for in a
+     * document — `X-Feature` is.
+     */
     @Test
     fun `a delimited parameter is joined at the call site, where the separator is known`() {
-        client shouldContain """headerParams = listOf("X-Feature" to joined(xFeature, ","))"""
+        client shouldContain """headerParams = listOf("X-Feature" to joined("X-Feature", xFeature, ","))"""
     }
 
     // ------------------------------------------------------------ the shape

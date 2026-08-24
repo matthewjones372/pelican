@@ -19,6 +19,7 @@ import example.generated.PlaceOrderFailure
 import example.generated.StreamOrdersFailure
 import example.generated.SubmitOrderFailure
 import example.generated.SubmitOrderResult
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
 import io.kotest.matchers.comparables.shouldBeLessThan
@@ -301,6 +302,16 @@ class GeneratedKotlinClientTest {
     fun `the lens-style endpoint reads its inputs the same way`() {
         val orders = client.searchOrders(limit = 2, xTraceId = "trace-1").toList()
         orders.size shouldBe 2
+    }
+
+    @Test
+    fun `an element carrying nothing is refused where it is written`() {
+        // `?tag=&tag=a` is two occurrences and one element, so this is a list
+        // the server could not hand back the length of. Repeated and joined
+        // alike, since the reading rule is the same for both.
+        shouldThrow<IllegalArgumentException> { client.searchOrders(tag = listOf("", "a")) }
+            .message shouldContain "would not arrive"
+        shouldThrow<IllegalArgumentException> { client.searchOrders(item = listOf("", "a")) }
     }
 
     @Test

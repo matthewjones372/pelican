@@ -96,15 +96,33 @@ fun PlainCodec<*>.decodeAll(name: String, style: ListStyle, wire: List<String>):
  * The occurrences a list travels as: one per element for [ListStyle.REPEATED],
  * one joined string otherwise, and none at all for an empty list.
  *
- * An element that the join would not survive is refused here rather than
+ * An element that the wire would not survive is refused here rather than
  * written, because the list that came back would differ from the one that went
- * out and nothing downstream could tell. That is an element carrying the
- * separator, and one padded with the space that [decodeAll] reads as padding.
+ * out and nothing downstream could tell. There are three of those.
+ *
+ * The first belongs to every style: an element encoding to nothing. [decodeAll]
+ * reads an occurrence carrying nothing as no element at all, which is what
+ * makes `?tags=` mean "a field nobody filled in", so `?tag=&tag=a` is two
+ * occurrences and one element. Preserving the empty one instead was the other
+ * way out and costs more than it buys — it would hand every handler an element
+ * no caller meant to send, for the sake of the one codec, [StringCodec], where
+ * an empty element is a value at all. So the list that cannot be sent is
+ * refused where somebody can still choose a different one.
+ *
+ * The other two belong to the joined styles: an element carrying the separator,
+ * and one padded with the space that [decodeAll] reads as padding.
  */
 fun PlainCodec<*>.encodeAll(name: String, style: ListStyle, values: List<*>): List<String> {
     @Suppress("UNCHECKED_CAST")
     val codec = this as PlainCodec<Any>
     val encoded = values.filterNotNull().map { codec.encode(it) }
+    encoded.forEach { value ->
+        require(value.isNotEmpty()) {
+            "'$name' was given an element that encodes to nothing, and an occurrence carrying nothing is " +
+                "not an element — it would not come back. Leave it out of the list, or encode it as " +
+                "something the other end can see."
+        }
+    }
     val separator = style.separator ?: return encoded
     if (encoded.isEmpty()) return emptyList()
     encoded.forEach { value ->

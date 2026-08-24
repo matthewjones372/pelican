@@ -24,7 +24,7 @@ private fun request(
     standingHeaders: Map<String, String> = headers(),
 ): HttpRequest {
     val search = query
-        .flatMap { (name, value) -> occurrences(value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
+        .flatMap { (name, value) -> occurrences(name, value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
         .joinToString("&")
 
     val builder = HttpRequest
@@ -39,7 +39,7 @@ private fun request(
     // One header carries all of them, so an absent optional cookie is simply
     // not written rather than sent empty — the same bargain every other
     // optional parameter makes.
-    val jar = cookies.flatMap { (name, value) -> occurrences(value).map { "$name=$it" } }
+    val jar = cookies.flatMap { (name, value) -> occurrences(name, value).map { "$name=$it" } }
     if (jar.isNotEmpty()) builder.header("Cookie", jar.joinToString("; "))
 
     return builder.build()

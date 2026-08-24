@@ -227,9 +227,9 @@ private fun plain(value: Any?): String? = when (value) {
  * all when it was left out, once when it carries a value, and once per element
  * when it was declared as a repeated list.
  */
-private fun occurrences(value: Any?): List<String> = when (value) {
+private fun occurrences(name: String, value: Any?): List<String> = when (value) {
     null -> emptyList()
-    is Collection<*> -> value.mapNotNull { plain(it) }
+    is Collection<*> -> value.mapNotNull { plain(it) }.onEach { element(name, it) }
     else -> listOfNotNull(plain(value))
 }
 
@@ -239,8 +239,25 @@ private fun occurrences(value: Any?): List<String> = when (value) {
  * alike: neither has anything to say, and `tags=` is not a shorter way of
  * saying nothing.
  */
-private fun joined(values: Collection<*>?, separator: String): String? =
-    values?.mapNotNull { plain(it) }?.takeIf { it.isNotEmpty() }?.joinToString(separator)
+private fun joined(name: String, values: Collection<*>?, separator: String): String? =
+    values?.mapNotNull { plain(it) }?.onEach { element(name, it) }
+        ?.takeIf { it.isNotEmpty() }?.joinToString(separator)
+
+/**
+ * One element of a list, checked before it is written.
+ *
+ * A server reads an occurrence carrying nothing as no element at all — that is
+ * what makes `?tags=` mean "a field nobody filled in" — so an empty element
+ * would arrive as a list one shorter than the one that was passed, with
+ * nothing on either side able to tell. Refused here, where the caller still
+ * has the list in hand.
+ */
+private fun element(name: String, value: String) {
+    require(value.isNotEmpty()) {
+        "'$name' was given an element that carries nothing, and an occurrence carrying nothing is not " +
+            "an element — it would not arrive. Leave it out of the list."
+    }
+}
 
 private fun urlEncode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 

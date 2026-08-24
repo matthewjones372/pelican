@@ -135,6 +135,20 @@ class MultiValuedInputsTest {
         StringCodec.encodeAll("tag", ListStyle.REPEATED, listOf("a,b")) shouldBe listOf("a,b")
     }
 
+    /**
+     * The third way a list can come back shorter than it went out, and the one
+     * the two guards below miss: `?tag=&tag=a` is two occurrences and one
+     * element, because an occurrence carrying nothing is not an element.
+     */
+    @Test
+    fun `an element carrying nothing is refused rather than written, whatever the style`() {
+        ListStyle.entries.forEach { style ->
+            shouldThrow<IllegalArgumentException> {
+                StringCodec.encodeAll("tag", style, listOf("", "a"))
+            }.message shouldContain "would not come back"
+        }
+    }
+
     @Test
     fun `an element padded with the space a reader would strip is refused too`() {
         shouldThrow<IllegalArgumentException> {

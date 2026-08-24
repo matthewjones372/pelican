@@ -563,7 +563,7 @@ private class KotlinClientEmitter(
             val element = plainType(codec, types, wire)
             val type = if (listStyle == null) element else "List<$element>"
             if (isRequired) required += "$name: $type" else optional += "$name: $type? = null"
-            pairs += "${kotlinString(wire)} to ${occurrences(name, listStyle)}"
+            pairs += "${kotlinString(wire)} to ${occurrences(wire, name, listStyle)}"
         }
 
         val bodyName = unique("body", taken)
@@ -674,10 +674,10 @@ private class KotlinClientEmitter(
      * one is joined here, because the separator is a property of the
      * *declaration* and the runtime has no way to see it from a `List`.
      */
-    private fun occurrences(name: String, listStyle: ListStyle?): String =
+    private fun occurrences(wire: String, name: String, listStyle: ListStyle?): String =
         when (val separator = listStyle?.separator) {
             null -> name
-            else -> "joined($name, ${kotlinString(separator.toString())})"
+            else -> "joined(${kotlinString(wire)}, $name, ${kotlinString(separator.toString())})"
         }
 
     /**

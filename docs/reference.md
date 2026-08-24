@@ -2164,6 +2164,14 @@ Declare the parameter as repeated(), or encode the element so that it cannot.
 
 The same goes for an element padded with the space a reader would strip.
 
+An element carrying *nothing* is refused under every style, `repeated()`
+included, because the reading rule that makes `?tags=` mean "a field nobody
+filled in" is what an empty element runs into: an occurrence carrying nothing is
+not an element, so `?tag=&tag=a` is two occurrences and a one-element list.
+Preserving the empty one on the way in was the other way out of this, and it
+would have handed every handler an element no caller meant to send for the sake
+of the one codec — `StringCodec` — where an empty element is a value at all.
+
 The alternative would be a list that came back a different length from the one
 that went out, with nothing downstream able to tell.
 
