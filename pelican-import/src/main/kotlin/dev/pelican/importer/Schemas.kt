@@ -42,11 +42,29 @@ internal object Schemas {
             )
 
             else -> (composed(obj, components, name) as? Composed.Undescribable)
-                ?.let { unsupported(path / it.keyword, it.reason) }
+                ?.let { unsupported(path / it.keyword, it.reason + wayThrough(obj, it)) }
         }
 
         nestedIn(obj).forEach { (key, nested) -> check(nested, path / key, components) }
     }
+
+    /**
+     * The one refusal here with a way through that is not "lose the
+     * operation", said where the refusal is.
+     *
+     * It belongs to this module rather than to the reason `pelican-codegen`
+     * wrote, because it is a sentence about a build file: the generator has no
+     * opinion about `endpoints { }`, and a document a *client* was generated
+     * from was never refused in the first place.
+     */
+    private fun wayThrough(obj: JsonObj, undescribable: Composed.Undescribable): String =
+        if (undescribable.keyword != "oneOf" || obj["discriminator"] != null) {
+            ""
+        } else {
+            "\n\nWhere the document is not yours to change, state the property in the build file " +
+                "instead — `discriminator(\"Payment\", property = \"kind\")` in the `endpoints { }` " +
+                "entry, addressing the schema by component name or by JSON pointer."
+        }
 
     /** Every named schema [roots] reach, directly or through another. */
     fun reachable(roots: List<JsonValue?>, components: JsonObj): Set<String> {

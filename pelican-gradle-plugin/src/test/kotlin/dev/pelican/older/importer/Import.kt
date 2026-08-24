@@ -2,7 +2,16 @@ package dev.pelican.older.importer
 
 import java.io.File
 
-/** A `pelican-import` from before the codec setting existed; see the older client fake. */
+/**
+ * A `pelican-import` from before the discriminator hints existed, which still
+ * takes the codec.
+ *
+ * The importer's fallback is two steps long rather than the client
+ * generator's one, so it needs two older versions to fall back *through*: this
+ * one, and the `dev.pelican.oldest.importer` beside it from before the codec.
+ * A step with no library standing at the bottom of it is a step nothing takes.
+ */
+@Suppress("LongParameterList")
 fun importEndpoints(
     document: File,
     sourceRoot: File,
@@ -10,12 +19,15 @@ fun importEndpoints(
     name: String,
     exclude: Set<String>,
     handlers: String?,
+    codec: String?,
 ): List<File> {
     val directory = packageName.split('.').fold(sourceRoot) { path, part -> File(path, part) }
     directory.mkdirs()
     return listOf(
         File(directory, "${name.replaceFirstChar { it.uppercase() }}Endpoints.kt").apply {
-            writeText("${document.name}|$packageName|$name|${exclude.sorted().joinToString("+")}|$handlers\n")
+            writeText(
+                "${document.name}|$packageName|$name|${exclude.sorted().joinToString("+")}|$handlers|$codec\n",
+            )
         },
     )
 }

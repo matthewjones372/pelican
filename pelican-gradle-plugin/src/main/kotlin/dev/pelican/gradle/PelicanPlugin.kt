@@ -130,6 +130,7 @@ class PelicanPlugin : Plugin<Project> {
             task.packageName.set(endpoints.packageName)
             task.entryName.set(endpoints.name)
             task.exclude.set(endpoints.exclude)
+            task.discriminators.set(endpoints.discriminators)
             task.handlers.set(endpoints.handlers)
             task.codec.set(endpoints.codec)
             task.outputDir.set(endpoints.outputDir)

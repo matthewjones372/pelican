@@ -21,6 +21,12 @@ import java.io.File
  * generating an endpoint whose type quietly says less than the document does.
  * Where the document is the one you own, fix it; where it is not, name the
  * operation in [ImportOptions.exclude] and it is left out, on the record.
+ *
+ * One refusal has a narrower way through than losing the operation. A `oneOf`
+ * with no `discriminator` is a union nothing says how to read, and
+ * [ImportOptions.discriminators] is where a reader states the property the
+ * document should have named — per schema, in the build file, on the record in
+ * the same way.
  */
 object Import {
 
@@ -61,11 +67,12 @@ object Import {
  * plugin's hands, which is the coupling being avoided.
  *
  * [handlers] is a [Backend] name, or null for no handler stubs; [codec] is a
- * [CodecAnnotations] name, or null for the default.
+ * [CodecAnnotations] name, or null for the default; [discriminators] is the
+ * per-schema discriminator hints, addressed as [Hints] describes.
  *
- * Both arities are declared rather than one with a default, because what the
+ * Every arity is declared rather than one with defaults, because what the
  * plugin looks up is a signature: a defaulted parameter would leave the older
- * one existing only as a synthetic bridge, and a plugin release and a library
+ * ones existing only as synthetic bridges, and a plugin release and a library
  * release would have to arrive together.
  */
 @Suppress("LongParameterList") // Every parameter is one entry in the build file's `endpoints { }` block.
@@ -77,12 +84,14 @@ fun importEndpoints(
     exclude: Set<String>,
     handlers: String?,
     codec: String?,
+    discriminators: Map<String, String>,
 ): List<File> = Import.write(
     document,
     ImportOptions(
         packageName = packageName,
         name = name,
         exclude = exclude,
+        discriminators = discriminators,
         codec = codec?.let { chosen ->
             CodecAnnotations.entries.firstOrNull { it.name.equals(chosen, ignoreCase = true) }
                 ?: throw ImportFailure(
@@ -99,6 +108,17 @@ fun importEndpoints(
     ),
     sourceRoot,
 )
+
+@Suppress("LongParameterList") // The arity before `discriminators`, kept for an older plugin to find.
+fun importEndpoints(
+    document: File,
+    sourceRoot: File,
+    packageName: String,
+    name: String,
+    exclude: Set<String>,
+    handlers: String?,
+    codec: String?,
+): List<File> = importEndpoints(document, sourceRoot, packageName, name, exclude, handlers, codec, emptyMap())
 
 fun importEndpoints(
     document: File,
@@ -131,6 +151,24 @@ class ImportOptions(
      * joining them.
      */
     val exclude: Set<String> = emptySet(),
+
+    /**
+     * Schema -> the property that tells the branches of its `oneOf` apart,
+     * for the unions a document declares without a `discriminator`.
+     *
+     * The refusal these get past is not being softened: a decoder still cannot
+     * try each branch and keep the first that parsed. What changes is who says
+     * which branch a payload is. The document did not, and a reader who knows
+     * writes it down here — per schema, in the build file, reviewed once, the
+     * way [exclude] is. See [Hints] for how a schema is addressed and where
+     * each branch's wire value comes from.
+     *
+     * A hint that stops mattering fails the import rather than doing nothing:
+     * the document stating its own `discriminator`, or nothing reaching the
+     * schema any more, both leave a claim about a payload format that is
+     * checked against nothing.
+     */
+    val discriminators: Map<String, String> = emptyMap(),
 
     /**
      * Which codec the generated payload types are annotated for.

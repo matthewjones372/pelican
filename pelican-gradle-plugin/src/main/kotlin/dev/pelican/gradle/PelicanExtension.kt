@@ -4,6 +4,7 @@ import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
 import javax.inject.Inject
@@ -171,6 +172,51 @@ abstract class EndpointsSpec @Inject constructor(private val name: String) : org
 
     fun exclude(vararg operationIds: String) {
         exclude.addAll(*operationIds)
+    }
+
+    /**
+     * Schema -> the property that tells the branches of its `oneOf` apart, for
+     * the unions a document declares without a `discriminator`.
+     *
+     * Set through [discriminator] rather than written as a map, so that the
+     * build file reads as a statement about one schema.
+     */
+    abstract val discriminators: MapProperty<String, String>
+
+    /**
+     * States which property tells a union's branches apart, where the document
+     * did not.
+     *
+     * ```kotlin
+     * discriminator("Payment", property = "kind")
+     * discriminator("Order/properties/payment", property = "kind")
+     * ```
+     *
+     * A `oneOf` with no `discriminator` is refused, because a decoder would
+     * have to try each branch and keep the first that parsed — which is wrong,
+     * silently, on the first payload two branches both accept. That refusal
+     * stands. This is who says which branch a payload is when the document
+     * does not: the reader, once, in a file somebody reviews.
+     *
+     * [schema] is a component name, a pointer relative to
+     * `#/components/schemas` for a union written under a property, or a JSON
+     * pointer from the root of the document — `#/paths/~1payments/post/...` —
+     * for one written at the endpoint. A union with no name is the case that
+     * makes the pointer worth having: without it, the way through would still
+     * be `exclude`, and the operation would still be lost.
+     *
+     * The value on the wire is not invented. It is the `const` a branch
+     * declares for [property], or the name of the schema the branch points at;
+     * a branch written inline that declares neither fails the import rather
+     * than being given a positional name no payload would carry.
+     *
+     * A hint that stops mattering — the document grew its own `discriminator`,
+     * or nothing reaches the schema any more — fails the import. An `exclude`
+     * that matches nothing has weakened nothing, and a hint that is checked
+     * against nothing is a claim about a payload format nobody is verifying.
+     */
+    fun discriminator(schema: String, property: String) {
+        discriminators.put(schema, property)
     }
 
     /**

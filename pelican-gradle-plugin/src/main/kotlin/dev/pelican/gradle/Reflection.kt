@@ -38,6 +38,16 @@ internal object Pelican {
      */
     private const val DEFAULT_CODEC = "JACKSON"
 
+    // The modules and the functions a fallback names when it refuses, spelled
+    // as the reader's build file and their dependency block spell them.
+    private const val CODEGEN_MODULE = "pelican-codegen"
+    private const val IMPORT_MODULE = "pelican-import"
+    private const val WRITES_CLIENT = "writeKotlinClient"
+    private const val IMPORTS = "importEndpoints"
+
+    /** The `discriminator(...)` entry, named as the build file writes it. */
+    private const val HINTS = "discriminator(...)"
+
     /** Calls the named no-argument function and returns whatever it produced. */
     fun spec(loader: ClassLoader, className: String, functionName: String): Any {
         val type = specClass(loader, className, functionName)
@@ -154,12 +164,7 @@ internal object Pelican {
             ) as File
         }
 
-        if (codec != null) {
-            throw PelicanFailure(
-                "`codec` is set, and the `pelican-codegen` on this task's classpath is older than it: its " +
-                    "`writeKotlinClient` takes no codec. Upgrade pelican-codegen, or remove the setting.",
-            )
-        }
+        if (codec != null) throw PelicanFailure(tooOld("codec", CODEGEN_MODULE, WRITES_CLIENT, "no codec"))
 
         val method = codegen.getMethod(
             "writeKotlinClient",
@@ -202,6 +207,7 @@ internal object Pelican {
         exclude: Set<String>,
         handlers: String?,
         codec: String?,
+        discriminators: Map<String, String>,
     ): List<*> = writeEndpoints(
         load(loader, IMPORT, "pelican-import"),
         document,
@@ -211,6 +217,7 @@ internal object Pelican {
         exclude,
         handlers,
         codec,
+        discriminators,
     )
 
     /** The same, against a `pelican-import` already resolved; see [writeClient]. */
@@ -224,28 +231,26 @@ internal object Pelican {
         exclude: Set<String>,
         handlers: String?,
         codec: String?,
+        discriminators: Map<String, String>,
     ): List<*> {
-        // The arity this plugin knows about and the arity the library on the
-        // consumer's classpath offers are allowed to differ — that is the whole
-        // point of looking the function up rather than compiling against it. An
-        // older `pelican-import` has no `codec` parameter, and refusing to
-        // import at all because of a setting nobody made would be the coupling
-        // this file exists to avoid.
-        val withCodec = runCatching {
-            importer.getMethod(
-                "importEndpoints",
-                File::class.java,
-                File::class.java,
-                String::class.java,
-                String::class.java,
-                Set::class.java,
-                String::class.java,
-                String::class.java,
-            )
-        }.getOrNull()
+        // The bargain `writeClient` makes, one step longer. The arity this
+        // plugin knows about and the arity the library on the consumer's
+        // classpath offers are allowed to differ — that is the whole point of
+        // looking the function up rather than compiling against it. Three
+        // releases are reachable here: one that takes the discriminator hints,
+        // one before them that still takes the codec, and one before that.
+        //
+        // Newest first, and a fallback is only taken when the setting it
+        // cannot carry was not made. Falling back past a setting somebody made
+        // would silently drop it and generate the file the setting was there
+        // to prevent, so each step down is guarded by a named refusal — the
+        // same one `writeClient` raises, written once so the two cannot come
+        // to disagree about what to say.
+        val text = String::class.java
 
-        if (withCodec != null) {
-            return withCodec.invokeUnwrapped(
+        val withHints = importEndpoints(importer, text, text, Map::class.java)
+        if (withHints != null) {
+            return withHints.invokeUnwrapped(
                 null,
                 document,
                 sourceRoot,
@@ -254,27 +259,52 @@ internal object Pelican {
                 exclude,
                 handlers,
                 codec,
+                discriminators,
             ) as List<*>
         }
+        if (discriminators.isNotEmpty()) throw PelicanFailure(tooOld(HINTS, IMPORT_MODULE, IMPORTS, "no hints"))
 
-        if (codec != null) {
-            throw PelicanFailure(
-                "`codec` is set, and the `pelican-import` on this task's classpath is older than it: its " +
-                    "`importEndpoints` takes no codec. Upgrade pelican-import, or remove the setting.",
-            )
+        val withCodec = importEndpoints(importer, text, text)
+        if (withCodec != null) {
+            return withCodec
+                .invokeUnwrapped(null, document, sourceRoot, packageName, name, exclude, handlers, codec) as List<*>
         }
+        if (codec != null) throw PelicanFailure(tooOld("codec", IMPORT_MODULE, IMPORTS, "no codec"))
 
-        val method = importer.getMethod(
+        val oldest = importEndpoints(importer, text)
+            ?: throw PelicanFailure(
+                "`${importer.name}` has no `importEndpoints` this plugin knows how to call. The " +
+                    "`pelican-import` on this task's classpath is not one this plugin supports.",
+            )
+        return oldest.invokeUnwrapped(null, document, sourceRoot, packageName, name, exclude, handlers) as List<*>
+    }
+
+    /** `importEndpoints` with these trailing parameters after the five every arity takes, or null. */
+    private fun importEndpoints(importer: Class<*>, vararg trailing: Class<*>): Method? = runCatching {
+        @Suppress("SpreadOperator") // Three class literals, once per task run; the copy is the readable spelling.
+        importer.getMethod(
             "importEndpoints",
             File::class.java,
             File::class.java,
             String::class.java,
             String::class.java,
             Set::class.java,
-            String::class.java,
+            *trailing,
         )
-        return method.invokeUnwrapped(null, document, sourceRoot, packageName, name, exclude, handlers) as List<*>
-    }
+    }.getOrNull()
+
+    /**
+     * What a setting the library cannot carry is told, in one sentence used by
+     * every fallback here.
+     *
+     * Two chains fall back — the client generator's, one step long, and the
+     * importer's, two — and each step of each is a place a setting could be
+     * dropped without a word. Saying it in one function is what stops the two
+     * drifting into telling a reader different things about the same problem.
+     */
+    private fun tooOld(setting: String, module: String, function: String, missing: String) =
+        "`$setting` is set, and the `$module` on this task's classpath is older than it: its " +
+            "`$function` takes $missing. Upgrade $module, or remove the setting."
 
     /** The document, rendered the way the entry asked for. */
     fun document(loader: ClassLoader, spec: Any, format: DocumentFormat): String {

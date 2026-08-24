@@ -464,6 +464,7 @@ and Gradle's are not the same Jackson.
 | `document` | endpoints | — required: the OpenAPI document to read |
 | `packageName` | endpoints | — required |
 | `exclude` | endpoints | empty: `operationId`s to leave out. See below |
+| `discriminator` | endpoints | none: `discriminator("Payment", property = "kind")` states which property tells an undiscriminated `oneOf`'s branches apart. See below |
 | `handlers` | endpoints | unset: `pekko`, `http4k` or `ktor` writes stubs |
 | `codec` | endpoints | unset: `jackson`. The same setting a client entry takes. See below |
 | `outputDir` | endpoints | `build/generated/pelican/<name>` |
@@ -614,7 +615,7 @@ What it refuses, and what each one would have cost:
 | Two 2xx responses | An endpoint's output is one type and one status. `200 Order` beside `202 Accepted` is a runtime distinction a handler makes, and picking either loses it |
 | A `default` response | "And anything else." An endpoint declares the statuses it answers with by name |
 | Two media types for one body or response | `jsonBody<T>()` is a JSON body; there is no form of it meaning "or XML" |
-| `oneOf` of several shapes with no `discriminator` | A union nothing says how to read. The decoder would have to try each branch and take the first that parsed, which is wrong on the first payload two branches both accept |
+| `oneOf` of several shapes with no `discriminator` | A union nothing says how to read. The decoder would have to try each branch and take the first that parsed, which is wrong on the first payload two branches both accept. Where you know the missing fact, `discriminator(...)` in the build file states it — see [below](#the-discriminator-a-document-did-not-write-down) |
 | `anyOf` of several shapes | A payload may satisfy two `anyOf` branches at once and a Kotlin value is one class or the other, so a sealed hierarchy would say something narrower than the document does |
 | `allOf` of schemas that disagree about a property | Merging would have to pick a winner, and the generated class would then accept payloads the document rejects |
 | A `discriminator` with no branches to discriminate | Neither spelling of a hierarchy is there: no `oneOf` listing the branches, and no schema declaring an `allOf` of this one |
@@ -667,7 +668,9 @@ data class BankTransfer(val iban: String) : Payment
 The `discriminator` is what makes this possible, and its absence is what is
 still refused. Kotlin can hold a union either way; a *decoder* cannot. Without
 one it would have to try each branch and keep the first that parsed, which is
-wrong on the first payload two branches both accept — and wrong silently.
+wrong on the first payload two branches both accept — and wrong silently. What
+a reader who already knows the missing fact can do about that is
+[below](#the-discriminator-a-document-did-not-write-down).
 
 #### What each branch is called
 
@@ -740,6 +743,113 @@ Without an explicit `mapping`, the value that selects a branch is the branch's
 own schema name, which is what OpenAPI defines an implicit mapping to be. That
 is a real loss where the producer meant something else, and it is the reason
 the publishing direction writes the mapping out rather than relying on it.
+
+#### The `discriminator` a document did not write down
+
+A `oneOf` with no `discriminator` is very common in documents nobody in your
+building owns, and until now it cost the whole operation. The reasoning for
+refusing it is not being overturned — a decoder that tries each branch and
+keeps the first that parsed is wrong, silently, on the first payload two
+branches both accept. What changes is *who says* which branch a payload is.
+The document did not; a reader who knows can, in the build file:
+
+```kotlin
+create("orders") {
+    document.set(file("orders.yaml"))
+    packageName.set("com.example.orders")
+    discriminator("Payment", property = "kind")
+}
+```
+
+Per schema, written down, reviewed once — the same shape as the `exclude` list
+and for the same reason. A global "guess at unions" switch would have been
+less typing and would have answered a different question: it says "and
+whatever else turns up", where this says "this union, told apart by this
+property". A `oneOf` the hints do not name still fails.
+
+What the hint does is write the `discriminator` into the document before
+anything reads it. Nothing downstream learns a hint existed: the union is read
+by the same function that reads every union, the branches are named by the
+same rule, and the schemas the generated file publishes carry the
+`discriminator` and its mapping exactly as a document that had stated it
+would. A hinted import and the same document with the `discriminator` written
+in generate the same file, byte for byte, and `HintsTest` asserts that as one
+comparison.
+
+##### Addressing the schema
+
+A component name is the easy half. A `oneOf` written out under a property has
+no name at all, and a hint that could only reach the named ones would leave
+the other half of the problem where it was. So the address is a JSON pointer,
+with two shortenings:
+
+| Written | Means |
+|---|---|
+| `Payment` | `#/components/schemas/Payment` — no slash, so a component |
+| `Order/properties/payment` | relative to `#/components/schemas`, for a union under a named schema |
+| `#/paths/~1payments/post/requestBody/content/application~1json/schema` | from the root, for a union written at the endpoint. RFC 6901 escaping, since a path template is made of slashes |
+
+The pointer addresses the document *as Pelican reads it*: bundled, so a schema
+pulled in from another file is under `components/schemas` with the name it had
+there, and converted, so a 2.0 document is addressed under `components/schemas`
+rather than `definitions`.
+
+##### Where each branch's value comes from
+
+Naming the property does not say what travels in it, and none of it is
+invented:
+
+1. **A `const` — or a single-valued `enum` — the branch declares for that
+   property.** The document has stated the value there. This wins over the
+   schema's name, and that is not the rule a documented `discriminator`
+   follows: OpenAPI's "an unmapped branch is selected by its own schema name"
+   is a rule for filling in a `discriminator` the document *claimed*, and this
+   document never claimed one. A branch saying `kind: { const: card }` under a
+   component called `CardPayment` travels as `card`, and publishing
+   `CardPayment` instead would be confidently wrong rather than merely vague.
+   The branch is then named `Card`, by the same rule a `mapping` key names one.
+2. **The name of the schema the branch points at**, where it declares no
+   constant. That is not invention either — it is the one name the document
+   gives the branch.
+3. **Nothing.** A branch written inline that declares no constant is refused.
+   It has no name to fall back on, and `PaymentVariant2` would be a wire value
+   nobody wrote: a client sending it would send a string the service has never
+   heard of. Give it a `const`, or point it at a named schema.
+
+The `mapping` is written out in full for every branch that is a reference,
+which is what makes the published document say the same thing again. A branch
+written inline is not in it and cannot be — a `mapping` value is a reference —
+and its `const` is where its value already was.
+
+##### When a hint is wrong
+
+Each one fails the build naming the hint as the build file writes it, the
+position it addresses, and what to do. They are collected, because the edit a
+reader makes is one edit to one block:
+
+| The hint | What it is told |
+|---|---|
+| Addresses nothing | There is no schema there, and how a schema is addressed |
+| Addresses something that is not a `oneOf` of several branches | What is there instead — a plain object, an `allOf`, an `anyOf` that stays refused |
+| Names a property no branch declares | That, and the properties the branches *do* declare, so a typo is one glance from fixed |
+| Produces two branches with one value | Which value, and where each branch's value came from |
+| Points at a branch written inline that states nothing | The position of that branch, and the two ways to name it |
+
+##### A hint that is no longer needed
+
+It fails, and an unused `exclude` does not. That is a difference between what
+the two say rather than an inconsistency. An `exclude` naming an operation that
+is not there has weakened nothing: everything still in the document is still
+held to the same standard. A hint is a standing claim about a payload format,
+and once the document states its own `discriminator` — or nothing reaches the
+schema any more, because the operations that did are excluded — that claim is
+checked against nothing. A claim nobody checks is the silent weakening the
+whole module is arranged against.
+
+`anyOf` of several branches is untouched by any of this and stays refused. A
+payload may satisfy two `anyOf` branches at once; a Kotlin value is one class
+or the other, so a sealed hierarchy would say something narrower than the
+document does, and no hint changes that.
 
 ### `allOf`
 
@@ -838,6 +948,15 @@ worth generating a class for — so an `anyOf` in one corner of a document costs
 that corner and nothing else. An `anyOf` inside a schema the *rest* of the
 document uses is a different matter, and fails outright: no list of operations
 to leave out would be an honest answer to it.
+
+Losing the operation is the blunt way through, and one refusal has a narrower
+one:
+[`discriminator(...)`](#the-discriminator-a-document-did-not-write-down)
+supplies the fact an undiscriminated `oneOf` is missing instead of giving up
+the operations that reach it. It is the same kind of statement — per schema
+rather than per operation, in the same block, reviewed the same way — and the
+two are treated differently in exactly one respect: an `exclude` that matches
+nothing is left alone, and a hint that matters to nothing fails.
 
 ### operationId is required
 
@@ -2326,7 +2445,9 @@ open  localhost:8080/api-docs                                 # Swagger UI
   emitter that could not be faithful anyway.
 - **A lenient import.** `pelican-import` refuses an operation it cannot fully
   describe rather than generating a weaker one, and the way through is a
-  per-operation `exclude` list. There is no global switch, on purpose — see
+  per-operation `exclude` list, or a per-schema `discriminator(...)` where what
+  is missing is which property tells a `oneOf`'s branches apart. There is no
+  global switch and no branch inference, on purpose — see
   [Importing an OpenAPI document](#importing-an-openapi-document).
 - **More than six typed inputs.** `endpoint(a..f)` is the largest overload;
   past that the lens form takes the whole `Params`.

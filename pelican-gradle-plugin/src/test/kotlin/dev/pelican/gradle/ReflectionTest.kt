@@ -138,18 +138,20 @@ class ReflectionTest {
             setOf("b", "a"),
             "pekko",
             "kotlinx",
+            mapOf("Payment" to "kind", "Order/properties/payment" to "type"),
         )
 
         written shouldBe listOf(File(dir, "com/example/orders/OrdersEndpoints.kt"))
         (written.single() as File).readText().trim() shouldBe
-            "openapi.yaml|com.example.orders|orders|a+b|pekko|kotlinx"
+            "openapi.yaml|com.example.orders|orders|a+b|pekko|kotlinx|" +
+            "Order/properties/payment=type+Payment=kind"
     }
 
     @Test
     fun `names the module to add when the importer is not on the classpath`(@TempDir dir: File) {
         val empty = java.net.URLClassLoader(emptyArray(), ClassLoader.getPlatformClassLoader())
         shouldThrow<PelicanFailure> {
-            Pelican.writeEndpoints(empty, dir, dir, "com.example", "orders", emptySet(), null, null)
+            Pelican.writeEndpoints(empty, dir, dir, "com.example", "orders", emptySet(), null, null, emptyMap())
         }.message.orEmpty() shouldContain "pelican-import"
     }
 
@@ -162,20 +164,27 @@ class ReflectionTest {
         written.readText().trim() shouldBe "Orders|example|OrdersClient|null|false|JACKSON"
     }
 
-    // ------------------------------------------------- an older library
+    // ------------------------------------------------ the older libraries
 
     /**
-     * The other half of every lookup above: a `pelican-codegen` or a
-     * `pelican-import` published before the codec setting existed.
+     * The other half of every lookup above: the releases each fallback falls
+     * back *to*.
      *
-     * Both are whole library versions standing in their own packages, and the
-     * tests reach them through the seam that takes a resolved class. Naming the
-     * class is the only way to have two versions on one test classpath — and
-     * without two versions the fallback would be a branch nothing ever takes,
-     * which is a fallback that has already stopped working and not said so.
+     * Every one is a whole library version standing in a package of its own,
+     * reached through the seam that takes a resolved class. Naming the class
+     * is the only way to have several versions on one test classpath — and
+     * without them a fallback is a branch nothing ever takes, which is a
+     * fallback that has already stopped working and not said so.
+     *
+     * The client generator falls back one step and so has one older version.
+     * The importer falls back two — past the discriminator hints, then past
+     * the codec — so it has two: `older`, which still takes the codec, and
+     * `oldest`, from before it. Comparatives rather than version numbers,
+     * because what decides a fallback is the order and not the release.
      */
     private val olderCodegen = Class.forName("dev.pelican.older.codegen.KotlinClientKt")
     private val olderImporter = Class.forName("dev.pelican.older.importer.ImportKt")
+    private val oldestImporter = Class.forName("dev.pelican.oldest.importer.ImportKt")
     private val apiSpec = Class.forName("dev.pelican.ApiSpec")
 
     @Test
@@ -199,11 +208,67 @@ class ReflectionTest {
         failure.message.orEmpty() shouldContain "takes no codec"
     }
 
+    /** One step down: no hints, and the codec still carried rather than dropped. */
+    @Test
+    fun `imports through the arity published before the discriminator hints`(@TempDir dir: File) {
+        val document = File(dir, "openapi.yaml").apply { writeText("openapi: 3.1.0") }
+        val written = Pelican.writeEndpoints(
+            olderImporter,
+            document,
+            dir,
+            "com.example",
+            "orders",
+            setOf("a"),
+            "ktor",
+            "kotlinx",
+            emptyMap(),
+        )
+
+        (written.single() as File).readText().trim() shouldBe "openapi.yaml|com.example|orders|a|ktor|kotlinx"
+    }
+
+    /**
+     * The guard that makes the step down safe. Falling back here with hints
+     * set would import the document as though nobody had stated the
+     * discriminator, and the unions the hints were for would come back
+     * refused — or worse, not come back at all.
+     */
+    @Test
+    fun `says which importer is too old to carry the discriminator hints`(@TempDir dir: File) {
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.writeEndpoints(
+                olderImporter,
+                dir,
+                dir,
+                "com.example",
+                "orders",
+                emptySet(),
+                null,
+                null,
+                mapOf("Payment" to "kind"),
+            )
+        }
+
+        failure.message.orEmpty() shouldContain "`discriminator(...)` is set"
+        failure.message.orEmpty() shouldContain "pelican-import"
+        failure.message.orEmpty() shouldContain "takes no hints"
+    }
+
+    /** Two steps down: the arity from before the codec, which is the bottom. */
     @Test
     fun `imports through the arity an older library published`(@TempDir dir: File) {
         val document = File(dir, "openapi.yaml").apply { writeText("openapi: 3.1.0") }
-        val written =
-            Pelican.writeEndpoints(olderImporter, document, dir, "com.example", "orders", setOf("a"), "ktor", null)
+        val written = Pelican.writeEndpoints(
+            oldestImporter,
+            document,
+            dir,
+            "com.example",
+            "orders",
+            setOf("a"),
+            "ktor",
+            null,
+            emptyMap(),
+        )
 
         (written.single() as File).readText().trim() shouldBe "openapi.yaml|com.example|orders|a|ktor"
     }
@@ -211,7 +276,17 @@ class ReflectionTest {
     @Test
     fun `says which importer is too old to carry the codec the entry set`(@TempDir dir: File) {
         val failure = shouldThrow<PelicanFailure> {
-            Pelican.writeEndpoints(olderImporter, dir, dir, "com.example", "orders", emptySet(), null, "kotlinx")
+            Pelican.writeEndpoints(
+                oldestImporter,
+                dir,
+                dir,
+                "com.example",
+                "orders",
+                emptySet(),
+                null,
+                "kotlinx",
+                emptyMap(),
+            )
         }
 
         failure.message.orEmpty() shouldContain "pelican-import"

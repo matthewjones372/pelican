@@ -4,6 +4,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
 import org.gradle.api.tasks.Classpath
@@ -210,6 +211,10 @@ abstract class GenerateEndpointsTask : PelicanTask() {
     @get:Input
     abstract val exclude: SetProperty<String>
 
+    /** Schema -> the property that tells its `oneOf` branches apart. See `EndpointsSpec.discriminator`. */
+    @get:Input
+    abstract val discriminators: MapProperty<String, String>
+
     @get:Input
     @get:Optional
     abstract val handlers: Property<String>
@@ -243,6 +248,7 @@ abstract class GenerateEndpointsTask : PelicanTask() {
             it.packageName.set(packageName)
             it.entryName.set(entryName)
             it.exclude.set(exclude)
+            it.discriminators.set(discriminators)
             it.handlers.set(handlers)
             it.codec.set(codec)
             it.outputDir.set(outputDir)

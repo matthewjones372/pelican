@@ -796,6 +796,33 @@ rather than a switch — the fourth such operation to appear still fails.
 Excluding one also excludes the schemas only it reached, so an `anyOf` in a
 corner of the document costs that corner and nothing else.
 
+Losing the operation is the blunt way through, and one refusal has a narrower
+one. A `oneOf` with no `discriminator` is refused because a decoder that tries
+each branch and keeps the first that parsed is wrong, silently, on the first
+payload two branches both accept — and that stands. What changes is who says
+which branch a payload is. The document did not; a reader who knows can:
+
+```kotlin
+create("orders") {
+    document.set(file("orders.yaml"))
+    packageName.set("com.example.orders")
+    discriminator("Payment", property = "kind")
+    discriminator("Order/properties/payment", property = "kind")
+}
+```
+
+Per schema, in the build file, reviewed once — a component name, or a JSON
+pointer for a union the document wrote out inline and never named. The
+`discriminator` is written into the document before anything reads it, so the
+branch names, the codec annotations and the republished `mapping` are all the
+ones a document that had stated it would have produced. Each branch's value on
+the wire is read, never invented: a `const` it declares for the property, or
+the name of the schema it points at, and an inline branch with neither is
+refused. A hint that names a property no branch declares, that addresses
+something that is not a union, that gives two branches one value — or that
+nothing generated needs any more — fails the build saying which. `anyOf` of
+several branches stays refused, hint or no hint.
+
 This repository imports its own document on every build: `:example` publishes
 `openapi.json` from its endpoint values, generates descriptions back out of it,
 compiles them, and compares what those publish against what it started with.
@@ -1266,7 +1293,9 @@ reasoning behind each, is in [docs/reference.md](docs/reference.md#what-isnt-her
 - **Importing is all-or-nothing per operation.** A document Pelican cannot fully
   describe fails the build rather than generating a weaker endpoint. The way
   through is an `exclude` list of `operationId`s in the build file, which is
-  deliberately per-operation and reviewable — see
+  deliberately per-operation and reviewable — or, for an undiscriminated
+  `oneOf` specifically, a per-schema `discriminator(...)` that states the fact
+  the document left out rather than losing the operation. See
   [Importing an OpenAPI document](#importing-an-openapi-document).
 - **Six typed inputs, then the lens form.** `endpoint(a..f)` is the largest tuple
   overload. Past that, `endpoint { }` reads `Params` by key at the cost of the

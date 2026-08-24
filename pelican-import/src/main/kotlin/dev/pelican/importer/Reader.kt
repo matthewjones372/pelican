@@ -29,7 +29,11 @@ internal class Reader(private val options: ImportOptions) {
     private var declared: JsonObj = JsonObj(emptyMap())
 
     fun read(file: File): IrApi {
-        document = normalise(Document.read(file))
+        // The hints go in before anything reads the document, so that what is
+        // read is one document with its discriminators stated rather than a
+        // document and a list of corrections to remember while reading it.
+        val hints = Hints(options.discriminators)
+        document = hints.applyTo(normalise(Document.read(file)))
 
         val components = document.obj("components")?.obj("schemas") ?: JsonObj(emptyMap())
         declared = JsonObj(components.fields.mapValues { (_, schema) -> normaliseSchema(schema) })
@@ -46,6 +50,10 @@ internal class Reader(private val options: ImportOptions) {
         problems.failIfAny(options.name)
 
         val schemas = used(endpoints, declared)
+        // Checked here rather than at the top, because "did this hint matter"
+        // is a question about what came out, not about what went in: a hint on
+        // a schema only an excluded operation reached has changed nothing.
+        hints.failIfUnused(listOf(schemas) + endpoints.flatMap { it.schemas() })
 
         val info = document.obj("info")
         val required = document.arr("security").let { requirements(it, JsonPath.root / "security") }

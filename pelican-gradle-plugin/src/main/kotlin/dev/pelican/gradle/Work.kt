@@ -2,6 +2,7 @@ package dev.pelican.gradle
 
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
 import org.gradle.workers.WorkAction
@@ -34,6 +35,7 @@ internal interface EndpointsParameters : WorkParameters {
     val packageName: Property<String>
     val entryName: Property<String>
     val exclude: SetProperty<String>
+    val discriminators: MapProperty<String, String>
     val handlers: Property<String>
     val codec: Property<String>
     val outputDir: DirectoryProperty
@@ -89,6 +91,7 @@ internal abstract class GenerateEndpointsWork : WorkAction<EndpointsParameters> 
             parameters.exclude.get(),
             parameters.handlers.orNull,
             parameters.codec.orNull,
+            parameters.discriminators.get(),
         )
         written.forEach { logger.lifecycle("Wrote $it") }
     }

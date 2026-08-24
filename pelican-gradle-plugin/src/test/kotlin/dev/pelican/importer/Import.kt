@@ -9,9 +9,10 @@ import java.io.File
  * was handed — the plugin's half of the job is the arguments, and the
  * generated Kotlin is asserted in that module's own tests and in `:example`.
  *
- * The arity a previous release published is in `dev.pelican.older.importer`
- * rather than here; see the note on the client fake for why the two cannot
- * share a class.
+ * One arity only. The two releases before it are whole library versions of
+ * their own, in `dev.pelican.older.importer` and `dev.pelican.oldest.importer`;
+ * see the note on the client fake for why they cannot share a class with this
+ * one.
  */
 @Suppress("LongParameterList")
 fun importEndpoints(
@@ -22,13 +23,16 @@ fun importEndpoints(
     exclude: Set<String>,
     handlers: String?,
     codec: String?,
+    discriminators: Map<String, String>,
 ): List<File> {
     val directory = packageName.split('.').fold(sourceRoot) { path, part -> File(path, part) }
     directory.mkdirs()
+    val hints = discriminators.entries.sortedBy { it.key }.joinToString("+") { "${it.key}=${it.value}" }
     return listOf(
         File(directory, "${name.replaceFirstChar { it.uppercase() }}Endpoints.kt").apply {
             writeText(
-                "${document.name}|$packageName|$name|${exclude.sorted().joinToString("+")}|$handlers|$codec\n",
+                "${document.name}|$packageName|$name|${exclude.sorted().joinToString("+")}" +
+                    "|$handlers|$codec|$hints\n",
             )
         },
     )
