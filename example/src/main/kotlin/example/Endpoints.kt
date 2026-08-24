@@ -134,6 +134,12 @@ val getUser = endpoint(userId) {
     summary = "Fetch a single user"
     operationId = "getUser"
     tag("users")
+    // The one response this endpoint describes and cannot produce. A 500 from
+    // an escaping exception is rendered as an ApiError by the library itself,
+    // and `default` is where a document says so — it is not returnable, so
+    // there is nothing here for `orFail` to take and nothing for the handler
+    // below to name.
+    defaultJson<ApiError>("Any other failure, rendered as an ApiError")
     json<User>() orFail noSuchUser
 }
 // handler: (Long) -> Outcome<ApiError, User>

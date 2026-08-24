@@ -65,18 +65,29 @@ class StrictnessTest {
         message shouldContain "Document the stream as the only 2xx"
     }
 
+    /**
+     * The other refusal that stopped being one. A `default` still cannot be
+     * *returned* — a handler answers with a status, and "some other status" is
+     * not one — so what it becomes is a line in the document and nothing a
+     * binder ever sees.
+     */
     @Test
-    fun `a default response says "and anything else", which an endpoint cannot`() {
-        refusing(
-            """
-            /orders:
-              get:
-                operationId: listOrders
-                responses:
-                  "200": { description: ok }
-                  default: { description: Anything else }
-            """,
-        ) shouldContain "`default` response"
+    fun `a default response is documented rather than refused`() {
+        val source = imported(
+            document(
+                """
+                /orders:
+                  get:
+                    operationId: listOrders
+                    responses:
+                      "200": { description: ok }
+                      default: { description: Anything else }
+                """,
+            ),
+        )
+
+        source shouldContain """defaultResponse("Anything else")"""
+        source shouldNotContain "orFail"
     }
 
     @Test
@@ -264,14 +275,20 @@ class StrictnessTest {
               get:
                 operationId: a
                 responses:
-                  "200": { description: ok }
-                  default: { description: anything else }
+                  "200":
+                    description: ok
+                    content:
+                      application/json: { schema: { type: object } }
+                      application/xml: { schema: { type: object } }
             /b:
               get:
                 operationId: b
                 responses:
-                  "200": { description: ok }
-                  default: { description: anything else }
+                  "200":
+                    description: ok
+                    content:
+                      application/json: { schema: { type: object } }
+                      application/xml: { schema: { type: object } }
             """,
         )
         message shouldContain "2 operations cannot be described"
@@ -288,8 +305,11 @@ class StrictnessTest {
               get:
                 operationId: a
                 responses:
-                  "200": { description: ok }
-                  default: { description: anything else }
+                  "200":
+                    description: ok
+                    content:
+                      application/json: { schema: { type: object } }
+                      application/xml: { schema: { type: object } }
             /b:
               get:
                 operationId: b

@@ -156,6 +156,10 @@ private fun requestBody(ep: Endpoint<*, *>, schemas: SchemaSource, components: S
  *
  * `emits(...)` headers go on every success, being the endpoint's promise; a
  * header declared on one response goes on that one alone.
+ *
+ * A `defaultResponse(...)` is written under `default` rather than under a
+ * status, which is the one entry here that describes a response no handler
+ * could produce.
  */
 private fun responses(ep: Endpoint<*, *>, schemas: SchemaSource, components: SchemaComponents): JsonObj = jsonObj {
     successesOf(ep.output).forEach { out ->
@@ -170,7 +174,10 @@ private fun responses(ep: Endpoint<*, *>, schemas: SchemaSource, components: Sch
         })
     }
     ep.errors.forEach { err ->
-        put(err.status.toString(), jsonObj {
+        // A null status is `default`, which is a key in this map like any
+        // status and unlike one in every other way: nothing produces it, and it
+        // stands for the statuses the entries beside it did not enumerate.
+        put(err.status?.toString() ?: "default", jsonObj {
             "description" to err.description
             responseHeaders(err.headers)?.let { put("headers", it) }
             val schema = err.type?.let { schemas.schema(it, components) }

@@ -358,6 +358,14 @@ the one place the declaration and the value are both in hand. Mark it
 `.optional()` for a header that is only sometimes sent. A failure that declares
 no headers is returned exactly as before.
 
+`defaultJson<ApiError>("Any other failure")` documents OpenAPI's `default` —
+"and anything else" — which is the one response an endpoint can describe and
+cannot produce. It is a statement rather than a value: nothing to pass to
+`orFail`, nothing for a handler to name, because a handler answers with a
+status and "some other status" is not one. `defaultResponse(...)` is the same
+for one with no payload. See
+[The one response an endpoint cannot produce](docs/reference.md#the-one-response-an-endpoint-cannot-produce).
+
 ## More than one successful response
 
 A failure is one *alternative*, not a special kind of thing. `or` declares
@@ -824,8 +832,8 @@ into one class, and refused rather than resolved where two of them disagree
 about a property.
 
 **The import is strict.** An operation using something Pelican cannot describe
-— two success statuses, two media types for one body, a `oneOf` with nothing
-saying which branch a payload is, a `default` response — fails the build naming
+— two media types for one body, a `oneOf` with nothing saying which branch a
+payload is, a streamed response beside another 2xx — fails the build naming
 the operation, the place in the document and the way out, rather than
 generating an endpoint whose type says less than the document does. That is the right default for a document you own, and an
 obstacle in one you do not, so operations you have decided to live without are

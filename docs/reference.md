@@ -613,7 +613,6 @@ What it refuses, and what each one would have cost:
 | In the document | Why there is no description for it |
 |---|---|
 | A streamed 2xx beside another 2xx | Both are read where both are values — see [More than one successful response](#more-than-one-successful-response) — but naming one alternative is what produces it, and a stream is produced in the server library's own type, which core cannot name. Document the stream as the only 2xx, or move the other statuses to an operation of their own |
-| A `default` response | "And anything else." An endpoint declares the statuses it answers with by name |
 | Two media types for one body or response | `jsonBody<T>()` is a JSON body; there is no form of it meaning "or XML" |
 | `oneOf` of several shapes with no `discriminator` | A union nothing says how to read. The decoder would have to try each branch and take the first that parsed, which is wrong on the first payload two branches both accept. Where you know the missing fact, `discriminator(...)` in the build file states it — see [below](#the-discriminator-a-document-did-not-write-down) |
 | `anyOf` of several shapes | A payload may satisfy two `anyOf` branches at once and a Kotlin value is one class or the other, so a sealed hierarchy would say something narrower than the document does |
@@ -2165,6 +2164,43 @@ What this does **not** cover, honestly:
   failures in one list, so every one of those types would have to erase back to
   the same thing to go in it. The check would have to be repeated at the point
   it was erased, which is the check that is already there.
+
+### The one response an endpoint cannot produce
+
+OpenAPI's `default` says "and anything else": whatever arrives under a status
+this operation did not enumerate looks like *this*. Most published documents
+have one, and it is usually the most useful sentence in the `responses` map —
+it is what tells a caller that an unlisted failure is still a `Problem` and not
+an HTML error page from a proxy.
+
+It is describable, and it is not returnable:
+
+```kotlin
+val getUser = endpoint(userId) {
+    get("users" / userId)
+    defaultJson<ApiError>("Any other failure, rendered as an ApiError")
+    json<User>() orFail noSuchUser
+}
+```
+
+`defaultResponse(description, vararg headers)` for one with no body,
+`defaultJson<T>(...)` for one that carries a payload. Both are statements and
+neither hands anything back — unlike `errorJson<T>(...)`, whose whole point is
+the value a handler returns. There is nothing to pass to `orFail`, nothing a
+binder sees, and no way for a handler to answer with it. That is not an
+omission: a handler answers with a status, and "some other status" is not one.
+It reaches the document, `ErrorSpec.status` is null there rather than an `Int`,
+and `pelican-openapi` writes it under the `default` key.
+
+An endpoint may declare one. A second would not be published beside the first —
+`default` is a single key in the response map — so it would silently replace it,
+and the check that refuses it runs when the endpoint value is built.
+
+What is still true is that `default` describes nothing Pelican *does*. The 500
+an escaping exception becomes is rendered by `renderError`, the same way it was
+before, and declaring a `default` neither changes that response nor promises
+anything about it. It writes down what the service already does with the
+statuses it did not list, for the benefit of whoever is reading the document.
 
 ## More than one successful response
 

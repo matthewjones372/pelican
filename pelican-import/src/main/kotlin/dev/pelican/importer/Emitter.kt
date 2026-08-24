@@ -207,11 +207,11 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
         ep.success is IrSuccess.Bytes -> "bytesNow"
 
-        streams(ep) && ep.failures.any { it.schema != null } -> "streamedOrFail"
+        streams(ep) && ep.failures.any { it.returnable } -> "streamedOrFail"
 
         streams(ep) -> "streamedNow"
 
-        ep.failures.any { it.schema != null } -> "handledOrFail"
+        ep.failures.any { it.returnable } -> "handledOrFail"
 
         ep.success is IrSuccess.Empty -> "handledWith"
 
@@ -258,7 +258,7 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         if (ep.responseHeaders.isNotEmpty()) {
             add("emits(${ep.responseHeaders.joinToString { headerName(it) }})")
         }
-        ep.failures.filter { it.schema == null }.forEach { add(errorResponse(it)) }
+        ep.failures.filterNot { it.returnable }.forEach { add(documented(ep, it)) }
         add(output(ep))
     }
 
@@ -332,9 +332,31 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         return "${schemeName(requirement.scheme)}.requires($scopes)"
     }
 
-    private fun errorResponse(failure: IrFailure): String {
+    /**
+     * A response the endpoint describes and the handler never returns: one the
+     * handler throws, or the `default` nothing can produce at all.
+     *
+     * The `default` keeps its payload type where it has one. Writing it as a
+     * bare `defaultResponse(...)` would have been simpler and would have
+     * dropped the schema, which is the silent weakening this importer refuses
+     * everywhere else — a document saying "and any other error is a Problem"
+     * would have come back saying only "and any other error".
+     */
+    private fun documented(ep: IrEndpoint, failure: IrFailure): String {
         val headers = failure.headers.joinToString("") { ", ${headerName(it)}" }
-        return "errorResponse(${failure.status}, ${kotlinString(failure.description)}$headers)"
+        val description = kotlinString(failure.description)
+        val schema = failure.schema
+
+        return when {
+            failure.status != null -> "errorResponse(${failure.status}, $description$headers)"
+
+            schema == null -> "defaultResponse($description$headers)"
+
+            else -> {
+                val type = typeFor(schema, typeName(ep.operationId) + "Failure")
+                "defaultJson<$type>($description$headers)"
+            }
+        }
     }
 
     // ---------------------------------------------------------------- outputs
@@ -342,7 +364,7 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     private fun output(ep: IrEndpoint): String {
         val successes = ep.successes.map { successOutput(ep, it) }
         val success = successes.joinToString(" or ")
-        val declared = ep.failures.filter { it.schema != null }.map { failureName(ep, it) }
+        val declared = ep.failures.filter { it.returnable }.map { failureName(ep, it) }
         return when {
             declared.isEmpty() -> success
 
@@ -428,18 +450,20 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         }
     }
 
+    /** Only ever asked of a [returnable] failure: the two below are what that means. */
     private fun failureName(ep: IrEndpoint, failure: IrFailure): String {
         val schema = failure.schema ?: error("A failure with no payload has no name")
+        val status = failure.status ?: error("A default response is not one a handler could name")
         val type = typeFor(schema, typeName(ep.operationId) + "Failure")
         // The headers are part of the key, not just of the declaration: two
         // 404s carrying the same payload are one value, and two 429s that
         // differ in what they send back are not.
         val headers = failure.headers.joinToString("") { ", ${headerName(it)}" }
-        val key = "failure:${failure.status}:$type:${failure.description}:$headers"
+        val key = "failure:$status:$type:${failure.description}:$headers"
         return named.getOrPut(key) {
-            val name = unique(memberName(type + reason(failure.status)), taken)
+            val name = unique(memberName(type + reason(status)), taken)
             failures[name] =
-                "val $name = errorJson<$type>(${failure.status}, ${kotlinString(failure.description)}$headers)"
+                "val $name = errorJson<$type>($status, ${kotlinString(failure.description)}$headers)"
             name
         }
     }
@@ -766,39 +790,7 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     private val knownFormats = setOf("uuid", "date", "date-time", "uri", "int32", "int64", "double", "float")
 
-    // ---------------------------------------------------------------- pieces
-
-    private fun description(text: String?) = text?.let { ", ${kotlinString(it)}" }.orEmpty()
-
-    private fun namedDescription(text: String?) =
-        if (text == null) "" else ", description = ${kotlinString(text)}"
-
-    private fun describedBy(text: String?) = if (text == null) "" else kotlinString(text)
-
-    private fun literal(value: dev.pelican.JsonValue, type: String): String = when (type) {
-        "String" -> kotlinString((value as? dev.pelican.JsonStr)?.value.orEmpty())
-        "Long" -> "${value.render()}L"
-        else -> value.render()
-    }
-
     private fun reason(status: Int): String = reasons[status] ?: "Status$status"
-
-    private fun StringBuilder.section(title: String, declarations: Collection<String>) {
-        if (declarations.isEmpty()) return
-        appendLine(rule(title))
-        appendLine()
-        declarations.forEach {
-            appendLine(it)
-            appendLine()
-        }
-    }
-
-    private fun rule(title: String): String {
-        val dashes = RULE_WIDTH - title.length
-        return "// " + "-".repeat(maxOf(dashes, 1)) + " $title"
-    }
-
-    private fun String.capitalise() = replaceFirstChar { it.uppercaseChar() }
 
     private val banner = """
         // Generated from an OpenAPI document by pelican-import. Do not edit: the
@@ -839,6 +831,43 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 private class Plain(val type: String, val codec: String?)
 
 /** A Kotlin type name and nothing else: not `List<Order>`, not `Order?`, not `String`. */
+// ------------------------------------------------------------------ pieces
+//
+// Text, and nothing else: none of these reads the emitter's state, so they sit
+// beside the constants below rather than inside the class. What they have in
+// common is that they answer "how is this written down", which is a question
+// about Kotlin syntax rather than about the document being read.
+
+private fun description(text: String?) = text?.let { ", ${kotlinString(it)}" }.orEmpty()
+
+private fun namedDescription(text: String?) =
+    if (text == null) "" else ", description = ${kotlinString(text)}"
+
+private fun describedBy(text: String?) = if (text == null) "" else kotlinString(text)
+
+private fun literal(value: dev.pelican.JsonValue, type: String): String = when (type) {
+    "String" -> kotlinString((value as? dev.pelican.JsonStr)?.value.orEmpty())
+    "Long" -> "${value.render()}L"
+    else -> value.render()
+}
+
+private fun StringBuilder.section(title: String, declarations: Collection<String>) {
+    if (declarations.isEmpty()) return
+    appendLine(rule(title))
+    appendLine()
+    declarations.forEach {
+        appendLine(it)
+        appendLine()
+    }
+}
+
+private fun rule(title: String): String {
+    val dashes = RULE_WIDTH - title.length
+    return "// " + "-".repeat(maxOf(dashes, 1)) + " $title"
+}
+
+private fun String.capitalise() = replaceFirstChar { it.uppercaseChar() }
+
 private val bareType = Regex("[A-Z][A-Za-z0-9_]*")
 
 /** Well inside the JVM's 64KB ceiling on a string constant, with room for escapes. */

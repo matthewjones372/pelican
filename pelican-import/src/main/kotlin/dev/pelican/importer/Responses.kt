@@ -10,6 +10,9 @@ import dev.pelican.JsonObj
  * is one for one what `endpoint(...)` can now say, since a handler names the
  * response it is producing.
  *
+ * `default` is the exception, and the only one: it becomes a failure with no
+ * status, which is documented and never returned. See [IrFailure.returnable].
+ *
  * `200 Order` beside `202 Accepted` used to be refused here, for the good
  * reason that an endpoint's output was one type and one status and picking
  * either lost the distinction. It is not refused any more; what is left of that
@@ -29,20 +32,11 @@ internal class Responses(private val reader: Reader, private val operation: Oper
         val responses = operation.node.obj("responses")
             ?: unsupported(at, "This operation documents no responses at all.")
 
-        val byStatus = responses.entries().map { (key, node) ->
-            if (key == "default") {
-                unsupported(
-                    at / key,
-                    "A `default` response says \"and anything else\", and an endpoint declares the " +
-                        "statuses it answers with by name. Document the statuses it really returns.",
-                )
-            }
-            val status = key.toIntOrNull()
-                ?: unsupported(at / key, "'$key' is not a status code. Pelican declares one status per response.")
-            status to node
-        }
+        val byStatus = responses.entries().map { (key, node) -> statusOf(at, key) to node }
 
-        val documented = byStatus.filter { (status, _) -> status in successful }
+        val documented = byStatus.mapNotNull { (status, node) ->
+            if (status != null && status in successful) status to node else null
+        }
         if (documented.isEmpty()) {
             unsupported(at, "No 2xx response is documented, so nothing says what a successful call returns.")
         }
@@ -77,11 +71,27 @@ internal class Responses(private val reader: Reader, private val operation: Oper
             // that is the only reading under which a `Location` on the 201 stays
             // off the 200.
             successes = successes.map { (success, own) -> if (successes.size == 1) success else success.with(own) },
-            failures = byStatus.filterNot { it.first in successful }.map { (code, node) ->
-                failure(code, at / code.toString(), node)
-            },
+            failures = byStatus
+                .filterNot { (status, _) -> status != null && status in successful }
+                .map { (status, node) -> failure(status, at / label(status), node) },
             successHeaders = if (successes.size == 1) successes.single().second else emptyList(),
         )
+    }
+
+    /**
+     * What key this response is written under, as a status.
+     *
+     * Null is `default`, which is how core spells the one response an endpoint
+     * describes and cannot produce. It used to be refused outright, and what
+     * the refusal cost was every document that says "and any other error is a
+     * Problem" — which a document says far more often than it enumerates each
+     * status it might answer with.
+     */
+    private fun statusOf(at: JsonPath, key: String): Int? = when (key) {
+        "default" -> null
+
+        else -> key.toIntOrNull()
+            ?: unsupported(at / key, "'$key' is not a status code. Pelican declares one status per response.")
     }
 
     /**
@@ -132,20 +142,21 @@ internal class Responses(private val reader: Reader, private val operation: Oper
         }
     }
 
-    private fun failure(status: Int, at: JsonPath, node: dev.pelican.JsonValue): IrFailure {
+    private fun failure(status: Int?, at: JsonPath, node: dev.pelican.JsonValue): IrFailure {
         val (response, path) = reader.deref(node, at)
         val description = response.str("description") ?: reason(status)
         val content = response.obj("content")
+        val named = "${label(status)} response"
 
         if (content == null || content.fields.isEmpty()) {
             return IrFailure(status, null, description, headers(response, path))
         }
 
-        val (mediaType, body) = single(content, path / "content", "$status response")
+        val (mediaType, body) = single(content, path / "content", named)
         if (!mediaType.isJson()) {
             unsupported(
                 path / "content",
-                "The $status response is $mediaType. A declared failure carries a JSON payload, " +
+                "The $named is $mediaType. A declared failure carries a JSON payload, " +
                     "or no payload at all.",
             )
         }
@@ -176,8 +187,14 @@ internal class Responses(private val reader: Reader, private val operation: Oper
     /** The statuses that mean the call worked, which is the whole of what 2xx means. */
     private val successful = 200..299
 
+    /** What the document calls this response, and what a message about it should call it too. */
+    private fun label(status: Int?): String = status?.toString() ?: "default"
+
     /** What to call a failure the document did not describe. */
-    private fun reason(status: Int): String = reasons[status] ?: "Status $status"
+    private fun reason(status: Int?): String = when (status) {
+        null -> "Any other response"
+        else -> reasons[status] ?: "Status $status"
+    }
 
     private val reasons = mapOf(
         400 to "Bad request",

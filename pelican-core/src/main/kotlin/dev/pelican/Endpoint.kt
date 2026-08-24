@@ -5,7 +5,15 @@ import kotlin.reflect.typeOf
 
 /** A non-2xx response declared for documentation purposes. */
 class ErrorSpec @PublishedApi internal constructor(
-    val status: Int,
+    /**
+     * Null is OpenAPI's `default`: "and anything else". It is the one response
+     * an endpoint can describe and cannot produce — a handler answers with a
+     * status, and there is no status that means "some other status" — so a
+     * null here only ever arrives from [EndpointBuilder.defaultResponse] or
+     * [EndpointBuilder.defaultJson], neither of which hands anything back to
+     * return. [ErrorOutput.status], the one a handler names, stays an `Int`.
+     */
+    val status: Int?,
     val description: String,
     val type: KType?,
     /**
@@ -203,6 +211,51 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     fun errorResponse(status: Int, description: String, vararg headers: ResponseHeader<*>) {
         errors += ErrorSpec(status, description, null, headers.toList())
+    }
+
+    /**
+     * Documents OpenAPI's `default` response — "and anything else":
+     *
+     * ```
+     * defaultResponse("Any other failure, as an ApiError")
+     * ```
+     *
+     * This is the one response an endpoint describes and cannot produce.
+     * Everything else declared here is either a status a handler returns or a
+     * status a handler throws, and both are statuses; `default` is the absence
+     * of one. So it returns nothing to name: there is no value to pass to
+     * [orFail], nothing binds it, and no handler can answer with it. What it
+     * does is tell a reader of the document what the statuses this endpoint
+     * did not enumerate will look like when they arrive.
+     *
+     * The alternative was to keep refusing it on import and have no way to
+     * write one, which cost every document that says "and any other error is a
+     * Problem" the fact that it says so — a fact a client generator would
+     * otherwise have to invent.
+     */
+    fun defaultResponse(description: String, vararg headers: ResponseHeader<*>) {
+        errors += ErrorSpec(null, description, null, headers.toList())
+    }
+
+    /**
+     * The same, for a `default` that carries a JSON payload:
+     *
+     * ```
+     * defaultJson<ApiError>("Any other failure")
+     * ```
+     *
+     * Named after [errorJson] and deliberately unlike it in the one way that
+     * matters: [errorJson] hands back a declaration a handler can return, and
+     * this hands back nothing, because a `default` is not a response anything
+     * can produce. [T] is published as that response's schema and no more.
+     */
+    inline fun <reified T> defaultJson(description: String, vararg headers: ResponseHeader<*>) {
+        addDefault(typeOf<T>(), description, headers.toList())
+    }
+
+    @PublishedApi
+    internal fun addDefault(type: KType, description: String, headers: List<ResponseHeader<*>>) {
+        errors += ErrorSpec(null, description, type, headers)
     }
 
     /**
@@ -475,6 +528,17 @@ private fun validate(ep: Endpoint<*, *>) {
                     "Take the rest as separate requests, or as one rawBody() you parse yourself.",
             )
         }
+    }
+
+    // `default` is one key in OpenAPI's response map, so a second declaration
+    // would not be published beside the first — it would replace it, and the
+    // endpoint would say something nobody wrote.
+    if (ep.errors.count { it.status == null } > 1) {
+        error(
+            "$ep declares more than one default response, and a document has room for one: " +
+                "`default` is the single entry meaning \"and anything else\". Say it once, or give the " +
+                "others the statuses they really are.",
+        )
     }
 
     // Two declarations of one header name would leave a handler unable to say

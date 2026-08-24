@@ -87,6 +87,47 @@ class ImportTest {
     }
 
     /**
+     * A `default` carrying a payload, which is how most documents say "and any
+     * other error is a Problem".
+     *
+     * The schema comes with it — `defaultJson<T>` publishes it again — and the
+     * handler is unaffected: `default` is the one response nothing can produce,
+     * so the stub is bound with `handledNow` rather than `handledOrFail` and
+     * there is no failure for the endpoint's type to carry.
+     */
+    @Test
+    fun `a default response is documentation, payload and all, and no handler returns it`() {
+        val yaml = document(
+            """
+            /orders:
+              get:
+                operationId: listOrders
+                responses:
+                  "200":
+                    description: ok
+                    content:
+                      application/json:
+                        schema: { type: object, properties: { id: { type: integer } } }
+                  default:
+                    description: Any other failure
+                    content:
+                      application/json:
+                        schema: { type: object, properties: { message: { type: string } } }
+            """,
+        )
+        val options = ImportOptions("app", "orders", handlers = Backend.KTOR)
+        val generated = Import.kotlin(documentOf("openapi.yaml" to yaml), options)
+
+        val endpoints = generated.getValue("OrdersEndpoints.kt")
+        endpoints shouldContain """defaultJson<ListOrdersFailure>("Any other failure")"""
+        endpoints shouldContain "data class ListOrdersFailure("
+        endpoints shouldNotContain "orFail"
+
+        generated.getValue("OrdersHandlers.kt") shouldContain
+            """listOrders handledNow { TODO("listOrders") }"""
+    }
+
+    /**
      * The refusal this replaced: `200 Order` beside `202 Accepted` was two
      * answers to a question an endpoint could give one answer to. Both are read
      * now, and the header on the 201 belongs to the 201 — where a

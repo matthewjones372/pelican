@@ -163,11 +163,23 @@ internal fun IrSuccess.with(headers: List<IrResponseHeader>): IrSuccess = when (
 
 /** A documented non-2xx. One with a JSON body becomes a typed failure; one without is documented only. */
 internal class IrFailure(
-    val status: Int,
+    /** Null is the document's `default` — "and anything else", which has no status of its own. */
+    val status: Int?,
     val schema: JsonObj?,
     val description: String,
     val headers: List<IrResponseHeader>,
 )
+
+/**
+ * Whether a handler could answer with this, which decides both the binder the
+ * stub is written against and whether the failure is named on the output.
+ *
+ * Two ways of not being returnable, and they are not the same thing. A failure
+ * with no payload is a response the handler *throws* — there is nothing to
+ * carry, so `errorResponse(...)` documents it and `notFound(...)` produces it.
+ * A `default` is a response nothing produces at all, whatever it carries.
+ */
+internal val IrFailure.returnable: Boolean get() = status != null && schema != null
 
 internal class IrResponseHeader(
     val name: String,
