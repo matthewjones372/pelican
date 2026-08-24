@@ -161,16 +161,14 @@ private class Hierarchies(private val schemas: Map<String, JsonObj>, classes: Ma
      */
     private fun branch(name: String, schema: JsonObj): JsonObj {
         val carried = discriminatorsAbove(name)
-        val properties = LinkedHashMap<String, JsonValue>()
-        properties += inheritedProperties(name)
-        properties += schema.ownProperties()
-        carried.forEach { properties.remove(it) }
-
+        val properties = (inheritedProperties(name) + schema.ownProperties()) - carried
         val required = (inheritedRequired(name) + schema.ownRequired()) - carried
 
+        // Whatever else the branch carried — a description, a title, an example
+        // — kept as it was. Only the four keys this rewrites are rebuilt.
         val kept = schema.fields - "allOf" - "properties" - "required" - "discriminator" - "type"
         return JsonObj(
-            LinkedHashMap<String, JsonValue>().apply {
+            buildMap {
                 put("type", JsonStr("object"))
                 putAll(kept)
                 if (properties.isNotEmpty()) put("properties", JsonObj(properties))

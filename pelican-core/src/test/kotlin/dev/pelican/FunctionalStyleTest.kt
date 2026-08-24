@@ -46,6 +46,8 @@ class FunctionalStyleTest {
             "the emitter builds one client method's parameter list, keeping names unique as it goes",
         "pelican-codegen/src/main/kotlin/dev/pelican/codegen/KotlinTypes.kt" to
             "generated type names are registered as they are minted, so a second use finds the first",
+        "pelican-codegen/src/main/kotlin/dev/pelican/codegen/Unions.kt" to
+            "merging an `allOf` gathers the properties its branches declare, then freezes them into one schema",
         "pelican-jackson/src/main/kotlin/dev/pelican/jackson/KotlinAwareModelResolver.kt" to
             "swagger's Schema is a mutable Java bean; patching it is the integration",
         "pelican-kotlinx/src/main/kotlin/dev/pelican/kotlinx/DescriptorSchemas.kt" to
