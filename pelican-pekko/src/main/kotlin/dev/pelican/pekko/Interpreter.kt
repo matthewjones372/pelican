@@ -22,6 +22,16 @@ import java.util.concurrent.CompletionStage
 private const val BLOCKING_IO_DISPATCHER = "pekko.actor.default-blocking-io-dispatcher"
 
 /**
+ * How far past [Api.maxBodyBytes] a body with no declared length is still read
+ * before the connection is cut, so that the 413 it earns can be delivered on a
+ * connection that is still whole. Sixty-four kilobytes: a body that overshoots
+ * by less than that is the ordinary case — a client that guessed wrong, not one
+ * that is attacking — and reading it out is cheap next to any limit worth
+ * setting. See the read itself for what this buys.
+ */
+private const val DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
+
+/**
  * Interprets an [Api] as a Pekko HTTP route.
  *
  * Each endpoint becomes `method { extractRequest { ... completeWithFuture } }`
@@ -344,58 +354,100 @@ private fun readBody(
             )
         }
 
-        is JsonBody<*>, is FormBody<*> -> {
-            // Checked before anything is read, so a declared oversize is
-            // refused without pulling the body across at all. The three
-            // backends all do this, and all answer 413.
-            val declaredLength = req.entity().contentLengthOption
-            if (declaredLength.isPresent && declaredLength.asLong > api.maxBodyBytes) {
-                return CompletableFuture.failedStage(PayloadTooLarge(api.maxBodyBytes))
-            }
-
-            // Two ways to read it, and which one matters more than it looks.
-            //
-            // `toStrict(timeout, maxBytes, system)` enforces the limit by
-            // materialising a limiting stage in front of the entity, and that
-            // costs about six microseconds a request — an order of magnitude
-            // more than everything else this interpreter does put together.
-            //
-            // It is only needed when nobody has said how long the body is. A
-            // declared Content-Length was checked above, and HTTP/1.1 reads
-            // exactly that many bytes off the connection, so the entity cannot
-            // arrive larger than the number already refused. Chunked requests
-            // declare nothing, and those still get the limiting stage.
-            val reading =
-                if (declaredLength.isPresent) {
-                    req.entity().toStrict(api.strictBodyTimeoutMillis, system)
-                } else {
-                    req.entity().toStrict(api.strictBodyTimeoutMillis, api.maxBodyBytes, system)
-                }
-            reading
-                .exceptionally { t ->
-                    // The backstop, for a chunked request that declared no length.
-                    // Pekko signals it with an EntityStreamException; core has its
-                    // own name for the condition so the three backends answer alike.
-                    throw if (isSizeLimit(t)) PayloadTooLarge(api.maxBodyBytes) else t
-                }
-                .thenApply { strict ->
-                    val text = strict.data.utf8String()
-                    // Whatever the codec throws is its own library's exception, and
-                    // nothing here should have to recognise it. Wrapping it in
-                    // core's own failure is what keeps this file codec-agnostic.
-                    values[body] = try {
-                        checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
-                            .decodeFromString(text)
-                    } catch (t: BodyDecodeFailure) {
-                        throw t
-                    } catch (t: Throwable) {
-                        throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
-                    }
-                    Unit
-                }
-        }
+        is JsonBody<*>, is FormBody<*> ->
+            readStrictBody(ep, api, codecs, req, body, values, system)
     }
 }
+
+/**
+ * A body a codec has to see whole: read into memory, checked against the
+ * limit, and decoded. Its own function because the reading is where the size
+ * ceiling is enforced, and that is more than a line of reasoning.
+ */
+private fun readStrictBody(
+    ep: Endpoint<*, *>,
+    api: Api,
+    codecs: EndpointCodecs,
+    req: HttpRequest,
+    body: BodyInput<*>,
+    values: MutableMap<ParamKey<*>, Any?>,
+    system: ClassicActorSystemProvider,
+): CompletionStage<Unit> {
+    // Checked before anything is read, so a declared oversize is refused
+    // without pulling the body across at all. The three backends all do
+    // this, and all answer 413.
+    val declaredLength = req.entity().contentLengthOption
+    if (declaredLength.isPresent && declaredLength.asLong > api.maxBodyBytes) {
+        return CompletableFuture.failedStage(PayloadTooLarge(api.maxBodyBytes))
+    }
+
+    // Two ways to read it, and which one matters more than it looks.
+    //
+    // `toStrict(timeout, maxBytes, system)` enforces a ceiling by
+    // materialising a limiting stage in front of the entity, and that costs
+    // about six microseconds a request — an order of magnitude more than
+    // everything else this interpreter does put together.
+    //
+    // It is only needed when nobody has said how long the body is. A
+    // declared Content-Length was checked above, and HTTP/1.1 reads exactly
+    // that many bytes off the connection, so the entity cannot arrive
+    // larger than the number already refused. Chunked requests declare
+    // nothing, and those still get the limiting stage.
+    //
+    // The ceiling handed to the stage is the limit plus a small overrun,
+    // and the refusal is made below on what actually arrived. The overrun
+    // is what makes the 413 reach the client at all. Cutting the entity off
+    // mid-upload leaves unread bytes on the connection, so Pekko HTTP
+    // answers with `Connection: close` and shuts the socket while the
+    // client is still writing — which the client sees as a broken pipe
+    // rather than as the refusal that explains it. Reading the last few
+    // kilobytes of a body that is only a little too big costs a bounded
+    // amount of memory and buys a request that ends in an answer. A client
+    // that keeps pushing past the overrun is cut off as before: the stage
+    // fails, the `exceptionally` below turns that into the same 413, and
+    // that one may well arrive as a dropped connection. Nothing can be
+    // promised to a sender that will not stop.
+    val reading =
+        if (declaredLength.isPresent) {
+            req.entity().toStrict(api.strictBodyTimeoutMillis, system)
+        } else {
+            req.entity()
+                .toStrict(api.strictBodyTimeoutMillis, api.maxBodyBytes + DRAIN_OVERRUN_BYTES, system)
+        }
+    return reading
+        .exceptionally { t ->
+            // The backstop, for a chunked request that declared no length.
+            // Pekko signals it with an EntityStreamException; core has its
+            // own name for the condition so the three backends answer
+            // alike.
+            throw if (isSizeLimit(t)) PayloadTooLarge(api.maxBodyBytes) else t
+        }
+        .thenApply { strict ->
+            // What arrived, against the limit itself rather than the
+            // ceiling the read was given. Everything within the overrun has
+            // been consumed by now, so the connection is whole and the
+            // refusal can be written down it.
+            if (strict.data.size() > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
+
+            values[body] = decode(ep, codecs, strict.data.utf8String())
+            Unit
+        }
+}
+
+/**
+ * Whatever the codec throws is its own library's exception, and nothing here
+ * should have to recognise it. Wrapping it in core's own failure is what keeps
+ * this file codec-agnostic.
+ */
+private fun decode(ep: Endpoint<*, *>, codecs: EndpointCodecs, text: String): Any? =
+    try {
+        checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
+            .decodeFromString(text)
+    } catch (t: BodyDecodeFailure) {
+        throw t
+    } catch (t: Throwable) {
+        throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
+    }
 
 private fun invoke(
     se: ServerEndpoint,

@@ -33,6 +33,7 @@ dependencies {
     testImplementation(project(":pelican-jackson"))
 
     testImplementation("org.apache.pekko:pekko-http-testkit_$scalaBinary:$pekkoHttpVersion")
+    testImplementation("org.apache.pekko:pekko-actor-testkit-typed_$scalaBinary")
     testImplementation("org.apache.pekko:pekko-stream-testkit_$scalaBinary")
     testImplementation("org.apache.pekko:pekko-testkit_$scalaBinary")
     testImplementation("junit:junit:4.13.2")
