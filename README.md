@@ -74,15 +74,12 @@ streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
 [Streaming](#streaming) · [Cookies, forms and uploads](#cookies-forms-and-uploads) ·
 [Response headers](#response-headers) · [Webhooks](#webhooks)
 
-**[Serving, testing, sharing](#serving-testing-sharing)** —
-[Running a server](#running-a-server) · [Testing](#testing) ·
-[A generated Kotlin client](#a-generated-kotlin-client) ·
-[Importing a document](#importing-an-openapi-document) · [Backends](#backends)
+**[Serving and testing](#serving-and-testing)** —
+[Running a server](#running-a-server) · [Testing](#testing) · [Backends](#backends)
 
-**[Appendix](#appendix)** —
-[A whole service, in one file](#a-whole-service-in-one-file) ·
+**[Appendix](#appendix)** — [Longer documents](#longer-documents) ·
 [The same endpoints, by hand](#the-same-endpoints-by-hand) ·
-[Modules](#modules) · [Running the examples](#running-the-examples) ·
+[Running the examples](#running-the-examples) ·
 [Versions](#versions)
 
 The reference manual, with the reasoning behind each design decision, is
@@ -485,7 +482,7 @@ of the description nobody publishing it controls. See
 
 ---
 
-# Serving, testing, sharing
+# Serving and testing
 
 ## Running a server
 
@@ -712,227 +709,6 @@ app.request(deleteBookmark, In2(1L, key)) shouldBuild "DELETE /bookmarks/1"
 transport. It is the one test in the suite that *should* fail on a rename: a
 red line here is the 404 your callers would have found for you.
 
-## A generated Kotlin client
-
-Callers who cannot hold the descriptions, because they are in another repository
-or on another release cycle, get a file generated from them instead. It is a
-Gradle task: no `main` to write, no `JavaExec` to wire.
-
-```kotlin
-plugins { id("dev.pelican") version "0.1.0-SNAPSHOT" }
-
-pelican {
-    clients {
-        create("orders") {
-            specClass.set("com.example.OrdersSpecKt")   // where ordersSpec() lives
-            specFunction.set("ordersSpec")
-            packageName.set("com.example.orders")
-        }
-    }
-}
-```
-
-`./gradlew generateOrdersClient` writes
-`build/generated/pelican/orders/com/example/orders/OrdersClient.kt`. Point
-`outputDir` at a source root instead and the client is a file you commit and
-review — which turns on `checkOrdersClient`, wired into `check`, so it cannot
-quietly stop matching the descriptions. The plugin generates the OpenAPI
-document from the same function; see
-[docs/reference.md](docs/reference.md#the-gradle-plugin).
-
-```kotlin
-val client = OrdersClient("https://orders.internal", JacksonCodecs)
-
-val orders = client.listOrders(1L, limit = 3)          // Streamed<Order>, as they arrive
-
-when (val result = client.placeOrder(1L, CreateOrder("anvil"), xApiKey = key)) {
-    is Outcome.Ok  -> result.value                     // Order
-    is Outcome.Err -> when (val failure = result.failure) {   // exhaustive
-        is PlaceOrderFailure.Unauthorized   -> retryWith(freshKey())
-        is PlaceOrderFailure.NotFound       -> null
-        is PlaceOrderFailure.TooManyRequests -> sleep(failure.retryAfter)   // Long?
-    }
-}
-```
-
-One method per endpoint, named by its `operationId`. Path parameters are
-positional; query parameters, headers and cookies are named parameters with
-defaults, and leaving one out leaves it off the request rather than sending it
-empty. A streaming endpoint hands back a `Streamed<T>`, a `Sequence` over the
-open connection decoded as elements land, and a file part is streamed into the
-request so a large upload is never held in memory. Declared failures become a
-sealed type per endpoint: add a failure, regenerate, and the calls that do not
-handle it stop compiling. A failure that declares response headers carries them
-as properties, typed from the schema the document publishes — nullable, because
-this is the reading end and a client that threw over a header would have thrown
-away the failure it was handed.
-
-An operation the document says is served somewhere else — an upload host, a
-read replica — is called there. `servers("https://uploads.example.com")` on an
-endpoint reaches the document and the generated method, which sends that one
-call to that host whatever base URL the client was given. Routing ignores it
-entirely: a server serves what it serves, and no description moves a request.
-
-A `webhook(...)` becomes a sender rather than a call: `orderPlaced(url, body,
-xSignature)`, with the destination first because the document does not know it.
-See [Webhooks](#webhooks).
-
-The generated file needs `pelican-core`, which has no dependencies of its own,
-and a `Codecs` chosen by the caller. Transport is the JDK's `HttpClient`. The
-example checks its generated client into the repo and runs the suite against a
-real server, so a test fails if the file drifts from the descriptions.
-
-A `oneOf` in the spec becomes a sealed interface, and that is the one payload
-shape no JSON library can read off the Kotlin alone: which property carries the
-branch, and what string selects each one, has to be written down. So those
-declarations are annotated for one library, and `codec.set("kotlinx")` on the
-client entry chooses which — the same setting an `endpoints` entry takes,
-because a client's bodies are read by the same library the service's are. Unset
-is Jackson, and a spec with no union generates the same client either way.
-
-`ordersSpec().writeKotlinClient(sourceRoot, packageName = "com.example.orders")`
-is the same thing without the build task, for a build that would rather make the
-call itself.
-
-## Importing an OpenAPI document
-
-The other direction, for the two cases where the descriptions are not yours to
-write first: calling somebody else's API, and building a service against a spec
-that was agreed before the code.
-
-```kotlin
-pelican {
-    endpoints {
-        create("orders") {
-            document.set(layout.projectDirectory.file("orders.yaml"))
-            packageName.set("com.example.orders")
-            handlers.set("pekko")            // optional: a stub per operation
-        }
-    }
-}
-```
-
-`./gradlew generateOrdersEndpoints` writes `OrdersEndpoints.kt`: the inputs as
-values, the payload types as data classes, one `endpoint(...)` per operation,
-and an `ordersSpec(schemas)` holding the lot. It is the file you would have
-written by hand from that document, and it reads like one:
-
-```kotlin
-val bookmarkId = pathParam<Long>("bookmarkId")
-val limit = queryParam("limit", IntCodec.atLeast(1).atMost(100), "How many to return").default(20)
-
-val problemNotFound = errorJson<Problem>(404, "No bookmark with that id")
-
-/** Fetch one bookmark */
-val getBookmark = endpoint(bookmarkId) {
-    get("bookmarks" / bookmarkId)
-    summary = "Fetch one bookmark"
-    operationId = "getBookmark"
-    json<Bookmark>() orFail problemNotFound
-}
-```
-
-The generated file also carries the document's own schemas, so `ordersSpec()`
-takes no arguments and needs no JSON library: reading a document, describing
-it, and generating a client for it is a path with no codec on it at all. Point
-`generateOrdersClient` at `ordersSpec` for a typed client of somebody else's
-API, or bind the endpoints to handlers and serve it. `ordersSpec(JacksonCodecs)`
-is the same descriptions with the payload types described from the generated
-Kotlin classes instead, which is what a service that has since edited them
-wants. `handlers.set("pekko")` writes the second
-file — one `TODO()` per operation, in the right binder for each output kind —
-and never overwrites it again, because after the first run it is your service
-rather than generated code.
-
-JSON or YAML, and 3.1, 3.0 and Swagger 2.0 alike: a 2.0 document and its 3.0
-twin generate the same descriptions, which is the claim `VersionsTest` makes.
-References to other files are followed and the schemas they name keep those
-names; references to another *host* are refused, because a build that fetches a
-URL to know what to generate cannot be reproduced.
-
-Where the document is published in pieces by somebody else and rewriting their
-`$ref`s would fork their spec, the host can be named — and naming it pins what
-it served rather than trusting it every morning:
-
-```kotlin
-create("orders") {
-    document.set(file("orders.yaml"))
-    packageName.set("com.example.orders")
-    allowRemote("https://schemas.example.com")
-}
-```
-
-`updateOrdersEndpointsLock` writes `orders.refs.lock` — every URL reached,
-transitively, with the SHA-256 of the bytes that came back — and
-`orders.refs.lock.d/`, the documents themselves. Commit both and the build
-makes no request at all; a document that changes upstream fails the next update
-naming both hashes, and `--accept-changes` is what records it. https only
-unless `http://` is written out, redirects never followed, and nothing read
-that is not in the lockfile. The whole of it is under
-[References](docs/reference.md#references).
-
-A `oneOf` with a `discriminator` comes back as a sealed interface and one data
-class per branch, annotated so that Jackson or kotlinx.serialization can
-actually read it — `codec.set("kotlinx")` chooses which. Branches are named
-from the `discriminator.mapping` key, then the referenced component, then
-`<Parent>Variant<n>`, all read out of the document so that the same document
-generates the same names every time. An `allOf` of several schemas is flattened
-into one class, and refused rather than resolved where two of them disagree
-about a property.
-
-**The import is strict.** An operation using something Pelican cannot describe
-— two media types for one body, a `oneOf` with nothing saying which branch a
-payload is, a streamed response beside another 2xx — fails the build naming
-the operation, the place in the document and the way out, rather than
-generating an endpoint whose type says less than the document does. That is the right default for a document you own, and an
-obstacle in one you do not, so operations you have decided to live without are
-listed by `operationId`:
-
-```kotlin
-create("orders") {
-    document.set(file("orders.yaml"))
-    packageName.set("com.example.orders")
-    exclude("uploadReceipt", "searchAnything")
-}
-```
-
-Written down in the build, reviewed once, and — this is the point of a list
-rather than a switch — the fourth such operation to appear still fails.
-Excluding one also excludes the schemas only it reached, so an `anyOf` in a
-corner of the document costs that corner and nothing else.
-
-Losing the operation is the blunt way through, and one refusal has a narrower
-one. A `oneOf` with no `discriminator` is refused because a decoder that tries
-each branch and keeps the first that parsed is wrong, silently, on the first
-payload two branches both accept — and that stands. What changes is who says
-which branch a payload is. The document did not; a reader who knows can:
-
-```kotlin
-create("orders") {
-    document.set(file("orders.yaml"))
-    packageName.set("com.example.orders")
-    discriminator("Payment", property = "kind")
-    discriminator("Order/properties/payment", property = "kind")
-}
-```
-
-Per schema, in the build file, reviewed once — a component name, or a JSON
-pointer for a union the document wrote out inline and never named. The
-`discriminator` is written into the document before anything reads it, so the
-branch names, the codec annotations and the republished `mapping` are all the
-ones a document that had stated it would have produced. Each branch's value on
-the wire is read, never invented: a `const` it declares for the property, or
-the name of the schema it points at, and an inline branch with neither is
-refused. A hint that names a property no branch declares, that addresses
-something that is not a union, that gives two branches one value — or that
-nothing generated needs any more — fails the build saying which. `anyOf` of
-several branches stays refused, hint or no hint.
-
-This repository imports its own document on every build: `:example` publishes
-`openapi.json` from its endpoint values, generates descriptions back out of it,
-compiles them, and compares what those publish against what it started with.
-See `ImportedOrdersTest`.
-
 ## Backends
 
 The backend is a choice about handlers. Bind the same endpoint values with
@@ -979,124 +755,25 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 # Appendix
 
-## A whole service, in one file
+## Longer documents
 
-Models, inputs, endpoints, handlers, store, server and docs. This block lives in
-the repo as [`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt),
-so it compiles on every build. Run it with `./gradlew :example:runReadmeExample`.
+Four things that wanted a page rather than a section, and one benchmark:
 
-```kotlin
-import dev.pelican.*
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.pekko.*
-import dev.pelican.pekko.docs.Docs
-import dev.pelican.pekko.docs.startWithDocs
-import org.apache.pekko.stream.javadsl.Source
+- **[A whole service, in one file](docs/a-whole-service.md)** — models, inputs,
+  endpoints, handlers, store, server and docs, all of it at once. Compiled on
+  every build as `ReadmeExample.kt`.
+- **[A generated Kotlin client](docs/generated-client.md)** — what callers who
+  cannot hold the descriptions get instead, and what the generator does with a
+  union, a failure or a stream.
+- **[Importing an OpenAPI document](docs/importing.md)** — a document somebody
+  else wrote, read into descriptions: what comes out, what is refused, and the
+  two settings that get you past a document you do not own.
+- **[Modules](docs/modules.md)** — what each of the fifteen modules is for and
+  what it depends on, for deciding which ones your build needs.
+- **[What it costs](docs/what-it-costs.md)** — the interpreter measured against
+  the hand-written route it replaces, with the baselines that comparison needs.
 
-// ---------------------------------------------------------------- 1. models
-
-data class Bookmark(val id: Long, val url: String, val title: String, val tags: List<String> = emptyList())
-data class CreateBookmark(val url: String, val title: String, val tags: List<String> = emptyList())
-data class NoSuchBookmark(val id: Long, val message: String)
-
-// ---------------------------------------------------------------- 2. inputs
-//
-// Declared once as values, and reused by the route, the decoder, the document
-// and the test client. Refinements are enforced *and* documented.
-
-@JvmInline value class Slug(val value: String)
-
-val slug = StringCodec
-    .matching(Regex("[a-z0-9-]{1,40}"), "a slug: lowercase letters, digits and dashes")
-    .map(::Slug, Slug::value)
-    .describedAs("A URL-safe tag", example = "streams")
-
-val bookmarkId  = pathParam<Long>("bookmarkId", description = "The bookmark's id")
-val limit       = queryParam("limit", IntCodec.between(1, 100), description = "How many to return").default(20)
-val tag         = queryParam("tag", slug, description = "Only bookmarks with this tag").optional()
-val apiKey      =
-    headerParam("X-Api-Key", StringCodec.nonEmpty().describedAs("The caller's API key", example = "let-me-in"))
-val newBookmark = jsonBody<CreateBookmark>(description = "The bookmark to save")
-
-val bookmarkMissing = errorJson<NoSuchBookmark>(404, "No bookmark with that id")
-val badKey          = errorJson<ApiError>(401, "Missing or bad API key")
-
-// ------------------------------------------------------------- 3. endpoints
-//
-// This section imports `dev.pelican` and nothing else. No Pekko, no Jackson.
-// These are descriptions: they do no work and hold no handler.
-
-val getBookmark = endpoint(bookmarkId) {
-    get("bookmarks" / bookmarkId)
-    summary = "Fetch one bookmark"
-    tag("bookmarks")
-    json<Bookmark>() orFail bookmarkMissing
-}
-
-val listBookmarks = endpoint(limit, tag) {
-    get("bookmarks")
-    summary = "List bookmarks, newest first"
-    tag("bookmarks")
-    jsonArray<Bookmark>()            // chunked `[{...},{...}]`, flushed as produced
-}
-
-val createBookmark = endpoint(apiKey, newBookmark) {
-    post("bookmarks")
-    summary = "Save a bookmark"
-    tag("bookmarks")
-    json<Bookmark>(status = 201) orFail badKey
-}
-
-// ----------------------------------------------------------------- 4. store
-
-object Bookmarks {
-    private val saved = mutableListOf(Bookmark(1, "https://pekko.apache.org", "Pekko", listOf("streams")))
-    private var nextId = 2L
-
-    fun find(id: Long) = saved.firstOrNull { it.id == id }
-    fun list(limit: Int, tag: Slug?) = saved.filter { tag == null || tag.value in it.tags }.take(limit)
-    fun add(req: CreateBookmark) = Bookmark(nextId++, req.url, req.title, req.tags).also { saved += it }
-}
-
-// -------------------------------------------------------------- 5. handlers
-//
-// The only place that knows a stream is a `Source`. Every parameter arrives
-// decoded and typed, in the order the endpoint declared it.
-
-val routes = listOf(
-    getBookmark handledOrFail { id ->                       // id: Long
-        Bookmarks.find(id)?.let { ok(it) }
-            ?: bookmarkMissing(NoSuchBookmark(id, "No bookmark $id"))
-    },
-
-    listBookmarks streamedNow { (max, tag) ->               // max: Int, tag: Slug?
-        Source.from(Bookmarks.list(max, tag))
-    },
-
-    createBookmark handledOrFail { (key, req) ->            // key: String, req: CreateBookmark
-        if (key != "let-me-in") badKey(ApiError(401, "Bad API key"))
-        else ok(Bookmarks.add(req))
-    },
-)
-
-// ---------------------------------------------------------------- 6. server
-
-fun main() {
-    val api = Api(routes, codecs = JacksonCodecs, title = "Bookmarks", version = "1.0.0")
-    val server = api.startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
-    println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
-}
-```
-
-Swagger UI is at `/api-docs` and the document at `/openapi.json`. Both are
-generated from the values above.
-
-```bash
-curl localhost:8080/bookmarks/1          # {"id":1,"url":"https://pekko.apache.org",...}
-curl localhost:8080/bookmarks/42         # 404 {"id":42,"message":"No bookmark 42"}
-curl 'localhost:8080/bookmarks?limit=0'  # 400, naming the constraint it broke
-open localhost:8080/api-docs             # Swagger UI
-```
+---
 
 ## The same endpoints, by hand
 
@@ -1376,32 +1053,6 @@ service keeps, and which of them a compiler is allowed to check.
 The Pekko block is illustrative and not part of the build, unlike
 [`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt).
 The Pelican half is that file, two endpoints of it.
-
-## Modules
-
-Fifteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
-rather than convention.
-
-| Module | Depends on | Contains |
-|---|---|---|
-| `pelican-core` | **nothing** | endpoint descriptions, plain codecs, a minimal JSON tree |
-| `pelican-jackson` / `pelican-kotlinx` | core + one JSON library | your `Codecs` |
-| `pelican-pekko` / `-http4k` / `-ktor` | core + one server library | descriptions → that server's routes |
-| `pelican-*-docs` | its backend, openapi | serves the document and Swagger UI |
-| `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 |
-| `pelican-codegen` | core | descriptions → a Kotlin client, as source |
-| `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
-| `pelican-gradle-plugin` | **nothing** | `dev.pelican`: every generator, as Gradle tasks |
-| `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
-| `pelican-test-pekko` / `-http4k` | test + that backend | the in-memory transport |
-
-Every one of those dependency claims is a test. `pelican-core` asserts its
-runtime classpath holds nothing but the Kotlin standard library, `pelican-openapi`
-asserts Pekko is absent so docs can be generated in a build task with no server
-present, each backend asserts the document generator and the other backends are
-absent, and `pelican-test` asserts it drags in no server library and no matcher
-library. The full breakdown is in
-[docs/reference.md](docs/reference.md#modules).
 
 ## Running the examples
 
