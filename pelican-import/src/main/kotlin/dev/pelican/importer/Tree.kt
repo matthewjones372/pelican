@@ -28,6 +28,8 @@ internal fun JsonObj.bool(key: String): Boolean = (this[key] as? JsonBool)?.valu
 
 internal fun JsonObj.int(key: String): Int? = (this[key] as? JsonNum)?.value?.toInt()
 
+internal fun JsonObj.long(key: String): Long? = (this[key] as? JsonNum)?.value?.toLong()
+
 internal fun JsonObj.strings(key: String): List<String> = arr(key).mapNotNull { (it as? JsonStr)?.value }
 
 /**

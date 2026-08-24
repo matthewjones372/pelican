@@ -791,7 +791,7 @@ What it refuses, and what each one would have cost:
 | In the document | Why there is no description for it |
 |---|---|
 | A streamed 2xx beside another 2xx | Both are read where both are values — see [More than one successful response](#more-than-one-successful-response) — but naming one alternative is what produces it, and a stream is produced in the server library's own type, which core cannot name. Document the stream as the only 2xx, or move the other statuses to an operation of their own |
-| Two media types for one body or response | `jsonBody<T>()` is a JSON body; there is no form of it meaning "or XML" |
+| Two media types for one response, or two *schemas* for one body | A response carries one payload rendered one way. A request body may carry one payload several ways — see [One body, several encodings](#one-body-several-encodings) — but a different schema under each media type is several payloads, and the handler is given one value of one type. Publish one schema under both, or describe the alternatives as a `oneOf` with a `discriminator` |
 | `oneOf` of several shapes with no `discriminator` | A union nothing says how to read. The decoder would have to try each branch and take the first that parsed, which is wrong on the first payload two branches both accept. Where you know the missing fact, `discriminator(...)` in the build file states it — see [below](#the-discriminator-a-document-did-not-write-down) |
 | `anyOf` of several shapes | A payload may satisfy two `anyOf` branches at once and a Kotlin value is one class or the other, so a sealed hierarchy would say something narrower than the document does |
 | `allOf` of schemas that disagree about a property | Merging would have to pick a winner, and the generated class would then accept payloads the document rejects |
@@ -803,7 +803,7 @@ What it refuses, and what each one would have cost:
 | A parameter under `content` | It carries a whole document rather than a value; that is a request body |
 | `deepObject`, or a `style` and an `explode` that contradict each other | `deepObject` spreads an object over several names, and the rest name a separator that the `explode` beside them makes meaningless |
 | A list constrained by `minItems`, `maxItems` or `uniqueItems` | A refinement narrows what one value decodes to and can say nothing about how many arrived, so the constraint would be republished and enforced by nobody |
-| Two file parts in a multipart body | The same rule `endpoint(...)` enforces at class-init: reading stops at the first file so it can be streamed |
+| Two *streamed* file parts in a multipart body | The same rule `endpoint(...)` enforces at class-init: reading stops at the first, so it can be streamed. A document with several is imported as `bufferedFile` parts and one streamed one — see [Two files, one of them streamed](#two-files-one-of-them-streamed) |
 | `callbacks` | A request the service makes *during* an operation, to a URL taken out of that operation's own payload through a runtime expression — `{$request.body#/callbackUrl}`. Nothing in an endpoint description evaluates one. A `webhooks` entry is the case that *is* imported: one call, to a URL a subscriber registered, which a description can say and a sender can make |
 | `servers` under a webhook | A webhook is sent to the URL a subscriber registered, and OpenAPI says nothing about what a Server Object beside it would mean. See [Webhooks](#webhooks-the-calls-the-service-sends) |
 | A streamed response on a webhook | The response is what the *subscriber* sends back to a call this service made, and nothing here consumes a stream from a subscriber |
@@ -1780,7 +1780,10 @@ unset ships that as the default — so there is one. A body over it is a 413
 raised before any codec sees it: each backend checks the declared
 `Content-Length` first, and falls back to truncating the read for a chunked
 request that declared none. A `rawBody()` stream is exempt, because nothing
-holds it whole.
+holds it whole, and so is a multipart body's streamed part. What a multipart
+body *does* hold — its text parts and its `bufferedFile` parts — shares this
+same number as one budget, on top of whatever bound each buffered part declared
+for itself.
 
 Two mistakes are now caught when the `Api` is constructed rather than on the
 request that trips over them:
@@ -2227,7 +2230,9 @@ signIn handledNow { form -> Session(form.user, form.remember, form.visits) }
 
 `application/x-www-form-urlencoded` in the document, a data class in the
 handler, and a 413 for an oversized one exactly as for a JSON body — it is a
-strict read like any other.
+strict read like any other. An endpoint that takes the same payload as JSON
+*and* as a form says so with `or`; see [One body, several
+encodings](#one-body-several-encodings) below.
 
 The interesting part is in the middle. A form is a list of string pairs and
 nothing else: `visits=3` is three characters whether the property is an `Int`,
@@ -2268,6 +2273,52 @@ other codec, so:
   and inventing a fourth is worse than saying no. Saying no happens when the
   endpoint is bound, not on the request that trips over it.
 
+### One body, several encodings
+
+A page with no JavaScript on it posts a form; the same page's script posts JSON;
+both are a `SignIn`. `or` is how a description says so:
+
+```kotlin
+val credentials = formBody<SignIn>(description = "The sign-in details") or jsonBody<SignIn>()
+
+val signIn = endpoint(credentials) {
+    post("sign-in")
+    json<Session>()
+}
+
+signIn handledNow { form -> Session(form.user, form.remember, form.visits) }   // SignIn
+```
+
+One payload, several encodings, and that boundary is the whole feature. The
+handler is given one value of one type, so what a request's `Content-Type`
+selects is a *decode* and never a payload — the codecs the `Api` is configured
+with already know how to read a `SignIn` out of either. Alternatives carrying
+different types do not compile past the `or`, and a document offering a
+different schema per media type is still refused on import, because that is a
+union of payloads wearing a content map and `oneOf` with a `discriminator` is
+how a union is said.
+
+The document publishes one `content` entry per encoding, all with the same
+schema, which is what a content map with several entries has always meant.
+
+- **The request's `Content-Type` picks the codec**, matched on the media type
+  with its parameters stripped, and resolved once per endpoint when the route is
+  built — so an encoding the payload type cannot be read from is a startup
+  failure rather than a 500 for whichever caller happened to choose it.
+- **A media type the endpoint did not declare is a 415** naming the ones it did.
+  So is no `Content-Type` at all: with a choice on offer, the header is the only
+  thing that says which decode was meant, and guessing would read a body as
+  something the caller never said it was.
+- **A body with one encoding still ignores the header**, exactly as it always
+  did. There is nothing to choose between, so the header carries no information
+  the reader needs, and a 415 there would refuse callers that have been posting
+  JSON with no `Content-Type` since before there was an alternative. A body that
+  will not decode explains itself better than a refusal to look at it would.
+- **The generated client sends the first**, for the same reason it calls the
+  first of several `servers`: a client sends exactly one `Content-Type`, and the
+  document's order is the document's answer. The typed test client does too, and
+  `sending("application/json")` is how a suite asserts on the other one.
+
 ## Multipart uploads
 
 ```kotlin
@@ -2294,7 +2345,10 @@ a body of another kind fails when it is built.
 In the document it is an object with one property per part: a text part carries
 its codec's schema, refinements included, and a file part is `format: binary`.
 What a file part expects to carry reaches the `encoding` block, which is what
-tells Swagger UI's file picker what to offer.
+tells Swagger UI's file picker what to offer. A `bufferedFile` publishes its
+bound as `maxLength`, so what the server will hold is part of the contract
+rather than something a caller discovers by being refused — and an import reads
+it back into the same declaration.
 
 ### The envelope is parsed by core
 
@@ -2320,25 +2374,67 @@ system's dispatcher rather than on the routing thread, and Ktor's comes from
 honest cost of one parser instead of three: on the backend whose whole calling
 convention is suspending, reading an upload blocks a thread.
 
+### Two files, one of them streamed
+
+A thumbnail beside a video, a signature beside a document, a checksum beside an
+archive: an upload form with two files on it is ordinary, and it used to be a
+description this library refused. `bufferedFile` is what makes it sayable.
+
+```kotlin
+val caption   = textPart("caption", StringCodec.nonEmpty())
+val thumbnail = bufferedFile("thumbnail", maxBytes = 256 * 1024, contentType = "image/png")
+val video     = filePart("video", contentType = "video/mp4")
+
+val upload = endpoint(caption, thumbnail, video) {
+    post("uploads")
+    json<Uploaded>(status = 201)
+}
+
+upload handledNow { (caption, thumbnail, video) ->    // String, UploadedFile, UploadedFile
+    Uploaded(caption, thumbnail.bytes().size, video.stream().transferTo(disk))
+}
+```
+
+The handler is handed an `UploadedFile` either way, and that is deliberate:
+where the bytes are is a decision the *description* makes, so a handler that
+stops caring does not have to be rewritten. What differs is what it cost to get
+there, and the declaration is where that is written down.
+
+- **`maxBytes` has no default.** A default is exactly the number nobody would
+  have looked at, and a buffered part is a caller-controlled allocation on every
+  request. Naming it is the price of the feature, and it is one line at the
+  place where somebody is choosing to pay it.
+- **A part over its bound is a 413 naming the part** and the number its own
+  declaration gave. Everything held in memory also shares one budget —
+  `Api(maxBodyBytes = ...)` — so six parts declaring a megabyte each cannot add
+  up to six megabytes of one request; where *that* is what ran out, the message
+  names `maxBodyBytes` instead, because a caller told about what was left of a
+  budget would go looking for a number nobody wrote down.
+- **The refusal is delivered rather than dropped.** The rest of the envelope is
+  read, up to a bounded overrun, before the 413 goes out: bytes left unread are
+  bytes the client is still writing, and answering into a half-read upload gives
+  it a broken pipe instead of the status that explains itself. This is the same
+  bargain, and the same 64 KiB, the Pekko interpreter makes for a strict body.
+
 ### What it will not do
 
-`UploadedFile.stream()` is the request's own body, so nothing here holds an
-upload. Two consequences follow, and both are enforced rather than hoped for:
+`UploadedFile.stream()` on a `filePart` is the request's own body, so nothing
+holds it. Two consequences follow, and both are enforced rather than hoped for:
 
-- **The file part has to be the last part on the wire.** Reading stops there, so
-  a text part sent after it has not been seen and never will be. A text part
-  still missing when the file arrives is a 400 that says exactly this. An HTML
-  form satisfies the rule by putting its `<input type="file">` last, and both
-  clients here write text parts first whatever order they were declared in.
-- **One file part per endpoint.** A second could only be reached by buffering
-  the first, so declaring two is a startup failure naming the reason rather
-  than a description no handler could ever be given. Two uploads want two
-  requests, or a `rawBody()` you parse yourself.
+- **The streamed part has to be the last part on the wire.** Reading stops
+  there, so anything sent after it has not been seen and never will be. A part
+  still missing when it arrives is a 400 that says exactly this. An HTML form
+  satisfies the rule by putting its last `<input type="file">` last, and both
+  clients here write the parts in the server's own reading order whatever order
+  they were declared in.
+- **One streamed part per endpoint, declared after the buffered ones.** A second
+  could only be reached by holding the first, and holding one silently is what a
+  streaming upload exists not to do — so declaring two is a startup failure that
+  names `bufferedFile` as the way out.
 
-The size limit works the way it does for `rawBody()`: the file part is exempt,
-because nothing holds it whole, and the text parts are bounded in total by
-`maxBodyBytes`. An upload larger than the limit is served; a *field* larger than
-it is a 413.
+The size limit works the way it does for `rawBody()`: the streamed part is
+exempt, because nothing holds it whole. An upload larger than the limit is
+served; a *field* or a buffered part larger than what bounds it is a 413.
 
 ## Declared failures
 
@@ -2763,9 +2859,10 @@ it for you — about ten lines.
 - `jsonBody<T>()` and `formBody<T>()` are the strict reads, because neither a
   JSON object nor a form can be decoded incrementally into a data class.
   `strictBodyTimeoutMillis` bounds them.
-- A multipart body is neither: its text parts are read as they arrive and its
-  file part is handed over unread, which is what makes an upload larger than
-  `maxBodyBytes` something the service can serve.
+- A multipart body is neither: the parts it holds are read as they arrive,
+  within one shared budget, and its streamed part is handed over unread — which
+  is what makes an upload larger than `maxBodyBytes` something the service can
+  serve.
 
 ## Testing
 
@@ -2797,7 +2894,17 @@ writes what a caller would write and nothing has to know the wire format:
 ```kotlin
 app.call(signIn, SignIn("ada", remember = true, visits = 3))
 
-app.call(importOrders, In2("March", UploadedFile("orders.csv", "text/csv", stream)))
+app.call(importOrders, In3("March", manifest, UploadedFile("orders.csv", "text/csv", stream)))
+```
+
+A body declaring several encodings is sent as the first of them, as a generated
+client sends it. `sending(...)` is how a suite asks for the other one, and it is
+the only place the choice is offered — a media type parameter on `call`,
+`response` and `request` alike would widen three signatures for the one endpoint
+in a suite that declares a choice:
+
+```kotlin
+app.sending("application/json").call(signIn, SignIn("ada", remember = true, visits = 3))
 ```
 
 Assertions are written against `ApiClient`, which knows only a `Transport`, so
@@ -3025,11 +3132,13 @@ open  localhost:8080/api-docs                                 # Swagger UI
 - **A published client artifact.** `pelican-test` derives a client from the
   descriptions, but it is scoped at testing: blocking calls, no retries, no
   connection pooling worth the name.
-- **More than one file part on a multipart endpoint, or one that is not last.**
-  The file is handed over as a live stream, so reading stops at it: a second
-  file part could only be reached by buffering the first, and a text part sent
-  after the file is never seen. Both are refused out loud — the first when the
-  endpoint is built, the second as a 400 naming the part it wanted. See
+- **More than one *streamed* file part on a multipart endpoint, or one that is
+  not last.** The part is handed over as a live stream, so reading stops at it:
+  a second could only be reached by holding the first, and anything sent after
+  it is never seen. Both are refused out loud — the first when the endpoint is
+  built, the second as a 400 naming the part it wanted. Holding a file *is*
+  sayable, with `bufferedFile(name, maxBytes = ...)`, which is what makes an
+  ordinary two-file upload form describable; see
   [Multipart uploads](#multipart-uploads).
 - **A binary file part from `pelican-test`.** `RequestSpec` carries a `String`
   body, so the typed test client uploads text. The generated client streams
@@ -3071,9 +3180,12 @@ open  localhost:8080/api-docs                                 # Swagger UI
 - **A Ktor wiring of the *orders* example.** The small `example/backends/`
   service runs on all three; the larger orders service is bound on Pekko and
   http4k only, and `ClientContractTest` runs against those two.
-- **Content negotiation** — one media type per response. An endpoint may answer
+- **Response negotiation** — one media type per response. An endpoint may answer
   two statuses two ways, but nothing reads `Accept` to choose between two
-  renderings of the *same* response.
+  renderings of the *same* response. The request direction is not the same
+  gap: a body declares its encodings and `Content-Type` picks one, because the
+  caller says which it sent rather than which it would prefer back. See
+  [One body, several encodings](#one-body-several-encodings).
 - **A streamed response among several.** An endpoint declaring more than one 2xx
   names the one it is producing, and producing a stream means handing over the
   backend's own type, which core cannot name. A stream is still a success; it is

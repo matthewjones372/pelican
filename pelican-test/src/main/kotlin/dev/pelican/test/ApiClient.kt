@@ -44,7 +44,30 @@ class ApiCallFailed(
 class ApiClient(
     val transport: Transport,
     val codecs: Codecs,
+    /**
+     * Which encoding to send where an endpoint declares several — see
+     * [sending]. Null takes the first the endpoint declared, which is what a
+     * generated client does and what every call made before there was anything
+     * to choose between did.
+     */
+    val prefers: String? = null,
 ) : AutoCloseable {
+
+    /**
+     * The same client, sending a negotiated body as [mediaType]:
+     *
+     * ```
+     * client.sending("application/json").call(placeOrderForm, In2(1L, order))
+     * ```
+     *
+     * A test that asserts the server reads *both* encodings has to be able to
+     * send both, and the alternative was a media type parameter on `call`,
+     * `response` and `request` alike — three signatures widened for the one
+     * endpoint in a suite that declares a choice. A media type this endpoint
+     * did not declare is left to the server to refuse, deliberately: that
+     * refusal is a thing worth asserting on.
+     */
+    fun sending(mediaType: String): ApiClient = ApiClient(transport, codecs, mediaType)
 
     /**
      * Builds the request an endpoint call would send, without sending it.
@@ -129,6 +152,20 @@ class ApiClient(
 
             is MultipartBody -> multipart(endpoint, input, values)
 
+            // The chosen encoding, and the header that says which it was. The
+            // value is looked up under the negotiated key, since that is the
+            // one the endpoint declared and the one a handler reads.
+            is NegotiatedBody<*> -> {
+                val chosen = input.alternatives.firstOrNull { it.mediaType == prefers }
+                    ?: input.alternatives.first()
+                val value = values[input] ?: error("No body supplied for $endpoint")
+                val text = when (chosen) {
+                    is FormBody<*> -> codecs.formCodec<Any?>(chosen.type).encodeToString(value)
+                    else -> codecs.codec<Any?>(checkNotNull(chosen.payloadType)).encodeToString(value)
+                }
+                Payload(text, chosen.mediaType)
+            }
+
             is RawBody -> when (val handle = values[input]) {
                 is TextBody -> Payload(handle.text)
 
@@ -144,8 +181,8 @@ class ApiClient(
      * parts are already described, so there is nothing to configure and
      * nothing to keep in step.
      *
-     * Text parts go first whatever order they were declared in, because the
-     * server stops reading at the file part — see `MultipartBody.decode`. A
+     * The order is the description's own `partsInWireOrder`: everything the
+     * server reads as it arrives, and then the streamed part it stops at. A
      * client that sent them in declaration order would be able to build a
      * request its own server refuses, which is a worse thing for a test client
      * to be able to do than a reordering is.
@@ -160,7 +197,7 @@ class ApiClient(
         body: MultipartBody,
         values: Map<ParamKey<*>, Any?>,
     ): Payload {
-        val sections = (body.textParts + body.fileParts).mapNotNull { part ->
+        val sections = body.partsInWireOrder.mapNotNull { part ->
             val value = values[part] ?: return@mapNotNull null
             when (part) {
                 is TextPart<*> -> buildString {

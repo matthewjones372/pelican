@@ -6,10 +6,15 @@ import dev.pelican.JsonValue
 /**
  * The request body.
  *
- * One media type per body, because that is what an endpoint description says:
- * `jsonBody<T>()` is a JSON body, and there is no form of it that means "or
- * XML, if the caller prefers". A document offering two is offering two
- * different decodes of the same request, and picking one here would generate a
+ * Several media types are read as several *encodings of one payload* — which
+ * is what an endpoint can now say, and the only reading of a content map that
+ * survives contact with a handler. `jsonBody<Order>() or formBody<Order>()` is
+ * one `Order` arriving two ways, and the request's `Content-Type` picks the
+ * decode.
+ *
+ * What stays refused is a content map whose entries describe *different
+ * shapes*. That is a union of payloads wearing a content map: the handler is
+ * given one value of one type, and picking one entry here would generate a
  * server that rejects half the callers the document invites.
  */
 internal class Bodies(private val reader: Reader, private val operation: Operation) {
@@ -21,6 +26,9 @@ internal class Bodies(private val reader: Reader, private val operation: Operati
 
         val content = body.obj("content")
             ?: unsupported(path, "The request body declares no content, so nothing says what it carries.")
+
+        if (content.entries().size > 1) return negotiated(content, path, description)
+
         val (mediaType, node) = single(content, path / "content", "request body")
         val schema = (node as? JsonObj)?.get("schema")
 
@@ -51,9 +59,83 @@ internal class Bodies(private val reader: Reader, private val operation: Operati
     }
 
     /**
+     * A body offered under several media types, which is describable in exactly
+     * one case: every entry carries the same schema, so what a `Content-Type`
+     * selects is a decode rather than a payload.
+     *
+     * The entries are compared after normalisation, so a document that spells
+     * one entry `$ref` and the other inline is still one schema — and one that
+     * genuinely describes two shapes is refused here rather than silently
+     * imported as whichever entry came first.
+     */
+    private fun negotiated(content: JsonObj, path: JsonPath, description: String?): IrBody {
+        val at = path / "content"
+        val entries = content.entries().map { (mediaType, node) ->
+            mediaType to (node as? JsonObj)?.get("schema")?.let(::normaliseSchema)
+        }
+
+        val encodings = entries.map { (mediaType, _) ->
+            when {
+                mediaType.isJson() -> "application/json"
+
+                mediaType == "application/x-www-form-urlencoded" -> mediaType
+
+                else -> unsupported(
+                    at,
+                    "The request body is offered as ${entries.joinToString { it.first }}, and $mediaType " +
+                        "is not one an endpoint reads a payload from. Pelican reads a body as JSON or as " +
+                        "a form; drop the others in the document, or take the body as raw bytes.",
+                )
+            }
+        }
+
+        val distinct = encodings.distinct()
+        if (distinct.size != encodings.size) {
+            unsupported(
+                at,
+                "The request body is offered as ${entries.joinToString { it.first }}, which are read the " +
+                    "same way — a request carries one Content-Type, so nothing could tell them apart.",
+            )
+        }
+
+        val schemas = entries.map { it.second }.distinct()
+        if (schemas.size > 1) {
+            unsupported(
+                at,
+                "The request body is offered as ${entries.joinToString { it.first }} with a different " +
+                    "schema under each. A handler is given one value of one type, so several encodings " +
+                    "of one payload is describable and several payloads is not. Where these really are " +
+                    "one type, publish one schema under both; where they are alternatives, say so with " +
+                    "a `oneOf` and a `discriminator`.",
+            )
+        }
+
+        val schema = schemas.single()
+            ?: unsupported(at, "The request body declares no schema under its media types.")
+
+        return IrBody.Negotiated(schema, encodings, description)
+    }
+
+    /**
      * A multipart body as its parts, which is how Pelican declares one: the
      * parts are the inputs, and the envelope holding them is assembled from
      * the list rather than written down.
+     *
+     * Several file parts used to be refused here, because reading stops at a
+     * streamed part and a second could only be reached by holding the first.
+     * Holding one is now something a description can *say* — `bufferedFile` —
+     * so this decides which parts are held, in two steps.
+     *
+     * A `maxLength` on a file part means it is held, with that bound. That is
+     * what this library's own generator publishes for a `bufferedFile`, so a
+     * document it wrote comes back exactly as it went out, bound included.
+     *
+     * Among the parts left, which is all of them in a document written by
+     * anything else, the *last* is the streamed one and the rest are held with
+     * [DEFAULT_BUFFERED_PART_BYTES]. Last because that is the only position a
+     * streamed part can occupy: everything after it would be read after reading
+     * had stopped. The bound is written into the generated source either way,
+     * since a part that costs memory should not cost it invisibly.
      */
     private fun parts(schema: JsonObj?, encoding: JsonObj?, path: JsonPath): List<IrPart> {
         val properties = schema?.obj("properties")
@@ -64,32 +146,50 @@ internal class Bodies(private val reader: Reader, private val operation: Operati
             val part = normaliseSchema(rawPart)
             val contentType = encoding?.obj(name)?.str("contentType") ?: part.str("contentMediaType")
             if (part.isBinary()) {
-                IrPart.File(name, contentType, name in required, part.str("description"))
+                IrPart.File(
+                    name,
+                    contentType,
+                    name in required,
+                    part.str("description"),
+                    bufferedBytes = part.long("maxLength"),
+                )
             } else {
                 IrPart.Text(name, part, name in required, part.str("description"))
             }
         }
 
-        // The same rule `endpoint(...)` enforces, stated a build earlier:
-        // reading stops at the first file part, because streaming it is the
-        // point and a second one could only be reached by buffering the first.
-        val files = parts.filterIsInstance<IrPart.File>()
-        if (files.size > 1) {
-            unsupported(
-                path,
-                "The multipart body has ${files.size} file parts (${files.joinToString { it.name }}), " +
-                    "and only the first could be streamed to a handler.",
-            )
+        val streamed = parts.filterIsInstance<IrPart.File>().lastOrNull { it.bufferedBytes == null }
+        val decided = parts.map {
+            if (it !is IrPart.File || it === streamed || it.bufferedBytes != null) it
+            else IrPart.File(it.name, it.contentType, it.required, it.description, DEFAULT_BUFFERED_PART_BYTES)
         }
-        return parts
+
+        // Declared last, because `endpoint(...)` refuses a streamed part with a
+        // buffered one after it and both generated clients write the parts in
+        // declaration order. A property map has no order a caller can observe,
+        // so this reorders nothing a reader of the document was relying on.
+        return decided.filterNot { it === streamed } + listOfNotNull(streamed)
     }
 }
 
 /**
+ * What a buffered part is read with when the document says nothing: one
+ * mebibyte. A number had to be picked, and this one is large enough for the
+ * companion files a second part usually is — a thumbnail, a signature, a
+ * checksum — and small enough that a document arriving from elsewhere cannot
+ * quietly authorise a large allocation per request. It is written into the
+ * generated source rather than defaulted there, so raising it is an edit to a
+ * line someone can see.
+ */
+internal const val DEFAULT_BUFFERED_PART_BYTES: Long = 1024L * 1024L
+
+/**
  * The one entry of a `content` map, or a refusal naming what else was there.
  *
- * Shared by bodies and responses because it is the same decision in both
- * places, and a reader who has met the message once should meet the same one.
+ * A request body reaches this only when there is a single entry to take: several
+ * are read as several encodings of one payload, above. What is left is the
+ * response half, where the refusal still stands — a handler produces one value
+ * and the endpoint says how it goes out, and nothing here reads `Accept`.
  */
 internal fun single(content: JsonObj, path: JsonPath, what: String): Pair<String, JsonValue> {
     val entries = content.entries()
@@ -100,8 +200,9 @@ internal fun single(content: JsonObj, path: JsonPath, what: String): Pair<String
 
         else -> unsupported(
             path,
-            "The $what is offered as ${entries.joinToString { it.first }}. An endpoint description " +
-                "carries one media type; pick one in the document, or exclude the operation.",
+            "The $what is offered as ${entries.joinToString { it.first }}. A response carries one " +
+                "payload rendered one way, and nothing here reads `Accept` to choose between two " +
+                "renderings of it; pick one in the document, or exclude the operation.",
         )
     }
 }

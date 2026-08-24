@@ -7,6 +7,7 @@ import dev.pelican.Outcome
 import dev.pelican.StringCodec
 import dev.pelican.UploadedFile
 import dev.pelican.Webhook
+import dev.pelican.bufferedFile
 import dev.pelican.commaSeparated
 import dev.pelican.cookieParam
 import dev.pelican.default
@@ -59,7 +60,13 @@ data class SignIn(val user: String, val remember: Boolean, val visits: Int)
 
 data class Session(val user: String, val remember: Boolean, val visits: Int)
 
-data class Uploaded(val caption: String, val filename: String?, val contentType: String?, val content: String)
+data class Uploaded(
+    val caption: String,
+    val filename: String?,
+    val contentType: String?,
+    val content: String,
+    val notes: String,
+)
 
 data class Filters(val tags: List<String>, val ids: List<Long>, val features: List<String>, val seen: List<String>)
 
@@ -97,15 +104,39 @@ val seenBefore = cookieParam<String>("seen", description = "Entries this browser
     .repeated()
     .optional()
 
-/** A form, which is what an HTML page posts when nobody has written any JavaScript. */
-val credentials = formBody<SignIn>(description = "The sign-in form, as a browser posts it")
+/**
+ * The same sign-in, posted either way.
+ *
+ * A browser with no JavaScript on the page posts a form; the same page's script
+ * posts JSON, and both are a `SignIn`. `or` is what says so — one payload, two
+ * encodings, and the request's `Content-Type` picks the decode. The form comes
+ * first because that is what a client with no way to ask sends, and because the
+ * document's order is the answer to "which one?" everywhere else too.
+ *
+ * A `Content-Type` that is neither is a 415 naming the two that are, which is
+ * the one thing a single-encoding body deliberately does not do: with nothing
+ * to choose between, the header carries no information and a body that will not
+ * decode explains itself better than a refusal to look at it would.
+ */
+val credentials = formBody<SignIn>(description = "The sign-in details, as a form or as JSON") or
+    jsonBody<SignIn>()
 
 /**
- * An upload: one text field and one file. The file arrives as a stream, so the
- * handler below decides what it costs — and the text field is declared with the
- * same codecs and refinements a query parameter takes.
+ * An upload: a text field and two files, which is the shape an ordinary upload
+ * form has and the shape this library used to refuse.
+ *
+ * The refusal was sound as far as it went. Reading stops at a streamed part —
+ * that is what handing a handler a live window on the request means — so a
+ * second file could only ever be reached by holding the first, and holding one
+ * silently is exactly what a streaming upload exists not to do.
+ *
+ * `bufferedFile` says it out loud instead. `maxBytes` has no default, so the
+ * memory this endpoint spends on [notes] is written where somebody choosing it
+ * has to look at it, and a caller who sends more gets a 413 naming the part.
+ * [upload] is unchanged and still streamed, because it is declared last.
  */
 val caption = textPart("caption", StringCodec.nonEmpty(), description = "What to call the file")
+val notes = bufferedFile("notes", maxBytes = 512, contentType = "text/plain", description = "A short note")
 val upload = filePart("file", contentType = "text/plain", description = "The file itself")
 
 /**
@@ -245,7 +276,8 @@ val signIn = endpoint(credentials) {
 }
 
 /**
- * A multipart upload: one text part, one file part, streamed.
+ * A multipart upload: a text part, a small file held in memory, and a streamed
+ * one after it.
  *
  * Also the one endpoint here that says it is served from somewhere else, which
  * is what an upload host usually is. That claim reaches the document and a
@@ -255,7 +287,7 @@ val signIn = endpoint(credentials) {
  * `uploads.example.com` — the URL is here to be read, and `AllBackendsTest`
  * asserts that it changes nothing about the serving.
  */
-val uploadFile = endpoint(caption, upload) {
+val uploadFile = endpoint(caption, notes, upload) {
     post("upload")
     servers("https://uploads.example.com")
     summary = "Upload a file with a caption"
@@ -369,9 +401,14 @@ internal fun sessionOf(form: SignIn) = Session(form.user, form.remember, form.vi
  * holds the whole thing in memory — the stream was handed over unread, so a
  * handler that wanted to copy it to disk a block at a time would say `stream()`
  * here instead and never allocate it.
+ *
+ * `notes` is the other way round: it was already read, within the bound its
+ * declaration named, and the handler is handed the same [UploadedFile] either
+ * way. Which is the point — where the bytes are is a decision the description
+ * makes, and a handler that stops caring does not have to be rewritten.
  */
-internal fun uploaded(caption: String, file: UploadedFile) =
-    Uploaded(caption, file.filename, file.contentType, file.text())
+internal fun uploaded(caption: String, notes: UploadedFile, file: UploadedFile) =
+    Uploaded(caption, file.filename, file.contentType, file.text(), notes.text())
 
 /**
  * Absent and empty are told apart in the description and joined together here,

@@ -45,7 +45,7 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
 
     signIn handledNow { form -> sessionOf(form) },
 
-    uploadFile handledNow { (caption, file) -> uploaded(caption, file) },
+    uploadFile handledNow { (caption, notes, file) -> uploaded(caption, notes, file) },
 
     filters handledNow { (tags, ids, features, seen) -> filtersOf(tags, ids, features, seen) },
 )

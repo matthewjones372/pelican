@@ -36,8 +36,11 @@ class BodiesAndCookiesTest {
 
     private val signInForm = formBody<SignIn>(description = "The sign-in form")
 
+    private val eitherWay = formBody<SignIn>(description = "However it was posted") or jsonBody<SignIn>()
+
     private val caption = textPart("caption", StringCodec.minLength(3), description = "What to call it")
     private val notes = textPart<String>("notes").optional()
+    private val thumbnail = bufferedFile("thumbnail", maxBytes = 4096, contentType = "image/png")
     private val attachment = filePart("attachment", contentType = "text/csv", description = "The file itself")
 
     private val read = endpoint(locale, session) {
@@ -52,17 +55,25 @@ class BodiesAndCookiesTest {
         json<Widget>()
     }
 
-    private val upload = endpoint(caption, notes, attachment) {
+    private val upload = endpoint(caption, notes, thumbnail, attachment) {
         post("upload")
         operationId = "upload"
         json<Widget>()
     }
 
-    private val document = ApiSpec(listOf(read, form, upload), Schemas, title = "Widgets").openApi()
+    private val negotiated = endpoint(eitherWay) {
+        post("sign-in-either-way")
+        operationId = "signInEitherWay"
+        json<Widget>()
+    }
+
+    private val document =
+        ApiSpec(listOf(read, form, upload, negotiated), Schemas, title = "Widgets").openApi()
 
     private val preferences = document / "paths" / "/preferences" / "get"
     private val signIn = document / "paths" / "/sign-in" / "post"
     private val uploaded = document / "paths" / "/upload" / "post"
+    private val eitherWayOperation = document / "paths" / "/sign-in-either-way" / "post"
 
     // ------------------------------------------------------------- cookies
 
@@ -95,6 +106,21 @@ class BodiesAndCookiesTest {
             "#/components/schemas/SignIn"
     }
 
+    @Test
+    fun `a body with several encodings is one content entry per encoding, all one schema`() {
+        val body = eitherWayOperation / "requestBody"
+
+        (body / "content").keys() shouldBe
+            setOf("application/x-www-form-urlencoded", "application/json")
+        // The same schema under both, because the entries are two ways of
+        // sending one payload rather than two payloads.
+        (body / "content" / "application/json" / "schema" / "\$ref").str() shouldBe
+            "#/components/schemas/SignIn"
+        (body / "content" / "application/x-www-form-urlencoded" / "schema" / "\$ref").str() shouldBe
+            "#/components/schemas/SignIn"
+        (body / "description").str() shouldBe "However it was posted"
+    }
+
     // ------------------------------------------------------------ multipart
 
     @Test
@@ -102,8 +128,8 @@ class BodiesAndCookiesTest {
         val schema = uploaded / "requestBody" / "content" / "multipart/form-data" / "schema"
 
         (schema / "type").str() shouldBe "object"
-        (schema / "properties").keys() shouldBe setOf("caption", "notes", "attachment")
-        (schema / "required").strings() shouldBe listOf("caption", "attachment")
+        (schema / "properties").keys() shouldBe setOf("caption", "notes", "thumbnail", "attachment")
+        (schema / "required").strings() shouldBe listOf("caption", "thumbnail", "attachment")
     }
 
     @Test
@@ -122,6 +148,17 @@ class BodiesAndCookiesTest {
         // so Swagger UI refuses to submit what the server would reject.
         (properties / "caption" / "minLength").num() shouldBe 3
         (properties / "caption" / "description").str() shouldBe "What to call it"
+    }
+
+    @Test
+    fun `a buffered part publishes the bound it will be read with`() {
+        val properties = uploaded / "requestBody" / "content" / "multipart/form-data" / "schema" / "properties"
+
+        // What the server will hold is part of the contract rather than
+        // something a caller finds out by being refused — and it is the one
+        // thing about such a part an import could not otherwise recover.
+        (properties / "thumbnail" / "maxLength").num() shouldBe 4096
+        (properties / "attachment").obj()["maxLength"].shouldBeNull()
     }
 
     @Test

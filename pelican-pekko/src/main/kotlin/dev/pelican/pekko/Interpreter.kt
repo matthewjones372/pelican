@@ -107,7 +107,7 @@ private fun HttpResponse.withCorsHeaders(headers: List<Pair<String, String>>): H
  * 204 — which is why such an API needs no codec configured at all.
  */
 internal class EndpointCodecs(
-    val body: BodyCodec<Any?>?,
+    val body: RequestBodyCodecs?,
     val payload: BodyCodec<Any?>?,
     /**
      * One per declared response — success or failure — keyed by identity. Two
@@ -366,8 +366,8 @@ private fun readBody(
         // dedicated blocking-IO pool and the two never contend.
         //
         // Exempt from the size limit for the same reason a raw body is: the
-        // file part is never held whole. What the text parts may cost is
-        // bounded, and that is what the limit is passed in for.
+        // streamed part is never held whole. What the parts that *are* held
+        // may cost is bounded, and that is what the limit is passed in for.
         is MultipartBody -> {
             val stream = req.entity()
                 .dataBytes
@@ -377,7 +377,7 @@ private fun readBody(
                     body.decode(
                         contentType = req.entity().contentType.toString(),
                         input = stream,
-                        maxTextBytes = api.maxBodyBytes,
+                        maxInMemoryBytes = api.maxBodyBytes,
                         into = values,
                     )
                 },
@@ -385,7 +385,7 @@ private fun readBody(
             )
         }
 
-        is JsonBody<*>, is FormBody<*> ->
+        is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> ->
             readStrictBody(ep, api, codecs, req, body, values, system)
     }
 }
@@ -460,25 +460,14 @@ private fun readStrictBody(
             // refusal can be written down it.
             if (strict.data.size() > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
 
-            values[body] = decode(ep, codecs, strict.data.utf8String())
+            // Which codec, and what a media type nobody declared means, are
+            // core's answers — see `RequestBodyCodecs`. So is wrapping whatever
+            // the codec threw, which is what keeps this file codec-agnostic.
+            values[body] = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
+                .decode(req.entity().contentType.toString(), strict.data.utf8String())
             Unit
         }
 }
-
-/**
- * Whatever the codec throws is its own library's exception, and nothing here
- * should have to recognise it. Wrapping it in core's own failure is what keeps
- * this file codec-agnostic.
- */
-private fun decode(ep: Endpoint<*, *>, codecs: EndpointCodecs, text: String): Any? =
-    try {
-        checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
-            .decodeFromString(text)
-    } catch (t: BodyDecodeFailure) {
-        throw t
-    } catch (t: Throwable) {
-        throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
-    }
 
 private fun invoke(
     se: ServerEndpoint,

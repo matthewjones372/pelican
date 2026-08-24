@@ -156,8 +156,8 @@ class TextPart<T> @PublishedApi internal constructor(
 }
 
 /**
- * A file field of a multipart body. The handler receives an [UploadedFile] and
- * reads it as a stream, so nothing here holds an upload whole.
+ * A file field of a multipart body. The handler receives an [UploadedFile]
+ * either way; [bufferedBytes] is what says where the bytes are when it does.
  */
 class FilePart<T> @PublishedApi internal constructor(
     override val name: String,
@@ -165,7 +165,17 @@ class FilePart<T> @PublishedApi internal constructor(
     /** What the part is expected to carry, e.g. `image/png`. Documented, not enforced. */
     val contentType: String? = null,
     override val description: String? = null,
+    /**
+     * Null for the ordinary case: the part is handed over as a live window on
+     * the request and nothing holds it. Otherwise this part is read into memory
+     * as it arrives and this is the most of it that will be — see [bufferedFile]
+     * for why that is a thing anyone would choose.
+     */
+    val bufferedBytes: Long? = null,
 ) : MultipartPart<T>() {
+    /** Whether reading stops here. Exactly the parts nothing holds whole. */
+    val streamed: Boolean get() = bufferedBytes == null
+
     override fun toString() = "part:$name"
 }
 
@@ -183,8 +193,73 @@ class MultipartBody internal constructor(
     val textParts: List<TextPart<*>> get() = parts.filterIsInstance<TextPart<*>>()
     val fileParts: List<FilePart<*>> get() = parts.filterIsInstance<FilePart<*>>()
 
+    /** The files held in memory as they arrive, in declaration order. */
+    val bufferedFileParts: List<FilePart<*>> get() = fileParts.filterNot { it.streamed }
+
+    /**
+     * The file reading stops at, or null. At most one is declarable, and a
+     * client writes it after everything else — see [FilePart.streamed].
+     */
+    val streamedFilePart: FilePart<*>? get() = fileParts.firstOrNull { it.streamed }
+
+    /**
+     * The parts in the order a client has to write them: everything that is
+     * read as it arrives, and then the one the reader stops at.
+     *
+     * Here rather than in each client because both of them — the typed test
+     * client and the generated one — would otherwise carry a copy of the same
+     * rule, and a client that ordered them differently from the server's reader
+     * would be able to build a request its own server refuses.
+     */
+    val partsInWireOrder: List<MultipartPart<*>>
+        get() = parts.filterNot { it is FilePart<*> && it.streamed } + listOfNotNull(streamedFilePart)
+
     override fun toString() = "body:multipart"
 }
+
+/**
+ * A request body that may arrive under any of several media types, all
+ * carrying the same payload type.
+ *
+ * One payload, several encodings, and that boundary is the whole design.
+ * `jsonBody<Order>() or formBody<Order>()` is an `Order` arriving two ways, and
+ * the [Codecs] the API is configured with already know how to read an `Order`
+ * out of either — so what a request's `Content-Type` selects is a decode, not a
+ * schema. Several *schemas* under one body stays undescribable, because the
+ * handler is handed one value of one type and there is nothing for a second
+ * shape to become.
+ *
+ * Built by [or], which is where the rules about what may go in one live.
+ */
+class NegotiatedBody<T> internal constructor(
+    /** In declaration order. A client that has to pick one picks the first. */
+    val alternatives: List<BodyInput<T>>,
+    override val description: String?,
+) : BodyInput<T>() {
+    override fun toString() = "body:" + alternatives.joinToString("|") { it.mediaType }
+}
+
+/**
+ * What this body travels as. The one media type a description names for it,
+ * which is why a [NegotiatedBody] has none of its own and its alternatives do.
+ */
+val BodyInput<*>.mediaType: String
+    get() = when (this) {
+        is JsonBody<*> -> "application/json"
+        is FormBody<*> -> "application/x-www-form-urlencoded"
+        is MultipartBody -> "multipart/form-data"
+        is RawBody -> "application/octet-stream"
+        is NegotiatedBody<*> -> error("$this is several media types; ask its alternatives")
+    }
+
+/** The payload type a codec reads this body into, or null where no codec reads it. */
+val BodyInput<*>.payloadType: KType?
+    get() = when (this) {
+        is JsonBody<*> -> type
+        is FormBody<*> -> type
+        is NegotiatedBody<*> -> alternatives.first().payloadType
+        is MultipartBody, is RawBody -> null
+    }
 
 // ---------------------------------------------------------------- factories
 
@@ -313,6 +388,69 @@ inline fun <reified T> jsonBody(description: String? = null): JsonBody<T> =
 inline fun <reified T> formBody(description: String? = null): FormBody<T> =
     FormBody(typeOf<T>(), description)
 
+/**
+ * The same payload, read from whichever of two encodings the caller sent:
+ *
+ * ```
+ * val order = formBody<CreateOrder>() or jsonBody<CreateOrder>()
+ *
+ * val placeOrder = endpoint(userId, order) {
+ *     post("users" / userId / "orders")
+ *     json<Order>(status = 201)
+ * }                                       // the handler is handed a CreateOrder
+ * ```
+ *
+ * The request's `Content-Type` picks the codec, and a media type this body did
+ * not declare is a 415 naming the ones it did. What the handler sees is one
+ * value of one type, which is the reason for the two rules enforced here.
+ *
+ * **The alternatives carry the same type.** Two types would be two handlers,
+ * and there is one. A document offering a different *schema* per media type is
+ * therefore still a document with no description — that is a union of payloads
+ * wearing a content map, and `oneOf` with a discriminator is how a union is
+ * said.
+ *
+ * **Each is a body a codec reads.** A multipart envelope and a raw stream are
+ * not decoded into a value at all, so neither is an alternative to one that is;
+ * an endpoint that may be sent either takes `rawBody()` and decides for itself.
+ *
+ * Order is kept, and it is the answer to the question a client has to ask: the
+ * generated client sends the first, the same way it takes the first of several
+ * `servers`.
+ */
+infix fun <T> BodyInput<T>.or(other: BodyInput<T>): NegotiatedBody<T> {
+    val alternatives = (asAlternatives() + other.asAlternatives())
+
+    val types = alternatives.map { alternative ->
+        requireNotNull(alternative.payloadType) {
+            "A ${alternative.mediaType} body is not decoded into a value, so it cannot be an " +
+                "alternative to one that is. Take the body as rawBody() and read it yourself."
+        }
+    }.distinct()
+    require(types.size == 1) {
+        "A body read several ways is still one value: these alternatives carry " +
+            types.joinToString() + ". Declare the endpoint's body as the one type its handler is " +
+            "given, or describe the alternatives as a union with a discriminator."
+    }
+
+    val clash = alternatives.groupBy { it.mediaType }.filterValues { it.size > 1 }.keys
+    require(clash.isEmpty()) {
+        "A request declares one Content-Type, so nothing could pick between two bodies both " +
+            "read as ${clash.joinToString()}."
+    }
+
+    return NegotiatedBody(alternatives, alternatives.firstNotNullOfOrNull { it.description })
+}
+
+/**
+ * Flattened, so that `a or b or c` is three alternatives rather than a pair
+ * holding a pair. Nesting would publish the same content map and read the same
+ * request, and would leave "the first" meaning something different depending on
+ * how the parentheses fell.
+ */
+private fun <T> BodyInput<T>.asAlternatives(): List<BodyInput<T>> =
+    if (this is NegotiatedBody<T>) alternatives else listOf(this)
+
 fun rawBody(description: String? = null): RawBody = RawBody(description)
 
 /**
@@ -349,6 +487,56 @@ fun filePart(
     description: String? = null,
 ): FilePart<UploadedFile> = FilePart(name, required = true, contentType = contentType, description = description)
 
+/**
+ * A file field held in memory rather than streamed, bounded by [maxBytes]:
+ *
+ * ```
+ * val thumbnail = bufferedFile("thumbnail", maxBytes = 256 * 1024)
+ * val document  = filePart("document")
+ *
+ * val upload = endpoint(caption, thumbnail, document) { post("uploads"); ... }
+ * ```
+ *
+ * This is what makes a second file part describable at all. Reading stops at a
+ * streamed part — that is what "a live window on the request" means — so a
+ * second one could only ever be reached by holding the first, and the old
+ * answer was to refuse the description. The cost of that refusal was every
+ * ordinary upload form with a small companion file on it: a thumbnail beside a
+ * video, a signature beside a document, a checksum file beside an archive.
+ *
+ * So the buffering is *declared* rather than inferred. [maxBytes] has no
+ * default, because a default is exactly the number nobody would have looked at:
+ * a part named here costs a caller-controlled allocation on every request, and
+ * the declaration is the one place where that is visible to the person choosing
+ * it. A part that arrives larger is a 413 naming the part and the bound.
+ *
+ * The whole of what an endpoint holds in memory is still bounded by
+ * [Api.maxBodyBytes] as well, so six parts declaring a megabyte each cannot add
+ * up to six megabytes of one request. And [filePart] is unchanged: the last
+ * file may still be streamed, and the streaming guarantee it makes is the same
+ * one it always made.
+ */
+fun bufferedFile(
+    name: String,
+    maxBytes: Long,
+    contentType: String? = null,
+    description: String? = null,
+): FilePart<UploadedFile> {
+    require(maxBytes > 0) { "A buffered part holds bytes, so '$name' has to be allowed at least one." }
+    return FilePart(
+        name,
+        required = true,
+        contentType = contentType,
+        description = description,
+        bufferedBytes = maxBytes,
+    )
+}
+
 /** Makes the file optional; reading it yields `null` when the caller sent no such part. */
-fun FilePart<UploadedFile>.optional(): FilePart<UploadedFile?> =
-    FilePart(name, required = false, contentType = contentType, description = description)
+fun FilePart<UploadedFile>.optional(): FilePart<UploadedFile?> = FilePart(
+    name,
+    required = false,
+    contentType = contentType,
+    description = description,
+    bufferedBytes = bufferedBytes,
+)

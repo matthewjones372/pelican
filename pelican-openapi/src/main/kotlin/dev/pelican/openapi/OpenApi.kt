@@ -187,6 +187,23 @@ private fun requestBody(ep: Endpoint<*, *>, schemas: SchemaSource, components: S
             })
         }
 
+        // One entry per encoding, all of them the same schema — which is what
+        // a `content` map with several entries has always meant and is the
+        // reason this is describable at all. The schema is the payload type's,
+        // published once and referred to by each entry, because a document
+        // whose JSON and form entries could drift apart would be describing two
+        // decodes rather than one value arriving two ways.
+        is NegotiatedBody<*> -> jsonObj {
+            "required" to true
+            putIfNotNull("description", body.description)
+            val schema = schemas.schema(checkNotNull(body.payloadType), components)
+            put("content", jsonObj {
+                body.alternatives.forEach { alternative ->
+                    put(alternative.mediaType, jsonObj { put("schema", schema) })
+                }
+            })
+        }
+
         null -> null
     }
 
@@ -360,6 +377,13 @@ private fun binarySchema(mediaType: String) = jsonObj {
  * on a part is documented exactly as the same refinement on a query parameter
  * is — `minLength` and `pattern` reach the form Swagger UI renders, and it
  * refuses to submit a value the server would reject.
+ *
+ * A `bufferedFile` part publishes its bound as `maxLength`, which is what makes
+ * the bound part of the contract rather than a server setting a caller has to
+ * discover by being refused. It is also the one thing about such a part that a
+ * reader — or an import of this document — could not otherwise recover: the
+ * schema is `type: string` with a media type, and the number of bytes it will
+ * be read with has nowhere else to go.
  */
 private fun multipartSchema(body: MultipartBody): JsonObj = jsonObj {
     "type" to "object"
@@ -371,7 +395,11 @@ private fun multipartSchema(body: MultipartBody): JsonObj = jsonObj {
 
                 is FilePart<*> -> put(
                     part.name,
-                    describedSchema(binarySchema(part.contentType ?: "application/octet-stream"), part.description),
+                    describedSchema(binarySchema(part.contentType ?: "application/octet-stream"), part.description)
+                        .let { schema ->
+                            val bound = part.bufferedBytes
+                            if (bound == null) schema else schema + jsonObj { "maxLength" to bound }
+                        },
                 )
             }
         }

@@ -424,18 +424,19 @@ These are inputs like any other, and take `optional()`, `default(v)`, codecs,
 refinements and 400s just as a query parameter does:
 
 ```kotlin
-val locale  = cookieParam<String>("locale").default("en")     // in: cookie
-val form    = formBody<SignIn>()                              // application/x-www-form-urlencoded
-val caption = textPart("caption", StringCodec.nonEmpty())     // multipart/form-data
-val upload  = filePart("file", contentType = "text/csv")
+val locale   = cookieParam<String>("locale").default("en")     // in: cookie
+val form     = formBody<SignIn>() or jsonBody<SignIn>()        // whichever the caller posts
+val caption  = textPart("caption", StringCodec.nonEmpty())     // multipart/form-data
+val manifest = bufferedFile("manifest", maxBytes = 8 * 1024)   // held, within a declared bound
+val upload   = filePart("file", contentType = "text/csv")      // streamed, and so declared last
 
-val importOrders = endpoint(locale, caption, upload) {
+val importOrders = endpoint(locale, caption, manifest, upload) {
     post("orders" / "import")
     json<ImportResult>(status = 201)
 }
 
-importOrders handledNow { (locale, caption, file) ->          // String, String, UploadedFile
-    ImportResult(caption, file.stream().bufferedReader().useLines { it.count() }, locale)
+importOrders handledNow { (locale, caption, manifest, file) -> // String, String, UploadedFile x2
+    ImportResult(caption, manifest.text(), file.stream().bufferedReader().useLines { it.count() }, locale)
 }
 ```
 
@@ -444,10 +445,19 @@ schema published for the body type. That is what makes a form body decode
 identically under Jackson and under kotlinx.serialization, which coerce
 differently when left to themselves.
 
+`or` says the same payload arrives several ways: one `SignIn`, two encodings,
+and the request's `Content-Type` picks the decode. A media type the endpoint did
+not declare is a 415 naming the ones it did. Two different *schemas* under one
+body remain undescribable — a handler is given one value of one type.
+
 `file.stream()` is the request's own body, positioned at the part's first byte
-and stopping at its boundary. Nothing buffers an upload, which brings one
-constraint: **the file must be the last part on the wire**, since reading stops
-there. A text part sent after it is a 400 that says so, and an HTML form
+and stopping at its boundary. Nothing holds a streamed upload, which brings one
+constraint: **the streamed file must be the last part on the wire**, since
+reading stops there. A companion file that has to arrive alongside it is
+declared `bufferedFile("thumbnail", maxBytes = 256 * 1024)` — held in memory,
+within a bound the declaration has to name — so a two-file upload form is
+describable and what it costs is written where it is chosen.
+A text part sent after the streamed file is a 400 that says so, and an HTML form
 satisfies the rule by putting its `<input type="file">` last.
 
 ## Response headers
@@ -1406,15 +1416,18 @@ reasoning behind each, is in [docs/reference.md](docs/reference.md#what-isnt-her
   wrote `nullable: true`, numeric exclusive bounds. There is no switch back, and
   tooling that reads only 3.0 is not served. See the
   [migration note](docs/reference.md#moving-from-303-to-310).
-- **One file part per multipart endpoint, and it goes last.** Reading stops at
-  the file so the handler gets a live stream. A second part is a startup failure
-  and a text part after the file is a 400. `rawBody()` is there for an envelope
-  you would rather parse yourself.
-- **No content negotiation.** One media type per response. An endpoint may
-  answer two statuses two ways, but nothing reads `Accept` to choose between two
-  renderings of the same response — which is also the commonest reason an import
-  refuses an operation: a document offering JSON or XML is offering two decodes
-  of one request, and there is no description that means either.
+- **One *streamed* file part per multipart endpoint, and it goes last.** Reading
+  stops there so the handler gets a live stream. A second streamed part is a
+  startup failure and a text part after it is a 400. Any number of parts may be
+  held in memory instead — `bufferedFile("thumbnail", maxBytes = 256 * 1024)` —
+  which is what makes a two-file upload form describable, and the bound is
+  required so that what it costs is visible where it is chosen.
+- **No response negotiation.** One media type per response, and nothing reads
+  `Accept` to choose between two renderings of one. A *request* body may declare
+  several encodings of one payload — `formBody<Order>() or jsonBody<Order>()`,
+  picked by `Content-Type`, 415 for anything else — but a different schema under
+  each media type is several payloads, and a handler is given one value of one
+  type.
 - **A streamed response is the only success it can be.** An endpoint declaring
   several 2xx names the one it is producing, and producing a stream means
   handing over the backend's own type, which core cannot name. `ndjson<Order>()

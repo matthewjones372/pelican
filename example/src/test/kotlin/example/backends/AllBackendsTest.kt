@@ -1,6 +1,7 @@
 package example.backends
 
 import dev.pelican.In2
+import dev.pelican.In3
 import dev.pelican.In4
 import dev.pelican.Outcome
 import dev.pelican.UploadedFile
@@ -194,7 +195,8 @@ class AllBackendsTest {
         client.request(preferences, In2("fr", "abc123")) shouldBuild "GET /preferences"
         client.request(signIn, SignIn("ada", remember = true, visits = 3)) shouldBuild "POST /sign-in"
         val upload = UploadedFile("big.txt", "text/plain", ByteArrayInputStream("hello".toByteArray()))
-        client.request(uploadFile, In2("Big", upload)) shouldBuild "POST /upload"
+        val notes = UploadedFile("about.txt", "text/plain", ByteArrayInputStream("note".toByteArray()))
+        client.request(uploadFile, In3("Big", notes, upload)) shouldBuild "POST /upload"
 
         // The line above pins what the URL is; this one pins that *this*
         // backend serves it. Three interpreters agreeing on how to build a
@@ -394,7 +396,8 @@ class AllBackendsTest {
     @MethodSource("backends")
     fun `an endpoint served from elsewhere is still routed here`(name: String, client: ApiClient) {
         val file = UploadedFile("big.txt", "text/plain", ByteArrayInputStream("hello".toByteArray()))
-        val request = client.request(uploadFile, In2("Big", file))
+        val about = UploadedFile("about.txt", "text/plain", ByteArrayInputStream("note".toByteArray()))
+        val request = client.request(uploadFile, In3("Big", about, file))
 
         // No host on the request: the transport is what decides where it goes.
         request shouldBuild "POST /upload"

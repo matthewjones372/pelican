@@ -3,7 +3,6 @@ package dev.pelican.http4k
 import dev.pelican.Api
 import dev.pelican.ApiException
 import dev.pelican.BodyCodec
-import dev.pelican.BodyDecodeFailure
 import dev.pelican.Codecs
 import dev.pelican.Cookies
 import dev.pelican.CorsHeaders
@@ -14,12 +13,14 @@ import dev.pelican.FallibleOutput
 import dev.pelican.FormBody
 import dev.pelican.JsonBody
 import dev.pelican.MultipartBody
+import dev.pelican.NegotiatedBody
 import dev.pelican.Output
 import dev.pelican.ParamKey
 import dev.pelican.Params
 import dev.pelican.PathSegment
 import dev.pelican.PayloadTooLarge
 import dev.pelican.RawBody
+import dev.pelican.RequestBodyCodecs
 import dev.pelican.ServerEndpoint
 import dev.pelican.corsPolicy
 import dev.pelican.declaredInputCount
@@ -137,7 +138,7 @@ private fun preflightResponse(cors: CorsPolicy, req: Request): Response =
  * 204 — which is why such an API needs no codec configured at all.
  */
 internal class EndpointCodecs(
-    val body: BodyCodec<Any?>?,
+    val body: RequestBodyCodecs?,
     val payload: BodyCodec<Any?>?,
     /**
      * One per declared response — success or failure — keyed by identity. Two
@@ -310,34 +311,28 @@ private fun readBody(
         // handler that never reads it never pulls the request into memory.
         is RawBody -> values[body] = Http4kByteStream(req.body)
 
-        // Exempt from the size limit for the same reason a raw body is:
-        // the file part is never held whole. What the text parts may cost
-        // is bounded, and that is what the limit is passed in for.
+        // Exempt from the size limit for the same reason a raw body is: the
+        // streamed part is never held whole. What the parts that *are* held
+        // may cost is bounded, and that is what the limit is passed in for.
         is MultipartBody -> body.decode(
             contentType = req.header("Content-Type"),
             input = req.body.stream,
-            maxTextBytes = api.maxBodyBytes,
+            maxInMemoryBytes = api.maxBodyBytes,
             into = values,
         )
 
-        is JsonBody<*>, is FormBody<*> -> {
+        is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
             // Checked before the body is pulled into a String, so an
             // oversized payload is refused rather than allocated — and again
             // on what arrived, because a request may declare no length.
             refuseIfOversize(req.header("Content-Length")?.toLongOrNull(), api.maxBodyBytes)
             val text = req.bodyString()
             refuseIfOversize(text.length.toLong(), api.maxBodyBytes)
-            // Whatever the codec throws is its own library's exception, and
-            // nothing here should have to recognise it. Wrapping it in
-            // core's own failure is what keeps this file codec-agnostic.
-            values[body] = try {
-                checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
-                    .decodeFromString(text)
-            } catch (t: BodyDecodeFailure) {
-                throw t
-            } catch (t: Throwable) {
-                throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
-            }
+            // Which codec, and what a media type nobody declared means, are
+            // core's answers — see `RequestBodyCodecs`. So is wrapping whatever
+            // the codec threw, which is what keeps this file codec-agnostic.
+            values[body] = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
+                .decode(req.header("Content-Type"), text)
         }
     }
 }

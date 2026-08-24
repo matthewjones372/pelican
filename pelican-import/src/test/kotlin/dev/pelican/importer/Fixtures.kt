@@ -31,13 +31,18 @@ internal fun imported(yaml: String, options: ImportOptions = ImportOptions("test
 /**
  * A minimal document with [paths] in it, so a test about one operation is
  * written as one operation.
+ *
+ * [components] is for the tests where a schema has to be *the same* schema in
+ * two places — a `$ref` from each is the only way a document says so, and
+ * writing it twice inline would be testing the wrong thing.
  */
-internal fun document(paths: String): String =
-    listOf(
+internal fun document(paths: String, components: String? = null): String =
+    listOfNotNull(
         "openapi: 3.1.0",
         "info:",
         "  title: Test",
         "  version: \"1.0.0\"",
+        components?.let { "components:\n  schemas:\n" + it.trimIndent().prependIndent("    ") },
         "paths:",
         paths.trimIndent().prependIndent("  "),
     ).joinToString("\n")

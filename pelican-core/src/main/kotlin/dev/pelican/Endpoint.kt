@@ -613,16 +613,7 @@ private fun validate(ep: Endpoint<*, *>) {
         val partClashes = body.parts.groupBy { it.name }.filterValues { it.size > 1 }.keys
         if (partClashes.isNotEmpty()) error("$ep declares the multipart part(s) $partClashes more than once")
 
-        // Reading stops at the first file part, because handing one over as a
-        // stream is the whole point and a second one could only be reached by
-        // buffering the first. A second declaration would therefore describe a
-        // part no handler could ever be given.
-        if (body.fileParts.size > 1) {
-            error(
-                "$ep declares ${body.fileParts.size} file parts, and only the first could be streamed. " +
-                    "Take the rest as separate requests, or as one rawBody() you parse yourself.",
-            )
-        }
+        validateFileParts(ep, body)
     }
 
     // `default` is one key in OpenAPI's response map, so a second declaration
@@ -647,6 +638,42 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     validateResponseHeaders(ep)
+}
+
+/**
+ * The two things a reader of a multipart envelope cannot do, checked where the
+ * description is built rather than on the request that trips over them.
+ *
+ * Reading stops at a streamed part — that is what handing one over as a live
+ * window on the request means — so **one** part may be streamed, and it is the
+ * one that goes last. Everything before it is read as it arrives: text parts,
+ * and the [bufferedFile] parts whose whole purpose is to make a second file
+ * describable at the price of saying what it costs.
+ *
+ * Both messages name `bufferedFile` because that is the way out, and it is a
+ * way out that did not exist when this was simply "one file part".
+ */
+private fun validateFileParts(ep: Endpoint<*, *>, body: MultipartBody) {
+    val streamed = body.fileParts.filter { it.streamed }
+    if (streamed.size > 1) {
+        error(
+            "$ep declares ${streamed.size} streamed file parts (${streamed.joinToString { it.name }}), " +
+                "and only the first could be streamed: reading stops there. Declare all but one with " +
+                "bufferedFile(name, maxBytes = ...), which says what holding it costs, or take the " +
+                "envelope as a rawBody() you parse yourself.",
+        )
+    }
+
+    // Both clients here write the parts in declaration order, so a buffered
+    // part declared after the streamed one is one they would send where no
+    // server could read it.
+    val last = body.fileParts.lastOrNull()
+    if (streamed.size == 1 && last !== streamed.single()) {
+        error(
+            "$ep declares the streamed file part '${streamed.single().name}' before the buffered part " +
+                "'${last?.name}', and reading stops at the streamed one. Declare it last.",
+        )
+    }
 }
 
 /**

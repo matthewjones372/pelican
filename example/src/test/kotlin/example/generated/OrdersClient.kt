@@ -204,9 +204,10 @@ class MultipartContent internal constructor(
  * is read from wherever it lives at the speed the socket drains — the same
  * promise the server makes when it hands a file part to a handler unread.
  *
- * Text parts are written first whatever order the endpoint declared them in,
- * because a server stops reading at the file part: nothing buffers an upload in
- * order to go back for a field that followed it.
+ * The parts arrive here already in the order a server reads them — everything
+ * it reads as it arrives, and then the streamed part it stops at — because that
+ * order is a property of the description and the generator reads it off there.
+ * Nothing goes back for a field that followed the streamed part.
  *
  * The boundary is random per call rather than fixed. Streaming means the
  * content cannot be scanned for a clash beforehand, so the answer is a
@@ -323,6 +324,7 @@ data class ImportResult(
     val filename: String? = null,
     val lines: Int,
     val session: String? = null,
+    val manifest: String,
 )
 
 data class BankTransfer(
@@ -663,8 +665,8 @@ class OrdersClient(
      *
      * `POST /users/{userId}/orders/import`
      */
-    fun importOrders(userId: Long, label: String, file: UploadedFile, session: String? = null): ImportResult {
-        val response = text(request("POST", "/users/${segment(userId)}/orders/import", cookies = listOf("session" to session), multipart = multipart(fields = listOf("label" to label), files = listOf("file" to file))))
+    fun importOrders(userId: Long, label: String, manifest: UploadedFile, file: UploadedFile, session: String? = null): ImportResult {
+        val response = text(request("POST", "/users/${segment(userId)}/orders/import", cookies = listOf("session" to session), multipart = multipart(fields = listOf("label" to label), files = listOf("manifest" to manifest, "file" to file))))
         if (!response.succeeded()) failed("POST", "/users/{userId}/orders/import", response)
         return importResultCodec.decodeFromString(response.body())
     }

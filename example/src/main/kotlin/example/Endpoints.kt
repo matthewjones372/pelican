@@ -62,13 +62,25 @@ val rawUpload = rawBody(description = "Anything; it is never buffered")
 // takes.
 val session = cookieParam<String>("session", description = "An opaque session id").optional()
 
-// A form, for the caller that posts one rather than JSON. The schema published
-// for CreateOrder is what says `quantity=2` is a number.
-val orderForm = formBody<CreateOrder>(description = "The order to place, as a form posts it")
+// The same order, posted either way: a form from a page with no JavaScript on
+// it, JSON from the same page's script. One payload and two encodings, which is
+// what `or` says — the request's Content-Type picks the decode, and a media
+// type neither of these names is a 415. The schema published for CreateOrder is
+// what says `quantity=2` is a number, and it is the same schema under both.
+val orderForm = formBody<CreateOrder>(description = "The order to place, as a form or as JSON") or
+    jsonBody<CreateOrder>()
 
-// A multipart upload: one text field and one file, where the file is handed to
-// the handler as a stream rather than read into memory.
+// A multipart upload: a text field, a small file read into memory, and a large
+// one handed to the handler as a stream. The bound on the manifest is written
+// here rather than defaulted, because that is where somebody deciding whether
+// this endpoint should hold it will read it.
 val importLabel = textPart("label", StringCodec.nonEmpty(), description = "What to call this import")
+val importManifest = bufferedFile(
+    "manifest",
+    maxBytes = 8 * 1024,
+    contentType = "text/csv",
+    description = "What the file is supposed to contain",
+)
 val importFile = filePart("file", contentType = "text/csv", description = "One order per line")
 
 // ----------------------------------------------------------- declared failures
@@ -242,7 +254,7 @@ val placeOrderForm = endpoint(userId, orderForm) {
     json<Order>(status = 201)
 }
 
-val importOrders = endpoint(userId, session, importLabel, importFile) {
+val importOrders = endpoint(userId, session, importLabel, importManifest, importFile) {
     post("users" / userId / "orders" / "import")
     summary = "Import orders from an uploaded file"
     operationId = "importOrders"

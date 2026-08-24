@@ -3,7 +3,6 @@ package dev.pelican.ktor
 import dev.pelican.Api
 import dev.pelican.ApiException
 import dev.pelican.BodyCodec
-import dev.pelican.BodyDecodeFailure
 import dev.pelican.Codecs
 import dev.pelican.Cookies
 import dev.pelican.CorsHeaders
@@ -15,12 +14,14 @@ import dev.pelican.FormBody
 import dev.pelican.JsonBody
 import dev.pelican.Method
 import dev.pelican.MultipartBody
+import dev.pelican.NegotiatedBody
 import dev.pelican.Output
 import dev.pelican.ParamKey
 import dev.pelican.Params
 import dev.pelican.PathSegment
 import dev.pelican.PayloadTooLarge
 import dev.pelican.RawBody
+import dev.pelican.RequestBodyCodecs
 import dev.pelican.ServerEndpoint
 import dev.pelican.corsPolicy
 import dev.pelican.decode
@@ -184,7 +185,7 @@ fun Application.pelican(api: Api) {
  * 204 — which is why such an API needs no codec configured at all.
  */
 internal class EndpointCodecs(
-    val body: BodyCodec<Any?>?,
+    val body: RequestBodyCodecs?,
     val payload: BodyCodec<Any?>?,
     /**
      * One per declared response — success or failure — keyed by identity. Two
@@ -333,12 +334,12 @@ private suspend fun readBody(
             body.decode(
                 contentType = call.request.headers[HttpHeaders.ContentType],
                 input = call.receiveChannel().toInputStream(),
-                maxTextBytes = api.maxBodyBytes,
+                maxInMemoryBytes = api.maxBodyBytes,
                 into = values,
             )
         }
 
-        is JsonBody<*>, is FormBody<*> -> {
+        is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
             // The one place a slow client is this module's problem: a
             // strict body has to arrive in full before the handler can be
             // called, so it gets the API's own deadline rather than the
@@ -352,17 +353,11 @@ private suspend fun readBody(
                 throw ApiException(408, "Timed out reading the request body", t.message, cause = t)
             }
             refuseIfOversize(text.length.toLong(), api.maxBodyBytes)
-            // Whatever the codec throws is its own library's exception, and
-            // nothing here should have to recognise it. Wrapping it in
-            // core's own failure is what keeps this file codec-agnostic.
-            values[body] = try {
-                checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
-                    .decodeFromString(text)
-            } catch (t: BodyDecodeFailure) {
-                throw t
-            } catch (t: Throwable) {
-                throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
-            }
+            // Which codec, and what a media type nobody declared means, are
+            // core's answers — see `RequestBodyCodecs`. So is wrapping whatever
+            // the codec threw, which is what keeps this file codec-agnostic.
+            values[body] = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
+                .decode(call.request.headers[HttpHeaders.ContentType], text)
         }
     }
 }

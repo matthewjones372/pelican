@@ -192,6 +192,10 @@ fun tooManyRequests(message: String = "Too many requests", retryAfterSeconds: Lo
  * The request body was larger than [Api.maxBodyBytes]. Raised by the
  * interpreters before the body is decoded, so an oversized payload never
  * reaches a codec.
+ *
+ * [detail] is for the limit that is not the API's own: a multipart part
+ * declares its own bound, and a 413 that named only the request would leave a
+ * caller looking at the wrong number.
  */
-class PayloadTooLarge(val limit: Long) :
-    RuntimeException("Request body exceeds the configured limit of $limit bytes")
+class PayloadTooLarge(val limit: Long, detail: String? = null) :
+    RuntimeException(detail ?: "Request body exceeds the configured limit of $limit bytes")

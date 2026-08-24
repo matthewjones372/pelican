@@ -117,6 +117,58 @@ fun JsonObj.withNullabilityOf(type: KType): JsonObj {
 interface Codecs : CodecFactory, SchemaSource
 
 /**
+ * How a request body is read, once the request says what it is.
+ *
+ * One entry per media type the endpoint declared, which is one entry for almost
+ * every endpoint there has ever been. The choosing and the 415 live here rather
+ * than in each interpreter for the same reason the multipart parser does: three
+ * copies of "which codec reads this" would be three chances for one backend to
+ * answer a `Content-Type` differently from the other two.
+ */
+class RequestBodyCodecs internal constructor(private val byMediaType: Map<String, BodyCodec<Any?>>) {
+
+    /**
+     * The body as the value it decodes to.
+     *
+     * [contentType] is consulted **only where the endpoint declared a choice.**
+     * With one encoding there is nothing to choose, and an endpoint that started
+     * refusing a request whose `Content-Type` it never checked before would be
+     * breaking callers over a header that carries no information here — a
+     * `jsonBody<T>()` sent with no header at all has always been decoded, and
+     * whatever the codec makes of a body that is not JSON is a 400 that
+     * describes the actual problem. Where there *are* alternatives the header is
+     * the only thing that says which decode was meant, so a media type nobody
+     * declared is a 415 rather than a guess.
+     *
+     * Whatever the codec throws is its own library's exception; wrapping it in
+     * core's own failure is what lets an interpreter map a bad body to a 400
+     * without naming Jackson or kotlinx.serialization.
+     */
+    fun decode(contentType: String?, text: String): Any? {
+        val codec = select(contentType)
+        return try {
+            codec.decodeFromString(text)
+        } catch (t: BodyDecodeFailure) {
+            throw t
+        } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
+            throw BodyDecodeFailure(t.message ?: "Could not decode the request body", t)
+        }
+    }
+
+    private fun select(contentType: String?): BodyCodec<Any?> {
+        byMediaType.values.singleOrNull()?.let { return it }
+
+        val declared = contentType?.substringBefore(';')?.trim()?.lowercase()
+        return byMediaType[declared] ?: throw ApiException(
+            415,
+            "Unsupported media type",
+            "The request body arrived as ${declared ?: "no media type at all"}, and this endpoint " +
+                "reads ${byMediaType.keys.joinToString(" or ")}. Send one of those in Content-Type.",
+        )
+    }
+}
+
+/**
  * Which codec reads this request body, or null for the bodies no codec reads —
  * a raw stream, a multipart envelope, no body at all.
  *
@@ -126,10 +178,24 @@ interface Codecs : CodecFactory, SchemaSource
  * three chances for one backend to read a form differently from the other two.
  * Called once per endpoint when a route is built, like every other codec.
  */
-fun Codecs.requestBodyCodec(input: BodyInput<*>?): BodyCodec<Any?>? = when (input) {
+fun Codecs.requestBodyCodec(input: BodyInput<*>?): RequestBodyCodecs? = when (input) {
+    is JsonBody<*>, is FormBody<*> -> RequestBodyCodecs(mapOf(input.mediaType to oneBodyCodec(input)))
+
+    // Every alternative is resolved here, not on the request that picks one, so
+    // an endpoint offering an encoding its payload type cannot be read from is a
+    // startup failure rather than a 500 for whichever caller chose that one.
+    is NegotiatedBody<*> -> RequestBodyCodecs(
+        input.alternatives.associate { it.mediaType to oneBodyCodec(it) },
+    )
+
+    null, is RawBody, is MultipartBody -> null
+}
+
+/** What reads a body of one media type. Every alternative is one of these. */
+private fun Codecs.oneBodyCodec(input: BodyInput<*>): BodyCodec<Any?> = when (input) {
     is JsonBody<*> -> codec(input.type)
     is FormBody<*> -> formCodec(input.type)
-    null, is RawBody, is MultipartBody -> null
+    else -> error("$input is not a body a codec reads")
 }
 
 /** The default when none is configured: fails with an actionable message. */

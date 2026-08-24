@@ -67,22 +67,27 @@ fun multipartBoundary(contentType: String?): String? {
  * `filename` means, whether a text field is trimmed. One parser is one answer,
  * and `MultipartTest` is where that answer is written down.
  *
- * Text parts are read as they arrive, into [into], bounded in total by
- * [maxTextBytes]. The file part is not read at all: when the reader reaches it
- * the handler is given a stream positioned at its first byte, which is the
- * whole point.
+ * Text parts and [bufferedFile] parts are read as they arrive, into [into]. A
+ * streamed file part is not read at all: when the reader reaches it the handler
+ * is given a stream positioned at its first byte, which is the whole point.
  *
- * That is also the constraint worth stating plainly: **the file part has to be
- * the last part on the wire.** Reading stops there, so a text part sent after
- * it has not been seen and never will be — nothing here buffers a file in
- * order to go back for it. A text part that is still missing when the file
- * arrives is a 400 that says exactly this. An HTML form satisfies the rule by
- * putting its `<input type="file">` last.
+ * That is also the constraint worth stating plainly: **the streamed part has to
+ * be the last part on the wire.** Reading stops there, so anything sent after
+ * it has not been seen and never will be — nothing here goes back for it. A
+ * part that is still missing when the streamed file arrives is a 400 that says
+ * exactly this. An HTML form satisfies the rule by putting its last
+ * `<input type="file">` last.
+ *
+ * Everything held in memory shares one budget, [maxInMemoryBytes], on top of
+ * whatever bound each buffered part declared for itself. Two bounds rather than
+ * one because they answer different questions: the per-part bound is what the
+ * *description* promises about one field, and the budget is what the *server*
+ * will spend on one request however many fields it declared.
  */
 fun MultipartBody.decode(
     contentType: String?,
     input: InputStream,
-    maxTextBytes: Long,
+    maxInMemoryBytes: Long,
     into: MutableMap<ParamKey<*>, Any?>,
 ) {
     val boundary = multipartBoundary(contentType)
@@ -93,7 +98,7 @@ fun MultipartBody.decode(
         )
 
     val reader = MultipartReader(input, boundary)
-    var budget = maxTextBytes
+    var budget = maxInMemoryBytes
     var stoppedAtFile: String? = null
 
     while (stoppedAtFile == null) {
@@ -104,14 +109,29 @@ fun MultipartBody.decode(
             null -> Unit
 
             is TextPart<*> -> {
-                val text = part.body.readAtMost(budget) { throw PayloadTooLarge(maxTextBytes) }
+                val text = part.body.readAtMost(budget) {
+                    refuse(input, declared.name, bound = null, budget = budget, max = maxInMemoryBytes)
+                }
                 budget -= text.size
                 into[declared] = declared.codec.decode(declared.name, String(text, StandardCharsets.UTF_8))
             }
 
             is FilePart<*> -> {
-                into[declared] = UploadedFile(part.filename, part.contentType, part.body)
-                stoppedAtFile = part.name
+                val bound = declared.bufferedBytes
+                if (bound == null) {
+                    into[declared] = UploadedFile(part.filename, part.contentType, part.body)
+                    stoppedAtFile = part.name
+                } else {
+                    // The smaller of the two: a part may declare more than the
+                    // request as a whole is allowed to spend, and the request's
+                    // budget is the one that has already been partly spent.
+                    val bytes = part.body.readAtMost(minOf(bound, budget)) {
+                        refuse(input, declared.name, bound, budget, maxInMemoryBytes)
+                    }
+                    budget -= bytes.size
+                    into[declared] =
+                        UploadedFile(part.filename, part.contentType, ByteArrayInputStream(bytes))
+                }
             }
         }
     }
@@ -120,12 +140,54 @@ fun MultipartBody.decode(
 }
 
 /**
+ * The 413 for a part that ran over, raised only after the rest of the envelope
+ * has been read — up to a point.
+ *
+ * The draining is what makes the refusal arrive. Bytes left unread on the
+ * connection are bytes the client is still writing, and a server that answers
+ * and closes mid-upload gives it a broken pipe instead of the status that
+ * explains itself; the Pekko interpreter reads a strict body slightly past its
+ * limit for exactly this reason. Here the overrun is bounded and then given up
+ * on: a caller that keeps pushing gets the connection cut, because nothing can
+ * be promised to a sender that will not stop.
+ *
+ * Which of the two bounds is named matters more than it looks. A caller told
+ * that a part exceeded seven bytes, because six of the request's budget had
+ * already gone on a caption, would go looking for a seven that nobody wrote
+ * down. So the message names the number that *was* written down: the part's own
+ * [bound] where that is what stopped it, and [max] where the request as a whole
+ * is what ran out.
+ */
+private fun refuse(input: InputStream, part: String, bound: Long?, budget: Long, max: Long): Nothing {
+    var remaining = DRAIN_OVERRUN_BYTES
+    val scratch = ByteArray(READ_BUFFER_BYTES)
+    while (remaining > 0) {
+        val read = input.read(scratch, 0, minOf(scratch.size.toLong(), remaining).toInt())
+        if (read < 0) break
+        remaining -= read
+    }
+
+    if (bound != null && bound <= budget) {
+        throw PayloadTooLarge(
+            bound,
+            "The part '$part' is larger than the $bound bytes its declaration allows it to hold. " +
+                "Raise maxBytes on bufferedFile(\"$part\", ...), or send less.",
+        )
+    }
+    throw PayloadTooLarge(
+        max,
+        "The parts of this request read into memory come to more than the $max bytes it may hold, " +
+            "and '$part' is where that ran out. Raise Api(maxBodyBytes = ...), or send less.",
+    )
+}
+
+/**
  * What the declaration expected and the request did not send: a required part
  * is a 400, an optional one takes its default.
  *
- * The detail names the file part reading stopped at, when there was one. That
- * is the whole difference between "you forgot a field" and "you sent it after
- * the upload, and nothing buffers an upload".
+ * The detail names the streamed part reading stopped at, when there was one.
+ * That is the whole difference between "you forgot a field" and "you sent it
+ * after the upload, and nothing goes back for it".
  */
 private fun fillMissingParts(
     parts: List<MultipartPart<*>>,
@@ -142,7 +204,7 @@ private fun fillMissingParts(
                 400,
                 "Missing required part '${part.name}'",
                 if (stoppedAtFile == null) null
-                else "Nothing buffers an upload, so reading stopped at the file part " +
+                else "Nothing holds a streamed upload, so reading stopped at the file part " +
                     "'$stoppedAtFile'. Send '${part.name}' before it.",
             )
         }
@@ -434,6 +496,13 @@ private fun unquoteParameter(value: String): String =
 
 /** One page. Big enough that the syscall is not the cost, small enough to hold several. */
 private const val READ_BUFFER_BYTES = 4096
+
+/**
+ * How much of a refused envelope is still read so that the 413 can be written
+ * down a connection that is still whole. Sixty-four kilobytes, the same number
+ * and the same reasoning as the Pekko interpreter's strict-body overrun.
+ */
+private const val DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
 
 /** A Kotlin Byte is signed; this is how one becomes the 0..255 the format talks about. */
 private const val BYTE_MASK = 0xFF

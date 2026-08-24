@@ -624,18 +624,22 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         val context = typeName(ep.operationId) + "Request"
         return when (body) {
             is IrBody.Json -> "jsonBody<${typeFor(body.schema, context)}>(${describedBy(body.description)})"
+
             is IrBody.Form -> "formBody<${typeFor(body.schema, context)}>(${describedBy(body.description)})"
+
             is IrBody.Raw -> "rawBody(${describedBy(body.description)})"
+
             is IrBody.Multipart -> error("A multipart body is declared by its parts")
+
+            // One payload, one type, and one `or` per further encoding — the
+            // same spelling a hand-written description uses, so a reader of the
+            // generated file learns the library rather than the importer.
+            is IrBody.Negotiated -> negotiatedDeclaration(body, typeFor(body.schema, context))
         }
     }
 
     private fun partDeclaration(part: IrPart): String = when (part) {
-        is IrPart.File -> {
-            val contentType = part.contentType?.let { ", contentType = ${kotlinString(it)}" }.orEmpty()
-            "filePart(${kotlinString(part.name)}$contentType${namedDescription(part.description)})" +
-                if (part.required) "" else ".optional()"
-        }
+        is IrPart.File -> fileDeclaration(part) + if (part.required) "" else ".optional()"
 
         is IrPart.Text -> {
             val plain = plain(part.schema, typeName(part.name))
@@ -826,6 +830,34 @@ private fun namedDescription(text: String?) =
     if (text == null) "" else ", description = ${kotlinString(text)}"
 
 private fun describedBy(text: String?) = if (text == null) "" else kotlinString(text)
+
+/**
+ * One payload under several media types, as the `or` a hand-written
+ * description would use — so a reader of the generated file learns the library
+ * rather than the importer.
+ *
+ * The description goes on the first alternative alone, which is where `or`
+ * reads it from; writing it on each would publish the same sentence twice for
+ * one body.
+ */
+private fun negotiatedDeclaration(body: IrBody.Negotiated, type: String): String =
+    body.encodings.mapIndexed { index, encoding ->
+        val described = if (index == 0) describedBy(body.description) else ""
+        if (encoding == "application/json") "jsonBody<$type>($described)" else "formBody<$type>($described)"
+    }.joinToString(" or ")
+
+/**
+ * A file part, streamed or held. The bound of a held one is written out rather
+ * than left to a default, because a part that costs a caller-controlled
+ * allocation on every request should say so where a reader of this file sees it.
+ */
+private fun fileDeclaration(part: IrPart.File): String {
+    val contentType = part.contentType?.let { ", contentType = ${kotlinString(it)}" }.orEmpty()
+    val call = part.bufferedBytes
+        ?.let { "bufferedFile(${kotlinString(part.name)}, maxBytes = $it$contentType" }
+        ?: "filePart(${kotlinString(part.name)}$contentType"
+    return "$call${namedDescription(part.description)})"
+}
 
 private fun literal(value: dev.pelican.JsonValue, type: String): String = when (type) {
     "String" -> kotlinString((value as? dev.pelican.JsonStr)?.value.orEmpty())

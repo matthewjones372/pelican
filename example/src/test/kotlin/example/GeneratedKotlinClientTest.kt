@@ -241,6 +241,7 @@ class GeneratedKotlinClientTest {
         val result = client.importOrders(
             userId = 1L,
             label = "March",
+            manifest = UploadedFile("manifest.txt", "text/plain", ByteArrayInputStream("3 orders".toByteArray())),
             file = UploadedFile("orders.csv", "text/csv", ByteArrayInputStream(csv.toByteArray())),
             session = "s-42",
         )
@@ -249,6 +250,9 @@ class GeneratedKotlinClientTest {
         result.filename shouldBe "orders.csv"
         result.lines shouldBe 3
         result.session shouldBe "s-42"
+        // The manifest was held in memory, within the bound its declaration
+        // named, and the streamed file after it was not held at all.
+        result.manifest shouldBe "3 orders"
     }
 
     @Test
@@ -256,6 +260,7 @@ class GeneratedKotlinClientTest {
         val result = client.importOrders(
             userId = 1L,
             label = "March",
+            manifest = UploadedFile("manifest.txt", "text/plain", ByteArrayInputStream("1 order".toByteArray())),
             file = UploadedFile("orders.csv", "text/csv", ByteArrayInputStream("1,anvil\n".toByteArray())),
         )
 

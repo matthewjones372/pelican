@@ -90,8 +90,62 @@ class StrictnessTest {
         source shouldNotContain "orFail"
     }
 
+    /**
+     * Half of what this used to refuse turned out to be describable, and the
+     * half that is left is the half a handler could not have been given.
+     *
+     * One payload under several encodings is a choice about *decoding*, and a
+     * `Content-Type` makes it: `jsonBody<T>() or formBody<T>()`. Several
+     * schemas under several media types is a choice about what the payload *is*,
+     * and there is one handler taking one type — so that one stays refused, and
+     * the message says which of the two this document wrote.
+     */
     @Test
-    fun `two media types for one body are two decodes of one request`() {
+    fun `one payload under two media types is two encodings of one body`() {
+        val source = imported(
+            document(
+                """
+                /orders:
+                  post:
+                    operationId: placeOrder
+                    requestBody:
+                      content:
+                        application/json: { schema: { ${'$'}ref: '#/components/schemas/Order' } }
+                        application/x-www-form-urlencoded:
+                          schema: { ${'$'}ref: '#/components/schemas/Order' }
+                    responses:
+                      "204": { description: ok }
+                """,
+                components = """
+                    Order:
+                      type: object
+                      properties: { item: { type: string } }
+                """,
+            ),
+        )
+
+        source shouldContain "jsonBody<Order>() or formBody<Order>()"
+    }
+
+    @Test
+    fun `a different schema under each media type is several payloads, not several encodings`() {
+        refusing(
+            """
+            /orders:
+              post:
+                operationId: placeOrder
+                requestBody:
+                  content:
+                    application/json: { schema: { type: object, properties: { item: { type: string } } } }
+                    application/x-www-form-urlencoded: { schema: { type: object } }
+                responses:
+                  "204": { description: ok }
+            """,
+        ) shouldContain "a `oneOf` and a `discriminator`"
+    }
+
+    @Test
+    fun `a media type no endpoint reads a payload from is still refused`() {
         refusing(
             """
             /orders:
@@ -105,6 +159,68 @@ class StrictnessTest {
                   "204": { description: ok }
             """,
         ) shouldContain "application/json, application/xml"
+    }
+
+    /**
+     * The other refusal that stopped being one. Reading stops at a streamed
+     * part, so a second file could only be reached by holding the first — which
+     * is now something a description can say, so the last file is streamed and
+     * the rest are `bufferedFile`s with the bound the document published, or a
+     * default written out where a reader will see it.
+     */
+    @Test
+    fun `two file parts become a buffered one and a streamed one`() {
+        val source = imported(
+            document(
+                """
+                /orders/import:
+                  post:
+                    operationId: importOrders
+                    requestBody:
+                      content:
+                        multipart/form-data:
+                          schema:
+                            type: object
+                            properties:
+                              thumbnail: { type: string, contentMediaType: image/png, maxLength: 4096 }
+                              document: { type: string, contentMediaType: application/octet-stream }
+                    responses:
+                      "204": { description: ok }
+                """,
+            ),
+        )
+
+        source shouldContain """bufferedFile("thumbnail", maxBytes = 4096"""
+        source shouldContain """filePart("document""""
+    }
+
+    @Test
+    fun `a document that published no bound gets one written out rather than defaulted`() {
+        val source = imported(
+            document(
+                """
+                /orders/import:
+                  post:
+                    operationId: importOrders
+                    requestBody:
+                      content:
+                        multipart/form-data:
+                          schema:
+                            type: object
+                            properties:
+                              first: { type: string, format: binary }
+                              second: { type: string, format: binary }
+                              third: { type: string, format: binary }
+                    responses:
+                      "204": { description: ok }
+                """,
+            ),
+        )
+
+        // The last is the streamed one; everything before it says what it costs.
+        source shouldContain """bufferedFile("first", maxBytes = 1048576)"""
+        source shouldContain """bufferedFile("second", maxBytes = 1048576)"""
+        source shouldContain """filePart("third")"""
     }
 
     @Test

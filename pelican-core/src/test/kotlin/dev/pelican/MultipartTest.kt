@@ -229,7 +229,7 @@ class MultipartTest {
     // ---------------------------------------------------- what is describable
 
     @Test
-    fun `two file parts is a description no handler could be given, so it fails when built`() {
+    fun `two streamed file parts is a description no handler could be given, so it fails when built`() {
         val failure = shouldThrow<IllegalStateException> {
             endpoint(filePart("first"), filePart("second")) {
                 post("upload")
@@ -239,7 +239,51 @@ class MultipartTest {
 
         withClue(failure.message) {
             failure.message shouldContain "only the first could be streamed"
+            // The refusal names the way out, which is the half that did not
+            // exist when this was simply "one file part per endpoint".
+            failure.message shouldContain "bufferedFile"
         }
+    }
+
+    @Test
+    fun `a streamed part declared before a buffered one fails when built`() {
+        // Reading stops at the streamed part, and both clients here write the
+        // parts in declaration order — so this is a description whose own
+        // client could only produce requests its own server refuses.
+        val failure = shouldThrow<IllegalStateException> {
+            endpoint(filePart("document"), bufferedFile("thumbnail", maxBytes = 64)) {
+                post("upload")
+                text()
+            }
+        }
+
+        withClue(failure.message) { failure.message shouldContain "Declare it last" }
+    }
+
+    @Test
+    fun `a buffered part with a streamed one after it is describable`() {
+        val declared = endpoint(bufferedFile("thumbnail", maxBytes = 64), filePart("document")) {
+            post("upload")
+            text()
+        }
+
+        val envelope = declared.bodyInput as MultipartBody
+        envelope.bufferedFileParts.map { it.name } shouldBe listOf("thumbnail")
+        envelope.streamedFilePart?.name shouldBe "document"
+    }
+
+    @Test
+    fun `any number of parts may be buffered, since reading never stops at one`() {
+        val declared = endpoint(
+            bufferedFile("a", maxBytes = 64),
+            bufferedFile("b", maxBytes = 64),
+            bufferedFile("c", maxBytes = 64),
+        ) {
+            post("upload")
+            text()
+        }
+
+        (declared.bodyInput as MultipartBody).streamedFilePart.shouldBeNull()
     }
 
     @Test
@@ -276,5 +320,147 @@ class MultipartTest {
 
         override fun read(b: ByteArray, off: Int, len: Int): Int =
             underlying.read(b, off, len).also { if (it > 0) read += it }
+    }
+}
+
+/**
+ * The second file part, which used to be a description this library refused.
+ *
+ * What made it refusable was that reading stops at a streamed part, so a second
+ * file could only be reached by holding the first — silently. `bufferedFile`
+ * makes the holding something the description says, with the bound written
+ * where the person choosing it will read it, and these are the three things
+ * that follow: it arrives, the bound is enforced, and the streamed part after
+ * it is still streamed.
+ */
+class BufferedPartTest {
+
+    private val caption = textPart<String>("caption")
+    private val thumbnail = bufferedFile("thumbnail", maxBytes = 32, contentType = "image/png")
+    private val document = filePart("document")
+
+    private val body = MultipartBody(listOf(caption, thumbnail, document))
+
+    private fun envelope(vararg parts: String): InputStream =
+        ByteArrayInputStream(
+            (parts.joinToString("") { "--b0undary\r\n$it\r\n" } + "--b0undary--\r\n")
+                .toByteArray(Charsets.UTF_8),
+        )
+
+    private fun upload(name: String, filename: String, content: String) =
+        "Content-Disposition: form-data; name=\"$name\"; filename=\"$filename\"\r\n" +
+            "Content-Type: text/plain\r\n\r\n$content"
+
+    private fun text(name: String, value: String) =
+        "Content-Disposition: form-data; name=\"$name\"\r\n\r\n$value"
+
+    private fun decode(input: InputStream, limit: Long = 8192): MutableMap<ParamKey<*>, Any?> {
+        val values = LinkedHashMap<ParamKey<*>, Any?>()
+        body.decode("multipart/form-data; boundary=b0undary", input, limit, values)
+        return values
+    }
+
+    @Test
+    fun `both files arrive, and the handler reads them the same way`() {
+        val values = decode(
+            envelope(
+                text("caption", "Holiday"),
+                upload("thumbnail", "small.png", "tiny"),
+                upload("document", "big.txt", "a much larger thing"),
+            ),
+        )
+
+        values[caption] shouldBe "Holiday"
+        (values[thumbnail] as UploadedFile).text() shouldBe "tiny"
+        (values[thumbnail] as UploadedFile).filename shouldBe "small.png"
+        (values[document] as UploadedFile).text() shouldBe "a much larger thing"
+    }
+
+    @Test
+    fun `the streamed part is still unread when the handler is given it`() {
+        // The guarantee the refusal existed to protect, kept: the part after
+        // the buffered one is a window on the request, not a copy of it.
+        val counting = object : InputStream() {
+            var read = 0
+            val source = ByteArrayInputStream(
+                envelope(
+                    text("caption", "c"),
+                    upload("thumbnail", "s.png", "tiny"),
+                    upload("document", "big.txt", "x".repeat(200_000)),
+                ).readBytes(),
+            )
+
+            override fun read(): Int = source.read().also { if (it >= 0) read++ }
+
+            override fun read(b: ByteArray, off: Int, len: Int): Int =
+                source.read(b, off, len).also { if (it > 0) read += it }
+        }
+
+        val values = decode(counting)
+
+        withClue("bytes read before the handler was given the stream") {
+            counting.read shouldBeLessThan 32_768
+        }
+        (values[document] as UploadedFile).text().length shouldBe 200_000
+    }
+
+    @Test
+    fun `a buffered part over the bound its declaration named is a 413 naming the part`() {
+        val failure = shouldThrow<PayloadTooLarge> {
+            decode(
+                envelope(
+                    text("caption", "c"),
+                    upload("thumbnail", "s.png", "x".repeat(64)),
+                    upload("document", "big.txt", "hello"),
+                ),
+            )
+        }
+
+        failure.limit shouldBe 32
+        withClue(failure.message) {
+            failure.message shouldContain "thumbnail"
+            failure.message shouldContain "maxBytes"
+        }
+    }
+
+    @Test
+    fun `the request's own budget bounds a part that declared more than the request may spend`() {
+        // Two bounds, and the smaller applies: a part says what one field may
+        // cost, and `Api(maxBodyBytes = ...)` says what the whole request may.
+        val failure = shouldThrow<PayloadTooLarge> {
+            decode(
+                envelope(
+                    text("caption", "c"),
+                    upload("thumbnail", "s.png", "x".repeat(20)),
+                    upload("document", "big.txt", "hello"),
+                ),
+                limit = 8,
+            )
+        }
+
+        // The number named is `maxBodyBytes`, not what was left of it after
+        // the caption: a caller told about a seven nobody wrote down would go
+        // looking for where it was configured.
+        failure.limit shouldBe 8
+        withClue(failure.message) { failure.message shouldContain "maxBodyBytes" }
+    }
+
+    @Test
+    fun `an optional buffered part the caller left out is null`() {
+        val optional = bufferedFile("thumbnail", maxBytes = 32).optional()
+        val declared = MultipartBody(listOf(caption, optional, document))
+        val values = LinkedHashMap<ParamKey<*>, Any?>()
+
+        declared.decode(
+            "multipart/form-data; boundary=b0undary",
+            envelope(text("caption", "c"), upload("document", "b.txt", "hello")),
+            8192,
+            values,
+        )
+
+        values[optional].shouldBeNull()
+        // The bound travels with the modifier: `optional()` says whether it has
+        // to be there, not where its bytes go.
+        optional.bufferedBytes shouldBe 32
     }
 }

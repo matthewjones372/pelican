@@ -1,11 +1,13 @@
 package dev.pelican.codegen
 
 import dev.pelican.ApiSpec
+import dev.pelican.BodyInput
 import dev.pelican.ByteStreamOutput
 import dev.pelican.EmptyOutput
 import dev.pelican.Endpoint
 import dev.pelican.ErrorOutput
 import dev.pelican.FallibleOutput
+import dev.pelican.FilePart
 import dev.pelican.FormBody
 import dev.pelican.JsonArrayOutput
 import dev.pelican.JsonBody
@@ -14,6 +16,7 @@ import dev.pelican.JsonOutput
 import dev.pelican.ListStyle
 import dev.pelican.MultipartBody
 import dev.pelican.NdjsonOutput
+import dev.pelican.NegotiatedBody
 import dev.pelican.Output
 import dev.pelican.PathParam
 import dev.pelican.PathSegment
@@ -24,7 +27,10 @@ import dev.pelican.SchemaRegistry
 import dev.pelican.SecurityRequirement
 import dev.pelican.SseOutput
 import dev.pelican.TextOutput
+import dev.pelican.TextPart
+import dev.pelican.mediaType
 import dev.pelican.operationName
+import dev.pelican.payloadType
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -217,8 +223,7 @@ private class KotlinClientEmitter(
         // complete before any of it is turned into a declaration.
         (endpoints + webhooks.map { it.operation }).forEach { ep ->
             when (val body = ep.bodyInput) {
-                is JsonBody<*> -> schema(body.type)
-                is FormBody<*> -> schema(body.type)
+                is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> schema(checkNotNull(body.payloadType))
                 else -> null
             }
             declaredSuccesses(ep).forEach { out -> out.payloadType?.let { schema(it) } }
@@ -562,36 +567,50 @@ private class KotlinClientEmitter(
         }
 
         val bodyName = unique("body", taken)
-        val bodyArgument = when (val input = ep.bodyInput) {
-            is JsonBody<*> -> {
-                required += "$bodyName: ${typeFor(input.type)}"
-                "body = HttpRequest.BodyPublishers.ofString(" +
-                    "${codecName(typeFor(input.type))}.encodeToString($bodyName)), " +
-                    "contentType = \"application/json\""
-            }
 
-            // Encoded by core, against the same published schema the server
-            // decodes it against — so the caller writes a `SignIn` and the
-            // pairs on the wire are the ones that type decodes back from.
-            is FormBody<*> -> {
-                required += "$bodyName: ${typeFor(input.type)}"
-                "body = HttpRequest.BodyPublishers.ofString(" +
-                    "${formCodecName(typeFor(input.type))}.encodeToString($bodyName)), " +
-                    "contentType = \"application/x-www-form-urlencoded\""
-            }
+        /** One encoded payload and the header naming it. Shared with the negotiated case below. */
+        fun encoded(input: BodyInput<*>): String {
+            val type = typeFor(checkNotNull(input.payloadType))
+            required += "$bodyName: $type"
+            // Encoded by core for a form, against the same published schema
+            // the server decodes it against — so the caller writes a `SignIn`
+            // and the pairs on the wire are the ones that type decodes back
+            // from.
+            val codec = if (input is FormBody<*>) formCodecName(type) else codecName(type)
+            return "body = HttpRequest.BodyPublishers.ofString($codec.encodeToString($bodyName)), " +
+                "contentType = ${kotlinString(input.mediaType)}"
+        }
+
+        val bodyArgument = when (val input = ep.bodyInput) {
+            is JsonBody<*>, is FormBody<*> -> encoded(input)
+
+            // The first alternative, for the same reason the first of several
+            // `servers` is the one a client calls: a client has to send exactly
+            // one Content-Type, and the document's order is the document's
+            // answer. Offering the choice would put a media type parameter on
+            // every generated method that takes a body, and a caller who wants
+            // the other encoding of a payload they already hold is better
+            // served by the server reading both than by this class asking.
+            is NegotiatedBody<*> -> encoded(input.alternatives.first())
 
             // A text part is a typed parameter like any other; a file part is
             // an UploadedFile, which is the same value a handler is given on
-            // the other side of the wire.
+            // the other side of the wire. In `partsInWireOrder`, since a
+            // streamed part is where the server stops reading.
             is MultipartBody -> {
                 val fields = mutableListOf<String>()
                 val files = mutableListOf<String>()
-                input.textParts.forEach { parameter(it.name, it.codec, it.required, null, fields) }
-                input.fileParts.forEach { part ->
-                    val name = unique(memberName(part.name), taken)
-                    if (part.required) required += "$name: UploadedFile"
-                    else optional += "$name: UploadedFile? = null"
-                    files += "${kotlinString(part.name)} to $name"
+                input.partsInWireOrder.forEach { part ->
+                    when (part) {
+                        is TextPart<*> -> parameter(part.name, part.codec, part.required, null, fields)
+
+                        is FilePart<*> -> {
+                            val name = unique(memberName(part.name), taken)
+                            if (part.required) required += "$name: UploadedFile"
+                            else optional += "$name: UploadedFile? = null"
+                            files += "${kotlinString(part.name)} to $name"
+                        }
+                    }
                 }
                 "multipart = multipart(" +
                     "fields = listOf(${fields.joinToString(", ")}), " +

@@ -179,6 +179,11 @@ class Api(
      * that leaves the limit unset ships that as the default. Raise it for an
      * endpoint that genuinely takes a large document, or take the body as a
      * `rawBody()` stream and never hold it whole.
+     *
+     * A multipart envelope is bounded by this too, but only for the parts that
+     * are actually held: its text parts and its [bufferedFile] parts share this
+     * number as one budget, on top of whatever bound each buffered part declared
+     * for itself, and the streamed part is exempt because nothing holds it.
      */
     val maxBodyBytes: Long = DEFAULT_MAX_BODY_BYTES,
 

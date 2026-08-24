@@ -90,7 +90,9 @@ class KotlinClientTest {
     private val feature = headerParam<String>("X-Feature").commaSeparated()
     private val seen = cookieParam<String>("seen").repeated().optional()
     private val widgetForm = formBody<NewWidget>()
+    private val eitherWay = jsonBody<NewWidget>() or formBody<NewWidget>()
     private val label = textPart<String>("label")
+    private val thumbnail = bufferedFile("thumbnail", maxBytes = 4096)
     private val attachment = filePart("attachment", contentType = "text/plain")
 
     private val noSuchWidget = errorJson<Problem>(404, "No widget with that id")
@@ -148,9 +150,15 @@ class KotlinClientTest {
         json<Widget>()
     }
 
-    private val importWidgets = endpoint(label, attachment) {
+    private val importWidgets = endpoint(label, thumbnail, attachment) {
         post("widgets" / "import")
         operationId = "importWidgets"
+        json<Widget>()
+    }
+
+    private val postWidgetEitherWay = endpoint(eitherWay) {
+        post("widgets" / "either-way")
+        operationId = "postWidgetEitherWay"
         json<Widget>()
     }
 
@@ -189,8 +197,8 @@ class KotlinClientTest {
     private fun spec() = ApiSpec(
         endpoints = listOf(
             getWidget, streamWidgets, listWidgets, watchWidgets, createWidget, deleteWidget,
-            uploadWidget, signInWidget, importWidgets, themed, searchWidgets, rebuild, unnamed,
-            pokeWidget,
+            uploadWidget, signInWidget, importWidgets, postWidgetEitherWay, themed, searchWidgets,
+            rebuild, unnamed, pokeWidget,
         ),
         schemas = WidgetSchemas,
         title = "Widget Shop",
@@ -297,11 +305,25 @@ class KotlinClientTest {
     }
 
     @Test
+    fun `a body with several encodings is sent as the first the endpoint declared`() {
+        // A client sends exactly one Content-Type, so it has to pick, and the
+        // document's order is the document's answer — the same rule as the
+        // first of several `servers`. Offering the choice would put a media
+        // type parameter on every generated method that takes a body.
+        client shouldContain "fun postWidgetEitherWay(body: NewWidget)"
+        client shouldContain
+            "body = HttpRequest.BodyPublishers.ofString(newWidgetCodec.encodeToString(body)), " +
+            "contentType = \"application/json\""
+    }
+
+    @Test
     fun `multipart parts are parameters, and the file part is the type a handler receives`() {
-        client shouldContain "fun importWidgets(label: String, attachment: UploadedFile)"
+        client shouldContain "fun importWidgets(label: String, thumbnail: UploadedFile, attachment: UploadedFile)"
+        // Written in the order the server reads them, so a buffered part goes
+        // out before the streamed one the reader stops at.
         client shouldContain
             """multipart = multipart(fields = listOf("label" to label), """ +
-            """files = listOf("attachment" to attachment))"""
+            """files = listOf("thumbnail" to thumbnail, "attachment" to attachment))"""
     }
 
     // ------------------------------------------------------------ responses

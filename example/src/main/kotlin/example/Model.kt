@@ -67,6 +67,8 @@ data class ImportResult(
     val lines: Int,
     /** Null when the caller sent no session cookie, which most callers will not. */
     val session: String?,
+    /** What the manifest part said the file would contain. Read in memory; see `importManifest`. */
+    val manifest: String,
 )
 
 /** Stand-in for a database. */

@@ -5,6 +5,7 @@ import dev.pelican.ApiError
 import dev.pelican.In2
 import dev.pelican.In3
 import dev.pelican.In4
+import dev.pelican.In5
 import dev.pelican.Outcome
 import dev.pelican.Params
 import dev.pelican.UploadedFile
@@ -281,15 +282,16 @@ abstract class ClientContractTest {
     fun `a multipart upload arrives with its text part, its file and its cookie`() {
         val result = app.call(
             importOrders,
-            In4(
+            In5(
                 1L,
                 "s-42",
                 "March",
+                UploadedFile("manifest.csv", "text/csv", ByteArrayInputStream("2 orders".toByteArray())),
                 UploadedFile("orders.csv", "text/csv", ByteArrayInputStream("1,anvil\n2,rope\n".toByteArray())),
             ),
         )
 
-        result shouldBe ImportResult("March", "orders.csv", 2, "s-42")
+        result shouldBe ImportResult("March", "orders.csv", 2, "s-42", "2 orders")
     }
 
     @Test
@@ -297,7 +299,13 @@ abstract class ClientContractTest {
         val res = app.transport.send(
             app.request(
                 importOrders,
-                In4(1L, "s-42", "March", UploadedFile("a.csv", "text/csv", ByteArrayInputStream("x\n".toByteArray()))),
+                In5(
+                    1L,
+                    "s-42",
+                    "March",
+                    UploadedFile("m.csv", "text/csv", ByteArrayInputStream("one".toByteArray())),
+                    UploadedFile("a.csv", "text/csv", ByteArrayInputStream("x\n".toByteArray())),
+                ),
             ).withoutHeader("Cookie"),
         )
 

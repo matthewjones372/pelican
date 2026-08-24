@@ -169,9 +169,10 @@ class MultipartContent internal constructor(
  * is read from wherever it lives at the speed the socket drains — the same
  * promise the server makes when it hands a file part to a handler unread.
  *
- * Text parts are written first whatever order the endpoint declared them in,
- * because a server stops reading at the file part: nothing buffers an upload in
- * order to go back for a field that followed it.
+ * The parts arrive here already in the order a server reads them — everything
+ * it reads as it arrives, and then the streamed part it stops at — because that
+ * order is a property of the description and the generator reads it off there.
+ * Nothing goes back for a field that followed the streamed part.
  *
  * The boundary is random per call rather than fixed. Streaming means the
  * content cannot be scanned for a clash beforehand, so the answer is a

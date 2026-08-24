@@ -92,6 +92,17 @@ internal sealed class IrBody {
     class Form(val schema: JsonObj, override val description: String?) : IrBody()
     class Multipart(val parts: List<IrPart>, override val description: String?) : IrBody()
     class Raw(override val description: String?) : IrBody()
+
+    /**
+     * One payload, offered under several media types. [encodings] are in the
+     * document's own order, since that is what decides which one a generated
+     * client sends.
+     */
+    class Negotiated(
+        val schema: JsonObj,
+        val encodings: List<String>,
+        override val description: String?,
+    ) : IrBody()
 }
 
 internal sealed class IrPart {
@@ -111,6 +122,8 @@ internal sealed class IrPart {
         val contentType: String?,
         override val required: Boolean,
         override val description: String?,
+        /** Null for the one part that is streamed; otherwise the bytes it is read with. */
+        val bufferedBytes: Long? = null,
     ) : IrPart()
 }
 
@@ -250,6 +263,7 @@ internal fun IrEndpoint.schemas(): List<JsonObj> = buildList {
     when (val declared = body) {
         is IrBody.Json -> add(declared.schema)
         is IrBody.Form -> add(declared.schema)
+        is IrBody.Negotiated -> add(declared.schema)
         is IrBody.Multipart -> declared.parts.filterIsInstance<IrPart.Text>().forEach { add(it.schema) }
         is IrBody.Raw, null -> Unit
     }

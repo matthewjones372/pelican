@@ -1,6 +1,7 @@
 package example.backends
 
 import dev.pelican.In2
+import dev.pelican.In3
 import dev.pelican.UploadedFile
 import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.test.ApiClient
@@ -134,6 +135,65 @@ class CookiesFormsAndUploadsTest {
         res.body shouldBe """{"user":"ada","remember":true,"visits":1}"""
     }
 
+    // ----------------------------------------------- the same body, two ways
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `the same payload is read from JSON as well as from the form`(name: String, client: ApiClient) {
+        // `credentials` is `formBody<SignIn>() or jsonBody<SignIn>()`: one
+        // payload, two encodings. The typed call is identical either way —
+        // what changes is the Content-Type the client puts on it.
+        val posted = SignIn("ada", remember = true, visits = 3)
+
+        client.call(signIn, posted) shouldBe Session("ada", remember = true, visits = 3)
+        client.sending("application/json").call(signIn, posted) shouldBe
+            Session("ada", remember = true, visits = 3)
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `each declared encoding really is sent as itself`(name: String, client: ApiClient) {
+        // Not just that both work: that the two requests differ on the wire in
+        // the one way they are supposed to.
+        val posted = SignIn("ada", remember = true, visits = 3)
+
+        client.request(signIn, posted).body shouldBe "user=ada&remember=true&visits=3"
+        client.sending("application/json").request(signIn, posted).body shouldBe
+            """{"user":"ada","remember":true,"visits":3}"""
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a media type the endpoint never declared is a 415 naming the ones it did`(
+        name: String,
+        client: ApiClient,
+    ) {
+        val res = client.transport.send(
+            client.request(signIn, SignIn("ada", remember = true, visits = 3))
+                .withHeader("Content-Type", "application/xml")
+                .withBody("<signIn/>"),
+        ).shouldHaveStatus(415)
+
+        res.body shouldContain "application/json"
+        res.body shouldContain "application/x-www-form-urlencoded"
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a body with one encoding is still read whatever the Content-Type says`(
+        name: String,
+        client: ApiClient,
+    ) {
+        // `echo` takes a plain `jsonBody<Note>()`. With nothing to choose
+        // between, the header carries no information the server needs, and a
+        // 415 here would refuse callers that have always been served.
+        val res = client.transport.send(
+            client.request(echo, In2("t-1", Note("hi"))).withHeader("Content-Type", "text/plain"),
+        )
+
+        res.status shouldBe 200
+    }
+
     // ------------------------------------------------------------ multipart
 
     @ParameterizedTest(name = "{0}")
@@ -144,10 +204,14 @@ class CookiesFormsAndUploadsTest {
     ) {
         val uploaded = client.call(
             uploadFile,
-            In2("The notes", file("notes.txt", "text/plain", "line one\nline two")),
+            In3(
+                "The notes",
+                file("about.txt", "text/plain", "a poem"),
+                file("notes.txt", "text/plain", "line one\nline two"),
+            ),
         )
 
-        uploaded shouldBe Uploaded("The notes", "notes.txt", "text/plain", "line one\nline two")
+        uploaded shouldBe Uploaded("The notes", "notes.txt", "text/plain", "line one\nline two", "a poem")
     }
 
     @ParameterizedTest(name = "{0}")
@@ -160,9 +224,34 @@ class CookiesFormsAndUploadsTest {
         // is a 413. This upload is bigger, and is not — the limit is about
         // what the server holds in memory, and a streamed part is not that.
         val content = "x".repeat(10_000)
-        val uploaded = client.call(uploadFile, In2("Big", file("big.txt", "text/plain", content)))
+        val uploaded = client.call(
+            uploadFile,
+            In3("Big", file("about.txt", "text/plain", "small"), file("big.txt", "text/plain", content)),
+        )
 
         uploaded.content.length shouldBe 10_000
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a buffered part over its declared bound is a 413 naming the part`(name: String, client: ApiClient) {
+        // `notes` is declared `bufferedFile("notes", maxBytes = 512)`. The
+        // streamed part after it may be any size at all — the test above sends
+        // ten kilobytes through it — so this is the bound doing the one thing
+        // it exists to do: bounding what the server holds.
+        val res = client.transport.send(
+            client.request(
+                uploadFile,
+                In3(
+                    "Too much",
+                    file("about.txt", "text/plain", "x".repeat(600)),
+                    file("a.txt", "text/plain", "hi"),
+                ),
+            ),
+        ).shouldHaveStatus(413)
+
+        res.body shouldContain "notes"
+        res.body shouldContain "512"
     }
 
     @ParameterizedTest(name = "{0}")
@@ -179,7 +268,7 @@ class CookiesFormsAndUploadsTest {
         ).joinToString("") { "--$boundary\r\n$it\r\n" } + "--$boundary--\r\n"
 
         val res = client.transport.send(
-            client.request(uploadFile, In2("Ignored", file("a.txt", "text/plain", "hello")))
+            client.request(uploadFile, In3("Ignored", small(), file("a.txt", "text/plain", "hello")))
                 .withHeader("Content-Type", "multipart/form-data; boundary=$boundary")
                 .withBody(body),
         ).shouldHaveStatus(400)
@@ -195,7 +284,7 @@ class CookiesFormsAndUploadsTest {
         client: ApiClient,
     ) {
         val res = client.transport.send(
-            client.request(uploadFile, In2("", file("a.txt", "text/plain", "hello"))),
+            client.request(uploadFile, In3("", small(), file("a.txt", "text/plain", "hello"))),
         ).shouldHaveStatus(400)
 
         res.body shouldContain "caption"
@@ -205,7 +294,7 @@ class CookiesFormsAndUploadsTest {
     @MethodSource("backends")
     fun `a body that is not multipart at all is a 400 rather than a 500`(name: String, client: ApiClient) {
         val res = client.transport.send(
-            client.request(uploadFile, In2("x", file("a.txt", "text/plain", "hello")))
+            client.request(uploadFile, In3("x", small(), file("a.txt", "text/plain", "hello")))
                 .withHeader("Content-Type", "application/json")
                 .withBody("""{"caption":"x"}"""),
         ).shouldHaveStatus(400)
@@ -220,17 +309,24 @@ class CookiesFormsAndUploadsTest {
      * description, and this one says they match each other.
      */
     @Test
-    fun `all three read a cookie, a form and an upload identically`() {
+    fun `all three read a cookie, a form, a JSON body and a two-file upload identically`() {
         fun answers(question: (ApiClient) -> String): Set<String> =
             clients.values.map(question).toSet()
 
         answers { it.transport.send(it.request(preferences, In2("de", "s1"))).body }.size shouldBe 1
         answers { it.transport.send(it.request(signIn, SignIn("ada", true, 2))).body }.size shouldBe 1
         answers {
-            it.transport.send(it.request(uploadFile, In2("c", file("a.txt", "text/plain", "hi")))).body
+            val json = it.sending("application/json")
+            json.transport.send(json.request(signIn, SignIn("ada", true, 2))).body
+        }.size shouldBe 1
+        answers {
+            it.transport.send(it.request(uploadFile, In3("c", small(), file("a.txt", "text/plain", "hi")))).body
         }.size shouldBe 1
     }
 
     private fun file(filename: String, contentType: String, content: String) =
         UploadedFile(filename, contentType, ByteArrayInputStream(content.toByteArray()))
+
+    /** The buffered part, where what it carries is not what the test is about. */
+    private fun small() = file("about.txt", "text/plain", "a note")
 }
