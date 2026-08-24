@@ -106,33 +106,29 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-> [!NOTE]
-> Pre-release. Nothing is published to Maven Central or the Gradle Plugin Portal
-> yet, so today you install locally — one command, and both work as normal
-> dependencies afterwards.
-
-Not on Maven Central yet. `./gradlew publishToMavenLocal` installs all sixteen
-modules at `dev.pelican:<module>:0.1.0-SNAPSHOT` with sources and javadoc, so
-`mavenLocal()` or `includeBuild` both work today. The Gradle plugin is a build
-of its own and installs the same way:
-`./gradlew -p pelican-gradle-plugin publishToMavenLocal`.
+All sixteen modules are on Maven Central under `io.github.matthewjones372`,
+with sources and an empty javadoc jar — the coordinate is the group the
+namespace is verified against; the Kotlin packages are `io.github.matthewjones372.pelican`.
 
 ```kotlin
 dependencies {
-    implementation("dev.pelican:pelican-core:0.1.0-SNAPSHOT")
-    implementation("dev.pelican:pelican-pekko:0.1.0-SNAPSHOT")
-    implementation("dev.pelican:pelican-jackson:0.1.0-SNAPSHOT")
-    testImplementation("dev.pelican:pelican-test:0.1.0-SNAPSHOT")
+    implementation("io.github.matthewjones372:pelican-core:0.1.0")
+    implementation("io.github.matthewjones372:pelican-pekko:0.1.0")
+    implementation("io.github.matthewjones372:pelican-jackson:0.1.0")
+    testImplementation("io.github.matthewjones372:pelican-test:0.1.0")
 }
 ```
 
-The plugin is `dev.pelican`, and it is not on the Gradle Plugin Portal yet
-either — so until it is, tell the build where to find it:
+The Gradle plugin is `io.github.matthewjones372.pelican`, on the Gradle Plugin
+Portal, so `plugins { }` resolves it with no `pluginManagement` block:
 
 ```kotlin
-// settings.gradle.kts
-pluginManagement { repositories { mavenLocal(); gradlePluginPortal() } }
+plugins { id("io.github.matthewjones372.pelican") version "0.1.0" }
 ```
+
+To build against unreleased changes instead, `./gradlew publishToMavenLocal`
+installs the modules and `./gradlew -p pelican-gradle-plugin publishToMavenLocal`
+the plugin; `mavenLocal()` or `includeBuild` both work.
 
 ## Your first endpoint
 
@@ -589,7 +585,7 @@ covered before it is bound, with no second list to keep up to date.
 ```
 
 ```
-ERROR dev.pelican.pekko - Unhandled failure in POST /reports [ref f3ef2bdef43b]
+ERROR io.github.matthewjones372.pelican.pekko - Unhandled failure in POST /reports [ref f3ef2bdef43b]
 java.sql.SQLException: connection to db-primary.internal:5432 refused
   ...
 ```

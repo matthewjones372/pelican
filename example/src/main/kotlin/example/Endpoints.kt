@@ -1,9 +1,9 @@
 package example
 
-import dev.pelican.*
+import io.github.matthewjones372.pelican.*
 
 /*
- * This file imports dev.pelican only. No Pekko, no HTTP library, no OpenAPI.
+ * This file imports io.github.matthewjones372.pelican only. No Pekko, no HTTP library, no OpenAPI.
  * It is the single source of truth that both the server interpreter and the
  * documentation generator read.
  */

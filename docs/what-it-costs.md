@@ -45,7 +45,7 @@ streams actually turn: `toStrict` materialises. A POST with a JSON body costs
 than the routing above — and the interpreter is about a microsecond *under* a
 hand-written `extractStrictEntity`, because it asks Pekko for the cheaper of
 two reads when the request declared its length. See
-[`ChunkedBodyLimitTest`](../pelican-pekko/src/test/kotlin/dev/pelican/pekko/ChunkedBodyLimitTest.kt)
+[`ChunkedBodyLimitTest`](../pelican-pekko/src/test/kotlin/io/github/matthewjones372/pelican/pekko/ChunkedBodyLimitTest.kt)
 for why the other read still exists.
 
 For scale: a loopback socket round trip is tens of microseconds and a database

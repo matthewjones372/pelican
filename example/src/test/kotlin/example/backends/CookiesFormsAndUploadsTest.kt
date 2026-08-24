@@ -1,12 +1,12 @@
 package example.backends
 
-import dev.pelican.In2
-import dev.pelican.In3
-import dev.pelican.UploadedFile
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.test.ApiClient
-import dev.pelican.test.apiClient
-import dev.pelican.test.shouldHaveStatus
+import io.github.matthewjones372.pelican.In2
+import io.github.matthewjones372.pelican.In3
+import io.github.matthewjones372.pelican.UploadedFile
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.test.ApiClient
+import io.github.matthewjones372.pelican.test.apiClient
+import io.github.matthewjones372.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain

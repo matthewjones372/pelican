@@ -26,7 +26,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
 | `pelican-test-http4k` | test, http4k | the in-memory transport, on http4k |
-| `pelican-gradle-plugin` | **nothing** | the `dev.pelican` Gradle plugin: every generator above, as tasks |
+| `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
 | `example` | core, openapi, jackson, all three backends | the orders, bookmarks, greetings and secured services |
 
 The layering is load-bearing, not decorative, and each edge is a test:
@@ -287,7 +287,7 @@ Three ways, all reading the same descriptions.
 
 ```kotlin
 // the whole build script
-plugins { id("dev.pelican") }
+plugins { id("io.github.matthewjones372.pelican") }
 
 pelican {
     documents {
@@ -317,8 +317,8 @@ spec.openApi()          // JsonObj — core's own tree, if you want to post-proc
 **Served by the running app** — opt in with `pelican-pekko-docs`:
 
 ```kotlin
-import dev.pelican.pekko.docs.Docs
-import dev.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 
 ordersApi().start(port = 8080)              // endpoints only; no OpenAPI code on the classpath
 ordersApi().startWithDocs(port = 8080)      // plus /openapi.json and /docs
@@ -605,7 +605,7 @@ The document and the client are both readings of the same values, and both are
 build tasks:
 
 ```kotlin
-plugins { id("dev.pelican") version "0.1.0-SNAPSHOT" }
+plugins { id("io.github.matthewjones372.pelican") version "0.1.0" }
 
 pelican {
     documents {
@@ -698,7 +698,7 @@ importer:
 
 ```kotlin
 val pelicanImport: Configuration by configurations.creating
-dependencies { pelicanImport("dev.pelican:pelican-import:0.1.0-SNAPSHOT") }
+dependencies { pelicanImport("io.github.matthewjones372:pelican-import:0.1.0") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
@@ -1789,7 +1789,7 @@ Now:
 ```
 
 ```
-ERROR dev.pelican.pekko - Unhandled failure in POST /reports [ref f3ef2bdef43b]
+ERROR io.github.matthewjones372.pelican.pekko - Unhandled failure in POST /reports [ref f3ef2bdef43b]
 java.sql.SQLException: connection to db-primary.internal:5432 refused
 ```
 

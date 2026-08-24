@@ -1,7 +1,7 @@
 package example
 
-import dev.pelican.ApiSpec
-import dev.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.ApiSpec
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 
 /**
  * The spec, as a value. Note what this file does not import: no server, no

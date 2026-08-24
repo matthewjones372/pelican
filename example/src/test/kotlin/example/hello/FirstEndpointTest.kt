@@ -1,7 +1,7 @@
 package example.hello
 
-import dev.pelican.test.pekko.inMemory
-import dev.pelican.test.shouldBuild
+import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 

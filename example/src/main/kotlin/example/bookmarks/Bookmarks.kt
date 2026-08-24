@@ -1,11 +1,11 @@
 package example.bookmarks
 
-import dev.pelican.*
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.openapi.openApiJson
-import dev.pelican.pekko.*
-import dev.pelican.pekko.docs.Docs
-import dev.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.openApiJson
+import io.github.matthewjones372.pelican.pekko.*
+import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import org.apache.pekko.stream.javadsl.Source
 
 // ============================================================ 1. the models
@@ -80,7 +80,7 @@ val badKey = errorJson<ApiError>(401, "Missing or bad API key")
 
 // ========================================================= 3. the endpoints
 //
-// This section imports `dev.pelican` and nothing else — no Pekko, no Jackson.
+// This section imports `io.github.matthewjones372.pelican` and nothing else — no Pekko, no Jackson.
 // These are descriptions; they do no work and hold no handler.
 
 val getBookmark = endpoint(bookmarkId) {

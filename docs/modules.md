@@ -16,7 +16,7 @@ rather than convention.
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
-| `pelican-gradle-plugin` | **nothing** | `dev.pelican`: every generator, as Gradle tasks |
+| `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-pekko` / `-http4k` | test + that backend | the in-memory transport |
 

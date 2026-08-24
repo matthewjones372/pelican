@@ -67,7 +67,7 @@ style:
     # a lint rule.
     active: false
   WildcardImport:
-    # See .editorconfig: `import dev.pelican.*` is the point of the core
+    # See .editorconfig: `import io.github.matthewjones372.pelican.*` is the point of the core
     # module's vocabulary, and the example sources are written to read that way.
     active: false
   MagicNumber:

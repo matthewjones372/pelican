@@ -1,22 +1,5 @@
 package example.http4k
 
-import dev.pelican.Api
-import dev.pelican.ApiError
-import dev.pelican.ServerEndpoint
-import dev.pelican.http4k.bytesNow
-import dev.pelican.http4k.docs.Docs
-import dev.pelican.http4k.docs.startWithDocs
-import dev.pelican.http4k.handledNow
-import dev.pelican.http4k.handledOneOf
-import dev.pelican.http4k.handledOrFail
-import dev.pelican.http4k.handledWith
-import dev.pelican.http4k.streamedNow
-import dev.pelican.http4k.streamedOrFail
-import dev.pelican.http4k.toStream
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.of
-import dev.pelican.ok
-import dev.pelican.unauthorized
 import example.ImportResult
 import example.Queued
 import example.Store
@@ -41,12 +24,29 @@ import example.statusFilter
 import example.streamOrders
 import example.submitOrder
 import example.watchOrders
+import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.http4k.bytesNow
+import io.github.matthewjones372.pelican.http4k.docs.Docs
+import io.github.matthewjones372.pelican.http4k.docs.startWithDocs
+import io.github.matthewjones372.pelican.http4k.handledNow
+import io.github.matthewjones372.pelican.http4k.handledOneOf
+import io.github.matthewjones372.pelican.http4k.handledOrFail
+import io.github.matthewjones372.pelican.http4k.handledWith
+import io.github.matthewjones372.pelican.http4k.streamedNow
+import io.github.matthewjones372.pelican.http4k.streamedOrFail
+import io.github.matthewjones372.pelican.http4k.toStream
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.of
+import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.pelican.unauthorized
 
 /**
  * The same service, on the other backend.
  *
  * Every endpoint here is the identical value from `Endpoints.kt` — the file
- * that imports `dev.pelican` and nothing else. Nothing about the descriptions
+ * that imports `io.github.matthewjones372.pelican` and nothing else. Nothing about the descriptions
  * knows which server will interpret them, so the whole difference between
  * serving this on Pekko and serving it on http4k is this file and
  * `OrdersApi.kt`: the handlers, and the type a streaming handler returns.

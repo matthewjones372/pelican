@@ -13,10 +13,10 @@ package example.generated
 
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
-import dev.pelican.BodyCodec
-import dev.pelican.Codecs
-import dev.pelican.UploadedFile
-import dev.pelican.formCodec
+import io.github.matthewjones372.pelican.BodyCodec
+import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.UploadedFile
+import io.github.matthewjones372.pelican.formCodec
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.InputStream

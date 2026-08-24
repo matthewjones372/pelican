@@ -1,12 +1,12 @@
 package example.backends
 
-import dev.pelican.Api
-import dev.pelican.ServerEndpoint
-import dev.pelican.http4k.handledNow
-import dev.pelican.http4k.handledOneOf
-import dev.pelican.http4k.handledOrFail
-import dev.pelican.http4k.start
-import dev.pelican.http4k.streamedNow
+import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.http4k.handledNow
+import io.github.matthewjones372.pelican.http4k.handledOneOf
+import io.github.matthewjones372.pelican.http4k.handledOrFail
+import io.github.matthewjones372.pelican.http4k.start
+import io.github.matthewjones372.pelican.http4k.streamedNow
 
 /**
  * The http4k binding of the same [greetingEndpoints].

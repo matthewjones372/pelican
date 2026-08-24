@@ -1,14 +1,14 @@
 package example
 
-import dev.pelican.Api
-import dev.pelican.ApiError
-import dev.pelican.ServerEndpoint
-import dev.pelican.jackson.JacksonCodecs
-import dev.pelican.of
-import dev.pelican.ok
-import dev.pelican.pekko.*
-import dev.pelican.pekko.docs.Docs
-import dev.pelican.unauthorized
+import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.of
+import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.pelican.pekko.*
+import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.unauthorized
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.javadsl.Source
 import java.time.Duration

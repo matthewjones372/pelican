@@ -1,14 +1,14 @@
 package example.backends
 
-import dev.pelican.Api
-import dev.pelican.Endpoint
-import dev.pelican.Filter
-import dev.pelican.ServerEndpoint
-import dev.pelican.attribute
-import dev.pelican.before
-import dev.pelican.cors
-import dev.pelican.forbidden
-import dev.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.attribute
+import io.github.matthewjones372.pelican.before
+import io.github.matthewjones372.pelican.cors
+import io.github.matthewjones372.pelican.forbidden
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 
 /**
  * Everything about this service that is not a handler.

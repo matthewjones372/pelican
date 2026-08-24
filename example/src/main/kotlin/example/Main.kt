@@ -1,6 +1,6 @@
 package example
 
-import dev.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 
 fun main(args: Array<String>) {
     // `./gradlew :example:run --args=8081` when 8080 is taken.
