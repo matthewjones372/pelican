@@ -62,6 +62,22 @@ class Endpoint<I, R> internal constructor(
      * token.
      */
     val security: List<SecurityRequirement>?,
+
+    /**
+     * Where this one operation is served from, when that is not where the rest
+     * of the API is — an upload host, a read replica, a service being moved
+     * one route at a time. Empty means the API's own [ApiSpec.servers], which
+     * is what almost every endpoint says.
+     *
+     * Routing ignores it entirely, and has to: a server serves what it serves,
+     * and a description that could redirect a route would be a description
+     * that decides where requests land. What reads it is the document, which
+     * publishes `servers` on the operation, and a generated client, which sends
+     * that operation's calls there instead of to its own base URL. Same list
+     * as [ApiSpec.servers], first entry first, for the same reason: a client
+     * has to pick one, and the document's order is the document's answer.
+     */
+    val servers: List<String>,
 ) {
     override fun toString() = "$method ${pathSpec.template}"
 }
@@ -91,6 +107,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     internal val tagList = mutableListOf<String>()
     internal val errors = mutableListOf<ErrorSpec>()
     internal val responseHeaders = mutableListOf<ResponseHeader<*>>()
+    internal val serverUrls = mutableListOf<String>()
 
     /** The typed failures declared here, so [orFail] does not document them twice. */
     @PublishedApi
@@ -140,6 +157,42 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun route(m: Method, p: PathSpec) {
         method = m
         pathSpec = p
+    }
+
+    // ------------------------------------------------------------ where it is served
+
+    /**
+     * Says this operation is served from somewhere other than the rest of the
+     * API:
+     *
+     * ```
+     * val uploadOrders = endpoint(userId, importFile) {
+     *     post("users" / userId / "orders" / "import")
+     *     servers("https://uploads.example.com")
+     *     json<ImportResult>(status = 201)
+     * }
+     * ```
+     *
+     * Documentation, and a client's problem. Nothing about routing changes:
+     * this server answers the paths it is given, and an endpoint that could
+     * move a route to another host would be a description deciding where a
+     * request lands. What honours it is [ApiSpec.openApi], which publishes
+     * `servers` on the operation, and a generated client, which sends this
+     * operation there rather than to its own base URL.
+     *
+     * Several are allowed because OpenAPI allows them and a document is worth
+     * republishing as it was read. A client takes the first, as it does with
+     * the API's own list.
+     */
+    fun servers(vararg urls: String) {
+        urls.forEach { url ->
+            require(url.isNotBlank()) {
+                "A server URL is where calls to this endpoint go, so it has to be one: " +
+                    "servers(\"https://uploads.example.com\"). Leave the call out for an endpoint served " +
+                    "where the rest of the API is."
+            }
+        }
+        serverUrls += urls
     }
 
     // ------------------------------------------------------------ inputs
@@ -485,6 +538,7 @@ private fun <I, R> build(inputs: Inputs<I>, b: EndpointBuilder, out: Output<R>):
         deprecated = b.deprecated,
         hidden = b.hidden,
         security = b.securityRequirements?.toList(),
+        servers = b.serverUrls.toList(),
     ).also(::validate)
 }
 

@@ -747,6 +747,12 @@ as properties, typed from the schema the document publishes — nullable, becaus
 this is the reading end and a client that threw over a header would have thrown
 away the failure it was handed.
 
+An operation the document says is served somewhere else — an upload host, a
+read replica — is called there. `servers("https://uploads.example.com")` on an
+endpoint reaches the document and the generated method, which sends that one
+call to that host whatever base URL the client was given. Routing ignores it
+entirely: a server serves what it serves, and no description moves a request.
+
 The generated file needs `pelican-core`, which has no dependencies of its own,
 and a `Codecs` chosen by the caller. Transport is the JDK's `HttpClient`. The
 example checks its generated client into the repo and runs the suite against a

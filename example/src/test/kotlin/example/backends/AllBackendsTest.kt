@@ -23,6 +23,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterAll
@@ -374,6 +375,39 @@ class AllBackendsTest {
         withClue("Retry-After leaked onto the success response") {
             responses["200"]!!.jsonObject["headers"]!!.jsonObject.keys shouldBe setOf("X-Request-Id")
         }
+    }
+
+    // --------------------------------------------------- served from elsewhere
+
+    /**
+     * `uploadFile` says it is served from an upload host, and every backend
+     * serves it here anyway.
+     *
+     * That is the claim worth testing on all three at once, because it is the
+     * one a future change could quietly break: a description that could move a
+     * route to another host would be a description deciding where a request
+     * lands. The document publishes the URL and a generated client calls it;
+     * the router does not read it, and this suite would go red on every backend
+     * the day one started to.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `an endpoint served from elsewhere is still routed here`(name: String, client: ApiClient) {
+        val file = UploadedFile("big.txt", "text/plain", ByteArrayInputStream("hello".toByteArray()))
+        val request = client.request(uploadFile, In2("Big", file))
+
+        // No host on the request: the transport is what decides where it goes.
+        request shouldBuild "POST /upload"
+        client.transport.send(request).status shouldBe 200
+    }
+
+    @Test
+    fun `and the document says where it is served, on the operation`() {
+        val operation = Json.parseToJsonElement(pekkoApi().spec().openApiJson())
+            .jsonObject["paths"]!!.jsonObject["/upload"]!!.jsonObject["post"]!!.jsonObject
+
+        operation["servers"]!!.jsonArray.map { it.jsonObject["url"]!!.jsonPrimitive.content } shouldBe
+            listOf("https://uploads.example.com")
     }
 
     // ------------------------------------------------------------- and together

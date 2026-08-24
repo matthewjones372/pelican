@@ -463,6 +463,7 @@ class OrdersClient(
     private val headers: () -> Map<String, String> = { emptyMap() },
 ) {
 
+    /** Where this client's calls go, unless an operation named a server of its own. */
     private val base: String = baseUrl.trimEnd('/')
 
     init {
@@ -475,6 +476,10 @@ class OrdersClient(
     /**
      * Every call goes through here. An absent query parameter or header is left
      * off rather than sent empty, so the server applies its own default.
+     *
+     * [origin] is this client's own base URL, except for a method the document said
+     * is served somewhere else: those pass the host that operation's `servers`
+     * block named, since that is where the service answers it.
      */
     private fun request(
         method: String,
@@ -485,13 +490,14 @@ class OrdersClient(
         body: HttpRequest.BodyPublisher = HttpRequest.BodyPublishers.noBody(),
         contentType: String? = null,
         multipart: MultipartContent? = null,
+        origin: String = base,
     ): HttpRequest {
         val search = query
             .flatMap { (name, value) -> occurrences(value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
             .joinToString("&")
 
         val builder = HttpRequest
-            .newBuilder(URI.create(base + path + if (search.isEmpty()) "" else "?$search"))
+            .newBuilder(URI.create(origin + path + if (search.isEmpty()) "" else "?$search"))
             .timeout(timeout)
             .method(method, multipart?.publisher ?: body)
 

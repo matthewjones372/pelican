@@ -78,6 +78,8 @@ import kotlin.reflect.KType
  * @param clientName the class name; defaults to the title, e.g. `OrdersClient`.
  * @param baseUrl what the client points at when its caller does not say;
  *   defaults to the spec's first server. With neither, the caller must pass one.
+ *   An endpoint declaring its own `servers` is called there whatever this says —
+ *   that is the document naming the host that answers it, not a default.
  * @param includeHidden hidden endpoints are left out, as they are left out of
  *   the document. Generating an internal client is what this switch is for.
  * @param codec which JSON library the payload types are annotated for. It is
@@ -261,6 +263,21 @@ private class KotlinClientEmitter(
             appendLine("class $clientName(")
             appendLine(resource("client-constructor.kt").trimEnd())
             appendLine(") {")
+            appendLine()
+            appendLine(indent(resource("client-base.kt").trim(), "    "))
+
+            // Written between the base URL and the calls that use it, because
+            // an init block reading a property has to come after it. An empty
+            // base builds a relative URI, which the JDK's request builder
+            // refuses, so it is worth saying at construction rather than at the
+            // first call. Left out where every operation named a server of its
+            // own: there the client's base is never used, and demanding one
+            // would be demanding a URL in order to ignore it.
+            if (endpoints.any { it.servers.isEmpty() }) {
+                appendLine()
+                appendLine(indent(resource("client-base-check.kt").trim(), "    "))
+            }
+
             appendLine()
             appendLine(indent(resource("client-body.kt").trim(), "    "))
             if (codecs.isNotEmpty() || formCodecs.isNotEmpty()) {
@@ -539,6 +556,12 @@ private class KotlinClientEmitter(
         val arguments = buildList {
             add(kotlinString(ep.method.name))
             add(pathExpression(ep, pathNames))
+            // An operation the document said is served elsewhere is called
+            // there, not at this client's base URL. Baked in rather than
+            // offered as a parameter: it is what the description says, the same
+            // way the path is, and a caller who wants to point the whole client
+            // somewhere else has `baseUrl` for that.
+            operationOrigin(ep)?.let { add("origin = ${kotlinString(it)}") }
             if (queryPairs.isNotEmpty()) add("query = listOf(${queryPairs.joinToString(", ")})")
             if (headerPairs.isNotEmpty()) add("headerParams = listOf(${headerPairs.joinToString(", ")})")
             if (cookiePairs.isNotEmpty()) add("cookies = listOf(${cookiePairs.joinToString(", ")})")
@@ -564,6 +587,16 @@ private class KotlinClientEmitter(
             null -> name
             else -> "joined($name, ${kotlinString(separator.toString())})"
         }
+
+    /**
+     * Where this operation is served, where that is not where the API is.
+     *
+     * The first of its declared servers, trimmed as the constructor trims the
+     * one it is given: a client sends one request to one host, and the
+     * document's order is the document's answer to which.
+     */
+    private fun operationOrigin(ep: Endpoint<*, *>): String? =
+        ep.servers.firstOrNull()?.trimEnd('/')
 
     private fun pathExpression(ep: Endpoint<*, *>, names: Map<PathParam<*>, String>): String {
         val template = ep.pathSpec.segments.joinToString("/", "/") { segment ->
@@ -722,6 +755,10 @@ private class KotlinClientEmitter(
             ep.description?.takeIf { it != ep.summary }?.let { add(""); add(it) }
             add("")
             add("`${ep.method.name} ${ep.pathSpec.template}`")
+            // Said here because it is the surprise: every other method on this
+            // class goes to the base URL the caller passed, and this one does
+            // not, whatever they passed.
+            operationOrigin(ep)?.let { add("Served from $it, which this operation declares rather than the API.") }
             requirements(ep)?.let { add(it) }
             if (ep.deprecated) { add(""); add("@deprecated") }
         }

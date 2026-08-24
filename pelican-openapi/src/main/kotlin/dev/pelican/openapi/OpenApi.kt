@@ -63,9 +63,7 @@ fun ApiSpec.openApi(): JsonObj {
             "version" to version
             putIfNotNull("description", description)
         })
-        if (servers.isNotEmpty()) {
-            put("servers", jsonArr(servers.map { url -> jsonObj { "url" to url } }))
-        }
+        if (servers.isNotEmpty()) put("servers", serverList(servers))
         put("paths", JsonObj(paths.mapValues { (_, ops) -> JsonObj(ops.toMap()) }))
         if (security.isNotEmpty()) put("security", requirements(security))
         put("components", jsonObj {
@@ -78,6 +76,14 @@ fun ApiSpec.openApi(): JsonObj {
 }
 
 fun ApiSpec.openApiJson(): String = openApi().renderPretty()
+
+/**
+ * A `servers` list, which is the same value at the document level and on one
+ * operation — OpenAPI's Server Object either way. One function, so the two
+ * cannot come to disagree about what a server is written as.
+ */
+private fun serverList(urls: List<String>): JsonArr =
+    jsonArr(urls.map { url -> jsonObj { "url" to url } })
 
 /** Every declared input that travels outside the body, in the order a reader expects them. */
 private fun parameters(ep: Endpoint<*, *>): List<JsonValue> = buildList {
@@ -208,6 +214,12 @@ private fun operation(
     // Null inherits the document-wide requirement; an empty list is the
     // endpoint saying it is public, which OpenAPI spells as `security: []`.
     ep.security?.let { put("security", requirements(it)) }
+
+    // Where this one operation is served from, for the endpoint that is not
+    // served where the rest of the API is. Written in the same shape as the
+    // document's own list, from the same function, because a reader who has
+    // learnt one has learnt the other.
+    if (ep.servers.isNotEmpty()) put("servers", serverList(ep.servers))
 
     val params = parameters(ep)
     if (params.isNotEmpty()) put("parameters", jsonArr(params))

@@ -248,6 +248,9 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     /** The block's statements, in the order the DSL reads best in. */
     private fun body(ep: IrEndpoint, keys: List<String>): List<String> = buildList {
         add(route(ep))
+        // Under the route, because it qualifies it: this is the operation whose
+        // path is served somewhere other than the rest of the document.
+        if (ep.servers.isNotEmpty()) add("servers(${ep.servers.joinToString { kotlinString(it) }})")
         ep.summary?.let { add("summary = ${kotlinString(it)}") }
         ep.description?.let { add("description = ${kotlinString(it)}") }
         add("operationId = ${kotlinString(ep.operationId)}")

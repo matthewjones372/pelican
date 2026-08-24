@@ -124,18 +124,33 @@ internal class Reader(private val options: ImportOptions) {
         }
     }
 
-    private fun servers(): List<String> = document.arr("servers").mapIndexedNotNull { i, server ->
-        val obj = server as? JsonObj ?: return@mapIndexedNotNull null
-        val url = obj.str("url") ?: return@mapIndexedNotNull null
-        // A templated URL carries its own defaults, and the defaults are what
-        // the document says the server is when nobody chooses. Substituting
-        // them is reading the document, not guessing at it.
-        obj.obj("variables").entries().fold(url) { substituted, (name, variable) ->
-            val default = (variable as? JsonObj)?.str("default")
-                ?: throw ImportFailure("servers[$i] uses {$name}, which declares no default")
-            substituted.replace("{$name}", default)
+    private fun servers(): List<String> = serverUrls(document, "servers")
+
+    /**
+     * A `servers` list, wherever it sits: the document's, or one operation's.
+     *
+     * One reading for both, because they are the same list in the same shape —
+     * a second one would be somewhere for the two to come to disagree about
+     * what a templated URL means. [where] is what a failure calls it.
+     *
+     * A variable with no default fails the import outright rather than being
+     * recorded against the operation, wherever the list sits. It is a document
+     * that does not say what its own URL is, and leaving out the operation
+     * would not make the remaining ones any better described.
+     */
+    private fun serverUrls(node: JsonObj, where: String): List<String> =
+        node.arr("servers").mapIndexedNotNull { i, server ->
+            val obj = server as? JsonObj ?: return@mapIndexedNotNull null
+            val url = obj.str("url") ?: return@mapIndexedNotNull null
+            // A templated URL carries its own defaults, and the defaults are
+            // what the document says the server is when nobody chooses.
+            // Substituting them is reading the document, not guessing at it.
+            obj.obj("variables").entries().fold(url) { substituted, (name, variable) ->
+                val default = (variable as? JsonObj)?.str("default")
+                    ?: throw ImportFailure("$where[$i] uses {$name}, which declares no default")
+                substituted.replace("{$name}", default)
+            }
         }
-    }
 
     /**
      * The schemes something actually requires.
@@ -259,13 +274,6 @@ internal class Reader(private val options: ImportOptions) {
         if (node.obj("callbacks")?.fields?.isNotEmpty() == true) {
             unsupported(path / "callbacks", "This operation declares callbacks, which Pelican cannot describe.")
         }
-        if (node.arr("servers").isNotEmpty()) {
-            unsupported(
-                path / "servers",
-                "This operation is served from somewhere other than the rest of the document, and an " +
-                    "endpoint description carries no server of its own.",
-            )
-        }
 
         if (operation.method == "trace") {
             unsupported(path, "TRACE is not a method Pelican routes.")
@@ -283,6 +291,9 @@ internal class Reader(private val options: ImportOptions) {
             tags = node.strings("tags"),
             deprecated = node.bool("deprecated"),
             params = params,
+            // Named against the operation's own path, so "servers[0] uses
+            // {region}" is about this operation's list and not the document's.
+            servers = serverUrls(node, "${operation.label} servers"),
             body = Bodies(this, operation).read(),
             successes = responses.successes,
             failures = responses.failures,

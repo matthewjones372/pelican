@@ -40,6 +40,8 @@ internal class IrEndpoint(
     val tags: List<String>,
     val deprecated: Boolean,
     val params: List<IrParam>,
+    /** Where this operation is served, where the document says that is not where the API is. */
+    val servers: List<String>,
     val body: IrBody?,
     /** Every documented 2xx, in status order. The first is what a bare `ok(...)` means. */
     val successes: List<IrSuccess>,

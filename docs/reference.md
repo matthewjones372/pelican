@@ -379,6 +379,53 @@ api.startWithDocs(docs = Docs(
 An `Api` (handlers included) can hand back its description half with
 `api.spec()`, so a test can assert the served spec matches the generated file.
 
+### One operation served somewhere else
+
+OpenAPI lets an operation carry a `servers` block of its own, and it usually
+means what it says: uploads go to an upload host, reads go to a replica, one
+route has been moved and the rest have not. An endpoint can say it:
+
+```kotlin
+val importOrders = endpoint(userId, importFile) {
+    post("users" / userId / "orders" / "import")
+    servers("https://uploads.example.com")
+    json<ImportResult>(status = 201)
+}
+```
+
+**Routing ignores it, and has to.** A server serves what it serves; an endpoint
+able to move a route to another host would be a description deciding where a
+request lands, which is the one thing a description must not do. Binding this
+endpoint to a handler routes `/users/{userId}/orders/import` on the server you
+started, exactly as it would without the line. `AllBackendsTest` asserts that on
+all three backends.
+
+What honours it is the two readings that are about somewhere else:
+
+- **The document.** `pelican-openapi` publishes `servers` on the operation, in
+  the same Server Object shape as the document-level list, written by the same
+  function so the two cannot come to disagree. Swagger UI reads the innermost
+  one it finds, so this pins "Try it out" for that operation the way the section
+  above describes for the whole document — worth knowing before declaring one on
+  a service you browse locally.
+- **A generated client.** The method for that operation sends its call to that
+  URL instead of the client's own base — baked into the generated source, the
+  way the path is, and its KDoc says so. `OrdersClient(baseUrl = ...)` still
+  points every *other* method; this one was told where it is served. If every
+  operation in a spec names a server, the generated client stops requiring a
+  base URL at all, because nothing would read it.
+
+Several URLs are kept in the order the document gave them, since a document is
+worth republishing as it was read. A client takes the first, as it does with the
+API's own list.
+
+`pelican-test`'s `ApiClient` deliberately does *not* read it. A `RequestSpec` is
+a method, a path and a body and names no host: the in-memory transport has none,
+and a live transport is pointed at the one server the suite is asserting about.
+Following a per-operation URL would send one call in the suite to a host nothing
+is running. A generated client honours it because it calls a service somebody
+else runs; a test client calls the service under test.
+
 ## The Gradle plugin
 
 The document and the client are both readings of the same values, and both are
@@ -626,7 +673,7 @@ What it refuses, and what each one would have cost:
 | `deepObject`, or a `style` and an `explode` that contradict each other | `deepObject` spreads an object over several names, and the rest name a separator that the `explode` beside them makes meaningless |
 | A list constrained by `minItems`, `maxItems` or `uniqueItems` | A refinement narrows what one value decodes to and can say nothing about how many arrived, so the constraint would be republished and enforced by nobody |
 | Two file parts in a multipart body | The same rule `endpoint(...)` enforces at class-init: reading stops at the first file so it can be streamed |
-| An operation with its own `servers`, or `callbacks` | A description carries no server of its own, and a callback is the other direction again |
+| `callbacks` | A call the service makes back to the caller, which is the other direction again |
 | `webhooks` | Calls the service makes rather than answers. Nothing here describes those, and dropping them would generate a client missing half of what the document offers |
 | A `$ref` to another host | See below |
 
@@ -1071,7 +1118,9 @@ chosen:
   whole document.
 - **A templated server URL is substituted with its declared defaults.** That is
   reading the document rather than guessing at it — the default is what the
-  document says the server is when nobody chooses.
+  document says the server is when nobody chooses. The document's list and an
+  operation's own are read by the one function, so a `{region}` means the same
+  thing wherever it sits.
 - **A response with no `description` gets the status's reason phrase.** The
   field is required by the spec, and a missing one is not worth failing over.
 
@@ -2471,7 +2520,10 @@ named for its backend: `inMemory()` comes from `pelican-test-pekko` and
 and still gets the typed client.
 
 `ApiClient(HttpClientTransport(url), codecs)` points the same suite at a
-deployed service.
+deployed service — every call in it, including one whose endpoint declares a
+`servers` of its own. See
+[One operation served somewhere else](#one-operation-served-somewhere-else) for
+why the test client is the reading that ignores that.
 
 ### Pinning the URL
 

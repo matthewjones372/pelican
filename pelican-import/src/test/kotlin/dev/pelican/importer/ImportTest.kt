@@ -208,6 +208,37 @@ class ImportTest {
         bookmarks shouldContain """servers = listOf("https://bookmarks.example.com/v1")"""
     }
 
+    /**
+     * The refusal this replaced: an operation with its own `servers` was one
+     * "an endpoint description carries no server of its own". It carries one
+     * now — as documentation and as a client's instruction, never as a routing
+     * decision, since a server serves what it serves.
+     */
+    @Test
+    fun `an operation served from somewhere else says where`() {
+        val elsewhere = imported(
+            """
+            openapi: 3.1.0
+            info: { title: Test, version: "1.0.0" }
+            servers:
+              - url: https://orders.example.com
+            paths:
+              /orders/import:
+                post:
+                  operationId: importOrders
+                  servers:
+                    - url: https://uploads.{region}.example.com
+                      variables:
+                        region: { default: eu }
+                  responses:
+                    "204": { description: ok }
+            """,
+        )
+
+        elsewhere shouldContain """servers("https://uploads.eu.example.com")"""
+        elsewhere shouldContain """servers = listOf("https://orders.example.com"),"""
+    }
+
     @Test
     fun `the description a document gives an operation becomes the KDoc above it`() {
         bookmarks shouldContain "The id is the one the create call handed back."

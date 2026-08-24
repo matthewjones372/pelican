@@ -242,9 +242,20 @@ val signIn = endpoint(credentials) {
     json<Session>()
 }
 
-/** A multipart upload: one text part, one file part, streamed. */
+/**
+ * A multipart upload: one text part, one file part, streamed.
+ *
+ * Also the one endpoint here that says it is served from somewhere else, which
+ * is what an upload host usually is. That claim reaches the document and a
+ * generated client and stops there: all three servers below route and answer
+ * this path exactly as they do the rest, because a server serves what it
+ * serves and no description moves a request. Nothing is actually running at
+ * `uploads.example.com` — the URL is here to be read, and `AllBackendsTest`
+ * asserts that it changes nothing about the serving.
+ */
 val uploadFile = endpoint(caption, upload) {
     post("upload")
+    servers("https://uploads.example.com")
     summary = "Upload a file with a caption"
     operationId = "uploadFile"
     tag("greetings")

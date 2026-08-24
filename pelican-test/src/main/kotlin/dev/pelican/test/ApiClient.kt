@@ -46,7 +46,19 @@ class ApiClient(
     val codecs: Codecs,
 ) : AutoCloseable {
 
-    /** Builds the request an endpoint call would send, without sending it. */
+    /**
+     * Builds the request an endpoint call would send, without sending it.
+     *
+     * An endpoint's own `servers` is deliberately not read here. A
+     * [RequestSpec] is a method, a path and a body — it names no host, because
+     * the transport is what decides where it goes: an in-memory route table has
+     * no host at all, and a live transport is pointed at the one server the
+     * suite is asserting about. Honouring a per-operation URL would mean this
+     * client leaving that server mid-suite for a host nothing here is running,
+     * which is a worse answer than ignoring a field that is documentation. A
+     * generated client honours it, because a client calling somebody else's
+     * service is the reading that has to.
+     */
     fun <I> request(endpoint: Endpoint<I, *>, input: I): RequestSpec {
         val values = endpoint.inputs.inject(input)
 
