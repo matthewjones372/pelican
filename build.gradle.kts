@@ -81,7 +81,12 @@ kover {
 }
 
 dependencies {
-    subprojects.forEach { kover(project(it.path)) }
+    // Every module but `benchmarks`. Its classes are run by JMH in a forked
+    // JVM, never by a test, so they would arrive here as several hundred lines
+    // that no test covers and pull the total down — a coverage floor that
+    // falls because a benchmark was written is measuring the wrong thing.
+    // See benchmarks/build.gradle.kts for why the agent stays off it entirely.
+    subprojects.filter { it.name != "benchmarks" }.forEach { kover(project(it.path)) }
 }
 
 // A floor nobody runs is not a floor: `./gradlew build` checks it.
@@ -94,10 +99,11 @@ tasks.named("check") {
 }
 
 /**
- * Every module but the example is published. The example is a runnable service
- * and a test suite; nobody should be able to depend on it by accident.
+ * Every module but the example and the benchmarks is published. The example is
+ * a runnable service and a test suite, and the benchmarks are a JMH harness;
+ * nobody should be able to depend on either by accident.
  */
-val publishedModules = subprojects.map { it.name } - "example"
+val publishedModules = subprojects.map { it.name } - setOf("example", "benchmarks")
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")

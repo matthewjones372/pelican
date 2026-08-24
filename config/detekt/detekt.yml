@@ -173,7 +173,11 @@ coroutines:
 
 potential-bugs:
   ImplicitDefaultLocale:
-    # The benchmarks format their numbers for whoever is reading the console
-    # they were run in, which is exactly what the default locale is. Nothing
-    # there is parsed again or written to a file.
+    # Test fixtures that upper-case an ASCII name to spell a file name. No
+    # locale any of these tests runs in changes that answer, and naming one
+    # would be ceremony.
+    #
+    # This line was written for the benchmarks, which used to be tests here and
+    # formatted their own numbers with `"%8.0f".format(...)`. They are a JMH
+    # harness now and format nothing.
     excludes: ['**/test/**']
