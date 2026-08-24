@@ -27,6 +27,9 @@ import kotlin.reflect.full.primaryConstructor
  */
 internal class KotlinAwareModelResolver(mapper: ObjectMapper) : ModelResolver(mapper) {
 
+    /** Component name -> the class swagger-core described under it. See [remember]. */
+    val described = LinkedHashMap<String, KClass<*>>()
+
     override fun resolve(
         annotatedType: AnnotatedType,
         context: ModelConverterContext,
@@ -39,13 +42,43 @@ internal class KotlinAwareModelResolver(mapper: ObjectMapper) : ModelResolver(ma
 
         // With resolveAsRef the returned schema is only a pointer; the model
         // being described is the one the context has just defined.
-        val target = resolved.`$ref`
-            ?.substringAfterLast('/')
-            ?.let { context.definedModels[it] }
-            ?: resolved
+        val component = resolved.`$ref`?.substringAfterLast('/')
+        val target = component?.let { context.definedModels[it] } ?: resolved
 
+        remember(component, target, context, kClass)
         patch(target, kClass)
         return resolved
+    }
+
+    /**
+     * Which class swagger-core described under which component name.
+     *
+     * Recorded here because here is the only place both halves are in one
+     * hand. A component is a name and a lump of JSON by the time it reaches
+     * [JacksonCodecs], and the union rewrite has to read Jackson's annotations
+     * off the class it came from — including for types nobody named at the top
+     * level, a branch of a hierarchy or a property four levels down, which is
+     * exactly the set this resolver is handed one at a time.
+     *
+     * Rederiving the name instead would mean reimplementing swagger's own
+     * naming, and the first thing it would get wrong is the one this repository
+     * already documents: an instantiated generic is `BoxInner`, not `Box`.
+     *
+     * A model reached through a `$ref` names itself; one being defined right
+     * now does not, and is found by identity among the models the context has
+     * just gained. Both happen — a branch resolved on the way through its
+     * hierarchy takes the second path.
+     */
+    private fun remember(
+        component: String?,
+        target: Schema<*>,
+        context: ModelConverterContext,
+        kClass: KClass<*>,
+    ) {
+        val name = component
+            ?: context.definedModels.entries.firstOrNull { (_, model) -> model === target }?.key
+            ?: return
+        described.putIfAbsent(name, kClass)
     }
 
     private fun patch(schema: Schema<*>, kClass: KClass<*>) {

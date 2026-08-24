@@ -67,6 +67,17 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
         ImportResult(label, file.filename, file.stream().bufferedReader().useLines { it.count() }, session)
     },
 
+    // The body arrives already decoded into whichever branch the `method`
+    // property selected, so the handler matches on the Kotlin type rather than
+    // on a string it has to check itself.
+    payOrder handledOrFail { (id, order, key, method) ->
+        when {
+            key != "let-me-in" -> badApiKey(ApiError(401, "Bad API key"))
+            Store.user(id) == null -> noSuchUser(ApiError(404, "No user $id"))
+            else -> ok(Store.pay(order, method))
+        }
+    },
+
     cancelOrder handledWith { (_, _, key) ->
         if (key != "let-me-in") unauthorized("Bad API key")
     },

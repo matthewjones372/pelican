@@ -87,6 +87,41 @@ class ImportedOrdersTest {
         return JsonObj(document.fields + mapOf("paths" to JsonObj(paths)))
     }
 
+    /**
+     * The union, and the one thing about it a document can silently lose.
+     *
+     * `bank_transfer` lives in a `@JsonSubTypes` annotation in `Model.kt` and
+     * nowhere else in the Kotlin. It reaches the document only because
+     * `pelican-jackson` writes the `discriminator.mapping` from that
+     * annotation; without it OpenAPI's implicit-mapping rule makes the value
+     * the *schema's* name, `BankTransfer`, and every reader of the document
+     * would encode a payload this service rejects.
+     *
+     * So the trip is made twice over. The second document is derived from the
+     * Kotlin the importer generated, which means the annotation that comes out
+     * has to say what the annotation that went in said — the round trip closing
+     * on the wire format rather than only on the shape.
+     */
+    @Test
+    fun `the value that selects each branch survives the trip out and back`() {
+        val published = mappingOf(ordersSpec().openApi())
+
+        published shouldBe mapOf(
+            "card" to "Card",
+            "bank_transfer" to "BankTransfer",
+            "invoice" to "Invoice",
+        )
+        mappingOf(importedSpec(JacksonCodecs).openApi()) shouldBe published
+    }
+
+    /** `discriminator.mapping` on `PaymentMethod`, as wire value -> schema name. */
+    private fun mappingOf(document: JsonObj): Map<String, String> {
+        val union = document.obj("components")?.fields("schemas")?.get("PaymentMethod") as JsonObj
+        val discriminator = union["discriminator"] as JsonObj
+        return (discriminator["mapping"] as JsonObj).fields
+            .mapValues { (_, target) -> (target as JsonStr).value.substringAfterLast('/') }
+    }
+
     @Test
     fun `so do the payload types the document named`() {
         schemaNames(ordersSpec().openApi()) shouldBe schemaNames(importedSpec(JacksonCodecs).openApi())

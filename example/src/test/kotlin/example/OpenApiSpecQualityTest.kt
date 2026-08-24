@@ -135,6 +135,34 @@ class OpenApiSpecQualityTest {
     }
 
     /**
+     * The discriminated union, read by the parser rather than by us.
+     *
+     * A `mapping` is the part of a hierarchy that a reader cannot reconstruct,
+     * and it is also the part that is easiest to write in a way only its author
+     * can read: a key pointing at a schema the document does not define
+     * resolves to nothing, and swagger-parser is what says so. Every branch is
+     * checked against the components, and the values are the ones the Kotlin
+     * annotations put on the wire.
+     */
+    @Test
+    fun `a hierarchy is published as a union whose every branch the parser can resolve`() {
+        val parsed = parse(ordersSpec().openApiJson()).openAPI
+        val union = parsed.components.schemas["PaymentMethod"].shouldNotBeNull()
+
+        union.discriminator.propertyName shouldBe "method"
+        union.discriminator.mapping.keys shouldBe setOf("card", "bank_transfer", "invoice")
+        withClue("a mapping pointing at a schema the document does not define is a dead reference") {
+            union.discriminator.mapping.values.forEach { target ->
+                parsed.components.schemas.keys shouldContain target.substringAfterLast('/')
+            }
+        }
+        withClue("resolved fully, so each branch arrives as the schema it referenced") {
+            union.oneOf.map { branch -> branch.properties.keys } shouldBe
+                listOf(setOf("number", "expiry"), setOf("iban"), setOf("reference"))
+        }
+    }
+
+    /**
      * The security schemes an endpoint requires have to be schemes the document
      * defines. swagger-parser does not treat a dangling requirement as an
      * error, and Swagger UI renders it as a padlock that cannot be opened, so

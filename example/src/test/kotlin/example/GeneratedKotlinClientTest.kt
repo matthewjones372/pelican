@@ -7,8 +7,11 @@ import dev.pelican.jackson.JacksonCodecs
 import dev.pelican.jackson.defaultMapper
 import dev.pelican.pekko.PelicanServer
 import dev.pelican.pekko.start
+import example.generated.BankTransfer
+import example.generated.Card
 import example.generated.CreateOrder
 import example.generated.GetUserFailure
+import example.generated.Invoice
 import example.generated.OrderStatus
 import example.generated.OrdersClient
 import example.generated.Outcome
@@ -106,6 +109,39 @@ class GeneratedKotlinClientTest {
         val order = (placed as Outcome.Ok).value
         order.item shouldBe "anvil"
         withClue("the server's own default should have applied") { order.quantity shouldBe 1 }
+    }
+
+    /**
+     * The generated union, over a socket, against the service it was generated
+     * from.
+     *
+     * `OrdersClient.kt` was written from the published document, and the
+     * hierarchy in it carries `name = "bank_transfer"` because the document
+     * carried the mapping that says so. Without it the generator would have had
+     * only the schema's name to go on, this call would put `"BankTransfer"` on
+     * the wire, and the server would answer 400 — a client generated from a
+     * service's own document failing against that service.
+     */
+    @Test
+    fun `a generated union puts the value on the wire that the service decodes`() {
+        val paid = client.payOrder(1L, 7L, BankTransfer("GB33"), xApiKey = "let-me-in")
+
+        val receipt = (paid as Outcome.Ok).value
+        receipt.orderId shouldBe 7L
+        receipt.paidWith shouldBe BankTransfer("GB33")
+    }
+
+    @Test
+    fun `and reads the branch back out of a payload that nests it`() {
+        val paid = client.payOrder(1L, 7L, Card("4111", "12/28"), xApiKey = "let-me-in") as Outcome.Ok
+
+        // Exhaustive over the generated hierarchy: a branch added to the
+        // service and regenerated breaks this `when` rather than arriving as
+        // something this test quietly ignores.
+        when (val method = paid.value.paidWith) {
+            is Card -> method.expiry shouldBe "12/28"
+            is BankTransfer, is Invoice -> error("decoded as $method")
+        }
     }
 
     @Test

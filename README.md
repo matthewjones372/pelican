@@ -539,6 +539,14 @@ or a `Map`, where erasure means only the Kotlin type still knows), enums, maps,
 nesting and recursion. The two shapes where they disagree are named in
 [docs/reference.md](docs/reference.md#what-isnt-here).
 
+A sealed hierarchy publishes the same way through either: `oneOf` over the
+branches with a `discriminator` and a full `mapping`, so the document says which
+*value* selects which branch. `@JsonSubTypes.Type(name = "bank_transfer")` on a
+class called `BankTransfer` is a fact that lives in one annotation, and a
+document that leaves it out is not vague — OpenAPI reads the missing mapping as
+"the value is the schema name", so every client generated from it would send
+`BankTransfer` and be rejected.
+
 ---
 
 # Testing
@@ -1177,7 +1185,7 @@ library. The full breakdown is in
 # Running the examples
 
 ```bash
-./gradlew build                          # all modules, 694 tests
+./gradlew build                          # all modules, 788 tests
 ./gradlew :example:runReadmeExample      # the service above, on :8080
 ./gradlew :example:run                   # the fuller orders API (streaming, SSE, raw bodies)
 ./gradlew :example:runBackends           # all three backends at once, on :8080-:8082

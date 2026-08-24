@@ -59,8 +59,8 @@ class UnionRoundTripTest {
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
     @JsonSubTypes(
-        JsonSubTypes.Type(value = JsonCard::class, name = "JsonCard"),
-        JsonSubTypes.Type(value = JsonBank::class, name = "JsonBank"),
+        JsonSubTypes.Type(value = JsonCard::class, name = "json_card"),
+        JsonSubTypes.Type(value = JsonBank::class, name = "json_bank"),
     )
     sealed interface JsonPayment
 
@@ -85,7 +85,7 @@ class UnionRoundTripTest {
         val codec = JacksonCodecs.codec<JsonPayment>(typeOf<JsonPayment>())
 
         val written = codec.encodeToString(JsonCard("4111"))
-        written shouldContain """"kind":"JsonCard""""
+        written shouldContain """"kind":"json_card""""
         codec.decodeFromString(written) shouldBe JsonCard("4111")
         codec.decodeFromString(codec.encodeToString(JsonBank("GB33"))) shouldBe JsonBank("GB33")
     }
@@ -93,13 +93,17 @@ class UnionRoundTripTest {
     // -------------------------------------------------------- the document
 
     /**
-     * The publishing direction, and the one place the two codecs genuinely
-     * differ. kotlinx's descriptors carry the serial name of every branch, so
-     * the document can say `oneOf` and name each one; swagger-core writes the
-     * hierarchy the way 3.0 did, as a parent holding the `discriminator` and a
-     * child per branch built with `allOf`. Both are hierarchies a document can
-     * express and both are read back below — what neither of them is, is the
-     * other one.
+     * The publishing direction, and what the two codecs have to agree on.
+     *
+     * Each reads a different set of annotations off a different set of classes,
+     * and neither can see what the other saw — but both know which value
+     * selects which branch, and both write it down the same way. That was not
+     * true for a long time: swagger-core describes a Jackson hierarchy the way
+     * 3.0 had to, a parent holding the `discriminator` and a child per branch
+     * built with `allOf`, and it writes no `mapping` because the names in
+     * `@JsonSubTypes` never reach its schema model. `pelican-jackson` rewrites
+     * that from the annotations now, which is what these two tests pin: one
+     * spelling, and the names in it.
      */
     @Test
     fun `kotlinx publishes a oneOf with a discriminator naming every branch`() {
@@ -116,15 +120,37 @@ class UnionRoundTripTest {
     }
 
     @Test
-    fun `jackson publishes the hierarchy 3_0 spelled, and says which property tells them apart`() {
+    fun `jackson publishes the same spelling, under the names its annotations gave the branches`() {
         val schemas = schemasOf(JacksonCodecs, "JsonPayment")
 
         val payment = schemas["JsonPayment"] as JsonObj
-        withClue("swagger-core does not write a oneOf, and this is what it writes instead") {
-            payment["oneOf"] shouldBe null
-            (payment["discriminator"] as JsonObj)["propertyName"] shouldBe JsonStr("kind")
+        payment.refs("oneOf") shouldBe listOf("JsonCard", "JsonBank")
+        val discriminator = payment["discriminator"] as JsonObj
+        discriminator["propertyName"] shouldBe JsonStr("kind")
+        withClue("`json_card` is what the code puts on the wire, and only the annotation knows it") {
+            (discriminator["mapping"] as JsonObj).fields shouldBe mapOf(
+                "json_card" to JsonStr("#/components/schemas/JsonCard"),
+                "json_bank" to JsonStr("#/components/schemas/JsonBank"),
+            )
         }
-        (schemas["JsonCard"] as JsonObj).refs("allOf") shouldBe listOf("JsonPayment")
+        withClue("a branch of a oneOf is the whole payload; pointing back at the parent would be a cycle") {
+            (schemas["JsonCard"] as JsonObj)["allOf"] shouldBe null
+        }
+    }
+
+    /**
+     * The same document shape from two codecs that share no code. Compared
+     * structurally rather than field by field, because the two hierarchies here
+     * are different Kotlin classes with different names — what has to match is
+     * the shape a reader of either document is holding.
+     */
+    @Test
+    fun `both codecs publish a hierarchy the same way`() {
+        val kotlinx = schemasOf(KotlinxCodecs, "Payment")["Payment"] as JsonObj
+        val jackson = schemasOf(JacksonCodecs, "JsonPayment")["JsonPayment"] as JsonObj
+
+        jackson.fields.keys shouldBe kotlinx.fields.keys
+        (jackson["discriminator"] as JsonObj).fields.keys shouldBe (kotlinx["discriminator"] as JsonObj).fields.keys
     }
 
     // ------------------------------------------------------------ and back
@@ -148,7 +174,7 @@ class UnionRoundTripTest {
 
         generated shouldContain "sealed interface JsonPayment"
         generated shouldContain "data class JsonCard("
-        generated shouldContain """JsonSubTypes.Type(value = JsonCard::class, name = "JsonCard")"""
+        generated shouldContain """JsonSubTypes.Type(value = JsonCard::class, name = "json_card")"""
         generated shouldNotContain "val kind:"
     }
 

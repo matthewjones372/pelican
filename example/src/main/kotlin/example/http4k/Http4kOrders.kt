@@ -26,6 +26,7 @@ import example.importOrders
 import example.limit
 import example.listOrders
 import example.noSuchUser
+import example.payOrder
 import example.placeOrder
 import example.placeOrderForm
 import example.reindex
@@ -87,6 +88,16 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     // neither would writing it somewhere; `bytes()` is what would.
     importOrders handledNow { (_, session, label, file) ->
         ImportResult(label, file.filename, file.stream().bufferedReader().useLines { it.count() }, session)
+    },
+
+    // Byte for byte the Pekko handler, because a decoded union branch is a
+    // Kotlin value and neither backend has an opinion about one.
+    payOrder handledOrFail { (id, order, key, method) ->
+        when {
+            key != "let-me-in" -> badApiKey(ApiError(401, "Bad API key"))
+            Store.user(id) == null -> noSuchUser(ApiError(404, "No user $id"))
+            else -> ok(Store.pay(order, method))
+        }
     },
 
     cancelOrder handledWith { (_, _, key) ->

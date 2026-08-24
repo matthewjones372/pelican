@@ -148,6 +148,37 @@ abstract class ClientContractTest {
         order.quantity shouldBe 1
     }
 
+    /**
+     * A union body, and the branch the server decoded it to.
+     *
+     * `bank_transfer` is the value on the wire and `BankTransfer` is the class,
+     * and the pair is a fact only the `@JsonSubTypes` annotation holds. Nothing
+     * in this test says the string — the endpoint description does not carry it
+     * either — so what is being checked is that one hierarchy is read the same
+     * way at both ends of the call.
+     */
+    @Test
+    fun `a union body arrives as the branch its discriminator names`() {
+        val receipt = app.call(payOrder, In4(1L, 7L, "let-me-in", BankTransfer("GB33")))
+        receipt.orderId shouldBe 7L
+        receipt.paidWith shouldBe BankTransfer("GB33")
+
+        val byCard = app.call(payOrder, In4(1L, 7L, "let-me-in", Card("4111", "12/28")))
+        withClue("the branch decides the surcharge, and the handler matched on it") {
+            byCard.total shouldBe receipt.total + 1.5
+        }
+    }
+
+    @Test
+    fun `the union comes back nested in a payload, carrying the value that selects it`() {
+        val body = app.response(payOrder, In4(1L, 7L, "let-me-in", Card("4111", "12/28"))).body
+
+        withClue("the wire name is the annotation's, not the class's") {
+            body shouldContain """"method":"card""""
+        }
+        body shouldNotContain "Card"
+    }
+
     @Test
     fun `a bad api key is 401`() {
         app.response(placeOrder, In3(1L, "wrong", CreateOrder("anvil", 1))).status shouldBe 401

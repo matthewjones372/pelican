@@ -11,6 +11,8 @@
 
 package example.generated
 
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import dev.pelican.BodyCodec
 import dev.pelican.Codecs
 import dev.pelican.UploadedFile
@@ -318,6 +320,34 @@ data class ImportResult(
     val session: String? = null,
 )
 
+data class BankTransfer(
+    val iban: String,
+) : PaymentMethod
+
+data class Card(
+    val number: String,
+    val expiry: String,
+) : PaymentMethod
+
+data class Invoice(
+    val reference: String,
+) : PaymentMethod
+
+/** One of [Card], [BankTransfer], [Invoice], told apart by `method`. */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "method")
+@JsonSubTypes(
+    JsonSubTypes.Type(value = Card::class, name = "card"),
+    JsonSubTypes.Type(value = BankTransfer::class, name = "bank_transfer"),
+    JsonSubTypes.Type(value = Invoice::class, name = "invoice"),
+)
+sealed interface PaymentMethod
+
+data class Receipt(
+    val orderId: Long,
+    val paidWith: PaymentMethod,
+    val total: Double,
+)
+
 enum class OrderStatus { PENDING, SHIPPED, DELIVERED, CANCELLED }
 
 // ------------------------------------------------------- declared failures
@@ -356,6 +386,21 @@ sealed interface PlaceOrderFailure {
 
     /** No user with that id */
     data class NotFound(val body: ApiError) : PlaceOrderFailure {
+        override val status: Int get() = 404
+    }
+}
+
+/** What `payOrder` declares it can fail with. */
+sealed interface PayOrderFailure {
+    val status: Int
+
+    /** Missing or bad API key */
+    data class Unauthorized(val body: ApiError) : PayOrderFailure {
+        override val status: Int get() = 401
+    }
+
+    /** No user with that id */
+    data class NotFound(val body: ApiError) : PayOrderFailure {
         override val status: Int get() = 404
     }
 }
@@ -448,6 +493,8 @@ class OrdersClient(
     private val tickCodec: BodyCodec<Tick> = codecs.codec(typeOf<Tick>())
     private val createOrderCodec: BodyCodec<CreateOrder> = codecs.codec(typeOf<CreateOrder>())
     private val importResultCodec: BodyCodec<ImportResult> = codecs.codec(typeOf<ImportResult>())
+    private val paymentMethodCodec: BodyCodec<PaymentMethod> = codecs.codec(typeOf<PaymentMethod>())
+    private val receiptCodec: BodyCodec<Receipt> = codecs.codec(typeOf<Receipt>())
     private val createOrderFormCodec: BodyCodec<CreateOrder> = codecs.formCodec(typeOf<CreateOrder>())
 
     /**
@@ -542,6 +589,21 @@ class OrdersClient(
         val response = text(request("POST", "/users/${segment(userId)}/orders/import", cookies = listOf("session" to session), multipart = multipart(fields = listOf("label" to label), files = listOf("file" to file))))
         if (!response.succeeded()) failed("POST", "/users/{userId}/orders/import", response)
         return importResultCodec.decodeFromString(response.body())
+    }
+
+    /**
+     * Pay for an order
+     *
+     * `POST /users/{userId}/orders/{orderId}/payment`
+     */
+    fun payOrder(userId: Long, orderId: Long, body: PaymentMethod, xApiKey: String): Outcome<PayOrderFailure, Receipt> {
+        val response = text(request("POST", "/users/${segment(userId)}/orders/${segment(orderId)}/payment", headerParams = listOf("X-Api-Key" to xApiKey), body = HttpRequest.BodyPublishers.ofString(paymentMethodCodec.encodeToString(body)), contentType = "application/json"))
+        when (response.statusCode()) {
+            401 -> return Outcome.Err(PayOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body())))
+            404 -> return Outcome.Err(PayOrderFailure.NotFound(apiErrorCodec.decodeFromString(response.body())))
+        }
+        if (!response.succeeded()) failed("POST", "/users/{userId}/orders/{orderId}/payment", response)
+        return Outcome.Ok(receiptCodec.decodeFromString(response.body()))
     }
 
     /**

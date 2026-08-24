@@ -218,6 +218,13 @@ generates one document through each and compares them, over models covering
 defaults, nullability, enums, maps, nesting and recursion. It also round-trips a
 value encoded by one codec through the other.
 
+A sealed hierarchy is the one payload type neither library can read off the
+Kotlin — nothing in `sealed interface PaymentMethod` says which property carries
+the branch or what string selects each one — so each is described from the
+annotations that make it readable, `@JsonTypeInfo`/`@JsonSubTypes` for Jackson
+and `@Serializable`/`@SerialName` for kotlinx.serialization. Both publish the
+result the same way; see [The publishing direction](#the-publishing-direction).
+
 Pass your own mapper or `Json` when the defaults do not fit:
 
 ```kotlin
@@ -681,13 +688,19 @@ kotlinx.serialization has no reflective fallback, so choosing it puts
 OpenAPI 3.0 had no way to list a hierarchy's branches, so it wrote the relation
 the other way up: a parent carrying the `discriminator`, and one child per
 branch declaring `allOf: [$ref parent, ...]`. That is read too, by looking for
-the schemas that point at the parent — it is what swagger-core still emits for
-an annotated Jackson hierarchy, which means it is what a document *this*
-library publishes from Kotlin classes says. See "The publishing direction"
-below.
+the schemas that point at the parent. It is what swagger-core emits for an
+annotated Jackson hierarchy and what a great many published documents say, so a
+reader that could not follow it would be a reader half the world's specs are
+closed to.
+
+Nothing this library *writes* says it any more — see "The publishing direction"
+below — but the two are not the same decision. What to accept from a document
+somebody else published and what to publish yourself never are.
 
 Without an explicit `mapping`, the value that selects a branch is the branch's
-own schema name, which is what OpenAPI defines an implicit mapping to be.
+own schema name, which is what OpenAPI defines an implicit mapping to be. That
+is a real loss where the producer meant something else, and it is the reason
+the publishing direction writes the mapping out rather than relying on it.
 
 ### `allOf`
 
@@ -699,23 +712,68 @@ would accept payloads the document rejects.
 
 ### The publishing direction
 
-The two codecs do not publish a sealed hierarchy the same way, and only one of
-them round-trips through the import above.
+Both codecs publish a sealed hierarchy the same way: `oneOf` over the branches,
+a `discriminator` naming the property that tells them apart, and a full
+`mapping` from each wire value to the schema it selects.
 
-`KotlinxCodecs` writes `oneOf` with a `discriminator` and a full `mapping`. It
-can, because a kotlinx descriptor carries the serial name of every branch —
-`@SerialName("card")` is right there — so the document can say which value
-picks which schema.
+```yaml
+PaymentMethod:
+  oneOf:
+    - { $ref: '#/components/schemas/Card' }
+    - { $ref: '#/components/schemas/BankTransfer' }
+  discriminator:
+    propertyName: method
+    mapping:
+      card: '#/components/schemas/Card'
+      bank_transfer: '#/components/schemas/BankTransfer'
+```
 
-`JacksonCodecs` describes types with swagger-core, and swagger-core writes the
-3.0 spelling: a parent holding the `discriminator`, and a child per branch
-built with `allOf`. It also writes no `mapping`, because the names in
-`@JsonSubTypes` do not reach the schema model. The import reads that shape
-back, so the trip closes — but by OpenAPI's rule the value selecting a branch
-is then the branch's schema name. Where a `@JsonSubTypes.Type(name = ...)`
-differs from its class's name, the published document does not say so and
-nothing downstream can know. Keep the two the same, or publish with
-`KotlinxCodecs`.
+The `mapping` is the half of a hierarchy a reader cannot reconstruct.
+`bank_transfer` selecting a schema called `BankTransfer` is a fact that lives in
+one annotation and nowhere else in the Kotlin, and OpenAPI's rule for a document
+that does not say it is that the value *is* the schema name — so a document
+missing the mapping is not vague about the wire format, it is confidently wrong
+about it, and every client generated from it encodes a payload the service
+rejects.
+
+`KotlinxCodecs` has always written it: a kotlinx descriptor carries the serial
+name of every branch, `@SerialName("card")` right there in the metadata.
+
+`JacksonCodecs` describes types with swagger-core, which writes the 3.0 spelling
+above and no `mapping` at all — the names in `@JsonSubTypes` never reach its
+schema model. So `pelican-jackson` rewrites the hierarchies it produced, from
+the annotations themselves: `Unions.kt` reads `@JsonTypeInfo` and
+`@JsonSubTypes` off the classes swagger-core described, and writes the union out
+as a `oneOf` with every branch named. What the parent held is pushed down into
+the branches rather than dropped, because a `oneOf` branch is the whole payload
+— a property declared on the sealed interface belongs in each class that
+inherits it.
+
+Which spelling to publish was the choice, and `oneOf` won on three counts: the
+documents are 3.1, where it is the native spelling; the 3.0 spelling has nowhere
+to put a `mapping`, which is the fact being rescued; and two codecs publishing
+one shape means a service can swap JSON libraries without its published document
+changing shape underneath its readers. Matching classes back to the components
+swagger-core named them under is what makes it possible at all, and it has to
+hold for a hierarchy reached anywhere — a property of a payload, an element of a
+list, a branch of another hierarchy — not only for one an operation names at the
+top. `KotlinAwareModelResolver` records the pairing as each type is resolved,
+which is the only place both halves are ever in one hand.
+
+Four shapes are refused rather than published as something they are not, each
+naming the class:
+
+| `@JsonTypeInfo` says | Why there is no document for it |
+|---|---|
+| `include` is anything but `As.PROPERTY` or `As.EXISTING_PROPERTY` | The type is not a property of the payload — it is a wrapper object, an array position, an external field — and a `discriminator` can only name a property |
+| `use` is anything but `Id.NAME` or `Id.CLASS` | Neither gives each branch a name that can be written down. `Id.DEDUCTION` puts nothing on the wire at all |
+| No `@JsonSubTypes` beside it | The document would declare a type property and never say which values it takes. Jackson needs the list too |
+| Two branches with one name | Two branches selected by one value is a payload no decoder can place |
+
+A sealed hierarchy is also the one payload type in the example that carries an
+annotation: see `PaymentMethod` in `example/src/main/kotlin/example/Model.kt`,
+which is served by a real endpoint, published, imported back, and generated into
+the checked-in client on every build.
 
 ### The exclude list
 
@@ -2052,7 +2110,7 @@ file quietly starting.
 
 **Kover**, aggregated across modules rather than per-module — a line in
 `pelican-core` is exercised by the tests in `pelican-pekko` as often as by its
-own — with a floor of 80% wired into `check`. It sits at 86% line, 71% branch.
+own — with a floor of 80% wired into `check`. It sits at 87% line, 70% branch.
 
 **OpenApiSpecQualityTest** reads the emitted documents back with
 swagger-parser, an implementation that did not write them: `$ref`s resolved,
@@ -2077,6 +2135,13 @@ contracts are compared. It is the only test either direction has that the other
 one cannot fake, and the compiler is doing half the work — generated Kotlin
 that does not compile fails the build here.
 
+What goes round that loop includes a discriminated union: `PaymentMethod`, a
+sealed hierarchy served by `payOrder`, whose `bank_transfer` branch is a class
+called `BankTransfer`. The pair is the case that cannot survive on shape alone
+— a document that publishes the shape and not the name sends every reader the
+class name instead — so the loop is asked for the names as well, and the
+generated client is called with one against a running server.
+
 Two smaller things. The Pekko route tests run through Pekko's own route
 testkit, behind a JUnit 5 extension in `PekkoRouteTestKit` — the testkit drives
 its `ActorSystem` from a JUnit 4 `@Rule`, which Jupiter does not run. And
@@ -2086,7 +2151,7 @@ http4k route; see [What it costs](../README.md#what-it-costs).
 ## Run it
 
 ```bash
-./gradlew build                     # 694 tests across all modules and the plugin
+./gradlew build                     # 788 tests across all modules and the plugin
 ./gradlew :example:run              # server on :8080, on Pekko
 ./gradlew :example:runHttp4k        # the same service on :8080, on http4k
 ./gradlew :example:runBackends      # the small example on all three backends at once
@@ -2168,13 +2233,14 @@ open  localhost:8080/api-docs                                 # Swagger UI
   carry, so closing them means teaching the walker to recognise a set and to
   name an instantiation. Not written; a service that stays on one codec sees
   neither.
-- **`discriminator.mapping` on the Jackson side.** `KotlinxCodecs` publishes a
-  sealed hierarchy as a `oneOf` with a `discriminator` and a full `mapping`;
-  swagger-core publishes the 3.0 spelling and no mapping at all, because the
-  names in `@JsonSubTypes` do not reach its schema model. Both are read back by
-  `pelican-import`, so the round trip closes either way — but a
-  `@JsonSubTypes.Type(name = ...)` that differs from its class's name is a fact
-  the Jackson-published document does not carry. See "The publishing direction".
+- **A hierarchy nested inside another, on the way back in.** `JacksonCodecs`
+  publishes one faithfully — a branch that is itself a `oneOf`, with what the
+  outer hierarchy declared pushed down to the classes that carry it on the wire.
+  `pelican-import` reads the branches back but not the link between the two
+  levels: the inner sealed interface comes back as a hierarchy of its own rather
+  than as a branch of the outer one. A `sealed interface` extending another is
+  the declaration that is missing, and nothing else about the payload is. Two
+  levels of hierarchy is rare enough that this is recorded rather than fixed.
 - **A `codec` for the generated *client*.** `pelican-import` takes one, so an
   imported union can be annotated for either library. `writeKotlinClient` does
   not: a generated client's payload types are always annotated for Jackson.

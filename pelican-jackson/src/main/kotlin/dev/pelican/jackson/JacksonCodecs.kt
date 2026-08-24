@@ -46,9 +46,16 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
      * come back as `JsonSchema` with a `types` *set*, which is what lets a
      * nullable property become a type union at all.
      */
-    private val converters = ModelConverters().apply {
-        addConverter(KotlinAwareModelResolver(mapper).openapi31(true))
-    }
+    private val describer = KotlinAwareModelResolver(mapper).apply { openapi31(true) }
+
+    /**
+     * The chain a type is resolved through, with [describer] at the front of
+     * it. The resolver is a value of its own rather than an argument here
+     * because it is also read directly: it is the one thing that knows which
+     * class each component was described from, and the union rewrite below
+     * cannot read a Jackson annotation without that.
+     */
+    private val converters = ModelConverters().apply { addConverter(describer) }
 
     @Suppress("UNCHECKED_CAST")
     override fun <T> codec(type: KType): BodyCodec<T> {
@@ -68,8 +75,15 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
 
         // Every model swagger touched becomes a component, so a type used by
         // ten endpoints is written down once and referenced ten times.
-        resolved?.referencedSchemas?.forEach { (name, schema) ->
-            if (!components.isRegistered(name)) components.register(name, schema.toJsonObj())
+        //
+        // Rewritten on the way, because a sealed hierarchy is the one shape
+        // swagger-core describes in a way that loses what the code says — see
+        // `unionsRewritten`. It runs over the whole batch rather than one
+        // schema at a time: a hierarchy is a parent and its branches together,
+        // and swagger resolves them together or not at all.
+        val described = resolved?.referencedSchemas.orEmpty().mapValues { (_, schema) -> schema.toJsonObj() }
+        unionsRewritten(described, describer.described).forEach { (name, schema) ->
+            if (!components.isRegistered(name)) components.register(name, schema)
         }
 
         val root = resolved?.schema ?: return jsonObj { "type" to "object" }

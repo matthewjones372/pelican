@@ -49,6 +49,12 @@ val seenOrders = cookieParam<Long>("seen", description = "Orders this browser ha
     .optional()
 
 val newOrder = jsonBody<CreateOrder>(description = "The order to place")
+
+// A body that is a discriminated union: three shapes, and a `method` property
+// saying which one arrived. The description says nothing about that — the
+// hierarchy carries it, and the document is generated from the same
+// annotations Jackson decodes with.
+val payment = jsonBody<PaymentMethod>(description = "How the order is being paid for")
 val rawUpload = rawBody(description = "Anything; it is never buffered")
 
 // A cookie is an ordinary input, not a credential: this one is a session the
@@ -137,6 +143,20 @@ val placeOrder = endpoint(userId, apiKey, newOrder) {
     json<Order>(status = 201).orFail(badApiKey, noSuchUser)
 }
 
+/**
+ * The union, both ways round: it arrives as the whole request body and comes
+ * back nested inside [Receipt]. Two positions in the document, one hierarchy —
+ * which is the case a schema generator has to get right in the components
+ * rather than at the top of one operation.
+ */
+val payOrder = endpoint(userId, orderId, apiKey, payment) {
+    post("users" / userId / "orders" / orderId / "payment")
+    summary = "Pay for an order"
+    operationId = "payOrder"
+    tag("orders")
+    json<Receipt>(status = 201).orFail(badApiKey, noSuchUser)
+}
+
 val cancelOrder = endpoint(userId, orderId, apiKey) {
     delete("users" / userId / "orders" / orderId)
     summary = "Cancel an order"
@@ -203,5 +223,5 @@ val reindex = endpoint(apiKey) {
 /** Everything above, in one list, so the server and the docs cannot drift. */
 val allEndpoints: List<Endpoint<*, *>> = listOf(
     getUser, streamOrders, watchOrders, listOrders, placeOrder, placeOrderForm, importOrders,
-    cancelOrder, echo, searchOrders, reindex,
+    payOrder, cancelOrder, echo, searchOrders, reindex,
 )
