@@ -33,7 +33,7 @@ class WebhookSenderTest {
     private val signature = headerParam<String>("X-Signature")
     private val event = jsonBody<OrderPlaced>()
 
-    private val listOrders = endpoint(noInputs) {
+    private val listOrders = endpoint {
         get("orders")
         operationId = "listOrders"
         json<Order>()

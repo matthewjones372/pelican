@@ -56,7 +56,7 @@ class CompatibilityTest {
 
     private val newOrder = jsonBody<CreateOrder>()
 
-    private val getOrder = endpoint(noInputs) {
+    private val getOrder = endpoint {
         get("orders")
         operationId = "getOrder"
         json<Order>()
@@ -105,7 +105,7 @@ class CompatibilityTest {
 
     @Test
     fun `an endpoint that was added costs an existing caller nothing`() {
-        val added = endpoint(noInputs) {
+        val added = endpoint {
             get("orders" / "count")
             operationId = "countOrders"
             json<Order>()
@@ -220,7 +220,7 @@ class CompatibilityTest {
     @Test
     fun `a declared failure that stopped being declared is one a caller handles for nothing`() {
         val declared = errorJson<Order>(404, "No order with that id")
-        val before = endpoint(noInputs) {
+        val before = endpoint {
             get("orders")
             operationId = "getOrder"
             json<Order>() orFail declared
@@ -240,7 +240,7 @@ class CompatibilityTest {
     @Test
     fun `a credential the operation did not ask for is a 401 for everyone not sending it`() {
         val scheme = apiKeyHeader("X-Api-Key", name = "apiKey")
-        val secured = endpoint(noInputs) {
+        val secured = endpoint {
             get("orders")
             operationId = "getOrder"
             security(scheme)
@@ -252,7 +252,7 @@ class CompatibilityTest {
 
     @Test
     fun `a renamed operationId renames a method in somebody else's source tree`() {
-        val renamed = endpoint(noInputs) {
+        val renamed = endpoint {
             get("orders")
             operationId = "fetchOrder"
             json<Order>()
@@ -263,7 +263,7 @@ class CompatibilityTest {
 
     @Test
     fun `a rewritten summary is prose, and prose is not a change to the contract`() {
-        val described = endpoint(noInputs) {
+        val described = endpoint {
             get("orders")
             operationId = "getOrder"
             summary = "Fetch the order"

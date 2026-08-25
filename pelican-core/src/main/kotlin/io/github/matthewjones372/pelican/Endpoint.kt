@@ -355,14 +355,16 @@ fun <A, B, C, D, E, F, R> endpoint(
 )
 
 /**
- * Lens style: the handler reads the whole [Params] bag by key. More flexible
- * past five or six inputs, at the cost of the compile-time guarantee —
- * an undeclared key throws at request time instead.
+ * No inputs, which is what no arguments says. The handler is given `Unit`.
+ *
+ * This overload used to be the lens form, and `noInputs` existed because that
+ * left zero inputs with no spelling of its own. The lens form is
+ * `endpoint(lensInputs) { … }`, which is a name rather than an absence.
  */
-fun <R> endpoint(block: EndpointBuilder.() -> Output<R>): Endpoint<Params, R> =
-    describe(lensInputs, block)
+fun <R> endpoint(block: EndpointBuilder.() -> Output<R>): Endpoint<Unit, R> =
+    describe(Inputs(emptyList(), { }, { emptyMap() }), block)
 
-/** With an [Inputs] built elsewhere — [noInputs], or a projection of your own. */
+/** With an [Inputs] built elsewhere — [lensInputs], or a projection of your own. */
 fun <I, R> endpoint(
     inputs: Inputs<I>,
     block: EndpointBuilder.() -> Output<R>,

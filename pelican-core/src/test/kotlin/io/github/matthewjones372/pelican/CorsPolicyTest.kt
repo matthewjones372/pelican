@@ -28,7 +28,7 @@ class CorsPolicyTest {
         json<String>()
     }
 
-    private val health = endpoint(noInputs) {
+    private val health = endpoint {
         get("health")
         text()
     }

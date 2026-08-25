@@ -27,7 +27,7 @@ class WebhooksTest {
 
     private val subscriberKey = apiKeyHeader("X-Subscriber-Key", name = "subscriberKey")
 
-    private val listOrders = endpoint(noInputs) {
+    private val listOrders = endpoint {
         get("orders")
         operationId = "listOrders"
         json<Order>()

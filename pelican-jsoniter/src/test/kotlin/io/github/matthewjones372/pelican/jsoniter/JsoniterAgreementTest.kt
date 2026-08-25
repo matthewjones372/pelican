@@ -83,7 +83,7 @@ class JsoniterAgreementTest {
             post("orders")
             json<Order>(status = 201)
         },
-        endpoint(noInputs) {
+        endpoint {
             get("categories")
             json<Category>()
         },

@@ -299,7 +299,7 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
      * takes the whole bag and reads it by key.
      */
     private fun declaration(keys: List<String>): String = when {
-        keys.isEmpty() -> "endpoint(noInputs)"
+        keys.isEmpty() -> "endpoint"
         keys.size <= TUPLE_LIMIT -> "endpoint(${keys.joinToString()})"
         else -> "endpoint"
     }

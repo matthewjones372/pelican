@@ -32,7 +32,7 @@ class OperationServersTest {
 
     private val upload = rawBody()
 
-    private val listOrders = endpoint(noInputs) {
+    private val listOrders = endpoint {
         get("orders")
         operationId = "listOrders"
         json<Order>()

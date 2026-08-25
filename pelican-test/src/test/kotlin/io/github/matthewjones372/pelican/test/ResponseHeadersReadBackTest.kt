@@ -4,7 +4,6 @@ import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.noInputs
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.responseHeader
 import io.kotest.matchers.nulls.shouldBeNull
@@ -18,7 +17,7 @@ class ResponseHeadersReadBackTest {
     private val retryAfter = responseHeader<Long>("Retry-After", "Seconds to wait")
     private val throttled = errorJson<Problem>(429, "Too many requests", retryAfter)
 
-    private val placeOrder = endpoint(noInputs) {
+    private val placeOrder = endpoint {
         post("orders")
         json<Problem>() orFail throttled
     }

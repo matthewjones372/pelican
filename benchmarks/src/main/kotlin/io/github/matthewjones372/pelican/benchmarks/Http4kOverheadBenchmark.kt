@@ -10,7 +10,6 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.http4k.handledNow
 import io.github.matthewjones372.pelican.http4k.toHttpHandler
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.noInputs
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.queryParam
 import org.http4k.core.HttpHandler
@@ -119,7 +118,7 @@ open class Http4kOverheadBenchmark {
     //
     // No inputs, no codec: what the interpreter costs before any decoding.
 
-    private val ping = endpoint(noInputs) {
+    private val ping = endpoint {
         get("ping")
         text()
     }

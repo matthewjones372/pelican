@@ -1,6 +1,5 @@
 package example.metrics
 
-import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
@@ -29,9 +28,6 @@ class MeteredOrdersTest {
             .filter { it.id.name == "http.server.requests" }
             .map { it.id.getTag("path") to it.id.getTag("status") }
             .toSet()
-
-    /** An endpoint that declares no inputs is called with the empty bag. */
-    private fun noInput() = Params(emptyMap(), null)
 
     private fun tagsFor(path: String, status: Int): Map<String, String> {
         val found = registry.meters.single {
@@ -79,7 +75,7 @@ class MeteredOrdersTest {
 
     @Test
     fun `the deprecated endpoint says so on its meters`() {
-        app.response(listOrdersV1, noInput()) shouldHaveStatus 200
+        app.response(listOrdersV1, Unit) shouldHaveStatus 200
 
         tagsFor("/v1/orders", 200)["deprecated"] shouldBe "true"
     }
@@ -99,7 +95,7 @@ class MeteredOrdersTest {
     fun `the meters read back through an ordinary endpoint, and count that one too`() {
         app.response(fetchOrder, 1L) shouldHaveStatus 200
 
-        val table = app.call(readMeters, noInput())
+        val table = app.call(readMeters, Unit)
 
         table shouldContain "path=/orders/{orderId}"
         table shouldContain "operation=fetchOrder"

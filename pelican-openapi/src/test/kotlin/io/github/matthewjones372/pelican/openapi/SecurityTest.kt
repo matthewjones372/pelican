@@ -53,13 +53,13 @@ class SecurityTest {
         empty()
     }
 
-    private val health = endpoint(noInputs) {
+    private val health = endpoint {
         get("health")
         noSecurity()
         text()
     }
 
-    private val debugDump = endpoint(noInputs) {
+    private val debugDump = endpoint {
         get("internal" / "dump")
         hidden = true
         security(oauth, "widgets:write")
@@ -124,7 +124,7 @@ class SecurityTest {
     @Test
     fun `a scope the scheme never declared fails when the endpoint is built`() {
         val e = shouldThrow<IllegalStateException> {
-            endpoint(noInputs) {
+            endpoint {
                 get("widgets")
                 security(oauth, "widgets:delete")
                 text()
@@ -141,7 +141,7 @@ class SecurityTest {
             tokenUrl = "https://id.example.com/token",
             scopes = listOf("widgets:read", "widgets:write"),
         )
-        val ep = endpoint(noInputs) {
+        val ep = endpoint {
             get("widgets")
             security(plain, "widgets:write")
             text()
@@ -166,7 +166,7 @@ class SecurityTest {
         shouldThrow<IllegalStateException> { bearer.requires("anything") }
 
         val doc = spec(
-            endpoint(noInputs) {
+            endpoint {
                 get("widgets")
                 security(bearer)
                 text()
@@ -181,7 +181,7 @@ class SecurityTest {
     @Test
     fun `an api key scheme documents where the key travels`() {
         val doc = spec(
-            endpoint(noInputs) {
+            endpoint {
                 get("widgets")
                 security(apiKeyHeader("X-Api-Key"))
                 text()
@@ -197,8 +197,8 @@ class SecurityTest {
     fun `two different schemes cannot share one name`() {
         val a = bearerAuth(name = "auth")
         val b = apiKeyHeader("X-Api-Key", name = "auth")
-        val one = endpoint(noInputs) { get("a"); security(a); text() }
-        val two = endpoint(noInputs) { get("b"); security(b); text() }
+        val one = endpoint { get("a"); security(a); text() }
+        val two = endpoint { get("b"); security(b); text() }
 
         val e = shouldThrow<IllegalStateException> { spec(one, two).openApi() }
         e.message shouldContain "'auth'"

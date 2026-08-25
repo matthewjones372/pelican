@@ -19,7 +19,6 @@ import io.github.matthewjones372.pelican.formBody
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.noInputs
 import io.github.matthewjones372.pelican.nonEmpty
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
@@ -275,7 +274,7 @@ val strict = endpoint(requiredTerm, requiredKey, requiredJar) {
  * `pelican-http4k`'s test fixtures and once in `pelican-ktor`'s, and not at all
  * on Pekko.
  */
-val motd = endpoint(noInputs) {
+val motd = endpoint {
     get("motd")
     summary = "A line of text, as text"
     operationId = "motd"
@@ -298,7 +297,7 @@ val forget = endpoint(name) {
  * hands over unread. Same reason as [motd]: described once here rather than
  * twice in two backends' fixtures and nowhere on the third.
  */
-val everyone = endpoint(noInputs) {
+val everyone = endpoint {
     get("everyone")
     summary = "The whole list, framed as an array while it is produced"
     operationId = "everyone"
@@ -307,7 +306,7 @@ val everyone = endpoint(noInputs) {
     jsonArray<Greeting>()
 }
 
-val logo = endpoint(noInputs) {
+val logo = endpoint {
     get("logo")
     summary = "Opaque bytes, with the media type the description gave them"
     operationId = "logo"
@@ -330,7 +329,7 @@ val echoRaw = endpoint(rawBody(description = "Whatever was sent, unread")) {
  * each backend does when a stream goes quiet, which genuinely differs; the
  * frames themselves are core's and should not.
  */
-val ticker = endpoint(noInputs) {
+val ticker = endpoint {
     get("ticker")
     summary = "A short run of events, named"
     operationId = "ticker"
