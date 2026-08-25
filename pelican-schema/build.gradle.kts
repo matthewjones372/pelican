@@ -12,6 +12,10 @@ plugins { kotlin("plugin.serialization") }
 dependencies {
     api(project(":pelican-core"))
 
+    // A validator that did not write the schema, on the principle that already
+    // puts swagger-parser in front of the emitted document.
+    testImplementation("com.networknt:json-schema-validator:1.5.9")
+
     testImplementation(project(":pelican-jackson"))
     testImplementation(project(":pelican-kotlinx"))
     testImplementation(project(":pelican-jsoniter"))
