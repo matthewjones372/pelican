@@ -3671,13 +3671,31 @@ outside the hierarchy. Inside one, nothing says so until the response is being
 written, and then it is an `UndeclaredResponse`: a 500 with a reference, the
 whole story in the log through `onServerError`.
 
-A single `orFail(failure)` pins `E` exactly and keeps the compile-time check, so
-an endpoint with one declared failure never has this problem. For the rest, the
-protection is that the mapping from a domain failure to a declared response is
-written once — `ShopError.declared()` in `example/shop` — and read by every
-endpoint that shares it, so there is one place to be wrong rather than one per
-handler. What that shape cannot express is that `quote` declares two of the
-three, which is why the refusal exists at all.
+It is not only a sealed hierarchy that does this. `E` is pinned to the failure's
+*payload type*, never to the `ErrorOutput` that declared it, so **one** declared
+failure is enough — any other failure carrying the same type fits:
+
+```kotlin
+val gone  = errorJson<ApiError>(410, "Gone")
+val other = errorJson<ApiError>(409, "Declared by another endpoint")
+
+val fetch = endpoint(id) { get("things" / id); json<Thing>() orFail gone }
+
+fetch handledOrFail { other(ApiError(409, "no")) }     // compiles
+```
+
+`ApiError` is the payload of most declared failures in most services, which is
+what makes this worth knowing rather than a curiosity.
+`DoesNotCompileTest` compiles that fixture on every build, so if it ever stops
+being true this page is corrected rather than quietly wrong.
+
+What protects a service is that the mapping from a domain failure to a declared
+response is written once — `ShopError.declared()` in `example/shop` — and read
+by every endpoint that shares it, so there is one place to be wrong rather than
+one per handler. What that shape cannot express is that `quote` declares two of
+the three, which is why the refusal exists at all: an undeclared response is an
+`UndeclaredResponse` when the response is written, a 500 with a reference, and
+the whole story in the log.
 
 ### One error model, not two
 
