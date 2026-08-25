@@ -110,7 +110,8 @@ baselines they need are in [what it costs](docs/what-it-costs.md).
 [More than one successful response](#more-than-one-successful-response) ·
 [Streaming](#streaming) · [Content negotiation](#content-negotiation) ·
 [Cookies, forms and uploads](#cookies-forms-and-uploads) ·
-[Response headers](#response-headers) · [Webhooks](#webhooks)
+[Response headers](#response-headers) · [Webhooks](#webhooks) ·
+[Tools a model can call](#tools-a-model-can-call)
 
 **[Serving and testing](#serving-and-testing)** —
 [Running a server](#running-a-server) · [Using it with existing routes](#using-it-with-existing-routes) ·
@@ -569,6 +570,57 @@ handler fails at construction rather than quietly serving `POST /`. The `204`
 above is what the *receiver* is expected to answer with, which is the one part
 of the description nobody publishing it controls. See
 [the reference](docs/reference.md#webhooks-the-calls-the-service-sends).
+
+## Tools a model can call
+
+The same descriptions, read once more — this time as MCP tools. An endpoint
+already knows its name, its arguments, their types, the constraints it enforces
+and the shape it answers with, which is everything a tool description needs:
+
+```kotlin
+val dispatch = ordersApi().mcpDispatch()
+
+dispatch.tools                                   // what tools/list publishes
+dispatch.call("placeOrder", jsonObj {            // and what tools/call runs
+    "userId" to 7
+    put("body", jsonObj { "item" to "a-widget"; "quantity" to 3 })
+})
+```
+
+`placeOrder` is the endpoint from [Declared failures](#declared-failures)
+above. Nothing was written twice to produce this:
+
+```json
+{ "name": "placeOrder",
+  "description": "Place an order",
+  "inputSchema": {
+    "type": "object",
+    "properties": { "userId": { "type": "integer", "format": "int64",
+                                "description": "The user's id" },
+                    "body":   { "$ref": "#/$defs/CreateOrder" } },
+    "required": ["userId", "body"],
+    "$defs": { "CreateOrder": { "type": "object", … } } },
+  "outputSchema": { "$ref": "#/$defs/Order", "$defs": { … } } }
+```
+
+The arguments decode through the same codecs and refinements an HTTP request
+does, so a `limit` declared `between(1, 100)` reaches the model as
+`minimum`/`maximum` **and** a model that sends `0` is refused before the handler
+runs. The call then goes through the handler the route already has, filters and
+all — there is no second implementation of the endpoint to keep in step.
+
+A declared failure comes back as something a model can act on rather than an
+exception:
+
+```
+404 No user with that id: {"status":404,"error":"No user 999","detail":null}
+```
+
+Header parameters are deliberately not arguments: a model asked for an
+`Authorization` value invents one. The credential is supplied where the tools
+are served. See [Tools a model can call](docs/mcp.md) for what is refused and
+why — a streamed response, a cookie, a multipart body — and for the whole
+mapping.
 
 ---
 
