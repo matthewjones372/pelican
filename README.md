@@ -680,6 +680,12 @@ metadata to describe a type with and no idea what a data class is.
 what its schemas are derived from, so the document and the wire format come from
 one place. Payload types need no annotations and no compiler plugin.
 
+All three run side by side under `./gradlew :example:runCodecs` — one set of
+endpoints, one set of handlers, three JSON libraries, and the same bytes out of
+each. `example/src/main/kotlin/example/codecs/ThreeCodecs.kt` is also where the
+annotations that keep a sealed hierarchy lined up across the three are written
+down, since that is the one shape none of them can read off the Kotlin.
+
 A sealed hierarchy publishes the same way through either: `oneOf` over the
 branches with a `discriminator` and a full `mapping`, so the document says which
 *value* selects which branch. `@JsonSubTypes.Type(name = "bank_transfer")` on a
@@ -824,6 +830,7 @@ Five things that wanted a page rather than a section, and one benchmark:
 ./gradlew :example:runReadmeExample      # the service above, on :8080
 ./gradlew :example:run                   # the fuller orders API (streaming, SSE, raw bodies)
 ./gradlew :example:runBackends           # all three backends at once, on :8080-:8082
+./gradlew :example:runCodecs             # all three JSON libraries at once, on :8080-:8082
 ./gradlew :example:runSecured            # a filter enforcing the security the descriptions declare
 ./gradlew :example:generateOrdersDocument  # the spec, with no server started
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise

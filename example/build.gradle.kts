@@ -2,6 +2,9 @@ import io.github.matthewjones372.pelican.gradle.DocumentFormat
 
 plugins {
     application
+    // For the codecs example, whose payload types are @Serializable so that
+    // kotlinx.serialization can be one of the three libraries reading them.
+    kotlin("plugin.serialization")
     // The build's own plugin, included from pluginManagement in settings.gradle.kts.
     // The example applies it by id exactly as a consumer would, which is what
     // keeps the plugin honest: if generation breaks, this build breaks.
@@ -21,13 +24,14 @@ dependencies {
     implementation(project(":pelican-ktor"))
     implementation(project(":pelican-ktor-docs"))
     implementation(project(":pelican-jackson"))
+    // The other two codec modules, for `example.codecs`: the same endpoints and
+    // handlers served three times, once per JSON library. `pelican-kotlinx` also
+    // carries the parser the assertions use — the tests read responses off a
+    // socket, and something has to turn them back into a tree, which
+    // `parseToJsonElement` does with no serializer of its own.
+    implementation(project(":pelican-kotlinx"))
+    implementation(project(":pelican-jsoniter"))
     runtimeOnly("ch.qos.logback:logback-classic:1.6.3")
-
-    // A JSON parser for the assertions only. The tests read responses off a
-    // socket, and something has to turn them back into a tree; this is not the
-    // example's codec, which is Jackson. No serialization compiler plugin is
-    // involved — `parseToJsonElement` needs none.
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // The OpenAPI documents this repository emits are checked by a parser that
     // is not the one that wrote them — swagger-parser reads the document back
@@ -92,6 +96,14 @@ tasks.register<JavaExec>("runBackends") {
     description = "Runs the greetings example on Pekko, http4k and Ktor side by side"
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("example.backends.MainKt")
+}
+
+/** The same service, served three times over three JSON libraries. */
+tasks.register<JavaExec>("runCodecs") {
+    group = "application"
+    description = "Runs the notes example on Jackson, kotlinx.serialization and jsoniter side by side"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.codecs.ThreeCodecsKt")
 }
 
 /** The README's "Your first endpoint", kept runnable for the same reason. */

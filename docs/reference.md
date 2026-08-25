@@ -229,6 +229,11 @@ annotations that make it readable, `@JsonTypeInfo`/`@JsonSubTypes` for Jackson
 and `@Serializable`/`@SerialName` for kotlinx.serialization. Both publish the
 result the same way; see [The publishing direction](#the-publishing-direction).
 
+`example.codecs` is all three at once: one set of endpoints and handlers, three
+`Api`s differing in the `codecs` argument, and a test asserting that the bytes
+and the document do not differ. `./gradlew :example:runCodecs` serves them side
+by side.
+
 Pass your own mapper, `Json` or jsoniter config when the defaults do not fit:
 
 ```kotlin
@@ -3195,6 +3200,7 @@ runs it; see [What it costs](what-it-costs.md).
 ./gradlew :example:run              # server on :8080, on Pekko
 ./gradlew :example:runHttp4k        # the same service on :8080, on http4k
 ./gradlew :example:runBackends      # the small example on all three backends at once
+./gradlew :example:runCodecs        # one service, served three times over three JSON libraries
 ./gradlew :example:generateOrdersDocument  # spec, no server
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ./gradlew :example:generateImportedEndpoints  # the document, read back as descriptions
