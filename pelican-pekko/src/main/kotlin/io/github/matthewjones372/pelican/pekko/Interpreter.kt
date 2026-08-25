@@ -471,8 +471,15 @@ private fun HttpResponse.withHeaders(params: Params): HttpResponse {
  * its 500, and the Content-Length check catches the ordinary case first.
  */
 
-/** What `toStrict` throws when the body stops arriving, wrapped or not. */
-private fun isReadTimeout(t: Throwable): Boolean =
+/**
+ * What `toStrict` throws when the body stops arriving, wrapped or not.
+ *
+ * `internal` so it can be asserted without a clock. The end-to-end path — a
+ * real body that stalls, a real 408 on the socket — is a race on a shared CI
+ * runner, and a test that fails on a slow machine is worse than the one it
+ * replaced.
+ */
+internal fun isReadTimeout(t: Throwable): Boolean =
     generateSequence(t) { it.cause }.any { it is java.util.concurrent.TimeoutException }
 
 /** RFC 9110's status for a caller who did not finish sending in time. */
