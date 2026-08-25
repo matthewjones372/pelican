@@ -1,5 +1,8 @@
 # 0004 — Naming the mistake at the binder
 
+Supersedes the first draft of this spec, whose shape was tried and does not
+work. See **Why this shape**.
+
 ## Problem
 
 Binding the wrong handler shape to an endpoint is the first mistake everyone
@@ -8,63 +11,84 @@ makes, and Kotlin reports it in terms nobody wrote:
 ```
 // handledNow on an endpoint that declares a failure
 e: Return type mismatch: expected 'Fallible<NotFoundFault, Item>', actual 'Item'.
-
-// handledOrFail on an endpoint that declares none
-e: Cannot infer type for type parameter 'E'. Specify it explicitly.
-e: Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: Unresolved reference. None of the following candidates is applicable
-   because of a receiver type mismatch:
 ```
 
-`Fallible` is a phantom marker with a private constructor. It appears in no
-example and in no user code, and neither message names `handledOrFail` or
-`handledNow`. `TODO.md` already carries this as open, with the right reason: a
-coding agent compiles, reads the error and retries, and an error naming neither
-the endpoint nor the fix costs the retry loop its convergence.
+`Fallible` is a phantom marker with a private constructor, in no example and in
+no user code: its whole existence is to give `Output` a type argument only the
+`orFail` binders accept. The one place a user meets it is this message, where it
+names neither what to return nor which binder returns it.
+
+`TODO.md` carries this as open with the right reason: an agent compiles, reads
+the error and retries, and an error naming neither the endpoint nor the fix
+costs the retry loop its convergence.
 
 ## Not doing
 
-- No compiler plugin, and no change to `Fallible`, `StreamOf` or `ByteStream`.
-  The phantom markers are how a backend binds only the endpoints it can.
-- No audit of every message in the library. Construction-time refusals are
-  already the standard the rest should meet; this is the binder pair only.
-- Not `handledWith`, `handledOneOf`, `handledByOneOf` or `bytesNow`. Three
-  pairs, named below, and stop.
+- **No `@Deprecated(ERROR)` overloads.** That was this spec's first shape and it
+  is refuted below.
+- No compiler plugin.
+- No change to `StreamOf` or `ByteStream`. They mark a handler's *carrier*,
+  which core genuinely cannot name; `Fallible` marks a value core names already.
+- No change to what any binder does at runtime.
 
 ## Shape
 
+Delete the phantom and put the type the handler actually returns in its place:
+
 ```kotlin
-@Deprecated(
-    "This endpoint declares failures with orFail, so its handler returns an " +
-        "Outcome. Use handledOrFail { … } and produce ok(value) or one of the " +
-        "declared failures.",
-    level = DeprecationLevel.ERROR,
-)
-infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledNow(
-    f: Params.(I) -> T,
-): ServerEndpoint = error("unreachable")
+// core
+class FallibleOutput<E, T> internal constructor(…) : Output<Outcome<E, T>>()
+
+// each backend
+infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledOrFail(
+    f: Params.(I) -> Outcome<E, T>,
+): ServerEndpoint
 ```
 
-Six per backend: `handledNow`/`handledOrFail`, `handledBy`/`handledByOrFail`,
-`streamedNow`/`streamedOrFail`, each pair in both directions. Ktor's take
-`suspend` lambdas and it has no `handledBy`, so it gets four.
+The message becomes, verbatim from a compile of this tree:
+
+```
+e: Return type mismatch: expected 'Outcome<Problem, Item>', actual 'Item'.
+```
+
+One error, no ambiguity, no inference cascade behind it — and `Outcome` is a
+type the user already writes, because `ok(…)` and `notFound(…)` return one.
 
 ## Why this shape
 
-Kotlin prints a `DeprecationLevel.ERROR` message verbatim, and the more
-specific receiver wins overload resolution — the trick `FallibleOutput.or`
-already relies on, for the same reason and with the same comment. The
-alternative is renaming `Fallible` to something self-describing: cheaper, and
-it still would not say what to write instead. Not recommended.
+**The first shape was tried and refuted.** A `@Deprecated(ERROR)` overload on
+the more specific receiver produces two compiler errors, in order: a platform
+declaration clash, fixable with `@JvmName`; and then
+
+```
+e: Overload resolution ambiguity between candidates:
+fun <I, T : Any> Endpoint<I, T>.handledNow(f: Params.(I) -> T): ServerEndpoint
+fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledNow(f: Params.(I) -> T): ServerEndpoint
+```
+
+so the mistake gets *worse* and the message never prints. The draft justified
+the trick by `FallibleOutput.or`, which does work — but `FallibleOutput<E, T>`
+is a genuine subtype of `Output<Fallible<E, T>>`, whereas
+`Endpoint<I, Fallible<E, T>>` and `Endpoint<I, T>` are two instantiations of one
+invariant class, and neither receiver is more specific.
+
+**The cost, measured rather than guessed.** With `Outcome` in the phantom's
+place, `ep handledNow { ok(Item(1)) }` compiles: the total binder becomes a
+second spelling of `handledOrFail`. Runtime is identical — both wrap the same
+lambda, and the interpreter switches on `out is FallibleOutput`. What is lost is
+a claim three `Handlers.kt` files make in comments, "these are the only binders
+that fit it", which has to be corrected rather than left to rot.
+
+The alternative is to leave the message as it is and spend the effort on
+`docs/`. Not recommended: the error is what a user meets first and a page is
+what they read second.
 
 ## Stack
 
-- [ ] **`spec-0004-binder-diagnostics`** — the refusing overloads on all three backends.
-      Done when: each of the six mistakes compiles to exactly one error, carrying the name of the binder to use instead.
-- [ ] **`spec-0004-negative-compilation`** — a harness compiling fixture sources through the Kotlin compiler API and asserting each fails with a named substring.
-      Done when: the six messages above are pinned, and deleting one overload turns a test red rather than a doc stale.
-- [ ] **`spec-0004-init-error-note`** — one paragraph in `docs/reference.md`: a refused description surfaces as `ExceptionInInitializerError` with a null message and the real one on the cause.
-      Done when: the page shows the two-line stack trace and says which half to read.
+- [ ] **`spec-0004-outcome-in-place-of-fallible`** — `Fallible` deleted; `FallibleOutput : Output<Outcome<E, T>>`; the binder receivers in three `Handlers.kt`; the three comments corrected; `ApiClient` and `DeclaredFailuresTest`'s annotations.
+      Done when: `handledNow` on an endpoint declaring a failure reports `expected 'Outcome<…>'`, `./gradlew build` is green, and no `Fallible` remains outside `FallibleOutput`.
+- [ ] **`spec-0004-negative-compilation`** — a harness compiling fixture sources through the Kotlin compiler API, asserting each fails with a named substring.
+      Done when: the message above is pinned by a test, and changing the phantom back turns it red.
 
 ## Acceptance
 
@@ -74,13 +98,16 @@ it still would not say what to write instead. Not recommended.
 
 ## Open questions
 
-1. Does the specific-receiver overload actually win, or does it read as
-   ambiguous? `FallibleOutput.or` says it wins. Recommend proving it in the
-   first stack entry before writing the other five.
-2. Harness: `kotlin-compiler-embeddable`, or shell out to `kotlinc`? Recommend
-   embeddable — no toolchain on PATH, and it is test-scoped in one module.
-3. Which module owns the harness? Recommend `example`, where the three backends
-   are already on the test classpath.
-4. Is `error("unreachable")` the right body, or should it be `TODO()`?
-   Recommend `error` with the same text, so a reflective call cannot look like
-   an unimplemented feature.
+1. Is `handledNow` accepting an `Outcome` acceptable, or should it be refused?
+   It cannot be refused by the type system for the reason the first shape
+   failed. Recommend accepting it and correcting the three comments — the
+   behaviour is identical and the better message is worth one more spelling.
+2. Does `Outcome`'s covariance (`out E, out T`) widen what a binder accepts now
+   that it sits in `Endpoint`'s invariant `R`? Recommend proving it in the first
+   entry: an endpoint declaring `Outcome<Fault, Item>` must not bind a handler
+   returning `Outcome<Fault, Any>`.
+3. `Fallible` is public API. Delete it, or keep it deprecated for a release?
+   Recommend deleting: the library is 0.x, it has no instances, and nothing
+   outside these signatures could hold one.
+4. Does the harness in entry 2 still earn its place with only one message left
+   to pin? Recommend yes, but it is the entry to cut first if it does not.
