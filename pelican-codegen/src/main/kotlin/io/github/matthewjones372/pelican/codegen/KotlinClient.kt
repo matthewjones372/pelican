@@ -66,6 +66,8 @@ import kotlin.reflect.KType
  * @param codec which JSON library the payload types are annotated for. Matters
  *   for one shape only — a sealed hierarchy, which neither library can read off
  *   the Kotlin alone.
+ * @param callStyle whether the methods block or suspend. See [CallStyle]: one
+ *   or the other, not both, and blocking unless the caller says otherwise.
  */
 fun ApiSpec.kotlinClient(
     packageName: String,
@@ -73,7 +75,41 @@ fun ApiSpec.kotlinClient(
     baseUrl: String? = servers.firstOrNull(),
     includeHidden: Boolean = false,
     codec: CodecAnnotations = CodecAnnotations.JACKSON,
-): String = KotlinClientEmitter(this, packageName, clientName, baseUrl.orEmpty(), includeHidden, codec).emit()
+    callStyle: CallStyle = CallStyle.BLOCKING,
+): String =
+    KotlinClientEmitter(this, packageName, clientName, baseUrl.orEmpty(), includeHidden, codec, callStyle).emit()
+
+/**
+ * Whether the generated methods block or suspend.
+ *
+ * One call surface per generated file rather than both on one class. Both would
+ * mean two methods per operation — `listOrders` and something spelled slightly
+ * differently — on a class whose whole appeal is that it has one method per
+ * endpoint under the endpoint's own name. It would also put kotlinx.coroutines
+ * on the classpath of every caller that generated a client, including the ones
+ * that will never call a suspending method, and leave a blocking method within
+ * reach of a coroutine that calls it by accident and parks a dispatcher thread
+ * for the length of an HTTP call — the exact cost the suspending surface exists
+ * to avoid.
+ *
+ * The choice does not divide the audience, because the file is generated in the
+ * calling project rather than published from the described one: each caller
+ * generates the surface it wants from the same descriptions. The method names,
+ * the parameters, the payload types and the sealed failures are identical
+ * either way, so moving between them is a line in a build file and nothing in
+ * the code that calls it.
+ */
+enum class CallStyle {
+    /** `fun listOrders(...)`, which joins the transport's stage. */
+    BLOCKING,
+
+    /**
+     * `suspend fun listOrders(...)`, which awaits it. The generated file then
+     * needs `org.jetbrains.kotlinx:kotlinx-coroutines-core` alongside
+     * `pelican-core`, and a cancelled coroutine cancels the exchange.
+     */
+    SUSPENDING,
+}
 
 /**
  * Writes the client into [sourceRoot] under the directories [packageName]
@@ -87,6 +123,7 @@ fun ApiSpec.writeKotlinClient(
     baseUrl: String? = servers.firstOrNull(),
     includeHidden: Boolean = false,
     codec: CodecAnnotations = CodecAnnotations.JACKSON,
+    callStyle: CallStyle = CallStyle.BLOCKING,
 ): Path {
     val directory = packageName.split('.')
         .filter { it.isNotEmpty() }
@@ -94,16 +131,18 @@ fun ApiSpec.writeKotlinClient(
 
     Files.createDirectories(directory)
     val file = directory.resolve("$clientName.kt")
-    Files.writeString(file, kotlinClient(packageName, clientName, baseUrl, includeHidden, codec))
+    Files.writeString(file, kotlinClient(packageName, clientName, baseUrl, includeHidden, codec, callStyle))
     return file
 }
 
 /**
  * As above, for callers holding a [File] — Gradle's `layout`, chiefly.
  *
- * The Gradle plugin looks this up by name, so [codec] is a second arity rather
- * than a defaulted parameter: a default would leave the six-argument method
- * existing nowhere, forcing plugin and library releases to arrive together.
+ * The Gradle plugin looks these up by name, so each setting the generator has
+ * grown is a further arity rather than a defaulted parameter: a default would
+ * leave the shorter method existing nowhere, forcing plugin and library
+ * releases to arrive together. The plugin asks for the longest signature it
+ * knows about and falls back through the ones below.
  */
 fun ApiSpec.writeKotlinClient(
     sourceRoot: File,
@@ -112,7 +151,19 @@ fun ApiSpec.writeKotlinClient(
     baseUrl: String? = servers.firstOrNull(),
     includeHidden: Boolean = false,
     codec: CodecAnnotations,
-): File = writeKotlinClient(sourceRoot.toPath(), packageName, clientName, baseUrl, includeHidden, codec).toFile()
+    callStyle: CallStyle,
+): File =
+    writeKotlinClient(sourceRoot.toPath(), packageName, clientName, baseUrl, includeHidden, codec, callStyle).toFile()
+
+/** The arity published before [callStyle] existed, and the default it stood for. */
+fun ApiSpec.writeKotlinClient(
+    sourceRoot: File,
+    packageName: String,
+    clientName: String = defaultClientName(title),
+    baseUrl: String? = servers.firstOrNull(),
+    includeHidden: Boolean = false,
+    codec: CodecAnnotations,
+): File = writeKotlinClient(sourceRoot, packageName, clientName, baseUrl, includeHidden, codec, CallStyle.BLOCKING)
 
 /** The arity published before [codec] existed, and the default it stood for. */
 fun ApiSpec.writeKotlinClient(
@@ -138,7 +189,10 @@ private class KotlinClientEmitter(
     private val baseUrl: String,
     includeHidden: Boolean,
     codec: CodecAnnotations,
+    private val callStyle: CallStyle,
 ) {
+    private val suspending = callStyle == CallStyle.SUSPENDING
+
     private val endpoints = spec.endpoints.filter { includeHidden || !it.hidden }
 
     /**
@@ -196,7 +250,7 @@ private class KotlinClientEmitter(
             appendLine()
             appendLine("package $packageName")
             appendLine()
-            val declared = IMPORTS.lines().filter { it.isNotBlank() } + types.imports().map { "import $it" }
+            val declared = imports().filter { it.isNotBlank() } + types.imports().map { "import $it" }
             appendLine(declared.sorted().joinToString("\n"))
             appendLine()
             appendLine(resource("runtime.kt").trim())
@@ -248,6 +302,8 @@ private class KotlinClientEmitter(
 
             appendLine()
             appendLine(indent(resource("client-body.kt").trim(), "    "))
+            appendLine()
+            appendLine(indent(resource(exchangeResource()).trim(), "    "))
             if (codecs.isNotEmpty() || formCodecs.isNotEmpty()) {
                 appendLine()
                 appendLine(indent(codecDeclarations(), "    "))
@@ -284,20 +340,64 @@ private class KotlinClientEmitter(
             appendLine(declarations.values.joinToString("\n\n"))
         }
 
-    private fun header(): String =
-        """
-        // Generated by Pelican from the endpoint descriptions of
-        // ${spec.title} ${spec.version}. Do not edit: regenerate.
-        //
-        // Every method below is one endpoint value read a fourth way: the path,
-        // the parameter names and the payload types are the ones the server routes
-        // and the document publishes.
-        //
-        // Needs pelican-core on the classpath, a Codecs to read bodies with, and
-        // a ClientTransport to send with — pelican-client-java, unless you have
-        // an HTTP client of your own to hand over.
-        @file:Suppress("unused", "RedundantVisibilityModifier")
+    /**
+     * Assembled rather than written as one literal, because `trimIndent` reads
+     * the string it is given after the interpolation has happened: a note
+     * inserted into it as several lines would take the whole header's
+     * indentation with it.
+     */
+    private fun header(): String {
+        val preamble =
+            """
+            // Generated by Pelican from the endpoint descriptions of
+            // ${spec.title} ${spec.version}. Do not edit: regenerate.
+            //
+            // Every method below is one endpoint value read a fourth way: the path,
+            // the parameter names and the payload types are the ones the server routes
+            // and the document publishes.
+            //
+            // Needs pelican-core on the classpath, a Codecs to read bodies with, and
+            // a ClientTransport to send with — pelican-client-java, unless you have
+            // an HTTP client of your own to hand over.
+            """.trimIndent()
+
+        val suppress = """@file:Suppress("unused", "RedundantVisibilityModifier")"""
+        return listOfNotNull(preamble, suspendingNote(), suppress).joinToString("\n")
+    }
+
+    /**
+     * What the suspending shape has to say for itself in the header, and
+     * nothing at all for the blocking one, whose classpath is what it was.
+     */
+    private fun suspendingNote(): String? =
+        if (!suspending) null
+        else """
+            //
+            // The methods here suspend, so this file also needs
+            // org.jetbrains.kotlinx:kotlinx-coroutines-core. A call is cancelled by
+            // cancelling the coroutine that made it, which cancels the exchange
+            // underneath rather than leaving it running with nobody to read it.
         """.trimIndent()
+
+    /** The exchange helpers, which are the whole of what the two call shapes disagree about. */
+    private fun exchangeResource(): String = when (callStyle) {
+        CallStyle.BLOCKING -> "client-exchange.kt"
+        CallStyle.SUSPENDING -> "client-exchange-suspend.kt"
+    }
+
+    /**
+     * What the generated file imports: the fixed list, less the one import only
+     * a blocking client has a use for, plus the coroutine bridge a suspending
+     * one is written in.
+     */
+    private fun imports(): List<String> = if (!suspending) IMPORTS.lines() else {
+        IMPORTS.lines().filterNot { it.contains("java.util.concurrent.CompletionException") } +
+            listOf(
+                "import kotlinx.coroutines.Dispatchers",
+                "import kotlinx.coroutines.future.await",
+                "import kotlinx.coroutines.withContext",
+            )
+    }
 
     /**
      * A `BodyCodec` per payload type, resolved when the client is constructed
@@ -329,7 +429,8 @@ private class KotlinClientEmitter(
         // two ways and declares no failure hands back the sealed type directly,
         // rather than an `Outcome` whose `Err` branch nothing could reach.
         val returns = if (failures.isEmpty()) produces else "Outcome<${failureType(ep, failures)}, $produces>"
-        val signature = "    fun $name(${call.parameters})" + if (returns == "Unit") " {" else ": $returns {"
+        val keyword = if (suspending) "suspend fun" else "fun"
+        val signature = "    $keyword $name(${call.parameters})" + if (returns == "Unit") " {" else ": $returns {"
 
         return buildString {
             appendLine(doc(ep))

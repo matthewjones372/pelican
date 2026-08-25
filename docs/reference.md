@@ -829,6 +829,24 @@ claim: it generates a client for a kotlinx service, builds a payload out of the
 discriminator and branch names the *generated file* declares, and decodes it
 with the real `KotlinxCodecs`.
 
+### Whether its methods block or suspend
+
+The other setting on a client entry, and the same shape of decision:
+
+```kotlin
+create("orders") {
+    specClass.set("com.example.OrdersSpecKt")
+    packageName.set("com.example.orders")
+    callStyle.set("suspending")   // or "blocking", the default
+}
+```
+
+`suspending` makes every generated method a `suspend` method and the file
+depend on `org.jetbrains.kotlinx:kotlinx-coroutines-core`; nothing else about
+it moves. Why it is one shape per file rather than both on one class, and what
+a cancelled coroutine does to a call in flight, is in
+[Blocking or suspending](#blocking-or-suspending).
+
 ### Without the plugin
 
 Both generators are ordinary functions, and a build that would rather call them
@@ -910,10 +928,85 @@ since coroutines would be a third-party dependency.
 It is also the shape core already uses for exactly this job in the other
 direction: `ServerEndpoint.invoke` is a `(Params) -> CompletionStage<Any?>`.
 
-The generated methods still block, and are unchanged from what they were: they
-`join` the stage and unwrap the `CompletionException`, so what a caller catches
-is the `IOException` or the timeout the transport raised rather than a wrapper
-that the choice of transport put around it.
+What the generated methods do with the stage is the next section: a blocking
+client joins it, a suspending client awaits it, and the interface underneath is
+the same interface either way. That is the point of choosing the widest shape —
+the two call surfaces are two readings of one transport rather than two
+transports.
+
+### Blocking or suspending
+
+The generated client has one call surface, and which one is decided when it is
+generated:
+
+```kotlin
+create("orders") {
+    specClass.set("com.example.OrdersSpecKt")
+    packageName.set("com.example.orders")
+    callStyle.set("suspending")   // or "blocking", the default
+}
+```
+
+Everything else about the file is the same file. The class name, the method
+names, the parameters and their defaults, the payload types, the sealed
+failures, the `Streamed<T>`: all of it comes from the descriptions, and none of
+it comes from the call shape. What changes is the keyword on each method and
+what the file waits on:
+
+```kotlin
+// blocking
+fun getUser(userId: Long): Outcome<GetUserFailure, User>
+
+// suspending
+suspend fun getUser(userId: Long): Outcome<GetUserFailure, User>
+```
+
+**One or the other rather than both.** A class carrying both would have two
+methods per endpoint, spelled differently enough to tell apart — which is the
+one thing a client with one method per endpoint under the endpoint's own name
+should not have. It would also put kotlinx.coroutines on the classpath of every
+caller that generated a client, including those that will never call a
+suspending method, and leave a blocking method within reach of a coroutine that
+calls it by accident and parks a dispatcher thread for the length of an HTTP
+call — which is the cost the suspending surface exists to avoid.
+
+The usual objection to picking one is that it splits the audience. It does not
+split this one, because the file is generated in the *calling* project rather
+than published from the described one: each caller generates the surface it
+wants, from the same descriptions, and a repository that genuinely wants both
+generates two entries into two packages. This one does exactly that, so that
+both are compiled and run against a real server by its own suite.
+
+**Where the coroutines live.** Not in `pelican-core`, which has the Kotlin
+standard library on its runtime classpath and nothing else, and not in a module
+of their own either. `suspend` is a language feature rather than a dependency,
+and the only thing the generated file needs from the library is the bridge from
+a `CompletionStage`, which is one function:
+
+```kotlin
+private suspend fun exchange(request: ClientRequest): ClientResponse =
+    transport.send(request).await()
+```
+
+So a suspending client needs `org.jetbrains.kotlinx:kotlinx-coroutines-core`
+beside `pelican-core`, and a blocking one needs what it always needed. The
+generated file says so in its own header.
+
+**Cancellation.** `await` resumes with what the transport raised rather than
+with the `CompletionException` a stage wraps around it — the same unwrapping
+the blocking form does by hand — and a coroutine cancelled while it is waiting
+cancels the `CompletableFuture` underneath it. An adapter has to carry that the
+rest of the way: `JavaHttpTransport` cancels the exchange the response was
+derived from, because cancellation travels down a chain of stages and not back
+up it, and a stage cancelled without that would leave the request running with
+nobody left to read it.
+
+**What still blocks.** Reading a body is a socket read wherever it happens. The
+generated suspending client reads a whole body inside `withContext(
+Dispatchers.IO)`, so it is not the caller's dispatcher that waits for it. A
+`Streamed<T>` cannot be handled the same way, because the caller decides when to
+ask for the next element: iterate one inside `withContext(Dispatchers.IO)`, or
+turn it into a `flow { }` with `flowOn(Dispatchers.IO)`.
 
 ### Streams cross both ways
 
@@ -923,7 +1016,11 @@ what the descriptions already promise:
 - A multipart file part is a `ClientRequest.Body.Streaming`, which is a
   function returning an `InputStream` rather than a stream, so a transport that
   has to send the request twice — a redirect, a retry — has a way to ask for
-  the bytes again. Nothing buffers the upload.
+  the bytes again. Nothing buffers the upload. Whether asking twice *works* is
+  a fact about the function: one that opens a file by name can be asked again,
+  and the generated client's own — a raw body is the stream its caller handed
+  over, and a file part is an `UploadedFile`, which holds one stream and hands
+  that same one out — cannot. See [Retrying](#retrying-and-what-is-safe-to-retry).
 - `ndjson`, `sse`, `jsonArray` and `bytes()` responses arrive as an unread
   `ClientResponse.body`, and `Streamed<T>` decodes off it as elements land,
   exactly as before. A call that is not streaming reads the body whole, once,
@@ -937,6 +1034,60 @@ This is also the reason the SPI is not `pelican-test`'s `Transport`. That one is
 blocking and carries a `String` body on purpose, because a test asserts on a
 result it already has — which is exactly why the typed test client
 [cannot upload binary](#what-isnt-here). Right taste, wrong constraints.
+
+### Retrying, and what is safe to retry
+
+Nothing retries unless somebody wrapped a transport in something that does:
+
+```kotlin
+val client = OrdersClient(
+    "https://orders.internal",
+    JacksonCodecs,
+    ClientTransport.default().retrying(),
+)
+```
+
+`retrying(policy)` is `RetryingTransport(this, policy)`, and both live in
+`pelican-core` beside the interface they decorate — no library, so every
+adapter inherits them. Retrying is a decorator rather than generated code
+because that is what the seam is for: retries, request logging and per-call
+metrics are the same shape, a transport wrapped around a transport, and none of
+them wants a line per operation in a file somebody regenerates. It also means
+the behaviour is visible where it was chosen, in the constructor call, rather
+than buried in a client that quietly sends twice.
+
+The default is no retries at all, which is what a client built without that
+wrapper does. A retry a caller did not ask for turns one failed call into
+several, and the call it multiplies is the one already arriving at a service in
+trouble.
+
+`RetryPolicy()` is the policy you get by naming none, and every default in it
+is narrow, because the cost of retrying something that was not transient is
+paid by the server rather than by whoever chose the default:
+
+| Setting | Default | Why |
+| --- | --- | --- |
+| `maxAttempts` | `3` | Two retries. The first covers the pooled connection the server closed while it was idle; the second covers a retry that landed on the same unhealthy node. A fourth is queueing work against a service that has now failed three times |
+| `initialBackoff`, `backoffMultiplier`, `maxBackoff` | `100ms`, `2.0`, `2s` | Doubling reaches a wait that matters within two retries without a first retry a caller would notice. The ceiling is there so that raising `maxAttempts` does not silently put a minute inside somebody's request |
+| `jitter` | `0.5` | Half of each wait is random. Clients that failed together compute the same backoff at the same instant and re-form the same herd; randomising *all* of it would let the wait collapse to nothing |
+| `statuses` | `408, 429, 502, 503, 504` | Each says the request did not get a fair hearing. **Not 500**: the common cause is an unhandled exception in a handler, and sending the same request again produces the same exception with the work done twice |
+| `methods` | `GET, HEAD, PUT, DELETE, OPTIONS` | HTTP's own idempotent set, which is all a description knows about whether a second send does a second thing. A POST that carries an idempotency key is safe and its caller is the one who knows that: name `Method.POST` here |
+| `retryStreamedBodies` | `false` | Whether `open()` can be called again is a fact about the function that was passed, and nothing here can see it. On, the request is handed to the transport again unchanged and the transport opens a fresh stream for itself |
+| `honourRetryAfter`, `retryAfterCap` | `true`, `10s` | A server that names a number knows something no curve here does, and waiting less than it asked is the one answer that is certainly wrong. Past the cap the policy stops retrying rather than waiting: the server has said it will not be ready inside anything the caller would call a call |
+| `failures` | `it is IOException` | A refused connection, a reset, a request that timed out — the socket-level accidents a second attempt may genuinely not repeat. A bug or a refusal survives being sent again |
+
+Only the delta-seconds form of `Retry-After` is read. The HTTP-date form would
+have to be compared against this machine's clock, and importing the skew
+between two clocks into a wait we already have a defensible value for buys
+nothing.
+
+Three details that are easy to get wrong, and are asserted by tests rather than
+promised here. A response that is going to be retried has its body closed
+first, because it is a live connection until somebody closes it. The wait is
+scheduled rather than slept through, so a policy that waits two seconds costs a
+timer entry and not a parked thread — which is what the asynchronous shape of
+`send` was for. And cancelling what the caller holds cancels both the exchange
+in flight and the retry that was going to follow it.
 
 ### Writing another one
 
