@@ -227,7 +227,11 @@ private fun responses(
         // nothing produces it and it stands for the statuses not enumerated.
         put(err.status?.toString() ?: "default", jsonObj {
             "description" to err.description
-            responseHeaders(err.headers)?.let { put("headers", it) }
+            // The endpoint's own headers ride on a failure too — `setHeader`
+            // puts them on whatever response came back — but they are not
+            // promised there: a filter that refuses never reaches the handler
+            // that would have set one.
+            responseHeaders(err.headers, alsoSometimes = ep.responseHeaders)?.let { put("headers", it) }
             val schema = err.type?.let { schemas.schema(it, components) }
             if (schema != null) {
                 put("content", jsonObj {
@@ -391,12 +395,16 @@ private fun schemaOf(
  * without `name` and `in`. The same [ResponseHeader] values the handler sets,
  * so a header cannot be documented and not sent, or the reverse.
  */
-private fun responseHeaders(headers: List<ResponseHeader<*>>): JsonObj? {
-    if (headers.isEmpty()) return null
+private fun responseHeaders(
+    headers: List<ResponseHeader<*>>,
+    alsoSometimes: List<ResponseHeader<*>> = emptyList(),
+): JsonObj? {
+    if (headers.isEmpty() && alsoSometimes.isEmpty()) return null
+    val sometimes = alsoSometimes.filterNot { extra -> headers.any { it === extra } }
     return jsonObj {
-        headers.forEach { h ->
+        (headers + sometimes).forEach { h ->
             put(h.name, jsonObj {
-                "required" to h.required
+                "required" to (h.required && h !in sometimes)
                 putIfNotNull("description", h.description ?: h.codec.description)
                 putIfNotNull("example", h.codec.example)
                 put("schema", h.codec.openApiSchema())
