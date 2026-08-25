@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.Method
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -15,6 +16,8 @@ import java.net.InetSocketAddress
 import java.net.http.HttpTimeoutException
 import java.time.Duration
 import java.util.concurrent.CompletionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.test.assertFailsWith
 
 /**
@@ -32,6 +35,10 @@ class JavaHttpTransportTest {
             Thread.sleep(SLOW_MILLIS)
             respond(exchange, "late")
         }
+        // Without one, `HttpServer` answers on a single thread — and `/slow`
+        // holds it for two seconds after the request that provoked it has
+        // already timed out, so whichever test ran next waited behind it.
+        executor = Executors.newCachedThreadPool()
         start()
     }
 
@@ -39,7 +46,10 @@ class JavaHttpTransportTest {
     private val transport = JavaHttpTransport()
 
     @AfterAll
-    fun tearDown() = server.stop(0)
+    fun tearDown() {
+        server.stop(0)
+        (server.executor as ExecutorService).shutdownNow()
+    }
 
     private fun echo(exchange: HttpExchange) {
         seen["method"] = exchange.requestMethod
@@ -114,7 +124,11 @@ class JavaHttpTransportTest {
             send(ClientRequest(Method.GET, "$base/slow", timeout = Duration.ofMillis(TIMEOUT_MILLIS)))
         }
 
-        failure.cause!!::class.simpleName shouldBe HttpTimeoutException::class.simpleName
+        // `is`, not an exact type. A budget this short can be spent before the
+        // connection is even up, and the JDK then throws
+        // `HttpConnectTimeoutException` — a subclass, so comparing the name
+        // failed on a machine that was busy and passed on one that was not.
+        failure.cause.shouldBeInstanceOf<HttpTimeoutException>()
         failure.message.orEmpty() shouldContain "timed out"
     }
 
