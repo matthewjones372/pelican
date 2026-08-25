@@ -326,7 +326,7 @@ A default for the whole API, and an endpoint that opts out:
 ```kotlin
 Api(routes, codecs = JacksonCodecs, security = listOf(oauth.requires("orders:read")))
 
-val health = endpoint(noInputs) {
+val health = endpoint {
     get("health")
     noSecurity()        // documented as public: `security: []`
     text()
