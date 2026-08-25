@@ -15,6 +15,8 @@ plugins {
     // closed. It wraps `maven-publish` and `signing`, so neither is applied
     // here directly.
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
+    // Renders the KDoc into the javadoc jar the published modules ship.
+    id("org.jetbrains.dokka") version "2.1.0" apply false
 }
 
 scmVersion {
@@ -195,16 +197,17 @@ subprojects {
 
     if (name in publishedModules) {
         apply(plugin = "com.vanniktech.maven.publish")
+        apply(plugin = "org.jetbrains.dokka")
 
         extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
             // Sources are not an optional extra for a library someone else has
             // to debug, and Maven Central will not accept a release without a
-            // javadoc jar. Kotlin has no javadoc to put in one — an empty jar
-            // is what `withJavadocJar()` produced here too — so this says so
-            // rather than shipping a jar that looks like it holds something.
+            // javadoc jar. Dokka fills it: an empty jar leaves javadoc.io
+            // blank, which puts the KDoc out of reach of anyone who has not
+            // cloned the repository.
             configure(
                 com.vanniktech.maven.publish.KotlinJvm(
-                    javadocJar = com.vanniktech.maven.publish.JavadocJar.Empty(),
+                    javadocJar = com.vanniktech.maven.publish.JavadocJar.Dokka("dokkaGeneratePublicationHtml"),
                     sourcesJar = true,
                 ),
             )
