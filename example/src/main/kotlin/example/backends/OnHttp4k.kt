@@ -3,12 +3,14 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.http4k.bytesNow
 import io.github.matthewjones372.pelican.http4k.handledNow
 import io.github.matthewjones372.pelican.http4k.handledOneOf
 import io.github.matthewjones372.pelican.http4k.handledOrFail
 import io.github.matthewjones372.pelican.http4k.handledWith
 import io.github.matthewjones372.pelican.http4k.start
 import io.github.matthewjones372.pelican.http4k.streamedNow
+import io.github.matthewjones372.pelican.http4k.toStream
 
 /**
  * The http4k binding of the same [greetingEndpoints].
@@ -52,6 +54,11 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
     motd handledNow { "Be excellent to each other." },
 
     forget handledWith { _ -> },
+    everyone streamedNow { greetingsOf().asSequence() },
+
+    logo bytesNow { java.io.ByteArrayInputStream(LOGO_BYTES) },
+
+    echoRaw bytesNow { body -> body.toStream() },
 )
 
 fun http4kApi(outerFilters: List<Filter> = emptyList()): Api =

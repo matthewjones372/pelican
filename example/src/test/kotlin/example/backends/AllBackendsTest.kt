@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.apiClient
+import io.github.matthewjones372.pelican.test.rawText
 import io.github.matthewjones372.pelican.test.shouldBeFailure
 import io.github.matthewjones372.pelican.test.shouldBeResponse
 import io.github.matthewjones372.pelican.test.shouldBuild
@@ -105,6 +106,58 @@ class AllBackendsTest {
         // The value is minted per request by a filter, so what is asserted is
         // that it is there at all.
         withClue(name) { client.response(forget, "ada").header("X-Request-Id").shouldNotBeNull() }
+    }
+
+    // --------------------------------------------- an array, bytes, and a body unread
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a streamed json array is one array whichever backend framed it`(name: String, client: ApiClient) {
+        val res = client.response(everyone, Unit)
+
+        withClue(name) {
+            res shouldHaveStatus 200
+            res shouldHaveContentType "application/json"
+            val languages = Json.parseToJsonElement(res.body).jsonArray
+                .map { it.jsonObject["language"]!!.jsonPrimitive.content }
+            languages shouldBe listOf("en", "fr")
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `opaque bytes keep the media type the description gave them`(name: String, client: ApiClient) {
+        val res = client.response(logo, Unit)
+
+        withClue(name) {
+            res shouldHaveStatus 200
+            res shouldHaveContentType "image/png"
+            res.body shouldBe "PELICAN"
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `and the document describes them as bytes of that type`(name: String, client: ApiClient) {
+        withClue(name) {
+            val json = allBackends.single { it.name == name }.api().spec().openApiJson()
+            val doc = Json.parseToJsonElement(json).jsonObject
+            val content = doc["paths"]!!.jsonObject["/logo"]!!.jsonObject["get"]!!
+                .jsonObject["responses"]!!.jsonObject["200"]!!.jsonObject["content"]!!.jsonObject
+            content.keys shouldBe setOf("image/png")
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a raw body is handed back without the framework reading it`(name: String, client: ApiClient) {
+        val sent = "not json, not a form, just bytes"
+        val res = client.transport.send(client.request(echoRaw, rawText(sent)))
+
+        withClue(name) {
+            res shouldHaveStatus 200
+            res.body shouldBe sent
+        }
     }
 
     // ------------------------------------------------------------- a simple GET
