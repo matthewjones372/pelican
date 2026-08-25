@@ -92,6 +92,30 @@ open class RoutingScaleBenchmark {
      * measured answer rather than an opinion.
      */
     private lateinit var http4kBare: HttpHandler
+
+    /**
+     * The prototype: the same routes handed to http4k grouped under their first
+     * literal segment, using http4k's own nesting, instead of as one flat list.
+     * Pelican knows the path structure before any router sees it; this is what
+     * knowing it is worth.
+     */
+    private lateinit var http4kGrouped: HttpHandler
+
+    /**
+     * The real prototype: Pelican dispatching for itself.
+     *
+     * One handler, a hash of the first path segment, then the handler for that
+     * bucket. This is the thing neither router can do for us — they hold opaque
+     * handlers and must scan; Pelican holds the descriptions and can index them
+     * before either sees a request.
+     *
+     * A ceiling rather than a projection: the handlers here answer a constant
+     * and decode nothing, so what this measures is dispatch alone. A real
+     * endpoint still pays for its codecs — around 1.7µs on this machine — and
+     * the number worth taking from this row is that the dispatch underneath it
+     * does not grow with the endpoint count.
+     */
+    private lateinit var http4kIndexed: HttpHandler
     private lateinit var pekkoBare: Function<HttpRequest, CompletionStage<HttpResponse>>
 
     /**
@@ -164,6 +188,40 @@ open class RoutingScaleBenchmark {
             Source.single(req).via(bareFlow).runWith(Sink.head(), system)
         }
 
+        // One `routes(...)` per first segment, nested under a prefix, so the
+        // outer scan is over distinct prefixes and the inner over one bucket.
+        val byPrefix = (
+            (1..endpoints - 1).map { n -> "resource$n" to ("/{id$n}" to "decoy") } +
+                ("items" to ("/{itemId}" to "item"))
+            )
+            .groupBy({ it.first }, { it.second })
+        http4kGrouped = routes(
+            byPrefix.map { (prefix, tails) ->
+                "/$prefix" bind routes(
+                    tails.map { (tail, answer) ->
+                        tail bind Method.GET to { _: Request -> Response(Status.OK).body(answer) }
+                    },
+                )
+            },
+        )
+
+        val index: Map<String, HttpHandler> =
+            (
+                (1..endpoints - 1).map { n -> "resource$n" to { _: Request -> Response(Status.OK).body("decoy") } } +
+                    (
+                        "items" to { req: Request ->
+                            Response(Status.OK).body("item-" + req.uri.path.substringAfterLast('/'))
+                        }
+                        )
+                ).toMap()
+        val notFound: HttpHandler = { _: Request -> Response(Status.NOT_FOUND) }
+        http4kIndexed = { req: Request ->
+            val path = req.uri.path
+            val start = if (path.startsWith("/")) 1 else 0
+            val end = path.indexOf('/', start).let { if (it < 0) path.length else it }
+            (index[path.substring(start, end)] ?: notFound)(req)
+        }
+
         request = Request(Method.GET, "/items/7")
         pekkoRequest = HttpRequest.GET("/items/7")
 
@@ -190,6 +248,12 @@ open class RoutingScaleBenchmark {
 
     @Benchmark
     fun lastRouteOnHttp4kHandWritten(): Any = http4kBare(request)
+
+    @Benchmark
+    fun lastRouteOnHttp4kGrouped(): Any = http4kGrouped(request)
+
+    @Benchmark
+    fun lastRouteOnHttp4kIndexed(): Any = http4kIndexed(request)
 
     @Benchmark
     fun lastRouteOnPekkoHandWritten(): HttpResponse =
