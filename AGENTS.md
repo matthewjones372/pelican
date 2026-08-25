@@ -1,5 +1,73 @@
 # Working in this repo
 
+## Specs come first
+
+Nothing is implemented without a spec file in `specs/`. An agent drafts it, a
+human edits it, and only the edited, committed version gets built.
+
+The draft is a proposal, not a plan. Its job is to be **cheap to disagree
+with**, so it stays short enough to read in one sitting:
+
+- **One page.** Roughly 80 lines. A draft that runs longer is proposing too
+  much at once — split it into two specs rather than writing more.
+- **No prose padding.** Fill the template's headings and stop. Where a heading
+  has nothing real under it, write "nothing" and move on.
+- **Uncertainty goes under Open questions**, not into a hedged paragraph under
+  Shape. Three or four questions in a first draft is healthy.
+- **Options, not verdicts.** Where a design could go two ways, give each a
+  sentence and recommend one. Do not silently pick.
+
+Then stop and hand it over. Do not implement a spec nobody has edited and
+committed: an unreviewed draft is still the agent's own opinion, which is the
+thing this process exists to stop.
+
+Before a spec exists: ask questions, read code, answer in chat. No code.
+
+`specs/README.md` gives the layout and the lifecycle.
+
+## One spec section per pull request
+
+Pull requests are stacked. Each branch sits on the one before it and is
+reviewable on its own.
+
+- **Soft cap: 200 changed lines**, excluding generated sources and golden
+  fixtures. Past that, split before writing code rather than after.
+- **One spec section per PR.** A spec with four stack entries is four branches,
+  not one branch with four commits.
+- **Announce the split first.** Post the intended stack — branch name and one
+  line each — and wait for a yes before the first commit.
+
+### Working a stack
+
+Set this once, so a rebase carries the branches above it:
+
+```bash
+git config rebase.updateRefs true
+```
+
+Branch from `origin/main`, not from a local `main` that may be behind, and
+build bottom-up with each PR based on its parent:
+
+```bash
+git switch -c spec-0003-descriptor origin/main
+gh pr create --base main --fill
+
+git switch -c spec-0003-codec        # branches off spec-0003-descriptor
+gh pr create --base spec-0003-descriptor --fill
+```
+
+After review changes land on a lower branch, restack from the top of the stack
+and push the whole chain:
+
+```bash
+git switch spec-0003-codec
+git rebase origin/main
+git push --force-with-lease origin spec-0003-descriptor spec-0003-codec
+```
+
+When the bottom PR merges, GitHub retargets its children onto `main` by itself.
+Rebase once more so the diff shown is only that branch's own work.
+
 ## Comments
 
 Comments record what the code cannot: the reason a thing is done the way it is.
