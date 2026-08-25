@@ -57,6 +57,7 @@ dependencies {
     // the transport it wants; see GeneratedKotlinClientTest.
     testImplementation(project(":pelican-client-java"))
     testImplementation(project(":pelican-client-pekko"))
+    testImplementation(project(":pelican-client-ktor"))
 
     // What the suspending client generated below is written against. Declared
     // rather than inherited: it arrives transitively with Ktor, and a version a

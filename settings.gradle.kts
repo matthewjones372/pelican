@@ -31,6 +31,7 @@ include(
     "pelican-metrics-otel",
     "pelican-client-java",
     "pelican-client-pekko",
+    "pelican-client-ktor",
     "pelican-test",
     "pelican-test-golden",
     "pelican-test-pekko",
