@@ -18,8 +18,11 @@ Free, and mostly absent today.
 - [x] **Topics.** Set: `kotlin`, `openapi`, `http4k`, `ktor`, `pekko`,
       `type-safe`, `api-first`, `rest-api`, `kotlin-library`,
       `openapi-generator`.
-- [x] **Homepage URL.** Points at the Maven Central listing, since there is no
-      docs site and the repository is its own front page.
+- [ ] **Homepage URL.** Left empty, deliberately. There is no docs site, and a
+      Sonatype artifact page is a package listing rather than a front page —
+      the badge already links it. Worth filling in when there is somewhere that
+      reads as the project's own: the published KDoc on javadoc.io once a
+      release ships the Dokka jar, or a real docs site if one is ever built.
 - [!] **Social preview.** `docs/assets/social-preview.png`, uploaded under
       Settings → General → Social preview. **The only item here with no API** —
       GitHub exposes no endpoint for it, so it has to be done in the browser.
