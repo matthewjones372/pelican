@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.jsoniter
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.SchemaComponents
+import io.github.matthewjones372.pelican.SchemaNames
 import io.github.matthewjones372.pelican.jsonArr
 import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.jsonStrings
@@ -39,6 +40,8 @@ internal class ReflectionSchemas(private val components: SchemaComponents) {
 
     /** Names currently being built, so a recursive type terminates at its ref. */
     private val inProgress = mutableSetOf<String>()
+
+    private val names = SchemaNames()
 
     fun schemaFor(type: KType): JsonObj {
         val base = build(type)
@@ -147,6 +150,8 @@ internal class ReflectionSchemas(private val components: SchemaComponents) {
     /** Registers [body] under the class's own name and returns a ref to it. */
     private fun named(kclass: KClass<*>, body: () -> JsonObj): JsonObj {
         val name = requireNotNull(kclass.simpleName)
+        names.claim(name, kclass.qualifiedName ?: kclass.java.name)
+
         if (components.isRegistered(name) || name in inProgress) return components.ref(name)
 
         inProgress += name

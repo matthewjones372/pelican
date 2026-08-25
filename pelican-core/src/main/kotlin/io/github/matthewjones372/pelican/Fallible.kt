@@ -88,6 +88,15 @@ fun FallibleOutput<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
         )
     }
 
+    // As in `failureNamedBy`, and for the same reason: `or` widens T to what
+    // the successes have in common, so `ok(value)` names the first success
+    // while carrying the second's payload and only the codec finds out.
+    if (chosen.doesNotCarry(ok.value)) {
+        throw UndeclaredResponse(
+            "$chosen carries ${chosen.payloadType} but the handler returned ${ok.value?.let { it::class }}",
+        )
+    }
+
     val promised = chosen.headers.filter { header ->
         header.required && ok.headers.none { (name, _) -> name.equals(header.name, ignoreCase = true) }
     }
@@ -99,6 +108,18 @@ fun FallibleOutput<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
             "responseHeader(...).optional() if it is only sometimes sent."
     }
     return chosen
+}
+
+/**
+ * Whether [value] is something other than the payload this response declared.
+ *
+ * A stream is exempt: what a handler produces for one is the backend's own type
+ * — a `Source`, a `Flow` — and never the element type the output names.
+ */
+private fun Output<*>.doesNotCarry(value: Any?): Boolean {
+    if (streams() || value == null) return false
+    val carried = payloadType?.classifier as? KClass<*> ?: return false
+    return !carried.isInstance(value)
 }
 
 /**

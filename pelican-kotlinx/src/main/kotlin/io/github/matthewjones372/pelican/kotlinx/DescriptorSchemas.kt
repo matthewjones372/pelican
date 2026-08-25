@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.kotlinx
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.SchemaComponents
+import io.github.matthewjones372.pelican.SchemaNames
 import io.github.matthewjones372.pelican.jsonArr
 import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.jsonStrings
@@ -29,6 +30,8 @@ internal class DescriptorSchemas(
 
     /** Names currently being built, so a recursive type terminates at its ref. */
     private val inProgress = mutableSetOf<String>()
+
+    private val names = SchemaNames()
 
     fun schemaFor(desc: SerialDescriptor): JsonObj {
         val base = build(desc)
@@ -123,6 +126,8 @@ internal class DescriptorSchemas(
     /** Registers [body] under the descriptor's short name and returns a ref to it. */
     private fun named(desc: SerialDescriptor, body: () -> JsonObj): JsonObj {
         val name = shortName(desc.serialName)
+        names.claim(name, desc.serialName.removeSuffix("?"))
+
         if (components.isRegistered(name) || name in inProgress) return components.ref(name)
 
         inProgress += name

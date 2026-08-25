@@ -50,6 +50,21 @@ class UndeclaredResponseTest {
     }
 
     @Test
+    fun `a success carrying the wrong payload is refused rather than encoded`() {
+        // `or` widens T to what the two responses have in common, so naming the
+        // first success with the second's payload compiles — and the codec
+        // resolved for it is the one that cannot write it.
+        val either = json<String>(200) or json<Long>(201)
+
+        val refused = shouldThrow<UndeclaredResponse> { either.successNamedBy(ok(1L) as Outcome.Ok<*>) }
+        val message = refused.message
+        message.shouldNotBeNull()
+        message shouldContain "json:200"
+        message shouldContain "kotlin.String"
+        message shouldContain "kotlin.Long"
+    }
+
+    @Test
     fun `the caller gets a reference and the log gets the reason`() {
         val rendered = renderError(UndeclaredResponse("error:410 was returned but this declares error:404"))
 

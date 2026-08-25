@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.jackson
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.github.matthewjones372.pelican.SchemaNames
 import io.swagger.v3.core.converter.AnnotatedType
 import io.swagger.v3.core.converter.ModelConverter
 import io.swagger.v3.core.converter.ModelConverterContext
@@ -27,6 +28,16 @@ internal class KotlinAwareModelResolver(mapper: ObjectMapper) : ModelResolver(ma
 
     /** Component name -> the class swagger-core described under it. See [remember]. */
     val described = LinkedHashMap<String, KClass<*>>()
+
+    /**
+     * The names claimed while describing one payload type. Reset per call
+     * rather than kept beside [described], which outlives the pass: two
+     * documents built through the same codec are allowed a class name each.
+     */
+    private var names = SchemaNames()
+
+    /** Starts describing one payload type, which is the scope a collision is refused in. */
+    fun freshPass() { names = SchemaNames() }
 
     override fun resolve(
         annotatedType: AnnotatedType,
@@ -66,6 +77,7 @@ internal class KotlinAwareModelResolver(mapper: ObjectMapper) : ModelResolver(ma
         val name = component
             ?: context.definedModels.entries.firstOrNull { (_, model) -> model === target }?.key
             ?: return
+        names.claim(name, kClass.qualifiedName ?: kClass.java.name)
         described.putIfAbsent(name, kClass)
     }
 

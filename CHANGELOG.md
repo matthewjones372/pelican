@@ -40,6 +40,17 @@ one.
   for an `Int?` fell through to a string and the value reached the codec quoted
   — a 400 on jsoniter and a silent coercion on the other two.
 
+### Added
+
+- **Three refusals where something was published as what it is not.** Two types
+  wanting one component name are refused where the schema is built, naming both
+  — all three sources named a component after the simple name and let the second
+  take the first's schema. A `Json` setting the schema derivation cannot see is
+  refused at `KotlinxCodecs(...)`, naming the setting: `classDiscriminator`,
+  `ignoreUnknownKeys`, `encodeDefaults` and `explicitNulls` are what it reads.
+  And a success carrying a payload its response never declared is now an
+  `UndeclaredResponse` naming both types, the check a failure already had.
+
 ### Changed
 
 - **Ktor dispatches through `RouteIndex`**, as the other two backends already

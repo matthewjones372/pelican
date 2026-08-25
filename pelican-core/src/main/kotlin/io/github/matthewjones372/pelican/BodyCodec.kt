@@ -203,6 +203,30 @@ object NoCodecs : Codecs {
     override fun schema(type: KType, components: SchemaComponents): JsonObj = fail()
 }
 
+/**
+ * Which type each component name is being described from, and the refusal when
+ * two want one name.
+ *
+ * All three schema sources name a component after the type's simple name, and
+ * all three registered the second silently — so a document said `Item` once and
+ * a consumer decoded the wrong one. Here rather than three times over, so the
+ * three cannot differ about what a collision is or what to do about it.
+ */
+class SchemaNames {
+    private val describedBy = mutableMapOf<String, String>()
+
+    /** Records that [owner] is described as [name]. Refuses where something else already is. */
+    fun claim(name: String, owner: String) {
+        val already = describedBy.put(name, owner)
+        require(already == null || already == owner) {
+            "Two types are described as '$name': $already and $owner. A schema component is named " +
+                "after the type, and a document holds one '$name', so the second would take the " +
+                "first's schema and every reader of the document would believe it. Rename one, or " +
+                "keep them out of the same document."
+        }
+    }
+}
+
 /** Default [SchemaComponents] implementation, used by the OpenAPI interpreter. */
 class SchemaRegistry : SchemaComponents {
     private val components = LinkedHashMap<String, JsonObj>()

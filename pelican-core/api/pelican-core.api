@@ -1291,6 +1291,11 @@ public abstract interface class io/github/matthewjones372/pelican/SchemaComponen
 	public abstract fun register (Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;)V
 }
 
+public final class io/github/matthewjones372/pelican/SchemaNames {
+	public fun <init> ()V
+	public final fun claim (Ljava/lang/String;Ljava/lang/String;)V
+}
+
 public final class io/github/matthewjones372/pelican/SchemaRegistry : io/github/matthewjones372/pelican/SchemaComponents {
 	public fun <init> ()V
 	public final fun all ()Lio/github/matthewjones372/pelican/JsonObj;

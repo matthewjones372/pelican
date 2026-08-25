@@ -55,6 +55,7 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
     }
 
     override fun schema(type: KType, components: SchemaComponents): JsonObj {
+        describer.freshPass()
         val resolved = converters.resolveAsResolvedSchema(
             AnnotatedType(type.javaType).resolveAsRef(true),
         )

@@ -317,6 +317,13 @@ Api(routes, codecs = KotlinxCodecs(myJson))
 Api(routes, codecs = JsoniterCodecs(jsoniterConfig { escapeUnicode(false) }))
 ```
 
+Two things are refused rather than published as something they are not:
+
+| Refused | Why, and the way out |
+|---|---|
+| A `Json` setting other than `classDiscriminator`, `ignoreUnknownKeys`, `encodeDefaults` and `explicitNulls` | Schemas here come from `SerialDescriptor`s, which know nothing about the `Json` that will write them. A `SnakeCase` naming strategy writes `placed_at` while the document still publishes `placedAt`, and the caller following it is refused by the service that published it. Refused at `KotlinxCodecs(...)`, naming the setting. Leave it as kotlinx.serialization has it, or describe the payloads the way they are written |
+| Two types wanting one component name | All three sources name a component after the type's simple name, so `catalogue.Item` and `basket.Item` in one payload both want `Item` — and the second silently took the first's schema. Refused where the schema is built, naming both types. Rename one, or keep them out of the same document |
+
 ### jsoniter, and what a library that never met Kotlin needs
 
 `pelican-jsoniter` is the third module and the one whose library has no
@@ -4101,6 +4108,13 @@ is gone.
   marker exists to avoid. A stream is still a success; it is just the only one,
   and `ndjson<Order>() orFail noSuchUser` is unchanged — a failure decided before
   the first element, as before.
+- **A success carrying the wrong payload.** `or` widens `T` to what the
+  responses have in common, so `ok(receipt)` compiles where the first success
+  declares an `Order` — and names that first success. The payload is checked
+  against what the response declared, the same check a failure already got, and
+  a mismatch is the `UndeclaredResponse` a 500 and a log line come from rather
+  than whatever the codec would have said. A streamed success is exempt: its
+  value is the backend's own type and never the payload the output names.
 
 Two 2xx with *different media types* are not refused: `json<Order>() or
 text(status = 202)` publishes `application/json` under 200 and `text/plain`

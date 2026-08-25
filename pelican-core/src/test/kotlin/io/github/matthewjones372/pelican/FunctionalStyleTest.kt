@@ -50,7 +50,8 @@ class FunctionalStyleTest {
             "the walk collects captured segments as it descends and unwinds them when a branch " +
             "fails, which is what lets a literal be tried before a capture without matching twice",
         "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/BodyCodec.kt" to
-            "codecs are resolved once per type and cached against it",
+            "codecs are resolved once per type and cached against it, and SchemaNames remembers which " +
+            "type claimed each component name while one is being described",
         "pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/OpenApi.kt" to
             "component schemas are collected as the document is walked, then emitted once",
         "pelican-schema/src/main/kotlin/io/github/matthewjones372/pelican/schema/StandaloneSchemas.kt" to
