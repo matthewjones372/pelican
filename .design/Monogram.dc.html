@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; }
+    a { color: #6aa9c4; } a:hover { color: #8cc3da; }
+  </style>
+</helmet>
+<div style="width: 940px; height: 760px; background: #0d1117; color: #e8eaed; padding: 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 32px">
+
+  <div style="display: flex; align-items: flex-start; gap: 20px">
+    <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; color: #6f7b8a; padding-top: 5px">C</div>
+    <div style="display: flex; flex-direction: column; gap: 8px; flex-grow: 1">
+      <div style="display: flex; align-items: baseline; gap: 14px">
+        <div style="font-size: 26px; font-weight: 600; letter-spacing: -0.015em">Monogram</div>
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7b8a">Letterform</div>
+      </div>
+      <div style="font-size: 14.5px; line-height: 1.6; color: #98a3b2; max-width: 700px; text-wrap: pretty">A geometric P built on one stem width and one bowl radius, with the bill growing out of the bowl at its lower right. The bowl is the pouch.</div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+    <div style="display: flex; align-items: center; justify-content: center; background: #151a21; border: 1px solid #232a34; border-radius: 4px; padding: 28px 20px"><svg width="148" height="148" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#e8eaed" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#e8eaed"></path></g></svg></div>
+    <div style="display: flex; align-items: center; justify-content: center; background: #f7f6f3; border: 1px solid #232a34; border-radius: 4px; padding: 28px 20px"><svg width="148" height="148" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#14171c" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#14171c"></path></g></svg></div>
+    <div style="display: flex; align-items: center; justify-content: center; background: #151a21; border: 1px solid #232a34; border-radius: 4px; padding: 28px 20px"><span style="color: {{accent}}"><svg width="148" height="148" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="currentColor" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="currentColor"></path></g></svg></span></div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7b8a">On dark</div>
+        <div style="display: flex; align-items: flex-end; gap: 26px; background: #151a21; border: 1px solid #232a34; border-radius: 4px; padding: 18px 24px; color: #e8eaed">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="64" height="64" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#e8eaed" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#e8eaed"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">64</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="48" height="48" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#e8eaed" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#e8eaed"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">48</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="32" height="32" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#e8eaed" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#e8eaed"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">32</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="24" height="24" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#e8eaed" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#e8eaed"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">24</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="16" height="16" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#e8eaed" stroke-width="10"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#e8eaed"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">16</span></div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7b8a">On paper</div>
+        <div style="display: flex; align-items: flex-end; gap: 26px; background: #f7f6f3; border: 1px solid #232a34; border-radius: 4px; padding: 18px 24px; color: #14171c">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="64" height="64" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#14171c" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#14171c"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">64</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="48" height="48" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#14171c" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#14171c"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">48</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="32" height="32" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#14171c" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#14171c"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">32</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="24" height="24" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#14171c" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#14171c"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">24</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 9px"><svg width="16" height="16" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#14171c" stroke-width="10"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#14171c"></path></g></svg><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">16</span></div>
+        </div>
+      </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7b8a">README header</div>
+    <div style="display: flex; align-items: center; gap: 18px; background: #151a21; border: 1px solid #232a34; border-radius: 4px; padding: 22px 26px">
+      <svg width="44" height="44" viewBox="0 0 64 64" aria-label="Monogram mark"><g><g fill="none" stroke="#e8eaed" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#e8eaed"></path></g></svg>
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <div style="font-size: 27px; font-weight: 500; letter-spacing: -0.02em; line-height: 1">Pelican</div>
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; color: #7b8794; letter-spacing: 0.01em">Type-safe HTTP for Kotlin</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="font-size: 13px; line-height: 1.6; color: #7b8794; max-width: 760px; text-wrap: pretty; margin-top: auto">Says "library" before it says "bird" — it reads as a mark in a dependency list rather than an illustration. Most legible of the four at 16px.</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#6aa9c4","options":["#6aa9c4","#c9a227","#d9694b","#8f9bb0"]}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#6aa9c4' };
+  }
+}
+</script>
+</body>
+</html>

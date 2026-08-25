@@ -3,3 +3,6 @@ build/
 *.log
 .idea/
 .claude/worktrees/
+
+# A 2.2MB rendered export with the artboards inlined as data URIs; `gen.mjs` rebuilds it.
+.design/pelican-logo-marks.html
