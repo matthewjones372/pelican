@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.codegen.KotlinTypes
 import io.github.matthewjones372.pelican.codegen.kdoc
 import io.github.matthewjones372.pelican.codegen.kotlinString
 import io.github.matthewjones372.pelican.codegen.memberName
+import io.github.matthewjones372.pelican.codegen.template
 import io.github.matthewjones372.pelican.codegen.typeName
 import io.github.matthewjones372.pelican.codegen.unique
 
@@ -148,10 +149,7 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     private val schemasName get() = typeName(options.name) + "Schemas"
 
-    private fun resource(name: String): String =
-        Emitter::class.java.getResourceAsStream(name)
-            ?.use { it.reader().readText() }
-            ?: error("$name is missing from pelican-import's resources")
+    private fun resource(name: String): String = template(Emitter::class.java, name)
 
     private fun spec(): String = buildString {
         appendLine(
