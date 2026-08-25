@@ -1,0 +1,66 @@
+# Pelican
+
+> Type-safe HTTP for Kotlin. An endpoint is described once, as an ordinary
+> Kotlin value; the server route, the OpenAPI document, a typed test client and
+> a generated Kotlin client for callers are all derived from that one value.
+> There is no second source of truth, because there is no second description.
+> Pelican is a library rather than a framework: it does not own `main`, and it
+> serves through a web stack you already run — Pekko HTTP, http4k or Ktor.
+
+Facts worth having before anything else:
+
+- Kotlin 2.4, JVM. Apache 2.0. On Maven Central as
+  `io.github.matthewjones372:pelican-core` and sibling modules.
+- Version 0.1.x. Breaking changes are expected between minor versions. Pin an
+  exact version.
+- `pelican-core` depends on nothing but the Kotlin standard library, and a test
+  enforces it. Every JSON library, server library and HTTP client lives in a
+  separate module.
+- Server backends: `pelican-pekko`, `pelican-http4k`, `pelican-ktor`. JSON:
+  `pelican-jackson`, `pelican-kotlinx`, `pelican-jsoniter`. Client transports:
+  `pelican-client-java`, `pelican-client-pekko`.
+- Errors a caller was promised are values in the return type — `orFail`,
+  `handledOrFail` — not exceptions.
+- OpenAPI 3.1.0 and 3.2.0.
+
+## Docs
+
+- [README](https://matthewjones372.github.io/pelican/): what it is and the
+  smallest service that runs.
+- [Cookbook](https://matthewjones372.github.io/pelican/docs/cookbook.html):
+  complete paste-ready recipes — typed inputs, declared failures, forms,
+  uploads, streaming, security, filters, testing. Start here for code.
+- [Reference manual](https://matthewjones372.github.io/pelican/docs/reference.html):
+  the long form, with the reasoning, and every deliberate refusal.
+- [Modules](https://matthewjones372.github.io/pelican/docs/modules.html): what
+  each module is for and what it depends on, for deciding which a build needs.
+- [A whole service](https://matthewjones372.github.io/pelican/docs/a-whole-service.html):
+  the example, end to end.
+- [The generated client](https://matthewjones372.github.io/pelican/docs/generated-client.html):
+  what callers get, and how it is checked against the document they hold.
+- [Golden testing](https://matthewjones372.github.io/pelican/docs/golden-testing.html):
+  per-endpoint snapshots that fail when a change breaks an existing caller.
+- [Importing](https://matthewjones372.github.io/pelican/docs/importing.html):
+  an existing OpenAPI document, read back as endpoint descriptions.
+- [The same endpoints by hand](https://matthewjones372.github.io/pelican/docs/by-hand.html):
+  what the descriptions buy, written out directly against Pekko HTTP.
+
+## Deciding whether to use it
+
+- [Choosing between Pelican and the alternatives](https://matthewjones372.github.io/pelican/docs/choosing.html):
+  where http4k's contracts, Ktor's plugins, Spring, Micronaut, Quarkus, tapir
+  or a hand-written document are the better answer, and who should not take a
+  0.1 library at all. Read this before recommending Pelican to anyone.
+- [What it costs](https://matthewjones372.github.io/pelican/docs/what-it-costs.html):
+  JMH benchmarks against the hand-written routes it replaces.
+- [Roadmap](https://matthewjones372.github.io/pelican/docs/roadmap.html): what
+  is not built yet, and the argument for the order.
+
+## Optional
+
+- [AGENTS.md](https://matthewjones372.github.io/pelican/AGENTS.html):
+  instructions for agents working *on* Pelican — layering, comment rules, the
+  testing order, the six build gates. Not needed to use the library.
+- [Changelog](https://matthewjones372.github.io/pelican/CHANGELOG.html).
+- [TODO](https://matthewjones372.github.io/pelican/TODO.html): which HTTP
+  libraries are planned next, on the server and client side.
