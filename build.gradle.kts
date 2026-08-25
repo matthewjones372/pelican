@@ -147,7 +147,22 @@ subprojects {
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 
-    tasks.withType<Test>().configureEach { useJUnitPlatform() }
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform()
+
+        // A hung test should fail the build, not stop it. These suites bind
+        // sockets, join on server shutdown and read streams that are supposed
+        // to end, and every one of those waits forever if the thing it is
+        // waiting for never happens. Sixty seconds is roughly ten times the
+        // slowest real test here.
+        systemProperty("junit.jupiter.execution.timeout.default", "60s")
+
+        // A hung test should fail the build, not stop it. These suites bind
+        // sockets, join on server shutdown and read streams that are supposed
+        // to end, and every one of those waits forever if the thing it is
+        // waiting for never happens. Sixty seconds is roughly ten times the
+        // slowest real test here.
+    }
 
     apply(plugin = "org.jetbrains.kotlinx.kover")
 

@@ -25,34 +25,29 @@ import io.ktor.server.response.respondText
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.copyTo
 import io.ktor.utils.io.writeStringUtf8
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletionException
 import kotlin.reflect.KClass
+import kotlin.time.Duration
 
 /**
  * Turns a described [Output] plus a handler's result into a Ktor response.
  *
- * Note the split of responsibilities. Core knows how to render one element —
- * `NdjsonOutput.frame`, `SseOutput.frame` — and this file knows how to put
- * elements on a socket. A streaming output is written with
- * `respondBytesWriter`, collecting the handler's flow and flushing each frame
- * as it is encoded, so the flow is walked at the speed the socket drains and
- * nothing is assembled first.
+ * Core renders one element — `NdjsonOutput.frame`, `SseOutput.frame` — and this
+ * puts elements on a socket with `respondBytesWriter`, flushing each frame as
+ * it is encoded. The flush matters: without it the engine holds frames until
+ * its own buffer fills, which turns a stream into a slow list.
  *
- * The flush matters: without it the engine holds frames until its own buffer
- * fills, which turns a stream into a slow list. This is the one part of
- * streaming the other backends could not fully decide for themselves — see the
- * note on `start` — and on Ktor it is decided here, for every engine.
- *
- * [JsonArrayOutput] is the one output core does not frame; [jsonArrayFrames]
- * supplies the brackets and commas here.
- *
- * [codecs] were resolved for this endpoint when the routes were built, not
- * looked up per request.
+ * [jsonArrayFrames] supplies the one framing core does not. [codecs] were
+ * resolved when the routes were built, not per request.
  */
 @Suppress("UNCHECKED_CAST")
 internal suspend fun respond(
@@ -61,15 +56,12 @@ internal suspend fun respond(
     value: Any?,
     codecs: EndpointCodecs,
 ) {
-    // Every output carrying a payload type had its codec resolved when the
-    // routes were built, so a null here is a bug in that resolution rather
-    // than anything a request can provoke.
+    // Resolved at route-build time, so a null is a bug in that resolution
+    // rather than anything a request can provoke.
     fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
 
-    // The handler named one of the endpoint's declared responses, and that
-    // declaration supplies the status, the media type and the type the body is
-    // written as — so this is the response the document promised, rather than
-    // whichever one happened to be first.
+    // The declaration the handler named supplies the status, the media type
+    // and the type the body is written as.
     if (out is FallibleOutput<*, *>) {
         return when (val outcome = value as Outcome<*, *>) {
             is Outcome.Ok<*> -> respondSuccess(call, out, outcome, codecs)
@@ -97,7 +89,8 @@ internal suspend fun respond(
         is SseOutput<*> -> {
             val o = out as SseOutput<Any?>
             val c = payload()
-            call.stream(ContentType.Text.EventStream, status, elements(value).map { o.frame(c, it) })
+            val frames = elements(value).map { o.frame(c, it) }
+            call.stream(ContentType.Text.EventStream, status, frames.withKeepAlive(o.keepAlive))
         }
 
         is JsonArrayOutput<*> ->
@@ -115,10 +108,9 @@ internal suspend fun respond(
 }
 
 /**
- * A body with no declared length, which is what tells Ktor to chunk it, and one
- * flush per frame, which is what makes those chunks leave promptly. The frames
- * are encoded inside the collect, so nothing is rendered before the socket asks
- * for it.
+ * No declared length, which is what tells Ktor to chunk it, and one flush per
+ * frame. The frames are encoded inside the collect, so nothing is rendered
+ * before the socket asks for it.
  */
 private suspend fun ApplicationCall.stream(
     contentType: ContentType,
@@ -132,14 +124,56 @@ private suspend fun ApplicationCall.stream(
 }
 
 /**
- * Frames a stream of documents as one JSON array.
+ * Injects an SSE comment down a stream that has gone quiet. Idle rather than
+ * periodic, matching `Source.keepAlive` — a busy stream sends nothing extra.
  *
- * Unlike NDJSON and SSE, core does not frame this one — the separators are the
- * backend's business, because Pekko already has `EntityStreamingSupport.json()`
- * and reimplementing it there would be worse. Ktor has no equivalent, so the
- * commas are put in here: the opening bracket travels with the first element
- * rather than ahead of it, so an empty stream still renders `[]` and a failure
- * to produce the first element has not yet committed to an array.
+ * The upstream flow is pumped into a rendezvous channel so that waiting for the
+ * next element becomes something `withTimeoutOrNull` can give up on; collecting
+ * directly offers no such seam. Rendezvous, because a buffer would pull
+ * elements ahead of the socket asking for them.
+ *
+ * A closed channel and an idle one are told apart by the `ChannelResult`, since
+ * both would produce a null.
+ */
+internal fun Flow<String>.withKeepAlive(interval: Duration?): Flow<String> {
+    if (interval == null) return this
+    return channelFlow {
+        val upstream = Channel<String>(Channel.RENDEZVOUS)
+        val pump = launch {
+            try {
+                this@withKeepAlive.collect { upstream.send(it) }
+                upstream.close()
+            } catch (t: Throwable) {
+                // Closed with the cause rather than rethrown, so a failed
+                // stream has one path out instead of two racing ones.
+                upstream.close(t)
+            }
+        }
+        try {
+            while (true) {
+                val next = withTimeoutOrNull(interval) { upstream.receiveCatching() }
+                when {
+                    next == null -> send(SseOutput.KEEP_ALIVE_FRAME)
+
+                    next.isClosed -> {
+                        next.exceptionOrNull()?.let { throw it }
+                        break
+                    }
+
+                    else -> send(next.getOrThrow())
+                }
+            }
+        } finally {
+            pump.cancel()
+        }
+    }
+}
+
+/**
+ * Frames a stream of documents as one JSON array, which core leaves to the
+ * backend. The opening bracket travels with the first element rather than
+ * ahead of it, so an empty stream renders `[]` and a first-element failure has
+ * not yet committed to an array.
  */
 internal fun jsonArrayFrames(elements: Flow<Any?>, codec: BodyCodec<Any?>): Flow<String> =
     flow {
@@ -152,13 +186,10 @@ internal fun jsonArrayFrames(elements: Flow<Any?>, codec: BodyCodec<Any?>): Flow
     }
 
 /**
- * Renders whichever declared success the handler named.
- *
- * Which one that is, and whether it is carrying what it promised, is core's
- * answer rather than this file's — `successNamedBy` — because a bare
- * `ok(value)` names none and so carries no headers, and three interpreters
- * deciding separately what that means is three chances to send a response the
- * document does not describe.
+ * Renders whichever declared success the handler named. Which one, and whether
+ * it carries what it promised, is `successNamedBy`'s answer — a bare
+ * `ok(value)` names none, and three interpreters deciding that separately is
+ * three chances to send an undescribed response.
  */
 private suspend fun respondSuccess(
     call: ApplicationCall,
@@ -167,19 +198,15 @@ private suspend fun respondSuccess(
     codecs: EndpointCodecs,
 ) {
     val chosen = out.successNamedBy(ok)
-    // Encoded and checked against the declaration when the handler produced
-    // the response, so there is nothing left to decide here. Appended before
-    // the body, because writing the body is what commits the response.
+    // Encoded and checked when the handler produced the response. Appended
+    // before the body, because writing the body commits the response.
     ok.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
     respond(call, chosen, ok.value, codecs)
 }
 
 /**
- * Renders one declared failure.
- *
- * The status comes from the declaration the handler named rather than from the
- * payload's type, so two failures carrying the same type under different
- * statuses stay distinct.
+ * Renders one declared failure. The status comes from the declaration rather
+ * than the payload's type, so two failures sharing a type stay distinct.
  */
 private suspend fun respondFailure(
     call: ApplicationCall,
@@ -196,9 +223,8 @@ private suspend fun respondFailure(
         "$declared carries ${declared.type} but the handler returned ${err.error?.let { it::class }}"
     }
     val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
-    // Encoded and checked against the declaration when the handler produced
-    // the failure, so there is nothing left to decide here. Appended before
-    // the body, because writing the body is what commits the response.
+    // Encoded and checked when the handler produced the failure. Appended
+    // before the body, because writing the body commits the response.
     err.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
     call.respondText(
         codec.encodeToString(err.error),
@@ -216,14 +242,11 @@ private fun statusOf(code: Int): HttpStatusCode = HttpStatusCode.fromValue(code)
 private val log: Logger = LoggerFactory.getLogger("io.github.matthewjones372.pelican.ktor")
 
 /**
- * Errors are rendered by hand, through core's own JSON tree, rather than
- * through the configured codec. A codec that has just failed is not the thing
- * to reach for when reporting that it failed.
+ * Rendered through core's own JSON tree rather than the configured codec: a
+ * codec that has just failed is not the thing to report that it failed.
  *
- * Which throwable becomes which response is core's decision ([renderError]), so
- * the three backends cannot drift. What is local to each is the logging: an
- * unexpected throwable is logged *here*, against the reference the caller was
- * given, because Pelican catches it and Ktor would otherwise never see it.
+ * [renderError] decides which throwable becomes which response. What is local
+ * is the logging — Pelican catches the throwable, so Ktor never sees it.
  */
 internal suspend fun ApplicationCall.respondError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null) {
     val rendered = renderError(raw, api?.exposeInternalErrors ?: false)

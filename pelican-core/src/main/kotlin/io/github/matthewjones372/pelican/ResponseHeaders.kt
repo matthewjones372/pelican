@@ -1,32 +1,12 @@
 package io.github.matthewjones372.pelican
 
 /**
- * A header the endpoint promises to send back, declared the same way an input
- * is: once, as a value, reused by the document and by the handler that sets it.
+ * A header the endpoint promises to send back, declared once as a value and
+ * reused by the document and by the handler that sets it. Setting one the
+ * endpoint never declared throws, so the document and the wire cannot disagree.
  *
- * ```
- * val location = responseHeader<String>("Location", "Where the new order lives")
- *
- * val placeOrder = endpoint(newOrder) {
- *     post("orders")
- *     emits(location)
- *     json<Order>(status = 201)
- * }
- *
- * placeOrder handledNow { req ->
- *     val order = Store.create(req)
- *     setHeader(location, "/orders/${order.id}")   // `this` is the request's Params
- *     order
- * }
- * ```
- *
- * Setting one the endpoint never declared throws, so the document and the wire
- * cannot disagree about which headers exist — the same bargain [ParamKey]
- * makes on the way in.
- *
- * The same value declares a header on a *declared failure*, where it belongs
- * to that one response rather than to the endpoint and travels with the
- * failure the handler returns; see [ErrorOutput.invoke].
+ * The same value declares a header on a *declared failure*, where it belongs to
+ * that response alone; see [ErrorOutput.invoke].
  */
 class ResponseHeader<T> @PublishedApi internal constructor(
     val name: String,
@@ -35,8 +15,32 @@ class ResponseHeader<T> @PublishedApi internal constructor(
     /** False for a header sent only sometimes — `Retry-After`, a paging cursor. */
     val required: Boolean = true,
 ) {
+    init {
+        require(name.isNotBlank()) { "A response header needs a name" }
+        require(name.lowercase() !in RESERVED) {
+            "$name is set by the server from the response itself, not declared as a header. " +
+                "Every backend either drops it or sends a second, conflicting copy: " +
+                "Pekko logs it and renders nothing. Content type comes from the output " +
+                "(json, text, bytes(mediaType)); length and framing come from the body."
+        }
+    }
+
     override fun toString() = "responseHeader:$name"
 }
+
+/**
+ * Headers no description may claim, because the server underneath owns them.
+ * Exactly the ones Pekko's renderer drops from a `RawHeader` with only a log
+ * line; the other two send a conflicting duplicate instead.
+ */
+private val RESERVED = setOf(
+    "content-type",
+    "content-length",
+    "transfer-encoding",
+    "connection",
+    "date",
+    "server",
+)
 
 inline fun <reified T : Any> responseHeader(
     name: String,

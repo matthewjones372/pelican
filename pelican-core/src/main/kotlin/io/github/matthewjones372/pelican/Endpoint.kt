@@ -2,32 +2,22 @@ package io.github.matthewjones372.pelican
 
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
+import kotlin.time.Duration
 
 /** A non-2xx response declared for documentation purposes. */
 class ErrorSpec @PublishedApi internal constructor(
-    /**
-     * Null is OpenAPI's `default`: "and anything else". It is the one response
-     * an endpoint can describe and cannot produce — a handler answers with a
-     * status, and there is no status that means "some other status" — so a
-     * null here only ever arrives from [EndpointBuilder.defaultResponse] or
-     * [EndpointBuilder.defaultJson], neither of which hands anything back to
-     * return. [ErrorOutput.status], the one a handler names, stays an `Int`.
-     */
+    /** Null is OpenAPI's `default`: "and anything else", which no handler can name. */
     val status: Int?,
     val description: String,
     val type: KType?,
-    /**
-     * Headers this failure carries — `Retry-After` on a 429, chiefly. Set
-     * either way it is declared: by `errorResponse(...)` for a failure that is
-     * only documented, and by `errorJson(...)` for one a handler returns.
-     */
+    /** Headers this failure carries — `Retry-After` on a 429, chiefly. */
     val headers: List<ResponseHeader<*>> = emptyList(),
 )
 
 /**
- * A description of one HTTP endpoint. A plain value: it does no work, holds no
- * handler, and mentions no server library. Interpreters turn it into a route,
- * an OpenAPI operation, or a client call.
+ * A description of one HTTP endpoint. A plain value: no handler, no server
+ * library. Interpreters turn it into a route, an OpenAPI operation, or a
+ * client call.
  */
 @Suppress("LongParameterList") // A description record: every parameter is a facet of the description.
 class Endpoint<I, R> internal constructor(
@@ -40,55 +30,37 @@ class Endpoint<I, R> internal constructor(
     val bodyInput: BodyInput<*>?,
     val output: Output<R>,
     val errors: List<ErrorSpec>,
-    /**
-     * What the endpoint promises to send back besides the body. Documented on
-     * the success response, and the only headers a handler may [Params.setHeader].
-     */
+    /** The only headers a handler may [Params.setHeader]. */
     val responseHeaders: List<ResponseHeader<*>>,
     val summary: String?,
     val description: String?,
     val operationId: String?,
     val tags: List<String>,
     val deprecated: Boolean,
-    /**
-     * Kept off the OpenAPI document. Still routed, still callable, still
-     * bound to a typed handler — the description simply is not published.
-     */
+    /** Kept off the OpenAPI document. Still routed and still callable. */
     val hidden: Boolean,
     /**
-     * What a caller must present. Null means "whatever the API says by
-     * default"; an empty list means this endpoint is deliberately public even
-     * when the API has a default. Documentation only — nothing here checks a
-     * token.
+     * Null means the API's default; empty means deliberately public despite
+     * one. Documentation only — nothing here checks a token.
      */
     val security: List<SecurityRequirement>?,
 
     /**
-     * Where this one operation is served from, when that is not where the rest
-     * of the API is — an upload host, a read replica, a service being moved
-     * one route at a time. Empty means the API's own [ApiSpec.servers], which
-     * is what almost every endpoint says.
+     * Where this one operation is served from — an upload host, a read
+     * replica. Empty means the API's own [ApiSpec.servers].
      *
-     * Routing ignores it entirely, and has to: a server serves what it serves,
-     * and a description that could redirect a route would be a description
-     * that decides where requests land. What reads it is the document, which
-     * publishes `servers` on the operation, and a generated client, which sends
-     * that operation's calls there instead of to its own base URL. Same list
-     * as [ApiSpec.servers], first entry first, for the same reason: a client
-     * has to pick one, and the document's order is the document's answer.
+     * Routing ignores it: a description that could redirect a route would be a
+     * description deciding where requests land. Only the document and a
+     * generated client read it, and a client takes the first entry.
      */
     val servers: List<String>,
 
     /**
-     * The name of the [Webhook] this describes, or null — which is what every
-     * endpoint that is a route says.
+     * The name of the [Webhook] this describes, or null for a route.
      *
-     * A description of a call the service *sends* is the same description read
-     * in the other direction, so it is one of these rather than a second model.
-     * What the name is for is telling the two apart afterwards: [Api] refuses to
-     * bind one, so a webhook cannot become a route by being put in the wrong
-     * list, and [operationName] derives a name from it rather than from a path
-     * that is deliberately empty.
+     * A call the service *sends* is the same description read the other way,
+     * so it is one of these rather than a second model. The name is what tells
+     * the two apart: [Api] refuses to bind one.
      */
     val webhookName: String? = null,
 ) {
@@ -104,10 +76,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     var operationId: String? = null
     var deprecated: Boolean = false
 
-    /**
-     * Leaves this endpoint out of the OpenAPI document. It is still routed and
-     * still served — this hides the description, it does not close the door.
-     */
+    /** Hides the description, not the route: it is still served. */
     var hidden: Boolean = false
 
     internal var method: Method = Method.GET
@@ -129,7 +98,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     internal var securityRequirements: List<SecurityRequirement>? = null
 
     init {
-        // Inputs listed on endpoint(...) register themselves, so each one is
+        // Inputs listed on endpoint(...) register themselves, so each is
         // written down exactly once.
         declared.forEach { key ->
             when (key) {
@@ -141,8 +110,8 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
                 is BodyInput<*> -> bodyInput = key
 
-                // A part is an input in its own right; the envelope holding
-                // them is assembled below, once they are all known.
+                // The envelope holding them is assembled below, once they are
+                // all known.
                 is MultipartPart<*> -> parts += key
 
                 is PathParam<*> -> Unit // matched positionally from the path
@@ -239,41 +208,21 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     // ------------------------------------------------------------ outputs, besides the body
 
-    /**
-     * Declares headers this endpoint sends back. They appear on the success
-     * response in the document, and a handler may set exactly these:
-     *
-     * ```
-     * emits(location, rateLimitRemaining)
-     * ```
-     */
+    /** Declares headers this endpoint sends back; a handler may set exactly these. */
     fun emits(vararg headers: ResponseHeader<*>) { responseHeaders += headers }
 
     // ------------------------------------------------------------ security
 
     /**
-     * Requires [scheme], optionally with [scopes]:
-     *
-     * ```
-     * val placeOrder = endpoint(userId, newOrder) {
-     *     post("users" / userId / "orders")
-     *     security(oauth, "orders:write")
-     *     json<Order>(status = 201)
-     * }
-     * ```
-     *
-     * A scope the scheme never declared fails here, when the endpoint value is
-     * built. Calling this twice records two alternatives — OpenAPI reads a list
-     * of requirements as "any one of these".
+     * Requires [scheme], optionally with [scopes]. A scope the scheme never
+     * declared fails here. Calling this twice records two alternatives, which
+     * is how OpenAPI reads a list of requirements.
      */
     fun security(scheme: SecurityScheme, vararg scopes: String) {
         securityRequirements = securityRequirements.orEmpty() + SecurityRequirement(scheme, scopes.toList())
     }
 
-    /**
-     * Marks this endpoint as open, overriding the API-wide requirement — the
-     * login route, a health check.
-     */
+    /** Overrides the API-wide requirement — the login route, a health check. */
     fun noSecurity() { securityRequirements = emptyList() }
 
     fun errorResponse(status: Int, description: String, vararg headers: ResponseHeader<*>) {
@@ -281,40 +230,18 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     }
 
     /**
-     * Documents OpenAPI's `default` response — "and anything else":
+     * Documents OpenAPI's `default` response — "and anything else".
      *
-     * ```
-     * defaultResponse("Any other failure, as an ApiError")
-     * ```
-     *
-     * This is the one response an endpoint describes and cannot produce.
-     * Everything else declared here is either a status a handler returns or a
-     * status a handler throws, and both are statuses; `default` is the absence
-     * of one. So it returns nothing to name: there is no value to pass to
-     * [orFail], nothing binds it, and no handler can answer with it. What it
-     * does is tell a reader of the document what the statuses this endpoint
-     * did not enumerate will look like when they arrive.
-     *
-     * The alternative was to keep refusing it on import and have no way to
-     * write one, which cost every document that says "and any other error is a
-     * Problem" the fact that it says so — a fact a client generator would
-     * otherwise have to invent.
+     * The one response an endpoint describes and cannot produce, so it returns
+     * nothing to name and nothing binds it.
      */
     fun defaultResponse(description: String, vararg headers: ResponseHeader<*>) {
         errors += ErrorSpec(null, description, null, headers.toList())
     }
 
     /**
-     * The same, for a `default` that carries a JSON payload:
-     *
-     * ```
-     * defaultJson<ApiError>("Any other failure")
-     * ```
-     *
-     * Named after [errorJson] and deliberately unlike it in the one way that
-     * matters: [errorJson] hands back a declaration a handler can return, and
-     * this hands back nothing, because a `default` is not a response anything
-     * can produce. [T] is published as that response's schema and no more.
+     * The same, for a `default` carrying a JSON payload. Unlike [errorJson] it
+     * returns nothing: [T] is published as the schema and no more.
      */
     inline fun <reified T> defaultJson(description: String, vararg headers: ResponseHeader<*>) {
         addDefault(typeOf<T>(), description, headers.toList())
@@ -326,23 +253,12 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     }
 
     /**
-     * Declares a failure response carrying [T] as a JSON body.
+     * Declares a failure carrying [T] as a JSON body. As a statement it only
+     * documents; passed to [orFail] it joins the output type, so the handler
+     * returns it rather than throwing it.
      *
-     * Used as a statement it documents the failure and nothing more. Pass the
-     * value it returns to [orFail] instead and the failure becomes part of the
-     * output type, so the handler must return it rather than throw it:
-     *
-     * ```
-     * json<User>() orFail errorJson<Problem>(404, "No user with that id")
-     * ```
-     *
-     * A failure the handler names has to be nameable, so one shared by several
-     * endpoints is better declared as a top-level `val` with the [errorJson]
-     * function of the same name.
-     *
-     * [headers] are the ones this failure sends with its payload — a
-     * `Retry-After` on a 429. They are documented on that response, and the
-     * handler supplies their values when it returns the failure.
+     * [headers] travel with this failure's payload and the handler supplies
+     * their values.
      */
     inline fun <reified T> errorJson(
         status: Int,
@@ -362,10 +278,8 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     /**
      * A single JSON value. Handler produces `T`.
      *
-     * [headers] belong to *this* response rather than to the endpoint, and are
-     * only nameable where the handler names the response it is producing —
-     * which is to say where the endpoint declares more than one. Use
-     * `emits(...)` for a header every response carries.
+     * [headers] belong to this response alone, so they are only settable where
+     * the handler names it. Use `emits(...)` for one every response carries.
      */
     inline fun <reified T> json(status: Int = 200, vararg headers: ResponseHeader<*>): JsonOutput<T> =
         JsonOutput(status, typeOf<T>(), headers.toList())
@@ -374,17 +288,19 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     inline fun <reified T> ndjson(status: Int = 200): NdjsonOutput<T> =
         NdjsonOutput(status, typeOf<T>())
 
-    /**
-     * A streamed JSON array. Renders as `[{...},{...}]` with the elements
-     * flushed as they are produced — Pekko implements the framing with
-     * `EntityStreamingSupport.json()`.
-     */
+    /** A streamed JSON array, flushed as elements are produced. */
     inline fun <reified T> jsonArray(status: Int = 200): JsonArrayOutput<T> =
         JsonArrayOutput(status, typeOf<T>())
 
-    /** Server-sent events. Handler produces the backend's stream of `T`. */
-    inline fun <reified T> sse(status: Int = 200, eventName: String? = null): SseOutput<T> =
-        SseOutput(status, typeOf<T>(), eventName)
+    /**
+     * Server-sent events. Handler produces the backend's stream of `T`.
+     * [keepAlive] fills an idle stream; see [SseOutput.keepAlive].
+     */
+    inline fun <reified T> sse(
+        status: Int = 200,
+        eventName: String? = null,
+        keepAlive: Duration? = null,
+    ): SseOutput<T> = SseOutput(status, typeOf<T>(), eventName, keepAlive)
 
     /** An opaque byte stream. Handler produces the backend's stream of bytes. */
     fun bytes(mediaType: String = "application/octet-stream", status: Int = 200): ByteStreamOutput =
@@ -400,25 +316,11 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 }
 
 /**
- * Describes an endpoint, declaring its inputs by listing them.
+ * Describes an endpoint, declaring its inputs by listing them. Listing one
+ * registers it for decoding, for documentation, and in the handler's
+ * signature at once, so reading an undeclared input does not compile.
  *
- * ```
- * val streamOrders = endpoint(userId, limit, statusFilter) {
- *     get("users" / userId / "orders")
- *     ndjson<Order>()
- * }
- *
- * streamOrders streamedNow { (id, lim, status) -> ... }   // (Long, Int, OrderStatus?)
- * ```
- *
- * Listing an input here does three things at once: it registers the parameter
- * for decoding, registers it for documentation, and fixes the handler's
- * signature. The handler receives exactly the declared inputs, with their
- * declared types — reading anything else is not a runtime error, it does not
- * compile.
- *
- * There is one overload per arity up to six. Past that a tuple stops paying for
- * itself; drop to the lens form below.
+ * One overload per arity up to six; past that use the lens form below.
  */
 fun <A, R> endpoint(
     a: ParamKey<A>,
@@ -485,19 +387,14 @@ fun <A, B, C, D, E, F, R> endpoint(
 )
 
 /**
- * Describes an endpoint in lens style: the handler receives the whole [Params]
- * bag and reads it by key, with inputs registered by `query(...)`/`header(...)`
- * inside the block. More flexible past five or six inputs, at the cost of the
- * compile-time guarantee — reading an undeclared key throws at request time
- * rather than failing to compile.
+ * Lens style: the handler reads the whole [Params] bag by key. More flexible
+ * past five or six inputs, at the cost of the compile-time guarantee —
+ * an undeclared key throws at request time instead.
  */
 fun <R> endpoint(block: EndpointBuilder.() -> Output<R>): Endpoint<Params, R> =
     describe(lensInputs, block)
 
-/**
- * Describes an endpoint with an [Inputs] built elsewhere — [noInputs] for an
- * endpoint that reads nothing, or a projection of your own.
- */
+/** With an [Inputs] built elsewhere — [noInputs], or a projection of your own. */
 fun <I, R> endpoint(
     inputs: Inputs<I>,
     block: EndpointBuilder.() -> Output<R>,
@@ -513,12 +410,9 @@ private fun <I, R> describe(
 }
 
 /**
- * The same, for the description of a call the service sends. It goes through
- * [build] rather than beside it because a webhook is an endpoint description —
- * the differences are the two lines below and the checks [webhook] runs after,
- * and a second builder would have been the whole DSL copied to change them.
- *
- * The lens inputs are not a limitation being worked around: see [webhook].
+ * The same, for a call the service sends. Shares [build] because a webhook is
+ * an endpoint description; a second builder would have copied the whole DSL to
+ * change two lines.
  */
 internal fun <R> describeWebhook(
     name: String,
@@ -526,8 +420,8 @@ internal fun <R> describeWebhook(
     block: EndpointBuilder.() -> Output<R>,
 ): Endpoint<Params, R> {
     val b = EndpointBuilder(lensInputs.keys)
-    // Set before the block, so that a block calling `post(...)` overwrites it
-    // and is caught saying what it may not say, rather than silently winning.
+    // Set before the block, so a block calling `post(...)` overwrites it and
+    // is caught rather than silently winning.
     b.method = method
     val out = b.block()
     return build(lensInputs, b, out, webhookName = name)
@@ -539,19 +433,16 @@ private fun <I, R> build(
     out: Output<R>,
     webhookName: String? = null,
 ): Endpoint<I, R> {
-    // A failure declared outside the block — a top-level val shared by several
-    // endpoints — is documented here, when the output that names it is seen.
-    // One declared with errorJson(...) inside the block is already recorded.
+    // A failure declared outside the block is documented here; one declared
+    // with errorJson(...) inside it is already recorded.
     if (out is FallibleOutput<*, *>) {
         out.failures
             .filterNot { declared -> b.declaredFailures.any { it === declared } }
             .forEach { b.errors += it.spec() }
     }
 
-    // The parts an endpoint declares *are* its body, so the envelope is built
-    // here rather than written down. Declaring a body as well would leave two
-    // things claiming to be one, and there is no reading of that which is not
-    // a mistake — hence the require rather than a rule about which wins.
+    // The parts an endpoint declares are its body, so the envelope is built
+    // here. A body as well would leave two things claiming to be one.
     if (b.parts.isNotEmpty()) {
         require(b.bodyInput == null) {
             "An endpoint declaring multipart parts cannot also declare a ${b.bodyInput} — " +
@@ -584,10 +475,8 @@ private fun <I, R> build(
 }
 
 /**
- * Catches the mismatches the type system can't see: an input declared but not
- * present in the path, or a path capture nobody can read. Runs when the
- * endpoint value is created, so it fails at class-init time, not on the first
- * request.
+ * Catches what the type system cannot see: an input declared but absent from
+ * the path, or a capture nobody reads. Runs at class-init, not first request.
  */
 private fun validate(ep: Endpoint<*, *>) {
     val inPath = ep.pathSpec.captures.toSet()
@@ -617,8 +506,7 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     // `default` is one key in OpenAPI's response map, so a second declaration
-    // would not be published beside the first — it would replace it, and the
-    // endpoint would say something nobody wrote.
+    // would replace the first rather than join it.
     if (ep.errors.count { it.status == null } > 1) {
         error(
             "$ep declares more than one default response, and a document has room for one: " +
@@ -627,8 +515,8 @@ private fun validate(ep: Endpoint<*, *>) {
         )
     }
 
-    // Two declarations of one header name would leave a handler unable to say
-    // which it meant, and the document with two entries for one header.
+    // Two declarations of one name leave a handler unable to say which it
+    // meant, and the document with two entries for one header.
     val headerClashes = ep.responseHeaders
         .groupBy { it.name.lowercase() }
         .filterValues { it.size > 1 }
@@ -641,17 +529,10 @@ private fun validate(ep: Endpoint<*, *>) {
 }
 
 /**
- * The two things a reader of a multipart envelope cannot do, checked where the
- * description is built rather than on the request that trips over them.
- *
- * Reading stops at a streamed part — that is what handing one over as a live
- * window on the request means — so **one** part may be streamed, and it is the
- * one that goes last. Everything before it is read as it arrives: text parts,
- * and the [bufferedFile] parts whose whole purpose is to make a second file
- * describable at the price of saying what it costs.
- *
- * Both messages name `bufferedFile` because that is the way out, and it is a
- * way out that did not exist when this was simply "one file part".
+ * Checked where the envelope is described rather than on the request that
+ * trips over it: reading stops at a streamed part, so at most one part may be
+ * streamed and it must go last. [bufferedFile] is the way out, which is why
+ * both messages name it.
  */
 private fun validateParts(ep: Endpoint<*, *>, body: MultipartBody) {
     val streamed = body.fileParts.filter { it.streamed }
@@ -664,16 +545,13 @@ private fun validateParts(ep: Endpoint<*, *>, body: MultipartBody) {
         )
     }
 
-    // Declaration order is what a caller reads the envelope's order off: an
-    // HTML form, a curl invocation, any generator that is not this one. The
-    // two clients here reorder to protect themselves — `partsInWireOrder` —
-    // which is a mitigation, not a licence for the description to describe a
-    // request no server could read.
+    // Declaration order is what a caller reads the envelope's order off — an
+    // HTML form, a curl invocation. The two clients here reorder to protect
+    // themselves (`partsInWireOrder`), which does not licence a description of
+    // a request no server could read.
     //
-    // Any part, not only a file. A text part after the streamed one is read by
-    // nobody either, and where it is optional that is the quieter half: a
-    // required part missing is a 400 that says why, and an optional one is a
-    // default nothing between the caller and the handler can see it got.
+    // Any part, not only a file: a text part after the streamed one is read by
+    // nobody either, and an optional one fails silently to its default.
     val stream = streamed.singleOrNull() ?: return
     val after = body.parts.dropWhile { it !== stream }.drop(1)
     if (after.isNotEmpty()) {
@@ -687,11 +565,9 @@ private fun validateParts(ep: Endpoint<*, *>, body: MultipartBody) {
 }
 
 /**
- * A header declared on one response is supplied where that response is named,
- * and a handler only names a response when there is more than one to choose
- * between. Declared on an endpoint's *only* output it is a promise nothing
- * could keep — the handler returns the payload alone and never sees the
- * declaration — so it is refused here rather than published and never sent.
+ * A response's own headers are supplied where that response is named, and a
+ * handler only names one when there are several. On an endpoint's only output
+ * the promise is unkeepable, so it is refused rather than never sent.
  */
 private fun validateResponseHeaders(ep: Endpoint<*, *>) {
     val declared = ep.output.let { if (it is FallibleOutput<*, *>) it.successes else listOf(it) }
@@ -712,12 +588,9 @@ private fun validateResponseHeaders(ep: Endpoint<*, *>) {
 }
 
 /**
- * What interpreters call this operation: the declared [Endpoint.operationId],
- * or a name derived from the method and the path.
- *
- * Shared deliberately. The OpenAPI document's `operationId` and a generated
- * client's method name are the same string, so a caller reading one and calling
- * the other cannot be looking at two different names for the same endpoint.
+ * The declared [Endpoint.operationId], or one derived from method and path.
+ * The document's `operationId` and a generated client's method name are the
+ * same string on purpose.
  */
 val Endpoint<*, *>.operationName: String
     get() = operationId ?: webhookName ?: derivedOperationName(method, pathSpec)
@@ -733,13 +606,9 @@ private fun derivedOperationName(method: Method, pathSpec: PathSpec): String {
 }
 
 /**
- * How many values a request for this endpoint will decode, for sizing the bag
- * they go into. `LinkedHashMap()` with no argument allocates sixteen buckets
- * on first insert, which is most of a request's worth of allocation for an
- * endpoint that declares two.
- *
- * Capacity, not size: a hash map resizes at three quarters full, so asking for
- * exactly what will be put in it would grow it on the last insert.
+ * How many values a request will decode, for sizing the bag they go into.
+ * `LinkedHashMap()` with no argument allocates sixteen buckets, which is most
+ * of a request's allocation for an endpoint declaring two.
  */
 fun Endpoint<*, *>.declaredInputCount(): Int {
     val declared = pathSpec.captures.size + queries.size + headerParams.size +

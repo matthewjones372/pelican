@@ -90,11 +90,13 @@ streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
 [Inputs and validation](#inputs-and-validation) ·
 [Declared failures](#declared-failures) ·
 [More than one successful response](#more-than-one-successful-response) ·
-[Streaming](#streaming) · [Cookies, forms and uploads](#cookies-forms-and-uploads) ·
+[Streaming](#streaming) · [Content negotiation](#content-negotiation) ·
+[Cookies, forms and uploads](#cookies-forms-and-uploads) ·
 [Response headers](#response-headers) · [Webhooks](#webhooks)
 
 **[Serving and testing](#serving-and-testing)** —
-[Running a server](#running-a-server) · [Testing](#testing) · [Backends](#backends)
+[Running a server](#running-a-server) · [Using it with existing routes](#using-it-with-existing-routes) ·
+[Testing](#testing) · [Backends](#backends)
 
 **[Appendix](#appendix)** — [Longer documents](#longer-documents) ·
 [Running the examples](#running-the-examples) · [Versions](#versions)
@@ -397,6 +399,7 @@ stream type, so a stream is still a success and still the only one. See
 ```kotlin
 ndjson<Order>()             // one JSON document per line
 sse<Tick>(eventName = "order")
+sse<Tick>(keepAlive = 15.seconds)   // a comment down a stream that has gone quiet
 jsonArray<Order>()          // `[{...},{...}]`, flushed as produced
 bytes()                     // opaque, never buffered
 ```
@@ -404,6 +407,30 @@ bytes()                     // opaque, never buffered
 Handlers return a stream and back-pressure runs from the socket to the source.
 The test suite throttles a source and fails if the first frame does not arrive
 well before the last, so a response that quietly buffers is caught as a bug.
+
+An SSE stream that produces nothing looks exactly like a dead one, and proxies,
+load balancers and phone radios drop it accordingly. `keepAlive` sends an SSE
+comment down a stream that has been idle that long — invisible to any client,
+enough to keep the connection open. It is off by default, because a stream that
+emits every second has nothing to gain from it.
+
+## Content negotiation
+
+An endpoint declares one media type per response, so `Accept` has one question
+to answer: will this caller read what this endpoint sends? If not, it gets a
+406 naming what was on offer, before the handler runs.
+
+```
+GET /orders   Accept: application/json   ->  200
+GET /orders   Accept: */*                ->  200
+GET /orders   Accept: text/csv           ->  406
+```
+
+Wildcards match, quality values are honoured including `q=0`, and a more
+specific range beats a less specific one — so a header meaning "anything except
+JSON" is read that way. A request with no `Accept`, or one nothing parseable can
+be got out of, asks for nothing in particular and is served. A response with no
+body — a 204 — has nothing to negotiate and is never refused.
 
 ## Cookies, forms and uploads
 
@@ -466,6 +493,11 @@ placeOrder handledNow { req ->
     order
 }
 ```
+
+`Content-Type`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Date` and
+`Server` cannot be declared: the server underneath sets them from the response
+itself, and one declared here would be dropped or duplicated depending on the
+backend. Content type comes from the output — `json`, `text`, `bytes(mediaType)`.
 
 Declaring the header puts it in the document with its schema, its description
 and whether it is always sent, and it is also the only thing `setHeader` will
@@ -540,9 +572,51 @@ val server = ordersApi().startWithDocs(system, port = 8080, docs = ordersDocs)
 ```
 
 `stop()` unbinds the port either way, and terminates the system only if Pelican
-created it: whoever made a system is who ends it. `toRoute(system)` is still
-there for a service that concatenates Pelican's route with its own and binds
-the result itself.
+created it: whoever made a system is who ends it.
+
+### Using it with existing routes
+
+Pelican does not have to own the port. Every `start` takes the route, handler or
+module as a parameter, so described endpoints go in beside routes you already
+have — which is what adopting it one endpoint at a time looks like.
+
+**Pekko** — `toRoute(system)` is a `Route` like any other:
+
+```kotlin
+val health = Directives.path("health") {
+    Directives.get { Directives.complete("ok") }
+}
+
+ordersApi().start(port = 8080) { system ->
+    Directives.concat(health, toRoute(system))
+}
+```
+
+**http4k** — `toHttpHandler()` is a `RoutingHttpHandler`:
+
+```kotlin
+val health = "/health" bind Method.GET to { Response(OK).body("ok") }
+
+ordersApi().start(port = 8080) { routes(health, toHttpHandler()) }
+```
+
+**Ktor** — `pelican(api)` installs the endpoints into a `Route`, so it composes
+with everything Ktor routing composes with: put it behind a `route("/v2")`,
+inside an `authenticate { }` block, or beside handwritten routes:
+
+```kotlin
+ordersApi().start(port = 8080) { api ->
+    install(CallLogging)
+    routing {
+        get("/health") { call.respondText("ok") }
+        pelican(api)
+    }
+}
+```
+
+Or bind the route yourself and never call `start` at all — `toRoute`,
+`toHttpHandler` and `Route.pelican` are the whole interface, and none of them
+starts anything.
 
 ### Filters
 

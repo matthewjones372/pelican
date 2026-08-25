@@ -43,6 +43,12 @@ dependencies {
     // The in-memory transports are per-backend, so the suites that run twice
     // ask for the one they need. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
+
+    // Pekko's own actor testkit, so a test needing a caller's ActorSystem gets
+    // one that is shut down and waited for by the JUnit extension rather than
+    // by a hand-written @AfterAll. The BOM comes transitively from
+    // pelican-pekko, so the version is that module's.
+    testImplementation("org.apache.pekko:pekko-actor-testkit-typed_2.13")
     testImplementation(project(":pelican-test-http4k"))
 
     // Matchers, declared here rather than arriving through pelican-test. The
