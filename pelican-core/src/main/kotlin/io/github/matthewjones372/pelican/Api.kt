@@ -37,6 +37,49 @@ class ApiSpec(
     init {
         refuseWebhooksAmong(endpoints)
         refuseRepeatedWebhooks(webhooks)
+        refuseRepeatedRoutes(endpoints)
+        refuseRepeatedOperationNames(endpoints, webhooks)
+    }
+}
+
+/**
+ * The document keys an operation by path and method, so the second of two would
+ * replace the first and never be published. [Api] refuses the same thing in the
+ * words of a router; this is the description's own reason, and it is the one a
+ * documentation-only build reaches.
+ */
+private fun refuseRepeatedRoutes(endpoints: List<Endpoint<*, *>>) {
+    val clashes = endpoints
+        .groupBy { it.method to it.pathSpec.template }
+        .filterValues { it.size > 1 }
+        .keys
+    require(clashes.isEmpty()) {
+        "Two endpoints are described for " + clashes.joinToString { (m, path) -> "$m $path" } +
+            ", and a document has one entry per path and method — the second would replace the " +
+            "first and never be published. Describe one, or give it a path of its own."
+    }
+}
+
+/**
+ * `operationId` has to be unique across a document, and it is also the method
+ * name a generated client takes, so two of them produce a file that does not
+ * compile. Checked on the resolved name, which covers a derived one as well as
+ * a declared one.
+ *
+ * A webhook counts once per name rather than once per entry: several methods
+ * under one name are deliberately allowed — [refuseRepeatedWebhooks] is where
+ * that rule lives — and they are one key in `webhooks` between them. What is
+ * refused here is a name an endpoint and a webhook both answer to.
+ */
+private fun refuseRepeatedOperationNames(endpoints: List<Endpoint<*, *>>, webhooks: List<Webhook>) {
+    val named = endpoints.map { it.operationName to it.toString() } +
+        webhooks.distinctBy { it.operationName }.map { it.operationName to it.toString() }
+    val clashes = named.groupBy { it.first }.filterValues { it.size > 1 }
+    require(clashes.isEmpty()) {
+        clashes.entries.joinToString("; ") { (name, owners) ->
+            "The operationId '$name' is declared by " + owners.joinToString { it.second }
+        } + ". It is the document's key for an operation and a generated client's method name, " +
+            "so the second would replace the first. Give one of them an operationId of its own."
     }
 }
 
