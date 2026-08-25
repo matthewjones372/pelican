@@ -18,6 +18,20 @@ maintained by habit. The unfinished parts are on either side of that core:
 what happens to a request while it is being served — metrics, traces, response
 rewriting — and what the caller gets.
 
+## What has since landed
+
+Two of the items below are partly done, and the page says so here rather than
+being quietly rewritten, because the argument for the order is worth keeping
+next to the result of following it.
+
+- **Item 1** shipped as `pelican-metrics`: `Endpoint.statusFor` resolves the
+  status once in core, `afterStatus` hands it to a filter, and a counter and a
+  timer come out tagged from the description. OpenTelemetry is still to do.
+- **Item 2** shipped as [Choosing between Pelican and the alternatives](choosing.md).
+- **Item 3** shipped its first phase: `ClientTransport` in core and
+  `pelican-client-java` over the JDK's own `HttpClient`. The Ktor and Pekko
+  adapters, the `suspend` surface and the retry policy are still to do.
+
 ## 1. Metrics and traces, from the description
 
 An endpoint already carries everything a useful metric needs a dimension for:
@@ -175,12 +189,29 @@ error. Worth doing, worth doing after the items above.
 `endpoint(a..f)` takes six typed inputs; past that a handler drops to the lens
 form and reads the whole `Params`. More overloads are one answer and a nicer
 builder is another, and neither is urgent — six covers nearly every endpoint
-anyone writes.
+anyone writes. Worth knowing where the bar actually sits: tapir does not escape
+this either, its `TupleArity` instances stopping at twenty-one. So the gap is
+six against twenty-one rather than six against no limit at all.
 
 Separately: the small greetings example runs on all three backends, but the
 fuller orders service is wired on Pekko and http4k only. "The backend is just a
 choice" is a claim the examples should demonstrate rather than assert, so the
 Ktor wiring should exist too.
+
+## 8. OpenAPI 3.2.0
+
+The emitter writes 3.1.0 and nothing else, and the reference manual frames that
+as a deliberate step forward under the heading "Moving from 3.0.3 to 3.1.0".
+That framing has expired: 3.2.0 has been the current specification since
+19 September 2025, and http4k's own renderer already defaults to it. Writing
+3.1.0 is now neither the floor nor the ceiling, and a reader whose tooling
+dictates a version rules Pelican out on it faster than on anything else here.
+
+This is late in the list only because it was written after the rest. On cost
+against value it belongs near the top: the document is emitted from one place,
+and what changed between 3.1 and 3.2 is additive for what Pelican describes.
+What it needs first is a survey of exactly what differs, so that emitting the
+newer number is not a claim the document cannot support.
 
 ## Not on this list
 
