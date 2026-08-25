@@ -14,45 +14,75 @@ one.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0]
+
+Ninety-seven commits since 0.1.0. One breaking change, named below.
+
+### Changed — read this one
+
+- **`endpoint { }` now means no inputs**, not the lens form. `endpoint(a)` is one
+  input and `endpoint(a, b)` is two, so no arguments should be none; the lens is
+  `endpoint(lensInputs) { }`, which is a name rather than an absence, and
+  `noInputs` is gone. Every affected call site is a compile error — a handler's
+  parameter moves from `Params` to `Unit` — so nothing silently keeps working
+  and means something else.
+- **`Fallible<E, T>` is gone**, replaced by `Outcome<E, T>` in the same position.
+  It was a phantom with a private constructor whose only appearance was in the
+  compiler error you got for using the wrong binder, where it named a type you
+  had never written. That error now reads `expected 'Outcome<Problem, Item>'`.
+
 ### Added
 
-- **`pelican-metrics`.** `Endpoint.statusFor` resolves the status once in core
-  and `afterStatus` hands it to a filter, so a counter and a timer come out
-  tagged from the description rather than from a string passed by hand.
-  OpenTelemetry spans alongside the meters.
-- **A client transport SPI.** `ClientTransport` in core, with
-  `pelican-client-java` over the JDK's own `HttpClient` and
-  `pelican-client-pekko` beside it. A generated client also offers a `suspend`
-  call surface and a retry policy.
+- **Routing that does not depend on how many endpoints you have.** Descriptions
+  go into a trie once instead of a list each router walks in turn. At two
+  hundred endpoints a request went from about 150µs to 223ns on http4k and 645ns
+  on Pekko — and both are now faster than the same routes registered by hand at
+  *every* size, including one. See [what it costs](docs/what-it-costs.md).
+- **`pelican-mcp`.** The endpoints as MCP tool descriptions and a dispatch that
+  runs them through the handler the route already has.
+- **`pelican-schema`.** A derived JSON Schema that resolves on its own, for
+  anything holding one without your OpenAPI document around it.
+- **`pelican-metrics` and `pelican-metrics-otel`.** Micrometer meters and
+  OpenTelemetry spans, dimensioned from the descriptions rather than by hand.
+- **A client transport SPI** — `ClientTransport` in core, with adapters over the
+  JDK's `HttpClient`, Pekko's and Ktor's — plus a `suspend` call surface and a
+  retry policy for generated clients.
 - **OpenAPI 3.2.0**, written as well as 3.1.0.
-- **Content negotiation on request bodies**, SSE keep-alives, and reserved
-  response headers.
-- **`pelican-test-golden`** fails when a change breaks an existing caller,
-  rather than only recording that the contract moved.
-- **`docs/choosing.md`** — where http4k's contracts, Ktor's plugins, Spring,
-  Micronaut, Quarkus, tapir or a hand-written document are the better answer.
-- **`docs/roadmap.md`** — what is not built yet and the argument for the order.
-- **`docs/cookbook.md`** — complete recipes rather than fragments.
-- **`CHANGELOG.md`**, **`CLAUDE.md`**, **`TODO.md`** and **`llms.txt`**.
-
-### Changed
-
-- **The javadoc jar holds the KDoc.** It was empty, which left javadoc.io blank
-  and the KDoc unreadable without a clone. Dokka renders it.
-- `AGENTS.md` carries the layering, the testing order and the build gates, not
-  only the comment rules.
-- The README says what Pelican is before it says how it works.
-- Renovate opens the dependency pull requests.
+- **`bytesOrFail`**, so a byte stream that may 404 before its first byte is
+  bindable and not merely describable.
+- **A `description` on a declared success**, so two of them stop both saying
+  "Success.".
+- **`UndeclaredResponse`**, so a handler returning a response its endpoint never
+  declared is distinguishable at `onServerError` from a broken codec.
 
 ### Fixed
 
-- **Generation under a parallel build.** The generator templates are read
-  through a connection of their own rather than a stream the worker's
-  classloader owns and closes, which failed `generate<Name>Endpoints` with
-  `java.io.IOException: Stream closed` whenever another task finished first.
-- jsoniter binds a value class as the value inside it, and honours jsoniter's
-  own settings and config contract.
-- The transport is named where two adapters are present.
+- **`maxBodyBytes` counted characters on http4k and Ktor**, so an 8MB limit
+  admitted roughly 24MB of CJK — and the body was already whole in memory before
+  there was a length to check. Both now count bytes as they read.
+- **Jackson dropped the discriminator on a collection of a union**, so
+  `json<List<PaymentMethod>>()` went out with no `kind` on any member and could
+  not be read back.
+- **kotlinx described a value class as an object** while writing it as a number.
+- **A slow request body** is a 408 on Pekko rather than an undescribed 500.
+- **Two parameters under one name** and **two endpoints sharing an
+  `operationId`** are refused where the endpoint is described, instead of
+  producing an invalid document and a client that will not compile.
+- **`ApiSpec` silently dropped one of two endpoints on a route.** `Api` refused
+  it; a documentation-only build did not.
+- **Parameter defaults and `emits(...)` headers on failures** now reach the
+  document, which the server was already applying and sending.
+
+### Known
+
+- **A handler can return a failure its endpoint never declared.** `E` is pinned
+  to the failure's *payload type*, not to the `ErrorOutput` that declared it, so
+  any failure carrying the same type fits — and `ApiError` is the payload of
+  most of them. It is an `UndeclaredResponse` when the response is written: a 500
+  with a reference, the whole story in the log. See
+  [declared failures](docs/reference.md#declared-failures).
 
 ## [0.1.0] — 2026-08-24
 
