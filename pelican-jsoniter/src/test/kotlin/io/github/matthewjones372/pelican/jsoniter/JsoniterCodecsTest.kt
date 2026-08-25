@@ -1,6 +1,8 @@
 package io.github.matthewjones372.pelican.jsoniter
 
+import com.jsoniter.output.EncodingMode
 import com.jsoniter.spi.Config
+import com.jsoniter.spi.DecodingMode
 import com.jsoniter.spi.JsonException
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.JsonArr
@@ -52,10 +54,10 @@ class JsoniterCodecsTest {
 
     @Test
     fun `a missing property takes the constructor's default, not a zero`() {
-        // The reason this module does its own binding. jsoniter's own reflection
-        // decoder builds the object first and assigns fields after, so a
-        // `quantity` nobody sent arrives as 0 — a wrong order, silently, which
-        // is worse than a rejected one.
+        // The reason this module does its own binding. jsoniter constructs
+        // first and assigns fields after, so it refuses a class with no
+        // no-argument constructor outright, and the `@JsonCreator` it offers
+        // instead throws on a `quantity` nobody sent rather than defaulting it.
         codec<Line>().decodeFromString("""{"sku":"sku-1"}""") shouldBe Line("sku-1")
         codec<Line>().decodeFromString("""{"sku":"sku-1","quantity":7}""") shouldBe Line("sku-1", 7)
     }
@@ -223,16 +225,56 @@ class JsoniterCodecsTest {
 
     @Test
     fun `a config that was not built here is refused rather than silently wrong`() {
-        // A plain jsoniter config parses perfectly well and binds a data class
-        // wrongly, which is the failure this module exists to prevent.
+        // A plain jsoniter config parses perfectly well and refuses to bind a
+        // data class at all, which is the failure this module exists to prevent.
         shouldThrow<IllegalArgumentException> { JsoniterCodecs(Config.Builder().build()) }
             .message shouldContain "jsoniterConfig"
     }
 
     @Test
-    fun `a configured config is used`() {
+    fun `a codegen mode is refused, because javassist is not a dependency here`() {
+        shouldThrow<IllegalArgumentException> {
+            jsoniterConfig { decodingMode(DecodingMode.DYNAMIC_MODE_AND_MATCH_FIELD_WITH_HASH) }
+        }.message shouldContain "REFLECTION_MODE"
+        shouldThrow<IllegalArgumentException> {
+            jsoniterConfig { encodingMode(EncodingMode.DYNAMIC_MODE) }
+        }.message shouldContain "REFLECTION_MODE"
+    }
+
+    @Test
+    fun `an indented config indents the way jsoniter does`() {
+        // The first field included: jsoniter's own encoder writes the indention
+        // that `writeObjectStart` only counts, and an object that skips it opens
+        // with its first field sharing the brace's line.
         val indented = JsoniterCodecs(jsoniterConfig { indentionStep(2) })
-        indented.codec<Line>(typeOf<Line>()).encodeToString(Line("s")) shouldContain "\n"
+
+        indented.codec<Line>(typeOf<Line>()).encodeToString(Line("sku-1")) shouldBe
+            "{\n  \"sku\": \"sku-1\",\n  \"quantity\": 1,\n  \"note\": null\n}"
+        indented.codec<Payment>(typeOf<Payment>()).encodeToString(Payment.Transfer("GB33")) shouldBe
+            "{\n  \"type\": \"Transfer\",\n  \"iban\": \"GB33\"\n}"
+    }
+
+    @Test
+    fun `omitDefaultValue leaves out what jsoniter leaves out`() {
+        val terse = JsoniterCodecs(jsoniterConfig { omitDefaultValue(true) })
+
+        terse.codec<Line>(typeOf<Line>()).encodeToString(Line("sku-1", quantity = 0)) shouldBe """{"sku":"sku-1"}"""
+        // And the setting is the config's, not the module's: the default config
+        // still writes a null the document says can be null.
+        codec<Line>().encodeToString(Line("sku-1", quantity = 0)) shouldBe
+            """{"sku":"sku-1","quantity":0,"note":null}"""
+    }
+
+    @Test
+    fun `what follows a union in a payload is still read as Kotlin`() {
+        // A branch is decoded by a nested `deserialize`, and jsoniter restores
+        // the *default* config when one ends rather than the config that was
+        // current — leaving the rest of the payload to a jsoniter that has
+        // never heard of Kotlin.
+        val text = """{"paidWith":{"type":"Transfer","iban":"GB33"},"alternatives":[{"type":"Voucher","code":"X"}]}"""
+
+        codec<Checkout>().decodeFromString(text) shouldBe
+            Checkout(Payment.Transfer("GB33"), listOf(Payment.Voucher("X")))
     }
 
     private inline fun <reified T> schemaOf(): JsonObj {

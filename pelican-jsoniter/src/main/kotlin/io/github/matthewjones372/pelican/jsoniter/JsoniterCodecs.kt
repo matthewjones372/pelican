@@ -19,12 +19,13 @@ import kotlin.reflect.KType
  * Api(routes, codecs = JsoniterCodecs(jsoniterConfig { … })) // configured
  * ```
  *
- * jsoniter is the fastest of the three and the only one that predates Kotlin
- * entirely, which is the whole shape of this module: the parsing and the
- * printing are jsoniter's, and the part that knows a data class from a bean is
- * [KotlinBinding][jsoniterConfig]'s. Payload types need no annotations and no
- * compiler plugin — a `data class` is enough — at the cost of the reflection
- * this does at startup, once per type.
+ * jsoniter's parser and printer are the fastest of the three, and jsoniter is
+ * the only one of the three that predates Kotlin entirely, which is the shape
+ * of this module: the parsing and the printing are its, and the part that knows
+ * a data class from a bean is [jsoniterConfig]'s. Payload types need no
+ * annotations and no compiler plugin — a `data class` is enough — paid for by
+ * the reflection the binding does once per type, and by a `callBy` on every
+ * value read.
  *
  * The library has been unmaintained since 2018. That is worth knowing before
  * choosing it over `pelican-jackson`, and it is also why the binding sits here

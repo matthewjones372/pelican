@@ -242,11 +242,13 @@ Api(routes, codecs = JsoniterCodecs(jsoniterConfig { escapeUnicode(false) }))
 `pelican-jsoniter` is the third module and the one whose library has no
 serialization metadata to read: jsoniter was finished in 2018, describes no
 types, and binds a JSON object the way its era did — construct the bean, then
-set a field per property. A Kotlin data class survives neither half of that. Its
-constructor takes every property at once, and that constructor is the only thing
-that knows which properties have defaults, so a field-at-a-time binder does not
-fail on `data class Line(val sku: String, val quantity: Int = 1)` — it returns
-`quantity = 0`, which is a wrong order rather than a rejected one.
+set a field per property. A Kotlin data class survives neither half of that. It
+has no no-argument constructor, so `data class Line(val sku: String, val
+quantity: Int = 1)` is refused outright: `no constructor for: class Line`.
+jsoniter's own answer, `@JsonCreator` on the constructor, gets the object built
+and loses the defaults with it — the `quantity` nobody sent throws inside the
+constructor call, because Kotlin keeps its defaults in a synthetic constructor
+that nothing but `callBy` reaches.
 
 So the binding is done in the module, over `kotlin.reflect`, and handed to
 jsoniter through the two hooks its `Extension` interface offers. A payload type
@@ -266,10 +268,16 @@ own name, described as a `oneOf` with a full `mapping`, so it publishes the same
 shape as the other two modules — with no annotations to declare it, since there
 is no annotation this library reads.
 
+jsoniter's own settings still apply to what the module writes: `indentionStep`
+indents an object the way jsoniter indents one, and `omitDefaultValue` leaves
+out what jsoniter's rule leaves out. The codegen modes are the exception — they
+compile decoders with javassist, which is not a dependency here, so a config
+asking for one is refused at assembly rather than failing on the first request.
+
 Three things are worth knowing before choosing it. The library has been
 unmaintained since 2018. The config must come from `jsoniterConfig { }`: a plain
-jsoniter `Config` parses perfectly well and binds a data class wrongly, so
-`JsoniterCodecs` refuses one at assembly rather than serving quiet nonsense. And
+jsoniter `Config` parses perfectly well and cannot bind a data class at all, so
+`JsoniterCodecs` refuses one at assembly rather than failing per request. And
 a payload type with type parameters — `Page<Order>` — is refused too, in both
 directions and in the document: nothing carries the argument to where the
 binding happens, so jsoniter would read an `Order` back as a map. Both other
