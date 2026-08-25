@@ -30,15 +30,6 @@ import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.toRoute as toPekkoRoute
 
-/**
- * Described endpoints served next to routes written by hand, on all three
- * backends.
- *
- * Each `start` takes the route, handler or module as a parameter for this: the
- * described endpoints are one value in the backend's own routing, not a server
- * that has to own the port. A service adopting Pelican one endpoint at a time
- * needs that to be true, and it is the claim most easily broken by accident.
- */
 class MountedAlongsideTest {
 
     data class Widget(val id: Long)

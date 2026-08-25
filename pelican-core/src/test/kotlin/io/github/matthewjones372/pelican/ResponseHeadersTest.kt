@@ -5,11 +5,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
-/**
- * A response header is declared the way an input is, and the bargain is the
- * same in the other direction: what a handler may set is what the document
- * promises, because they are the same value.
- */
 class ResponseHeadersTest {
 
     private val location = responseHeader<String>("Location", "Where it went")

@@ -93,10 +93,6 @@ internal class JsoniterConfig private constructor(name: String, builder: Builder
  * The settings are jsoniter's own — `escapeUnicode`, `indentionStep` and the
  * rest are on the builder this hands you:
  *
- * ```
- * JsoniterCodecs(jsoniterConfig { escapeUnicode(false) })
- * ```
- *
  * Decoding and encoding stay in jsoniter's reflection mode, the one that needs
  * no bytecode generation: the codegen modes want javassist, which this module
  * does not depend on, and they are refused rather than accepted and then failed
@@ -141,11 +137,6 @@ private fun decoderFor(type: Type, config: JsoniterConfig): Decoder? {
  * missing property that is merely nullable becomes null, and a missing property
  * that is neither is the error, named, rather than an exception from inside a
  * constructor call that mentions no field at all.
- *
- * A property the class does not declare is skipped rather than refused, which
- * is the same lenience `defaultMapper()` and `defaultJson()` are configured
- * for: an unknown field is a caller running ahead of this server, not a bad
- * request.
  */
 private class ObjectDecoder(private val kclass: KClass<*>) : Decoder {
 
@@ -295,9 +286,6 @@ private fun encoderFor(type: Type, config: JsoniterConfig): Encoder? {
  * and a null one keep the different meanings a document that marks the field
  * nullable gives them, the same choice `defaultMapper()` and `defaultJson()`
  * make.
- *
- * [discriminator], when there is one, is the branch marker a union writes ahead
- * of the branch's own properties.
  */
 private class ObjectEncoder(
     kclass: KClass<*>,
@@ -329,10 +317,6 @@ private class ObjectEncoder(
         for (property in properties) {
             val held = property.read(value)
             if (property.omit?.shouldOmit(held) == true) continue
-            // The indention before the first field belongs to the encoder:
-            // `writeObjectStart` only counts the level, and `writeMore` writes
-            // the ones after it. Without this an indented object opens with its
-            // first field on the brace's line.
             if (first) stream.writeIndention() else stream.writeMore()
             first = false
             stream.writeObjectField(property.name)
@@ -425,11 +409,6 @@ private fun generic(type: Type): String? {
 /**
  * Whether a class was written in Kotlin, which is the line between what this
  * module binds and what it leaves to jsoniter.
- *
- * It has to be asked of the Java class rather than of the Kotlin one, because
- * `KClass` answers for types that have no Kotlin behind them at all: a
- * `java.lang.String` reflects as `kotlin.String`, primary constructor and all,
- * and a binder that trusted that would read every string as an object.
  */
 private val Class<*>.isKotlin: Boolean get() = isAnnotationPresent(Metadata::class.java)
 

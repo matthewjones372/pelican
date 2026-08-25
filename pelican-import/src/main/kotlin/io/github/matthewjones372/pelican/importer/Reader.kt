@@ -7,11 +7,6 @@ import java.io.File
 
 /**
  * A document, read as endpoint descriptions.
- *
- * Version differences are gone before this starts — [Swagger2] and
- * [normaliseSchemas] — so what is read is one shape and the only interesting
- * decision is what to refuse. Refusals are recorded per operation rather than
- * thrown, so one run reports every one. See [Problems].
  */
 internal class Reader(private val options: ImportOptions) {
 
@@ -72,11 +67,6 @@ internal class Reader(private val options: ImportOptions) {
 
     /**
      * One operation as a description, or null with the reason recorded.
-     *
-     * Recorded rather than thrown so that one run reports every operation that
-     * could not be described — see [Problems]. Shared by the two passes because
-     * the refusals are the same refusals: a webhook is read by the same reader
-     * that reads a route, which is the whole reason it can be imported at all.
      */
     private fun describe(operation: Operation): IrEndpoint? = try {
         endpoint(operation)
@@ -87,13 +77,6 @@ internal class Reader(private val options: ImportOptions) {
 
     /**
      * The named schemas the imported endpoints actually reach, checked.
-     *
-     * Only the ones reached: `components` is a library, and a type nobody uses
-     * is not worth failing over. So excluding an operation excludes the schemas
-     * only it used.
-     *
-     * Reached and unmodellable fails the import outright: a `oneOf` under
-     * `Order` is not one operation's problem.
      */
     private fun used(endpoints: List<IrEndpoint>, declared: JsonObj): JsonObj {
         val reachable = Schemas.reachable(endpoints.flatMap { it.schemas() }, declared)
@@ -130,9 +113,6 @@ internal class Reader(private val options: ImportOptions) {
      * A `servers` list, wherever it sits. One reading for both, or the two
      * would come to disagree about what a templated URL means. [where] is what
      * a failure calls it.
-     *
-     * A variable with no default fails outright rather than per operation: the
-     * document does not say what its own URL is.
      */
     private fun serverUrls(node: JsonObj, where: String): List<String> =
         node.arr("servers").mapIndexedNotNull { i, server ->
@@ -211,14 +191,6 @@ internal class Reader(private val options: ImportOptions) {
 
     /**
      * Every operation in the document, named and in document order.
-     *
-     * `operationId` is required here although the document makes it optional:
-     * the generated value, the client's method and the handler stub are all
-     * named after it, and deriving one from method and path would produce
-     * `getOrdersByOrderIdItems` and rename half the file on a route change.
-     *
-     * One pass over both sections, since a webhook and a route are two values
-     * in one generated file and a shared id is a clash either way.
      */
     private fun operations(): Found {
         val naming = Naming()
@@ -341,9 +313,6 @@ internal class Reader(private val options: ImportOptions) {
      * destination is a URL this document has never seen — so reading it would
      * invent a rule and dropping it would be a silent weakening. Recorded per
      * operation, so `exclude` is the way past.
-     *
-     * A streamed response is refused for core's reason: nothing on this side
-     * consumes a stream from a subscriber.
      */
     private fun checkWebhook(operation: Operation, responses: Responses.Result) {
         if (operation.node.arr("servers").isNotEmpty()) {

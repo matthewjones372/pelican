@@ -15,10 +15,6 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 
-/**
- * The claim the example makes: the JSON library is one argument of [notesApi],
- * and changing it changes neither what goes on the wire nor what is published.
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ThreeCodecsTest {
 

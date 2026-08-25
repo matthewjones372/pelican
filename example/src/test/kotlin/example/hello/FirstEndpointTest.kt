@@ -5,11 +5,6 @@ import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-/**
- * The two assertions the README's "Your first endpoint" section shows, so that
- * the smallest example on the front page is a thing that runs rather than a
- * thing that reads well.
- */
 class FirstEndpointTest {
 
     private val app = greetings().inMemory("first-endpoint")

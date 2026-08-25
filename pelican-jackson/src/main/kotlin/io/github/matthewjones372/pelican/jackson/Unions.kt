@@ -24,15 +24,6 @@ import kotlin.reflect.KClass
  * branch's *schema* name, so a service whose wire value is `bank_transfer`
  * publishes `BankTransfer`: a document confidently different from the service.
  *
- * So hierarchies are rewritten from the annotations into 3.1's spelling, which
- * `KotlinxCodecs` already publishes: `oneOf` with a `discriminator` naming every
- * branch. A document that changed shape when a service swapped JSON libraries
- * would be one its readers could not depend on.
- *
- * What the parent held is pushed down rather than dropped, since a `oneOf`
- * branch is the whole payload — leaving the `allOf` would point each branch at
- * a parent that is now a `oneOf` of those branches.
- *
  * A hierarchy under a hierarchy is published flat: Jackson resolves the declared
  * base type's type id and no other, so a leaf two levels down is chosen by the
  * root's property under its own name. kotlinx.serialization flattens the same
@@ -136,10 +127,6 @@ private class Hierarchies(private val schemas: Map<String, JsonObj>, private val
     /**
      * A branch as the whole payload it is: what the hierarchy declared above
      * it, then what it declares itself.
-     *
-     * The discriminator property is left out of branches and parent alike: it
-     * is what the `discriminator` is about, and declaring it would put a field
-     * in the document that no class generated from that document has.
      */
     private fun branch(name: String, schema: JsonObj): JsonObj {
         val above = above(name)
@@ -221,11 +208,6 @@ private class Hierarchies(private val schemas: Map<String, JsonObj>, private val
      * The classes a payload can actually be, walking through middle levels
      * rather than publishing them: Jackson resolves the declared base type's
      * id and no other, so a level between root and leaf is never on the wire.
-     *
-     * [seen] is the path down to here rather than everything met so far, so a
-     * `@JsonSubTypes` pointing back up is a refusal naming the class rather
-     * than a stack overflow. Two branches legitimately reaching one class are
-     * the repeated-value check's complaint instead.
      */
     private fun leaves(
         root: String,

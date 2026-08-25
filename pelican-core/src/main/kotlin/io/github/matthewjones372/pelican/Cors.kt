@@ -29,18 +29,6 @@ sealed interface CorsOrigins {
 
 /**
  * The CORS settings for an [Api]. Off unless set.
- *
- * What a browser is told is derived from the descriptions rather than
- * configured twice: the allowed methods are those declared on that path, and
- * the allowed headers are the ones its endpoints declare, plus `Content-Type`
- * where they take a body and whatever header their security scheme names.
- *
- * [additionalAllowedHeaders] covers what a description cannot know — a gateway's
- * tracing header. It adds rather than replaces, since a shorter list than your
- * own endpoints declare would break them. [exposedHeaders] is the other
- * direction, and a plain list because response headers are not described here.
- *
- * Credentials with `*` fails here, because the browser rejects that pairing.
  */
 class Cors internal constructor(
     val origins: CorsOrigins,
@@ -125,9 +113,6 @@ sealed interface CorsPreflight {
 /**
  * The CORS decisions for one [Api], worked out from its descriptions when an
  * interpreter binds it. Only the path and the origin are per-request.
- *
- * Two entry points, which is what keeps CORS one implementation rather than
- * three: [actualResponseHeaders] and [preflight].
  */
 class CorsPolicy internal constructor(
     val cors: Cors,
@@ -136,17 +121,6 @@ class CorsPolicy internal constructor(
 ) {
     /**
      * The headers to add to a real response, given the request's `Origin`.
-     *
-     * No `Access-Control-Allow-Origin` for a request with no `Origin` — a curl,
-     * a server-to-server call, a same-origin fetch — and none for an origin the
-     * policy does not allow, which is what makes the browser block the
-     * response.
-     *
-     * `Vary: Origin` is still returned in both of those cases. The header is a
-     * statement about the *route*, not about this one request: any response
-     * here could have carried a different `Access-Control-Allow-Origin`, so a
-     * shared cache must key on `Origin` or it will hand a browser the
-     * header-less answer it stored for a curl.
      */
     fun actualResponseHeaders(origin: String?): List<Pair<String, String>> {
         val allowed = allowOriginHeader(origin) ?: return listOfNotNull(varyOrigin())
@@ -162,10 +136,6 @@ class CorsPolicy internal constructor(
 
     /**
      * Decides one `OPTIONS` request.
-     *
-     * [path] is the request path, matched against the declared templates: the
-     * methods offered back are the ones described for that path, so a preflight
-     * cannot advertise a route that does not exist or omit one that does.
      */
     fun preflight(origin: String?, requestMethod: String?, path: String): CorsPreflight {
         if (origin == null || requestMethod == null) return CorsPreflight.NotPreflight
@@ -199,31 +169,18 @@ class CorsPolicy internal constructor(
         cors.maxAgeSeconds?.let { headers += MAX_AGE to it.toString() }
         varyOrigin()?.let { headers += it }
 
-        // `Access-Control-Request-Headers` is deliberately not consulted. What
-        // is allowed is what the endpoints on this path declare, whatever the
-        // browser asks for, so a header nobody described is simply absent from
-        // the answer rather than turning the preflight into a 403 the browser
-        // reports as a bare network error.
         return CorsPreflight.Allowed(headers)
     }
 
     /**
      * The request headers a browser may send to [endpoints], read off their
      * descriptions.
-     *
-     * Public because it is the answer to "why is my header being stripped" —
-     * assert on it in a test rather than reading a preflight by hand.
      */
     fun allowedRequestHeaders(endpoints: List<Endpoint<*, *>>): List<String> {
         val names = LinkedHashSet<String>()
 
         for (ep in endpoints) {
             ep.headerParams.forEach { names += it.name }
-            // Deliberately not ep.cookieParams. `Cookie` is a forbidden header
-            // name: a script cannot set it, the browser attaches it itself, and
-            // whether it does is `allowCredentials` rather than this list. A
-            // cookie parameter named here would be a permission granted for
-            // something nobody was going to ask permission for.
             if (ep.bodyInput != null) names += "Content-Type"
             (ep.security ?: apiSecurity).forEach { requirement ->
                 credentialHeaderOf(requirement.scheme)?.let { names += it }

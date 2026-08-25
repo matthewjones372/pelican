@@ -46,11 +46,6 @@ class SseKeepAliveTest {
         /** Long enough that a missing keep-alive cannot be mistaken for a slow one. */
         const val QUIET_MILLIS = 600L
 
-        /**
-         * An SSE comment is a line that is nothing but a colon. An event line
-         * is `data: ...`, whose colon is followed by a space, so this sequence
-         * appears in the body only where a keep-alive put it.
-         */
         const val KEEP_ALIVE = ":\n\n"
     }
 
@@ -63,11 +58,6 @@ class SseKeepAliveTest {
 
     private fun api(route: ServerEndpoint) = Api(endpoints = listOf(route), codecs = JacksonCodecs)
 
-    /**
-     * Read to the end rather than incrementally: the stream closes itself after
-     * the second event, so the whole body is available and the assertions are
-     * about what arrived rather than about when.
-     */
     private fun body(baseUrl: String): String =
         HttpClient.newHttpClient().send(
             HttpRequest.newBuilder(URI.create("$baseUrl/quiet")).GET().build(),
@@ -87,11 +77,6 @@ class SseKeepAliveTest {
     fun `pekko fills the silence`() {
         val server = api(
             quiet streamedNowOnPekko {
-                // `throttle` rather than an `initialDelay` on a concatenated
-                // source: `concat` materialises the second source alongside the
-                // first, so its timer starts before the first element is
-                // written and the gap is a race. One element per interval puts
-                // the silence where the test needs it.
                 Source.from(listOf(Tick(1), Tick(2)))
                     .throttle(1, java.time.Duration.ofMillis(QUIET_MILLIS))
             },

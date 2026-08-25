@@ -4,9 +4,6 @@ package io.github.matthewjones372.pelican.importer
  * What the document says that Pelican cannot describe, collected rather than
  * thrown one at a time: stopping at the first would make a queue of fix, rerun,
  * wait, and the decision a reader makes is one decision about the whole list.
- *
- * One problem per operation, since the rest of what it says is being read
- * through the first and a second complaint is usually the first again.
  */
 internal class Problems {
 

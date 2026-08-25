@@ -8,14 +8,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
-/**
- * What reaches the disk, and what is left alone.
- *
- * The write-once rule for handler stubs is the only place this module writes
- * something it will not write again, and it is the one worth a test: the value
- * of a stub is the code somebody puts in it, and a generator that overwrote
- * that would be deleting the only part of the output anybody wrote.
- */
 class WritingTest {
 
     private val document = File("src/test/resources/bookmarks.yaml")
@@ -59,12 +51,6 @@ class WritingTest {
         }.message.orEmpty() shouldContain "No such file"
     }
 
-    /**
-     * The layering, as the other modules state it: this one reads documents and
-     * writes source, and has no business seeing a server library — nor the
-     * document *emitter*, which is the other direction and belongs to whoever
-     * publishes rather than to whoever imports.
-     */
     @Test
     fun `no server library and no document emitter are on this module's classpath`() {
         withClue("pelican-import generates source; a server here would mean a dependency crept in") {

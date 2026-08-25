@@ -48,19 +48,11 @@ class Endpoint<I, R> internal constructor(
     /**
      * Where this one operation is served from — an upload host, a read
      * replica. Empty means the API's own [ApiSpec.servers].
-     *
-     * Routing ignores it: a description that could redirect a route would be a
-     * description deciding where requests land. Only the document and a
-     * generated client read it, and a client takes the first entry.
      */
     val servers: List<String>,
 
     /**
      * The name of the [Webhook] this describes, or null for a route.
-     *
-     * A call the service *sends* is the same description read the other way,
-     * so it is one of these rather than a second model. The name is what tells
-     * the two apart: [Api] refuses to bind one.
      */
     val webhookName: String? = null,
 ) {
@@ -146,26 +138,13 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     /**
      * Says this operation is served from somewhere other than the rest of the
-     * API:
+     * API.
      *
-     * ```
-     * val uploadOrders = endpoint(userId, importFile) {
-     *     post("users" / userId / "orders" / "import")
-     *     servers("https://uploads.example.com")
-     *     json<ImportResult>(status = 201)
-     * }
-     * ```
-     *
-     * Documentation, and a client's problem. Nothing about routing changes:
-     * this server answers the paths it is given, and an endpoint that could
-     * move a route to another host would be a description deciding where a
-     * request lands. What honours it is [ApiSpec.openApi], which publishes
-     * `servers` on the operation, and a generated client, which sends this
-     * operation there rather than to its own base URL.
-     *
-     * Several are allowed because OpenAPI allows them and a document is worth
-     * republishing as it was read. A client takes the first, as it does with
-     * the API's own list.
+     * Documentation, and a client's problem: nothing about routing changes, and
+     * this server still answers the paths it is given. [ApiSpec.openApi]
+     * publishes `servers` on the operation and a generated client sends the
+     * operation there rather than to its own base URL. Several are allowed
+     * because OpenAPI allows them; a client takes the first.
      */
     fun servers(vararg urls: String) {
         urls.forEach { url ->
@@ -186,13 +165,6 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     /**
      * Declares the parts of a `multipart/form-data` body:
-     *
-     * ```
-     * part(caption, photo, description = "The picture and what to call it")
-     * ```
-     *
-     * The envelope itself is not a value anyone writes down — listing its
-     * parts is what says the body is one.
      */
     fun part(vararg params: MultipartPart<*>, description: String? = null) {
         parts += params
@@ -231,9 +203,6 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     /**
      * Documents OpenAPI's `default` response — "and anything else".
-     *
-     * The one response an endpoint describes and cannot produce, so it returns
-     * nothing to name and nothing binds it.
      */
     fun defaultResponse(description: String, vararg headers: ResponseHeader<*>) {
         errors += ErrorSpec(null, description, null, headers.toList())
@@ -256,9 +225,6 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
      * Declares a failure carrying [T] as a JSON body. As a statement it only
      * documents; passed to [orFail] it joins the output type, so the handler
      * returns it rather than throwing it.
-     *
-     * [headers] travel with this failure's payload and the handler supplies
-     * their values.
      */
     inline fun <reified T> errorJson(
         status: Int,
@@ -277,9 +243,6 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     /**
      * A single JSON value. Handler produces `T`.
-     *
-     * [headers] belong to this response alone, so they are only settable where
-     * the handler names it. Use `emits(...)` for one every response carries.
      */
     inline fun <reified T> json(status: Int = 200, vararg headers: ResponseHeader<*>): JsonOutput<T> =
         JsonOutput(status, typeOf<T>(), headers.toList())
@@ -319,8 +282,6 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
  * Describes an endpoint, declaring its inputs by listing them. Listing one
  * registers it for decoding, for documentation, and in the handler's
  * signature at once, so reading an undeclared input does not compile.
- *
- * One overload per arity up to six; past that use the lens form below.
  */
 fun <A, R> endpoint(
     a: ParamKey<A>,
@@ -545,13 +506,6 @@ private fun validateParts(ep: Endpoint<*, *>, body: MultipartBody) {
         )
     }
 
-    // Declaration order is what a caller reads the envelope's order off — an
-    // HTML form, a curl invocation. The two clients here reorder to protect
-    // themselves (`partsInWireOrder`), which does not licence a description of
-    // a request no server could read.
-    //
-    // Any part, not only a file: a text part after the streamed one is read by
-    // nobody either, and an optional one fails silently to its default.
     val stream = streamed.singleOrNull() ?: return
     val after = body.parts.dropWhile { it !== stream }.drop(1)
     if (after.isNotEmpty()) {

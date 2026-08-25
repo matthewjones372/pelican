@@ -22,14 +22,6 @@ import io.ktor.http.HttpMethod as KtorMethod
  * The typed bridge between a backend-agnostic [Endpoint] and Ktor. Core cannot
  * name a stream, so streaming endpoints carry the phantom marker [StreamOf];
  * this cashes it in for a `Flow<T>`, with the element type still checked.
- *
- * Every binder takes a `suspend` function. A lambda that suspends nowhere is
- * still valid, so there is no second, blocking set.
- *
- * `ServerEndpoint` speaks `CompletionStage`, the only handler type core can
- * name without picking a concurrency library. The gap is closed here: the
- * handler is launched in the call's own scope, so a disconnected client
- * cancels it.
  */
 
 // ------------------------------------------------------------- value outputs
@@ -108,11 +100,6 @@ val Params.call: ApplicationCall
 /**
  * Runs a handler as a child coroutine of the call and hands core the stage it
  * asked for, so the interpreter's await is a real suspension.
- *
- * The failure is caught here because a child that fails cancels its parent: a
- * handler throwing `notFound(...)` would tear the call down before the 404
- * could be rendered. Cancellation still travels the other way, so it is
- * rethrown rather than swallowed.
  */
 @Suppress("TooGenericExceptionCaught") // Catching everything is the contract; see the KDoc above.
 private fun Params.launch(f: suspend () -> Any?): CompletionStage<Any?> {

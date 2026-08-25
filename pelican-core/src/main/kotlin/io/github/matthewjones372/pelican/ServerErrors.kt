@@ -5,11 +5,6 @@ import java.util.concurrent.CompletionException
 /**
  * What one throwable becomes on the wire, decided in core so the three backends
  * cannot drift.
- *
- * [unexpected] is the distinction that matters. A [DecodeFailure]'s message was
- * written for the caller; anything escaping a handler was written for a log and
- * may name a table or a host. So an unexpected failure carries only a
- * [reference] out, and the throwable goes back for the interpreter to log.
  */
 class RenderedError(
     val error: ApiError,

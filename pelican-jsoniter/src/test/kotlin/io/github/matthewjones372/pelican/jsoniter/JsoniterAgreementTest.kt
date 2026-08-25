@@ -34,15 +34,6 @@ class JsoniterAgreementTest {
     /** A wrapper the JVM erases out of most signatures, and neither source may describe. */
     @JvmInline value class Reference(val value: String)
 
-    /**
-     * The shapes the two sources have any reason to disagree about: defaults,
-     * nullability at property level, and nullability one and two levels inside a
-     * collection — where the Java type is identical either way and only the
-     * Kotlin type still knows. Each nullable collection is paired with a
-     * non-nullable sibling of the same element type, so a source that widens a
-     * shared schema object in place is caught by the sibling rather than by the
-     * property it meant to widen.
-     */
     data class Order(
         val id: Long,
         val status: Status,
@@ -243,10 +234,6 @@ private fun JsonObj.ref(): String = this["\$ref"].asString()
 private fun JsonValue?.asStrings(): List<String> =
     (this as? JsonArr)?.items?.map { (it as JsonStr).value }.orEmpty()
 
-/**
- * Removes the two differences that carry no meaning: the order of an object's
- * keys, and the order of a `required` list. Everything else is compared exactly.
- */
 private fun JsonValue.normalise(): JsonValue = when (this) {
     is JsonObj -> JsonObj(
         fields.toSortedMap().mapValues { (key, value) ->

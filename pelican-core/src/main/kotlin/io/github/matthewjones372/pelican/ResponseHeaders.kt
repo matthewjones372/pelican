@@ -4,9 +4,6 @@ package io.github.matthewjones372.pelican
  * A header the endpoint promises to send back, declared once as a value and
  * reused by the document and by the handler that sets it. Setting one the
  * endpoint never declared throws, so the document and the wire cannot disagree.
- *
- * The same value declares a header on a *declared failure*, where it belongs to
- * that response alone; see [ErrorOutput.invoke].
  */
 class ResponseHeader<T> @PublishedApi internal constructor(
     val name: String,

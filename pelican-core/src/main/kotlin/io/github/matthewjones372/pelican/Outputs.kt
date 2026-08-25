@@ -17,9 +17,6 @@ class ByteStream private constructor()
 /**
  * What an endpoint answers with: a status, a media type, a payload type. How
  * that becomes bytes is the [Codecs]' decision, later.
- *
- * A whole response rather than half of one, which is what makes several
- * declarable side by side — see [or] and [invoke].
  */
 sealed class Output<R> {
     abstract val status: Int
@@ -31,34 +28,18 @@ sealed class Output<R> {
     /**
      * What negotiation is answered against, worked out once because an output
      * never changes after the endpoint is described. See [acceptable].
-     *
-     * [LazyThreadSafetyMode.PUBLICATION] rather than a lock: a race computes
-     * the same set twice and discards one, which beats locking every read.
      */
     open val produces: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) { setOfNotNull(mediaType) }
 
     /**
      * Headers belonging to *this* response and no other — a `Location` on a
      * 201 that a 200 beside it must not carry.
-     *
-     * Declared here rather than with `emits(...)` for the same reason a
-     * failure's are declared on the failure: `emits(...)` is the endpoint's
-     * list, documented on every response it sends and settable from any of
-     * them. An endpoint that answers one status one way and another another
-     * way has headers that belong to one of the two.
-     *
-     * Empty for the streaming outputs, which cannot be alternatives at all —
-     * see [FallibleOutput].
      */
     open val headers: List<ResponseHeader<*>> get() = emptyList()
 
     /**
      * Names this response as the one the handler is producing —
      * `created(order, location of "/orders/7")`.
-     *
-     * The declaration fixes the status, so `json<Order>(200)` and
-     * `json<Order>(201)` stay distinguishable although the payload cannot tell
-     * them apart. Headers are checked as in [ErrorOutput.invoke].
      */
     operator fun invoke(value: R, vararg values: HeaderValue): Outcome<Nothing, R> =
         Outcome.Ok(value, this, encodeDeclaredHeaders(this, headers, values))
@@ -87,9 +68,6 @@ private const val LAST_INFORMATIONAL = 199
 /**
  * Checked where the response is declared, so a bad status stops the service
  * coming up rather than turning one request into an unexplained 500.
- *
- * [carriesBody] is false only for [EmptyOutput]: `empty(status = 204)` is
- * fine, a payload under a 204 is what every server strips or refuses.
  */
 internal fun checkStatus(owner: String, status: Int, carriesBody: Boolean) {
     require(status in MIN_STATUS..MAX_STATUS) {
@@ -156,9 +134,6 @@ class SseOutput<T> @PublishedApi internal constructor(
      * How long the stream may sit idle before a comment proves it is still
      * there, or null to send nothing. An idle SSE connection is
      * indistinguishable from a dead one, and proxies drop it accordingly.
-     *
-     * Null by default: it changes the bytes on the wire, and a stream that
-     * emits every second gains nothing.
      */
     val keepAlive: Duration? = null,
 ) : Output<StreamOf<T>>() {

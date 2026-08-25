@@ -11,13 +11,6 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
 
-/**
- * What a browser is told, decided from the descriptions alone.
- *
- * These are the answers all three backends serve — the interpreters read this
- * policy rather than each deciding for themselves, which is why
- * `CorsTest` in the example can assert one set of headers across the three.
- */
 class CorsPolicyTest {
 
     private val userId = pathParam<Long>("userId")

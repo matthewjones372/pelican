@@ -24,10 +24,6 @@ import java.net.http.HttpResponse
  * through another, and a version of this that quietly started a second system
  * for the docs would still serve every page correctly. What says otherwise is
  * the system still being up after `stop()`.
- *
- * The caller's system comes from Pekko's own actor testkit, which the JUnit
- * extension shuts down and waits for — a hand-written `@AfterAll` leaves a
- * half-dead system behind for whichever class runs next.
  */
 @ExtendWith(TestKitJUnit5Extension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

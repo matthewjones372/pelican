@@ -18,21 +18,6 @@ import io.github.matthewjones372.pelican.ktor.start as startOnKtor
 import io.github.matthewjones372.pelican.pekko.handledOneOf as handledOneOfOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
-/**
- * The one thing a bare `ok(...)` cannot say, asked of all three interpreters.
- *
- * `remember` answers `newlyLearned or alreadyKnown`, and the 201 declares a
- * `Location` it always sends. Naming that response is what supplies the header
- * — `newlyLearned(greeting, greetingAt of "...")` — and `ok(value)` names no
- * response, so it has nowhere to put one. Left alone it would answer 201 with
- * no `Location` while the published document promises one, which is the one
- * kind of wrong answer a caller cannot see is wrong.
- *
- * The handler below is therefore deliberately incorrect; `Greetings.kt` has the
- * right one. What is under test is that all three backends refuse it out loud
- * rather than each deciding for itself, which they do because the decision is
- * core's — `successNamedBy` — and not theirs.
- */
 class BareOkTest {
 
     /** A 500 says the response was refused; a 201 says it went out unpromised. */

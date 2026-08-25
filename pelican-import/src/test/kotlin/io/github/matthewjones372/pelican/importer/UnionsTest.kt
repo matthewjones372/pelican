@@ -7,14 +7,6 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
-/**
- * Unions, merges, and the ones still refused.
- *
- * The naming is what these are mostly about. A sealed hierarchy is easy to
- * generate and hard to *name*, and the names end up in the caller's source —
- * so what each rule produces is asserted here rather than left to whatever the
- * generator happened to do on the day.
- */
 class UnionsTest {
 
     private fun union(discriminator: String = "propertyName: kind"): String =
@@ -100,11 +92,6 @@ class UnionsTest {
         generated shouldNotContain "data class Bank("
     }
 
-    /**
-     * A branch the document never named, under a parent that named neither: the
-     * last resort, and positional so that it does not move when a sibling's
-     * properties change.
-     */
     @Test
     fun `an inline branch falls back to a positional name`() {
         val generated = imported(
@@ -233,12 +220,6 @@ class UnionsTest {
         generated shouldContain "val id: String,"
     }
 
-    /**
-     * A union written where it was used, over branches the document *did*
-     * name. The hierarchy is reached after both classes are already known, so
-     * this is the case that decides whether a class can still be told which
-     * hierarchy it belongs to after it has been declared.
-     */
     @Test
     fun `a union written at the endpoint adopts the components it names`() {
         val generated = imported(
@@ -366,13 +347,6 @@ class UnionsTest {
         message shouldContain "add a `discriminator`"
     }
 
-    /**
-     * `anyOf` stays refused, and the message says why rather than only that.
-     * A payload may satisfy two `anyOf` branches at once and a Kotlin value is
-     * one class or the other, so a sealed hierarchy would be a narrower claim
-     * than the document makes — which is the degrading this module exists to
-     * refuse.
-     */
     @Test
     fun `anyOf of several branches is refused, and the message says what it would have cost`() {
         val message = refusing(
@@ -402,15 +376,6 @@ class UnionsTest {
         message shouldContain "components.schemas.Payment.anyOf"
     }
 
-    /**
-     * A hierarchy inside a hierarchy: two discriminator properties on one
-     * payload, which is the one union shape neither codec reads.
-     *
-     * `sealed interface Electronic : Payment` is a declaration Kotlin has and
-     * both codecs hold — what neither does is put two type ids on a payload.
-     * Generating it would compile and decode nothing, which is exactly the
-     * silent weakening this module refuses.
-     */
     @Test
     fun `a union whose branch is itself a union is refused, and the message says how to flatten it`() {
         val message = refusing(

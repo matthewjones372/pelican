@@ -43,12 +43,8 @@ import java.net.http.HttpResponse
  * `BodyPublishers.ofInputStream` is how the JDK client is made to send chunked
  * with no Content-Length: it cannot know the length in advance either.
  *
- * The system comes from Pekko's own actor testkit rather than a hand-made
- * `ActorSystem.create`: `TestKitJUnit5Extension` shuts it down through
- * `ActorTestKit.shutdown`, which waits for termination and fails the run if it
- * does not come — where a hand-written `@AfterAll` leaves a half-dead system
- * behind for whichever test class JUnit runs next. `@TestInstance(PER_CLASS)`
- * is what makes one kit, and so one binding, serve both tests.
+ * `@TestInstance(PER_CLASS)` is what makes one kit, and so one binding, serve
+ * both tests.
  */
 @ExtendWith(TestKitJUnit5Extension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

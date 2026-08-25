@@ -14,26 +14,16 @@ import kotlin.reflect.KType
  * Reads and writes bodies with jsoniter, and derives schemas from the same
  * constructors the binding reads.
  *
- * ```
- * Api(routes, codecs = JsoniterCodecs)                      // defaults
- * Api(routes, codecs = JsoniterCodecs(jsoniterConfig { … })) // configured
- * ```
+ * jsoniter predates Kotlin, so the parsing and the printing are its and the
+ * part that tells a data class from a bean is [jsoniterConfig]'s. Payload types
+ * need no annotations and no compiler plugin, paid for by reflection once per
+ * type and a `callBy` on every value read.
  *
- * jsoniter's parser and printer are the fastest of the three, and jsoniter is
- * the only one of the three that predates Kotlin entirely, which is the shape
- * of this module: the parsing and the printing are its, and the part that knows
- * a data class from a bean is [jsoniterConfig]'s. Payload types need no
- * annotations and no compiler plugin — a `data class` is enough — paid for by
- * the reflection the binding does once per type, and by a `callBy` on every
- * value read.
+ * The library has been unmaintained since 2018, which is also why the binding
+ * sits here rather than in a fork: nothing above needs jsoniter to change.
  *
- * The library has been unmaintained since 2018. That is worth knowing before
- * choosing it over `pelican-jackson`, and it is also why the binding sits here
- * rather than in a fork: nothing above needs jsoniter to change.
- *
- * What it does not do is polymorphism *outside* a sealed hierarchy. A sealed
- * class travels with a `type` discriminator, described and read; an open one
- * would need a registry of implementations, which jsoniter has no notion of.
+ * Polymorphism outside a sealed hierarchy is not supported. An open one would
+ * need a registry of implementations, which jsoniter has no notion of.
  */
 class JsoniterCodecs(private val config: Config) : Codecs {
 

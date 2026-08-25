@@ -17,14 +17,6 @@ import java.util.HexFormat
  * References to another host: refused by default, fetched only where the build
  * file named the host, and never used without checking what came back against
  * a committed hash.
- *
- * The refusal is not softened — a build that fetches produces different code on
- * a different day and fails offline. What changes is who takes that risk: the
- * reader, once, per host, in a reviewed file, with a lockfile turning "whatever
- * the far end serves" back into a fixed input.
- *
- * So no path here reads fetched bytes without comparing them to a recorded
- * hash. [update] is the exception, and a task of its own.
  */
 internal class Remote private constructor(
     private val allowed: List<Origin>,
@@ -52,10 +44,6 @@ internal class Remote private constructor(
 
     /**
      * Whether a `$ref` written in a document on disk points off the machine.
-     *
-     * A scheme, or the protocol-relative `//host/path` — which is the one a
-     * check for `://` misses, and the one that would otherwise be read as a
-     * directory called nothing.
      */
     fun isRemote(ref: String) = ABSOLUTE.containsMatchIn(ref)
 
@@ -63,13 +51,6 @@ internal class Remote private constructor(
 
     /**
      * The document [ref] names, as a readable source or a refusal.
-     *
-     * [base] is the URL the reference was written in, or null for a file on
-     * disk — which is what makes a remote reference from a local document have
-     * to be absolute.
-     *
-     * Every check is here rather than at the fetch, because the interesting
-     * ones cost no request.
      */
     fun source(ref: String, base: URI?, path: JsonPath): UrlSource {
         if (allowsNothing) refuseOutright(ref, path)
@@ -93,10 +74,6 @@ internal class Remote private constructor(
             )
         }
         if (uri.userInfo != null) {
-            // The URL is not repeated back. Everything else here names what it
-            // refused, because naming it is how a reader finds it — but a
-            // message goes to a console, a CI log and an issue tracker, and
-            // this one would carry the password to all three.
             refuse(
                 "$path refers to a URL on $host carrying a credential in it. That URL would be written " +
                     "into the lockfile and committed, so a password in it is a password in the " +
@@ -161,10 +138,6 @@ internal class Remote private constructor(
 
     /**
      * The bytes for [uri], proved to be the ones the lockfile records.
-     *
-     * The cache comes first not only for speed: a checkout with the lockfile
-     * and the cache builds with no network at all. It is hashed too, since
-     * trusting it because it is ours would be the one unchecked path.
      */
     private fun verified(uri: URI, path: JsonPath): ByteArray {
         val key = uri.toString()
@@ -207,11 +180,6 @@ internal class Remote private constructor(
             .GET()
             .build()
 
-        // Streamed rather than handed over whole, so the status can be judged
-        // before a byte of the body is kept and the body itself can be
-        // bounded. A host allowed in the build file is still a host: allowing
-        // it says its documents may be read, not that it may decide how much
-        // memory this build has.
         client.send(request, HttpResponse.BodyHandlers.ofInputStream()).let { response ->
             response.body().use { body -> answer(response.statusCode(), response, body, uri, path) }
         }
@@ -259,11 +227,6 @@ internal class Remote private constructor(
 
     /**
      * A redirect is refused rather than followed, even to a named host.
-     *
-     * Following one elsewhere is how an allowlist is got past. Following one
-     * within an allowed host would be safe and is still refused, because
-     * refusing makes the `$ref` name the URL the document really lives at —
-     * the URL the lockfile should have recorded.
      */
     private fun refuseRedirect(uri: URI, path: JsonPath, status: Int, location: String?): Nothing {
         val target = location?.let { runCatching { uri.resolve(it) }.getOrNull() }
@@ -399,14 +362,6 @@ internal class Remote private constructor(
 
     /**
      * The fetched documents, beside the lockfile, named by their own hash.
-     *
-     * Content-addressed rather than by URL: the lockfile already pairs the two,
-     * and a URL turned into a filename is a path-traversal question nobody
-     * should answer to run a build. A changed document then shows in the diff
-     * as one file gone and one arrived.
-     *
-     * Committing it is optional, and the difference between a build that needs
-     * the network and one that does not.
      */
     private fun cacheDirectory(): File? = lockfile?.let { File(it.parentFile, it.name + ".d") }
 
@@ -419,10 +374,6 @@ internal class Remote private constructor(
         directory.mkdirs()
         entries.forEach { (url, hash) -> fetched[url]?.let { cacheFile(hash).writeBytes(it) } }
 
-        // What is no longer referenced goes, and only what this directory is
-        // for: a stale copy left behind is a document nobody reviews and the
-        // build no longer reads, and the pattern is what stops a mistyped
-        // `lockfile` from emptying a directory somebody's own files are in.
         val keep = entries.values.map { cacheFile(it).name }.toSet()
         directory.listFiles().orEmpty()
             .filter { it.isFile && CACHED.matches(it.name) && it.name !in keep }
@@ -481,9 +432,6 @@ internal class Remote private constructor(
          * rather than a URL prefix: `https://good.example` is a prefix of
          * `https://good.example.evil.test`, and three fields compared for
          * equality have no such second reading.
-         *
-         * A bare host means https, the only scheme allowed unasked. `http://`
-         * has to be written, so it gets reviewed.
          */
         private fun origin(written: String): Origin {
             val hasScheme = written.contains("://")
@@ -548,9 +496,5 @@ internal data class Origin(val scheme: String, val host: String, val port: Int) 
 /**
  * Refusing to fetch, said the way the rest of this module refuses: a message
  * written for whoever has to fix it, and nothing else.
- *
- * A function rather than `throw` at each site because several of these sit in
- * one decision — a scheme, a host, a lockfile entry — and a `Nothing` return
- * keeps each of them one statement instead of a branch with a throw in it.
  */
 private fun refuse(message: String): Nothing = throw ImportFailure(message)

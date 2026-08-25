@@ -8,15 +8,6 @@ import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.typeOf
 
-/**
- * `default`: the one response an endpoint describes and cannot produce.
- *
- * Everything else an endpoint declares is a status — one a handler returns, or
- * one it throws. This is the absence of a status, so the tests below are mostly
- * about what it is *not*: not an `ErrorOutput`, not something `orFail` can be
- * given, not something a binder ever sees. What it is, is a line in the
- * document saying what the statuses nobody enumerated will look like.
- */
 class DefaultResponseTest {
 
     data class Problem(val code: String)
@@ -39,11 +30,6 @@ class DefaultResponseTest {
         declared.type.shouldBeNull()
     }
 
-    /**
-     * The payload is the half worth keeping. A document that says "and any
-     * other error is a Problem" is saying something about every status it did
-     * not list, and dropping the schema would leave only the shrug.
-     */
     @Test
     fun `a default carrying a payload publishes its type and stays unreturnable`() {
         val ep = endpoint(widgetId) {
@@ -75,11 +61,6 @@ class DefaultResponseTest {
         (ep.output as FallibleOutput<*, *>).failures.map { it.status } shouldBe listOf(404)
     }
 
-    /**
-     * A document has one `default` key. A second declaration would not be
-     * published beside the first, it would replace it — so the endpoint would
-     * say something nobody wrote.
-     */
     @Test
     fun `two defaults are refused, because a document has room for one`() {
         shouldThrow<IllegalStateException> {

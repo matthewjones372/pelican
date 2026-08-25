@@ -95,13 +95,6 @@ class FailureHeadersTest {
         res.headerOrNull("Retry-After").shouldBeNull()
     }
 
-    /**
-     * A promise the document made and the handler broke. It is a 500 rather
-     * than a 429 without the header, because the failure is refused where it is
-     * produced — a response that says "come back later" without saying when is
-     * a contract the caller cannot act on, and shipping one quietly is what
-     * declaring the header was meant to stop.
-     */
     @Test
     fun `a required header the handler left out is a 500, not a 429 missing it`() {
         val res = forgetful.test().get("/widgets/0")

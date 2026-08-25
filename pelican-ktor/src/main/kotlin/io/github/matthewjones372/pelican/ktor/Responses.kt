@@ -40,14 +40,6 @@ import kotlin.time.Duration
 
 /**
  * Turns a described [Output] plus a handler's result into a Ktor response.
- *
- * Core renders one element — `NdjsonOutput.frame`, `SseOutput.frame` — and this
- * puts elements on a socket with `respondBytesWriter`, flushing each frame as
- * it is encoded. The flush matters: without it the engine holds frames until
- * its own buffer fills, which turns a stream into a slow list.
- *
- * [jsonArrayFrames] supplies the one framing core does not. [codecs] were
- * resolved when the routes were built, not per request.
  */
 @Suppress("UNCHECKED_CAST")
 internal suspend fun respond(
@@ -126,14 +118,6 @@ private suspend fun ApplicationCall.stream(
 /**
  * Injects an SSE comment down a stream that has gone quiet. Idle rather than
  * periodic, matching `Source.keepAlive` — a busy stream sends nothing extra.
- *
- * The upstream flow is pumped into a rendezvous channel so that waiting for the
- * next element becomes something `withTimeoutOrNull` can give up on; collecting
- * directly offers no such seam. Rendezvous, because a buffer would pull
- * elements ahead of the socket asking for them.
- *
- * A closed channel and an idle one are told apart by the `ChannelResult`, since
- * both would produce a null.
  */
 internal fun Flow<String>.withKeepAlive(interval: Duration?): Flow<String> {
     if (interval == null) return this

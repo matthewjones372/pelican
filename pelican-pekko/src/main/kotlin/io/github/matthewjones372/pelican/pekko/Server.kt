@@ -28,8 +28,6 @@ class PelicanServer internal constructor(
      * Unbinds the port, and terminates the actor system if this server started
      * it. The stage completes once the system has actually terminated, so a
      * test joining on it does not return with threads still up.
-     *
-     * A borrowed system is only unbound from: whoever created one ends it.
      */
     fun stop(): CompletionStage<Void> =
         binding.unbind()
@@ -67,9 +65,6 @@ fun Api.start(
 /**
  * Binds this API on a system you already have, so a service that is more than
  * its HTTP layer does not run two of everything an `ActorSystem` carries.
- *
- * [PelicanServer.stop] unbinds the port and leaves such a system running.
- * `toRoute(system)` is the lower-level door for binding the route yourself.
  */
 fun Api.start(
     system: ActorSystem<Void>,

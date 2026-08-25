@@ -13,14 +13,6 @@ import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 
-/**
- * The multipart parser, which is core's rather than any backend's — so this is
- * where its behaviour is written down, once, for all three.
- *
- * The interesting cases are the ones a naive reader gets wrong: a boundary that
- * straddles two reads from the source, content that begins with the boundary's
- * first few bytes without being one, and a part nobody asked for.
- */
 class MultipartTest {
 
     private val caption = textPart<String>("caption")
@@ -247,10 +239,6 @@ class MultipartTest {
 
     @Test
     fun `a streamed part declared before a buffered one fails when built`() {
-        // Reading stops at the streamed part, so this is a description that
-        // describes an envelope no server could read. The two clients here
-        // reorder rather than write it — `partsInWireOrder` — which saves them
-        // and not the caller reading the description for itself.
         val failure = shouldThrow<IllegalStateException> {
             endpoint(filePart("document"), bufferedFile("thumbnail", maxBytes = 64)) {
                 post("upload")
@@ -279,12 +267,6 @@ class MultipartTest {
         }
     }
 
-    /**
-     * Why that description is worth refusing rather than leaving to the
-     * request: an *optional* part that arrives after the streamed one is not a
-     * 400 like a required one, it is a default. The caller sent a value, the
-     * handler was given something else, and nothing between them can tell.
-     */
     @Test
     fun `an optional part sent after the file part is silently its default`() {
         val values = decode(
@@ -357,16 +339,6 @@ class MultipartTest {
     }
 }
 
-/**
- * The second file part, which used to be a description this library refused.
- *
- * What made it refusable was that reading stops at a streamed part, so a second
- * file could only be reached by holding the first — silently. `bufferedFile`
- * makes the holding something the description says, with the bound written
- * where the person choosing it will read it, and these are the three things
- * that follow: it arrives, the bound is enforced, and the streamed part after
- * it is still streamed.
- */
 class BufferedPartTest {
 
     private val caption = textPart<String>("caption")

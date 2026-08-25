@@ -5,20 +5,6 @@ import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.io.File
 
-/**
- * The same API, written in three dialects, imported as one thing.
- *
- * `tiny-2.0.json` and `tiny-3.0.yaml` describe the same service: same routes,
- * same types, same key. Asserting that they generate the *same source* is
- * worth more than asserting each one separately, because it is the claim the
- * module actually makes — that which dialect a document was written in is not
- * something the descriptions it produces should remember.
- *
- * The two documents have to be equivalent for that to mean anything, which is
- * why neither of them has a nullable property in it: 2.0 has no way to say
- * nullable, so a 3.0 document that does is describing a different API rather
- * than the same one in an older dialect.
- */
 class VersionsTest {
 
     private val options = ImportOptions("app", "tiny")

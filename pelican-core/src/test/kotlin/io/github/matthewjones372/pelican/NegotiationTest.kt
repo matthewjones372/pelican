@@ -4,19 +4,6 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-/**
- * What an `Accept` header means, decided once in core.
- *
- * Pelican does not go through its backends' marshalling layers, so nothing
- * underneath it negotiates on its behalf — see [acceptable]. That makes this
- * the only place the question is answered, and the only place it can be got
- * wrong for all three interpreters at once.
- *
- * The cases below are the ones that separate a real implementation from a
- * `contains` call: quality values, wildcards, and the precedence rule that
- * lets a caller say "anything, but JSON for preference" or, worse, "anything
- * *except* JSON".
- */
 class NegotiationTest {
 
     private val json = setOf("application/json")
@@ -55,14 +42,6 @@ class NegotiationTest {
         }
     }
 
-    /**
-     * The precedence rule, which is the whole reason a quality is looked up
-     * through the *most specific* matching range rather than the best one.
-     *
-     * A header of `&#42;/&#42;;q=0` followed by `application/json` reads as "nothing, except JSON". Taking the
-     * highest quality of any match would read it as "anything", and taking the
-     * first would read it as "nothing" — both wrong, in opposite directions.
-     */
     @Test
     fun `a more specific range beats a wildcard, in both directions`() {
         withClue("nothing, except JSON") {
@@ -83,11 +62,6 @@ class NegotiationTest {
         }
     }
 
-    /**
-     * An `Accept` a caller very likely did not write — a proxy's, an SDK's, a
-     * copy-paste — is not grounds for refusing them. Nothing parseable means
-     * nothing was asked for.
-     */
     @Test
     fun `an unparseable header is not a refusal`() {
         withClue("no slash, so not a media range, so nothing was asked for") {

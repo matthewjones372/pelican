@@ -13,37 +13,21 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 // =========================================================== 1. the payloads
-//
-// One set of types, read and written by three JSON libraries. Jackson and
-// kotlinx.serialization each have to be told the things Kotlin does not say,
-// and each is told in its own vocabulary; jsoniter is told nothing, because
-// `pelican-jsoniter` binds through the primary constructor and there is no
-// jsoniter annotation to write.
 
 @Serializable
 data class Note(
     val id: Long,
     val text: String,
-    /** A default, so a body that omits it exercises what each library does with one. */
     val level: Level = Level.INFO,
-    /** Nullable, so an absent value and a null one can be told apart on the wire. */
     val author: String? = null,
 )
 
-/** No annotation for anyone: an enum is the one shape all three read off the Kotlin. */
 enum class Level { INFO, WARN }
 
 /**
- * Where a note is sent — the shape no library can read off the Kotlin, since
- * nothing in `sealed interface Channel` says which property carries the branch
- * or what selects each one.
- *
- * Lining the three up is the exercise. `pelican-jsoniter` writes a `type`
- * carrying the branch's own class name and nothing configures that, so it is
- * the fixed point: Jackson is pointed at the same property with the same
- * names, and kotlinx already calls it `type`, so each branch takes a
- * `@SerialName` that is its class name rather than the package-qualified one
- * it would default to. All three then send the same bytes.
+ * `pelican-jsoniter` writes a `type` carrying the branch's class name and
+ * nothing configures that, so the annotations below are matched to it: without
+ * the `@SerialName`s, kotlinx would send the package-qualified name instead.
  */
 @Serializable
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
@@ -65,9 +49,6 @@ data class Sms(val number: String) : Channel
 data class Delivery(val note: Note, val to: Channel)
 
 // ========================================================= 2. the endpoints
-//
-// Descriptions, shared by all three services below. Nothing here names a JSON
-// library.
 
 val noteId = pathParam<Long>("noteId", description = "The note's id")
 
@@ -90,9 +71,6 @@ val deliverNote = endpoint(delivery) {
 val codecEndpoints = listOf(getNote, deliverNote)
 
 // =========================================================== 3. the handlers
-//
-// Also shared. A handler never sees the codec: it takes decoded values and
-// returns values to encode.
 
 val codecRoutes: List<ServerEndpoint> = listOf(
 
@@ -104,10 +82,8 @@ val codecRoutes: List<ServerEndpoint> = listOf(
 )
 
 // ============================================================ 4. the services
-//
-// Three of them, differing in one argument.
 
-/** The same endpoints and the same handlers, over whichever JSON library is passed. */
+/** The same endpoints and handlers, over whichever JSON library is passed. */
 fun notesApi(codecs: Codecs): Api = Api(
     endpoints = codecRoutes,
     codecs = codecs,
@@ -116,7 +92,7 @@ fun notesApi(codecs: Codecs): Api = Api(
     description = "The same service, read and written by three JSON libraries.",
 )
 
-/** The document, which needs only the schema half of a codec module. */
+/** Documentation needs only the schema half of a codec module. */
 fun notesSpec(schemas: SchemaSource): ApiSpec = ApiSpec(
     endpoints = codecEndpoints,
     schemas = schemas,
@@ -124,15 +100,7 @@ fun notesSpec(schemas: SchemaSource): ApiSpec = ApiSpec(
     version = "1.0.0",
 )
 
-/**
- * All three at once, so the same request can be sent to each and the answers
- * compared.
- *
- * ```
- * ./gradlew :example:runCodecs             # Jackson :8080, kotlinx :8081, jsoniter :8082
- * ./gradlew :example:runCodecs --args=9000
- * ```
- */
+/** `./gradlew :example:runCodecs` — Jackson :8080, kotlinx :8081, jsoniter :8082. */
 fun main(args: Array<String>) {
     val basePort = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
     val docs = Docs(docsPath = "/api-docs")

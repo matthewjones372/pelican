@@ -21,16 +21,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 
-/**
- * The three things that used to have nowhere to live, held to one answer across
- * all three interpreters: a response header that is declared rather than
- * stringly-typed, a filter that runs around every handler, and a body size the
- * service refuses before a codec sees it.
- *
- * Same shape as [AllBackendsTest], and for the same reason — a rule written on
- * the `Api` that two backends applied differently would be a rule one of them
- * was getting wrong.
- */
 class FiltersAndHeadersTest {
 
     companion object {
@@ -96,10 +86,6 @@ class FiltersAndHeadersTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `filters run outermost first, so a refusal still gets stamped`(name: String, client: ApiClient) {
-        // `stamping` is listed before `gate`, so it has already set the header
-        // by the time `gate` throws — and the header survives onto the error.
-        // A correlation id that vanished exactly when something went wrong
-        // would be a correlation id worth nothing.
         client.response(echo, In2("blocked", Note("nope")))
             .shouldHaveStatus(403)
             .shouldHaveHeader("X-Request-Id", "blocked")

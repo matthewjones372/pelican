@@ -82,19 +82,9 @@ class OpenApiSpecQualityTest {
         val parsed = parse(spec.json).openAPI
 
         parsed.openapi shouldBe "3.1.0"
-        // `jsonSchemaDialect` is deliberately absent — 2020-12 is what 3.1
-        // already means, and OpenApi.kt says so where it decides not to write
-        // it. Asserted rather than assumed, because a parser that read this
-        // document as 3.0 and filled the field in would be a real problem.
         parsed.jsonSchemaDialect.shouldBeNull()
     }
 
-    /**
-     * Round-tripping through the parser and back out has to preserve the parts
-     * a reader depends on. This is narrower than it sounds: the parser
-     * normalises freely, so the check is on the operations and their statuses
-     * rather than on byte equality.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("specs")
     fun `every path the description declares survives a parse`(spec: Spec) {
@@ -116,13 +106,6 @@ class OpenApiSpecQualityTest {
         }
     }
 
-    /**
-     * The YAML is not a second document. It is the same tree, written the
-     * other way, so the parser has to read the two into the same object —
-     * which is a claim about the renderer that nothing in `pelican-openapi`
-     * can make about itself: the emitter that would agree with a wrong quoting
-     * rule is the one that wrote it.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("specs")
     fun `the YAML rendering parses as the same document`(spec: Spec) {

@@ -5,20 +5,14 @@ import io.github.matthewjones372.pelican.ErrorOutput
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Output
 
-/*
+/**
  * Assertions for the things every endpoint test asserts on.
  *
- * The point is the failure message. `assertEquals(404, res.status)` reports
- * "expected: <404> but was: <500>" and leaves you to go and find the body that
- * would explain why; these print it, because a wrong status is nearly always
- * explained by the payload that came with it.
- *
  * They throw plain `AssertionError`, which every JUnit, kotest and Kotlin-test
- * runner already understands. This module used to export kotest's matchers as
- * an `api` dependency, which put kotest on the classpath of anyone who wanted
- * a typed client and had their own matchers already. The ones that return a
- * value — `shouldBeOk`, `shouldBeError` — are the join: assert the shape here,
- * then carry on with whatever matcher library you actually use.
+ * runner understands and which puts no matcher library on a consumer's
+ * classpath. The ones that return a value — `shouldBeOk`, `shouldBeError` —
+ * are the join: assert the shape here, then carry on with whatever matcher
+ * library the suite already uses.
  */
 
 // ------------------------------------------------------------------- requests

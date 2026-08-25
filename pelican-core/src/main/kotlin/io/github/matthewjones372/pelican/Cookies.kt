@@ -3,10 +3,6 @@ package io.github.matthewjones372.pelican
 /**
  * Reads and writes the `Cookie` request header.
  *
- * The three backends each have a cookie API and each behaves differently — one
- * unquotes, another splits on `,` as well as `;` — so the splitting lives here
- * and they only hand over the header.
- *
  * Values travel exactly as written: RFC 6265 already excludes `;`, `,`, space
  * and control characters, and percent-decoding would corrupt a value
  * containing a `%`. [render] refuses a value a cookie cannot carry.

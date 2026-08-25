@@ -44,10 +44,7 @@ dependencies {
     // ask for the one they need. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
 
-    // Pekko's own actor testkit, so a test needing a caller's ActorSystem gets
-    // one that is shut down and waited for by the JUnit extension rather than
-    // by a hand-written @AfterAll. The BOM comes transitively from
-    // pelican-pekko, so the version is that module's.
+    // Version-less: the BOM comes transitively from pelican-pekko.
     testImplementation("org.apache.pekko:pekko-actor-testkit-typed_2.13")
     testImplementation(project(":pelican-test-http4k"))
 
@@ -59,12 +56,6 @@ dependencies {
 
 /**
  * What the import task runs against, kept out of the example's own classpaths.
- *
- * `pelican-import` is a build-time tool: nothing the example runs or tests
- * needs it. Its own configuration also breaks the circle a `testImplementation`
- * would make — the generated descriptions are compiled into the test source
- * set, so a task reading that source set's classpath would be waiting for
- * itself.
  */
 val pelicanImport = configurations.register("pelicanImport")
 
@@ -133,14 +124,6 @@ tasks.register<JavaExec>("runReadmeExample") {
  * and the Kotlin client. No server is started and no request is made — the
  * plugin loads `ordersSpec()` off this module's own runtime classpath and
  * generates from the values it returns.
- *
- * `./gradlew :example:generateOrdersDocument` writes build/openapi.json.
- * `./gradlew :example:generateOrdersClient` rewrites the checked-in client.
- *
- * The client is written into this module's *test* sources on purpose, so it is
- * compiled and run against a real server by `GeneratedKotlinClientTest`. That
- * is what turns on `checkOrdersClient`, which `check` depends on: a committed
- * client that no longer matches the descriptions fails the build.
  */
 pelican {
     documents {
@@ -169,13 +152,6 @@ pelican {
     }
     /**
      * The same document, read back the other way.
-     *
-     * This is the round trip, run on every build: the descriptions become a
-     * document, the document becomes descriptions again, and
-     * `ImportedOrdersTest` compares what the second set publishes against what
-     * the first one did. Two things are being checked at once, and the
-     * quieter one is the compiler — generated Kotlin that does not compile
-     * fails the build here rather than in somebody's project.
      */
     endpoints {
         create("imported") {
@@ -205,8 +181,4 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach { exclude("example/impo
 
 tasks.named("compileTestKotlin") { dependsOn("generateImportedEndpoints") }
 
-// The benchmarks used to live here, as tests that looped and timed behind a
-// `-Dbenchmark=true` switch. They are a JMH harness in `:benchmarks` now, which
-// took the flight-recording flag and the coverage-agent exemption with them —
-// JMH forks its own JVMs, so there is no test task left for an agent to attach
-// to. `./gradlew :benchmarks:jmh`.
+// The benchmarks are a JMH harness in `:benchmarks`: `./gradlew :benchmarks:jmh`.

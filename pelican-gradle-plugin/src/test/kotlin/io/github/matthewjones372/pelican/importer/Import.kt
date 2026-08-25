@@ -2,19 +2,6 @@ package io.github.matthewjones372.pelican.importer
 
 import java.io.File
 
-/**
- * The signature `pelican-import` publishes, standing in for its body.
- *
- * As with the client generator above it, what it writes is a record of what it
- * was handed — the plugin's half of the job is the arguments, and the
- * generated Kotlin is asserted in that module's own tests and in `:example`.
- *
- * One arity only. The three releases before it are whole library versions of
- * their own, in `io.github.matthewjones372.pelican.previous.importer`,
- * `io.github.matthewjones372.pelican.older.importer` and
- * `io.github.matthewjones372.pelican.oldest.importer`; see the note on the
- * client fake for why they cannot share a class with this one.
- */
 @Suppress("LongParameterList")
 fun importEndpoints(
     document: File,
@@ -41,10 +28,6 @@ fun importEndpoints(
     )
 }
 
-/**
- * The lockfile writer, likewise standing in for its body: it records what it
- * was asked to record, so the test can assert the arguments crossed the seam.
- */
 fun updateRemoteLock(
     document: File,
     lockfile: File,

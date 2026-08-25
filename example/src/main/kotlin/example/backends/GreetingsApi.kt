@@ -35,18 +35,8 @@ fun greetingsApi(
     version = "1.0.0",
     description = "One set of endpoint descriptions, served by three different HTTP libraries.",
 
-    // Cross-origin access for one named origin. What that origin is *allowed*
-    // to do is not written here: the methods and the request headers a
-    // preflight answers with are read off the endpoints above, so `echo`
-    // gaining a header is a browser gaining permission to send it, with
-    // nothing else to change. `CorsTest` asserts all three backends say the
-    // same thing.
     cors = cors("https://console.example.com"),
 
-    // Two filters, in the order a request meets them. Written once, here, and
-    // run by all three interpreters — a filter is a description-level thing
-    // like everything else, so `AllBackendsTest` can hold the three to the
-    // same answers about them.
     filters = listOf(stamping, gate),
 
     // Small enough to prove in a test without shipping a megabyte. The default
@@ -58,10 +48,6 @@ fun greetingsApi(
     // out is a startup failure rather than a documented 404.
     covers = covers,
 
-    // The call this service sends. Nothing above binds it and nothing below
-    // routes it: the three interpreters build their routes from `endpoints`,
-    // and a webhook goes to a URL a subscriber registered rather than to a path
-    // here. It reaches the document and the generated sender, and stops there.
     webhooks = greetingWebhooks,
 )
 
@@ -70,18 +56,8 @@ val correlationId = attribute<String>("correlationId")
 
 /**
  * Puts a correlation id on every answer.
- *
- * The interesting part is that this is *one* filter and there are three
- * endpoints, none of whose handlers mention a header. `setHeader` takes the
- * same [requestId] value the endpoints declared with `emits(...)`, so a header
- * cannot be stamped here and missing from the document — passing one no
- * endpoint declared throws instead.
  */
 val stamping: Filter = Filter { params, next ->
-    // `traceId` is declared on `echo` and nowhere else, and a filter runs for
-    // every endpoint — so this asks whether the key is there rather than
-    // assuming it. Reading an undeclared key throws, deliberately: on a handler
-    // that is a wiring mistake, and a filter is the one place it is not.
     val id = (if (traceId in params) params[traceId] else null)
         ?: ("gen-" + params.hashCode().toString(HEX))
     params[correlationId] = id
@@ -91,10 +67,6 @@ val stamping: Filter = Filter { params, next ->
 
 /**
  * A filter that can say no.
- *
- * Rejecting is throwing, so the 403 is rendered by the same code that renders
- * every other declared failure, on every backend — and `next` is never called,
- * which is what "short-circuit" has to mean.
  */
 val gate: Filter = before { params ->
     if (traceId in params && params[traceId] == "blocked") {

@@ -9,15 +9,6 @@ import io.github.matthewjones372.pelican.emptyJsonObj
 
 /**
  * Which codec the generated declarations are annotated for.
- *
- * A sealed hierarchy is the one shape no JSON library can read off the Kotlin
- * alone: nothing in `sealed interface Payment` says which property carries the
- * branch. The two libraries spell that differently, so the file is annotated
- * for one of them.
- *
- * [JACKSON] is the default and costs a document with no union nothing.
- * [KOTLINX] is not free the same way: with no reflective fallback, every
- * generated payload type carries `@Serializable`.
  */
 enum class CodecAnnotations { JACKSON, KOTLINX }
 
@@ -25,10 +16,6 @@ enum class CodecAnnotations { JACKSON, KOTLINX }
  * Schemas in, Kotlin declarations out. It reads JSON Schema and never a
  * `KType`, which keeps the generated payload types in step with the
  * *documented* ones rather than with a second opinion about the same classes.
- *
- * Registered first and written last, because a `oneOf` reached halfway through
- * a document can decide that a class declared near the top belongs to a
- * hierarchy.
  */
 class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.JACKSON) {
 
@@ -146,10 +133,6 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
 
     /**
      * Every declaration written out, and again until nothing changes.
-     *
-     * Rendering a class resolves its property types, and that can declare
-     * another which tells an already-written class which hierarchy it belongs
-     * to. The fixed point is what stops the document's own order mattering.
      */
     private fun settle(): List<String> {
         var written = emptyMap<String, String>()
@@ -181,11 +164,6 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
             // neither is a type expression, and both are a declaration.
             ?: hoistComposed(obj, context)
             ?: (obj["allOf"] as? JsonArr)?.items?.singleOrNull()?.let { type(it, context) }
-            // `anyOf` of one real branch and a null one is how 3.1 spells a
-            // nullable reference; the null branch is already accounted for by
-            // `admitsNull`, so what is left is the type. Anything richer is
-            // read by `composed` above, or is a union this generator does not
-            // model and falls through below.
             ?: obj.anyOfBranches()?.singleOrNull()?.let { type(it, context) }
         if (named != null) return named
 
@@ -276,11 +254,6 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
         // An optional property is nullable with a default here, because
         // Kotlin has no other way to say "may be left out".
         val kotlinType = if (!required && !declared.endsWith("?")) "$declared?" else declared
-        // The wire name is kept exactly, backticked where it has to be —
-        // renaming it would need a codec-specific annotation on every
-        // property that was renamed, where the only annotations this
-        // generator writes are the ones a sealed hierarchy cannot be read
-        // without.
         val propertyName = if (isIdentifier(property)) property else "`$property`"
         appendLine("    val $propertyName: $kotlinType${if (required) "" else " = null"},")
     }
@@ -377,11 +350,6 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
      * has for it: a `"null"` among the types, or a `"null"` branch of an
      * `anyOf` — the latter being what a nullable `$ref` has to become, since a
      * reference has no `type` of its own to widen.
-     *
-     * `nullable: true` is not read, and not as a kindness to older documents
-     * either: it is 3.0's keyword, the emitter no longer writes it, and
-     * accepting it here would mean this generator understood a document shape
-     * nothing in this repository can produce or test.
      */
     private fun JsonObj.admitsNull(): Boolean =
         NULL_TYPE in ((this["type"] as? JsonArr)?.items.orEmpty()) ||

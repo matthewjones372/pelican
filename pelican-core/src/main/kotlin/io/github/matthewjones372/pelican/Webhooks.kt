@@ -4,11 +4,6 @@ package io.github.matthewjones372.pelican
  * A call the service makes — OpenAPI 3.1's `webhooks` — described the way a
  * call it answers is described. It holds an [Endpoint] because that is the same
  * description read in the other direction.
- *
- * It has no route: [operation]'s path is empty and nothing reads it, since the
- * destination is a URL the subscriber chose. The name is the identity.
- *
- * Not a [ServerEndpoint] and cannot become one; [Api] refuses to bind it.
  */
 class Webhook internal constructor(
     /** The key OpenAPI files this under, and the name of the sender generated for it. */
@@ -31,18 +26,6 @@ val Webhook.operationName: String get() = operation.operationName
 
 /**
  * Describes a call the service sends rather than serves.
- *
- * [method] is an argument because it is the whole of what a webhook says about
- * its request line; a path or a `servers(...)` is refused, both being claims
- * about a host the subscriber owns.
- *
- * Only the lens form of [endpoint] is offered: the tuple overloads exist to fix
- * a handler's signature and there is no handler here. Inputs go inside the
- * block.
- *
- * The output is what the *subscriber* answers with — the one part of the
- * description nobody publishing it controls — and a generated sender reads the
- * answer against it.
  */
 fun <R> webhook(
     name: String,

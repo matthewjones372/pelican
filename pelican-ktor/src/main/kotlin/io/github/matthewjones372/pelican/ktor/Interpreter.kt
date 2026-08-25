@@ -313,10 +313,6 @@ private suspend fun readBody(
         }
 
         is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
-            // A strict body has to arrive in full before the handler runs, so
-            // it gets the API's deadline rather than the engine's idle timeout.
-            // The length is checked before the body becomes a String, so an
-            // oversized payload is refused rather than allocated.
             refuseIfOversize(call.request.headers["Content-Length"]?.toLongOrNull(), api.maxBodyBytes)
             val text = try {
                 withTimeout(api.strictBodyTimeoutMillis) { call.receiveText() }

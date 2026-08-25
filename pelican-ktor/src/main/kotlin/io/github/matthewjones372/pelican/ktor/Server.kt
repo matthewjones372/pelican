@@ -42,10 +42,6 @@ class PelicanServer internal constructor(
  * `CIO`, which ships with this module, so a Pelican service on Ktor needs no
  * further dependency.
  *
- * Unlike the other two backends the engine has little say in how promptly a
- * streamed frame reaches the wire: the writer flushes each frame as it is
- * encoded (see `Responses.kt`).
- *
  * [module] is how a module knowing more than this one — one serving an OpenAPI
  * document, or a service with routes of its own — configures the application.
  */

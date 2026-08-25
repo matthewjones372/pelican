@@ -6,15 +6,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
-/**
- * A parameter that carries several values, and the two questions that only
- * arise once it can: where the boundaries between the values are, and what an
- * absent one means.
- *
- * The interpreters are held to the same answers in `AllBackendsTest`, which
- * asks them over a socket. This is the same rules without a server, so a
- * disagreement here is about the description rather than about a backend.
- */
 class MultiValuedInputsTest {
 
     // ----------------------------------------------------------- the styles
@@ -71,10 +62,6 @@ class MultiValuedInputsTest {
 
     @Test
     fun `an optional list is null when absent, so required still means something`() {
-        // Not the empty list: an empty list cannot be sent, so reading absence
-        // as one would leave a handler unable to tell "filtered by nothing"
-        // from "did not filter". `.default(emptyList())` is the other reading,
-        // and it is written down where it is chosen.
         queryParam<String>("tag").repeated().optional().decodeList(emptyList()).shouldBeNull()
         queryParam<String>("tag").repeated().default(emptyList()).decodeList(emptyList()) shouldBe emptyList<String>()
     }
@@ -135,11 +122,6 @@ class MultiValuedInputsTest {
         StringCodec.encodeAll("tag", ListStyle.REPEATED, listOf("a,b")) shouldBe listOf("a,b")
     }
 
-    /**
-     * The third way a list can come back shorter than it went out, and the one
-     * the two guards below miss: `?tag=&tag=a` is two occurrences and one
-     * element, because an occurrence carrying nothing is not an element.
-     */
     @Test
     fun `an element carrying nothing is refused rather than written, whatever the style`() {
         ListStyle.entries.forEach { style ->

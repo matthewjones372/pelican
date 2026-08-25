@@ -1,21 +1,10 @@
 /**
  * The benchmarks, in a module of their own and run by JMH.
  *
- * They used to be JUnit tests in `:example` that looped and timed. That harness
- * had no warmup control, no fork isolation, nothing stopping the JIT deleting
- * work whose result went unused, and it measured allocation by differencing a
- * thread counter — so its numbers were plausible without being evidence. JMH
- * answers all four, and the only thing hand-written here is the wiring that
- * runs it.
- *
- * A module rather than a source set in `:example`: that build script is already
- * two hundred lines of documents, clients, imports and run tasks, and the
- * benchmark brought a flight-recording block and a coverage-agent exemption
- * with it. Here the benchmark's build concerns are the whole file, and
- * `:example` lost twenty-five lines it was carrying for a guest.
- *
- * Nothing wires `jmh` into `check` or `build`, so `./gradlew build` compiles
- * these sources and never runs them — opt-in exactly as the old harness was.
+ * A timing loop in a test measures nothing trustworthy: no warmup control, no
+ * fork isolation, nothing stopping the JIT deleting work whose result goes
+ * unused, and allocation read off a thread counter. JMH answers all four, and
+ * the only thing hand-written here is the wiring that runs it.
  */
 
 // One version, shared by the runtime the benchmarks compile against and the
@@ -59,10 +48,6 @@ dependencies { jmhGenerator("org.openjdk.jmh:jmh-generator-bytecode:$jmhVersion"
 val generatedStubSources = layout.buildDirectory.dir("generated/jmh/java")
 val generatedStubResources = layout.buildDirectory.dir("generated/jmh/resources")
 
-// Where Kotlin puts this module's classes, asked of the task rather than
-// spelled as a path: the generator takes one directory and `main.output`
-// carries two, of which the empty Java one would be as good an answer to a
-// `filter` and the wrong one.
 val benchmarkClasses = tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin")
     .flatMap { it.destinationDirectory }
 
@@ -83,12 +68,6 @@ val toolchainLauncher = toolchains.launcherFor { languageVersion.set(benchmarkJd
 
 /**
  * The reflection generator, not the ASM one.
- *
- * Reflection loads each class to read its annotations, so it needs the whole
- * runtime classpath and is the slower of the two. ASM reads bytecode without
- * loading anything, and reads Kotlin's synthetic members as though a person
- * had written them — which is how you get stubs for methods that are not
- * benchmarks. The extra second is worth not debugging that.
  */
 val generateBenchmarkStubs = tasks.register<JavaExec>("generateBenchmarkStubs") {
     description = "Generates JMH's benchmark stubs from the compiled Kotlin"
@@ -130,24 +109,8 @@ val compileBenchmarkStubs = tasks.register<JavaCompile>("compileBenchmarkStubs")
 /**
  * The run itself: `./gradlew :benchmarks:jmh`.
  *
- * A `JavaExec`, and deliberately not a `Test` task. Coverage instrumentation
- * rewrites bytecode, and it rewrites more of Pelican than of a hand-written
- * route — which is exactly the comparison being made, so a measurement taken
- * through the agent reports the agent. That cost an afternoon to notice while
- * the benchmarks were tests; outside the test task there is no agent left to
- * remember to turn off.
- *
- * `-prof gc` is on by default because allocation per request is half the
- * answer and, unlike a timing, it is the same number every run.
- * `-PbenchmarkArgs=...` is appended to it, so a shorter run, a filter or a
- * profiler is one flag away:
- *
- *     ./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 Http4k"
- *     ./gradlew :benchmarks:jmh -PbenchmarkArgs="-prof jfr"
- *
- * The second replaces the `-Dprofile=true` flight-recording block `:example`
- * used to carry, and improves on it: JMH records each fork separately and
- * knows which part of the run was warmup.
+ * The second flight-records the run: JMH records each fork separately and
+ * knows which part of it was warmup.
  */
 val jmh = tasks.register<JavaExec>("jmh") {
     group = "verification"

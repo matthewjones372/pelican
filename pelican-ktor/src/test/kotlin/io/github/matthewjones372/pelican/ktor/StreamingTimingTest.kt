@@ -14,20 +14,6 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
-/**
- * The same invariant the other two backends' tests hold, over a socket: a
- * streamed row reaches the caller when it is produced, not when the last one
- * is.
- *
- * There are two halves to it. The handler's flow must be collected as the body
- * is written rather than before — that is what makes `delay` inside the flow
- * show up as a gap between rows — and each frame must be flushed rather than
- * left in the engine's buffer. Both halves live in `Responses.kt`, which is why
- * this backend needs no engine of its own to make streaming work.
- *
- * The margins are wide on purpose: the claim is "the first row does not wait
- * for the last", not a latency budget.
- */
 class StreamingTimingTest {
 
     private val rows = 10

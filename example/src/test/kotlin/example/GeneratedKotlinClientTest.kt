@@ -36,20 +36,6 @@ import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayInputStream
 import java.io.File
 
-/**
- * The generated Kotlin client, compiled and run.
- *
- * [example.generated.OrdersClient] is checked in, generated from the very
- * endpoint values this module serves. That it compiles is the build's business;
- * that it *works* is this file's. The server is real, on a real port, so a
- * generator that emits the wrong path, the wrong parameter name or the wrong
- * frame format fails here — which is the only place it can, since a generated
- * client is exactly the artefact nothing else type-checks against the service.
- *
- * Note what the calls below never mention: no URL, no query string, no JSON.
- * The types are the generated ones, so a rename in `Endpoints.kt` breaks this
- * file at compile time the moment the client is regenerated.
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GeneratedKotlinClientTest {
 
@@ -114,17 +100,6 @@ class GeneratedKotlinClientTest {
         withClue("the server's own default should have applied") { order.quantity shouldBe 1 }
     }
 
-    /**
-     * The generated union, over a socket, against the service it was generated
-     * from.
-     *
-     * `OrdersClient.kt` was written from the published document, and the
-     * hierarchy in it carries `name = "bank_transfer"` because the document
-     * carried the mapping that says so. Without it the generator would have had
-     * only the schema's name to go on, this call would put `"BankTransfer"` on
-     * the wire, and the server would answer 400 — a client generated from a
-     * service's own document failing against that service.
-     */
     @Test
     fun `a generated union puts the value on the wire that the service decodes`() {
         val paid = client.payOrder(1L, 7L, BankTransfer("GB33"), xApiKey = "let-me-in")
@@ -163,15 +138,6 @@ class GeneratedKotlinClientTest {
         }
     }
 
-    /**
-     * The header the 429 declares, read back as the `Long` it was declared as.
-     *
-     * Nothing here parses a response: `retryAfter` is a property of the
-     * generated failure because the *document* said that response carries that
-     * header, with that schema — so a service that stopped sending it, or
-     * started sending something else, is a regeneration away from breaking
-     * this line rather than a caller away from a surprise.
-     */
     @Test
     fun `a declared failure hands back the header it was declared to carry`() {
         val refused = client.placeOrder(
@@ -185,16 +151,6 @@ class GeneratedKotlinClientTest {
         failure.retryAfter shouldBe 30L
     }
 
-    /**
-     * The two successes, as the caller has to meet them.
-     *
-     * `submitOrder` returns a `SubmitOrderResult`, not an `Order` — so the
-     * caller cannot read the 201's payload without having said which response
-     * it is looking at, and the `when` below is exhaustive. Declare a third 2xx
-     * on the endpoint, regenerate, and this stops compiling, which is the point
-     * of the sealed type: the alternative was the two payloads' common
-     * supertype, and `Any` would have compiled and said nothing.
-     */
     @Test
     fun `an endpoint that answers two ways makes the caller say which one it got`() {
         val placed = client.submitOrder(1L, CreateOrder("anvil", quantity = 2), xApiKey = "let-me-in")

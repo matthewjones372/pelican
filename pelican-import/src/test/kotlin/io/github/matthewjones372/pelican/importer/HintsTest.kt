@@ -7,15 +7,6 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
-/**
- * The `discriminator` a document never wrote down, stated in the build file.
- *
- * The refusal these get past is not softened and is asserted still standing in
- * [UnionsTest]: a `oneOf` with nothing saying which branch a payload is stays
- * refused. What is tested here is the other half — that a reader who knows can
- * say so, that saying it wrong fails with a message worth reading, and that
- * everything the documented path does the hinted one does too.
- */
 class HintsTest {
 
     private fun hinted(yaml: String, vararg hints: Pair<String, String>): String =
@@ -24,15 +15,6 @@ class HintsTest {
     private fun refusing(yaml: String, vararg hints: Pair<String, String>): String =
         shouldThrow<ImportFailure> { hinted(yaml, *hints) }.message.orEmpty()
 
-    /**
-     * Two branches the document names and nothing telling them apart, which is
-     * the shape a hint exists for.
-     *
-     * Assembled line by line rather than written as one indented literal,
-     * because the branches and the schemas they point at vary from test to
-     * test and an interpolated block would land at whatever indentation it
-     * carried.
-     */
     private fun payments(
         cards: String = PLAIN_CARDS,
         names: List<String> = listOf("Card", "Bank"),
@@ -73,11 +55,6 @@ class HintsTest {
         generated shouldContain """property = "kind""""
     }
 
-    /**
-     * The discriminator property belongs to the hierarchy, not to the branch,
-     * and a hint does not change whose it is. Two places holding one value is
-     * two places for them to disagree.
-     */
     @Test
     fun `the hinted discriminator is carried by the hierarchy, not by the branches`() {
         val generated = hinted(payments(), "Payment" to "kind")
@@ -124,11 +101,6 @@ class HintsTest {
         generated shouldContain """JsonSubTypes.Type(value = Card::class, name = "card")"""
     }
 
-    /**
-     * The case a component name could not address, and the reason the hint is
-     * a pointer rather than a name: without it, a union written out under a
-     * property would still cost the whole operation.
-     */
     @Test
     fun `an inline union under a property is addressed by pointer`() {
         val generated = hinted(
@@ -199,12 +171,6 @@ class HintsTest {
         generated shouldContain ") : LatestResponse"
     }
 
-    /**
-     * What the hint rescues has to survive being published again, or the
-     * import has only moved the problem into the next document. The schemas
-     * the generated file carries are the document's own, so the discriminator
-     * and its full mapping are in them.
-     */
     @Test
     fun `the schemas the generated file publishes carry the discriminator and a full mapping`() {
         val generated = hinted(payments(CONST_CARDS, names = listOf("CardPayment", "BankPayment")), "Payment" to "kind")
@@ -214,16 +180,6 @@ class HintsTest {
         generated shouldContain "\\\"bank_transfer\\\":\\\"#/components/schemas/BankPayment\\\""
     }
 
-    /**
-     * The whole design claim, as one comparison: a hint makes the import
-     * behave exactly as though the document had carried the `discriminator`
-     * and mapping it implies — same names, same wire values, same published
-     * schemas, byte for byte.
-     *
-     * It is also the round trip stated the cheap way. The schemas the
-     * generated file publishes are the ones on the right-hand side, so
-     * importing what a hinted import publishes needs no hint the second time.
-     */
     @Test
     fun `a hint generates what the document stating it itself would have generated`() {
         hinted(payments(), "Payment" to "kind") shouldBe imported(
@@ -333,11 +289,6 @@ class HintsTest {
         message shouldContain "cannot place a payload in two classes"
     }
 
-    /**
-     * The one branch with nothing to fall back on. A reference has the name of
-     * the schema it points at; an inline branch has nothing, and a positional
-     * name would be a wire value nobody wrote down.
-     */
     @Test
     fun `an inline branch that states no value is refused rather than given a positional one`() {
         val message = refusing(
@@ -394,13 +345,6 @@ class HintsTest {
         message shouldContain "drop the hint"
     }
 
-    /**
-     * Excluding the operation that reached the union leaves the hint stating a
-     * fact about nothing, and that is worth failing over where an unused
-     * `exclude` is not: an exclude that matches nothing has weakened nothing,
-     * and an unchecked claim about a payload format is the silent weakening a
-     * strict import is for.
-     */
     @Test
     fun `a hint whose schema no imported operation reaches is refused`() {
         val message = shouldThrow<ImportFailure> {

@@ -4,16 +4,6 @@ import io.github.matthewjones372.pelican.*
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-/**
- * The YAML rendering, pinned as text.
- *
- * A renderer nobody reads back is a renderer that can drift into something no
- * parser accepts, so these tests assert the exact bytes for the shapes that
- * are easy to get wrong — nesting, sequences of mappings, empty collections,
- * and the strings YAML would otherwise resolve to some other type. The other
- * half of the claim is made where a parser that is not this one reads a real
- * document: see the example module's OpenApiSpecQualityTest.
- */
 class YamlTest {
 
     @Test
@@ -158,10 +148,6 @@ class YamlTest {
             """.trimIndent() + "\n"
     }
 
-    /**
-     * A block scalar cannot carry a line with trailing whitespace — a parser
-     * reading it back drops the spaces — so those strings are quoted instead.
-     */
     @Test
     fun `quotes a multi-line string a block would not round-trip`() {
         jsonObj {

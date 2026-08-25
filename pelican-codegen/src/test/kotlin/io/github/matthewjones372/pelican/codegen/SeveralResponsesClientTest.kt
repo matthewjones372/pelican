@@ -7,19 +7,6 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-/**
- * What a caller is handed when an endpoint answers more than one way.
- *
- * A generated client's job is to make the caller face what the description
- * says, and two successes are the case where handing back a value would lose
- * the distinction — `200 Order` and `201 Order` carry the same bytes, so the
- * payload cannot say which arrived. The answer is the one this module already
- * gives for declared failures: a sealed type per endpoint, one member per
- * status, `when` over it exhaustive.
- *
- * Text only, as in [KotlinClientTest]: whether it compiles and runs is
- * asserted in `:example`, against a server that can answer it.
- */
 class SeveralResponsesClientTest {
 
     object Schemas : SchemaSource {
@@ -69,12 +56,6 @@ class SeveralResponsesClientTest {
         client shouldContain "data class Accepted(val body: Queued) : SubmitOrderResult {"
     }
 
-    /**
-     * The caller cannot read the payload without saying which response it is
-     * looking at, and that is the whole reason this is a sealed type rather
-     * than the two payloads' common supertype: `Any` would have compiled
-     * everywhere and said nothing.
-     */
     @Test
     fun `the call returns that type, and reads which one arrived off the status`() {
         client shouldContain "fun submitOrder(body: Order): Outcome<SubmitOrderFailure, SubmitOrderResult>"
@@ -91,11 +72,6 @@ class SeveralResponsesClientTest {
         client shouldContain "else -> failed(\"POST\", \"/orders\", response)"
     }
 
-    /**
-     * The `Outcome` is the failure side's doing. Without a failure there is no
-     * `Err` branch to be the other half of, so the sealed type comes back on
-     * its own.
-     */
     @Test
     fun `with no failures declared the sealed type is the return type itself`() {
         client shouldContain "fun rememberOrder(body: Order): RememberOrderResult"

@@ -10,10 +10,6 @@ import java.nio.charset.StandardCharsets
 /**
  * A file a caller uploaded, handed over unread: [stream] is a window onto the
  * request's own body, stopping at the part's boundary.
- *
- * Core's stream rather than the backend's, because a part only exists once the
- * envelope is parsed and the parsing is core's — so an upload reads the same
- * way on all three. The constructor is public because a client sends one too.
  */
 class UploadedFile(
     /** What the caller called it. Advisory, attacker-controlled, and often absent. */
@@ -49,15 +45,6 @@ fun multipartBoundary(contentType: String?): String? {
  * One parser rather than each backend's own — http4k-core has none, Pekko's is
  * a stream, Ktor's suspends — so that "which part wins when a name repeats" has
  * one answer. `MultipartTest` is where that answer is written down.
- *
- * Text and [bufferedFile] parts are read as they arrive; a streamed file part
- * is handed over positioned at its first byte. **The streamed part has to be
- * last on the wire**, because reading stops there and nothing goes back — a
- * part still missing when it arrives is a 400 saying so.
- *
- * Everything held shares [maxInMemoryBytes] on top of each buffered part's own
- * bound: the per-part bound is what the description promises about one field,
- * the budget is what the server spends on one request.
  */
 fun MultipartBody.decode(
     contentType: String?,
@@ -116,10 +103,6 @@ fun MultipartBody.decode(
  * The 413 for a part that ran over, raised after draining the rest — up to a
  * bound. Unread bytes are bytes the client is still writing, and answering
  * mid-upload gives it a broken pipe instead of the status.
- *
- * The message names the bound that was written down: the part's own [bound]
- * where that stopped it, [max] where the request's budget ran out. Naming a
- * number nobody wrote sends the caller looking for it.
  */
 private fun refuse(input: InputStream, part: String, bound: Long?, budget: Long, max: Long): Nothing {
     var remaining = DRAIN_OVERRUN_BYTES
@@ -279,10 +262,6 @@ internal class MultipartReader(source: InputStream, boundary: String) {
 
 /**
  * Hands over the bytes before the next delimiter and nothing past it.
- *
- * A delimiter can straddle two reads, so the last `delimiter.size - 1` bytes
- * are held back — otherwise a partial match at the end of the buffer ships the
- * first bytes of a boundary as content.
  */
 private class BoundaryScanner(
     private val source: InputStream,

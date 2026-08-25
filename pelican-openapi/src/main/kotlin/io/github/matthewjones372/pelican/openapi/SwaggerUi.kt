@@ -10,10 +10,6 @@ import io.github.matthewjones372.pelican.jsonStrings
 
 /**
  * How the docs page authenticates when a reader clicks "Authorize".
- *
- * No client secret: the page runs in a browser, so a secret shipped to it is
- * not secret. PKCE replaces it and is on by default — register the page as a
- * public client with `<docsPath>/oauth2-redirect.html` as its redirect URI.
  */
 class DocsOAuth(
     val clientId: String,
@@ -30,10 +26,6 @@ class DocsOAuth(
  * from there, so a reader can curl the same URL; without one the document is
  * embedded, so switching off `/openapi.json` does not leave the page pointed at
  * nothing.
- *
- * [oauthRedirectPath] becomes absolute in the page rather than here: the origin
- * the reader is on is the only one the browser will accept back, and the one
- * thing the server cannot know.
  */
 fun swaggerUiHtml(
     title: String,
@@ -73,9 +65,6 @@ fun swaggerUiHtml(
  * Where the identity provider sends the reader back to. Runs in the pop-up
  * Swagger UI opened, hands the code to the opener and closes; nothing is
  * stored, and the token exchange happens in the opener.
- *
- * `state` is checked rather than accepted, because a response the page did not
- * ask for is what a CSRF against the flow looks like.
  */
 fun oauth2RedirectHtml(): String = """
 <!doctype html>

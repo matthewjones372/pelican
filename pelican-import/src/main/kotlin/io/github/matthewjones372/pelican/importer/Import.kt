@@ -5,17 +5,6 @@ import java.io.File
 
 /**
  * An OpenAPI document in, endpoint descriptions out.
- *
- * What comes out is ordinary Kotlin in the vocabulary a hand-written service
- * uses, reaching for no server library — the file describes the API and does
- * not run it, so it serves a client and a server equally.
- *
- * The import is strict: an operation Pelican cannot describe fails the whole
- * import rather than generating an endpoint that says less than the document
- * does. [ImportOptions.exclude] leaves one out, on the record.
- *
- * [ImportOptions.discriminators] is the narrower way past one refusal: a
- * `oneOf` with no `discriminator` is a union nothing says how to read.
  */
 object Import {
 
@@ -55,19 +44,6 @@ object Import {
 
 /**
  * The one entry the Gradle plugin calls, in types the JDK already has.
- *
- * The plugin loads this off the consumer's classpath by name, which keeps the
- * two versions independent — and stays cheap only while the signature is made
- * of `File`, `String` and `Set`. Building an [ImportOptions] reflectively would
- * put this module's constructor in the plugin's hands.
- *
- * [handlers] is a [Backend] name, [codec] a [CodecAnnotations] name;
- * [discriminators] is addressed as [Hints] describes, and [allowRemote] and
- * [lockfile] as [Remote] does.
- *
- * Every arity is declared rather than defaulted, because what the plugin looks
- * up is a signature — a default would leave the older ones as synthetic
- * bridges, forcing plugin and library releases to arrive together.
  */
 @Suppress("LongParameterList") // Every parameter is one entry in the build file's `endpoints { }` block.
 fun importEndpoints(
@@ -144,13 +120,6 @@ fun importEndpoints(
 /**
  * Rewrites [lockfile] from what [allowRemote] serves now, returning one line per
  * URL added, changed or dropped.
- *
- * Separate from [importEndpoints] rather than a flag on it, because it is the
- * one operation here that trusts the network — which makes "a build fetches
- * nothing this has not recorded" checkable rather than a claim about a boolean.
- *
- * [acceptChanges] is required before a recorded hash may change: adding a URL
- * shows in the diff, and changing one is the supply-chain event.
  */
 fun updateRemoteLock(
     document: File,
@@ -175,10 +144,6 @@ fun importEndpoints(
 
 /**
  * What to generate.
- *
- * [name] is the one thing without a sensible default: it names the generated
- * `<name>Spec()` function and the file the endpoints land in, and a document
- * does not say what you call the service it describes.
  */
 class ImportOptions(
     val packageName: String,
@@ -195,25 +160,12 @@ class ImportOptions(
     /**
      * Schema -> the property telling the branches of its `oneOf` apart, for
      * unions a document declares without a `discriminator`.
-     *
-     * The refusal is not softened — a decoder still cannot try each branch and
-     * keep the first that parsed. What changes is who says which branch a
-     * payload is: a reader, per schema, reviewed once. See [Hints].
-     *
-     * A hint that stops mattering fails the import, since a claim about a
-     * payload format checked against nothing is worse than none.
      */
     val discriminators: Map<String, String> = emptyMap(),
 
     /**
      * The hosts a `$ref` may be fetched from, as origins. Empty by default,
      * which means a `$ref` to another host fails the import.
-     *
-     * Naming a host trusts what it serves *once*: every URL reached and the
-     * hash of what came back go into [lockfile], and a later build getting
-     * different bytes fails. A global "follow references" switch would say
-     * "and wherever else the document points"; this says "this host, at these
-     * hashes".
      */
     val allowRemote: Set<String> = emptySet(),
 
@@ -252,10 +204,6 @@ enum class Backend(internal val packageName: String) {
 
 /**
  * What a document that cannot be imported says, and why.
- *
- * One exception for the whole document rather than one per problem: the answer
- * to three unsupported operations is one decision about all three, and it
- * cannot be made from the first of them.
  */
 class ImportFailure(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 

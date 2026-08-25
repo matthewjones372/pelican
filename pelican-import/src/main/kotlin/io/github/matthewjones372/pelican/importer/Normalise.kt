@@ -8,14 +8,6 @@ import io.github.matthewjones372.pelican.JsonValue
 
 /**
  * 3.0's spelling of a schema, rewritten as 3.1's.
- *
- * The disagreement that matters is nullability: 3.0 has `nullable: true` beside
- * the type, 3.1 has `"null"` among the types. Everything downstream reads the
- * 3.1 spelling, so this is where the older one stops existing.
- *
- * A nullable `$ref` makes it more than a rename: a reference has no `type` to
- * widen, so 3.1 spells it as an `anyOf` with a null branch and 3.0 could not
- * spell it at all.
  */
 internal fun normaliseSchema(value: JsonValue): JsonObj {
     val schema = value as? JsonObj ?: return JsonObj(emptyMap())

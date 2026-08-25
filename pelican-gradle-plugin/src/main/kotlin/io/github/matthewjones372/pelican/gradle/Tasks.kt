@@ -67,10 +67,6 @@ abstract class SpecTask : PelicanTask() {
 
 /**
  * Writes one client. See `ClientSpec` for what each property means.
- *
- * Not cacheable: where the output lands is the build script's decision, and a
- * client in a source root is a file somebody edits and commits — a cache hit
- * replacing it would answer a question nobody asked.
  */
 @DisableCachingByDefault(because = "The output may be a source root the consumer owns")
 abstract class GenerateKotlinClientTask : SpecTask() {
@@ -266,10 +262,6 @@ abstract class GenerateEndpointsTask : PelicanTask() {
  * Rewrites the lockfile of remote `$ref`s from what the allowed hosts serve
  * now. The one task that trusts the network, and a task of its own for that
  * reason: nothing depends on it and it has to be typed.
- *
- * A recorded hash will not change without `--accept-changes` either — adding a
- * URL is free and shows in the diff, and changing one is the event the lockfile
- * exists for.
  */
 @UntrackedTask(because = "It fetches: what the far end says now is the answer, by definition")
 abstract class UpdateEndpointsLockTask : PelicanTask() {

@@ -5,15 +5,6 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
-/**
- * `webhooks`, read as the descriptions they are.
- *
- * A webhook is a Path Item Object filed under a name instead of a path, so the
- * same reader reads it and the same emitter writes it out — what changes is
- * that nothing produced here can be routed. The tests worth having are
- * therefore about the two ends: that the description survives, and that it
- * lands in the list a server never looks at.
- */
 class WebhooksTest {
 
     private fun withWebhooks(webhooks: String, paths: String? = null): String = imported(
@@ -82,11 +73,6 @@ class WebhooksTest {
         generated shouldContain "empty()"
     }
 
-    /**
-     * The list a server never reads. `apiEndpoints` is what an interpreter is
-     * handed; a webhook is not in it, and the generated spec passes these in
-     * the field the document publishes them from.
-     */
     @Test
     fun `webhooks land in their own list, and not among the endpoints`() {
         generated shouldContain "val testWebhooks: List<Webhook> = listOf(\n    orderPlaced,\n)"
@@ -110,11 +96,6 @@ class WebhooksTest {
         source shouldContain """webhook("orderUpdated", method = Method.PUT) {"""
     }
 
-    /**
-     * Two methods under one name are two webhooks sharing a key, which is what
-     * the document says and what `ApiSpec` groups back together when it
-     * publishes them.
-     */
     @Test
     fun `two methods under one name are two descriptions of that name`() {
         val source = withWebhooks(
@@ -135,11 +116,6 @@ class WebhooksTest {
         source shouldContain """val orderAmended = webhook("orderChanged", method = Method.PUT) {"""
     }
 
-    /**
-     * The names are one namespace: both become top-level values in one
-     * generated file, so a webhook borrowing a route's operationId is a clash
-     * whichever section it sits in.
-     */
     @Test
     fun `an operationId shared with a route is still a clash`() {
         shouldThrow<ImportFailure> {
@@ -218,10 +194,6 @@ class WebhooksTest {
         }.message.orEmpty() shouldContain "a webhook has no path"
     }
 
-    /**
-     * The response is the subscriber's, and a subscriber streaming back at the
-     * service that called it is a shape nothing on this side consumes.
-     */
     @Test
     fun `a streamed response from a subscriber is refused`() {
         shouldThrow<ImportFailure> {

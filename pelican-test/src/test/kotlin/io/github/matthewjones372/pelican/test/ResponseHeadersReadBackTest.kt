@@ -11,15 +11,6 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-/**
- * Reading a declared failure's headers back off a server this repository did
- * not write.
- *
- * The server under test is the thing being asserted about, so everything this
- * client is handed has to survive being wrong. A header is one fact about a
- * response among several, and the ones beside it are usually the ones the test
- * came for.
- */
 class ResponseHeadersReadBackTest {
 
     data class Problem(val code: String)

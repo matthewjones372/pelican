@@ -17,16 +17,6 @@ import kotlin.io.path.readText
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-/**
- * The generated file is checked here as text, which is all this module can do:
- * whether it compiles and *runs* is asserted in `:example`, where the generated
- * client is checked in against a server that can answer it.
- *
- * As in `pelican-openapi`, the schemas are hand-written, so these tests need no
- * codec module — and prove the generator reads whatever the spec's own
- * [SchemaSource] produced rather than having its own opinion about a Kotlin
- * class.
- */
 class KotlinClientTest {
 
     object WidgetSchemas : SchemaSource {
@@ -224,11 +214,6 @@ class KotlinClientTest {
         client shouldContain """cookies = listOf("seen" to seen)"""
     }
 
-    /**
-     * The wire name travels with it because the refusal is written for whoever
-     * passed the list, and `xFeature` is not what they would look for in a
-     * document — `X-Feature` is.
-     */
     @Test
     fun `a delimited parameter is joined at the call site, where the separator is known`() {
         client shouldContain """headerParams = listOf("X-Feature" to joined("X-Feature", xFeature, ","))"""
@@ -311,10 +296,6 @@ class KotlinClientTest {
 
     @Test
     fun `a body with several encodings is sent as the first the endpoint declared`() {
-        // A client sends exactly one Content-Type, so it has to pick, and the
-        // document's order is the document's answer — the same rule as the
-        // first of several `servers`. Offering the choice would put a media
-        // type parameter on every generated method that takes a body.
         client shouldContain "fun postWidgetEitherWay(body: NewWidget)"
         client shouldContain
             "body = HttpRequest.BodyPublishers.ofString(newWidgetCodec.encodeToString(body)), " +
@@ -383,15 +364,6 @@ class KotlinClientTest {
         client shouldContain "return Outcome.Ok(widgetCodec.decodeFromString(response.body()))"
     }
 
-    /**
-     * A failure that declares a header gets a property for it, typed from the
-     * schema the document publishes — so a caller reads `retryAfter` off the
-     * failure rather than going back to the response for a string to parse.
-     *
-     * Nullable, and parsed with the total form: this is the reading end, and a
-     * client that threw over a header would have thrown away the failure it was
-     * handed.
-     */
     @Test
     fun `a failure declaring a header carries it, typed, on the generated failure`() {
         client shouldContain
@@ -441,13 +413,6 @@ class KotlinClientTest {
         client shouldContain "enum class WidgetColour { RED, GREEN }"
     }
 
-    /**
-     * A constant is written exactly as the wire spells it, in backticks where
-     * Kotlin needs them. `EnumCodec` matches on the constant's name, so
-     * renaming `in-progress` to `IN_PROGRESS` would need a codec-specific
-     * annotation to map it back — which is the one thing these declarations
-     * are meant to work without.
-     */
     @Test
     fun `an enum keeps a constant the wire uses, in backticks where it has to`() {
         val jobs = object : SchemaSource {
@@ -526,10 +491,6 @@ class KotlinClientTest {
 
     // -------------------------------------------------------------- unions
 
-    /**
-     * A discriminated union, kept apart from [WidgetSchemas] because it is the
-     * one payload shape that costs the generated file an import — see below.
-     */
     object PaymentSchemas : SchemaSource {
         override fun schema(type: KType, components: SchemaComponents): JsonObj {
             if (!components.isRegistered("Payment")) {

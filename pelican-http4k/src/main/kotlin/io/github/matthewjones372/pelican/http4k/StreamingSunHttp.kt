@@ -30,11 +30,6 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
  * Otherwise http4k's `SunHttp`, whose source says to duplicate and modify it.
  * For real load pass a production backend — `Jetty(port)`, `Undertow(port)` —
  * noting that only some of them stream.
- *
- * [executor] is a cached pool rather than a work-stealing one, because a
- * streaming handler holds its thread for as long as the stream runs. The pool
- * is therefore unbounded, which is another reason a busy service wants a real
- * backend.
  */
 class StreamingSunHttp(
     private val port: Int = 8000,

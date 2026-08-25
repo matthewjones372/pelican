@@ -63,9 +63,6 @@ private val simpleLocations = setOf("path", "header")
  * Space around a separator is padding — RFC 9110 makes it optional in every
  * list-bearing header — so an element that really starts or ends with one
  * needs [ListStyle.REPEATED].
- *
- * An empty piece contributes nothing: `?tags=` is a field nobody filled in,
- * and reading it as one empty string would invent an element.
  */
 fun PlainCodec<*>.decodeAll(name: String, style: ListStyle, wire: List<String>): List<Any> {
     val separator = style.separator
@@ -76,12 +73,6 @@ fun PlainCodec<*>.decodeAll(name: String, style: ListStyle, wire: List<String>):
 /**
  * The occurrences a list travels as: one per element for [ListStyle.REPEATED],
  * one joined string otherwise, none for an empty list.
- *
- * Three elements are refused rather than written, because each would come back
- * as a different list and nothing downstream could tell: one encoding to
- * nothing, in any style, since [decodeAll] reads an empty occurrence as no
- * element; and, in the joined styles, one carrying the separator or padded
- * with the space [decodeAll] trims.
  */
 fun PlainCodec<*>.encodeAll(name: String, style: ListStyle, values: List<*>): List<String> {
     @Suppress("UNCHECKED_CAST")

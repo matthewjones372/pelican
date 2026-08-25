@@ -5,12 +5,6 @@ import java.util.concurrent.CompletionStage
 
 /**
  * Runs around every handler: authentication, rate limiting, a request log.
- *
- * A filter sees the request after its inputs are decoded, so `params[userId]`
- * is a `Long` rather than a string to parse again. Rejecting is throwing —
- * [unauthorized], [forbidden] and friends.
- *
- * Composed once at route-build time. The first filter is the outermost.
  */
 fun interface Filter {
     fun handle(params: Params, next: (Params) -> CompletionStage<Any?>): CompletionStage<Any?>

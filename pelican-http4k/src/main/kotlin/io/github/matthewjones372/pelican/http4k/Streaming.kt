@@ -11,12 +11,6 @@ import kotlin.time.Duration
  * A stream over frames produced as they are asked for, which is what makes a
  * streaming endpoint stream on a server-as-a-function: the copy loop reads
  * before it writes, so one `read` pulls exactly one element.
- *
- * [read] returns one frame at a time even when offered a larger buffer, since
- * filling it would pull elements nobody has asked for.
- *
- * How promptly those bytes leave the machine is the backend's business — see
- * the note in `Server.kt`.
  */
 internal class FrameInputStream(frames: Sequence<String>) : InputStream() {
     private val iterator = frames.iterator()
@@ -60,11 +54,6 @@ internal class FrameInputStream(frames: Sequence<String>) : InputStream() {
 /**
  * Injects an SSE comment down a stream that has gone quiet. Idle rather than
  * periodic, matching `Source.keepAlive` — a busy stream sends nothing extra.
- *
- * The expensive one of the three: a blocking iterator cannot express "wait for
- * the next element with a deadline", so the sequence is walked on a thread of
- * its own and the reader holds the deadline. One thread per live keep-alive
- * stream, which is why it is null by default.
  */
 internal fun Sequence<String>.withKeepAlive(interval: Duration?): Sequence<String> =
     if (interval == null) this else Sequence { KeepAliveIterator(iterator(), interval) }
@@ -78,10 +67,6 @@ private class Failed(val cause: Throwable)
 /**
  * Hands elements across from the thread walking the sequence, filling the
  * silence when it has nothing yet.
- *
- * A [SynchronousQueue] has no capacity, so the producer sits inside `put` until
- * this iterator takes the element. A queue of even one would undo the
- * back-pressure the streaming path is built on.
  */
 private class KeepAliveIterator(
     upstream: Iterator<String>,

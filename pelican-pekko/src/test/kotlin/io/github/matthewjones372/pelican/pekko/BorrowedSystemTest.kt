@@ -28,10 +28,6 @@ import java.net.http.HttpResponse
  * gets to end it. `stop()` unbinds the port and leaves a borrowed system
  * running, because terminating it would take the caller's cluster down with
  * their HTTP port — and the caller has no way to put it back.
- *
- * The caller's system comes from Pekko's own actor testkit: `ActorTestKit`
- * shuts down through the extension and fails the run if termination does not
- * come, where a hand-written `@AfterAll` leaves a half-dead system behind.
  */
 @ExtendWith(TestKitJUnit5Extension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

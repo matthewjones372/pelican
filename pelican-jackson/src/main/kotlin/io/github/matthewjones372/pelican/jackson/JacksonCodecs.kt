@@ -28,12 +28,6 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
     /**
      * swagger-core introspects with its own mapper, which knows nothing about
      * Kotlin, so a resolver backed by [mapper] goes at the front of the chain.
-     *
-     * `openapi31(true)` is asked on the resolver rather than on
-     * [ModelConverters], whose flag only configures the resolver that class
-     * builds for itself — the one this stands in front of. Asked this way,
-     * models come back with a `types` set, which is what lets a nullable
-     * property become a type union.
      */
     private val describer = KotlinAwareModelResolver(mapper).apply { openapi31(true) }
 

@@ -6,20 +6,11 @@ import kotlin.reflect.typeOf
 /**
  * Phantom marker for "the handler names which declared response it is
  * producing" — a success carrying [T], or a failure carrying [E].
- *
- * Like [StreamOf] it has no instances. It carries the declared types in
- * `Endpoint<I, R>` without a third type parameter on every signature: binders
- * for this shape demand an [Outcome], so an undeclared response does not
- * compile.
  */
 class Fallible<E, T> private constructor()
 
 /**
  * One of the declared responses, carrying its payload.
- *
- * Built by invoking the declaration itself, because naming the response is
- * what fixes the status — two responses sharing a payload type stay
- * distinguishable. [ok] means the first declared success.
  */
 sealed interface Outcome<out E, out T> {
     /**
@@ -78,15 +69,6 @@ fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)
 /**
  * Which declared success an [Outcome.Ok] names, and the one place a success is
  * checked against what it promised.
- *
- * Shared by the three interpreters rather than resolved in each, because this
- * is where a bare [ok] becomes visible: it names no response, so it carries no
- * headers, and the response it means may declare one it always sends. Three
- * copies would be three chances to send a 201 without its `Location`.
- *
- * A loud 500 rather than a refused declaration, because
- * `json<Order>(201, location) or empty(202)` is the ordinary create-or-accept
- * shape — the handler that does not name its response is the mistake.
  */
 fun FallibleOutput<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
     val chosen = ok.declared ?: successes.first()
@@ -131,8 +113,6 @@ infix fun <T : Any> ResponseHeader<T>.of(value: T): HeaderValue = HeaderValue(th
  * The headers a declared response is sent with, checked against what it
  * declared and encoded in *declaration* order rather than call order, so two
  * handlers producing the same response put the same bytes on the wire.
- *
- * [owner] is the declaration, so a refusal names the response not just a status.
  */
 internal fun encodeDeclaredHeaders(
     owner: Any,
@@ -185,10 +165,6 @@ class ErrorOutput<E> @PublishedApi internal constructor(
     /**
      * Produces this failure, with a value for each header it declared —
      * `throttled(ApiError(429, "Slow down"), retryAfter of 30L)`.
-     *
-     * Stricter than [Params.setHeader], which only reports a missing required
-     * header: a handler setting them one at a time is not finished until the
-     * response is built, whereas this call is the whole answer.
      */
     operator fun invoke(error: E, vararg values: HeaderValue): Outcome<E, Nothing> =
         Outcome.Err(this, error, encodeDeclaredHeaders(this, headers, values))
@@ -211,10 +187,6 @@ inline fun <reified E> errorJson(
 /**
  * The responses one endpoint declares: at least one success, and the failures a
  * handler may return instead.
- *
- * Wrapping rather than replacing keeps every existing output usable as a
- * success — including the streaming ones, so `Fallible<E, StreamOf<T>>` still
- * means "a stream of T, or a failure decided before the first element".
  */
 class FallibleOutput<E, T> internal constructor(
     /** In declaration order. The first is the one a bare [ok] means. */
@@ -275,10 +247,6 @@ internal fun Output<*>.streams(): Boolean =
 
 /**
  * Declares a second successful response — `json<Order>(201) or empty(202)`.
- *
- * [T] infers to the payload types' common supertype, so a sealed hierarchy
- * makes a handler's `when` exhaustive. Unrelated types give `Any`, and the
- * statuses still tell the responses apart.
  */
 infix fun <T> Output<out T>.or(other: Output<out T>): FallibleOutput<Nothing, T> =
     responses(listOf(this, other), emptyList())
@@ -331,10 +299,6 @@ private fun <E, T> orFailAll(
 
 /**
  * The one place a list of declared responses is assembled.
- *
- * A nested `FallibleOutput` is spliced, not kept: left nested it would be a
- * response whose payload is a phantom marker, rendered and documented as
- * nothing. Splicing makes both readings of `a or b or c` the same list.
  */
 private fun <E, T> responses(
     declared: List<Output<*>>,

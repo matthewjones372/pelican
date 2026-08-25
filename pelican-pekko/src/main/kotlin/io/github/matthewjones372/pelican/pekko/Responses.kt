@@ -28,8 +28,6 @@ internal val EVENT_STREAM: ContentType.NonBinary = MediaTypes.TEXT_EVENT_STREAM.
  * puts elements on a socket, mapping the source into a chunked entity so
  * back-pressure reaches the source. [JsonArrayOutput] is the exception: Pekko
  * frames a stream of JSON documents as an array already.
- *
- * [codecs] were resolved when the route was built, not per request.
  */
 @Suppress("UNCHECKED_CAST")
 internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs): HttpResponse {
@@ -186,9 +184,6 @@ private val log: Logger = LoggerFactory.getLogger("io.github.matthewjones372.pel
 /**
  * Rendered through core's own JSON tree rather than the configured codec: a
  * codec that has just failed is not the thing to report that it failed.
- *
- * [renderError] decides which throwable becomes which response. What is local
- * is the logging — Pelican catches the throwable, so the server never sees it.
  */
 internal fun errorResponse(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): HttpResponse {
     val rendered = renderError(raw, api?.exposeInternalErrors ?: false)

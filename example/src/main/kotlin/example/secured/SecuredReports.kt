@@ -21,26 +21,6 @@ import java.util.Base64
  *  - `oauth2AuthorizationCode(...)` — an external identity provider, with
  *    scopes, and a redirect URL the docs page is sent back to after the reader
  *    signs in.
- *
- * Two halves, and the join between them is the point:
- *
- *  1. The *description* (sections 1–4). `security(scheme, "scope")` says what a
- *     caller must present. It draws the padlock and writes
- *     `components.securitySchemes` — it checks nothing.
- *  2. The *enforcement* (section 6). One [Filter], registered once on the
- *     [Api], which reads `endpoint.security` — the very list that drew the
- *     padlock — and holds the caller to it.
- *
- * So the document is not a description of the check written alongside it; it is
- * the input to the check. Add an endpoint with `security(companyIdp,
- * "reports:admin")` and it is enforced before it is bound to a handler. Call
- * `noSecurity()` and the filter steps aside, because that is what the empty
- * requirement list means to a reader of the document too.
- *
- * Pelican still validates no credential — it has no idea what yours means, and
- * [Introspection] below is where that knowledge lives. What it does supply is
- * the requirement, in a form something else can enforce, and somewhere to put
- * the enforcing that is not "every handler, by hand".
  */
 
 // ==================================================== 1. the security schemes
@@ -240,9 +220,6 @@ object StaffDirectory {
  * Stands in for the identity provider's token introspection endpoint — the call
  * a real service makes to turn an opaque bearer token into a subject and a set
  * of scopes (or verifies a JWT signature against the provider's JWKS instead).
- *
- * These three tokens exist so the example is runnable with curl. Nothing signs
- * them and nothing expires them; a real one is neither guessable nor eternal.
  */
 object Introspection {
     private val issued = mapOf(
@@ -292,11 +269,6 @@ private fun callerOf(p: Params): Caller? {
 
 /**
  * Whether this caller satisfies one requirement.
- *
- * A requirement names a scheme and, for OAuth, the scopes. Matching on the
- * scheme *value* rather than on its name is what keeps this honest: these are
- * the same `staffLogin` and `companyIdp` objects the endpoints point at, so a
- * scheme renamed in the document cannot silently stop being checked.
  */
 private fun Caller.satisfies(requirement: SecurityRequirement): Boolean =
     when (requirement.scheme) {
@@ -307,11 +279,6 @@ private fun Caller.satisfies(requirement: SecurityRequirement): Boolean =
 
 /**
  * The rule, in one place, for every endpoint.
- *
- * 401 and 403 mean different things and are worth keeping apart: 401 is "I do
- * not know who you are", 403 is "I do, and it is not enough". The `WWW-
- * Authenticate` header on the 401 is what tells a browser which of the two
- * credentials to prompt for.
  *
  * A list of requirements means *any one will do*, which is how OpenAPI reads it
  * and therefore how `withdrawReport` — admin token **or** operator login — has
@@ -355,10 +322,6 @@ val securedRoutes: List<ServerEndpoint> = listOf(
     },
 
     fileReport handledNow { p ->
-        // The subject the identity provider vouched for becomes the author, so
-        // the caller cannot claim to be someone else by putting it in the body.
-        // `p[caller]` is what the filter worked out; there is no second check
-        // here, and no way for this handler to have skipped the first.
         val filed = Reports.file(p[caller].subject, p[newReport])
         setHeader(reportLocation, "/reports/${filed.id}")
         filed
@@ -400,15 +363,6 @@ const val DOCS_PATH = "/api-docs"
 /**
  * The docs page as an OAuth client of its own, which is what makes "Try it out"
  * send a real token rather than nothing.
- *
- * No client secret: this page runs in a browser, so a secret shipped to it is
- * not a secret. PKCE replaces it and is on by default — register the docs page
- * with the identity provider as a *public* client.
- *
- * The redirect URL is the one thing to get exactly right on the provider's
- * side: `<origin>/api-docs/oauth2-redirect.html`, served by this service beside
- * the page. [oauth2RedirectPath] is where that path comes from, so what gets
- * printed at start-up and what gets served cannot disagree.
  */
 val securedDocs = Docs(
     docsPath = DOCS_PATH,

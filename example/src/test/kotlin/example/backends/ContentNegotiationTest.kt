@@ -19,25 +19,12 @@ import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
 /**
- * Two answers a backend used to get to decide for itself, asked of all three
- * over a real socket.
+ * Pelican resolves its own codecs and never goes through a `Marshaller`, a
+ * `ContentConverter` or a `BiDiBodyLens`, so nothing underneath it reads
+ * `Accept`.
  *
- * *Negotiation.* Pelican resolves its own codecs and never goes through a
- * `Marshaller`, a `ContentConverter` or a `BiDiBodyLens`, so nothing
- * underneath it looks at `Accept`. Left there, an endpoint serving JSON would
- * answer 200 with JSON to a caller who said it would only read XML. The
- * decision is core's ([acceptable]) and the three interpreters only apply it,
- * which is what this checks.
- *
- * *An unregistered status.* 419 is a perfectly legal status code and is not in
- * anybody's registry. http4k and Ktor have always handled that; Pekko's
- * `StatusCodes.get` throws for it, which used to turn a documented 419 into an
- * undocumented 500.
- *
- * Over a socket rather than through a testkit, because both claims are about
- * what leaves the machine. `java.net.http` rather than this library's own
- * client: the client sends an `Accept` of its own, and the header under test
- * has to be the one written here.
+ * `java.net.http` rather than this library's own client, which sends an
+ * `Accept` of its own: the header under test has to be the one written here.
  */
 class ContentNegotiationTest {
 
@@ -63,10 +50,6 @@ class ContentNegotiationTest {
         return client.send(request, HttpResponse.BodyHandlers.ofString())
     }
 
-    /**
-     * Every claim in one function, so the three backends are held to the same
-     * list rather than to three lists that drifted.
-     */
     private fun probe(baseUrl: String) {
         withClue("no Accept at all asks for nothing in particular") {
             get(baseUrl, "/widget", accept = null).statusCode() shouldBe 200

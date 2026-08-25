@@ -31,14 +31,6 @@ class ApiSpec(
 
     /**
      * The calls this service sends — OpenAPI 3.1's `webhooks`.
-     *
-     * A list rather than a map keyed by name: a bare [Endpoint] as a map value
-     * could be moved between fields to make a route into a webhook, whereas a
-     * [Webhook] knows which it is.
-     *
-     * Neither [servers] nor [security] reaches them. A webhook's request goes
-     * to a URL a subscriber chose and carries the credential that subscriber
-     * asked for, so it says what it requires or says nothing.
      */
     val webhooks: List<Webhook> = emptyList(),
 ) {
@@ -127,9 +119,6 @@ class Api(
      * The largest strict body that will be read; over it is a 413 raised before
      * any codec sees it. Defaulted because an unbounded body is a way to run a
      * service out of memory with one request.
-     *
-     * A multipart envelope's held parts share this as one budget, on top of
-     * each buffered part's own bound. The streamed part is exempt.
      */
     val maxBodyBytes: Long = DEFAULT_MAX_BODY_BYTES,
 

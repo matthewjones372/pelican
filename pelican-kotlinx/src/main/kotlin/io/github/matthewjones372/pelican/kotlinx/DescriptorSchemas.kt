@@ -88,9 +88,6 @@ internal class DescriptorSchemas(
      * written out because a reader cannot recover it: `@SerialName("card")` on
      * a class called `Card` is the difference between a document another tool
      * can decode and one it can only guess at.
-     *
-     * A sealed descriptor carries its branches under element 1, and the element
-     * names there are the serial names.
      */
     private fun union(desc: SerialDescriptor): JsonObj {
         val branches = desc.getElementDescriptor(1)

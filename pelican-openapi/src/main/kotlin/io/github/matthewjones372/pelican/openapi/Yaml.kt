@@ -6,10 +6,6 @@ import io.github.matthewjones372.pelican.*
  * The same document, written as YAML — a second rendering of core's
  * [JsonValue], not a second document, so the two cannot disagree. No YAML
  * library for the same reason there is no JSON one.
- *
- * YAML 1.2: block mappings and sequences, plain scalars where they cannot be
- * misread and double quotes where they could, and a literal block for a string
- * with newlines in it.
  */
 fun ApiSpec.openApiYaml(): String = openApi().renderYaml()
 

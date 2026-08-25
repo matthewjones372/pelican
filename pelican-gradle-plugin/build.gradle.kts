@@ -1,10 +1,3 @@
-// The plugin has no dependency on any Pelican module, and that is deliberate.
-//
-// Generation runs against the *consumer's* classpath: their compiled spec, and
-// the `pelican-codegen` / `pelican-openapi` they already depend on. The plugin
-// only loads classes out of that classpath by name, so its version and the
-// library's are free to move independently — and this build cannot form a
-// cycle with the one it is included by.
 plugins {
     kotlin("jvm") version "2.4.10"
     `java-gradle-plugin`
@@ -87,11 +80,6 @@ gradlePlugin {
     }
 }
 
-// The plugin is exercised end to end by `example`, which applies it by id and
-// generates the client this repository commits. What is tested here is the one
-// part that has no compiler behind it: the names this plugin looks up on
-// somebody else's classpath. The test sources stand in for the library, with
-// the same class and method signatures the real modules have.
 tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 publishing {

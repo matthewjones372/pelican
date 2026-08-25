@@ -19,21 +19,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 
-/**
- * What a browser is told, asked of all three backends.
- *
- * Companion to [AllBackendsTest], and the same argument: the policy lives in
- * core and is derived from the endpoint descriptions, so three interpreters
- * that disagree here are two interpreters with a bug. `CorsPolicyTest` in
- * `pelican-core` holds the decisions themselves; this holds the claim that each
- * backend puts them on the wire — on a preflight, on a success, and on an
- * error, which is the one a hand-rolled filter usually misses.
- *
- * The requests are still built from the endpoint values. A browser's own
- * headers are not part of any description, so they go on by hand with
- * `withHeader` — which is exactly what a browser does to a request the script
- * never wrote them into.
- */
 class CorsTest {
 
     companion object {
@@ -84,11 +69,6 @@ class CorsTest {
         res.header("Access-Control-Max-Age") shouldBe "600"
     }
 
-    /**
-     * The whole point of deriving this: `X-Trace-Id` and the JSON body are
-     * declared on `echo` and nowhere else, and that is enough to let a browser
-     * send both.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `the headers a browser may send are the ones the endpoint declares`(name: String, client: ApiClient) {
@@ -137,10 +117,6 @@ class CorsTest {
         res.header("Access-Control-Allow-Origin") shouldBe ALLOWED
     }
 
-    /**
-     * Without this the script sees a bare network error instead of the 400 the
-     * server took the trouble to explain.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `an error carries them, or the browser hides why the call failed`(name: String, client: ApiClient) {
@@ -159,22 +135,11 @@ class CorsTest {
             client.request(echo, In2("trace-1", Note("hi"))).fromBrowser(REJECTED),
         )
 
-        // The call itself is served — CORS is a browser's rule, not a
-        // credential check, and pretending otherwise would make a `curl` and a
-        // fetch behave differently. What is withheld is the permission to read
-        // the answer.
         res.status shouldBe 200
         res.header("Access-Control-Allow-Origin").shouldBeNull()
         res.header("Vary") shouldBe "Origin"
     }
 
-    /**
-     * The one header a request with no `Origin` still picks up, and it has to:
-     * a cache between the browser and the service would otherwise be free to
-     * store this answer under the URL alone and hand it back — stripped of its
-     * `Access-Control-Allow-Origin` — to the browser that was allowed to read
-     * it.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a request that is not cross-origin is left as it was, but still varies by origin`(

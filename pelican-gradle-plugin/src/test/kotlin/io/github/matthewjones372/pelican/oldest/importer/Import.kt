@@ -2,15 +2,6 @@ package io.github.matthewjones372.pelican.oldest.importer
 
 import java.io.File
 
-/**
- * A `pelican-import` from before the codec setting existed — the bottom of the
- * importer's fallback, and the version the `older` one beside it falls back to.
- *
- * `older` and `oldest` rather than a version number, because what the plugin
- * cares about is the order and not the release: each one is one signature
- * further back, and the ladder reads the same way whatever the library is
- * called that quarter.
- */
 fun importEndpoints(
     document: File,
     sourceRoot: File,

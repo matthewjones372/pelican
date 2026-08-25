@@ -72,11 +72,6 @@ class ConcatenatedRoutesTest {
         cors = cors(allowed),
     )
 
-    /**
-     * Somebody else's routes. `OPTIONS /custom` is answered deliberately: it is
-     * how the test tells "Pelican rejected and this ran" apart from "nothing
-     * ran at all", which a 404 on its own cannot.
-     */
     private val ownRoutes: Route = Directives.concat(
         Directives.get { Directives.path("custom") { Directives.complete("mine") } },
         Directives.method(HttpMethods.OPTIONS) {
@@ -139,11 +134,6 @@ class ConcatenatedRoutesTest {
         res.headerOrNull("Access-Control-Allow-Headers") shouldBe "X-Trace-Id"
     }
 
-    /**
-     * The one that matters. Pelican describes no `/custom`, so its preflight
-     * route has no business answering for it — and the proof that it did not is
-     * the other route's own answer coming back.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("orderings")
     fun `an OPTIONS for a path Pelican does not describe falls through to your route`(name: String, route: Route) {

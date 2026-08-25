@@ -9,10 +9,6 @@ import java.time.Duration
 
 /**
  * Talks to a real server over a real socket, with the JDK's own client.
- *
- * It exists alongside [InMemoryTransport] so the same suite runs on both:
- * which transport is underneath decides whether a test is a fast check or an
- * integration test, including against something already deployed.
  */
 class HttpClientTransport(
     baseUrl: String,

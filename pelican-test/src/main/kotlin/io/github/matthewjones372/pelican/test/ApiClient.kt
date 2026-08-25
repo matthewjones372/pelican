@@ -22,9 +22,6 @@ class ApiCallFailed(
  * renaming an input stops the tests compiling rather than starting to 404. And
  * a passing test is evidence about the *documented* contract, since the path
  * template and payload types are the ones the OpenAPI interpreter reads.
- *
- * Responses decode with the [Codecs] that encoded them, so a green test also
- * proves the codec round-trips.
  */
 class ApiClient(
     val transport: Transport,
@@ -40,21 +37,11 @@ class ApiClient(
      * The same client, sending a negotiated body as [mediaType]. A client
      * rather than a parameter on `call`, `response` and `request` alike, which
      * would widen three signatures for the one endpoint that declares a choice.
-     *
-     * An undeclared media type is left to the server to refuse, which is a
-     * refusal worth asserting on.
      */
     fun sending(mediaType: String): ApiClient = ApiClient(transport, codecs, mediaType)
 
     /**
      * Builds the request an endpoint call would send, without sending it.
-     *
-     * An endpoint's own `servers` is not read: a [RequestSpec] names no host,
-     * because the transport decides where it goes, and honouring a
-     * per-operation URL would send the suite to a host nothing here is running.
-     * A generated client honours it, being the reading that has to.
-     *
-     * A webhook's operation is refused: it has no path, and nothing serves one.
      */
     fun <I> request(endpoint: Endpoint<I, *>, input: I): RequestSpec {
         require(endpoint.webhookName == null) {
@@ -142,9 +129,6 @@ class ApiClient(
      * Writes the envelope by hand. The order is `partsInWireOrder`, not
      * declaration order, so this client cannot build a request its own server
      * refuses.
-     *
-     * A part's content is a `String`, since [RequestSpec] carries one — a file
-     * part whose bytes are not text has to go through `transport` directly.
      */
     private fun multipart(
         endpoint: Endpoint<*, *>,
@@ -221,10 +205,6 @@ class ApiClient(
      * Which declared success this is, read the only way a caller can: by
      * status. Two 2xx sharing one are refused at declaration, so at most one
      * matches.
-     *
-     * A single declared success answers whatever status arrived — that is
-     * `response(...)`'s finding to make. Where there is a choice, a 2xx from
-     * outside the declared set is a response nothing could name.
      */
     private fun <E, T> chosenSuccess(out: FallibleOutput<E, T>, res: ResponseSpec): Output<out T> =
         out.successes.singleOrNull()
@@ -238,9 +218,6 @@ class ApiClient(
      * Decodes whichever declared response came back, as the type the endpoint
      * declared rather than a string to grep. The headers that response declared
      * come back on it, decoded by their own codecs.
-     *
-     * An undeclared status still throws [ApiCallFailed]: the point is to assert
-     * on the contract, so a response from outside it is a finding.
      */
     @Suppress("UNCHECKED_CAST")
     fun <I, E, T> outcome(endpoint: Endpoint<I, Fallible<E, T>>, input: I): Outcome<E, T> {
@@ -250,10 +227,6 @@ class ApiClient(
 
         val declared = out.failures.firstOrNull { it.status == res.status }
         return when {
-            // Built rather than produced by invoking the declaration, which
-            // would apply the server's bargain here: a required header the
-            // server left off is a thing a test asserts, not a reason to throw
-            // away the failure that arrived.
             declared != null -> Outcome.Err(
                 declared,
                 codecs.codec<Any?>(declared.type).decodeFromString(res.body) as E,

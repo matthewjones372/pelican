@@ -13,20 +13,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
-/**
- * A union published by this module, read back by `pelican-import`.
- *
- * Writing a discriminator is the easy half. The half worth a test is whether
- * the document it produces describes the payload well enough for a reader who
- * has none of the Kotlin — which is what the importer is: it holds no
- * annotations, no constructor and no branch, only the document. A union that
- * only travels outwards is a union whose two halves are free to drift.
- *
- * The other two codec modules make this claim from annotations that say which
- * value selects which branch. This one has no annotations to read, so the
- * branch's own name is the value — and that convention is only worth anything
- * if it survives the trip.
- */
 class UnionImportTest {
 
     sealed interface Payment {

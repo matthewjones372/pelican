@@ -26,8 +26,6 @@ import java.util.concurrent.TimeUnit
  * Runs requests straight through the interpreted route: no socket, but not a
  * shortcut either — `Route.function` seals the route, so matching, decoding and
  * the rejection-to-status rules are a bound server's.
- *
- * It does not exercise chunk framing, connection handling or TLS.
  */
 class InMemoryTransport(
     private val api: Api,

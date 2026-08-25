@@ -33,10 +33,6 @@ class PelicanServer internal constructor(
  * this module and flushes each frame where http4k's stock `SunHttp` holds it
  * in a 4KB buffer.
  *
- * The backend decides how promptly a streamed frame reaches the wire: measured
- * with ten rows 100ms apart, `Jetty` and the default deliver the first in about
- * a tenth of a second, while `SunHttp` and `Undertow` deliver all ten at the end.
- *
  * [handler] is how a module knowing more than this one — one serving an OpenAPI
  * document, or a service with routes of its own — wraps it.
  */

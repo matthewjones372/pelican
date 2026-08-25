@@ -37,12 +37,6 @@ typealias Docs = io.github.matthewjones372.pelican.openapi.Docs
  * one place that needs both halves of Pelican at once — the server interpreter
  * and the document interpreter. A service that does not publish docs depends on
  * `pelican-http4k` alone and never compiles or ships the generator.
- *
- * ```
- * ordersApi().start(port = 8080)                       // endpoints only
- * ordersApi().startWithDocs(port = 8080)               // plus /openapi.json and /docs
- * ordersApi().startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
- * ```
  */
 fun Api.docsRoutes(docs: Docs = Docs()): List<RoutingHttpHandler> {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }
@@ -80,10 +74,6 @@ fun Api.docsRoutes(docs: Docs = Docs()): List<RoutingHttpHandler> {
 
 /**
  * The endpoints and the documentation, as one handler.
- *
- * The docs come first so that an API which happens to route `/docs` itself does
- * not have its page shadowed — and if that is the API you are serving, pass a
- * [Docs] with different paths rather than relying on the order.
  */
 fun Api.handlerWithDocs(docs: Docs = Docs()): RoutingHttpHandler =
     routes(docsRoutes(docs) + toHttpHandler())

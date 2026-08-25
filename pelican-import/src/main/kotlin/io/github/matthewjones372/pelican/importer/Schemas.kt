@@ -9,18 +9,6 @@ import io.github.matthewjones372.pelican.codegen.composed
 
 /**
  * What a schema has to say to become a Kotlin type.
- *
- * `pelican-codegen`'s type generator answers anything it cannot model with
- * `Any?`, which is right for a client and wrong here: an import that turned a
- * union into `Any?` would produce a handler taking `Any?` and a document no
- * longer saying what the original did, with no sign anything was lost.
- *
- * So shapes that would degrade are refused before the generator sees them, and
- * the genuinely unconstrained ones are let through — `Any?` and
- * `Map<String, Any?>` are what an empty schema and a free-form object mean.
- *
- * The composed shapes are read by the function that generates them, not here:
- * two readings of one `oneOf` would eventually disagree.
  */
 internal object Schemas {
 
@@ -73,11 +61,6 @@ internal object Schemas {
 
     /**
      * One name, and the branches of the hierarchy it turns out to be.
-     *
-     * A hierarchy written the way 3.0 wrote one points upwards only: each
-     * branch references the parent and the parent references nothing. Reached
-     * through the parent, the branches would be dropped as unused, and the
-     * sealed interface generated from it would have no classes under it.
      */
     private fun follow(
         name: String,

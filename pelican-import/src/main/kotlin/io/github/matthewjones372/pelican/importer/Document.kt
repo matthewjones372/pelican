@@ -16,14 +16,6 @@ import java.net.URI
 
 /**
  * Reading a document off disk, as one self-contained tree.
- *
- * YAML 1.2 is a superset of JSON, so one parser reads both and the extension
- * decides nothing. What comes back is core's [JsonValue], the type
- * `pelican-openapi` writes documents out of, so both directions share a shape.
- *
- * References to other files are resolved here; references to other *hosts* are
- * refused unless the build file named the host, and [Remote] is what makes the
- * fetched half a fixed input where it is allowed.
  */
 internal object Document {
 
@@ -115,11 +107,6 @@ internal class JsonPath private constructor(private val parent: JsonPath?, priva
 
 /**
  * Where a value was read from, and what a `$ref` inside it means.
- *
- * A file and a fetched URL answer the same two questions, so they answer them
- * behind one type — otherwise the fetched half needs a second walk of the tree,
- * and the two would come to disagree about a `#/...` inside a pulled-in
- * document.
  */
 internal sealed class Source {
 
@@ -157,10 +144,6 @@ internal class UrlSource(private val uri: URI) : Source() {
     override val id: String = uri.toString()
     override val stem: String = uri.path.orEmpty().substringAfterLast('/').substringBeforeLast('.')
 
-    // Relative and absolute alike: `./common.yaml` beside a fetched document
-    // is another document on that host, and it is checked against the
-    // allowlist exactly as the first one was. A fetched document naming a
-    // second host is followed only where the build file named that host too.
     override fun sibling(ref: String, path: JsonPath, remote: Remote): Source = remote.source(ref, uri, path)
 
     override fun read(remote: Remote, path: JsonPath): JsonObj = remote.document(uri, path)
@@ -168,11 +151,6 @@ internal class UrlSource(private val uri: URI) : Source() {
 
 /**
  * The `$ref`s that point out of this file, resolved into it.
- *
- * Another file's schema is hoisted into `components/schemas` under its own
- * name, because the generated Kotlin is named after that — otherwise a spec
- * split across files generates names invented from where each type was used.
- * Everything else is inlined where it stood.
  */
 private class Bundle(root: JsonObj, private val rootSource: Source, private val remote: Remote) {
     /** (document, pointer) -> the name it was hoisted under, so one type is hoisted once. */

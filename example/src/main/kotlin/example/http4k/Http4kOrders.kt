@@ -110,10 +110,6 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     // The upload arrives as a stream. Counting lines never holds the file, and
     // neither would writing it somewhere; `bytes()` is what would.
     importOrders handledNow { (_, session, label, manifest, file) ->
-        // The manifest was read before the handler ran, within the bound its
-        // declaration named; the file was not read at all. Both arrive as an
-        // UploadedFile, so what changes between them is where the bytes are and
-        // not what a handler has to say about them.
         val declared = manifest.text().trim()
         ImportResult(
             label,

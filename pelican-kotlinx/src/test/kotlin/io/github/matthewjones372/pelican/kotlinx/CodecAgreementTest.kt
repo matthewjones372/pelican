@@ -72,11 +72,6 @@ class CodecAgreementTest {
         val gift: Boolean = false,
     )
 
-    /**
-     * Recursive on purpose: both sources have to terminate at a `$ref`. And
-     * `related` is that same termination one level inside a collection, where
-     * the element is the type being defined.
-     */
     @Serializable
     data class Category(
         val name: String,
@@ -97,12 +92,6 @@ class CodecAgreementTest {
     private val newOrder = jsonBody<CreateOrder>(description = "The order to place")
     private val upload = rawBody()
 
-    /**
-     * A body whose *own* type is a collection of nullable elements. It never
-     * reaches a model resolver — there is no model, only a `Map` — so it is the
-     * top-level half of the same problem the fields inside [Order] are the
-     * nested half of.
-     */
     private val depotUpdate = jsonBody<Map<String, Address?>>(description = "Depots, by code")
 
     private val endpoints = listOf(

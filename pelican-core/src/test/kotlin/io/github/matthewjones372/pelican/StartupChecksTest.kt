@@ -6,15 +6,6 @@ import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
 
-/**
- * The mistakes a list of endpoints can make that the type system cannot see,
- * caught when the [Api] is built rather than on the request that trips over
- * them.
- *
- * Both were previously silent: an endpoint bound twice meant the second handler
- * was simply unreachable, and one left out of the list meant a description that
- * documented itself and answered 404.
- */
 class StartupChecksTest {
 
     private val userId = pathParam<Long>("userId")

@@ -14,10 +14,6 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-/**
- * Two questions the document has to answer: which endpoints are published at
- * all, and what a caller must present to use them.
- */
 class SecurityTest {
 
     object Schemas : SchemaSource {

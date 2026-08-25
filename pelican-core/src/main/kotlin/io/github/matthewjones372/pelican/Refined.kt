@@ -12,8 +12,6 @@ import java.time.format.DateTimeParseException
  * refinement narrows it further, rejecting with a 400 before any handler sees
  * it *and* writing the constraint into the schema — so the document says what
  * the server enforces.
- *
- * See [map] and [mapOrFail] for the version that survives being passed around.
  */
 internal class DerivedPlainCodec<A : Any, B : Any>(
     private val base: PlainCodec<A>,
@@ -36,9 +34,6 @@ internal class DerivedPlainCodec<A : Any, B : Any>(
 
 /**
  * Accepts only values satisfying [predicate], and documents that with [facets].
- *
- * [expected] completes the sentence in the 400: `Cannot decode 'x' for
- * 'limit': expected a value of at least 1`.
  */
 fun <T : Any> PlainCodec<T>.refine(
     expected: String,

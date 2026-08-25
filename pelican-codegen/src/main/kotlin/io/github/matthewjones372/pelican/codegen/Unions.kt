@@ -9,15 +9,6 @@ import io.github.matthewjones372.pelican.jsonStrings
 
 /**
  * Schemas built out of other schemas, read once.
- *
- * The type generator turns a `oneOf` into a sealed hierarchy and the importer
- * decides whether the document is describable at all. Two readings would be two
- * answers, and the day they disagreed the importer would accept a document the
- * generator then degraded.
- *
- * Narrow on purpose: a `oneOf` is a sealed hierarchy only where the document
- * says which branch a payload is, because a decoder that guesses gets it wrong
- * on the first payload two branches accept.
  */
 sealed interface Composed {
 
@@ -150,10 +141,6 @@ private fun union(schema: JsonObj, branches: List<JsonObj>, components: JsonObj)
 
 /**
  * Whether this schema is itself a hierarchy, asked of a branch of another one.
- *
- * One level of look-ahead and no recursion: two hierarchies naming each other
- * as branches would otherwise ask forever. "Is there another level below" is
- * all a union above needs, and deeper levels are caught by the same check there.
  */
 private fun JsonObj?.isHierarchy(components: JsonObj, name: String?): Boolean {
     if (this == null) return false
@@ -179,10 +166,6 @@ private fun constant(branch: JsonObj, property: String, components: JsonObj): St
 
 /**
  * `allOf` flattened into the one class it describes.
- *
- * A property declared by two branches has no honest answer: keeping either
- * generates a class decoding payloads the document rejects. It comes back as
- * [Composed.Undescribable], and the caller decides refusal or fallback.
  */
 private fun merge(schema: JsonObj, branches: List<JsonValue>, components: JsonObj): Composed {
     val properties = LinkedHashMap<String, JsonValue>()
@@ -218,10 +201,6 @@ private fun merge(schema: JsonObj, branches: List<JsonValue>, components: JsonOb
 
 /**
  * Every branch resolved, with a branch that is itself an `allOf` folded in.
- *
- * [seen] is the references already followed. A schema merging itself is a
- * document nobody meant to write, and without this it is a stack overflow in a
- * build rather than a refusal with a position in it.
  */
 private fun flatten(branches: List<JsonValue>, components: JsonObj, seen: MutableSet<String>): List<JsonObj>? =
     buildList {
@@ -319,11 +298,6 @@ private fun repeatedValues(property: String, values: Collection<String>): String
  * discriminator naming the leaf. So a document that spreads the type over two
  * properties describes a payload neither library writes or reads, and a sealed
  * interface extending another would generate cleanly and decode nothing.
- *
- * The flattening is what both libraries do, so the flattening is what the
- * document should say — which is also what this repository's own two codecs
- * publish for a nested hierarchy, and therefore what a round trip through here
- * meets.
  */
 private fun nestedHierarchy(property: String, branches: Collection<String>): String {
     val named = branches.joinToString(", ") { "`$it`" }

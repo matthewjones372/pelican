@@ -48,9 +48,6 @@ import org.http4k.core.Method as Http4kMethod
  * and the 404/405 rules are http4k's own. A [PathSpec.template] is already
  * http4k's syntax, so the two agree by construction rather than by translation.
  *
- * The result is a plain function from `Request` to `Response`, which is the
- * whole in-memory test story for this backend.
- *
  * Endpoints only. See `pelican-http4k-docs` for `startWithDocs`.
  */
 fun Api.toHttpHandler(): RoutingHttpHandler {

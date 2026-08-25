@@ -20,13 +20,11 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.io.ByteArrayInputStream
 
 /**
- * The three input kinds that used to be in the README's "Honest limits", held
- * to one answer across all three interpreters.
+ * Cookies, forms and uploads, held to one answer across all three interpreters.
  *
- * Same shape as [AllBackendsTest], and for the same reason: a cookie that
- * decoded differently on Ktor, or a form field that Jackson coerced and
- * kotlinx.serialization refused, would be a description two servers disagreed
- * about — which is the one thing this project claims cannot happen.
+ * Same shape as [AllBackendsTest]: a cookie decoded differently on Ktor, or a
+ * form field Jackson coerced and kotlinx.serialization refused, is a
+ * description two servers disagree about.
  */
 class CookiesFormsAndUploadsTest {
 
@@ -235,10 +233,6 @@ class CookiesFormsAndUploadsTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a buffered part over its declared bound is a 413 naming the part`(name: String, client: ApiClient) {
-        // `notes` is declared `bufferedFile("notes", maxBytes = 512)`. The
-        // streamed part after it may be any size at all — the test above sends
-        // ten kilobytes through it — so this is the bound doing the one thing
-        // it exists to do: bounding what the server holds.
         val res = client.transport.send(
             client.request(
                 uploadFile,
@@ -304,10 +298,6 @@ class CookiesFormsAndUploadsTest {
 
     // ------------------------------------------------------------ and together
 
-    /**
-     * As in [AllBackendsTest]: the tests above say each backend matches the
-     * description, and this one says they match each other.
-     */
     @Test
     fun `all three read a cookie, a form, a JSON body and a two-file upload identically`() {
         fun answers(question: (ApiClient) -> String): Set<String> =

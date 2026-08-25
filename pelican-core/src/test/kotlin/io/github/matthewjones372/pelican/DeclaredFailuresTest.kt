@@ -126,9 +126,9 @@ class DeclaredFailuresTest {
         val gone = errorJson<Trouble.Missing>(404, "No widget with that id")
         val denied = errorJson<Trouble.Denied>(403, "Not yours")
 
-        // The point of this test is the declared type on the left: if the
-        // inference ever stopped producing the sealed supertype, a handler
-        // could no longer answer with a `when` over Trouble.
+        // The declared type on the left is the assertion: inference that
+        // stopped producing the sealed supertype would leave a handler unable
+        // to answer with a `when` over Trouble.
         val ep: Endpoint<Long, Fallible<Trouble, Widget>> = endpoint(widgetId) {
             get("widgets" / widgetId)
             json<Widget>().orFail(gone, denied)

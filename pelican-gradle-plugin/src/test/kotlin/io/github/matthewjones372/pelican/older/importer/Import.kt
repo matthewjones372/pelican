@@ -2,15 +2,6 @@ package io.github.matthewjones372.pelican.older.importer
 
 import java.io.File
 
-/**
- * A `pelican-import` from before the discriminator hints existed, which still
- * takes the codec.
- *
- * The importer's fallback is two steps long rather than the client
- * generator's one, so it needs two older versions to fall back *through*: this
- * one, and the `io.github.matthewjones372.pelican.oldest.importer` beside it from before the codec.
- * A step with no library standing at the bottom of it is a step nothing takes.
- */
 @Suppress("LongParameterList")
 fun importEndpoints(
     document: File,

@@ -1,14 +1,7 @@
 package io.github.matthewjones372.pelican.codegen
 
-/*
+/**
  * Turning names written for the wire into names that are legal in Kotlin.
- *
- * A header called `X-Api-Key` cannot be a parameter name, so unlike the wire
- * names in the document these do get rewritten. The rule is mechanical and
- * stated once: strip everything that is not a letter or a digit, and camel-case
- * across what is left. `X-Api-Key` becomes `xApiKey`, never `apiKey` — a rule
- * that drops information is a rule that stops matching the day two headers
- * differ only by the part it dropped.
  */
 
 private val keywords = setOf(
@@ -46,24 +39,6 @@ fun memberName(raw: String): String {
 /**
  * What one branch of a union is called, in the order the document is willing
  * to say it.
- *
- * 1. [mapped] — the `discriminator.mapping` key that selects the branch. It is
- *    the one name the document gives this branch *as a branch*, and it is the
- *    word a reader matching on the wire value already has in their head.
- * 2. [ref] — the component the branch points at, for a union whose mapping is
- *    implicit.
- * 3. `<Parent>Variant<n>`, positional, for a branch written inline under a
- *    parent that named it neither way.
- *
- * All three are functions of the document alone, so the same document
- * generates the same names every time. That matters more than any one of them
- * being the prettiest: these names end up in a caller's source, and a name
- * that moved between two runs of the same generator would be a rename nobody
- * made.
- *
- * A mapping key that is itself a reference — some documents write the whole
- * `#/components/schemas/X` as the key — is not a name, and falls through to
- * the one the reference already has.
  */
 fun branchName(parent: String, index: Int, mapped: String?, ref: String?): String =
     typeName(mapped?.takeIf { it.readsAsAName() } ?: ref ?: "${parent}Variant${index + 1}")

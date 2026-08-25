@@ -7,22 +7,6 @@ import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KType
 
-/**
- * One payload, several encodings — the half of "two media types for one body"
- * that turned out to be describable.
- *
- * The line this draws is the whole design, so it is where the tests are. An
- * endpoint hands its handler one value of one type; several *encodings* of that
- * value is a choice about decoding, which a `Content-Type` can make, and several
- * *shapes* is a choice about what the payload is, which it cannot. So the first
- * is a body and the second is still refused — by the type system where a
- * description is written by hand, and by the importer where it is read.
- *
- * The codec here hands back whatever it was given, for the same reason
- * `FormBodyTest`'s does: which library can turn a document into a data class is
- * tested where that library is, and what is being asserted on here is which
- * codec a request reaches at all.
- */
 class NegotiatedBodyTest {
 
     data class Order(val item: String)
@@ -59,12 +43,6 @@ class NegotiatedBodyTest {
 
     @Test
     fun `a further alternative flattens rather than nesting`() {
-        // `a or b or c` associates to the left, and a pair holding a pair would
-        // leave "the first alternative" — which is what a client sends —
-        // depending on where the parentheses fell. The observable consequence
-        // is this one: the third is compared against both of the first two, so
-        // an encoding already in there is caught rather than buried a level
-        // down where nothing would look at it again.
         val failure = shouldThrow<IllegalArgumentException> {
             (jsonBody<Order>() or formBody<Order>()) or jsonBody<Order>()
         }
@@ -144,10 +122,6 @@ class NegotiatedBodyTest {
 
     @Test
     fun `a body with one encoding still ignores the header, as it always did`() {
-        // The 415 is only for a body that declared a choice. With one encoding
-        // the header carries no information this reader needs, and refusing a
-        // request over it would break every caller that has been sending a JSON
-        // body with no Content-Type since before there was anything to choose.
         val codecs = Schemas.requestBodyCodec(jsonBody<Order>())!!
 
         codecs.decode("text/plain", "{}") shouldBe "json:{}"

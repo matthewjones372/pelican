@@ -29,13 +29,6 @@ internal const val CONTENT_TYPE = "Content-Type"
 
 /**
  * Turns a described [Output] plus a handler's result into an http4k response.
- *
- * Core renders one element — `NdjsonOutput.frame`, `SseOutput.frame` — and this
- * puts elements on a socket through [FrameInputStream], which encodes one only
- * when the server asks for the bytes.
- *
- * `jsonArrayFrames` supplies the one framing core does not. [codecs] were
- * resolved when the handler was built, not per request.
  */
 @Suppress("UNCHECKED_CAST")
 internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs): Response {
@@ -166,9 +159,6 @@ private val log: Logger = LoggerFactory.getLogger("io.github.matthewjones372.pel
 /**
  * Rendered through core's own JSON tree rather than the configured codec: a
  * codec that has just failed is not the thing to report that it failed.
- *
- * [renderError] decides which throwable becomes which response. What is local
- * is the logging — Pelican catches the throwable, so the server never sees it.
  */
 internal fun errorResponse(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): Response {
     val rendered = renderError(raw, api?.exposeInternalErrors ?: false)

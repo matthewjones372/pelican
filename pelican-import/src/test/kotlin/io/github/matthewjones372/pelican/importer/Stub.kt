@@ -4,22 +4,6 @@ import com.sun.net.httpserver.HttpServer
 import java.net.InetAddress
 import java.net.InetSocketAddress
 
-/**
- * A host to fetch from, on this machine.
- *
- * Nothing here reaches the internet, and that is not only politeness to
- * whoever runs the build: a test whose subject is "what does this do when the
- * far end changes" cannot be written against a far end nobody controls, and a
- * test that needs a network is a test that reports a broken feature every time
- * a coffee shop is between it and DNS.
- *
- * It answers over plain HTTP, which is exactly the opt-in the policy provides
- * for: an origin with no certificate has to be written `http://…` in the build
- * file to be fetched at all. So the awkward half of the arrangement — a stub
- * server cannot present a certificate anybody trusts — is also the half worth
- * exercising, and https-only remains the default that every other test here
- * checks is still in force.
- */
 internal class Stub : AutoCloseable {
 
     private val server: HttpServer = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)

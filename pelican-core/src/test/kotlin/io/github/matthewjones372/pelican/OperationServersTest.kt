@@ -6,17 +6,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
-/**
- * An endpoint served from somewhere other than the rest of the API.
- *
- * The description carries the URL and nothing here does anything with it: this
- * server serves the paths it is given, and an endpoint able to move a route to
- * another host would be a description deciding where a request lands. What
- * honours it is `pelican-openapi`, which publishes `servers` on the operation,
- * and `pelican-codegen`, whose generated method calls that host instead of the
- * client's own base URL. Both have tests of their own; these are about the
- * value.
- */
 class OperationServersTest {
 
     data class Receipt(val id: Long)

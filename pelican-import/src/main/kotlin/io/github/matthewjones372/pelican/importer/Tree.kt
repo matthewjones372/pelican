@@ -7,15 +7,8 @@ import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.JsonValue
 
-/*
+/**
  * Reading a JSON tree, without pretending it is typed.
- *
- * A document read off disk is a tree of maybes: every field may be absent, and
- * every field may be the wrong kind of thing, because it was written by hand or
- * by another generator. These accessors answer "what does it say here" and
- * nothing else — an absent field and a field of the wrong type both come back
- * null, and the caller decides which of those is a problem and what to say
- * about it.
  */
 
 internal fun JsonObj.obj(key: String): JsonObj? = this[key] as? JsonObj
@@ -34,9 +27,6 @@ internal fun JsonObj.strings(key: String): List<String> = arr(key).mapNotNull { 
 
 /**
  * The type this schema claims, ignoring the `"null"` that only widens one.
- *
- * A schema saying two real types is a union, and `Schemas.check` refuses it
- * before anything here has to decide which of them to believe.
  */
 internal fun JsonObj.scalarType(): String? = str("type")
     ?: (this["type"] as? JsonArr)?.items?.mapNotNull { (it as? JsonStr)?.value }?.firstOrNull { it != "null" }

@@ -138,12 +138,6 @@ class UnionRoundTripTest {
         }
     }
 
-    /**
-     * The same document shape from two codecs that share no code. Compared
-     * structurally rather than field by field, because the two hierarchies here
-     * are different Kotlin classes with different names — what has to match is
-     * the shape a reader of either document is holding.
-     */
     @Test
     fun `both codecs publish a hierarchy the same way`() {
         val kotlinx = schemasOf(KotlinxCodecs, "Payment")["Payment"] as JsonObj

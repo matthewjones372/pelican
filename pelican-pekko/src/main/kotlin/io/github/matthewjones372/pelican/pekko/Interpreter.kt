@@ -139,11 +139,6 @@ private fun routeFor(
         } else {
             val answered = invoke(se, api, codecs, handler, req, captures, system)
             Directives.completeWithFuture(
-                // On whatever came back, errors included: without the headers
-                // a browser script sees a network error rather than the 400.
-                //
-                // Left alone when CORS is off, because `thenApply` still
-                // allocates a stage and a closure on every request.
                 if (cors == null) {
                     answered
                 } else {
@@ -227,11 +222,6 @@ private fun HttpRequest.headerValues(name: String): List<String> =
 @Suppress("UNCHECKED_CAST")
 /**
  * Everything decodable before the body arrives.
- *
- * One rule — present, decode it; absent and required, refuse; absent and
- * optional, take the default — spelled out per input kind because "present"
- * differs: an `Optional` for a query or header, a map lookup for a cookie, at
- * least one non-empty occurrence for a list.
  */
 private fun decodePlainInputs(
     ep: Endpoint<*, *>,
@@ -308,9 +298,6 @@ private fun decodeCookies(ep: Endpoint<*, *>, req: HttpRequest, into: MutableMap
  * The body, read the way its declaration says to: not at all, as a stream
  * handed over unconsumed, as a multipart envelope parsed off the blocking-IO
  * pool, or as a strict payload for a codec.
- *
- * A refusal fails the stage rather than building a response here, so
- * `renderError` stays the one place that decides what a failure looks like.
  */
 private fun readBody(
     ep: Endpoint<*, *>,

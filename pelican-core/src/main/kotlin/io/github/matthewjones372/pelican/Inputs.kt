@@ -7,10 +7,6 @@ import kotlin.reflect.typeOf
 
 /**
  * Anything a handler can pull a typed value out of via [Params.get].
- *
- * Keys are compared by identity, so hold on to the value you declare:
- * `queryParam<Int>("limit").optional()` returns a *new* key, and that is the
- * one to register and to read.
  */
 sealed interface ParamKey<out T>
 
@@ -191,8 +187,6 @@ class MultipartBody internal constructor(
  * A request body arriving under any of several media types, all carrying the
  * same payload type: `Content-Type` selects a decode, not a schema. Several
  * schemas under one body stays undescribable, since the handler gets one value.
- *
- * Built by [or].
  */
 class NegotiatedBody<T> internal constructor(
     /** In declaration order. A client that has to pick one picks the first. */
@@ -273,16 +267,10 @@ fun <T : Any> CookieParam<T>.default(value: T): CookieParam<T> =
 
 // ------------------------------------------------------- more than one value
 
-/*
+/**
  * The spellings differ by location because the honest encodings do: a query
  * string can repeat a name, a header cannot, and RFC 9110 already defines what
  * two lines of one header name mean.
- *
- * `repeated()` then `optional()` is the only order that type-checks.
- *
- * An absent list reads as `null`, not empty: `?tag=` carries no element, so
- * reading absence as empty would leave `required` with nothing to mean.
- * `.default(emptyList())` asks for the other reading.
  */
 
 /** Several occurrences of the name: `?tag=a&tag=b`. */
@@ -332,11 +320,6 @@ inline fun <reified T> formBody(description: String? = null): FormBody<T> =
  * The same payload, read from whichever encoding the caller sent —
  * `formBody<CreateOrder>() or jsonBody<CreateOrder>()`. `Content-Type` picks
  * the codec; an undeclared one is a 415 naming those that were declared.
- *
- * Two rules follow from the handler seeing one value of one type: the
- * alternatives carry the same type, and each is a body a codec reads — a
- * multipart envelope or a raw stream is not decoded at all. Order is kept
- * because a generated client sends the first.
  */
 infix fun <T> BodyInput<T>.or(other: BodyInput<T>): NegotiatedBody<T> {
     val alternatives = (asAlternatives() + other.asAlternatives())
@@ -390,9 +373,6 @@ fun <T : Any> TextPart<T>.default(value: T): TextPart<T> =
 
 /**
  * A named file field of a multipart body, read by the handler as a stream.
- *
- * [contentType] reaches the document's `encoding` block, which is what tells a
- * browser what to offer. Nothing here rejects a part carrying something else.
  */
 fun filePart(
     name: String,
@@ -404,11 +384,6 @@ fun filePart(
  * A file field held in memory rather than streamed, bounded by [maxBytes].
  * This is what makes a second file part describable: reading stops at a
  * streamed part, so a second could only be reached by holding the first.
- *
- * [maxBytes] has no default, because the part costs a caller-controlled
- * allocation on every request and the declaration is where that is visible.
- * A larger part is a 413 naming the part and the bound; the total is still
- * bounded by [Api.maxBodyBytes].
  */
 fun bufferedFile(
     name: String,

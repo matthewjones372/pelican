@@ -4,9 +4,6 @@ package io.github.matthewjones372.pelican
  * The decoded inputs for one request, read back with the key objects declared
  * on the endpoint. The internal cast is unchecked but sound: a key enters the
  * map only through the decoder that produced its declared type.
- *
- * The receiver of every handler lambda, so a typed handler still reaches
- * [setHeader] and the backend's own request.
  */
 class Params(
     private val values: Map<ParamKey<*>, Any?>,
@@ -36,11 +33,6 @@ class Params(
 
     // ---------------------------------------------------------- attributes
 
-    // Created on first write. Most requests touch neither map, and two empty
-    // LinkedHashMaps per request was a measurable part of the interpreter's
-    // allocation — see Http4kOverheadBenchmark. Unsynchronised, as before: a
-    // Params belongs to one request, and the CompletionStage between threads
-    // is what publishes the writes.
     @Suppress("DoubleMutabilityForCollection") // Null until first write is the point; see above.
     private var attributes: MutableMap<Attribute<*>, Any?>? = null
 

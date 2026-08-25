@@ -7,19 +7,6 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-/**
- * The reading of a webhook that does something: a call the service sends.
- *
- * A generated client method is an outbound HTTP call built from a description,
- * which is exactly what a webhook needs — so the sender comes out of the same
- * emitter rather than a second one beside it. What is worth asserting is the
- * three things that differ, each of which would be a real mistake if it went
- * the other way: where the call goes, what it carries, and what it does not.
- *
- * Text only, as in [KotlinClientTest]: whether it compiles is asserted in
- * `:example`, whose checked-in client is generated from this code and run
- * against a real server.
- */
 class WebhookSenderTest {
 
     object Schemas : SchemaSource {
@@ -72,11 +59,6 @@ class WebhookSenderTest {
 
     private val client = clientFor(orderPlaced)
 
-    /**
-     * The destination is an argument because the document cannot hold it: the
-     * URL belongs to whoever subscribed, and a description that named one would
-     * be naming a host this service does not own.
-     */
     @Test
     fun `the sender takes the subscriber's url and sends the call there`() {
         client shouldContain "fun orderPlaced(url: String, body: OrderPlaced, xSignature: String)"
@@ -89,11 +71,6 @@ class WebhookSenderTest {
         client shouldContain """request("POST", "", origin = url"""
     }
 
-    /**
-     * The one that would be a security bug rather than a wrong answer: the
-     * standing headers are the credential this client presents to the API, and
-     * a subscriber is not the API.
-     */
     @Test
     fun `the client's standing headers do not go to a subscriber`() {
         client shouldContain "standingHeaders = emptyMap()"
@@ -106,12 +83,6 @@ class WebhookSenderTest {
         client shouldContain """headerParams = listOf("X-Signature" to xSignature)"""
     }
 
-    /**
-     * The response is the receiver's, read the way any response is read. It is
-     * the part of the description nobody publishing the document controls, which
-     * the KDoc says rather than the type — a 202 from a subscriber is still a
-     * 202.
-     */
     @Test
     fun `what comes back is what the receiver answered`() {
         val withPayload = clientFor(
@@ -156,11 +127,6 @@ class WebhookSenderTest {
         client shouldContain """failed("POST", url, response)"""
     }
 
-    /**
-     * A document of nothing but webhooks describes no call anybody makes *to*
-     * this service, so a base URL would be a value demanded in order to be
-     * ignored.
-     */
     @Test
     fun `a spec that is only webhooks needs no base url`() {
         val sendersOnly = ApiSpec(emptyList(), Schemas, title = "Orders", webhooks = listOf(orderPlaced))

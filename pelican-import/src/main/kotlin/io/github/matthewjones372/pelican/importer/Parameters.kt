@@ -8,13 +8,6 @@ import io.github.matthewjones372.pelican.defaultStyleAt
 
 /**
  * The inputs that travel outside the body.
- *
- * Two lists become one: the path item's parameters apply to every operation,
- * and the operation's own override them by name and location.
- *
- * Each value is one string on the wire decoded into one Kotlin value, so what
- * has no such reading is refused — an object, a list of objects, a whole JSON
- * document under `content`.
  */
 internal class Parameters(private val reader: Reader, private val operation: Operation) {
 
@@ -188,11 +181,6 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
 
     /** What one element of a list parameter is, which is where its codec comes from. */
     private fun itemSchema(schema: JsonObj, name: String, path: JsonPath): JsonObj {
-        // A refinement in Pelican narrows what one value decodes to, and there
-        // is nothing it can say about how many of them arrived. `minItems: 1`
-        // would therefore be written into the document again and enforced by
-        // nobody, which is the silent weakening a strict import exists to
-        // rule out. Required already says "at least one" and is enforced.
         val unenforceable = schema.fields.keys - listKeywords
         if (unenforceable.isNotEmpty()) {
             unsupported(

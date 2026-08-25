@@ -34,10 +34,6 @@ import kotlin.reflect.full.primaryConstructor
  * binding comes from — the primary constructor — which is the same metadata
  * `KotlinBinding` reads, and that is what keeps this document and this module's
  * wire format from drifting apart.
- *
- * Named object types are hoisted into `#/components/schemas` and referenced;
- * primitives, lists, maps and enums are inlined. That is the shape both other
- * modules produce, which is what lets the documents be compared.
  */
 internal class ReflectionSchemas(private val components: SchemaComponents) {
 
@@ -84,10 +80,6 @@ internal class ReflectionSchemas(private val components: SchemaComponents) {
 
             kclass.isSealed -> named(kclass) { union(kclass) }
 
-            // Refused rather than described as the object it is not. A `Page<T>`
-            // would document one shape for every argument it is ever used with,
-            // and this module could not read the payload back anyway — see
-            // `KotlinBinding`, which refuses the same shape for the same reason.
             kclass.typeParameters.isNotEmpty() && kclass.primaryConstructor != null ->
                 error(
                     "pelican-jsoniter cannot describe ${kclass.simpleName}<>: a type argument reaches neither " +
@@ -148,9 +140,6 @@ internal class ReflectionSchemas(private val components: SchemaComponents) {
 
     /**
      * The schema of a type argument — an element, or a map's value.
-     *
-     * A star projection carries no type and a raw `List` has no argument at
-     * all; either way the honest answer is that anything may be there.
      */
     private fun elementAt(type: KType, index: Int): JsonObj =
         type.arguments.getOrNull(index)?.type?.let(::schemaFor) ?: emptySchema

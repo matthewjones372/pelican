@@ -14,14 +14,6 @@ import io.github.matthewjones372.pelican.codegen.unique
 
 /**
  * Endpoint descriptions, written out as Kotlin.
- *
- * Meant to be read as well as compiled: inputs as named values at the top,
- * payload types under them, one `endpoint(...)` per operation in document
- * order — the file somebody would have written by hand.
- *
- * Declaration order is load-bearing: top-level values initialise in source
- * order, so an endpoint naming a failure declared below it would read a null
- * at class-init.
  */
 internal class Emitter(private val api: IrApi, private val options: ImportOptions) {
 
@@ -43,10 +35,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     /**
      * Schemas the document wrote out where they were used, under the name the
      * type generator gave each one.
-     *
-     * The generated schema source needs them: a response whose schema was
-     * written inline has no name in `components` to look up, and re-deriving
-     * it from the Kotlin class is the thing being avoided.
      */
     private val inlineSchemas = LinkedHashMap<String, JsonObj>()
 
@@ -139,11 +127,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     /**
      * The document's own schemas, as a `SchemaSource` in the generated file.
-     *
-     * It is what makes an imported description self-contained: the spec can be
-     * published, and a client generated from it, with no codec module present
-     * — and what a caller reads is what the document said rather than a codec's
-     * reading of the classes generated from it.
      */
     private fun schemaSource(): String {
         val blob = jsonObjOf(
@@ -576,11 +559,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     /**
      * How several values are told apart, where the parameter carries several.
-     *
-     * It comes before `optional()` because that is the only order that
-     * compiles: spreading turns a `QueryParam<Int>` into a
-     * `QueryParam<List<Int>>`, and the modifier below then makes that
-     * nullable.
      */
     private fun spread(param: IrParam): String = when (param.listStyle) {
         null -> ""
@@ -646,13 +624,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     /**
      * A schema for a value travelling as one string, as its Kotlin type and the
      * codec that decodes it.
-     *
-     * A codec is written only where there is something to say beyond the type —
-     * a constraint, or a format core has no reified type for. Otherwise the
-     * declaration is `queryParam<Int>("limit")`.
-     *
-     * Constraints become refinements rather than comments: `atLeast(1)` rejects
-     * a zero *and* documents `minimum: 1`.
      */
     private fun plain(schema: JsonObj, context: String): Plain {
         if (schema["enum"] != null) return Plain(typeFor(schema, context), null)
@@ -676,11 +647,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     /**
      * The same value, carrying the sample the document offered.
-     *
-     * An example belongs to the *type* in Pelican rather than to one use of
-     * it, which is `describedAs`. Writing it out forces the codec form even
-     * where nothing else needed one — a reified `queryParam<Int>("limit")` has
-     * nowhere to hang it.
      */
     private fun Plain.exampled(example: String?): Plain {
         if (example == null) return this
@@ -878,10 +844,6 @@ private const val RULE_WIDTH = 68
 
 /**
  * A security scheme as the builder call that makes one.
- *
- * Text, like everything else down here, once the *name* the value is bound to
- * is somebody else's problem: the emitter mints that, because it has to stay
- * unique against every other declaration in the file.
  */
 private fun schemeCall(scheme: IrScheme): String {
     val shared = buildList {

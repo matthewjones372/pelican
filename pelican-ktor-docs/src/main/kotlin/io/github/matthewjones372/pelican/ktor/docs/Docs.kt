@@ -37,12 +37,6 @@ typealias Docs = io.github.matthewjones372.pelican.openapi.Docs
  * Pelican at once — the server interpreter and the document interpreter. A
  * service that does not publish docs depends on `pelican-ktor` alone and never
  * compiles or ships the generator.
- *
- * ```
- * ordersApi().start(port = 8080)                       // endpoints only
- * ordersApi().startWithDocs(port = 8080)               // plus /openapi.json and /docs
- * ordersApi().startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
- * ```
  */
 fun Route.pelicanDocs(api: Api, docs: Docs = Docs()) {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }

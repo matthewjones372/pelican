@@ -8,11 +8,6 @@ import kotlin.reflect.KType
 /**
  * A codec for an `application/x-www-form-urlencoded` body carrying [type].
  *
- * A form is string pairs and nothing else, so something has to say whether
- * `count=3` is a number: the schema already published for [type] does. The
- * fields become a JSON document of that shape, which the configured
- * [BodyCodec] then reads.
- *
  * Going through JSON is what keeps the codec modules agreeing — Jackson would
  * coerce `"3"` to an `Int` and kotlinx.serialization would refuse. Resolved
  * once at route-build time, so an undescribable form is a startup failure.
@@ -57,10 +52,6 @@ private class Field(val kind: Kind, val repeated: Boolean)
 
 /**
  * What each field of a form means, read off the published schema once.
- *
- * Scalars and arrays of scalars only: a nested object needs a bracket
- * convention nobody agrees on (`user[name]`, `user.name`), and inventing a
- * fourth is worse than refusing at bind time.
  */
 private class FormShape(private val fields: Map<String, Field>) {
 

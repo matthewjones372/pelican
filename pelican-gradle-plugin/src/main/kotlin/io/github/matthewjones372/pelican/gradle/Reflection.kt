@@ -7,11 +7,6 @@ import java.lang.reflect.Modifier
 
 /**
  * Everything the plugin knows about Pelican, in one file, by name.
- *
- * The plugin compiles against none of the library's modules and reaches them
- * through the consumer's own classpath, so a project can move to a new library
- * version without waiting for a plugin release. The cost is that a wrong name
- * is a runtime failure, so every lookup reports what it wanted and where.
  */
 internal object Pelican {
 
@@ -121,11 +116,6 @@ internal object Pelican {
         val name = clientName ?: defaultClientName(codegen, spec)
         val url = baseUrl ?: firstServer(spec)
 
-        // The arity this plugin knows and the one on the consumer's classpath
-        // may differ, which is why the function is looked up. The signature
-        // carrying the codec wins where there is one, so upgrading the library
-        // is enough to get the setting. A library too old to have
-        // `CodecAnnotations` fails the same way, hence the load inside the try.
         val withCodec = runCatching {
             val annotations = Class.forName(CODEC_ANNOTATIONS, true, codegen.classLoader)
             annotations to codegen.getMethod(
@@ -227,20 +217,6 @@ internal object Pelican {
         allowRemote: Set<String>,
         lockfile: File?,
     ): List<*> {
-        // The bargain `writeClient` makes, two steps longer. The arity this
-        // plugin knows about and the arity the library on the consumer's
-        // classpath offers are allowed to differ — that is the whole point of
-        // looking the function up rather than compiling against it. Four
-        // releases are reachable here: one that takes the remote allowlist and
-        // its lockfile, one before it that takes the discriminator hints, one
-        // before them that still takes the codec, and one before that.
-        //
-        // Newest first, and a fallback is only taken when the setting it
-        // cannot carry was not made. Falling back past a setting somebody made
-        // would silently drop it and generate the file the setting was there
-        // to prevent, so each step down is guarded by a named refusal — the
-        // same one `writeClient` raises, written once so the two cannot come
-        // to disagree about what to say.
         val text = String::class.java
 
         val withRemote = importEndpoints(importer, text, text, Map::class.java, Set::class.java, File::class.java)
@@ -259,11 +235,6 @@ internal object Pelican {
                 lockfile,
             ) as List<*>
         }
-        // Guarded harder than the rest, because this is the one setting whose
-        // absence is a *security* difference rather than a missing annotation:
-        // an importer with no lockfile in its signature has no hash check
-        // either, and falling back to it would fetch and generate from
-        // whatever came back.
         if (allowRemote.isNotEmpty()) refuse(tooOld(REMOTE, IMPORT_MODULE, IMPORTS, "no allowlist"))
 
         val withHints = importEndpoints(importer, text, text, Map::class.java)
@@ -299,11 +270,6 @@ internal object Pelican {
     /**
      * Rewrites the lockfile of remote references, and returns the lines
      * describing what changed.
-     *
-     * No fallback ladder under this one, and deliberately so: an importer
-     * without it has no lockfile at all, so there is nothing older for it to
-     * mean. The refusal says which module to upgrade, which is the only useful
-     * answer.
      */
     @Suppress("LongParameterList")
     fun updateLock(
@@ -366,11 +332,6 @@ internal object Pelican {
     /**
      * What a setting the library cannot carry is told, in one sentence used by
      * every fallback here.
-     *
-     * Two chains fall back — the client generator's, one step long, and the
-     * importer's, two — and each step of each is a place a setting could be
-     * dropped without a word. Saying it in one function is what stops the two
-     * drifting into telling a reader different things about the same problem.
      */
     private fun tooOld(setting: String, module: String, function: String, missing: String) =
         "`$setting` is set, and the `$module` on this task's classpath is older than it: its " +
@@ -439,11 +400,6 @@ internal object Pelican {
 
 /**
  * Refusing, said the way every refusal here says it.
- *
- * A `Nothing` return rather than a `throw` at each site: half the lookups
- * below are a ladder of guards, and a guard reads as one statement — `if the
- * library cannot carry this, say so` — where a branch with a throw in it reads
- * as control flow somebody has to follow.
  */
 internal fun refuse(message: String): Nothing = throw PelicanFailure(message)
 

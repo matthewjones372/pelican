@@ -43,10 +43,6 @@ interface SchemaSource {
 /**
  * The same schema with null allowed, spelled as OpenAPI 3.1 does: the dialect
  * is JSON Schema 2020-12, so a nullable string is `type: ["string", "null"]`.
- *
- * A `$ref` is why this is a function rather than a line in each schema source.
- * `type` beside a `$ref` means "and also of this type", so a reference goes
- * under `anyOf` next to a bare null schema.
  */
 fun JsonObj.orNull(): JsonObj = when (val type = this["type"]) {
     is JsonStr -> this + jsonObj { put("type", jsonArr(listOf(type, JsonStr("null")))) }
@@ -97,12 +93,6 @@ class RequestBodyCodecs internal constructor(private val byMediaType: Map<String
 
     /**
      * The body as the value it decodes to.
-     *
-     * [contentType] is consulted only where the endpoint declared a choice.
-     * With one encoding the header carries no information — a `jsonBody<T>()`
-     * sent without one still decodes, and a body that is not JSON is a 400
-     * describing the actual problem. With alternatives it is the only thing
-     * saying which decode was meant, so an undeclared type is a 415.
      */
     fun decode(contentType: String?, text: String): Any? {
         val codec = select(contentType)

@@ -10,9 +10,6 @@ import kotlin.reflect.KType
  * Reads and writes bodies with kotlinx.serialization, deriving schemas from the
  * same `SerialDescriptor`s the serializers are built from.
  *
- * Not a fallback: the second implementation is what makes the pluggability
- * testable, and `CodecAgreementTest` compares the two documents.
- *
  * Payload types must be `@Serializable`, which is the trade for needing no
  * runtime reflection.
  */

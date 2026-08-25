@@ -9,19 +9,6 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import org.junit.jupiter.api.Test
 
-/**
- * `or`, which is `orFail` with the word "fail" taken out of it.
- *
- * The two are one mechanism: an output holds the responses an endpoint
- * declares, a handler produces one by naming it, and which one it named is
- * what fixes the status. Declared failures were the first users of that, and
- * these are the tests for the half that is not about failing.
- *
- * What cannot be tested here is the part that matters most — that a handler
- * which answers with something the endpoint never declared does not compile.
- * That is a property of the binders in the three backend modules, and the
- * evidence for it is that `:example` compiles at all.
- */
 class SeveralResponsesTest {
 
     data class Order(val id: Long)
@@ -67,14 +54,6 @@ class SeveralResponsesTest {
         (ep.output as FallibleOutput<*, *>).successes.map { it.status } shouldBe listOf(201, 202, 204)
     }
 
-    /**
-     * The chain where the payload types agree, and the one place this could
-     * have gone quietly wrong: `json<Order>(200) or json<Order>(201)` is an
-     * `Output<Order>`, so the third `or` finds a receiver whose payload type is
-     * *narrower* than `empty()`'s and falls through to the general overload.
-     * Splicing is what keeps the two readings the same list rather than leaving
-     * a pair nested inside a response nothing could render.
-     */
     @Test
     fun `and chains the same way when the general overload has to take over`() {
         val ep = endpoint(newOrder) {
@@ -113,11 +92,6 @@ class SeveralResponsesTest {
         ep.errors.map { it.status } shouldBe listOf(401)
     }
 
-    /**
-     * The case a payload type cannot settle. `200 Order` and `201 Order` carry
-     * the same bytes, so identity is what tells them apart — the same answer
-     * [ErrorOutput] gives for two failures sharing a type.
-     */
     @Test
     fun `two responses carrying one type stay distinguishable by which was named`() {
         val found = json<Order>(status = 200)
@@ -127,7 +101,7 @@ class SeveralResponsesTest {
         ok.declared shouldBeSameInstanceAs found
         (made(Order(1)) as Outcome.Ok).declared shouldBeSameInstanceAs made
 
-        // Equal payloads, different responses — which is the whole point.
+        // Equal payloads, different responses.
         ok.value shouldBe (made(Order(1)) as Outcome.Ok).value
     }
 
@@ -178,11 +152,6 @@ class SeveralResponsesTest {
         (page(Order(1)) as Outcome.Ok).headers.shouldBeEmpty()
     }
 
-    /**
-     * The reading end, where an [Outcome] is built from a response rather than
-     * by a handler: a header that arrived unreadable is as absent as one that
-     * never arrived, and neither is a reason to lose the response it came on.
-     */
     @Test
     fun `a header that arrived but does not decode reads as null, on a success as on a failure`() {
         val count = responseHeader<Int>("X-Count")
@@ -194,11 +163,6 @@ class SeveralResponsesTest {
         answer.value shouldBe Order(1)
     }
 
-    /**
-     * Declared on an endpoint's only response, a header is a promise nothing
-     * could keep: the handler for one response returns the payload alone and
-     * never sees the declaration.
-     */
     @Test
     fun `a header on an endpoint's only response is refused when the endpoint is built`() {
         val refused = shouldThrow<IllegalStateException> { placing(json<Order>(status = 201, location)) }
@@ -224,13 +188,6 @@ class SeveralResponsesTest {
         single.successNamedBy(ok(Order(1)) as Outcome.Ok) shouldBeSameInstanceAs single.successes.first()
     }
 
-    /**
-     * The hole this closes. `ok(...)` names no response and so carries no
-     * headers, and `Output.invoke` — the only other way to produce a success —
-     * refuses a required header that was left out. So an endpoint whose first
-     * success promises a `Location` could answer 201 without one, and the
-     * document promised it.
-     */
     @Test
     fun `a bare ok is refused where the response it means promises a header`() {
         val refused = shouldThrow<IllegalStateException> { twoWays.successNamedBy(ok(Order(1)) as Outcome.Ok) }
@@ -250,12 +207,6 @@ class SeveralResponsesTest {
         paged.successNamedBy(ok(Order(1)) as Outcome.Ok) shouldBeSameInstanceAs paged.successes.first()
     }
 
-    /**
-     * The single-success endpoint, which is every endpoint that predates any of
-     * this: a header on an endpoint's only response is already refused when the
-     * endpoint is built, so `ok(value)` cannot reach the check above and nothing
-     * about writing one changed.
-     */
     @Test
     fun `a single declared success still takes a bare ok`() {
         val only = json<Order>(status = 200) orFail badKey

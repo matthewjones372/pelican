@@ -11,11 +11,6 @@ import javax.inject.Inject
 
 /**
  * The `pelican { }` block.
- *
- * Containers rather than properties, because a module talking to three services
- * generates three clients, each with its own spec, package and output. Every
- * entry names its tasks: `orders` gives `generateOrdersClient`,
- * `checkOrdersClient` and `generateOrdersDocument`.
  */
 abstract class PelicanExtension {
     abstract val clients: NamedDomainObjectContainer<ClientSpec>
@@ -49,10 +44,6 @@ interface SpecSource {
      * What the generator runs against. Defaults to `main`'s runtime classpath,
      * which carries its own task dependencies, so generating compiles first
      * without a `dependsOn`.
-     *
-     * `pelican-codegen` or `pelican-openapi` has to be on it, and both are read
-     * by name rather than off the plugin's classpath — which is what keeps the
-     * plugin's version and the library's independent.
      */
     val classpath: ConfigurableFileCollection
 }
@@ -76,11 +67,6 @@ abstract class ClientSpec @Inject constructor(private val name: String) : SpecSo
     /**
      * Which codec the generated payload types are annotated for — `jackson` or
      * `kotlinx` — or unset for Jackson.
-     *
-     * It matters for one shape only. A `oneOf` becomes a sealed interface, and
-     * nothing in `sealed interface Payment` says which property carries the
-     * branch or what selects each one; the two libraries spell that
-     * differently. A spec without a union generates the same client either way.
      */
     abstract val codec: Property<String>
 
@@ -105,10 +91,6 @@ abstract class DocumentSpec @Inject constructor(private val name: String) : Spec
 
 /**
  * One set of endpoint descriptions, generated *from* an OpenAPI document.
- *
- * The other entries read a compiled `ApiSpec`; this one reads a document
- * somebody else wrote, so it has no `specClass` or `specFunction` and needs
- * `pelican-import` on its classpath rather than the consumer's code.
  */
 abstract class EndpointsSpec @Inject constructor(private val name: String) : org.gradle.api.Named {
     override fun getName(): String = name
@@ -141,23 +123,6 @@ abstract class EndpointsSpec @Inject constructor(private val name: String) : org
     /**
      * States which property tells a union's branches apart, where the document
      * did not — `discriminator("Payment", property = "kind")`.
-     *
-     * A `oneOf` with no `discriminator` stays refused: a decoder would have to
-     * try each branch and keep the first that parsed, which is silently wrong
-     * on the first payload two branches accept. This is the reader saying
-     * which branch a payload is, once, in a file somebody reviews.
-     *
-     * [schema] is a component name, a pointer relative to
-     * `#/components/schemas`, or a JSON pointer from the document root for a
-     * union written at the endpoint — which is the case with no name to use.
-     *
-     * The wire value is not invented: it is the `const` a branch declares for
-     * [property], or the name of the schema it points at. A branch declaring
-     * neither fails the import.
-     *
-     * A hint that stops mattering fails the import too. An `exclude` matching
-     * nothing has weakened nothing; a hint checked against nothing is a claim
-     * about a payload format nobody is verifying.
      */
     fun discriminator(schema: String, property: String) {
         discriminators.put(schema, property)
@@ -171,19 +136,6 @@ abstract class EndpointsSpec @Inject constructor(private val name: String) : org
 
     /**
      * Allows a `$ref` to another host — one host, on purpose, in writing.
-     *
-     * A remote `$ref` is refused by default because a build that fetches a URL
-     * produces different code on a different day and fails offline. This moves
-     * that decision to somebody who can make it, once per host, and pairs it
-     * with a [lockfile] that records and checks the hash of what came back.
-     *
-     * An entry is an origin and not a URL prefix, because a prefix match is how
-     * an allowlist is got past: `https://good.example` is a prefix of
-     * `https://good.example.evil.test`. A bare `example.com` means https, so
-     * plain HTTP has to be written out and shows up in a review.
-     *
-     * Redirects are never followed: a host that can redirect can move the
-     * document somewhere nobody reviewed. The failure names the URL it gave.
      */
     fun allowRemote(vararg origins: String) {
         allowRemote.addAll(*origins)
@@ -192,15 +144,6 @@ abstract class EndpointsSpec @Inject constructor(private val name: String) : org
     /**
      * Where the URL and hash of every fetched document is recorded, defaulting
      * to `<document>.refs.lock` beside it.
-     *
-     * Commit it: it is what makes a fetching build reproducible, since a
-     * document changing behind one of those URLs then fails the build rather
-     * than generating different code. `update<Name>EndpointsLock` rewrites it,
-     * and refuses to change a hash it holds without `--accept-changes`.
-     *
-     * The documents themselves are cached in a `.d` directory beside it.
-     * Committing that too is the difference between a build that needs the
-     * network and one that does not.
      */
     abstract val lockfile: RegularFileProperty
 

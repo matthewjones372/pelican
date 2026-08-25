@@ -7,19 +7,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
-/**
- * The names, pinned.
- *
- * Everything the plugin knows about Pelican is a string, because it loads the
- * library off the consumer's classpath rather than compiling against it. That
- * buys a plugin whose version and the library's move independently, and it
- * costs the compiler's opinion on every one of these calls — so the calls are
- * made here instead, against classes carrying the same signatures.
- *
- * What this cannot check is that the real signatures are still these. The
- * example module does that, by applying the plugin and generating the client
- * this repository commits.
- */
 class ReflectionTest {
 
     private val loader = javaClass.classLoader
@@ -200,24 +187,6 @@ class ReflectionTest {
 
     // ------------------------------------------------ the older libraries
 
-    /**
-     * The other half of every lookup above: the releases each fallback falls
-     * back *to*.
-     *
-     * Every one is a whole library version standing in a package of its own,
-     * reached through the seam that takes a resolved class. Naming the class
-     * is the only way to have several versions on one test classpath — and
-     * without them a fallback is a branch nothing ever takes, which is a
-     * fallback that has already stopped working and not said so.
-     *
-     * The client generator falls back one step and so has one older version.
-     * The importer falls back three — past the remote allowlist, then past the
-     * discriminator hints, then past the codec — so it has three: `previous`,
-     * which still takes the hints, `older`, which still takes the codec, and
-     * `oldest`, from before it. Names for the order rather than version
-     * numbers, because what decides a fallback is the order and not the
-     * release.
-     */
     private val olderCodegen = Class.forName("io.github.matthewjones372.pelican.older.codegen.KotlinClientKt")
     private val previousImporter = Class.forName("io.github.matthewjones372.pelican.previous.importer.ImportKt")
     private val olderImporter = Class.forName("io.github.matthewjones372.pelican.older.importer.ImportKt")
@@ -267,13 +236,6 @@ class ReflectionTest {
             "openapi.yaml|com.example|orders|a|ktor|kotlinx|Payment=kind"
     }
 
-    /**
-     * The guard with the most riding on it. An importer from before the
-     * lockfile has no hash check in it either, so stepping down to it with
-     * hosts allowed would not merely drop a setting — it would fetch URLs and
-     * generate from whatever came back, which is the one thing the whole
-     * arrangement is arranged against.
-     */
     @Test
     fun `says which importer is too old to carry the remote allowlist`(@TempDir dir: File) {
         val failure = shouldThrow<PelicanFailure> {
@@ -318,12 +280,6 @@ class ReflectionTest {
         (written.single() as File).readText().trim() shouldBe "openapi.yaml|com.example|orders|a|ktor|kotlinx"
     }
 
-    /**
-     * The guard that makes the step down safe. Falling back here with hints
-     * set would import the document as though nobody had stated the
-     * discriminator, and the unions the hints were for would come back
-     * refused — or worse, not come back at all.
-     */
     @Test
     fun `says which importer is too old to carry the discriminator hints`(@TempDir dir: File) {
         val failure = shouldThrow<PelicanFailure> {

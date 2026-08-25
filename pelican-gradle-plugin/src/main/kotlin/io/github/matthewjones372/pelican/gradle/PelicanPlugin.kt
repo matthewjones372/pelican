@@ -9,11 +9,6 @@ import java.io.File
 
 /**
  * `plugins { id("io.github.matthewjones372.pelican") }`.
- *
- * Makes the document and the client build tasks rather than a `main` somebody
- * wrote and a `JavaExec` somebody wired. Nothing here compiles against
- * Pelican — generation runs against the consumer's classpath, see [Pelican] —
- * so the plugin's version and the library's are independent.
  */
 class PelicanPlugin : Plugin<Project> {
 

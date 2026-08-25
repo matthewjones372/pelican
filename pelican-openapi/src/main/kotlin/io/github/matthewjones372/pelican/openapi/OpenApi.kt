@@ -11,11 +11,6 @@ import io.github.matthewjones372.pelican.*
 /**
  * Interprets endpoint descriptions as an OpenAPI 3.1.0 document.
  *
- * Depends on `pelican-core` and nothing else: documentation is a second reading
- * of the same values, not a byproduct of running the service. Payload schemas
- * come from the [SchemaSource] the spec was built with, so a description
- * documents identically under either JSON library.
- *
  * 3.1 only, deliberately. Nullability is spelled inside a schema rather than
  * around it, so a selectable version would need either an OpenAPI argument on
  * core's [SchemaSource] — a type that exists so core need not know what OpenAPI
@@ -84,9 +79,6 @@ private fun serverList(urls: List<String>): JsonArr =
  * `webhooks`: the calls the service sends, keyed by name rather than by path.
  * The value is a Path Item Object written by the same [operation] function,
  * since a webhook is one of these read in the other direction.
- *
- * No `servers`, on purpose: a Server Object here would be this document naming
- * a host that belongs to whoever subscribed.
  */
 private fun webhookItems(
     webhooks: List<Webhook>,
@@ -184,10 +176,6 @@ private fun requestBody(ep: Endpoint<*, *>, schemas: SchemaSource, components: S
 /**
  * One entry per successful response the output describes, and one per declared
  * failure — each with its own schema and media type.
- *
- * `emits(...)` headers go on every success, being the endpoint's promise; a
- * header declared on one response goes on that one alone. A
- * `defaultResponse(...)` is written under `default`.
  */
 private fun responses(ep: Endpoint<*, *>, schemas: SchemaSource, components: SchemaComponents): JsonObj = jsonObj {
     successesOf(ep.output).forEach { out ->
@@ -302,11 +290,6 @@ private fun responseHeaders(headers: List<ResponseHeader<*>>): JsonObj? {
  * Opaque bytes, as 3.1's `contentMediaType` rather than 3.0's `format: binary`,
  * which JSON Schema never defined. No `contentEncoding`: these bytes go on the
  * wire as themselves.
- *
- * The media type is named again although it is already the `content` key,
- * because a schema gets read on its own and one saying only `type: string`
- * is a lie outside its own context. A parameter rather than a constant, since
- * `bytes(mediaType = ...)` lets an endpoint name what it streams.
  */
 private fun binarySchema(mediaType: String) = jsonObj {
     "type" to "string"
@@ -320,10 +303,6 @@ private fun binarySchema(mediaType: String) = jsonObj {
  * Text parts' schemas come from their own codecs, so a refinement is documented
  * as it would be on a query parameter and Swagger UI refuses to submit a value
  * the server would reject.
- *
- * A `bufferedFile` publishes its bound as `maxLength`, which makes it part of
- * the contract rather than a setting discovered by being refused — and there is
- * nowhere else in the schema for that number to go.
  */
 private fun multipartSchema(body: MultipartBody): JsonObj = jsonObj {
     "type" to "object"

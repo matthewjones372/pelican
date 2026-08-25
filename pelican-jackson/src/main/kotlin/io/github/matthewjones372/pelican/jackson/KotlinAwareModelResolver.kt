@@ -56,9 +56,6 @@ internal class KotlinAwareModelResolver(mapper: ObjectMapper) : ModelResolver(ma
      *
      * Rederiving the name would mean reimplementing swagger's own naming, whose
      * first surprise is that an instantiated generic is `BoxInner`, not `Box`.
-     *
-     * A model reached through a `$ref` names itself; one being defined now is
-     * found by identity among the models the context has just gained.
      */
     private fun remember(
         component: String?,
@@ -105,11 +102,6 @@ internal class KotlinAwareModelResolver(mapper: ObjectMapper) : ModelResolver(ma
      * `List<Inner?>` needs it: the property is not nullable, and swagger-core
      * has erased the element's nullability by the time we see it. The Kotlin
      * type is the only witness left.
-     *
-     * Core's `JsonObj.withNullabilityOf` written against `Schema`. The
-     * duplication is the price of the split — a property's Kotlin type is only
-     * visible from the constructor and never reaches `JacksonCodecs` — and
-     * `CodecAgreementTest` keeps the two in step.
      */
     private fun Schema<*>.matching(type: KType): Schema<*> {
         val element = type.arguments.lastOrNull()?.type

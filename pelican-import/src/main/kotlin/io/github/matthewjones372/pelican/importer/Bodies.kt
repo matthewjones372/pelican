@@ -7,10 +7,6 @@ import io.github.matthewjones372.pelican.JsonValue
  * The request body. Several media types are read as several encodings of one
  * payload, which is the only reading of a content map that survives contact
  * with a handler: `Content-Type` picks the decode.
- *
- * A content map whose entries describe different *shapes* stays refused —
- * that is a union wearing a content map, and picking one entry would generate
- * a server rejecting half the callers the document invites.
  */
 internal class Bodies(private val reader: Reader, private val operation: Operation) {
 
@@ -109,15 +105,6 @@ internal class Bodies(private val reader: Reader, private val operation: Operati
 
     /**
      * A multipart body as its parts, which is how Pelican declares one.
-     *
-     * Which parts are held is decided in two steps. A `maxLength` on a file
-     * part means held, with that bound — what this library's own generator
-     * publishes for a `bufferedFile`, so its documents round-trip.
-     *
-     * Among the rest the *last* is streamed and the others are held with
-     * [DEFAULT_BUFFERED_PART_BYTES]. Last because everything after a streamed
-     * part would be read after reading had stopped. The bound is written into
-     * the generated source, so memory is never spent invisibly.
      */
     private fun parts(schema: JsonObj?, encoding: JsonObj?, path: JsonPath): List<IrPart> {
         val properties = schema?.obj("properties")
