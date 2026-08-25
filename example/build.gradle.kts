@@ -49,6 +49,10 @@ dependencies {
     // is worth very little; see OpenApiSpecQualityTest.
     testImplementation("io.swagger.parser.v3:swagger-parser:2.1.47")
 
+    // The compiler, so that "this does not compile, and here is what it says"
+    // can be a test rather than a sentence in a document that goes stale.
+    testImplementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.10")
+
     // The generated client is compiled in this source set, and a generated
     // client needs a transport. Both adapters are here so the suite runs the
     // same client over each of them — which is also what makes this the one
