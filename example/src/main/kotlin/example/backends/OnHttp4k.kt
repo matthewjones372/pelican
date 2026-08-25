@@ -54,6 +54,8 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
     motd handledNow { "Be excellent to each other." },
 
     forget handledWith { _ -> },
+
+    ticker streamedNow { ticks().asSequence() },
     everyone streamedNow { greetingsOf().asSequence() },
 
     logo bytesNow { java.io.ByteArrayInputStream(LOGO_BYTES) },

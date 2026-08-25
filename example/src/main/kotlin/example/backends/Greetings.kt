@@ -325,11 +325,25 @@ val echoRaw = endpoint(rawBody(description = "Whatever was sent, unread")) {
     bytes()
 }
 
+/**
+ * Server-sent events, the last kind core frames. `SseKeepAliveTest` covers what
+ * each backend does when a stream goes quiet, which genuinely differs; the
+ * frames themselves are core's and should not.
+ */
+val ticker = endpoint(noInputs) {
+    get("ticker")
+    summary = "A short run of events, named"
+    operationId = "ticker"
+    tag("greetings")
+    emits(requestId)
+    sse<Tick>(eventName = "tick")
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
-        motd, forget, everyone, logo, echoRaw,
+        motd, forget, everyone, logo, echoRaw, ticker,
     )
 
 /**
@@ -360,6 +374,9 @@ val greetingWebhooks: List<Webhook> = listOf(greetingRecorded)
  * the endpoint. The media type is the claim; these bytes only have to survive.
  */
 val LOGO_BYTES: ByteArray = "PELICAN".toByteArray(Charsets.US_ASCII)
+
+/** A short, fixed run of events, so three backends can be compared frame for frame. */
+fun ticks(): List<Tick> = listOf(Tick(1, "one"), Tick(2, "two"))
 
 /** A short, fixed list, so three backends can be compared byte for byte. */
 fun greetingsOf(): List<Greeting> = listOf(Greeting("Hello", "en"), Greeting("Bonjour", "fr"))

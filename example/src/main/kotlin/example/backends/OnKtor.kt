@@ -57,6 +57,8 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
     motd handledNow { "Be excellent to each other." },
 
     forget handledWith { _ -> },
+
+    ticker streamedNow { ticks().asFlow() },
     everyone streamedNow { greetingsOf().asFlow() },
 
     logo bytesNow { io.ktor.utils.io.ByteReadChannel(LOGO_BYTES) },
