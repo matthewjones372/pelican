@@ -81,36 +81,48 @@ thing a single-JVM loop cannot see and forks exist to expose. Read the row as
 ## What matching costs when there is more than one endpoint
 
 Every table above uses an API of **one** endpoint, which measures decoding and
-rendering and says nothing about the thing that actually varies between
-services. Pekko reduces its routes with `Directives.concat` and http4k's
-`routes(...)` tries them in order, so both are an ordered scan. The endpoint
-under test is declared last, which is the worst case a scan has and the one a
-service acquires by adding endpoints over time.
+rendering and says nothing about the thing that varies most between services.
+Pekko reduces its routes with `Directives.concat` and http4k's `routes(...)`
+tries them in order, so both are an ordered scan. The endpoint under test is
+declared last — the worst case a scan has, and the one a service acquires by
+adding endpoints over time.
 
 `./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"` — a class of its
 own, so the six-minute run above is unchanged.
 
-| endpoints | Pelican on http4k | Pelican on Pekko |
-|---|---|---|
-| 1 | 1757 ± 265ns | 670 ± 187ns |
-| 50 | 48,511ns | 20,063ns |
-| 200 | 151,063 ± 37,778ns | 148,140 ± 16,189ns |
+| endpoints | Pelican on http4k | http4k routes, by hand | Pelican on Pekko |
+|---|---|---|---|
+| 1 | 1771 ± 265ns | 1646 ± 1472ns | 670 ± 187ns |
+| 50 | 37,827ns | 62,125ns | 20,567ns |
+| 200 | 147,907ns | 146,314ns | 149,511ns |
 
-**The curve is not flat, and this is the honest headline of the page.** At two
-hundred endpoints a request spends about 150µs being matched, against 1.8µs and
-0.7µs for the first. Allocation tells the same story: http4k goes from 4.6KB a
-request to 385KB, because each candidate that fails to match does work and
-throws it away — Pekko's rejections and http4k's route attempts both allocate.
+At two hundred endpoints a request spends about 150µs being matched, against
+under two microseconds for the first. That is a real cost and a service with a
+hundred endpoints will pay it.
 
-Two things to hold on to before reading it as a verdict on the library. The
-decoys have **distinct first path segments**, which is the shape most flattering
-to an index and least flattering to a scan; a service whose endpoints all sit
-under `/orders` would degrade differently. And both routers are doing the
-scanning — this is what `concat` and `routes(...)` do with the list they are
-given, not something the interpreter adds on top.
+**It is not the interpreter.** The middle column is the control: the same two
+hundred routes registered with http4k directly, no Pelican involved. Measured
+against each other with tighter bounds:
 
-What it means for a service today: a handful of endpoints costs what the tables
-above say. A hundred or more, and matching is the dominant cost of a request.
+```
+Pelican on http4k, 200 endpoints:   134,344 ± 8559ns
+the same routes written by hand:    135,104 ± 5465ns
+```
+
+The two are the same number. `routes(...)` and `Directives.concat` are ordered
+scans, and at two hundred entries that is what an ordered scan costs whoever
+built the list. Interpreting a description adds nothing measurable to it — which
+is the same finding as every table above, holding at a scale those tables do not
+reach.
+
+Two caveats worth keeping. The decoys have **distinct first path segments**,
+which is the shape most flattering to an index and least flattering to a scan; a
+service whose endpoints all sit under `/orders` would degrade differently. And
+the hand-written Pekko control is not comparable in the same way — building a
+sealed route and running one request through a materialised flow costs about
+23µs on its own, which swamps the first column, so only the http4k control is
+apples to apples.
+
 Ktor is exempt by construction — `Route.pelican` installs one Ktor route per
 endpoint and lets Ktor's own tree score them — and is not yet measured here.
 

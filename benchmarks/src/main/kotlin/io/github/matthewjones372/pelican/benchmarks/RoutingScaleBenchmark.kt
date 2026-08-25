@@ -10,10 +10,19 @@ import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.javadsl.Behaviors
 import org.apache.pekko.http.javadsl.model.HttpRequest
 import org.apache.pekko.http.javadsl.model.HttpResponse
+import org.apache.pekko.http.javadsl.server.Directives
+import org.apache.pekko.http.javadsl.server.PathMatchers
 import org.apache.pekko.japi.function.Function
+import org.apache.pekko.stream.javadsl.Sink
+import org.apache.pekko.stream.javadsl.Source
 import org.http4k.core.HttpHandler
 import org.http4k.core.Method
 import org.http4k.core.Request
+import org.http4k.core.Response
+import org.http4k.core.Status
+import org.http4k.routing.bind
+import org.http4k.routing.path
+import org.http4k.routing.routes
 import org.openjdk.jmh.annotations.Benchmark
 import org.openjdk.jmh.annotations.BenchmarkMode
 import org.openjdk.jmh.annotations.Fork
@@ -78,6 +87,14 @@ open class RoutingScaleBenchmark {
     private lateinit var pekkoRequest: HttpRequest
 
     /**
+     * The controls. The same number of routes, registered with each router
+     * directly, so the question "is this the interpreter or the router?" has a
+     * measured answer rather than an opinion.
+     */
+    private lateinit var http4kBare: HttpHandler
+    private lateinit var pekkoBare: Function<HttpRequest, CompletionStage<HttpResponse>>
+
+    /**
      * One system for the class. Creating one costs milliseconds against an
      * operation measured in nanoseconds, so it is not per iteration.
      */
@@ -121,6 +138,32 @@ open class RoutingScaleBenchmark {
             codecs = JacksonCodecs,
         ).toRoute(system).function(system)
 
+        http4kBare = routes(
+            (1..endpoints - 1).map { n ->
+                "/resource$n/{id$n}" bind Method.GET to { _: Request -> Response(Status.OK).body("decoy") }
+            } + (
+                "/items/{itemId}" bind Method.GET to { req: Request ->
+                    Response(Status.OK).body("item-" + req.path("itemId"))
+                }
+                ),
+        )
+
+        val bareRoutes = (1..endpoints - 1).map { n ->
+            Directives.get {
+                Directives.path(PathMatchers.segment("resource$n").slash(PathMatchers.longSegment())) { _ ->
+                    Directives.complete("decoy")
+                }
+            }
+        } + Directives.get {
+            Directives.path(PathMatchers.segment("items").slash(PathMatchers.longSegment())) { id ->
+                Directives.complete("item-$id")
+            }
+        }
+        val bareFlow = bareRoutes.reduce { a, b -> Directives.concat(a, b) }.seal().flow(system)
+        pekkoBare = Function { req ->
+            Source.single(req).via(bareFlow).runWith(Sink.head(), system)
+        }
+
         request = Request(Method.GET, "/items/7")
         pekkoRequest = HttpRequest.GET("/items/7")
 
@@ -144,4 +187,11 @@ open class RoutingScaleBenchmark {
 
     @Benchmark
     fun lastRouteOnPekko(): HttpResponse = answer(pekkoRequest)
+
+    @Benchmark
+    fun lastRouteOnHttp4kHandWritten(): Any = http4kBare(request)
+
+    @Benchmark
+    fun lastRouteOnPekkoHandWritten(): HttpResponse =
+        pekkoBare.apply(pekkoRequest).toCompletableFuture().join()
 }
