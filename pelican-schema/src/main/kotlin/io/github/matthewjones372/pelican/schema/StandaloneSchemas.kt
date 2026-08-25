@@ -23,8 +23,10 @@ class StandaloneSchemas(private val schemas: SchemaSource) {
     fun schema(type: KType): JsonObj {
         val defs = SchemaDefs()
         val root = schemas.schema(type, defs).rebasedOnto(defs)
-        val definitions = defs.all().rebasedOnto(defs)
-        return if (definitions.isEmpty) root else root + jsonObj { put(DEFS, definitions) }
+        val definitions = defs.all().rebasedOnto(defs).branchesSelected()
+        val document = if (definitions.isEmpty) root else root + jsonObj { put(DEFS, definitions) }
+        document.refuseOpenHierarchies()
+        return document
     }
 }
 
