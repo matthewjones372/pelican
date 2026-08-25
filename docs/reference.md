@@ -3596,7 +3596,7 @@ val badApiKey  = errorJson<ApiError>(401, "Missing or bad API key")
 val getUser = endpoint(userId) {
     get("users" / userId)
     json<User>() orFail noSuchUser
-}                                  // Endpoint<Long, Fallible<ApiError, User>>
+}                                  // Endpoint<Long, Outcome<ApiError, User>>
 
 val placeOrder = endpoint(userId, apiKey, newOrder) {
     post("users" / userId / "orders")
@@ -3637,12 +3637,43 @@ What the compiler catches:
   e: Return type mismatch: expected 'Outcome<ApiError, User>', actual 'Outcome<OtherProblem, Nothing>'
 
 +(getUser handledNow { id -> Store.user(id)!! })
-  e: Return type mismatch: expected 'Fallible<ApiError, User>', actual 'User'
+  e: Return type mismatch: expected 'Outcome<ApiError, User>', actual 'User'
 ```
 
 With several payload types the error parameter infers to their common
 supertype, so a sealed hierarchy of problems makes the handler's `when`
 exhaustive as well.
+
+#### What widening `E` stops the compiler catching
+
+That inference has a cost, and it is worth knowing before a sealed hierarchy is
+shared between endpoints. `Outcome` is covariant in `E`, so once `E` has widened
+to the hierarchy, *every* failure of that hierarchy fits — including ones this
+endpoint never declared:
+
+```kotlin
+val quote = endpoint(basket) {
+    post("cart" / "quote")
+    json<Receipt>().orFail(emptyBasket, unknownBook)      // E infers to ShopError
+}
+
+quote handledOrFail { basket ->
+    badEmail(ShopError.BadEmail("a@b", "nope"))           // compiles. Never declared here.
+}
+```
+
+The second example above is caught only because `otherFailure` carries a type
+outside the hierarchy. Inside one, nothing says so until the response is being
+written, and then it is an `UndeclaredResponse`: a 500 with a reference, the
+whole story in the log through `onServerError`.
+
+A single `orFail(failure)` pins `E` exactly and keeps the compile-time check, so
+an endpoint with one declared failure never has this problem. For the rest, the
+protection is that the mapping from a domain failure to a declared response is
+written once — `ShopError.declared()` in `example/shop` — and read by every
+endpoint that shares it, so there is one place to be wrong rather than one per
+handler. What that shape cannot express is that `quote` declares two of the
+three, which is why the refusal exists at all.
 
 ### One error model, not two
 
@@ -3723,7 +3754,7 @@ declares several successful responses — see
 alternatives are not failures.
 
 Streaming works the same way: `ndjson<Order>() orFail noSuchUser` is a
-`Fallible<ApiError, StreamOf<Order>>`, which is a failure decided before the
+`Outcome<ApiError, StreamOf<Order>>`, which is a failure decided before the
 first element rather than mid-stream.
 
 Tests read them back typed, through the same descriptions:
@@ -3900,7 +3931,7 @@ submitOrder handledOneOf { (id, key, req) ->
 }
 ```
 
-`submitOrder` is an `Endpoint<In3<Long, String, CreateOrder>, Fallible<ApiError, Any>>`
+`submitOrder` is an `Endpoint<In3<Long, String, CreateOrder>, Outcome<ApiError, Any>>`
 — the same shape `orFail` alone produces, with more than one thing on the
 success side. Which means everything about it is already familiar:
 
