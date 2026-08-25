@@ -106,6 +106,17 @@ tasks.register<JavaExec>("runBookmarks") {
     mainClass.set("example.bookmarks.BookmarksKt")
 }
 
+/**
+ * The bookshop: a domain that fails in three ways, and a document that says so.
+ * `./gradlew :example:runShop --args=8082`.
+ */
+tasks.register<JavaExec>("runShop") {
+    group = "application"
+    description = "Runs the Rookery Books example"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.shop.ShopKt")
+}
+
 /** The security example: basic auth, an external identity provider, and a docs page that can sign in. */
 tasks.register<JavaExec>("runSecured") {
     group = "application"

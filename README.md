@@ -993,6 +993,7 @@ Nine things that wanted a page rather than a section, and one benchmark:
 ./gradlew :example:runSecured            # a filter enforcing the security the descriptions declare
 ./gradlew :example:runMetrics            # Micrometer meters tagged from the descriptions, at /admin/meters
 ./gradlew :example:runTracing            # OpenTelemetry spans from the same descriptions, at /admin/traces
+./gradlew :example:runShop               # a bookshop: three domain failures, three declared responses
 ./gradlew :example:generateOrdersDocument  # the spec, with no server started
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ```

@@ -3063,6 +3063,28 @@ date-time`), `LocalDate` (`date`), `LocalDateTime`, `URI` (`uri`) and
 `NonEmptyString` — each with a real 400 for input it cannot parse, rather than
 a 500 from `parse` throwing.
 
+An `enum` is worth spelling out, because it is the case where taking the
+`String` and checking it in the handler is the tempting mistake:
+
+```kotlin
+enum class Genre { FICTION, ESSAYS, SCIENCE, CRIME, POETRY, HISTORY }
+
+val genre = queryParam<Genre>("genre", description = "Only this genre").optional()
+```
+
+```json
+{ "name": "genre", "in": "query", "required": false,
+  "description": "Only this genre",
+  "schema": { "type": "string", "enum": ["FICTION", "ESSAYS", "SCIENCE", "CRIME", "POETRY", "HISTORY"] } }
+```
+
+`?genre=BANANA` is a 400 raised before the handler runs, naming the parameter
+and what it expected; `?genre=crime` decodes, because matching is
+case-insensitive against the constant names. What is *published* is the
+constants as written. The handler is handed a `Genre?`, so there is no branch
+in it for a word that is not one — which is the difference between a validation
+rule the document carries and one only the handler knows about.
+
 ## More than one value
 
 `?tag=a&tag=b`, `?id=1,2`, `X-Feature: beta,dark`. A parameter that carries
@@ -3522,6 +3544,72 @@ With several payload types the error parameter infers to their common
 supertype, so a sealed hierarchy of problems makes the handler's `when`
 exhaustive as well.
 
+### One error model, not two
+
+That sentence is the whole of what `example/shop` is for, because the mistake it
+prevents is the one everybody writes first:
+
+```kotlin
+placeOrder handledOrFail { req ->
+    runCatching { ok(desk.place(req)) }
+        .getOrElse { e -> badOrder(Problem(codeOf(e), e.message ?: "Bad order")) }
+}
+```
+
+This compiles, serves, and publishes a single 400 for an empty basket, a book
+nobody stocks, and an undeliverable address alike. Three failures a bookshop
+genuinely has become one shrug, and a caller reading the document cannot tell
+which happened or which is worth retrying. The library did not push anyone
+there: `orFail(emptyBasket, unknownBook, badEmail)` was always available. What
+pushed is that the domain signalled by *throwing*, which hands the HTTP layer a
+`Throwable` and no list of what it might be — and the only honest thing to write
+against that is a catch-all.
+
+So the fix is upstream of the endpoint. Have the domain **return** its failures
+as a sealed hierarchy, and make that hierarchy the payload type of the declared
+responses:
+
+```kotlin
+sealed interface ShopError {
+    data class EmptyBasket(val message: String) : ShopError
+    data class UnknownBook(val bookId: String, val message: String) : ShopError
+    data class BadEmail(val email: String, val message: String) : ShopError
+}
+
+val emptyBasket = errorJson<ShopError.EmptyBasket>(400, "The basket has nothing in it")
+val unknownBook = errorJson<ShopError.UnknownBook>(404, "No book with that id")
+val badEmail    = errorJson<ShopError.BadEmail>(422, "That address will not take a receipt")
+
+val placeOrder = endpoint(newOrder) {
+    post("orders")
+    json<Order>(status = 201).orFail(emptyBasket, unknownBook, badEmail)
+}
+```
+
+`E` infers to `ShopError`, so the mapping is a `when` with no `else` — and a
+fourth branch added to the hierarchy stops it compiling until it has a status of
+its own:
+
+```kotlin
+fun ShopError.declared(): Outcome<ShopError, Nothing> = when (this) {
+    is ShopError.EmptyBasket -> emptyBasket(this)
+    is ShopError.UnknownBook -> unknownBook(this)
+    is ShopError.BadEmail    -> badEmail(this)
+}
+```
+
+Two things follow that the `runCatching` version cannot have. The statuses say
+different things — 400 for a malformed request, 404 for a shelf that has no such
+id, 422 for a request that is well formed and still not actionable — and the
+payloads carry what a caller would act on: *which* book was not stocked, *which*
+address was refused, rather than one `message` string to parse. Both are visible
+in the published document, which is where a bookshop is interesting.
+
+Nothing here is a library feature. It is the ordinary consequence of having one
+error type rather than two, and the reason to write it down is that the shorter
+wrong path is genuinely shorter.
+
+
 The binders are named apart from the total ones — `handledOrFail`,
 `handledByOrFail`, `streamedOrFail`, `streamedByOrFail` — rather than
 overloaded, because a lambda's return type is inferred *after* overload
@@ -3821,6 +3909,30 @@ text(status = 202)` publishes `application/json` under 200 and `text/plain`
 under 202, which is one content map per status and exactly what the format is
 for. What could not be told apart is two responses under one status, and that is
 the refusal above.
+
+## A whole list, or a stream of one
+
+`json<List<Book>>()` and `jsonArray<Book>()` put the same bytes on the wire —
+one JSON array — and publish the same schema: `type: array` over the element.
+A caller reading the document cannot tell which was chosen, and neither can a
+caller reading the response. What differs is *when* the bytes are written.
+
+`json<List<T>>()` encodes a list that is already in hand, in one go, with a
+`Content-Length`. The handler is an ordinary `handledNow` returning a `List<T>`,
+and no backend stream type is involved: a shelf of sixteen books never has to
+become a `Source`, a `Sequence` or a `Flow`.
+
+`jsonArray<T>()` frames a stream, flushing elements as they are produced. The
+handler is `streamedNow` and returns the backend's own stream type. Nothing is
+held whole, so the response can be larger than memory and the first element
+reaches the caller before the last one exists.
+
+So: a bounded collection already loaded is `json<List<T>>()`; a query nobody has
+counted is `jsonArray<T>()`. Since the document is the same either way, this is
+a decision about memory and latency rather than about the contract, and moving
+from one to the other later breaks nothing that was promised. `example/shop`
+lists a catalogue the first way and `example/bookmarks` streams one the second
+way; `ShopContractTest` pins the two schemas being identical.
 
 ## How streaming stays backend-agnostic
 
