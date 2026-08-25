@@ -127,8 +127,12 @@ class ServerEndpoint(
 fun Api.handlerFor(se: ServerEndpoint): (Params) -> CompletionStage<Any?> =
     filters.wrap(se.invoke)
 
-/** Bound endpoints plus the settings shared between them. */
-class Api(
+/**
+ * Bound endpoints plus the settings shared between them. Built by [api]: the
+ * constructor is internal so that a setting can be added without breaking every
+ * caller compiled against the last release.
+ */
+class Api internal constructor(
     val endpoints: List<ServerEndpoint>,
 
     /**
@@ -137,8 +141,8 @@ class Api(
      */
     val codecs: Codecs = NoCodecs,
 
-    val title: String = "API",
-    val version: String = "1.0.0",
+    val title: String = DEFAULT_TITLE,
+    val version: String = DEFAULT_VERSION,
     val description: String? = null,
     val servers: List<String> = emptyList(),
 
@@ -160,7 +164,7 @@ class Api(
      * caller gets a 408 on Pekko and on Ktor; http4k reads on the calling
      * thread and its server owns that timeout, so this does not reach it.
      */
-    val strictBodyTimeoutMillis: Long = 10_000,
+    val strictBodyTimeoutMillis: Long = DEFAULT_STRICT_BODY_TIMEOUT_MILLIS,
 
     /**
      * The largest strict body that will be read; over it is a 413 raised before
@@ -233,5 +237,11 @@ class Api(
     )
 }
 
+// Written once and read twice: the constructor states them, and [ApiBuilder]
+// starts from them.
+internal const val DEFAULT_TITLE: String = "API"
+internal const val DEFAULT_VERSION: String = "1.0.0"
+internal const val DEFAULT_STRICT_BODY_TIMEOUT_MILLIS: Long = 10_000
+
 /** Eight megabytes. See [Api.maxBodyBytes] for why there is a limit at all. */
-private const val DEFAULT_MAX_BODY_BYTES: Long = 8L * 1024L * 1024L
+internal const val DEFAULT_MAX_BODY_BYTES: Long = 8L * 1024L * 1024L

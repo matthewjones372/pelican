@@ -34,6 +34,8 @@ import java.io.File
 class FunctionalStyleTest {
 
     private val builders = mapOf(
+        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/ApiBuilder.kt" to
+            "the filter chain accumulates a line at a time, and the Api it returns is handed a copy",
         "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Endpoint.kt" to
             "EndpointBuilder collects declarations as they are made and freezes them into an Endpoint",
         "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/JsonValue.kt" to
