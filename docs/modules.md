@@ -1,10 +1,10 @@
 # Modules
 
-Linked from the [README](../README.md). What each of the sixteen modules is
+Linked from the [README](../README.md). What each of the seventeen modules is
 for, and what it depends on — the list to read when deciding which ones a
 build actually needs.
 
-Sixteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
+Seventeen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
 rather than convention.
 
 | Module | Depends on | Contains |
@@ -18,6 +18,7 @@ rather than convention.
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
 | `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
+| `pelican-test-golden` | test + openapi | per-endpoint goldens; fails on a breaking change |
 | `pelican-test-pekko` / `-http4k` | test + that backend | the in-memory transport |
 
 Every one of those dependency claims is a test. `pelican-core` asserts its

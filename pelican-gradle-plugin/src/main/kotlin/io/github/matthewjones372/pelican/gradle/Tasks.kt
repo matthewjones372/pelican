@@ -324,3 +324,37 @@ abstract class GenerateDocumentTask : SpecTask() {
         }
     }
 }
+
+/**
+ * Fails when the descriptions have moved away from a document callers hold.
+ *
+ * Registered for a `documents` entry that names a `baseline`, and wired into
+ * `check` — which is where a question about somebody else's deployed client
+ * belongs, next to the compiler and the tests rather than in a release ritual
+ * somebody has to remember.
+ */
+@UntrackedTask(because = "Compares a committed document against freshly generated output")
+abstract class CheckDocumentTask : SpecTask() {
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val baseline: RegularFileProperty
+
+    /** The name the failure spells the entry with. */
+    @get:Input
+    abstract val entryName: Property<String>
+
+    init {
+        group = "verification"
+    }
+
+    @TaskAction
+    fun check() {
+        queue().submit(CheckDocumentWork::class.java) {
+            it.specClass.set(specClass)
+            it.specFunction.set(specFunction)
+            it.baseline.set(baseline)
+            it.entryName.set(entryName)
+        }
+    }
+}

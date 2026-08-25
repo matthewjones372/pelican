@@ -1,0 +1,53 @@
+{
+  "paths": {
+    "/users/{userId}/orders/{orderId}": {
+      "delete": {
+        "summary": "Cancel an order",
+        "operationId": "cancelOrder",
+        "tags": [
+          "orders"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user's id",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "X-Api-Key",
+            "in": "header",
+            "required": true,
+            "description": "Required credential",
+            "example": "let-me-in",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  }
+}

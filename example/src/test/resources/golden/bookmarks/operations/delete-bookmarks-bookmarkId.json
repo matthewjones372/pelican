@@ -1,0 +1,44 @@
+{
+  "paths": {
+    "/bookmarks/{bookmarkId}": {
+      "delete": {
+        "summary": "Forget a bookmark",
+        "operationId": "deleteBookmarksByBookmarkId",
+        "tags": [
+          "bookmarks"
+        ],
+        "parameters": [
+          {
+            "name": "bookmarkId",
+            "in": "path",
+            "required": true,
+            "description": "The bookmark's id",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "X-Api-Key",
+            "in": "header",
+            "required": true,
+            "description": "The caller's API key",
+            "example": "let-me-in",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "paths": {
+    "/users/{userId}/orders/import": {
+      "post": {
+        "summary": "Import orders from an uploaded file",
+        "operationId": "importOrders",
+        "tags": [
+          "orders"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user's id",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "session",
+            "in": "cookie",
+            "required": false,
+            "description": "An opaque session id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "What to call this import"
+                  },
+                  "manifest": {
+                    "type": "string",
+                    "contentMediaType": "text/csv",
+                    "description": "What the file is supposed to contain",
+                    "maxLength": 8192
+                  },
+                  "file": {
+                    "type": "string",
+                    "contentMediaType": "text/csv",
+                    "description": "One order per line"
+                  }
+                },
+                "required": [
+                  "label",
+                  "manifest",
+                  "file"
+                ]
+              },
+              "encoding": {
+                "manifest": {
+                  "contentType": "text/csv"
+                },
+                "file": {
+                  "contentType": "text/csv"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ImportResult": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "filename": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "session": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "manifest": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "lines",
+          "manifest"
+        ]
+      }
+    }
+  }
+}

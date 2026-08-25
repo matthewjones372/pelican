@@ -7,7 +7,8 @@
 
 # Pelican
 
-**Type-safe HTTP for Kotlin.** Describe an endpoint once, as a value.
+**Type-safe HTTP for Kotlin.** Describe an endpoint once — get the server
+route, the OpenAPI document and a typed client from that one description.
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.matthewjones372/pelican-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core)
 [![build](https://github.com/matthewjones372/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
@@ -22,13 +23,23 @@
 
 ---
 
-You describe an endpoint once, as a value. Pelican turns that one description
-into the server route, the OpenAPI document, a test client, and a generated
-Kotlin client for your callers — there is no second source of truth, because
-there is no second description.
+Pelican is a Kotlin library for describing HTTP APIs. You write down what an
+endpoint is — its path, its inputs, the types it can return — as an ordinary
+Kotlin value. Pelican then derives the rest from that one value: the server
+route, the OpenAPI document, a test client, and a generated Kotlin client for
+your callers.
 
-Runs on Pekko HTTP, http4k or Ktor. Roughly what tapir is for Scala, scoped to
-what Kotlin's type system can express without implicits.
+That inverts the usual arrangement, where the route lives in code, the schema
+lives in annotations or a hand-written YAML file, and the two are kept in step
+by whoever remembers. Here there is no second source of truth, because there is
+no second description.
+
+It is a library rather than a framework: it does not own your `main`, and it
+serves through a web stack you already run — Pekko HTTP, http4k or Ktor. If you
+know tapir from Scala, this is that idea, scoped to what Kotlin's type system
+can express without implicits.
+
+A description, then the handler that answers it:
 
 ```kotlin
 val getBookmark = endpoint(bookmarkId) {
@@ -45,12 +56,6 @@ getBookmark handledOrFail { id ->                    // id: Long, already decode
 
 Change the path parameter's type, the response type or the declared error, and
 the handler stops compiling.
-
-Interpreting a description is not free, and what it costs is measured rather
-than argued about — 75ns a request against an http4k route someone tuned by
-hand, 131ns against a Pekko one, and cheaper than the idiomatic version of
-either. The numbers, the error bars they came with and the baselines they need
-are in [what it costs](docs/what-it-costs.md).
 
 ## Why you might want this
 
@@ -79,6 +84,12 @@ endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
 **Swapping backends does not touch your descriptions.** Only the type a
 streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
 `Flow` on Ktor.
+
+**And it is not slow.** Interpreting a description is not free, but what it
+costs is measured rather than argued about — 75ns a request against an http4k
+route someone tuned by hand, 131ns against a Pekko one, and cheaper than the
+idiomatic version of either. The numbers, the error bars they came with and the
+baselines they need are in [what it costs](docs/what-it-costs.md).
 
 ## Contents
 
@@ -110,7 +121,7 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-All sixteen modules are on Maven Central under `io.github.matthewjones372`,
+All seventeen modules are on Maven Central under `io.github.matthewjones372`,
 with sources and an empty javadoc jar.
 
 ```kotlin
@@ -836,6 +847,39 @@ app.request(deleteBookmark, In2(1L, key)) shouldBuild "DELETE /bookmarks/1"
 transport. It is the one test in the suite that *should* fail on a rename: a
 red line here is the 404 your callers would have found for you.
 
+### Golden files
+
+A literal pins the URL it was written for. What nothing pins is the change that
+costs most: a required field added to a request body, an endpoint deleted, a
+response that stopped carrying a field. Every typed test passes — both ends move
+together — and the first to notice is the caller who deployed last month.
+
+`pelican-test-golden` records what the descriptions publish, one file per
+endpoint, and compares the next run against those files as contracts:
+
+```kotlin
+private val golden = Golden()
+
+@Test fun `every endpoint publishes what it published`() {
+    golden.operations(bookmarksSpec())      // one file per endpoint; nothing to write per endpoint
+}
+```
+
+```
+post-bookmarks.json — 1 change breaks callers.
+
+  POST /bookmarks
+    ✖ `folder` in the request body (application/json) is new and required
+        every caller that is not sending it is refused
+```
+
+A new optional parameter or a rewritten summary updates the golden and passes; a
+break fails. The same check runs from Gradle without a test suite, as
+`check<Name>Document`.
+
+[Golden files](docs/golden-testing.md) is the page: what counts as a break, how
+to accept one you meant, and how to record the wire bytes too.
+
 ## Backends
 
 The backend is a choice about handlers. Bind the same endpoint values with
@@ -884,7 +928,7 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 ## Longer documents
 
-Five things that wanted a page rather than a section, and one benchmark:
+Six things that wanted a page rather than a section, and one benchmark:
 
 | Page | What it answers |
 |---|---|
@@ -892,7 +936,8 @@ Five things that wanted a page rather than a section, and one benchmark:
 | [A generated Kotlin client](docs/generated-client.md) | What callers who cannot hold the descriptions get instead, and what the generator does with a union, a failure or a stream. |
 | [Importing an OpenAPI document](docs/importing.md) | A document somebody else wrote, read into descriptions: what comes out, what is refused, and how to get past a document you do not own. |
 | [The same endpoints, by hand](docs/by-hand.md) | The same two endpoints written directly against Pekko HTTP, so what the descriptions buy is legible rather than asserted. |
-| [Modules](docs/modules.md) | What each of the sixteen modules is for and what it depends on, for deciding which ones your build needs. |
+| [Golden files](docs/golden-testing.md) | A test that fails when a change would break the callers you already have — a new required field, a deleted endpoint — and stays quiet when it would not. |
+| [Modules](docs/modules.md) | What each of the seventeen modules is for and what it depends on, for deciding which ones your build needs. |
 | [What it costs](docs/what-it-costs.md) | The interpreter measured by JMH against the hand-written routes it replaces, with the baselines that comparison needs and the error bars it came with. |
 
 ---

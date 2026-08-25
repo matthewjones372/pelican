@@ -55,6 +55,11 @@ internal interface DocumentParameters : SpecParameters {
     val outputFile: RegularFileProperty
 }
 
+internal interface CompatibilityParameters : SpecParameters {
+    val baseline: RegularFileProperty
+    val entryName: Property<String>
+}
+
 internal abstract class GenerateClientWork : WorkAction<ClientParameters> {
     override fun execute() {
         val written = parameters.writeClientInto(parameters.outputDir.get().asFile)
@@ -132,6 +137,40 @@ internal abstract class GenerateDocumentWork : WorkAction<DocumentParameters> {
         target.parentFile?.mkdirs()
         target.writeText(Pelican.document(javaClass.classLoader, spec, parameters.format.get()))
         logger.lifecycle("Wrote $target")
+    }
+}
+
+/**
+ * Compares what the descriptions publish now against the document callers were
+ * given, and fails the build on a difference they cannot survive.
+ *
+ * The report is printed at `lifecycle` rather than raised as the exception's
+ * message: a build failure prints one line and then a stack trace, and what
+ * matters here is the list. The exception says how many, and the reader has
+ * already seen which.
+ */
+internal abstract class CheckDocumentWork : WorkAction<CompatibilityParameters> {
+    override fun execute() {
+        val loader = javaClass.classLoader
+        val spec = Pelican.spec(loader, parameters.specClass.get(), parameters.specFunction.get())
+        val baseline = parameters.baseline.get().asFile
+
+        val (report, breaking) = Pelican.compatibility(
+            loader,
+            baseline.readText(),
+            Pelican.document(loader, spec, DocumentFormat.JSON),
+            baseline.name,
+        )
+
+        logger.lifecycle(report)
+
+        if (breaking > 0) {
+            throw PelicanFailure(
+                "${parameters.entryName.get()}: $breaking change${if (breaking == 1) "" else "s"} would break " +
+                    "callers written against ${baseline.path}. The report above says which. If the break is " +
+                    "meant, regenerate that document and commit it with the change that causes it.",
+            )
+        }
     }
 }
 

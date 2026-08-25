@@ -1,0 +1,7 @@
+POST /users/7/orders
+X-Api-Key: an-api-key
+
+{
+  "item": "a-widget",
+  "quantity": 2
+}

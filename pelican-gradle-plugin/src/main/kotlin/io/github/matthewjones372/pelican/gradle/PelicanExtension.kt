@@ -87,6 +87,17 @@ abstract class DocumentSpec @Inject constructor(private val name: String) : Spec
 
     /** Defaults to `build/generated/pelican/<name>/openapi.<format>`. */
     abstract val outputFile: RegularFileProperty
+
+    /**
+     * The document the callers already have, where it is committed somewhere.
+     *
+     * Setting it registers `check<Name>Document`, which compares what the
+     * descriptions produce now against that file and fails the build when a
+     * difference is one an existing caller cannot survive: a new required
+     * field, a deleted endpoint, a response that stopped carrying something.
+     * A difference nobody has to act on is reported and does not fail.
+     */
+    abstract val baseline: RegularFileProperty
 }
 
 /**
