@@ -440,7 +440,7 @@ class SwaggerUiOAuthTest {
         scopes = mapOf("orders:read" to "Read orders"),
     )
 
-    private val secured = endpoint(noInputs) {
+    private val secured = endpoint {
         get("secure")
         security(oauth, "orders:read")
         json<User>()
@@ -560,7 +560,7 @@ class SwaggerUiTest {
 
     @Test
     fun `a description containing a closing script tag cannot break out of the page`() {
-        val hazard = endpoint(noInputs) {
+        val hazard = endpoint {
             get("hazard")
             summary = "Closes the tag: </script><script>alert(1)</script>"
             json<User>()

@@ -125,7 +125,7 @@ class CodecAgreementTest {
             delete("orders" / orderId)
             empty(status = 204)
         },
-        endpoint(noInputs) {
+        endpoint {
             get("categories")
             json<Category>()
         },
@@ -133,7 +133,7 @@ class CodecAgreementTest {
             post("upload")
             bytes()
         },
-        endpoint(noInputs) {
+        endpoint {
             get("health")
             text()
         },

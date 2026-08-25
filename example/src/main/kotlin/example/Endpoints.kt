@@ -237,7 +237,7 @@ val importOrders = endpoint(userId, session, importLabel, importManifest, import
  * trade: reading an undeclared key is a runtime error rather than a compile
  * error, so prefer the typed form until it stops scaling.
  */
-val searchOrders = endpoint {
+val searchOrders = endpoint(lensInputs) {
     get("search")
     summary = "Lens-style: the handler reads inputs from the Params bag"
     operationId = "searchOrders"

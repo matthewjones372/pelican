@@ -45,7 +45,7 @@ class DefaultResponseTest {
         json<Widget>() orFail missing
     }
 
-    private val listWidgets = endpoint(noInputs) {
+    private val listWidgets = endpoint {
         get("widgets")
         operationId = "listWidgets"
         defaultResponse("Any other failure")

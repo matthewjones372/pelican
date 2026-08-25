@@ -122,7 +122,7 @@ val health = endpoint {
 }
 
 /** No `security(...)` line, so this inherits the API-wide `reports:read`. */
-val listReports = endpoint {
+val listReports = endpoint(lensInputs) {
     get("reports")
     summary = "List reports"
     operationId = "listReports"
@@ -132,7 +132,7 @@ val listReports = endpoint {
     jsonArray<Report>()
 }
 
-val getReport = endpoint {
+val getReport = endpoint(reportId) {
     get("reports" / reportId)
     summary = "Fetch one report"
     operationId = "getReport"
@@ -142,7 +142,7 @@ val getReport = endpoint {
     json<Report>() orFail reportMissing
 }
 
-val fileReport = endpoint {
+val fileReport = endpoint(lensInputs) {
     post("reports")
     summary = "File a report"
     operationId = "fileReport"
@@ -159,7 +159,7 @@ val fileReport = endpoint {
  * from the identity provider, or an operator with a password. Swagger UI draws
  * both padlocks and sends whichever the reader has authorized.
  */
-val withdrawReport = endpoint {
+val withdrawReport = endpoint(reportId) {
     delete("reports" / reportId)
     summary = "Withdraw a report"
     operationId = "withdrawReport"
@@ -316,8 +316,7 @@ val securedRoutes: List<ServerEndpoint> = listOf(
 
     listReports streamedNow { p -> Source.from(Reports.list(p[limit])) },
 
-    getReport handledOrFail { p ->
-        val id = p[reportId]
+    getReport handledOrFail { id ->
         Reports.find(id)?.let { ok(it) } ?: reportMissing(NoSuchReport(id, "No report $id"))
     },
 
@@ -327,7 +326,7 @@ val securedRoutes: List<ServerEndpoint> = listOf(
         filed
     },
 
-    withdrawReport handledWith { p -> Reports.withdraw(p[reportId]) },
+    withdrawReport handledWith { id -> Reports.withdraw(id) },
 
     usage handledNow { Usage(reports = Reports.count(), callers = 3) },
 )

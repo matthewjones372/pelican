@@ -29,18 +29,18 @@ class GoldenTest {
 
     data class Order(val id: Long, val total: String)
 
-    private val getOrder = endpoint(noInputs) {
+    private val getOrder = endpoint {
         get("orders")
         operationId = "getOrder"
         json<Order>()
     }
 
-    private val countOrders = endpoint(noInputs) {
+    private val countOrders = endpoint {
         get("orders" / "count")
         json<Order>()
     }
 
-    private val secretOrders = endpoint(noInputs) {
+    private val secretOrders = endpoint {
         get("orders" / "secret")
         hidden = true
         json<Order>()

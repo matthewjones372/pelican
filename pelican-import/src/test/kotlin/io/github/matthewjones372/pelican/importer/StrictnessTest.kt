@@ -415,7 +415,7 @@ class StrictnessTest {
                       application/json: { schema: { type: object, properties: { id: { type: string } } } }
         """
         val generated = imported(document(paths), ImportOptions("app", "test", exclude = setOf("a")))
-        generated shouldContain "val b = endpoint(noInputs)"
+        generated shouldContain "val b = endpoint {"
         generated shouldNotContain "val a ="
     }
 

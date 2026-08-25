@@ -3,7 +3,6 @@ package io.github.matthewjones372.pelican.test
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.noInputs
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -11,12 +10,12 @@ class OperationServersTest {
 
     data class Receipt(val id: Long)
 
-    private val here = endpoint(noInputs) {
+    private val here = endpoint {
         get("receipts")
         json<Receipt>()
     }
 
-    private val elsewhere = endpoint(noInputs) {
+    private val elsewhere = endpoint {
         get("receipts")
         servers("https://uploads.example.com")
         json<Receipt>()

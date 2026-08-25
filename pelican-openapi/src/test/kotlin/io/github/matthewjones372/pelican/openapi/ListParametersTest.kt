@@ -34,7 +34,7 @@ class ListParametersTest {
     private val feature = headerParam("X-Feature", StringCodec.describedAs(example = "beta")).commaSeparated()
     private val seen = cookieParam<String>("seen").repeated().optional()
 
-    private val search = endpoint {
+    private val search = endpoint(lensInputs) {
         get("widgets")
         operationId = "searchWidgets"
         query(tag, ids, fields, sort)

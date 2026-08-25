@@ -2,7 +2,6 @@ package io.github.matthewjones372.pelican.test.pekko
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.noInputs
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.RequestSpec
@@ -12,7 +11,7 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-private val ping = endpoint(noInputs) {
+private val ping = endpoint {
     get("ping")
     text()
 }

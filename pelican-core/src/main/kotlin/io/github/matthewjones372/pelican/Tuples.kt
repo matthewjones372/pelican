@@ -9,11 +9,14 @@ class Inputs<I>(
     val inject: (I) -> Map<ParamKey<*>, Any?>,
 )
 
-/** Lens style: the handler gets the whole bag and reads it by key. */
+/**
+ * Lens style: the handler gets the whole bag and reads it by key.
+ *
+ * The way past the sixth arity, at the cost of the compile-time guarantee — an
+ * undeclared key throws at request time. Asked for by name, because
+ * `endpoint { }` says no inputs and that is what it means.
+ */
 val lensInputs: Inputs<Params> = Inputs(emptyList(), { it }, { it.asMap() })
-
-/** No inputs at all. */
-val noInputs: Inputs<Unit> = Inputs(emptyList(), { }, { emptyMap() })
 
 data class In2<A, B>(val a: A, val b: B)
 data class In3<A, B, C>(val a: A, val b: B, val c: C)
