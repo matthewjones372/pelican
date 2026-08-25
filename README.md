@@ -962,9 +962,6 @@ on core alone, so neither needs an HTTP library present.
 
 ## Versions
 
-Kotlin 2.2.20 · Pekko 1.6.0 · Pekko HTTP 1.4.0 · http4k 6.22.0.0 · Ktor 3.5.2 ·
-Jackson 2.22.2 · swagger-core 2.2.54 · kotlinx.serialization 1.9.0 ·
-slf4j-api 2.0.17 · snakeyaml-engine 2.10 · JDK 21 · Gradle 8.14.3
-
-http4k is pinned to the last release built against Kotlin 2.2.20. A newer one
-ships stdlib metadata this compiler will not read, so bump both together.
+Which Kotlin, which Pekko, which JDK: the reference manual holds the list, at
+[Versions](docs/reference.md#versions). It was copied here too until the two
+copies drifted apart, so there is one of them now.
