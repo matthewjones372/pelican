@@ -1,0 +1,440 @@
+[
+  {
+    "name": "getUser",
+    "description": "Fetch a single user",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The user's id"
+        }
+      },
+      "required": [
+        "userId"
+      ]
+    },
+    "outputSchema": {
+      "$ref": "#/$defs/User",
+      "$defs": {
+        "User": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "email",
+            "id",
+            "name"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "placeOrder",
+    "description": "Place an order",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The user's id"
+        },
+        "body": {
+          "$ref": "#/$defs/CreateOrder"
+        }
+      },
+      "required": [
+        "userId",
+        "body"
+      ],
+      "$defs": {
+        "CreateOrder": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "required": [
+            "item"
+          ]
+        }
+      }
+    },
+    "outputSchema": {
+      "$ref": "#/$defs/Order",
+      "$defs": {
+        "Order": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "userId": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "item": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "SHIPPED",
+                "DELIVERED",
+                "CANCELLED"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "item",
+            "quantity",
+            "status",
+            "userId"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "submitOrder",
+    "description": "Place an order, or take it for later when it is too large to place now",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The user's id"
+        },
+        "body": {
+          "$ref": "#/$defs/CreateOrder"
+        }
+      },
+      "required": [
+        "userId",
+        "body"
+      ],
+      "$defs": {
+        "CreateOrder": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "required": [
+            "item"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "placeOrderForm",
+    "description": "Place an order from an HTML form",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The user's id"
+        },
+        "body": {
+          "$ref": "#/$defs/CreateOrder"
+        }
+      },
+      "required": [
+        "userId",
+        "body"
+      ],
+      "$defs": {
+        "CreateOrder": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "required": [
+            "item"
+          ]
+        }
+      }
+    },
+    "outputSchema": {
+      "$ref": "#/$defs/Order",
+      "$defs": {
+        "Order": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "userId": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "item": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "SHIPPED",
+                "DELIVERED",
+                "CANCELLED"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "item",
+            "quantity",
+            "status",
+            "userId"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "payOrder",
+    "description": "Pay for an order",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The user's id"
+        },
+        "orderId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "body": {
+          "$ref": "#/$defs/PaymentMethod"
+        }
+      },
+      "required": [
+        "userId",
+        "orderId",
+        "body"
+      ],
+      "$defs": {
+        "BankTransfer": {
+          "type": "object",
+          "properties": {
+            "iban": {
+              "type": "string"
+            },
+            "method": {
+              "const": "bank_transfer"
+            }
+          },
+          "required": [
+            "iban",
+            "method"
+          ]
+        },
+        "Card": {
+          "type": "object",
+          "properties": {
+            "number": {
+              "type": "string"
+            },
+            "expiry": {
+              "type": "string"
+            },
+            "method": {
+              "const": "card"
+            }
+          },
+          "required": [
+            "expiry",
+            "number",
+            "method"
+          ]
+        },
+        "Invoice": {
+          "type": "object",
+          "properties": {
+            "reference": {
+              "type": "string"
+            },
+            "method": {
+              "const": "invoice"
+            }
+          },
+          "required": [
+            "reference",
+            "method"
+          ]
+        },
+        "PaymentMethod": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Card"
+            },
+            {
+              "$ref": "#/$defs/BankTransfer"
+            },
+            {
+              "$ref": "#/$defs/Invoice"
+            }
+          ]
+        }
+      }
+    },
+    "outputSchema": {
+      "$ref": "#/$defs/Receipt",
+      "$defs": {
+        "BankTransfer": {
+          "type": "object",
+          "properties": {
+            "iban": {
+              "type": "string"
+            },
+            "method": {
+              "const": "bank_transfer"
+            }
+          },
+          "required": [
+            "iban",
+            "method"
+          ]
+        },
+        "Card": {
+          "type": "object",
+          "properties": {
+            "number": {
+              "type": "string"
+            },
+            "expiry": {
+              "type": "string"
+            },
+            "method": {
+              "const": "card"
+            }
+          },
+          "required": [
+            "expiry",
+            "number",
+            "method"
+          ]
+        },
+        "Invoice": {
+          "type": "object",
+          "properties": {
+            "reference": {
+              "type": "string"
+            },
+            "method": {
+              "const": "invoice"
+            }
+          },
+          "required": [
+            "reference",
+            "method"
+          ]
+        },
+        "PaymentMethod": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Card"
+            },
+            {
+              "$ref": "#/$defs/BankTransfer"
+            },
+            {
+              "$ref": "#/$defs/Invoice"
+            }
+          ]
+        },
+        "Receipt": {
+          "type": "object",
+          "properties": {
+            "orderId": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "paidWith": {
+              "$ref": "#/$defs/PaymentMethod"
+            },
+            "total": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "required": [
+            "orderId",
+            "paidWith",
+            "total"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "cancelOrder",
+    "description": "Cancel an order",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The user's id"
+        },
+        "orderId": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "userId",
+        "orderId"
+      ]
+    }
+  }
+]
