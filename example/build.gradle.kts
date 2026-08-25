@@ -55,6 +55,11 @@ dependencies {
     // classpath in the repository where `ClientTransport.default()` finds two
     // providers and refuses to choose. Every client built here therefore names
     // the transport it wants; see GeneratedKotlinClientTest.
+    // Tool descriptions for the same endpoints, asserted here because this is
+    // where the service that has streams, uploads and a raw body lives. Not an
+    // `implementation`: nothing in the example serves them yet.
+    testImplementation(project(":pelican-mcp"))
+
     testImplementation(project(":pelican-client-java"))
     testImplementation(project(":pelican-client-pekko"))
     testImplementation(project(":pelican-client-ktor"))
