@@ -10,22 +10,18 @@ import java.io.File
 /**
  * `plugins { id("io.github.matthewjones372.pelican") }`.
  *
- * The endpoint descriptions are the source of truth for the service, for its
- * documentation and for its client; this is what makes the last two a build
- * task rather than a `main` somebody wrote and a `JavaExec` somebody wired.
- *
- * Nothing here compiles against Pelican. Generation runs against the
- * consumer's own classpath — see [Pelican] — so the plugin version and the
- * library version are independent.
+ * Makes the document and the client build tasks rather than a `main` somebody
+ * wrote and a `JavaExec` somebody wired. Nothing here compiles against
+ * Pelican — generation runs against the consumer's classpath, see [Pelican] —
+ * so the plugin's version and the library's are independent.
  */
 class PelicanPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
         val pelican = project.extensions.create("pelican", PelicanExtension::class.java)
 
-        // `main`'s runtime classpath, if there is one, as the default for every
-        // entry. It carries its own task dependencies, so a generate task
-        // compiles what it is about to load without anybody saying `dependsOn`.
+        // The default for every entry. It carries its own task dependencies,
+        // so a generate task compiles what it is about to load.
         val defaultClasspath = project.objects.fileCollection()
         project.plugins.withType(JavaPlugin::class.java).configureEach {
             defaultClasspath.from(project.mainSourceSet().runtimeClasspath)
@@ -52,10 +48,9 @@ class PelicanPlugin : Plugin<Project> {
         pelican.endpoints.configureEach { endpoints ->
             endpoints.outputDir.convention(project.defaultOutput(endpoints.name))
             endpoints.classpath.from(defaultClasspath)
-            // Beside the document rather than under `build/`: it is a checked-in
-            // input, it is reviewed in the same diff as the `$ref` that made it
-            // necessary, and a lockfile inside the build directory would be a
-            // lockfile `clean` deletes.
+            // Beside the document rather than under `build/`: a checked-in
+            // input, reviewed in the same diff as the `$ref` that made it
+            // necessary, and one `clean` would otherwise delete.
             endpoints.lockfile.convention(
                 endpoints.document.map { document ->
                     val file = document.asFile
@@ -103,8 +98,7 @@ class PelicanPlugin : Plugin<Project> {
         }
 
         // Where the output lands decides two things, and both need the value
-        // rather than the provider — hence `afterEvaluate`, which is the last
-        // moment the build script can still have changed it.
+        // rather than the provider — hence `afterEvaluate`.
         afterEvaluate {
             val generated = client.outputDir.get().asFile
             val ours = generated.isInside(layout.buildDirectory.get().asFile)
@@ -112,20 +106,18 @@ class PelicanPlugin : Plugin<Project> {
             generate.configure { task ->
                 task.cleanOutput.set(ours)
                 if (ours) {
-                    // A directory this task owns is a tracked output: up to
-                    // date when nothing changed, and cleaned when it did.
+                    // A directory this task owns is a tracked output.
                     task.outputs.dir(client.outputDir)
                 } else {
-                    // A source root is not. Declaring it would make every task
-                    // that compiles those sources depend on this one, which is
-                    // not what checking generated code into a repository means:
-                    // the file is committed, and regenerating it is deliberate.
+                    // A source root is not: declaring it would make every
+                    // compile depend on this task, and a committed file is
+                    // regenerated deliberately.
                     task.outputs.upToDateWhen { false }
                 }
             }
 
-            // Nothing can drift out of date inside `build/`, so the check is
-            // only wired up for a client somebody commits.
+            // Nothing inside `build/` can drift, so only a committed client
+            // gets the check.
             if (!ours) {
                 tasks.matching { task -> task.name == "check" }.configureEach { task -> task.dependsOn(check) }
             }
@@ -151,11 +143,9 @@ class PelicanPlugin : Plugin<Project> {
             task.outputDir.set(endpoints.outputDir)
         }
 
-        // Registered whether or not a host is allowed, and it costs nothing to:
-        // a task nothing depends on is configured lazily and never runs. What
-        // it buys is that somebody who has just written `allowRemote(...)` finds
-        // the task that fills the lockfile by asking `tasks`, rather than by
-        // reading the failure and then the manual.
+        // Registered whether or not a host is allowed: a task nothing depends
+        // on never runs, and somebody who has just written `allowRemote(...)`
+        // finds the lockfile task by asking `tasks`.
         tasks.register("update${name}EndpointsLock", UpdateEndpointsLockTask::class.java) { task ->
             task.description = "Records the URL and hash of every remote \$ref the ${endpoints.name} document reaches"
             task.classpath.from(endpoints.classpath)
@@ -165,10 +155,8 @@ class PelicanPlugin : Plugin<Project> {
             task.entryName.set(endpoints.name)
         }
 
-        // The same rule the client task follows: a directory inside `build/`
-        // is this task's own, and anywhere else is a source root somebody
-        // commits — where a tracked output would make every compile depend on
-        // regenerating.
+        // As the client task: inside `build/` is this task's own output,
+        // anywhere else is a committed source root.
         afterEvaluate {
             val ours = endpoints.outputDir.get().asFile.isInside(layout.buildDirectory.get().asFile)
             generate.configure { task ->
@@ -210,13 +198,9 @@ class PelicanPlugin : Plugin<Project> {
 
     /**
      * Where `pelican-import` caches what it fetched: a `.d` directory beside
-     * the lockfile.
-     *
-     * The rule is spelled here as well as in the library, and one line of
-     * duplication is the cheaper half of the trade. The alternative was an
-     * entry point on `pelican-import` existing only to be asked where its own
-     * cache is — which is a signature to keep compatible forever, for a
-     * question whose answer is a suffix.
+     * the lockfile. Spelled here as well as in the library, which is cheaper
+     * than an entry point existing only to answer a question whose answer is
+     * a suffix.
      */
     private fun cacheOf(lockfile: File) = File(lockfile.parentFile, lockfile.name + ".d")
 

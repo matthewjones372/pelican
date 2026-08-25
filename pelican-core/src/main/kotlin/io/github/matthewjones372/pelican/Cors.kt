@@ -1,11 +1,6 @@
 package io.github.matthewjones372.pelican
 
-/**
- * Which origins a browser may call this API from.
- *
- * A value, like everything else here, so the same setting can be shared
- * between environments and asserted on in a test.
- */
+/** Which origins a browser may call this API from. */
 sealed interface CorsOrigins {
     fun allows(origin: String): Boolean
 
@@ -33,33 +28,19 @@ sealed interface CorsOrigins {
 }
 
 /**
- * The CORS settings for an [Api]. Off unless you set one: an API with no `cors`
- * emits no `Access-Control-*` header and answers no preflight, exactly as
- * before this existed.
+ * The CORS settings for an [Api]. Off unless set.
  *
- * What a browser is told is derived from the endpoint descriptions rather than
- * configured a second time. The methods a preflight allows are the methods
- * declared on that path; the headers it allows are the ones the endpoints on
- * that path declare, plus `Content-Type` where they take a body and the
- * credential header their security scheme names. So a new endpoint, a new
- * `header(...)` or a new scheme is reachable from the browser as soon as it is
- * described — there is no second list to keep in step.
+ * What a browser is told is derived from the descriptions rather than
+ * configured twice: the allowed methods are those declared on that path, and
+ * the allowed headers are the ones its endpoints declare, plus `Content-Type`
+ * where they take a body and whatever header their security scheme names.
  *
- * ```
- * Api(routes, JacksonCodecs, cors = cors("https://app.example.com"))
- * ```
+ * [additionalAllowedHeaders] covers what a description cannot know — a gateway's
+ * tracing header. It adds rather than replaces, since a shorter list than your
+ * own endpoints declare would break them. [exposedHeaders] is the other
+ * direction, and a plain list because response headers are not described here.
  *
- * [additionalAllowedHeaders] covers what a description cannot know about — a
- * tracing header added by a gateway, say. It adds to the derived set rather
- * than replacing it, because a list shorter than what your own endpoints
- * declare is a list that breaks them.
- *
- * [exposedHeaders] is the other direction: response headers a script is allowed
- * to read. Pelican does not describe response headers, so this one is a plain
- * list.
- *
- * Credentials and `*` cannot be combined — the browser rejects that pairing, so
- * it fails here instead, when the value is built.
+ * Credentials with `*` fails here, because the browser rejects that pairing.
  */
 class Cors internal constructor(
     val origins: CorsOrigins,
@@ -77,14 +58,7 @@ class Cors internal constructor(
     }
 }
 
-/**
- * CORS for the origins named, which is the setting a service in front of a
- * single-page app wants:
- *
- * ```
- * cors("https://app.example.com", "http://localhost:5173")
- * ```
- */
+/** CORS for the origins named — what a service in front of an SPA wants. */
 fun cors(
     vararg origins: String,
     additionalAllowedHeaders: List<String> = emptyList(),
@@ -115,9 +89,8 @@ fun cors(
 )
 
 /**
- * CORS for every origin. A public read-only API; not one that reads a cookie or
- * an `Authorization` header a browser sends automatically — for those, name the
- * origins.
+ * CORS for every origin. For a public read-only API; name the origins instead
+ * where the browser attaches a cookie or an `Authorization` header itself.
  */
 fun corsAnyOrigin(
     additionalAllowedHeaders: List<String> = emptyList(),
@@ -150,16 +123,11 @@ sealed interface CorsPreflight {
 }
 
 /**
- * The CORS decisions for one [Api], worked out from its descriptions.
+ * The CORS decisions for one [Api], worked out from its descriptions when an
+ * interpreter binds it. Only the path and the origin are per-request.
  *
- * Built once when an interpreter binds the API, not per request: the answer to
- * a preflight depends on the path and the origin, and everything else about it
- * — which methods, which headers — is settled by the descriptions before a
- * request arrives.
- *
- * Backends use exactly two entry points, which is what keeps CORS one
- * implementation rather than three: [actualResponseHeaders] for a real request,
- * and [preflight] for an `OPTIONS` one.
+ * Two entry points, which is what keeps CORS one implementation rather than
+ * three: [actualResponseHeaders] and [preflight].
  */
 class CorsPolicy internal constructor(
     val cors: Cors,
@@ -285,19 +253,13 @@ class CorsPolicy internal constructor(
         if (cors.origins is CorsOrigins.Any && !cors.allowCredentials) null else "Vary" to "Origin"
 }
 
-/**
- * The CORS decisions for this API, or null when it has none configured.
- *
- * Called once by an interpreter as it binds the endpoints — see the three
- * backends. Nothing about it is per-request.
- */
+/** The CORS decisions for this API, or null. Called once as endpoints are bound. */
 fun Api.corsPolicy(): CorsPolicy? =
     cors?.let { CorsPolicy(it, endpoints.map { se -> se.endpoint }, security) }
 
 /**
- * The header a browser would carry this scheme's credential in, or null when it
- * is not one a script sets — a cookie the browser attaches itself, a query
- * parameter that is part of the URL.
+ * The header a browser carries this scheme's credential in, or null when a
+ * script does not set it — a cookie, a query parameter.
  */
 private fun credentialHeaderOf(scheme: SecurityScheme): String? = when (scheme) {
     is HttpScheme -> "Authorization"
@@ -306,11 +268,8 @@ private fun credentialHeaderOf(scheme: SecurityScheme): String? = when (scheme) 
 }
 
 /**
- * Whether a concrete request path matches this template.
- *
- * Literals have to agree; a capture takes whatever is in that position. Only
- * the shape is checked — whether the capture *decodes* is the interpreter's
- * business, and a preflight is answered before anything decodes anyway.
+ * Whether a request path matches this template. Shape only: whether a capture
+ * decodes is the interpreter's business, and a preflight precedes decoding.
  */
 internal fun PathSpec.matchesPath(path: String): Boolean {
     val parts = path.split('/').filter { it.isNotEmpty() }

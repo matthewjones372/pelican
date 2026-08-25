@@ -28,31 +28,17 @@ class PelicanServer internal constructor(
 }
 
 /**
- * Binds this API on [port]. Pass port 0 to let the OS choose one, which is
- * what the tests do.
+ * Binds this API on [port]; port 0 lets the OS choose. [config] defaults to
+ * [StreamingSunHttp], the JDK's own server, which needs no dependency beyond
+ * this module and flushes each frame where http4k's stock `SunHttp` holds it
+ * in a 4KB buffer.
  *
- * [config] is the http4k backend. The default is [StreamingSunHttp], which is
- * the JDK's own server and so needs no dependency beyond this module — and,
- * unlike http4k's stock `SunHttp`, it flushes each frame rather than holding it
- * in a 4KB buffer. Pass any other `ServerConfig` to swap it, adding that
- * http4k module to your build:
+ * The backend decides how promptly a streamed frame reaches the wire: measured
+ * with ten rows 100ms apart, `Jetty` and the default deliver the first in about
+ * a tenth of a second, while `SunHttp` and `Undertow` deliver all ten at the end.
  *
- * ```
- * ordersApi().start(port = 8080)
- * ordersApi().start(port = 8080, config = Jetty(8080))
- * ```
- *
- * The backend decides how promptly a streamed frame reaches the wire. This
- * module hands the server one frame per read (see `FrameInputStream`), but a
- * backend that aggregates small writes will hold a frame until its own buffer
- * fills. Measured with ten rows produced 100ms apart: `Jetty` and the default
- * here deliver the first in about a tenth of a second, http4k's `SunHttp` and
- * `Undertow` deliver all ten at the end.
- *
- * [handler] exists so that a module which knows more than this one — serving
- * an OpenAPI document alongside the endpoints, say — can wrap the handler
- * without this module having to know about it. The default is the endpoints
- * alone.
+ * [handler] is how a module knowing more than this one — one serving an OpenAPI
+ * document, or a service with routes of its own — wraps it.
  */
 fun Api.start(
     port: Int = 8080,

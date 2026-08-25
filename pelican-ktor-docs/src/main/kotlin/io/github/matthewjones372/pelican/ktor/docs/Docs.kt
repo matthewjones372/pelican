@@ -66,8 +66,8 @@ fun Route.pelicanDocs(api: Api, docs: Docs = Docs()) {
             swaggerUiHtml(api.title, specPath.orEmpty(), document, docs.oauth, redirectPath),
             cors,
         )
-        // Served next to the page, so the identity provider has one redirect
-        // URI to register and it is on the same origin as the docs.
+        // Next to the page, so the provider has one redirect URI to register
+        // and it is on the docs' own origin.
         if (redirectPath != null) {
             staticRoute(redirectPath, ContentType.Text.Html, oauth2RedirectHtml(), cors)
         }
@@ -75,11 +75,9 @@ fun Route.pelicanDocs(api: Api, docs: Docs = Docs()) {
 }
 
 /**
- * The endpoints and the documentation, as one application.
- *
- * The docs are added first so that an API which happens to route `/docs` itself
- * does not have its page shadowed — and if that is the API you are serving,
- * pass a [Docs] with different paths rather than relying on the order.
+ * The endpoints and the documentation, as one application. Docs first, so an
+ * API that routes `/docs` itself does not shadow the page — though that API
+ * should pass a [Docs] with different paths rather than rely on order.
  */
 fun Application.pelicanWithDocs(api: Api, docs: Docs = Docs()) {
     routing {
@@ -97,9 +95,8 @@ fun Api.startWithDocs(
 ): PelicanServer = start(port, host, factory) { pelicanWithDocs(it, docs) }
 
 /**
- * Registered as a path with no captures, so it is matched exactly — these paths
- * are configuration, and `/api-docs/oauth2-redirect.html` is as valid a setting
- * as `/docs`.
+ * No captures, so the path is matched exactly: these are configuration, and
+ * `/api-docs/oauth2-redirect.html` is as valid a setting as `/docs`.
  */
 private fun Route.staticRoute(
     rawPath: String,

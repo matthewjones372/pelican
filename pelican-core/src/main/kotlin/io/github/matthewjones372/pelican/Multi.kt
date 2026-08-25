@@ -1,24 +1,17 @@
 package io.github.matthewjones372.pelican
 
 /**
- * How the several values of a multi-valued parameter are spread across the
- * wire.
+ * How a multi-valued parameter's values are spread across the wire. The same
+ * [PlainCodec] read more than once; only the boundaries differ.
  *
- * A [PlainCodec] answers what one string decodes to, and that is still the
- * whole of what an element means here — a repeated parameter is not a second
- * kind of codec, it is the same codec read more than once. What differs is
- * only where the boundaries between the values are: separate occurrences of
- * the name, or one occurrence with a character between the parts.
- *
- * The four below are the encodings OpenAPI can describe faithfully for a list
- * of scalars. Its `deepObject` is missing on purpose: it describes an object,
- * not a list, and there is no reading of it that a `List<T>` would not lose.
+ * These four are what OpenAPI can describe faithfully for a list of scalars.
+ * `deepObject` is absent because it describes an object, not a list.
  */
 enum class ListStyle(
     /**
      * What joins the values inside one occurrence, or null where the
-     * occurrences themselves are the boundary. Public because a generated
-     * client has to write the join into source it cannot call [encodeAll] from.
+     * occurrences are the boundary. Public because a generated client writes
+     * the join into source it cannot call [encodeAll] from.
      */
     val separator: Char?,
 ) {
@@ -39,10 +32,8 @@ enum class ListStyle(
     val explode: Boolean get() = this == REPEATED
 
     /**
-     * OpenAPI's `style` for this encoding where the parameter travels. A comma
-     * is `form` in a query string and `simple` in a header — the same wire
-     * shape under two names, because OpenAPI names the encoding after the
-     * place rather than after the separator.
+     * OpenAPI's `style` where the parameter travels. A comma is `form` in a
+     * query and `simple` in a header: one wire shape, two names.
      */
     fun styleAt(location: String): String = when {
         this == SPACE -> "spaceDelimited"
@@ -56,35 +47,25 @@ enum class ListStyle(
 fun defaultStyleAt(location: String): String = if (location in simpleLocations) "simple" else "form"
 
 /**
- * The `explode` OpenAPI assumes for [style] when a parameter names none. It is
- * false everywhere except `form`, which is the one place a document has to say
- * `explode: false` to get the comma.
+ * The `explode` OpenAPI assumes for [style]. False everywhere but `form`, which
+ * is the one place a document says `explode: false` to get the comma.
  */
 fun defaultExplodeFor(style: String): Boolean = style == "form"
 
 private val simpleLocations = setOf("path", "header")
 
 /**
- * Every value the wire carried under this name, as the list it was declared to
- * be.
+ * Every value the wire carried under this name.
  *
- * [wire] is all of the occurrences, not the first: `?tag=a&tag=b` arrives as
- * two, and so does a header sent on two lines. A delimited style flattens them
- * rather than refusing the second, which is RFC 9110's own rule for repeated
- * header field lines and costs nothing to extend to a query string.
+ * [wire] is all the occurrences: a delimited style flattens them rather than
+ * refusing the second, which is RFC 9110's rule for repeated header lines.
  *
- * Space around a separator is padding, not content. RFC 9110 makes it optional
- * in every list-bearing header, so `beta, dark` and `beta,dark` are the same
- * two values and reading the second element as `" dark"` would be a decode
- * failure nobody could see in the header. An element that really does begin or
- * end with a space cannot travel joined at all, and [ListStyle.REPEATED] is
- * the declaration that carries one.
+ * Space around a separator is padding — RFC 9110 makes it optional in every
+ * list-bearing header — so an element that really starts or ends with one
+ * needs [ListStyle.REPEATED].
  *
- * An empty piece contributes nothing. `?tags=` is how a form submits a field
- * nobody filled in, and reading it as a list holding one empty string would
- * hand a handler an element no caller meant to send — while a codec that
- * genuinely accepts the empty string, [StringCodec], is also the one where the
- * distinction is least visible.
+ * An empty piece contributes nothing: `?tags=` is a field nobody filled in,
+ * and reading it as one empty string would invent an element.
  */
 fun PlainCodec<*>.decodeAll(name: String, style: ListStyle, wire: List<String>): List<Any> {
     val separator = style.separator
@@ -94,23 +75,13 @@ fun PlainCodec<*>.decodeAll(name: String, style: ListStyle, wire: List<String>):
 
 /**
  * The occurrences a list travels as: one per element for [ListStyle.REPEATED],
- * one joined string otherwise, and none at all for an empty list.
+ * one joined string otherwise, none for an empty list.
  *
- * An element that the wire would not survive is refused here rather than
- * written, because the list that came back would differ from the one that went
- * out and nothing downstream could tell. There are three of those.
- *
- * The first belongs to every style: an element encoding to nothing. [decodeAll]
- * reads an occurrence carrying nothing as no element at all, which is what
- * makes `?tags=` mean "a field nobody filled in", so `?tag=&tag=a` is two
- * occurrences and one element. Preserving the empty one instead was the other
- * way out and costs more than it buys — it would hand every handler an element
- * no caller meant to send, for the sake of the one codec, [StringCodec], where
- * an empty element is a value at all. So the list that cannot be sent is
- * refused where somebody can still choose a different one.
- *
- * The other two belong to the joined styles: an element carrying the separator,
- * and one padded with the space that [decodeAll] reads as padding.
+ * Three elements are refused rather than written, because each would come back
+ * as a different list and nothing downstream could tell: one encoding to
+ * nothing, in any style, since [decodeAll] reads an empty occurrence as no
+ * element; and, in the joined styles, one carrying the separator or padded
+ * with the space [decodeAll] trims.
  */
 fun PlainCodec<*>.encodeAll(name: String, style: ListStyle, values: List<*>): List<String> {
     @Suppress("UNCHECKED_CAST")
@@ -139,13 +110,9 @@ fun PlainCodec<*>.encodeAll(name: String, style: ListStyle, values: List<*>): Li
 }
 
 /**
- * The schema for a parameter carrying several [element]s, as OpenAPI models
- * one.
- *
- * The element's example goes inside `items` rather than on the parameter,
- * because that is what it is an example of. A parameter-level `example` for an
- * array would have to be an array, and choosing a length for it would be this
- * module deciding something no description said.
+ * The schema for a parameter carrying several [element]s. The example goes
+ * inside `items`, because a parameter-level one would have to be an array and
+ * choosing its length is not this module's decision.
  */
 fun listSchema(element: PlainCodec<*>): JsonObj = jsonObj {
     "type" to "array"
@@ -156,14 +123,10 @@ fun listSchema(element: PlainCodec<*>): JsonObj = jsonObj {
 }
 
 /**
- * What a multi-valued parameter contributes to a request's inputs, given every
- * occurrence the request carried under its name.
- *
- * The three locations share this rather than each interpreter spelling it out
- * nine times, because the part worth getting right is the same in all of them
- * and is not the obvious part: an occurrence carrying nothing is not an
- * element, so a list that comes out empty is a parameter the caller did not
- * send, and gets the same answer an absent scalar gets.
+ * What a multi-valued parameter contributes, given every occurrence under its
+ * name. Shared by the three locations because the subtle part is common: an
+ * empty occurrence is not an element, so a list that comes out empty is a
+ * parameter the caller did not send.
  */
 fun QueryParam<*>.decodeList(wire: List<String>): Any? =
     listValue(name, codec, listStyle, required, default, "query parameter", wire)

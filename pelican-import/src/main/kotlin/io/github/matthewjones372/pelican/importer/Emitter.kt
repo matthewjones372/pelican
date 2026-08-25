@@ -15,16 +15,13 @@ import io.github.matthewjones372.pelican.codegen.unique
 /**
  * Endpoint descriptions, written out as Kotlin.
  *
- * What comes out is meant to be read, not just compiled: inputs as named
- * values at the top, payload types under them, and one `endpoint(...)` per
- * operation in the order the document listed them. It is the file somebody
- * would have written by hand from the same document, which matters because
- * they are going to be reading it for as long as they call the API.
+ * Meant to be read as well as compiled: inputs as named values at the top,
+ * payload types under them, one `endpoint(...)` per operation in document
+ * order — the file somebody would have written by hand.
  *
- * Declaration order is load-bearing. Top-level values in Kotlin initialise in
- * source order, so an endpoint naming a failure declared below it would read a
- * null at class-init time. Inputs, failures and schemes therefore all come
- * before the endpoints that use them.
+ * Declaration order is load-bearing: top-level values initialise in source
+ * order, so an endpoint naming a failure declared below it would read a null
+ * at class-init.
  */
 internal class Emitter(private val api: IrApi, private val options: ImportOptions) {
 
@@ -211,13 +208,9 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     }
 
     /**
-     * The handlers, once, as a starting point.
-     *
-     * Every one of them is a `TODO()`, which is the honest state of a service
-     * nobody has written yet: it compiles, it routes, and it throws the moment
-     * a request reaches something unimplemented. The file is written once and
-     * never overwritten — see [Import.write] — because after the first run it
-     * is not generated code any more.
+     * The handlers, once, as a starting point: every one a `TODO()`, so the
+     * service compiles and routes and throws where nothing is written yet.
+     * Written once and never overwritten — see [Import.write].
      */
     private fun handlersFile(backend: Backend): String = buildString {
         appendLine(stubBanner)
@@ -281,13 +274,10 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     }
 
     /**
-     * A call the document says the service sends.
-     *
-     * The same block as an endpoint's, minus the two lines that would describe
-     * a URL — there is no route to write, and the method is what `webhook(...)`
-     * takes instead. The inputs are declared inside whatever there are of them:
-     * the tuple form of `endpoint(...)` exists to type a handler's parameter,
-     * and nothing binds a handler to one of these.
+     * A call the document says the service sends — an endpoint's block minus
+     * the URL, since `webhook(...)` takes the method instead. Inputs are
+     * declared inside: the tuple form exists to type a handler's parameter, and
+     * nothing binds a handler to one of these.
      */
     private fun webhook(hook: IrWebhook): String = buildString {
         val ep = hook.operation
@@ -392,14 +382,10 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     }
 
     /**
-     * A response the endpoint describes and the handler never returns: one the
-     * handler throws, or the `default` nothing can produce at all.
-     *
-     * The `default` keeps its payload type where it has one. Writing it as a
-     * bare `defaultResponse(...)` would have been simpler and would have
-     * dropped the schema, which is the silent weakening this importer refuses
-     * everywhere else — a document saying "and any other error is a Problem"
-     * would have come back saying only "and any other error".
+     * A response the handler never returns: one it throws, or the `default`
+     * nothing can produce. The `default` keeps its payload type, since a bare
+     * `defaultResponse(...)` would turn "any other error is a Problem" back
+     * into "any other error".
      */
     private fun documented(ep: IrEndpoint, failure: IrFailure): String {
         val headers = failure.headers.joinToString("") { ", ${headerName(it)}" }
@@ -658,18 +644,15 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     // ------------------------------------------------------- values on the wire
 
     /**
-     * A schema for a value that travels as one string, as the Kotlin type it
-     * decodes to and the codec that decodes it.
+     * A schema for a value travelling as one string, as its Kotlin type and the
+     * codec that decodes it.
      *
-     * A codec is only written out when there is something to say beyond the
-     * type — a constraint, or a format core has no reified type for. Without
-     * one the declaration is `queryParam<Int>("limit")`, which is what somebody
-     * would have written, and core resolves the codec from the type.
+     * A codec is written only where there is something to say beyond the type —
+     * a constraint, or a format core has no reified type for. Otherwise the
+     * declaration is `queryParam<Int>("limit")`.
      *
-     * Constraints become refinements rather than comments, because a
-     * refinement is both: `atLeast(1)` rejects a zero *and* documents
-     * `minimum: 1`, so the imported endpoint enforces what the document
-     * promised rather than merely restating it.
+     * Constraints become refinements rather than comments: `atLeast(1)` rejects
+     * a zero *and* documents `minimum: 1`.
      */
     private fun plain(schema: JsonObj, context: String): Plain {
         if (schema["enum"] != null) return Plain(typeFor(schema, context), null)
@@ -835,13 +818,9 @@ private fun namedDescription(text: String?) =
 private fun describedBy(text: String?) = if (text == null) "" else kotlinString(text)
 
 /**
- * One payload under several media types, as the `or` a hand-written
- * description would use — so a reader of the generated file learns the library
- * rather than the importer.
- *
- * The description goes on the first alternative alone, which is where `or`
- * reads it from; writing it on each would publish the same sentence twice for
- * one body.
+ * One payload under several media types, as the `or` a hand-written description
+ * would use. The description goes on the first alternative alone, which is
+ * where `or` reads it from.
  */
 private fun negotiatedDeclaration(body: IrBody.Negotiated, type: String): String =
     body.encodings.mapIndexed { index, encoding ->

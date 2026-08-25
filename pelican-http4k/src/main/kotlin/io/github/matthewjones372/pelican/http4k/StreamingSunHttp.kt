@@ -21,34 +21,20 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
  * The JDK's own HTTP server, wired so that a streamed response actually
  * streams.
  *
- * This exists because of a measurement rather than a preference. http4k's stock
- * `SunHttp` copies the response body to the socket without flushing, so the
- * JDK's chunked output stream holds frames until its own 4KB buffer fills: ten
- * NDJSON rows produced 100ms apart all arrive together at the end, a second
- * later. `Undertow` behaves the same way; `Jetty` does not. Flushing after each
- * write is the whole difference — the first row then lands in about 150ms, as
- * the description promised it would.
+ * http4k's stock `SunHttp` copies the body without flushing, so the JDK's
+ * chunked stream holds frames until its 4KB buffer fills: ten NDJSON rows
+ * produced 100ms apart arrive together at the end. `Undertow` is the same,
+ * `Jetty` is not. Flushing after each write is the whole difference, and
+ * `StreamingTimingTest` is the measurement.
  *
- * Pelican's streaming outputs are a claim about when bytes leave the machine,
- * and enough of it is decided here that shipping a default which quietly broke
- * it would make the claim untrue. So this is what [io.github.matthewjones372.pelican.http4k.start]
- * binds by default, and it needs nothing beyond http4k-core and the JDK.
- * `StreamingTimingTest` is the measurement, kept as a test.
+ * Otherwise http4k's `SunHttp`, whose source says to duplicate and modify it.
+ * For real load pass a production backend — `Jetty(port)`, `Undertow(port)` —
+ * noting that only some of them stream.
  *
- * It is otherwise http4k's `SunHttp`, whose own source says to duplicate and
- * modify it as required. For a service under real load, pass a production
- * backend instead — `Jetty(port)`, `Undertow(port)` — the way you would with
- * any http4k app, and note that only some of them stream:
- *
- * ```
- * ordersApi().start(port = 8080, config = Jetty(8080))
- * ```
- *
- * [executor] is a cached pool rather than the work-stealing pool http4k's
- * version uses, because a streaming handler holds its thread for as long as the
- * stream runs: on a pool sized to the CPU count, a handful of slow streams
- * would leave nothing to serve anything else with. The cost is that the pool is
- * unbounded, which is another reason a busy service wants a real backend.
+ * [executor] is a cached pool rather than a work-stealing one, because a
+ * streaming handler holds its thread for as long as the stream runs. The pool
+ * is therefore unbounded, which is another reason a busy service wants a real
+ * backend.
  */
 class StreamingSunHttp(
     private val port: Int = 8000,
@@ -83,8 +69,8 @@ private fun HttpExchange.handle(http: HttpHandler) {
         val response = toRequest()?.let(http) ?: Response(Status.NOT_IMPLEMENTED)
         respondWith(response)
     } catch (_: Exception) {
-        // The response has very likely been started by now, so there is nothing
-        // useful left to say; this matches what http4k's own server does.
+        // The response has likely been started, so there is nothing useful
+        // left to say. Matches what http4k's own server does.
         runCatching { sendResponseHeaders(500, -1) }
     } finally {
         close()
@@ -105,12 +91,9 @@ private fun HttpExchange.toRequest(): Request? =
 private fun supportedMethod(name: String): Method? = Method.entries.firstOrNull { it.name == name }
 
 /**
- * Writes the response, flushing after every read.
- *
- * A response with a known length is written the same way; the flushing only
- * matters for the streamed ones, where each read of the body is exactly one
- * frame (see [FrameInputStream]) and the flush is what puts that frame on the
- * wire instead of in a buffer.
+ * Writes the response, flushing after every read. It only matters for streamed
+ * bodies, where one read is one frame (see [FrameInputStream]) and the flush is
+ * what puts it on the wire instead of in a buffer.
  */
 private fun HttpExchange.respondWith(response: Response) {
     response.headers.forEach { (name, value) -> responseHeaders.add(name, value.orEmpty()) }
@@ -120,8 +103,8 @@ private fun HttpExchange.respondWith(response: Response) {
         return
     }
 
-    // Length 0 means "unknown, chunk it" to this server — which is what a
-    // streamed body has, because giving it a length would mean buffering it.
+    // Length 0 means "unknown, chunk it" to this server, which is what a
+    // streamed body has.
     sendResponseHeaders(response.status.code, response.body.length ?: 0)
 
     val buffer = ByteArray(COPY_BUFFER_BYTES)

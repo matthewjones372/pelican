@@ -3,21 +3,12 @@ package io.github.matthewjones372.pelican.importer
 import io.github.matthewjones372.pelican.JsonObj
 
 /**
- * What an operation answers with.
+ * What an operation answers with: every documented 2xx a declared success, and
+ * every other status a failure the handler may return and the caller may match
+ * on — one for one with what `endpoint(...)` says.
  *
- * Every documented 2xx becomes a declared success and every other documented
- * status a failure the handler may return and the caller may match on — which
- * is one for one what `endpoint(...)` can now say, since a handler names the
- * response it is producing.
- *
- * `default` is the exception, and the only one: it becomes a failure with no
- * status, which is documented and never returned. See [IrFailure.returnable].
- *
- * `200 Order` beside `202 Accepted` used to be refused here, for the good
- * reason that an endpoint's output was one type and one status and picking
- * either lost the distinction. It is not refused any more; what is left of that
- * refusal is the pair below, which is genuinely unsayable rather than merely
- * unsaid.
+ * `default` is the only exception, becoming a failure with no status:
+ * documented and never returned. See [IrFailure.returnable].
  */
 internal class Responses(private val reader: Reader, private val operation: Operation) {
 
@@ -79,13 +70,10 @@ internal class Responses(private val reader: Reader, private val operation: Oper
     }
 
     /**
-     * What key this response is written under, as a status.
-     *
-     * Null is `default`, which is how core spells the one response an endpoint
-     * describes and cannot produce. It used to be refused outright, and what
-     * the refusal cost was every document that says "and any other error is a
-     * Problem" — which a document says far more often than it enumerates each
-     * status it might answer with.
+     * What key this response is written under, as a status. Null is `default`,
+     * core's spelling of the one response an endpoint describes and cannot
+     * produce — which documents say far more often than they enumerate every
+     * status they might answer with.
      */
     private fun statusOf(at: JsonPath, key: String): Int? = when (key) {
         "default" -> null

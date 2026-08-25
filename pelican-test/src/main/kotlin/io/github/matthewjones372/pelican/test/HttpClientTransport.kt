@@ -10,11 +10,9 @@ import java.time.Duration
 /**
  * Talks to a real server over a real socket, with the JDK's own client.
  *
- * The point of this existing alongside [InMemoryTransport] is that the *same*
- * suite runs on both. Assertions are written once against [ApiClient]; which
- * transport is underneath decides whether a test is a fast unit-level check or
- * a genuine integration test — including against something already deployed,
- * which the in-memory transport by definition cannot reach.
+ * It exists alongside [InMemoryTransport] so the same suite runs on both:
+ * which transport is underneath decides whether a test is a fast check or an
+ * integration test, including against something already deployed.
  */
 class HttpClientTransport(
     baseUrl: String,

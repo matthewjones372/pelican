@@ -12,25 +12,10 @@ import javax.inject.Inject
 /**
  * The `pelican { }` block.
  *
- * Two containers rather than two properties, because a module that talks to
- * three services generates three clients, and each of them has its own spec,
- * package and output. Every entry names its tasks: `orders` gives
- * `generateOrdersClient`, `checkOrdersClient` and `generateOrdersDocument`.
- *
- * ```kotlin
- * pelican {
- *     clients {
- *         create("orders") {
- *             specClass.set("example.GenerateOpenApiKt")
- *             specFunction.set("ordersSpec")
- *             packageName.set("example.generated")
- *         }
- *     }
- *     documents {
- *         create("orders") { specClass.set("example.GenerateOpenApiKt") }
- *     }
- * }
- * ```
+ * Containers rather than properties, because a module talking to three services
+ * generates three clients, each with its own spec, package and output. Every
+ * entry names its tasks: `orders` gives `generateOrdersClient`,
+ * `checkOrdersClient` and `generateOrdersDocument`.
  */
 abstract class PelicanExtension {
     abstract val clients: NamedDomainObjectContainer<ClientSpec>
@@ -45,13 +30,10 @@ abstract class PelicanExtension {
 }
 
 /**
- * Where an `ApiSpec` comes from.
- *
- * The spec is Kotlin in the consuming project, so the only way to have the
- * generated output agree with the running service is to run that code. The
- * plugin loads [specClass] off [classpath] and calls [specFunction] on it —
- * a top-level function (whose class is the file name plus `Kt`), a member of
- * an `object`, or a member of a class with a no-argument constructor.
+ * Where an `ApiSpec` comes from. The spec is Kotlin in the consuming project,
+ * so the only way for generated output to agree with the running service is to
+ * run that code: [specClass] is loaded off [classpath] and [specFunction]
+ * called on it.
  */
 interface SpecSource {
     /**
@@ -64,15 +46,13 @@ interface SpecSource {
     val specFunction: Property<String>
 
     /**
-     * What the generator runs against: the consumer's compiled classes and
-     * everything they depend on. Defaults to `main`'s runtime classpath, which
-     * carries its own task dependencies — so generating compiles first without
-     * anybody writing a `dependsOn`.
+     * What the generator runs against. Defaults to `main`'s runtime classpath,
+     * which carries its own task dependencies, so generating compiles first
+     * without a `dependsOn`.
      *
-     * `pelican-codegen` (for a client) or `pelican-openapi` (for a document)
-     * has to be on it. Both are read by name and never by the plugin's own
-     * classpath, which is what keeps the plugin's version and the library's
-     * independent of each other.
+     * `pelican-codegen` or `pelican-openapi` has to be on it, and both are read
+     * by name rather than off the plugin's classpath — which is what keeps the
+     * plugin's version and the library's independent.
      */
     val classpath: ConfigurableFileCollection
 }
@@ -94,28 +74,20 @@ abstract class ClientSpec @Inject constructor(private val name: String) : SpecSo
     abstract val includeHidden: Property<Boolean>
 
     /**
-     * Which codec the generated payload types are annotated for — `jackson`
-     * or `kotlinx` — or unset for Jackson. The same setting `endpoints` takes,
-     * spelled the same way, because it is the same decision: a generated
-     * client's bodies are read by the same library the service's are.
+     * Which codec the generated payload types are annotated for — `jackson` or
+     * `kotlinx` — or unset for Jackson.
      *
-     * It matters for one shape and no others. A `oneOf` becomes a sealed
-     * interface, and nothing in `sealed interface Payment` says which property
-     * carries the branch or what string selects each one; that has to be
-     * written down, and the two libraries spell it differently. A spec without
-     * a union generates the same client either way.
+     * It matters for one shape only. A `oneOf` becomes a sealed interface, and
+     * nothing in `sealed interface Payment` says which property carries the
+     * branch or what selects each one; the two libraries spell that
+     * differently. A spec without a union generates the same client either way.
      */
     abstract val codec: Property<String>
 
     /**
-     * The source root written into — the generator lays out the package
-     * directories underneath it. Defaults to
-     * `build/generated/pelican/<name>`, which nothing checks in.
-     *
-     * Point it at a real source root and the generated client becomes a file
-     * in the repository, reviewable in a diff. That is a supported choice, and
-     * it is what turns `check<Name>Client` on: a checked-in client that no
-     * longer matches the descriptions fails `check`.
+     * The source root written into, defaulting to `build/generated/pelican/
+     * <name>`. Point it at a real source root and the client becomes a
+     * reviewable file — which is also what turns `check<Name>Client` on.
      */
     abstract val outputDir: DirectoryProperty
 }
@@ -134,21 +106,9 @@ abstract class DocumentSpec @Inject constructor(private val name: String) : Spec
 /**
  * One set of endpoint descriptions, generated *from* an OpenAPI document.
  *
- * The other entries here read a compiled `ApiSpec` and write something else.
- * This one reads a document somebody else wrote — so it has no `specClass` and
- * no `specFunction`, and its classpath needs `pelican-import` rather than the
- * consumer's own code.
- *
- * ```kotlin
- * pelican {
- *     endpoints {
- *         create("orders") {
- *             document.set(layout.projectDirectory.file("orders.yaml"))
- *             packageName.set("com.example.orders")
- *         }
- *     }
- * }
- * ```
+ * The other entries read a compiled `ApiSpec`; this one reads a document
+ * somebody else wrote, so it has no `specClass` or `specFunction` and needs
+ * `pelican-import` on its classpath rather than the consumer's code.
  */
 abstract class EndpointsSpec @Inject constructor(private val name: String) : org.gradle.api.Named {
     override fun getName(): String = name
@@ -160,13 +120,10 @@ abstract class EndpointsSpec @Inject constructor(private val name: String) : org
     abstract val packageName: Property<String>
 
     /**
-     * Operations to leave out, by `operationId`.
-     *
-     * The import is strict: an operation using something Pelican cannot
-     * describe fails the build rather than generating an endpoint that says
-     * less than the document does. This is where the ones you have decided to
-     * live without are written down, so that the next one to appear fails
-     * rather than joining them quietly.
+     * Operations to leave out, by `operationId`. The import is strict — an
+     * operation Pelican cannot describe fails the build — so this is where the
+     * ones you decided to live without are written down, and the next one to
+     * appear fails rather than joining them quietly.
      */
     abstract val exclude: SetProperty<String>
 
@@ -175,134 +132,96 @@ abstract class EndpointsSpec @Inject constructor(private val name: String) : org
     }
 
     /**
-     * Schema -> the property that tells the branches of its `oneOf` apart, for
-     * the unions a document declares without a `discriminator`.
-     *
-     * Set through [discriminator] rather than written as a map, so that the
-     * build file reads as a statement about one schema.
+     * Schema -> the property telling the branches of its `oneOf` apart, for
+     * unions a document declares without a `discriminator`. Set through
+     * [discriminator], so the build file reads as a statement about one schema.
      */
     abstract val discriminators: MapProperty<String, String>
 
     /**
      * States which property tells a union's branches apart, where the document
-     * did not.
+     * did not — `discriminator("Payment", property = "kind")`.
      *
-     * ```kotlin
-     * discriminator("Payment", property = "kind")
-     * discriminator("Order/properties/payment", property = "kind")
-     * ```
-     *
-     * A `oneOf` with no `discriminator` is refused, because a decoder would
-     * have to try each branch and keep the first that parsed — which is wrong,
-     * silently, on the first payload two branches both accept. That refusal
-     * stands. This is who says which branch a payload is when the document
-     * does not: the reader, once, in a file somebody reviews.
+     * A `oneOf` with no `discriminator` stays refused: a decoder would have to
+     * try each branch and keep the first that parsed, which is silently wrong
+     * on the first payload two branches accept. This is the reader saying
+     * which branch a payload is, once, in a file somebody reviews.
      *
      * [schema] is a component name, a pointer relative to
-     * `#/components/schemas` for a union written under a property, or a JSON
-     * pointer from the root of the document — `#/paths/~1payments/post/...` —
-     * for one written at the endpoint. A union with no name is the case that
-     * makes the pointer worth having: without it, the way through would still
-     * be `exclude`, and the operation would still be lost.
+     * `#/components/schemas`, or a JSON pointer from the document root for a
+     * union written at the endpoint — which is the case with no name to use.
      *
-     * The value on the wire is not invented. It is the `const` a branch
-     * declares for [property], or the name of the schema the branch points at;
-     * a branch written inline that declares neither fails the import rather
-     * than being given a positional name no payload would carry.
+     * The wire value is not invented: it is the `const` a branch declares for
+     * [property], or the name of the schema it points at. A branch declaring
+     * neither fails the import.
      *
-     * A hint that stops mattering — the document grew its own `discriminator`,
-     * or nothing reaches the schema any more — fails the import. An `exclude`
-     * that matches nothing has weakened nothing, and a hint that is checked
-     * against nothing is a claim about a payload format nobody is verifying.
+     * A hint that stops mattering fails the import too. An `exclude` matching
+     * nothing has weakened nothing; a hint checked against nothing is a claim
+     * about a payload format nobody is verifying.
      */
     fun discriminator(schema: String, property: String) {
         discriminators.put(schema, property)
     }
 
     /**
-     * The hosts a `$ref` in the document may be fetched from, as origins.
-     *
-     * Set through [allowRemote] rather than written as a set, so the build
-     * file reads as a statement about one host.
+     * The hosts a `$ref` may be fetched from, as origins. Set through
+     * [allowRemote], so the build file reads as a statement about one host.
      */
     abstract val allowRemote: SetProperty<String>
 
     /**
      * Allows a `$ref` to another host — one host, on purpose, in writing.
      *
-     * ```kotlin
-     * allowRemote("https://schemas.example.com")
-     * ```
+     * A remote `$ref` is refused by default because a build that fetches a URL
+     * produces different code on a different day and fails offline. This moves
+     * that decision to somebody who can make it, once per host, and pairs it
+     * with a [lockfile] that records and checks the hash of what came back.
      *
-     * A remote `$ref` is refused by default and the reasoning stands: a build
-     * that fetches a URL to know what to generate produces different code on a
-     * different day, fails offline, and hands a code generator whatever the
-     * far end is serving this morning. This does not overturn that. It moves
-     * the decision to somebody who can make it, once, per host — the same
-     * shape [exclude] and [discriminator] have — and pairs it with a
-     * [lockfile], which turns "whatever the far end is serving" back into a
-     * fixed input: every URL reached and the hash of what came back are
-     * recorded, committed, and checked on every later build.
+     * An entry is an origin and not a URL prefix, because a prefix match is how
+     * an allowlist is got past: `https://good.example` is a prefix of
+     * `https://good.example.evil.test`. A bare `example.com` means https, so
+     * plain HTTP has to be written out and shows up in a review.
      *
-     * An entry is an *origin* and not a URL prefix, because a prefix match is
-     * how an allowlist is got past: `https://good.example` is a prefix of
-     * `https://good.example.evil.test`. A bare `example.com` means https —
-     * the only scheme fetched without being asked for — and `http://` has to
-     * be written out, which is what makes plain HTTP a line in a review rather
-     * than a default nobody noticed.
-     *
-     * Redirects are never followed, to an allowed host or otherwise. A host
-     * that can redirect is a host that can move the document somewhere nobody
-     * reviewed; the failure names the URL it gave, to be written into the
-     * `$ref` instead.
+     * Redirects are never followed: a host that can redirect can move the
+     * document somewhere nobody reviewed. The failure names the URL it gave.
      */
     fun allowRemote(vararg origins: String) {
         allowRemote.addAll(*origins)
     }
 
     /**
-     * Where the URL and hash of every fetched document is recorded. Defaults
-     * to `<document>.refs.lock` beside the document.
+     * Where the URL and hash of every fetched document is recorded, defaulting
+     * to `<document>.refs.lock` beside it.
      *
-     * Commit it. It is the whole of what makes a build that fetches
-     * reproducible: a document behind one of those URLs changing fails the
-     * build, naming the URL and both hashes, rather than quietly generating
-     * different code. `update<Name>EndpointsLock` is what rewrites it, and it
-     * refuses to change a hash it already holds without `--accept-changes`.
+     * Commit it: it is what makes a fetching build reproducible, since a
+     * document changing behind one of those URLs then fails the build rather
+     * than generating different code. `update<Name>EndpointsLock` rewrites it,
+     * and refuses to change a hash it holds without `--accept-changes`.
      *
-     * The fetched documents themselves are cached in a `.d` directory beside
-     * it, named by their own hash. Committing that too is optional and it is
-     * the difference between a build that needs the network and one that does
-     * not: with the cache, no request is made at all.
+     * The documents themselves are cached in a `.d` directory beside it.
+     * Committing that too is the difference between a build that needs the
+     * network and one that does not.
      */
     abstract val lockfile: RegularFileProperty
 
     /**
-     * The backend to generate handler stubs against — `pekko`, `http4k` or
-     * `ktor` — or unset for none.
-     *
-     * The stubs are written once and never overwritten: after the first run
-     * they are the service, not generated code.
+     * The backend to generate handler stubs against, or unset for none. Stubs
+     * are written once and never overwritten: after the first run they are the
+     * service, not generated code.
      */
     abstract val handlers: Property<String>
 
     /**
-     * Which codec the generated payload types are annotated for — `jackson`
-     * or `kotlinx` — or unset for Jackson.
-     *
-     * It matters for one shape and no others. A `oneOf` becomes a sealed
-     * interface, and nothing in `sealed interface Payment` says which property
-     * carries the branch or what string selects each one; that has to be
-     * written down, and the two libraries spell it differently. A document
-     * without a union generates the same file either way.
+     * Which codec the generated payload types are annotated for, or unset for
+     * Jackson. It matters only for a `oneOf`, which becomes a sealed interface
+     * carrying discriminator annotations the two libraries spell differently.
      */
     abstract val codec: Property<String>
 
     /**
-     * The source root written into. Defaults to
-     * `build/generated/pelican/<name>`; point it at a real source root to have
-     * the descriptions become files in the repository. Either way the
-     * generated endpoints file is rewritten on every run.
+     * The source root written into, defaulting to `build/generated/pelican/
+     * <name>`. Point it at a real source root to commit the descriptions; the
+     * endpoints file is rewritten on every run either way.
      */
     abstract val outputDir: DirectoryProperty
 

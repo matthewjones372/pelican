@@ -17,32 +17,21 @@ import java.util.concurrent.CompletionStage
 import org.http4k.core.Method as Http4kMethod
 
 /**
- * The typed bridge between a backend-agnostic [Endpoint] and http4k.
+ * The typed bridge between a backend-agnostic [Endpoint] and http4k. Core
+ * cannot name a stream, so streaming endpoints carry the phantom marker
+ * [StreamOf]; this cashes it in for a `Sequence<T>`.
  *
- * Core cannot name a stream, so it types streaming endpoints with the phantom
- * marker [StreamOf]. This file is where that marker is cashed in — for a
- * `Sequence<T>` here, as `pelican-pekko` cashes the same marker in for a
- * `Source<T, NotUsed>`. The compiler still checks the element type, and the
- * endpoint descriptions know about neither.
- *
- * A `Sequence` is the honest equivalent of a `Source` for a server-as-a-
- * function: http4k hands a handler a request and wants a response, on the
- * calling thread, so laziness rather than back-pressure signalling is what
- * keeps a stream from being assembled in memory. The sequence is pulled as the
- * response body is written, one element at a time — see `Responses.kt`.
+ * A `Sequence` is the honest equivalent of a `Source` here: http4k answers on
+ * the calling thread, so laziness rather than back-pressure signalling is what
+ * keeps a stream out of memory. It is pulled as the body is written.
  */
 
 // ------------------------------------------------------------- value outputs
 //
-// Every binder takes `Params.(I) -> ...`, where I is the endpoint's declared
-// input list. With endpoint(a, b, c) that is a typed tuple; with the lens style
-// it is Params. One set of functions, both styles.
-//
-// The receiver is what lets a *typed* handler reach the things that are not
-// inputs — `setHeader`, an attribute a filter set, the backend's own request —
-// without giving up its typed inputs for the whole Params bag. A lambda that
-// ignores it is unchanged: `handledNow { id -> ... }` still compiles, and so
-// does `handledNow { (a, b) -> ... }`.
+// Every binder takes `Params.(I) -> ...` — a typed tuple with endpoint(a, b),
+// Params in the lens style. The receiver lets a typed handler still reach
+// `setHeader`, an attribute, or the backend's request. A lambda that ignores
+// it is unchanged.
 
 /** Binds an endpoint whose output is a single value. */
 infix fun <I, T : Any> Endpoint<I, T>.handledNow(f: Params.(I) -> T): ServerEndpoint =
@@ -89,14 +78,9 @@ infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledByOrFail(
 // ------------------------------------------------------------- several successes
 //
 // The same binder under the name that reads right when the alternatives are
-// not failures. An endpoint declaring `200 Order` beside `202 Accepted` is an
-// `Endpoint<I, Fallible<Nothing, Any>>` — the shape above with an empty failure
-// side — and a handler for it names the response it is producing by invoking
-// the declaration, exactly as it names a failure.
-//
-// Two names for one signature rather than one name for both, because
-// `handledOrFail` on an endpoint that declares no failure at all reads as a
-// mistake, and the call site is where the name is read.
+// not failures — `Fallible<Nothing, T>` is the shape above with an empty
+// failure side. Two names because `handledOrFail` on an endpoint declaring no
+// failure reads as a mistake.
 
 /** Binds an endpoint that answers with one of several declared responses. */
 infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOneOf(
@@ -123,12 +107,8 @@ infix fun <I, E : Any, T> Endpoint<I, Fallible<E, StreamOf<T>>>.streamedByOrFail
 // ------------------------------------------------------------- streams
 
 /**
- * Binds a streaming endpoint. Building a `Sequence` is cheap and synchronous —
- * the work happens as it is consumed — so this is the usual case.
- *
- * Return a lazy sequence and the elements reach the socket as they are
- * produced. Return `list.asSequence()` and you have described a stream of
- * something you already assembled, which is legal and sometimes what you want.
+ * Binds a streaming endpoint. A lazy `Sequence` does its work as it is
+ * consumed, so elements reach the socket as they are produced.
  */
 infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedNow(f: Params.(I) -> Sequence<T>): ServerEndpoint =
     ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
@@ -146,10 +126,7 @@ infix fun <I> Endpoint<I, ByteStream>.bytesNow(f: Params.(I) -> InputStream): Se
 
 internal class Http4kByteStream(val body: Body) : ByteStreamHandle
 
-/**
- * The request body as a stream. Nothing has been read from it yet, and nothing
- * will be until the handler reads it.
- */
+/** The request body as a stream, unread until the handler reads it. */
 fun ByteStreamHandle.toStream(): InputStream = (this as Http4kByteStream).body.stream
 
 /** Escape hatch: the raw http4k request behind this call. */

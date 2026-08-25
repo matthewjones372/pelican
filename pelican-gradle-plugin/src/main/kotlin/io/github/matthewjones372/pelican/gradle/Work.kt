@@ -12,9 +12,8 @@ import java.nio.file.Files
 
 /**
  * The work itself, run against the consumer's classpath rather than the
- * plugin's — a classloader holding their compiled spec, `pelican-codegen` and
- * whatever else they build with. The action's own classloader is that one, so
- * loading by name from here finds their classes and their library version.
+ * plugin's. The action's own classloader is theirs, so loading by name from
+ * here finds their classes and their library version.
  */
 internal interface SpecParameters : WorkParameters {
     val specClass: Property<String>
@@ -64,10 +63,9 @@ internal abstract class GenerateClientWork : WorkAction<ClientParameters> {
 }
 
 /**
- * Generates into a scratch directory and compares. What it is checking is that
- * a client somebody committed still says what the descriptions say — so the
- * failure names the task that fixes it, because that is the next thing its
- * reader is going to want.
+ * Generates into a scratch directory and compares, checking that a committed
+ * client still says what the descriptions say. The failure names the task that
+ * fixes it.
  */
 internal abstract class CheckClientWork : WorkAction<ClientParameters> {
     override fun execute() {
@@ -110,11 +108,9 @@ internal abstract class GenerateEndpointsWork : WorkAction<EndpointsParameters> 
 }
 
 /**
- * What the update task ran, said out loud.
- *
- * Every line is printed rather than counted, because the reader of this output
- * is deciding whether to commit what it just wrote — and "3 references
- * updated" is not something anybody can review.
+ * What the update task ran, said out loud. Every line rather than a count,
+ * because the reader is deciding whether to commit it and "3 references
+ * updated" is not reviewable.
  */
 internal abstract class UpdateLockWork : WorkAction<LockParameters> {
     override fun execute() {

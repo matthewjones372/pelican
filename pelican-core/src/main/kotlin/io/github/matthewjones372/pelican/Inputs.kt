@@ -14,8 +14,7 @@ import kotlin.reflect.typeOf
  */
 sealed interface ParamKey<out T>
 
-// The properties below are public because interpreters live in other modules.
-// They are the description's surface area: read them, don't mutate anything.
+// Public because interpreters live in other modules. Read them; mutate nothing.
 
 /** A captured path segment, e.g. the `{userId}` in `/users/{userId}`. */
 class PathParam<T> @PublishedApi internal constructor(
@@ -33,11 +32,7 @@ class QueryParam<T> @PublishedApi internal constructor(
     val required: Boolean,
     val default: Any?,
     val description: String? = null,
-    /**
-     * Null for the ordinary case of one value. Otherwise this parameter is
-     * declared as a list, [codec] decodes one element of it, and this says how
-     * the elements are told apart on the wire.
-     */
+    /** Null for one value; otherwise how the list's elements are told apart. */
     val listStyle: ListStyle? = null,
 ) : ParamKey<T> {
     override fun toString() = "query:$name"
@@ -61,12 +56,8 @@ class HeaderParam<T> @PublishedApi internal constructor(
 }
 
 /**
- * A cookie sent by the caller, read as an ordinary typed input.
- *
- * Distinct from `apiKeyCookie`, which describes a cookie as a *credential* and
- * draws a padlock. This is the other kind: a locale, a feature flag, an
- * A/B bucket — something a handler wants decoded and the document should
- * describe, and which no security scheme is the honest name for.
+ * A cookie read as an ordinary typed input — a locale, a feature flag. Distinct
+ * from `apiKeyCookie`, which describes one as a credential and draws a padlock.
  */
 class CookieParam<T> @PublishedApi internal constructor(
     val name: String,
@@ -98,11 +89,9 @@ class JsonBody<T> @PublishedApi internal constructor(
 }
 
 /**
- * An `application/x-www-form-urlencoded` request body, decoded into [type].
- *
- * It travels as `a=1&b=two`, which carries no types at all — so the shape the
- * document publishes for [type] is what says whether `1` is a number or the
- * string "1". See [formCodec] for what that buys.
+ * An `application/x-www-form-urlencoded` body, decoded into [type]. The wire
+ * form carries no types, so [type]'s published schema is what says whether `1`
+ * is a number or a string.
  */
 class FormBody<T> @PublishedApi internal constructor(
     val type: KType,
@@ -112,14 +101,8 @@ class FormBody<T> @PublishedApi internal constructor(
 }
 
 /**
- * A handle to the request body as a back-pressured byte stream. The backend
- * decides what the concrete stream type is; ask it for one:
- *
- * ```
- * val src: Source<ByteString, Any> = params[rawUpload].toSource()   // pelican-pekko
- * ```
- *
- * Nothing is buffered — the handler consumes it at its own pace.
+ * The request body as a back-pressured byte stream; the backend decides the
+ * concrete type. Nothing is buffered.
  */
 interface ByteStreamHandle
 
@@ -131,13 +114,9 @@ class RawBody @PublishedApi internal constructor(
 }
 
 /**
- * One named field of a `multipart/form-data` body.
- *
- * A part is a [ParamKey] rather than something read out of a body object,
- * because that is what makes it an ordinary input: list the parts on
- * `endpoint(...)` and the handler receives them typed and in order, exactly as
- * it receives a query parameter. The [MultipartBody] holding them is assembled
- * for you — nothing declares it by hand.
+ * One named field of a `multipart/form-data` body. A [ParamKey] so that parts
+ * are ordinary inputs: list them on `endpoint(...)` and the handler receives
+ * them typed. The [MultipartBody] holding them is assembled for you.
  */
 sealed class MultipartPart<T> : ParamKey<T> {
     abstract val name: String
@@ -166,10 +145,8 @@ class FilePart<T> @PublishedApi internal constructor(
     val contentType: String? = null,
     override val description: String? = null,
     /**
-     * Null for the ordinary case: the part is handed over as a live window on
-     * the request and nothing holds it. Otherwise this part is read into memory
-     * as it arrives and this is the most of it that will be — see [bufferedFile]
-     * for why that is a thing anyone would choose.
+     * Null when the part is handed over as a live window on the request.
+     * Otherwise the most of it that will be held in memory; see [bufferedFile].
      */
     val bufferedBytes: Long? = null,
 ) : MultipartPart<T>() {
@@ -180,11 +157,8 @@ class FilePart<T> @PublishedApi internal constructor(
 }
 
 /**
- * A `multipart/form-data` request body, described by its parts.
- *
- * Assembled from the [MultipartPart]s an endpoint declares rather than written
- * down: the parts are the inputs, and this is what the document and the
- * interpreters read to know the body is an envelope rather than a payload.
+ * A `multipart/form-data` body, assembled from the [MultipartPart]s an endpoint
+ * declares rather than written down.
  */
 class MultipartBody internal constructor(
     val parts: List<MultipartPart<*>>,
@@ -203,13 +177,9 @@ class MultipartBody internal constructor(
     val streamedFilePart: FilePart<*>? get() = fileParts.firstOrNull { it.streamed }
 
     /**
-     * The parts in the order a client has to write them: everything that is
-     * read as it arrives, and then the one the reader stops at.
-     *
-     * Here rather than in each client because both of them — the typed test
-     * client and the generated one — would otherwise carry a copy of the same
-     * rule, and a client that ordered them differently from the server's reader
-     * would be able to build a request its own server refuses.
+     * The order a client has to write them: everything read as it arrives,
+     * then the one the reader stops at. Here rather than in each client, so
+     * neither can build a request its own server refuses.
      */
     val partsInWireOrder: List<MultipartPart<*>>
         get() = parts.filterNot { it is FilePart<*> && it.streamed } + listOfNotNull(streamedFilePart)
@@ -218,18 +188,11 @@ class MultipartBody internal constructor(
 }
 
 /**
- * A request body that may arrive under any of several media types, all
- * carrying the same payload type.
+ * A request body arriving under any of several media types, all carrying the
+ * same payload type: `Content-Type` selects a decode, not a schema. Several
+ * schemas under one body stays undescribable, since the handler gets one value.
  *
- * One payload, several encodings, and that boundary is the whole design.
- * `jsonBody<Order>() or formBody<Order>()` is an `Order` arriving two ways, and
- * the [Codecs] the API is configured with already know how to read an `Order`
- * out of either — so what a request's `Content-Type` selects is a decode, not a
- * schema. Several *schemas* under one body stays undescribable, because the
- * handler is handed one value of one type and there is nothing for a second
- * shape to become.
- *
- * Built by [or], which is where the rules about what may go in one live.
+ * Built by [or].
  */
 class NegotiatedBody<T> internal constructor(
     /** In declaration order. A client that has to pick one picks the first. */
@@ -239,10 +202,7 @@ class NegotiatedBody<T> internal constructor(
     override fun toString() = "body:" + alternatives.joinToString("|") { it.mediaType }
 }
 
-/**
- * What this body travels as. The one media type a description names for it,
- * which is why a [NegotiatedBody] has none of its own and its alternatives do.
- */
+/** The one media type a description names, which is why [NegotiatedBody] has none. */
 val BodyInput<*>.mediaType: String
     get() = when (this) {
         is JsonBody<*> -> "application/json"
@@ -314,24 +274,15 @@ fun <T : Any> CookieParam<T>.default(value: T): CookieParam<T> =
 // ------------------------------------------------------- more than one value
 
 /*
- * A list parameter is declared by saying how its values are spread, and the
- * spellings offered differ by location because the encodings that are honest
- * differ by location. A query string can repeat a name; a header cannot, and
- * RFC 9110 already says what several values on one header field name mean. So
- * there is no `Header.repeated()` to write down and then have to explain.
+ * The spellings differ by location because the honest encodings do: a query
+ * string can repeat a name, a header cannot, and RFC 9110 already defines what
+ * two lines of one header name mean.
  *
- * Order matters, and only one order compiles: `repeated()` turns a
- * `QueryParam<Int>` into a `QueryParam<List<Int>>`, and `optional()` then
- * turns that into a `QueryParam<List<Int>?>`. The reverse does not type-check,
- * which is the check being relied on rather than a message at startup.
+ * `repeated()` then `optional()` is the only order that type-checks.
  *
- * An absent list reads as `null`, not as an empty list, and that is the
- * decision the rest of this follows from. An empty list on the wire is not
- * expressible — `?tag=` carries no element — so reading absence as empty would
- * leave `required` with nothing left to mean, and a handler with no way to
- * tell "the caller filtered by nothing" from "the caller did not filter".
- * `.default(emptyList())` is how a description asks for the other reading, in
- * the one place it is written down.
+ * An absent list reads as `null`, not empty: `?tag=` carries no element, so
+ * reading absence as empty would leave `required` with nothing to mean.
+ * `.default(emptyList())` asks for the other reading.
  */
 
 /** Several occurrences of the name: `?tag=a&tag=b`. */
@@ -352,10 +303,9 @@ private fun <T : Any> QueryParam<T>.listed(style: ListStyle): QueryParam<List<T>
 }
 
 /**
- * A header carrying several values: `X-Tags: a,b`, or the same values sent on
- * two header lines, which RFC 9110 defines as meaning the one comma-joined
- * field. Both are read; the document describes the comma, which is the form
- * OpenAPI has a name for.
+ * A header carrying several values: `X-Tags: a,b`, or two header lines, which
+ * RFC 9110 defines as the same thing. Both are read; the document describes the
+ * comma, which is the form OpenAPI names.
  */
 fun <T : Any> HeaderParam<T>.commaSeparated(): HeaderParam<List<T>> {
     require(listStyle == null) { "$this already carries a list of values" }
@@ -363,10 +313,8 @@ fun <T : Any> HeaderParam<T>.commaSeparated(): HeaderParam<List<T>> {
 }
 
 /**
- * A cookie carrying several values, as several pairs in the one header:
- * `Cookie: tag=a; tag=b`. There is no comma-separated spelling, because RFC
- * 6265 excludes the comma from a cookie value and a `Cookie` header carrying
- * one is a header the next proxy is entitled to mangle.
+ * A cookie carrying several values as several pairs: `Cookie: tag=a; tag=b`.
+ * No comma spelling, because RFC 6265 excludes the comma from a cookie value.
  */
 fun <T : Any> CookieParam<T>.repeated(): CookieParam<List<T>> {
     require(listStyle == null) { "$this already carries a list of values" }
@@ -376,47 +324,19 @@ fun <T : Any> CookieParam<T>.repeated(): CookieParam<List<T>> {
 inline fun <reified T> jsonBody(description: String? = null): JsonBody<T> =
     JsonBody(typeOf<T>(), description)
 
-/**
- * An `application/x-www-form-urlencoded` body decoded into [T].
- *
- * ```
- * data class SignIn(val user: String, val remember: Boolean)
- *
- * val credentials = formBody<SignIn>(description = "The sign-in form")
- * ```
- */
+/** An `application/x-www-form-urlencoded` body decoded into [T]. */
 inline fun <reified T> formBody(description: String? = null): FormBody<T> =
     FormBody(typeOf<T>(), description)
 
 /**
- * The same payload, read from whichever of two encodings the caller sent:
+ * The same payload, read from whichever encoding the caller sent —
+ * `formBody<CreateOrder>() or jsonBody<CreateOrder>()`. `Content-Type` picks
+ * the codec; an undeclared one is a 415 naming those that were declared.
  *
- * ```
- * val order = formBody<CreateOrder>() or jsonBody<CreateOrder>()
- *
- * val placeOrder = endpoint(userId, order) {
- *     post("users" / userId / "orders")
- *     json<Order>(status = 201)
- * }                                       // the handler is handed a CreateOrder
- * ```
- *
- * The request's `Content-Type` picks the codec, and a media type this body did
- * not declare is a 415 naming the ones it did. What the handler sees is one
- * value of one type, which is the reason for the two rules enforced here.
- *
- * **The alternatives carry the same type.** Two types would be two handlers,
- * and there is one. A document offering a different *schema* per media type is
- * therefore still a document with no description — that is a union of payloads
- * wearing a content map, and `oneOf` with a discriminator is how a union is
- * said.
- *
- * **Each is a body a codec reads.** A multipart envelope and a raw stream are
- * not decoded into a value at all, so neither is an alternative to one that is;
- * an endpoint that may be sent either takes `rawBody()` and decides for itself.
- *
- * Order is kept, and it is the answer to the question a client has to ask: the
- * generated client sends the first, the same way it takes the first of several
- * `servers`.
+ * Two rules follow from the handler seeing one value of one type: the
+ * alternatives carry the same type, and each is a body a codec reads — a
+ * multipart envelope or a raw stream is not decoded at all. Order is kept
+ * because a generated client sends the first.
  */
 infix fun <T> BodyInput<T>.or(other: BodyInput<T>): NegotiatedBody<T> {
     val alternatives = (asAlternatives() + other.asAlternatives())
@@ -443,10 +363,8 @@ infix fun <T> BodyInput<T>.or(other: BodyInput<T>): NegotiatedBody<T> {
 }
 
 /**
- * Flattened, so that `a or b or c` is three alternatives rather than a pair
- * holding a pair. Nesting would publish the same content map and read the same
- * request, and would leave "the first" meaning something different depending on
- * how the parentheses fell.
+ * Flattened, so `a or b or c` is three alternatives rather than nested pairs —
+ * otherwise "the first" would depend on where the parentheses fell.
  */
 private fun <T> BodyInput<T>.asAlternatives(): List<BodyInput<T>> =
     if (this is NegotiatedBody<T>) alternatives else listOf(this)
@@ -454,9 +372,8 @@ private fun <T> BodyInput<T>.asAlternatives(): List<BodyInput<T>> =
 fun rawBody(description: String? = null): RawBody = RawBody(description)
 
 /**
- * A named text field of a multipart body. Takes the same codecs and the same
- * [optional]/[default] modifiers a query parameter takes, because it is the
- * same kind of thing: one string on the wire, decoded into a declared type.
+ * A named text field of a multipart body: one string on the wire, so it takes
+ * the same codecs and modifiers a query parameter takes.
  */
 inline fun <reified T : Any> textPart(name: String, description: String? = null): TextPart<T> =
     TextPart(name, plainCodecFor<T>(), required = true, default = null, description = description)
@@ -472,14 +389,10 @@ fun <T : Any> TextPart<T>.default(value: T): TextPart<T> =
     TextPart(name, codec, required = false, default = value, description = description)
 
 /**
- * A named file field of a multipart body. The handler gets an [UploadedFile]
- * and reads it as a stream.
+ * A named file field of a multipart body, read by the handler as a stream.
  *
- * [contentType] is what the part is expected to carry — `image/png`, or a
- * comma-separated list, or a wildcard. It reaches the document's `encoding`
- * block, which is what tells a browser and Swagger UI what to offer; nothing
- * here rejects a part that carries something else, for the same reason nothing
- * here validates a token.
+ * [contentType] reaches the document's `encoding` block, which is what tells a
+ * browser what to offer. Nothing here rejects a part carrying something else.
  */
 fun filePart(
     name: String,
@@ -488,33 +401,14 @@ fun filePart(
 ): FilePart<UploadedFile> = FilePart(name, required = true, contentType = contentType, description = description)
 
 /**
- * A file field held in memory rather than streamed, bounded by [maxBytes]:
+ * A file field held in memory rather than streamed, bounded by [maxBytes].
+ * This is what makes a second file part describable: reading stops at a
+ * streamed part, so a second could only be reached by holding the first.
  *
- * ```
- * val thumbnail = bufferedFile("thumbnail", maxBytes = 256 * 1024)
- * val document  = filePart("document")
- *
- * val upload = endpoint(caption, thumbnail, document) { post("uploads"); ... }
- * ```
- *
- * This is what makes a second file part describable at all. Reading stops at a
- * streamed part — that is what "a live window on the request" means — so a
- * second one could only ever be reached by holding the first, and the old
- * answer was to refuse the description. The cost of that refusal was every
- * ordinary upload form with a small companion file on it: a thumbnail beside a
- * video, a signature beside a document, a checksum file beside an archive.
- *
- * So the buffering is *declared* rather than inferred. [maxBytes] has no
- * default, because a default is exactly the number nobody would have looked at:
- * a part named here costs a caller-controlled allocation on every request, and
- * the declaration is the one place where that is visible to the person choosing
- * it. A part that arrives larger is a 413 naming the part and the bound.
- *
- * The whole of what an endpoint holds in memory is still bounded by
- * [Api.maxBodyBytes] as well, so six parts declaring a megabyte each cannot add
- * up to six megabytes of one request. And [filePart] is unchanged: the last
- * file may still be streamed, and the streaming guarantee it makes is the same
- * one it always made.
+ * [maxBytes] has no default, because the part costs a caller-controlled
+ * allocation on every request and the declaration is where that is visible.
+ * A larger part is a 413 naming the part and the bound; the total is still
+ * bounded by [Api.maxBodyBytes].
  */
 fun bufferedFile(
     name: String,

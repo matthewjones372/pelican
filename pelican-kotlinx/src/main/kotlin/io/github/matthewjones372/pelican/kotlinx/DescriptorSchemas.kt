@@ -17,11 +17,9 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 /**
  * Turns kotlinx.serialization descriptors into OpenAPI schemas.
  *
- * Named object types are hoisted into `#/components/schemas` and referenced,
- * so a type used by ten endpoints is described once. Everything else —
- * primitives, lists, maps, enums — is inlined. That is the same shape
- * swagger-core produces for the Jackson side, which is what lets the two
- * documents be compared.
+ * Named object types are hoisted into `#/components/schemas`; everything else
+ * is inlined. The same shape swagger-core produces for the Jackson side, which
+ * is what lets the two documents be compared.
  */
 internal class DescriptorSchemas(
     private val components: SchemaComponents,
@@ -34,8 +32,8 @@ internal class DescriptorSchemas(
 
     fun schemaFor(desc: SerialDescriptor): JsonObj {
         val base = build(desc)
-        // `orNull` rather than a `nullable: true` written here, so that this and
-        // the swagger-core side cannot drift into two spellings of one fact.
+        // `orNull` rather than a `nullable: true` written here, so this and
+        // the swagger-core side cannot drift into two spellings.
         return if (desc.isNullable) base.orNull() else base
     }
 
@@ -52,9 +50,8 @@ internal class DescriptorSchemas(
 
         PrimitiveKind.DOUBLE -> prim("number", "double")
 
-        // Inlined rather than hoisted, which is what swagger-core does for the
-        // Jackson side. An enum is small enough that a shared definition buys
-        // little, and agreeing is worth more than saving the bytes.
+        // Inlined rather than hoisted, matching swagger-core: agreeing is
+        // worth more than the bytes a shared definition would save.
         SerialKind.ENUM -> jsonObj {
             "type" to "string"
             put("enum", jsonStrings((0 until desc.elementsCount).map(desc::getElementName)))
@@ -76,9 +73,8 @@ internal class DescriptorSchemas(
 
         PolymorphicKind.SEALED -> named(desc) { union(desc) }
 
-        // An open hierarchy is not a closed union: the subclasses are whatever
-        // was registered in a module at runtime, and a `oneOf` listing the ones
-        // this JVM happens to know would be a narrower document than the code.
+        // Not a closed union: subclasses are registered at runtime, so a
+        // `oneOf` would describe less than the code allows.
         PolymorphicKind.OPEN -> jsonObj {
             "type" to "object"
             "description" to "polymorphic: ${desc.serialName}"
@@ -88,18 +84,13 @@ internal class DescriptorSchemas(
     }
 
     /**
-     * A sealed hierarchy as the union it is: `oneOf` over the branches, with
-     * the `discriminator` saying which property tells them apart and which
-     * value picks each one.
+     * A sealed hierarchy as `oneOf` plus a `discriminator`. The mapping is
+     * written out because a reader cannot recover it: `@SerialName("card")` on
+     * a class called `Card` is the difference between a document another tool
+     * can decode and one it can only guess at.
      *
-     * Written out rather than left implicit because the mapping is the half a
-     * reader cannot recover. `@SerialName("card")` on a class called `Card` is
-     * the difference between a document another tool can decode and one it can
-     * only guess at — and `pelican-import` reads exactly this shape back.
-     *
-     * A sealed descriptor carries its branches under element 1, which is
-     * kotlinx's own framing of `{ "type": ..., "value": ... }`; the element
-     * *names* there are the serial names, which is what travels.
+     * A sealed descriptor carries its branches under element 1, and the element
+     * names there are the serial names.
      */
     private fun union(desc: SerialDescriptor): JsonObj {
         val branches = desc.getElementDescriptor(1)
@@ -145,8 +136,7 @@ internal class DescriptorSchemas(
             val child = desc.getElementDescriptor(i)
             val name = desc.getElementName(i)
             properties[name] = schemaFor(child)
-            // A property with a default can be left out of the payload; a
-            // nullable one can be sent as null. Neither is required.
+            // A default may be left out and a nullable may be null.
             if (!child.isNullable && !desc.isElementOptional(i)) required += name
         }
 

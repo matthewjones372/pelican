@@ -1,19 +1,12 @@
 package io.github.matthewjones372.pelican
 
 /**
- * Security schemes, described the same way everything else here is: as plain
- * values, declared once and referenced by the endpoints that need them.
+ * Security schemes as plain values, declared once and referenced by the
+ * endpoints that need them. An endpoint holds the scheme itself, so a scope it
+ * never declared fails at class-init rather than on the first request.
  *
- * The annotation-driven frameworks put the scheme in one place and a scope
- * string in another, and nothing checks that the two agree. Here a scheme is a
- * value, an endpoint holds a reference to it, and asking for a scope the scheme
- * never declared fails when the endpoint value is constructed — at class-init
- * time, not on the first request.
- *
- * These descriptions document a requirement; they do not enforce one. Nothing
- * in Pelican validates a token — see the README. Declaring `security(...)` puts
- * the padlock in Swagger UI and the requirement in the spec; rejecting a caller
- * who has no token is the handler's job, or a filter in front of it.
+ * Documented, never enforced: nothing here validates a token. `security(...)`
+ * puts the padlock in Swagger UI; rejecting a caller is a handler's job.
  */
 sealed interface SecurityScheme {
     /** The key this scheme appears under in `components.securitySchemes`. */
@@ -85,20 +78,8 @@ sealed class OAuthFlow(val scopes: Map<String, String>) {
 // ------------------------------------------------------------------ builders
 
 /**
- * The authorization code flow, which is the one a browser-based Swagger UI can
- * actually complete. Pair it with [DocsOAuth] on the `Api` to have the docs page
- * run the flow itself.
- *
- * ```
- * val oauth = oauth2AuthorizationCode(
- *     authorizationUrl = "https://id.example.com/oauth2/authorize",
- *     tokenUrl = "https://id.example.com/oauth2/token",
- *     scopes = mapOf(
- *         "orders:read"  to "Read orders",
- *         "orders:write" to "Place and cancel orders",
- *     ),
- * )
- * ```
+ * The authorization code flow, the one a browser-based Swagger UI can complete.
+ * Pair it with [DocsOAuth] to have the docs page run the flow itself.
  */
 fun oauth2AuthorizationCode(
     authorizationUrl: String,
@@ -148,21 +129,9 @@ fun oauth2(
 ): OAuth2Scheme = OAuth2Scheme(name, flows, description)
 
 /**
- * The same builders, given scopes as bare names.
- *
- * OpenAPI models a scheme's scopes as name -> description, and Swagger UI puts
- * the description beside the checkbox in the Authorize dialog. When there is
- * nothing useful to say beyond the name, this form says only the name — the
- * dialog still lists a checkbox per scope, and the endpoint side is unchanged
- * either way, because a requirement only ever names scopes.
- *
- * ```
- * oauth2AuthorizationCode(
- *     authorizationUrl = "https://id.example.com/oauth2/authorize",
- *     tokenUrl = "https://id.example.com/oauth2/token",
- *     scopes = listOf("orders:read", "orders:write"),
- * )
- * ```
+ * The same builders with scopes as bare names, for when there is nothing to say
+ * beyond the name. OpenAPI models them as name -> description, and Swagger UI
+ * shows the description beside each checkbox.
  */
 fun oauth2AuthorizationCode(
     authorizationUrl: String,
@@ -198,10 +167,7 @@ fun oauth2Implicit(
     description: String? = null,
 ): OAuth2Scheme = oauth2Implicit(authorizationUrl, scopes.described(), refreshUrl, name, description)
 
-/**
- * Declaration order is kept: Swagger UI lists the checkboxes in the order the
- * document gives them, so the order written here is the order a reader sees.
- */
+/** Declaration order is kept: Swagger UI lists checkboxes in document order. */
 private fun List<String>.described(): Map<String, String> =
     associateWithTo(LinkedHashMap()) { "" }
 
@@ -250,8 +216,8 @@ fun openIdConnect(
 // -------------------------------------------------------------- requirements
 
 /**
- * One scheme, and the scopes a caller needs under it. Several of these on one
- * endpoint means *any* of them is enough, which is how OpenAPI reads a list.
+ * One scheme and the scopes a caller needs under it. Several on one endpoint
+ * means any of them is enough, which is how OpenAPI reads a list.
  */
 class SecurityRequirement internal constructor(
     val scheme: SecurityScheme,
@@ -274,9 +240,8 @@ fun SecurityScheme.requires(vararg scopes: String): SecurityRequirement =
     SecurityRequirement(this, scopes.toList())
 
 /**
- * Collects the schemes referenced by [requirements], failing on two different
- * schemes registered under one name — which would otherwise produce a document
- * where half the endpoints point at the wrong thing.
+ * Collects the schemes [requirements] reference, failing on two different ones
+ * under a single name — half the endpoints would point at the wrong thing.
  */
 fun securitySchemesOf(requirements: List<SecurityRequirement>): List<SecurityScheme> {
     val byName = LinkedHashMap<String, SecurityScheme>()

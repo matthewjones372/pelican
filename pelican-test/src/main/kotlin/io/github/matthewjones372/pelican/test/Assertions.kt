@@ -23,33 +23,16 @@ import io.github.matthewjones372.pelican.Output
 
 // ------------------------------------------------------------------- requests
 //
-// Every other assertion here is about behaviour, and behaviour is what the
-// typed call is good at: `call(getBookmark, 1L)` says nothing about the URL, so
-// renaming an input breaks compilation rather than quietly starting to 404.
+// A typed call says nothing about the URL, which is its strength and its blind
+// spot: a rename moves the client and the server together, so every typed test
+// stays green while deployed callers get a 404.
 //
-// That is also its blind spot. The client builds the request from the same
-// description the server routes on, so a rename moves both at once and every
-// typed test stays green — while the callers already deployed against the old
-// path get a 404. The URL and the parameter names are the contract those
-// callers hold; nothing in a typed call pins them.
-//
-// So pin them once, per endpoint, against a literal:
-//
-// ```
-// app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
-// ```
-//
-// This is the one assertion that *should* fail on a rename. `request` builds
-// without sending, so it costs no server and no transport.
+// So pin the request line once per endpoint against a literal. This is the one
+// assertion that should fail on a rename, and `request` builds without sending.
 
 /**
- * Asserts the call an endpoint would send is this request line — the method,
- * the path and the query string, exactly as a caller would have to write them.
- *
- * ```
- * app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
- * app.request(listBookmarks, In2(20, Slug("streams"))) shouldBuild "GET /bookmarks?limit=20&tag=streams"
- * ```
+ * Asserts the call an endpoint would send is this request line — method, path
+ * and query string, as a caller would have to write them.
  */
 infix fun RequestSpec.shouldBuild(expected: String): RequestSpec = apply {
     val actual = toString()
@@ -89,19 +72,11 @@ fun ResponseSpec.shouldHaveNoBody(): ResponseSpec = apply {
 
 // -------------------------------------------------------------------- outcomes
 //
-// An endpoint that declares its failures answers with an `Outcome`, and a test
-// nearly always knows which side it wants. Reaching for `when` to find out
-// costs an unreachable branch and an `error("...")` in it — noise around the
-// one line that is the assertion. These say it directly, and hand back the
-// value so the next assertion is about the payload rather than the wrapper.
+// A test nearly always knows which side of an `Outcome` it wants, and a `when`
+// to find out costs an unreachable branch. These say it directly and hand back
+// the value, so the next assertion is about the payload.
 
-/**
- * Asserts the call succeeded, and returns the value.
- *
- * ```
- * app.outcome(getBookmark, 1L).shouldBeOk().title shouldBe "Pekko"
- * ```
- */
+/** Asserts the call succeeded, and returns the value. */
 fun <E, T> Outcome<E, T>.shouldBeOk(): T = when (this) {
     is Outcome.Ok -> value
 
@@ -112,28 +87,15 @@ fun <E, T> Outcome<E, T>.shouldBeOk(): T = when (this) {
 }
 
 /**
- * Asserts the call returned one of the endpoint's declared failures, and
- * returns the payload — so the assertion about *which* failure is whatever you
- * would normally write:
- *
- * ```
- * app.outcome(getBookmark, 9_999L).shouldBeError().shouldBeInstanceOf<NoSuchBookmark>()
- * app.outcome(getBookmark, 9_999L).shouldBeError().message shouldContain "9999"
- * ```
+ * Asserts the call returned one of the declared failures and returns the
+ * payload, so the assertion about which one is whatever you normally write.
  */
 fun <E, T> Outcome<E, T>.shouldBeError(): E = when (this) {
     is Outcome.Ok -> fail("Expected a declared failure but the call succeeded with: $value")
     is Outcome.Err -> error
 }
 
-/**
- * Asserts the call failed with exactly this payload. The common case, and the
- * one worth having an infix for:
- *
- * ```
- * app.outcome(getBookmark, 9_999L) shouldBeError NoSuchBookmark(9_999L, "No bookmark 9999")
- * ```
- */
+/** Asserts the call failed with exactly this payload. */
 infix fun <E, T> Outcome<E, T>.shouldBeError(expected: E): E {
     val actual = shouldBeError()
     if (actual != expected) fail("Expected the declared failure $expected but was $actual")
@@ -141,14 +103,9 @@ infix fun <E, T> Outcome<E, T>.shouldBeError(expected: E): E {
 }
 
 /**
- * Asserts the call failed with the failure this endpoint declared *under this
- * name* — which is the assertion to make when two failures carry the same
- * payload type under different statuses, and equality on the payload cannot
- * tell them apart.
- *
- * ```
- * app.outcome(placeOrder, input) shouldBeFailure noSuchUser
- * ```
+ * Asserts the call failed with the failure declared under this name — the
+ * assertion to make when two failures share a payload type under different
+ * statuses and equality cannot tell them apart.
  */
 infix fun <E, T> Outcome<E, T>.shouldBeFailure(expected: ErrorOutput<out E>): E = when (this) {
     is Outcome.Ok -> fail("Expected the declared failure $expected but the call succeeded with: $value")
@@ -162,14 +119,9 @@ infix fun <E, T> Outcome<E, T>.shouldBeFailure(expected: ErrorOutput<out E>): E 
 }
 
 /**
- * Asserts the call came back as the success this endpoint declared *under this
- * name*, and returns the value — the assertion to make when an endpoint
- * declares more than one 2xx, since a `200 Order` and a `201 Order` carry the
- * same payload type and equality cannot separate them:
- *
- * ```
- * app.outcome(placeOrder, input) shouldBeResponse accepted
- * ```
+ * Asserts the call came back as the success declared under this name, and
+ * returns the value — for an endpoint declaring more than one 2xx, where a
+ * `200 Order` and a `201 Order` cannot be told apart by equality.
  */
 infix fun <E, T> Outcome<E, T>.shouldBeResponse(expected: Output<*>): T = when (this) {
     is Outcome.Err -> fail(
@@ -188,9 +140,8 @@ infix fun <E, T> Outcome<E, T>.shouldBeResponse(expected: Output<*>): T = when (
 // ---------------------------------------------------------------- error bodies
 
 /**
- * The error payload, decoded. Pelican renders every framework-level failure as
- * an [ApiError], so a test can assert on its structure rather than grep the
- * body for a substring and hope.
+ * The error payload, decoded. Every framework-level failure renders as an
+ * [ApiError], so a test asserts on structure rather than grepping the body.
  */
 fun ApiClient.errorBody(response: ResponseSpec): ApiError = decodeBody(response)
 

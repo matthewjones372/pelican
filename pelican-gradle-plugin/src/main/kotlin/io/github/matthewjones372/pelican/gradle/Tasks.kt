@@ -23,12 +23,10 @@ import org.gradle.workers.WorkerExecutor
 import javax.inject.Inject
 
 /**
- * What every generating task needs: the classpath to run against.
- *
- * The classpath is the task's real input. Declaring it `@Classpath` is what
- * makes the tasks incremental in the way that matters — an unrelated change to
- * a resource does not regenerate anything, and a change to the file the spec
- * is written in regenerates everything.
+ * What every generating task needs: the classpath to run against, which is the
+ * real input. `@Classpath` is what makes them incremental in the way that
+ * matters — a resource change regenerates nothing, a spec change regenerates
+ * everything.
  */
 @DisableCachingByDefault(because = "Generation is one reflective call; a cache lookup would cost more")
 abstract class PelicanTask : DefaultTask() {
@@ -45,22 +43,17 @@ abstract class PelicanTask : DefaultTask() {
 
     /**
      * Classloader isolation rather than a forked process: the work is one
-     * reflective call into code that is already compiled, and a JVM per
-     * generated client would cost more than the generation does. The consumer's
-     * classpath is loaded in isolation from Gradle's own, so their Jackson and
+     * reflective call, and a JVM per client would cost more than generating
+     * does. Isolated from Gradle's own classpath, so their Jackson and
      * Gradle's cannot be the same Jackson.
      */
     protected fun queue() = workers.classLoaderIsolation { it.classpath.from(classpath) }
 }
 
 /**
- * A task that reads the descriptions themselves: a class to load and a
- * function to call, which between them return the `ApiSpec`.
- *
- * The import task is the one generating task that is not one of these. It
- * reads a document rather than compiled descriptions, so there is no spec for
- * it to load — which is the whole difference between the two directions,
- * stated as a class.
+ * A task that reads the descriptions themselves: a class to load and a function
+ * to call. The import task is the one that is not one of these, reading a
+ * document rather than compiled descriptions.
  */
 @DisableCachingByDefault(because = "See PelicanTask")
 abstract class SpecTask : PelicanTask() {
@@ -75,10 +68,9 @@ abstract class SpecTask : PelicanTask() {
 /**
  * Writes one client. See `ClientSpec` for what each property means.
  *
- * Not cacheable, and not because it could not be: where the output lands is a
- * decision the build script makes, and a client written into a source root is
- * a file somebody edits, commits and reviews. A cache hit that silently
- * replaced it would be answering a question nobody asked.
+ * Not cacheable: where the output lands is the build script's decision, and a
+ * client in a source root is a file somebody edits and commits — a cache hit
+ * replacing it would answer a question nobody asked.
  */
 @DisableCachingByDefault(because = "The output may be a source root the consumer owns")
 abstract class GenerateKotlinClientTask : SpecTask() {
@@ -102,10 +94,9 @@ abstract class GenerateKotlinClientTask : SpecTask() {
     abstract val codec: Property<String>
 
     /**
-     * Not `@OutputDirectory` here. Whether the directory is an output Gradle
-     * tracks is decided when the task is registered, because pointing this at
-     * a source root — a supported choice — would otherwise make every task
-     * that compiles those sources depend on this one. See `PelicanPlugin`.
+     * Not `@OutputDirectory`: whether Gradle tracks it is decided at
+     * registration, because pointing it at a source root would otherwise make
+     * every compile depend on this task. See `PelicanPlugin`.
      */
     @get:Internal
     abstract val outputDir: DirectoryProperty
@@ -118,8 +109,7 @@ abstract class GenerateKotlinClientTask : SpecTask() {
     fun generate() {
         val target = outputDir.get().asFile
         // A renamed client must not leave the old one behind — but only where
-        // the whole directory belongs to this task. A source root has the
-        // consumer's own files in it.
+        // the directory is this task's. A source root has other files in it.
         if (cleanOutput.get()) target.deleteRecursively()
         target.mkdirs()
 
@@ -137,10 +127,8 @@ abstract class GenerateKotlinClientTask : SpecTask() {
 }
 
 /**
- * Fails when a committed client no longer matches the descriptions.
- *
- * Only worth having where the client is checked in, which is why the plugin
- * wires it into `check` for those entries and leaves it alone for the rest.
+ * Fails when a committed client no longer matches the descriptions. Only wired
+ * into `check` for entries whose client is checked in.
  */
 @UntrackedTask(because = "Compares a committed file against freshly generated output")
 abstract class CheckKotlinClientTask : SpecTask() {
@@ -164,10 +152,9 @@ abstract class CheckKotlinClientTask : SpecTask() {
     abstract val codec: Property<String>
 
     /**
-     * Read, never written — the generated copy goes to a temporary directory
-     * and the two are compared there. The task declares no outputs and so
-     * always runs, which for a comparison is the only honest answer: what it
-     * is checking is a file somebody edits by hand.
+     * Read, never written: the generated copy goes to a temporary directory and
+     * the two are compared there. No outputs, so it always runs — what it
+     * checks is a file somebody edits by hand.
      */
     @get:Internal
     abstract val outputDir: DirectoryProperty
@@ -192,17 +179,14 @@ abstract class CheckKotlinClientTask : SpecTask() {
 }
 
 /**
- * Writes endpoint descriptions read from an OpenAPI document.
- *
- * Not cacheable and never up to date for the same reason the client task is
- * not: where the output lands is the build script's decision, and it is
- * commonly a source root somebody commits.
+ * Writes endpoint descriptions read from an OpenAPI document. Not cacheable for
+ * the client task's reason: the output is commonly a source root somebody
+ * commits.
  */
 @DisableCachingByDefault(because = "The output may be a source root the consumer owns; see the client task")
 abstract class GenerateEndpointsTask : PelicanTask() {
 
-    // The contents are the input and where the file sits is not: the same
-    // document imported from two checkouts is the same import.
+    // Contents, not location: the same document in two checkouts is one import.
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val document: RegularFileProperty
@@ -226,15 +210,10 @@ abstract class GenerateEndpointsTask : PelicanTask() {
     abstract val lockfile: RegularFileProperty
 
     /**
-     * The lockfile and the cache beside it, as inputs.
-     *
-     * A file collection rather than `@InputFile`, because neither is there
-     * until a host is allowed and the update task has run — and an
-     * `@InputFile` that is missing fails the build before the task can say
-     * anything useful about why. They are still declared: what the import
-     * generates depends on the bytes those hold, and a task that read them
-     * without saying so would report up to date over a lockfile somebody had
-     * just edited.
+     * The lockfile and the cache beside it. A file collection rather than
+     * `@InputFile` because neither exists until a host is allowed, and a
+     * missing `@InputFile` fails before the task can explain why. Still
+     * declared, or the task would report up to date over an edited lockfile.
      */
     @get:InputFiles
     @get:Optional
@@ -263,10 +242,9 @@ abstract class GenerateEndpointsTask : PelicanTask() {
 
     @TaskAction
     fun generate() {
-        // Handler stubs are written once and never overwritten, which is what
-        // makes them a starting point rather than output. Inside `build/` there
-        // is nothing to protect — nobody edits a file there — and leaving last
-        // run's stubs in place would leave them describing an older document.
+        // Handler stubs are written once and never overwritten, which makes
+        // them a starting point rather than output. Inside `build/` nobody
+        // edits them, and last run's would describe an older document.
         if (cleanOutput.get()) outputDir.get().asFile.deleteRecursively()
 
         queue().submit(GenerateEndpointsWork::class.java) {
@@ -285,15 +263,13 @@ abstract class GenerateEndpointsTask : PelicanTask() {
 }
 
 /**
- * Rewrites the lockfile of remote `$ref`s from what the allowed hosts are
- * serving now.
+ * Rewrites the lockfile of remote `$ref`s from what the allowed hosts serve
+ * now. The one task that trusts the network, and a task of its own for that
+ * reason: nothing depends on it and it has to be typed.
  *
- * The one task here that trusts the network, and it is a task of its own for
- * exactly that reason: nothing depends on it, `build` does not reach it, and
- * it has to be typed. "Just re-run the update task" is how a hash check gets
- * neutered, so a hash that is already recorded will not change without
- * `--accept-changes` as well — adding a URL nobody had locked is free and
- * shows in the diff, and *changing* one is the event the lockfile exists for.
+ * A recorded hash will not change without `--accept-changes` either — adding a
+ * URL is free and shows in the diff, and changing one is the event the lockfile
+ * exists for.
  */
 @UntrackedTask(because = "It fetches: what the far end says now is the answer, by definition")
 abstract class UpdateEndpointsLockTask : PelicanTask() {

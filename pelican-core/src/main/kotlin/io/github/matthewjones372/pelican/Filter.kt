@@ -4,35 +4,21 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
 /**
- * Something that runs around every handler: authentication, rate limiting, a
- * request log, a timer.
+ * Runs around every handler: authentication, rate limiting, a request log.
  *
- * A filter sees the request after its inputs are decoded — so `params[userId]`
- * is a `Long`, not a string to parse again — and decides whether to call
- * [next]. Rejecting is throwing: [unauthorized], [forbidden] and friends make
- * the response the interpreters already know how to render.
+ * A filter sees the request after its inputs are decoded, so `params[userId]`
+ * is a `Long` rather than a string to parse again. Rejecting is throwing —
+ * [unauthorized], [forbidden] and friends.
  *
- * ```
- * val requireToken = before { p ->
- *     if (p.endpoint?.security?.isEmpty() == true) return@before   // opted out
- *     p.setAttribute(caller, Tokens.check(p.request.bearer()) ?: unauthorized())
- * }
- *
- * Api(routes, JacksonCodecs, filters = listOf(requireToken))
- * ```
- *
- * The chain is composed once, when the route is built, not per request. The
- * first filter in the list is the outermost — it sees the request first and the
- * result last.
+ * Composed once at route-build time. The first filter is the outermost.
  */
 fun interface Filter {
     fun handle(params: Params, next: (Params) -> CompletionStage<Any?>): CompletionStage<Any?>
 }
 
 /**
- * The common shape: look at the request, throw to reject it, return to let it
- * through. Nothing to remember about calling `next`, which is the step that is
- * easy to forget and impossible to see missing.
+ * Look at the request, throw to reject it, return to let it through. Nothing to
+ * remember about calling `next`, which is easy to forget and invisible missing.
  */
 fun before(check: (Params) -> Unit): Filter = Filter { params, next ->
     check(params)
@@ -53,14 +39,7 @@ fun after(action: (params: Params, result: Any?, error: Throwable?) -> Unit): Fi
         }
     }
 
-/**
- * Narrows a filter to the endpoints [predicate] accepts. Everything else skips
- * straight to the handler.
- *
- * ```
- * requireToken.onlyWhen { it.security != emptyList<SecurityRequirement>() }
- * ```
- */
+/** Narrows a filter to the endpoints [predicate] accepts. */
 fun Filter.onlyWhen(predicate: (Endpoint<*, *>) -> Boolean): Filter = Filter { params, next ->
     val ep = params.endpoint
     if (ep != null && !predicate(ep)) next(params) else handle(params, next)
@@ -74,18 +53,8 @@ fun List<Filter>.wrap(handler: (Params) -> CompletionStage<Any?>): (Params) -> C
     foldRight(handler) { filter, next -> { params -> filter.handle(params, next) } }
 
 /**
- * Somewhere to put what a filter worked out, so the handler can read it back
- * without going to the raw request a second time.
- *
- * ```
- * val caller = attribute<Caller>("caller")
- *
- * // in a filter
- * p[caller] = Tokens.check(...) ?: unauthorized()
- *
- * // in a handler
- * val who = p[caller]
- * ```
+ * Somewhere to put what a filter worked out, so the handler reads it back
+ * without going to the raw request again.
  */
 class Attribute<T> internal constructor(val name: String) {
     override fun toString() = "attribute:$name"

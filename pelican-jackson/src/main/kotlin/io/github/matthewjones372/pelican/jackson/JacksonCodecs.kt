@@ -17,50 +17,36 @@ import io.swagger.v3.core.util.Json31 as SwaggerJson31
 
 /**
  * Reads and writes bodies with Jackson, and describes types with swagger-core.
+ * Use the object for the defaults, or construct one with your own mapper.
  *
- * Use it as an object when the defaults are fine, or construct one to supply
- * your own mapper:
- *
- * ```
- * Api(routes, codecs = JacksonCodecs)                 // defaults
- * Api(routes, codecs = JacksonCodecs(myObjectMapper)) // configured
- * ```
- *
- * Schemas deliberately come from swagger-core rather than a hand-rolled walker
- * over Kotlin reflection: it reads Jackson's own annotations, so it sees
- * exactly what Jackson sees. `@JsonProperty`, `@JsonIgnore` and `@JsonTypeInfo`
- * shape the document without being told about them twice.
+ * swagger-core rather than a walk over Kotlin reflection because it reads
+ * Jackson's own annotations, so `@JsonProperty`, `@JsonIgnore` and
+ * `@JsonTypeInfo` shape the document without being declared twice.
  */
 class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
 
     /**
-     * swagger-core's own converter introspects with its own mapper, which knows
-     * nothing about Kotlin. Putting a resolver backed by [mapper] at the front
-     * of the chain is what makes data-class defaults and nullability visible to
-     * the schema generator as well as to the parser.
+     * swagger-core introspects with its own mapper, which knows nothing about
+     * Kotlin, so a resolver backed by [mapper] goes at the front of the chain.
      *
-     * `openapi31(true)` is how swagger-core is asked for 3.1, and it is asked on
-     * the resolver rather than on [ModelConverters] because the flag there only
-     * configures the resolver that class builds for itself — which this one
-     * stands in front of, so it would never be reached. Asked this way, models
-     * come back as `JsonSchema` with a `types` *set*, which is what lets a
-     * nullable property become a type union at all.
+     * `openapi31(true)` is asked on the resolver rather than on
+     * [ModelConverters], whose flag only configures the resolver that class
+     * builds for itself — the one this stands in front of. Asked this way,
+     * models come back with a `types` set, which is what lets a nullable
+     * property become a type union.
      */
     private val describer = KotlinAwareModelResolver(mapper).apply { openapi31(true) }
 
     /**
-     * The chain a type is resolved through, with [describer] at the front of
-     * it. The resolver is a value of its own rather than an argument here
-     * because it is also read directly: it is the one thing that knows which
-     * class each component was described from, and the union rewrite below
-     * cannot read a Jackson annotation without that.
+     * The chain a type is resolved through, with [describer] at the front. The
+     * resolver is a value of its own because it is also read directly: it knows
+     * which class each component came from, which the union rewrite needs.
      */
     private val converters = ModelConverters().apply { addConverter(describer) }
 
     @Suppress("UNCHECKED_CAST")
     override fun <T> codec(type: KType): BodyCodec<T> {
-        // Resolved once, when the Api is assembled. KType -> JavaType goes
-        // through reflection and is not cheap enough to do per request.
+        // Once, when the Api is assembled: KType -> JavaType is reflection.
         val javaType = mapper.constructType(type.javaType)
         return object : BodyCodec<T> {
             override fun encodeToString(value: T): String = mapper.writeValueAsString(value)
@@ -73,14 +59,11 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
             AnnotatedType(type.javaType).resolveAsRef(true),
         )
 
-        // Every model swagger touched becomes a component, so a type used by
-        // ten endpoints is written down once and referenced ten times.
-        //
-        // Rewritten on the way, because a sealed hierarchy is the one shape
-        // swagger-core describes in a way that loses what the code says — see
-        // `unionsRewritten`. It runs over the whole batch rather than one
-        // schema at a time: a hierarchy is a parent and its branches together,
-        // and swagger resolves them together or not at all.
+        // Every model swagger touched becomes a component, so a shared type is
+        // written down once. Rewritten on the way, because a sealed hierarchy
+        // is the one shape swagger-core describes lossily — see
+        // `unionsRewritten`, which runs over the whole batch since a hierarchy
+        // is a parent and its branches together.
         val described = resolved?.referencedSchemas.orEmpty().mapValues { (_, schema) -> schema.toJsonObj() }
         unionsRewritten(described, describer.described).forEach { (name, schema) ->
             if (!components.isRegistered(name)) components.register(name, schema)
@@ -89,11 +72,9 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
         val root = resolved?.schema ?: return jsonObj { "type" to "object" }
         val json = root.toJsonObj()
 
-        // Core's own walk, not a spelling of ours. swagger-core resolved this
-        // from an erased Java type, so a nullable element inside a `List` or a
-        // `Map` is gone by the time it gets here and only [type] still knows.
-        // Nullability *inside a model* is a different problem with a different
-        // owner — see `KotlinAwareModelResolver`, which has the constructor.
+        // swagger-core resolved this from an erased Java type, so a nullable
+        // element inside a `List` or `Map` is gone and only [type] still knows.
+        // Nullability inside a model is `KotlinAwareModelResolver`'s problem.
         return json.withNullabilityOf(type)
     }
 
@@ -101,38 +82,30 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
 }
 
 /**
- * The mapper used when none is supplied: Kotlin-aware, `java.time`-aware,
- * lenient about unknown fields, and writing dates as strings rather than
- * epoch numbers.
+ * The mapper used when none is supplied: Kotlin- and `java.time`-aware, lenient
+ * about unknown fields, and writing dates as strings.
  */
 fun defaultMapper(): ObjectMapper = jacksonMapperBuilder()
     .addModule(JavaTimeModule())
     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
     .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-    // Values and contents alike: a null field is written as `null` rather than
-    // dropped, because an absent field and a null one mean different things to
-    // a document that says the field is nullable.
+    // A null field is written rather than dropped: absent and null mean
+    // different things where the document says the field is nullable.
     .defaultPropertyInclusion(JsonInclude.Value.construct(JsonInclude.Include.ALWAYS, JsonInclude.Include.ALWAYS))
     .build()
 
 // ------------------------------------------------- swagger Schema -> JsonObj
 
 /**
- * `Json31` and not `Json`, because the dialect is decided by the serializer.
- * The same model object written through the 3.0 mapper emits `nullable` and a
- * scalar `type`; through this one it emits a `type` array and drops `nullable`
- * on the floor, which is exactly the 3.1 spelling and exactly the reason a
- * half-converted pipeline would silently lose nullability rather than fail.
+ * `Json31` and not `Json`: the serializer decides the dialect. The 3.0 mapper
+ * emits `nullable` and a scalar `type`; this one emits a `type` array, which is
+ * the 3.1 spelling — so a half-converted pipeline loses nullability silently.
  */
 private fun Schema<*>.toJsonObj(): JsonObj =
     SwaggerJson31.mapper().convertValue(this, JsonNode::class.java).toJsonValue() as? JsonObj
         ?: jsonObj { "type" to "object" }
 
-/**
- * swagger's model classes carry a bookkeeping field that records whether an
- * example was set explicitly. It is an artefact of their object model, not part
- * of the schema, and it is not wanted in the document.
- */
+/** An artefact of swagger's object model, not part of the schema. */
 private const val SWAGGER_BOOKKEEPING = "exampleSetFlag"
 
 private fun JsonNode.toJsonValue(): JsonValue = when {

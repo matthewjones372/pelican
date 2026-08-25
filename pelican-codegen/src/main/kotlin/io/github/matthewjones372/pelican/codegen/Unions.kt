@@ -10,16 +10,14 @@ import io.github.matthewjones372.pelican.jsonStrings
 /**
  * Schemas built out of other schemas, read once.
  *
- * Two callers ask the same question of a `oneOf` and get different jobs from
- * the answer: the type generator turns it into a sealed hierarchy, and the
- * importer decides whether the document could be described at all. Reading the
- * keyword twice would be two answers to one question, and the day they
- * disagreed the importer would accept a document the generator then degraded.
+ * The type generator turns a `oneOf` into a sealed hierarchy and the importer
+ * decides whether the document is describable at all. Two readings would be two
+ * answers, and the day they disagreed the importer would accept a document the
+ * generator then degraded.
  *
- * The reading is deliberately narrow. A `oneOf` is a Kotlin sealed hierarchy
- * only when the document says which branch a payload is — that is what a
- * `discriminator` is — because a decoder that has to guess is a decoder that
- * gets it wrong on the first payload two branches both accept.
+ * Narrow on purpose: a `oneOf` is a sealed hierarchy only where the document
+ * says which branch a payload is, because a decoder that guesses gets it wrong
+ * on the first payload two branches accept.
  */
 sealed interface Composed {
 
@@ -41,12 +39,9 @@ sealed interface Composed {
 }
 
 /**
- * One arm of a union: the class it becomes, and the value on the wire that
- * selects it.
- *
- * The two are separate on purpose. A document that maps `"card"` to
- * `#/components/schemas/CardPayment` has named the branch twice, and the name
- * a Kotlin reader types is not necessarily the string a payload carries.
+ * One arm of a union: the class it becomes and the wire value that selects it.
+ * Separate, because a document mapping `"card"` to `CardPayment` has named the
+ * branch twice and a reader's name is not the payload's string.
  */
 class Branch internal constructor(
     /** The discriminator value that selects this branch. Never derived — always read. */
@@ -83,21 +78,16 @@ fun composed(schema: JsonObj, components: JsonObj, name: String? = null): Compos
 }
 
 /**
- * The same hierarchy, written the way OpenAPI 3.0 wrote one: a parent carrying
- * the `discriminator`, and each child an `allOf` of the parent and its own
- * properties. Nothing points down, so the branches are found by looking for
- * the schemas that point up.
+ * The same hierarchy in OpenAPI 3.0's spelling: a parent carrying the
+ * `discriminator`, each child an `allOf` of it. Nothing points down, so the
+ * branches are found by looking for the schemas that point up.
  *
- * It is read as well as 3.1's `oneOf` because it is what a great many
- * documents say — swagger-core still emits it for an annotated Jackson
- * hierarchy, which means a document Pelican itself publishes from Kotlin
- * classes is one of them, and a round trip that could not read its own output
- * back would be no round trip at all.
+ * Read as well as 3.1's `oneOf` because swagger-core still emits it for an
+ * annotated Jackson hierarchy — so a document Pelican publishes is one, and a
+ * round trip that could not read its own output back would be no round trip.
  *
- * Without a `mapping`, the value that selects a branch is the branch's own
- * schema name. That is what OpenAPI says an implicit mapping is; where the
- * producer meant something else it did not write it down, and there is nothing
- * here to read instead.
+ * Without a `mapping` the selecting value is the branch's own schema name,
+ * which is OpenAPI's implicit mapping.
  */
 private fun inherited(name: String?, schema: JsonObj, components: JsonObj): Composed {
     val property = ((schema["discriminator"] as? JsonObj)?.get("propertyName") as? JsonStr)?.value
@@ -159,14 +149,11 @@ private fun union(schema: JsonObj, branches: List<JsonObj>, components: JsonObj)
 }
 
 /**
- * Whether this schema is itself a hierarchy — either spelling — asked of a
- * branch of another one.
+ * Whether this schema is itself a hierarchy, asked of a branch of another one.
  *
- * One level of look-ahead and no recursion, deliberately. Asking [composed] the
- * question instead would be the same question again one level down, and two
- * hierarchies that name each other as branches would ask it forever; this
- * answers "is there another level below this one", which is all a union above
- * needs to know, and any depth below is caught by the same check at that level.
+ * One level of look-ahead and no recursion: two hierarchies naming each other
+ * as branches would otherwise ask forever. "Is there another level below" is
+ * all a union above needs, and deeper levels are caught by the same check there.
  */
 private fun JsonObj?.isHierarchy(components: JsonObj, name: String?): Boolean {
     if (this == null) return false
@@ -193,11 +180,9 @@ private fun constant(branch: JsonObj, property: String, components: JsonObj): St
 /**
  * `allOf` flattened into the one class it describes.
  *
- * A property declared by two branches is the case that has no honest answer.
- * Keeping either would generate a class that decodes payloads the document
- * rejects, and the document is where the disagreement is — so it comes back as
- * [Composed.Undescribable] naming the properties, and the caller decides
- * whether that is a refusal or a fallback.
+ * A property declared by two branches has no honest answer: keeping either
+ * generates a class decoding payloads the document rejects. It comes back as
+ * [Composed.Undescribable], and the caller decides refusal or fallback.
  */
 private fun merge(schema: JsonObj, branches: List<JsonValue>, components: JsonObj): Composed {
     val properties = LinkedHashMap<String, JsonValue>()

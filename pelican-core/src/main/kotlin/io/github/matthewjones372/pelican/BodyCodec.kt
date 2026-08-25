@@ -3,12 +3,8 @@ package io.github.matthewjones372.pelican
 import kotlin.reflect.KType
 
 /**
- * Reads and writes a request or response body.
- *
- * Descriptions never hold one of these — they hold a [KType] and nothing more.
- * The codec is resolved when an [Api] is assembled, which is why swapping
- * Jackson for kotlinx.serialization changes one line in one file and touches
- * no endpoint description.
+ * Reads and writes a request or response body. Descriptions hold a [KType] and
+ * never one of these, which is why swapping JSON libraries changes one line.
  */
 interface BodyCodec<T> {
     fun encodeToString(value: T): String
@@ -16,11 +12,8 @@ interface BodyCodec<T> {
 }
 
 /**
- * Thrown when a request body cannot be decoded.
- *
- * Backends wrap whatever their codec threw in this, so mapping a bad body to a
- * 400 does not require naming `SerializationException` or `JacksonException` —
- * which a backend module has no business knowing about.
+ * Thrown when a request body cannot be decoded. Backends wrap whatever the
+ * codec threw, so mapping a bad body to a 400 names no JSON library.
  */
 class BodyDecodeFailure(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
@@ -40,33 +33,20 @@ interface SchemaComponents {
 }
 
 /**
- * Describes a type as an OpenAPI schema. Kept separate from [CodecFactory]
- * because documentation must be generatable without a server — and, in
- * practice, both implementations derive schemas from the same metadata their
- * codec uses, so the two stay consistent.
+ * Describes a type as an OpenAPI schema. Separate from [CodecFactory] because
+ * documentation has to be generatable without a server.
  */
 interface SchemaSource {
     fun schema(type: KType, components: SchemaComponents): JsonObj
 }
 
 /**
- * The same schema, but null is also allowed — spelled the way OpenAPI 3.1 does.
+ * The same schema with null allowed, spelled as OpenAPI 3.1 does: the dialect
+ * is JSON Schema 2020-12, so a nullable string is `type: ["string", "null"]`.
  *
- * 3.0 had a keyword for this, `nullable: true`, sitting outside JSON Schema and
- * meaning nothing to a JSON Schema validator. 3.1 dropped it: the dialect is
- * JSON Schema 2020-12, where null is a type like any other, so a nullable
- * string is `type: ["string", "null"]`.
- *
- * A `$ref` is the awkward one, and it is why this is a function rather than a
- * line in each schema source. `type` beside a `$ref` says "and also of this
- * type", not "or null", so a reference has to be put under `anyOf` next to a
- * bare null schema. That case is also the one 3.0 could not express at all —
- * a `$ref` took no siblings there, so both schema sources simply dropped the
- * nullability and documented a field that may be null as if it never were.
- *
- * It lives in core, beside [SchemaSource], because two schema sources that
- * spell this differently produce two different documents from one set of
- * descriptions — which is the thing this library exists not to do.
+ * A `$ref` is why this is a function rather than a line in each schema source.
+ * `type` beside a `$ref` means "and also of this type", so a reference goes
+ * under `anyOf` next to a bare null schema.
  */
 fun JsonObj.orNull(): JsonObj = when (val type = this["type"]) {
     is JsonStr -> this + jsonObj { put("type", jsonArr(listOf(type, JsonStr("null")))) }
@@ -82,24 +62,16 @@ fun JsonObj.orNull(): JsonObj = when (val type = this["type"]) {
 }
 
 /**
- * The same schema, made to agree with [type] about null at every depth [type]
- * has — not only at the top.
+ * The same schema, agreeing with [type] about null at every depth.
  *
- * `List<Order?>` is the shape that makes this worth a function. Erasure takes
- * the element's nullability with it, so a schema source deriving types from
- * Java reflection sees `List<Order?>` and `List<Order>` as the same thing and
- * describes the first one wrongly. Only the Kotlin type still knows, so the
- * two are walked together: `items` against the element type,
- * `additionalProperties` against the value type, as deep as the generics go.
+ * `List<Order?>` is the shape that needs it: erasure takes the element's
+ * nullability, so a source deriving types from Java reflection cannot tell it
+ * from `List<Order>`. Only the Kotlin type knows, so the two are walked
+ * together — `items` and `additionalProperties` against the last type argument,
+ * which is the element for `List`, `Array` and `Map` alike.
  *
- * The element is the *last* type argument, which is right for every shape a
- * schema spells this way: `List<T>` and `Array<T>` have one argument, `Map<K,
- * V>` has two and it is `V` that becomes the schema. A star projection carries
- * no type, and then there is nothing to descend into.
- *
- * A source whose own metadata already tracks nullability all the way down —
- * kotlinx.serialization's descriptors do — has no need of this and should not
- * call it twice over its own work.
+ * A source already tracking nullability all the way down, as
+ * kotlinx.serialization's descriptors do, should not call this over its work.
  */
 fun JsonObj.withNullabilityOf(type: KType): JsonObj {
     val element = type.arguments.lastOrNull()?.type
@@ -117,32 +89,20 @@ fun JsonObj.withNullabilityOf(type: KType): JsonObj {
 interface Codecs : CodecFactory, SchemaSource
 
 /**
- * How a request body is read, once the request says what it is.
- *
- * One entry per media type the endpoint declared, which is one entry for almost
- * every endpoint there has ever been. The choosing and the 415 live here rather
- * than in each interpreter for the same reason the multipart parser does: three
- * copies of "which codec reads this" would be three chances for one backend to
- * answer a `Content-Type` differently from the other two.
+ * How a request body is read, once the request says what it is: one entry per
+ * media type the endpoint declared. The choosing and the 415 live here so that
+ * three backends cannot answer a `Content-Type` three ways.
  */
 class RequestBodyCodecs internal constructor(private val byMediaType: Map<String, BodyCodec<Any?>>) {
 
     /**
      * The body as the value it decodes to.
      *
-     * [contentType] is consulted **only where the endpoint declared a choice.**
-     * With one encoding there is nothing to choose, and an endpoint that started
-     * refusing a request whose `Content-Type` it never checked before would be
-     * breaking callers over a header that carries no information here — a
-     * `jsonBody<T>()` sent with no header at all has always been decoded, and
-     * whatever the codec makes of a body that is not JSON is a 400 that
-     * describes the actual problem. Where there *are* alternatives the header is
-     * the only thing that says which decode was meant, so a media type nobody
-     * declared is a 415 rather than a guess.
-     *
-     * Whatever the codec throws is its own library's exception; wrapping it in
-     * core's own failure is what lets an interpreter map a bad body to a 400
-     * without naming Jackson or kotlinx.serialization.
+     * [contentType] is consulted only where the endpoint declared a choice.
+     * With one encoding the header carries no information — a `jsonBody<T>()`
+     * sent without one still decodes, and a body that is not JSON is a 400
+     * describing the actual problem. With alternatives it is the only thing
+     * saying which decode was meant, so an undeclared type is a 415.
      */
     fun decode(contentType: String?, text: String): Any? {
         val codec = select(contentType)
@@ -169,21 +129,15 @@ class RequestBodyCodecs internal constructor(private val byMediaType: Map<String
 }
 
 /**
- * Which codec reads this request body, or null for the bodies no codec reads —
- * a raw stream, a multipart envelope, no body at all.
- *
- * Lives here rather than in each interpreter because "a form body goes through
- * the configured codec, having been shaped by the published schema first" is a
- * decision about descriptions, not about a server. Three copies of it would be
- * three chances for one backend to read a form differently from the other two.
- * Called once per endpoint when a route is built, like every other codec.
+ * Which codec reads this request body, or null for the ones no codec reads — a
+ * raw stream, a multipart envelope, no body. A decision about descriptions
+ * rather than about a server, so it is here and not in each interpreter.
  */
 fun Codecs.requestBodyCodec(input: BodyInput<*>?): RequestBodyCodecs? = when (input) {
     is JsonBody<*>, is FormBody<*> -> RequestBodyCodecs(mapOf(input.mediaType to oneBodyCodec(input)))
 
-    // Every alternative is resolved here, not on the request that picks one, so
-    // an endpoint offering an encoding its payload type cannot be read from is a
-    // startup failure rather than a 500 for whichever caller chose that one.
+    // Resolved here rather than on the request that picks one, so an unreadable
+    // encoding is a startup failure and not a 500 for whoever chose it.
     is NegotiatedBody<*> -> RequestBodyCodecs(
         input.alternatives.associate { it.mediaType to oneBodyCodec(it) },
     )

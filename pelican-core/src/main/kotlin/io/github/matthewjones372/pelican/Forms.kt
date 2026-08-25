@@ -8,24 +8,14 @@ import kotlin.reflect.KType
 /**
  * A codec for an `application/x-www-form-urlencoded` body carrying [type].
  *
- * A form is a list of string pairs and nothing else: `count=3` is the same
- * three characters whether the field is a number, a string or an enum. So
- * something has to say which — and the honest answer is the schema the
- * document already publishes for [type]. This reads it, turns the fields into
- * a JSON document of the shape that schema describes, and hands that to the
- * configured [BodyCodec]. The reverse direction is the same trip backwards.
+ * A form is string pairs and nothing else, so something has to say whether
+ * `count=3` is a number: the schema already published for [type] does. The
+ * fields become a JSON document of that shape, which the configured
+ * [BodyCodec] then reads.
  *
- * Going through JSON is what keeps the two codec modules agreeing. Jackson
- * would happily coerce the string `"3"` into an `Int` on its own and
- * kotlinx.serialization would refuse — so a form body read by "let the codec
- * sort it out" would decode differently depending on a choice that is supposed
- * to change nothing. Reading the schema instead makes `count=3` a JSON number
- * before either library sees it, and `CodecAgreementTest`'s claim keeps
- * holding.
- *
- * Resolved once per endpoint at route-build time, alongside every other codec,
- * so a form whose type a schema cannot describe is a startup failure rather
- * than a 500 on the first POST.
+ * Going through JSON is what keeps the codec modules agreeing — Jackson would
+ * coerce `"3"` to an `Int` and kotlinx.serialization would refuse. Resolved
+ * once at route-build time, so an undescribable form is a startup failure.
  */
 @Suppress("UNCHECKED_CAST")
 fun <T> Codecs.formCodec(type: KType): BodyCodec<T> =
@@ -68,21 +58,16 @@ private class Field(val kind: Kind, val repeated: Boolean)
 /**
  * What each field of a form means, read off the published schema once.
  *
- * Only scalars and arrays of scalars, because that is what a form can carry: a
- * nested object would have to be spelled with a bracket convention nobody
- * agrees on — `user[name]` in PHP, `user.name` in Spring — and inventing a
- * fourth is worse than saying no. Saying no happens when the endpoint is bound,
- * rather than on the request that trips over it.
+ * Scalars and arrays of scalars only: a nested object needs a bracket
+ * convention nobody agrees on (`user[name]`, `user.name`), and inventing a
+ * fourth is worse than refusing at bind time.
  */
 private class FormShape(private val fields: Map<String, Field>) {
 
     fun toJson(pairs: List<Pair<String, String>>): JsonObj {
         val byName = LinkedHashMap<String, MutableList<String>>()
-        // A field the schema does not describe is dropped rather than
-        // rejected. Browsers send more than the form declares — the name of
-        // the submit button that was clicked, a CSRF token a filter already
-        // took care of — and refusing those would make an ordinary HTML form
-        // impossible to point at an endpoint.
+        // Dropped rather than rejected: browsers send more than the form
+        // declares — the submit button's name, a CSRF token a filter handled.
         pairs.filter { it.first in fields }
             .forEach { (name, value) -> byName.getOrPut(name) { mutableListOf() } += value }
 
@@ -92,10 +77,8 @@ private class FormShape(private val fields: Map<String, Field>) {
                 when {
                     field.repeated -> name to JsonArr(values.map { scalar(name, field.kind, it) })
 
-                    // An untouched field in an HTML form is submitted empty,
-                    // and "" is not a number, a boolean or an enum. Treating
-                    // it as absent is what lets the type's own default apply,
-                    // rather than answering 400 for a field nobody filled in.
+                    // An untouched HTML field is submitted empty, and "" is
+                    // not a number. Absent lets the type's own default apply.
                     values.first().isEmpty() && field.kind != Kind.STRING -> null
 
                     else -> name to scalar(name, field.kind, values.first())
@@ -125,11 +108,9 @@ private class FormShape(private val fields: Map<String, Field>) {
     }
 
     /**
-     * One field, as the type the schema says it is. A value that does not
-     * parse gets the same [DecodeFailure] a query parameter gets, naming the
-     * field and what was expected — so a bad form field is a 400 that explains
-     * itself rather than whatever the JSON library would have said about a
-     * document the caller never wrote.
+     * One field, as the type the schema says it is. A value that does not parse
+     * gets the same [DecodeFailure] a query parameter gets, rather than the
+     * JSON library's complaint about a document the caller never wrote.
      */
     private fun scalar(name: String, kind: Kind, raw: String): JsonValue = when (kind) {
         Kind.STRING -> JsonStr(raw)
@@ -180,11 +161,7 @@ private class FormShape(private val fields: Map<String, Field>) {
             return Field(kind, repeated = false)
         }
 
-        /**
-         * A `$ref` back into the schema it points at. Schema sources name any
-         * type they think is worth naming, so the shape of a form is usually
-         * behind one — and a form has to see the properties themselves.
-         */
+        /** A `$ref` followed to the schema it names; a form needs the properties. */
         private fun resolve(schema: JsonObj, components: SchemaRegistry): JsonObj {
             val ref = (schema["\$ref"] as? JsonStr)?.value ?: return schema
             val name = ref.substringAfterLast('/')

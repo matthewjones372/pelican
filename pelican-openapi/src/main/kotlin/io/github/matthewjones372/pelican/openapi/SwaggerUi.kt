@@ -9,13 +9,11 @@ import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.jsonStrings
 
 /**
- * How the docs page authenticates itself when a reader clicks "Authorize".
+ * How the docs page authenticates when a reader clicks "Authorize".
  *
- * There is no client secret here on purpose: the docs page is a public client
- * running in a browser, so a secret shipped to it is not secret. PKCE is what
- * replaces it, and is on by default — register the docs page with your identity
- * provider as a public client, with `<docsPath>/oauth2-redirect.html` as its
- * redirect URI.
+ * No client secret: the page runs in a browser, so a secret shipped to it is
+ * not secret. PKCE replaces it and is on by default — register the page as a
+ * public client with `<docsPath>/oauth2-redirect.html` as its redirect URI.
  */
 class DocsOAuth(
     val clientId: String,
@@ -28,19 +26,14 @@ class DocsOAuth(
 )
 
 /**
- * A Swagger UI page for [spec].
+ * A Swagger UI page for [spec]. With a [specPath] the page fetches the document
+ * from there, so a reader can curl the same URL; without one the document is
+ * embedded, so switching off `/openapi.json` does not leave the page pointed at
+ * nothing.
  *
- * When [specPath] is non-empty the page fetches the document from there, so a
- * reader can also curl the same URL and the two cannot drift. When it is empty
- * — the spec endpoint has been switched off — the document is embedded in the
- * page instead, so turning off `/openapi.json` does not silently leave a docs
- * page pointed at nothing.
- *
- * [oauth] turns on the Authorize button's ability to actually run the flow.
- * [oauthRedirectPath] is where [oauth2RedirectHtml] is served, and is turned
- * into an absolute URL by the page itself rather than being configured — the
- * origin the reader is on is the only one the browser will accept back, and it
- * is the one thing the server cannot know.
+ * [oauthRedirectPath] becomes absolute in the page rather than here: the origin
+ * the reader is on is the only one the browser will accept back, and the one
+ * thing the server cannot know.
  */
 fun swaggerUiHtml(
     title: String,
@@ -77,15 +70,12 @@ fun swaggerUiHtml(
 }
 
 /**
- * Where the identity provider sends the reader back to.
+ * Where the identity provider sends the reader back to. Runs in the pop-up
+ * Swagger UI opened, hands the code to the opener and closes; nothing is
+ * stored, and the token exchange happens in the opener.
  *
- * The page runs in the pop-up Swagger UI opened, hands the authorization code
- * back to the window that opened it, and closes. Nothing is stored and nothing
- * is sent anywhere else — the token exchange happens in the opener.
- *
- * `state` is compared against the value Swagger UI generated; a mismatch is
- * reported rather than silently accepted, because a response the page did not
- * ask for is exactly what a CSRF against the flow looks like.
+ * `state` is checked rather than accepted, because a response the page did not
+ * ask for is what a CSRF against the flow looks like.
  */
 fun oauth2RedirectHtml(): String = """
 <!doctype html>
@@ -97,8 +87,8 @@ fun oauth2RedirectHtml(): String = """
     var opener = window.opener && window.opener.swaggerUIRedirectOauth2;
     if (!opener) { document.body.innerText = 'Nothing opened this page.'; return; }
 
-    // The code flow answers in the query string; the implicit flow answers in
-    // the fragment, which never leaves the browser.
+    // The code flow answers in the query string; the implicit flow in the
+    // fragment, which never leaves the browser.
     var raw = window.location.hash
       ? window.location.hash.substring(1)
       : window.location.search.substring(1);
@@ -171,8 +161,8 @@ private fun oauthConfig(o: DocsOAuth): String = jsonObj {
 private fun js(value: String): String = JsonStr(value).render()
 
 /**
- * `</script>` anywhere inside a script block ends it, whatever the surrounding
- * quotes say — a summary or description containing one would otherwise break
- * out of the page. The escape is invisible to a JSON parser.
+ * `</script>` ends a script block whatever the surrounding quotes say, so a
+ * description containing one would break out of the page. The escape is
+ * invisible to a JSON parser.
  */
 private fun String.inlineInScript(): String = replace("</", "<\\/")

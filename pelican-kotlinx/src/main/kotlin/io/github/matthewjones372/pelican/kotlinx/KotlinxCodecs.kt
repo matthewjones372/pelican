@@ -7,19 +7,13 @@ import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 
 /**
- * Reads and writes bodies with kotlinx.serialization, and derives schemas by
- * walking the same `SerialDescriptor`s the serializers are built from.
+ * Reads and writes bodies with kotlinx.serialization, deriving schemas from the
+ * same `SerialDescriptor`s the serializers are built from.
  *
- * ```
- * Api(routes, codecs = KotlinxCodecs)          // defaults
- * Api(routes, codecs = KotlinxCodecs(myJson))  // configured
- * ```
+ * Not a fallback: the second implementation is what makes the pluggability
+ * testable, and `CodecAgreementTest` compares the two documents.
  *
- * This module is not a fallback — it is the second implementation that makes
- * the pluggability testable. `CodecAgreementTest` generates the same spec
- * through this and through `JacksonCodecs` and compares the results.
- *
- * Payload types must be `@Serializable`, which is the trade for not needing
+ * Payload types must be `@Serializable`, which is the trade for needing no
  * runtime reflection.
  */
 class KotlinxCodecs(private val json: Json) : Codecs {
@@ -42,10 +36,8 @@ class KotlinxCodecs(private val json: Json) : Codecs {
 }
 
 /**
- * The `Json` used when none is supplied. Configured to behave the way the
- * Jackson default does — lenient about unknown fields, and writing defaulted
- * properties rather than omitting them — so switching codecs changes the
- * library and not the wire format.
+ * The `Json` used when none is supplied, configured to behave as the Jackson
+ * default does, so switching codecs changes the library and not the wire.
  */
 fun defaultJson(): Json = Json {
     ignoreUnknownKeys = true

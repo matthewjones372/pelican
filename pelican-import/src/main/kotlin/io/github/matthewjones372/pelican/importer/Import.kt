@@ -6,27 +6,16 @@ import java.io.File
 /**
  * An OpenAPI document in, endpoint descriptions out.
  *
- * ```
- * Import.write(File("openapi.yaml"), ImportOptions("com.example.orders"), sourceRoot)
- * ```
+ * What comes out is ordinary Kotlin in the vocabulary a hand-written service
+ * uses, reaching for no server library — the file describes the API and does
+ * not run it, so it serves a client and a server equally.
  *
- * What comes out is ordinary Kotlin: input values, payload types, and one
- * `endpoint(...)` per operation, in the same vocabulary a hand-written service
- * uses. Nothing is generated that has to be edited to compile, and nothing is
- * generated that reaches for a server library — the file this writes describes
- * the API and does not run it, so it serves a client and a server equally.
+ * The import is strict: an operation Pelican cannot describe fails the whole
+ * import rather than generating an endpoint that says less than the document
+ * does. [ImportOptions.exclude] leaves one out, on the record.
  *
- * The import is strict. An operation using something Pelican cannot describe
- * fails the whole import, naming the operation and what it was, rather than
- * generating an endpoint whose type quietly says less than the document does.
- * Where the document is the one you own, fix it; where it is not, name the
- * operation in [ImportOptions.exclude] and it is left out, on the record.
- *
- * One refusal has a narrower way through than losing the operation. A `oneOf`
- * with no `discriminator` is a union nothing says how to read, and
- * [ImportOptions.discriminators] is where a reader states the property the
- * document should have named — per schema, in the build file, on the record in
- * the same way.
+ * [ImportOptions.discriminators] is the narrower way past one refusal: a
+ * `oneOf` with no `discriminator` is a union nothing says how to read.
  */
 object Import {
 
@@ -38,11 +27,8 @@ object Import {
 
     /**
      * Writes what [kotlin] generates into [sourceRoot], laid out by package.
-     *
-     * The endpoints file is rewritten every time. A handler file is written
-     * once and never again: its whole purpose is to be filled in, and a
-     * generator that overwrote it would be deleting the only part of this
-     * anybody wrote by hand.
+     * The endpoints file is rewritten every time; a handler file is written
+     * once, its whole purpose being to be filled in.
      */
     fun write(document: File, options: ImportOptions, sourceRoot: File): List<File> {
         val directory = File(sourceRoot, options.packageName.replace('.', '/'))
@@ -55,14 +41,10 @@ object Import {
     }
 
     /**
-     * Rewrites the lockfile from what the allowed hosts are serving now, and
-     * says what changed.
-     *
-     * Only the bundling runs, not the whole import: what is being recorded is
-     * which URLs the document reaches and what is at them, and a document with
-     * an operation Pelican cannot describe still has references worth locking.
-     * Refusing to update the lockfile until the import succeeds would make one
-     * problem block the fix for the other.
+     * Rewrites the lockfile from what the allowed hosts serve now, and says what
+     * changed. Only the bundling runs: a document with an undescribable
+     * operation still has references worth locking, and blocking one fix on the
+     * other helps nobody.
      */
     fun updateLock(document: File, options: ImportOptions, acceptChanges: Boolean): List<String> {
         val remote = Remote.forUpdate(options)
@@ -72,27 +54,20 @@ object Import {
 }
 
 /**
- * The one entry the Gradle plugin calls, taking and returning only types the
- * JDK already has.
+ * The one entry the Gradle plugin calls, in types the JDK already has.
  *
- * The plugin does not compile against this module — it loads it off the
- * consumer's own classpath by name, so that the plugin's version and the
- * library's stay independent. That is only cheap while the signature it looks
- * up is made of `File`, `String` and `Set`; a reflective call that had to
- * build an [ImportOptions] first would put this module's constructor in the
- * plugin's hands, which is the coupling being avoided.
+ * The plugin loads this off the consumer's classpath by name, which keeps the
+ * two versions independent — and stays cheap only while the signature is made
+ * of `File`, `String` and `Set`. Building an [ImportOptions] reflectively would
+ * put this module's constructor in the plugin's hands.
  *
- * [handlers] is a [Backend] name, or null for no handler stubs; [codec] is a
- * [CodecAnnotations] name, or null for the default; [discriminators] is the
- * per-schema discriminator hints, addressed as [Hints] describes;
- * [allowRemote] is the hosts a `$ref` may be fetched from and [lockfile] is
- * where the hash of everything fetched is recorded, both as [Remote]
- * describes.
+ * [handlers] is a [Backend] name, [codec] a [CodecAnnotations] name;
+ * [discriminators] is addressed as [Hints] describes, and [allowRemote] and
+ * [lockfile] as [Remote] does.
  *
- * Every arity is declared rather than one with defaults, because what the
- * plugin looks up is a signature: a defaulted parameter would leave the older
- * ones existing only as synthetic bridges, and a plugin release and a library
- * release would have to arrive together.
+ * Every arity is declared rather than defaulted, because what the plugin looks
+ * up is a signature — a default would leave the older ones as synthetic
+ * bridges, forcing plugin and library releases to arrive together.
  */
 @Suppress("LongParameterList") // Every parameter is one entry in the build file's `endpoints { }` block.
 fun importEndpoints(
@@ -167,20 +142,15 @@ fun importEndpoints(
 ): List<File> = importEndpoints(document, sourceRoot, packageName, name, exclude, handlers, codec, emptyMap())
 
 /**
- * Rewrites [lockfile] from what [allowRemote] is serving now, and returns one
- * line per URL added, changed or dropped.
+ * Rewrites [lockfile] from what [allowRemote] serves now, returning one line per
+ * URL added, changed or dropped.
  *
- * The second entry point the plugin calls, and made of the same JDK types as
- * the first for the same reason. It is separate from [importEndpoints] rather
- * than a flag on it because it is the one operation here that trusts the
- * network: a build fetches nothing this has not already recorded, and keeping
- * the two apart is what makes that sentence checkable rather than a claim
- * about which branch a boolean took.
+ * Separate from [importEndpoints] rather than a flag on it, because it is the
+ * one operation here that trusts the network — which makes "a build fetches
+ * nothing this has not recorded" checkable rather than a claim about a boolean.
  *
- * [acceptChanges] is required before a hash that is already recorded may
- * change. Adding a URL nobody had recorded is new review surface and shows up
- * in the diff as such; *changing* one is the supply-chain event, and it is
- * worth a second word on the command line.
+ * [acceptChanges] is required before a recorded hash may change: adding a URL
+ * shows in the diff, and changing one is the supply-chain event.
  */
 fun updateRemoteLock(
     document: File,
@@ -215,87 +185,60 @@ class ImportOptions(
     val name: String = "api",
 
     /**
-     * Operations to leave out, by `operationId`.
-     *
-     * This is the release valve on a strict import, and it is deliberately
-     * per-operation and written down in the build. A document with three
-     * operations Pelican cannot describe should generate the other two hundred
-     * — but it should say which three, in a file somebody reviews, so that a
-     * fourth one appearing next quarter fails the build instead of quietly
-     * joining them.
+     * Operations to leave out, by `operationId` — the release valve on a strict
+     * import, per-operation and written down in the build. A document with
+     * three undescribable operations should generate the other two hundred and
+     * say which three, so a fourth fails the build.
      */
     val exclude: Set<String> = emptySet(),
 
     /**
-     * Schema -> the property that tells the branches of its `oneOf` apart,
-     * for the unions a document declares without a `discriminator`.
+     * Schema -> the property telling the branches of its `oneOf` apart, for
+     * unions a document declares without a `discriminator`.
      *
-     * The refusal these get past is not being softened: a decoder still cannot
-     * try each branch and keep the first that parsed. What changes is who says
-     * which branch a payload is. The document did not, and a reader who knows
-     * writes it down here — per schema, in the build file, reviewed once, the
-     * way [exclude] is. See [Hints] for how a schema is addressed and where
-     * each branch's wire value comes from.
+     * The refusal is not softened — a decoder still cannot try each branch and
+     * keep the first that parsed. What changes is who says which branch a
+     * payload is: a reader, per schema, reviewed once. See [Hints].
      *
-     * A hint that stops mattering fails the import rather than doing nothing:
-     * the document stating its own `discriminator`, or nothing reaching the
-     * schema any more, both leave a claim about a payload format that is
-     * checked against nothing.
+     * A hint that stops mattering fails the import, since a claim about a
+     * payload format checked against nothing is worse than none.
      */
     val discriminators: Map<String, String> = emptyMap(),
 
     /**
-     * The hosts a `$ref` may be fetched from, as origins — `example.com`,
-     * `https://example.com`, `http://mirror.internal:8080`.
+     * The hosts a `$ref` may be fetched from, as origins. Empty by default,
+     * which means a `$ref` to another host fails the import.
      *
-     * Empty by default, and empty is the whole of the old behaviour: a `$ref`
-     * to another host fails the import. Naming a host does not make the build
-     * trust what it serves, only what it serves *once*: every URL reached and
-     * the hash of what came back are written to [lockfile], and a later build
-     * that gets different bytes fails rather than generating different code.
-     *
-     * Per host, in the build file, reviewed once — the shape [exclude] and
-     * [discriminators] have, for the reason they have it. A global "follow
-     * references" switch would have answered a different question: it says
-     * "and wherever else the document points", where this says "this host, and
-     * these documents at these hashes".
+     * Naming a host trusts what it serves *once*: every URL reached and the
+     * hash of what came back go into [lockfile], and a later build getting
+     * different bytes fails. A global "follow references" switch would say
+     * "and wherever else the document points"; this says "this host, at these
+     * hashes".
      */
     val allowRemote: Set<String> = emptySet(),
 
     /**
-     * Where the URL and hash of everything fetched is recorded, and checked
-     * against on every later build.
-     *
+     * Where the URL and hash of everything fetched is recorded and checked.
      * Required as soon as [allowRemote] names anything: there is no mode that
-     * fetches without recording. See [Remote] for the format, the cache beside
-     * it that makes an offline build possible, and how it is updated.
+     * fetches without recording. See [Remote].
      */
     val lockfile: File? = null,
 
     /**
-     * Which codec the generated payload types are annotated for.
+     * Which codec the generated payload types are annotated for. Costs a
+     * document with no union nothing; a union is the exception, since
+     * `sealed interface Payment` does not say which property carries the
+     * branch and the two libraries spell that differently.
      *
-     * It costs a document with no union nothing: no annotation is written
-     * unless a sealed hierarchy is generated, and nothing else in the file has
-     * ever needed one. A union is the exception — `sealed interface Payment`
-     * does not say which property carries the branch or what string selects
-     * each one, and the two libraries spell that differently — so the file is
-     * annotated for whichever one will be reading the bodies.
-     *
-     * Jackson by default, because `pelican-jackson` is the default codec
-     * module. Choosing kotlinx.serialization is not free in the same way: it
-     * has no reflective fallback, so every generated payload type carries
-     * `@Serializable` under it.
+     * Jackson by default. kotlinx.serialization is not free the same way: with
+     * no reflective fallback, every payload type carries `@Serializable`.
      */
     val codec: CodecAnnotations = CodecAnnotations.JACKSON,
 
     /**
-     * The backend to generate handler stubs for, or null for none.
-     *
-     * The stubs are written once and never overwritten. They exist so that a
-     * spec-first service compiles on the first run and fails only where it is
-     * called — a `TODO()` per operation is the honest state of a service
-     * nobody has written yet.
+     * The backend to generate handler stubs for, or null for none. Written once
+     * and never overwritten, so a spec-first service compiles on the first run
+     * and fails only where it is called.
      */
     val handlers: Backend? = null,
 )

@@ -23,13 +23,11 @@ import org.apache.pekko.http.javadsl.model.Uri
 import java.util.concurrent.TimeUnit
 
 /**
- * Runs requests straight through the interpreted route. No socket, no port, no
- * bind — but not a shortcut either: `Route.function` seals the route, so path
- * matching, parameter decoding, body handling, response building and the
- * rejection-to-status rules are all the ones a bound server would use.
+ * Runs requests straight through the interpreted route: no socket, but not a
+ * shortcut either — `Route.function` seals the route, so matching, decoding and
+ * the rejection-to-status rules are a bound server's.
  *
- * What it does *not* exercise is everything below the route: chunk framing on
- * the wire, connection handling, TLS. Keep a socket-level test for those.
+ * It does not exercise chunk framing, connection handling or TLS.
  */
 class InMemoryTransport(
     private val api: Api,
@@ -43,11 +41,9 @@ class InMemoryTransport(
     var shutdownTimeoutSeconds: Long = 10
 
     /**
-     * The raw exchange, with the response entity still unconsumed.
-     *
-     * The escape hatch for anything [Transport] flattens away: a chunked
-     * entity is still lazy here, so back-pressure and delivery-timing
-     * assertions work in memory exactly as they do over a socket.
+     * The raw exchange, entity unconsumed — the escape hatch for what
+     * [Transport] flattens away. A chunked entity is still lazy, so
+     * delivery-timing assertions work in memory as over a socket.
      */
     fun exchange(request: HttpRequest): HttpResponse =
         handler.apply(request).toCompletableFuture().join()
@@ -66,13 +62,9 @@ class InMemoryTransport(
     }
 
     /**
-     * Shuts the system down and *waits* for it to be down.
-     *
-     * `terminate()` is asynchronous, so returning straight after it would let a
-     * suite that opens several clients stack up systems and their thread pools
-     * while reporting each one closed. This is what `ActorTestKit`'s
-     * `shutdownTestKit` does; doing it here avoids a testkit dependency on this
-     * module's main classpath for the one behaviour that matters.
+     * Shuts the system down and waits for it to be down. `terminate()` is
+     * asynchronous, so returning straight after it would let a suite stack up
+     * systems and their thread pools while reporting each one closed.
      */
     override fun close() {
         if (!ownsSystem) return
@@ -86,8 +78,7 @@ private fun RequestSpec.toPekko(): HttpRequest {
         .withMethod(method.toPekkoMethod())
         .withUri(Uri.create(target))
 
-    // Content-Type belongs to the entity in Pekko's model, so it is set with
-    // the body rather than added as a header.
+    // Content-Type belongs to the entity in Pekko's model.
     headers.filterNot { it.first.equals("Content-Type", ignoreCase = true) }
         .forEach { (name, value) -> req = req.addHeader(HttpHeader.parse(name, value)) }
 
@@ -95,10 +86,8 @@ private fun RequestSpec.toPekko(): HttpRequest {
     if (payload != null) {
         val declared = headers.firstOrNull { it.first.equals("Content-Type", ignoreCase = true) }
         val contentType = declared?.let { ContentTypes.parse(it.second) } ?: ContentTypes.APPLICATION_JSON
-        // A multipart content type is not one Pekko will take a String for —
-        // it carries a boundary and is modelled as binary — so the bytes are
-        // handed over instead. UTF-8 either way, which is what the String
-        // already was.
+        // Pekko models a multipart content type as binary, so the bytes go
+        // over instead. UTF-8 either way.
         req = req.withEntity(
             if (contentType is ContentType.NonBinary) HttpEntities.create(contentType, payload)
             else HttpEntities.create(contentType, payload.toByteArray(Charsets.UTF_8)),
@@ -118,15 +107,9 @@ private fun Method.toPekkoMethod(): HttpMethod = when (this) {
 }
 
 /**
- * A client that talks to this API in memory.
- *
- * ```
- * val app = ordersApi().inMemory()
- * ```
- *
- * Owns an `ActorSystem`, so close it when the suite is done. Pass an existing
- * system instead to share one across test classes — creating one per class is
- * the main cost left in an in-memory suite.
+ * A client that talks to this API in memory. Owns an `ActorSystem`, so close it
+ * when the suite is done; pass an existing one to share it across classes,
+ * which is the main cost left in an in-memory suite.
  */
 fun Api.inMemory(systemName: String = "pelican-test"): ApiClient =
     ApiClient(
@@ -138,16 +121,8 @@ fun Api.inMemory(system: ActorSystem<Void>): ApiClient =
     ApiClient(InMemoryTransport(this, system, ownsSystem = false), codecs)
 
 /**
- * A client for a server this process started. The codecs come from the [Api]
- * it is serving, so there is nothing to keep in sync:
- *
- * ```
- * val server = ordersApi().start(port = 0)
- * val app = server.client()
- * ```
- *
- * This lived in `pelican-test` until it was the only reason that module
- * dragged Pekko onto every consumer's test classpath. It is one function; the
- * transport it builds is the JDK's own.
+ * A client for a server this process started; the codecs come from the [Api] it
+ * serves. Here rather than in `pelican-test`, which would otherwise drag Pekko
+ * onto every consumer's test classpath.
  */
 fun PelicanServer.client(): ApiClient = apiClient(baseUrl, api.codecs)

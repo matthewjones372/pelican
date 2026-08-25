@@ -69,8 +69,8 @@ fun Api.docsRoutes(docs: Docs = Docs()): List<RoutingHttpHandler> {
                     cors,
                 ),
             )
-            // Served next to the page, so the identity provider has one redirect
-            // URI to register and it is on the same origin as the docs.
+            // Next to the page, so the provider has one redirect URI to
+            // register and it is on the docs' own origin.
             if (redirectPath != null) {
                 add(staticRoute(redirectPath, "text/html; charset=utf-8", oauth2RedirectHtml(), cors))
             }

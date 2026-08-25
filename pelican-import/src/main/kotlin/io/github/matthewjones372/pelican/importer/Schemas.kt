@@ -10,23 +10,17 @@ import io.github.matthewjones372.pelican.codegen.composed
 /**
  * What a schema has to say to become a Kotlin type.
  *
- * The type generator this hands schemas to — `pelican-codegen`'s, the same one
- * the client generator uses — answers anything it cannot model with `Any?`.
- * That is the right answer *there*: a client that generates is better than a
- * client that does not, and `Any?` is honest about what it knows.
+ * `pelican-codegen`'s type generator answers anything it cannot model with
+ * `Any?`, which is right for a client and wrong here: an import that turned a
+ * union into `Any?` would produce a handler taking `Any?` and a document no
+ * longer saying what the original did, with no sign anything was lost.
  *
- * It is the wrong answer here. An import that turned a union into `Any?` would
- * produce a handler taking `Any?`, a document that no longer says what the
- * original said, and no sign that anything was lost. So the shapes that would
- * degrade are refused before the generator ever sees them, and the ones that
- * are genuinely unconstrained — an empty schema, a free-form object — are let
- * through, because `Any?` and `Map<String, Any?>` are what those mean.
+ * So shapes that would degrade are refused before the generator sees them, and
+ * the genuinely unconstrained ones are let through — `Any?` and
+ * `Map<String, Any?>` are what an empty schema and a free-form object mean.
  *
- * The composed shapes are read by `pelican-codegen` rather than here, and by
- * exactly the function that generates them. Two readings of one `oneOf` is one
- * reading too many: the day they disagreed, this would accept a document the
- * generator then quietly degraded, which is the failure mode the whole module
- * is arranged against.
+ * The composed shapes are read by the function that generates them, not here:
+ * two readings of one `oneOf` would eventually disagree.
  */
 internal object Schemas {
 
@@ -49,13 +43,9 @@ internal object Schemas {
     }
 
     /**
-     * The one refusal here with a way through that is not "lose the
-     * operation", said where the refusal is.
-     *
-     * It belongs to this module rather than to the reason `pelican-codegen`
-     * wrote, because it is a sentence about a build file: the generator has no
-     * opinion about `endpoints { }`, and a document a *client* was generated
-     * from was never refused in the first place.
+     * The one refusal with a way through that is not "lose the operation".
+     * Here rather than in `pelican-codegen`'s message because it is a sentence
+     * about a build file, which the generator has no opinion about.
      */
     private fun wayThrough(obj: JsonObj, undescribable: Composed.Undescribable): String =
         if (undescribable.keyword != "oneOf" || obj["discriminator"] != null) {

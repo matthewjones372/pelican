@@ -8,21 +8,12 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeParseException
 
 /**
- * Refinements for plain (string-carried) inputs.
+ * Refinements for plain inputs. A [PlainCodec] says what a value parses as; a
+ * refinement narrows it further, rejecting with a 400 before any handler sees
+ * it *and* writing the constraint into the schema — so the document says what
+ * the server enforces.
  *
- * A [PlainCodec] already decides what a path segment, query parameter or
- * header *parses as*. A refinement narrows that further — non-empty, in range,
- * matching a pattern — and does two things at once: the value is rejected with
- * a 400 before any handler sees it, and the constraint is written into the
- * OpenAPI schema, so the document says what the server actually enforces.
- *
- * ```
- * val limit = queryParam("limit", IntCodec.between(1, 100), description = "Page size")
- * val slug  = pathParam("slug", StringCodec.matching(Regex("[a-z-]+"), "a slug"))
- * ```
- *
- * Wrapping the refined codec in a type of your own is the version that also
- * survives being passed around — see [map] and [mapOrFail].
+ * See [map] and [mapOrFail] for the version that survives being passed around.
  */
 internal class DerivedPlainCodec<A : Any, B : Any>(
     private val base: PlainCodec<A>,
@@ -63,19 +54,8 @@ fun <T : Any> PlainCodec<T>.refine(
 )
 
 /**
- * Derives a codec for a type of your own, where the conversion can fail:
- * return null and the request is a 400 rather than an exception in a handler.
- *
- * ```
- * @JvmInline value class Email(val value: String)
- *
- * val emailCodec = StringCodec.mapOrFail(
- *     expected = "an email address",
- *     facets = jsonObj { "format" to "email" },
- *     decode = { raw -> if ("@" in raw) Email(raw) else null },
- *     encode = Email::value,
- * )
- * ```
+ * Derives a codec for a type of your own where the conversion can fail: return
+ * null and the request is a 400 rather than an exception in a handler.
  */
 fun <A : Any, B : Any> PlainCodec<A>.mapOrFail(
     expected: String,
@@ -90,9 +70,8 @@ fun <A : Any, B : Any> PlainCodec<A>.mapOrFail(
 )
 
 /**
- * Documents the *type*, not one use of it. Every parameter built from the
- * returned codec carries this description and example unless it says something
- * of its own.
+ * Documents the type rather than one use of it: every parameter built from the
+ * returned codec carries this unless it says something of its own.
  */
 fun <T : Any> PlainCodec<T>.describedAs(
     description: String? = null,
@@ -155,13 +134,8 @@ fun <T> PlainCodec<T>.between(min: T, max: T): PlainCodec<T> where T : Number, T
     ) { it in min..max }
 
 /**
- * Rejects zero and negatives.
- *
- * The bound is the *value* of `exclusiveMinimum`, which is what OpenAPI 3.1
- * means by it. 3.0 meant something else by the same word — a boolean flag
- * modifying `minimum`, so this pair was `minimum: 0, exclusiveMinimum: true` —
- * and this facet has always been written the JSON Schema way, which made it
- * quietly wrong under the 3.0 emitter and makes it right now with no change.
+ * Rejects zero and negatives. The bound is the *value* of `exclusiveMinimum`,
+ * which is what 3.1 means by it; 3.0 meant a boolean flag modifying `minimum`.
  */
 fun <T> PlainCodec<T>.positive(): PlainCodec<T> where T : Number, T : Comparable<T> =
     refine("a positive value", jsonObj { put("exclusiveMinimum", JsonNum(0)) }) {
@@ -171,9 +145,8 @@ fun <T> PlainCodec<T>.positive(): PlainCodec<T> where T : Number, T : Comparable
 // ------------------------------------------------------- ready-made types
 
 /**
- * A string that is known not to be empty, because nothing else can be
- * constructed. Unlike a refinement on one parameter, the *type* carries the
- * guarantee into whatever the handler passes it to.
+ * A string known not to be empty, because nothing else can be constructed.
+ * Unlike a refinement, the type carries the guarantee onwards.
  */
 @JvmInline
 value class NonEmptyString private constructor(val value: String) {
