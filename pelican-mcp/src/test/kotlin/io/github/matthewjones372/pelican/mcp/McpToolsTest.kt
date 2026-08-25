@@ -18,6 +18,7 @@ class McpToolsTest {
 
     data class Order(val id: Long, val item: String)
     data class CreateOrder(val item: String, val quantity: Int = 1)
+    data class Queued(val ticket: String)
 
     private val userId = pathParam<Long>("userId", description = "The user's id")
     private val limit = queryParam("limit", IntCodec.between(1, 100), description = "Maximum rows").default(25)
@@ -39,10 +40,11 @@ class McpToolsTest {
         json<Order>(status = 201)
     }
 
-    private val ticks = endpoint {
-        get("ticks")
-        operationId = "ticks"
-        ndjson<Order>()
+    /** Two right answers to one question, so neither is *the* shape that comes back. */
+    private val submitOrder = endpoint(userId, newOrder) {
+        post("users" / userId / "orders" / "submit")
+        operationId = "submitOrder"
+        json<Order>(status = 201) or json<Queued>(status = 202)
     }
 
     private val secret = endpoint {
@@ -52,13 +54,17 @@ class McpToolsTest {
         json<Order>()
     }
 
+    // `placeOrder` requires an X-Api-Key, and a required header with nothing
+    // behind it is refused: see McpDispatchTest.
+    private val options = McpOptions(headers = mapOf("X-Api-Key" to "let-me-in"))
+
     private fun toolsFor(vararg endpoints: Endpoint<*, *>): List<McpTool> =
-        ApiSpec(endpoints.toList(), JacksonCodecs).mcpTools()
+        ApiSpec(endpoints.toList(), JacksonCodecs).mcpTools(options)
 
     @Test
     fun `one tool per endpoint, named as the document and the generated client name it`() {
-        toolsFor(getOrder, placeOrder, ticks).map { it.name } shouldContainExactly
-            listOf("listOrders", "placeOrder", "ticks")
+        toolsFor(getOrder, placeOrder, submitOrder).map { it.name } shouldContainExactly
+            listOf("listOrders", "placeOrder", "submitOrder")
     }
 
     @Test
@@ -127,8 +133,8 @@ class McpToolsTest {
         }
         (placed!!["\$ref"] as JsonStr).value shouldBe "#/\$defs/Order"
 
-        withClue("a stream is not one answer, and MCP has nowhere to put the rest") {
-            toolsFor(ticks).single().outputSchema.shouldBeNull()
+        withClue("two declared successes are two shapes, and there is one outputSchema to publish") {
+            toolsFor(submitOrder).single().outputSchema.shouldBeNull()
         }
     }
 }

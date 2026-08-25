@@ -1,13 +1,20 @@
 package io.github.matthewjones372.pelican.mcp
 
 import io.github.matthewjones372.pelican.ApiSpec
+import io.github.matthewjones372.pelican.BodyInput
+import io.github.matthewjones372.pelican.ByteStreamOutput
+import io.github.matthewjones372.pelican.EmptyOutput
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FallibleOutput
+import io.github.matthewjones372.pelican.JsonArrayOutput
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonOutput
+import io.github.matthewjones372.pelican.NdjsonOutput
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.PlainCodec
 import io.github.matthewjones372.pelican.QueryParam
+import io.github.matthewjones372.pelican.SseOutput
+import io.github.matthewjones372.pelican.TextOutput
 import io.github.matthewjones372.pelican.emptyJsonObj
 import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.jsonStrings
@@ -40,13 +47,25 @@ class McpTool(
     val outputSchema: JsonObj? = null,
 )
 
-/** Which endpoints a model is told about. */
+/** Which endpoints a model is told about, and what is supplied on its behalf. */
 class McpOptions(
     /**
      * Default: everything the document describes. `hidden` already means "still
      * served, not written down", and a tool list is somewhere it is written down.
+     *
+     * A service with streams or uploads has to narrow this: what MCP cannot
+     * carry is refused rather than quietly dropped, so that leaving an endpoint
+     * out is a decision somebody made.
      */
     val include: (Endpoint<*, *>) -> Boolean = { !it.hidden },
+
+    /**
+     * Header values supplied for every call, by name — an `X-Api-Key` the
+     * service requires. Headers are not tool arguments: a model asked for a
+     * credential invents one, so the credential belongs to whatever serves
+     * these tools.
+     */
+    val headers: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -59,10 +78,11 @@ class McpOptions(
  */
 fun ApiSpec.mcpTools(options: McpOptions = McpOptions()): List<McpTool> {
     val standalone = StandaloneSchemas(schemas)
-    return endpoints.filter(options.include).map { it.mcpTool(standalone) }
+    return endpoints.filter(options.include).map { it.mcpTool(standalone, options) }
 }
 
-private fun Endpoint<*, *>.mcpTool(schemas: StandaloneSchemas): McpTool {
+internal fun Endpoint<*, *>.mcpTool(schemas: StandaloneSchemas, options: McpOptions): McpTool {
+    refuseWhatMcpCannotCarry(options)
     val summary = summary
     val description = description ?: summary
     return McpTool(
@@ -72,6 +92,19 @@ private fun Endpoint<*, *>.mcpTool(schemas: StandaloneSchemas): McpTool {
         title = summary?.takeIf { it != description },
         outputSchema = successType()?.let { schemas.schema(it) },
     )
+}
+
+/**
+ * One tool as `tools/list` publishes it, which is also the shape a golden file
+ * records: a tool list is a contract with whatever is pointed at it, and a
+ * schema that quietly narrows is a caller's call that quietly stops working.
+ */
+fun McpTool.toJson(): JsonObj = jsonObj {
+    "name" to name
+    putIfNotNull("title", title)
+    putIfNotNull("description", description)
+    put("inputSchema", inputSchema)
+    put("outputSchema", outputSchema)
 }
 
 /**
@@ -111,6 +144,50 @@ private fun QueryParam<*>.argumentSchema(): JsonObj =
 
 private fun PlainCodec<*>.described(description: String?): JsonObj =
     openApiSchema() + ((description ?: this.description)?.let { jsonObj { "description" to it } } ?: emptyJsonObj)
+
+/**
+ * What a tool call cannot carry, refused where the tools are derived rather
+ * than at the call that trips over it.
+ *
+ * MCP answers one call with one result: there is nowhere to put a second row,
+ * an event or a byte stream, and nothing on the way in to carry an upload. A
+ * cookie is a browser's, and a required header a model would have to invent.
+ * Each of these is an endpoint to leave out of `include`, or a decision to
+ * make — never a tool that half works.
+ */
+private fun Endpoint<*, *>.refuseWhatMcpCannotCarry(options: McpOptions) {
+    require(output.isOneAnswer()) {
+        "$operationName answers with $output, and a tool call has one result to put an answer in — " +
+            "a stream of rows or events has nowhere to go. Leave it out with " +
+            "McpOptions(include = { ... }), and let a caller that can stream have it over HTTP."
+    }
+    require(bodyInput.isReadable()) {
+        "$operationName takes $bodyInput, which is bytes rather than a payload a model could write. " +
+            "Leave it out with McpOptions(include = { ... })."
+    }
+    require(cookieParams.isEmpty()) {
+        "$operationName reads the cookie(s) ${cookieParams.joinToString { it.name }}, and a tool call has " +
+            "no browser behind it. Leave it out with McpOptions(include = { ... }), or read the value " +
+            "from somewhere a caller without cookies can supply it."
+    }
+    val missing = headerParams.filter { it.required && it.name !in options.headers }
+    require(missing.isEmpty()) {
+        "$operationName requires the header(s) ${missing.joinToString { it.name }}, and a header is not a " +
+            "tool argument — a model asked for one invents it. Supply the value with " +
+            "McpOptions(headers = mapOf(\"${missing.first().name}\" to ...)), or leave the endpoint out " +
+            "with McpOptions(include = { ... })."
+    }
+}
+
+/** One result, and one thing to put in it. */
+private fun Output<*>.isOneAnswer(): Boolean = when (this) {
+    is JsonOutput<*>, is TextOutput, is EmptyOutput -> true
+    is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*>, is ByteStreamOutput -> false
+    is FallibleOutput<*, *> -> successes.all { it.isOneAnswer() }
+}
+
+/** A body a codec reads is one a model could write; an envelope or a raw stream is not. */
+private fun BodyInput<*>?.isReadable(): Boolean = this == null || payloadType != null
 
 /**
  * The type of the one JSON answer, or null where there is not exactly one.
