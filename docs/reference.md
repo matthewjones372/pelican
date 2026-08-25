@@ -3686,7 +3686,11 @@ open  localhost:8080/api-docs                                 # Swagger UI
 
 Kotlin 2.4.10 · Pekko 1.7.0 · Pekko HTTP 1.4.0 · http4k 6.58.0.0 · Ktor 3.5.2 ·
 Jackson 2.22.2 · swagger-core 2.2.54 · kotlinx.serialization 1.11.0 ·
-slf4j-api 2.0.17 · JDK 21 · Gradle 9.7.1
+jsoniter 0.9.23 · slf4j-api 2.0.18 · snakeyaml-engine 2.10 · JDK 21 ·
+Gradle 9.7.1
+
+This is the only copy of that list. The README carried a second one until the
+two disagreed about half of it, and now points here instead.
 
 http4k built against a newer stdlib than the compiler reading it fails on
 metadata, so the two are bumped together; `pelican-http4k/build.gradle.kts`
