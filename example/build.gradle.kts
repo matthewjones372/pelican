@@ -27,6 +27,13 @@ dependencies {
     // Meters, which are opt-in in the same way serving the docs is: this is the
     // module that adds them, and `example.metrics` is what it looks like.
     implementation(project(":pelican-metrics"))
+    // The same idea through the other vendor's API, and a separate module for
+    // exactly that reason: `example.tracing` is what it looks like. The SDK is
+    // declared here rather than arriving through the module, because which SDK
+    // a service runs — or whether it runs one at all — is the service's choice
+    // and not the library's.
+    implementation(project(":pelican-metrics-otel"))
+    implementation("io.opentelemetry:opentelemetry-sdk:1.65.0")
     // The other two codec modules, for `example.codecs`: the same endpoints and
     // handlers served three times, once per JSON library. `pelican-kotlinx` also
     // carries the parser the assertions use — the tests read responses off a
@@ -47,6 +54,12 @@ dependencies {
     // consumer already running Ktor would take that adapter instead and pass
     // the engine it has.
     testImplementation(project(":pelican-client-java"))
+
+    // The in-memory metric reader `TracedOrdersTest` collects the histogram
+    // through. The in-memory *span* exporter lives in the same artifact, but
+    // the example writes its own so that the runnable service does not have to
+    // ship a testing library to render `/admin/traces`.
+    testImplementation("io.opentelemetry:opentelemetry-sdk-testing:1.65.0")
 
     testImplementation(project(":pelican-test"))
     // The in-memory transports are per-backend, so the suites that run twice
@@ -121,6 +134,14 @@ tasks.register<JavaExec>("runMetrics") {
     description = "Runs the Orders example with Micrometer meters taken from the descriptions"
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("example.metrics.MeteredOrdersKt")
+}
+
+/** The traced service: `curl` it, then read `/admin/traces` to see the spans that produced. */
+tasks.register<JavaExec>("runTracing") {
+    group = "application"
+    description = "Runs the Orders example with OpenTelemetry spans taken from the descriptions"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.tracing.TracedOrdersKt")
 }
 
 /** The README's "Your first endpoint", kept runnable for the same reason. */

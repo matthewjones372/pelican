@@ -16,6 +16,11 @@ import org.junit.jupiter.api.Test
  * meter API. No server library — which is what lets the same one line mean the
  * same thing on all three interpreters — and no OpenAPI generator, no JSON
  * library, and nothing that would arrive uninvited.
+ *
+ * `pelican-metrics-otel` is the other half of that, and the reason it is a
+ * module rather than a second file here: a service that wanted Micrometer must
+ * not acquire the OpenTelemetry API for it, and the test below says so in the
+ * same breath as the rest.
  */
 class NoOtherDependenciesTest {
 
@@ -48,12 +53,15 @@ class NoOtherDependenciesTest {
     }
 
     @Test
-    fun `no server library is reachable from the meters`() {
+    fun `no server library and no second telemetry API is reachable from the meters`() {
         listOf(
             "org.apache.pekko.http.javadsl.server.Directives",
             "org.http4k.core.Request",
             "io.ktor.server.application.Application",
             "io.github.matthewjones372.pelican.openapi.OpenApiKt",
+            // A service that asked for Micrometer did not ask for the other
+            // vendor's API. `pelican-metrics-otel` asserts the converse.
+            "io.opentelemetry.api.OpenTelemetry",
         ).forEach { name ->
             withClue("$name is on pelican-metrics' classpath; a dependency crept in") {
                 shouldThrow<ClassNotFoundException> { Class.forName(name) }

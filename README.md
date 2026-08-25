@@ -121,7 +121,7 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-All nineteen modules are on Maven Central under `io.github.matthewjones372`,
+All twenty modules are on Maven Central under `io.github.matthewjones372`,
 with sources and an empty javadoc jar.
 
 ```kotlin
@@ -679,7 +679,7 @@ compiled on every build.
 the caller to it. Add an endpoint with `security(idp, "reports:admin")` and it is
 covered before it is bound, with no second list to keep up to date.
 
-### Meters, from the same descriptions
+### Meters and traces, from the same descriptions
 
 A filter can read the endpoint, so a metric does not have to be hand-written per
 route either. `pelican-metrics` is one line:
@@ -694,6 +694,21 @@ rather than one per order id — the operation id, the status, and whether the
 endpoint is deprecated. Nothing is passed in and nothing has to be kept in step
 with the router, because all of it is already written down on the endpoint. See
 [Metrics](docs/reference.md#metrics) for what it does and does not see.
+
+`pelican-metrics-otel` is the same idea through the other vendor's API, and it
+carries traces as well:
+
+```kotlin
+Api(endpoints, JacksonCodecs, filters = listOf(openTelemetry(sdk)))
+```
+
+A `SERVER` span per request, named `GET /orders/{orderId}` from the endpoint
+rather than from the path that arrived, carrying `http.route`,
+`http.request.method` and `http.response.status_code`, with its span status set
+from the outcome — plus the `http.server.request.duration` histogram the
+OpenTelemetry semantic conventions specify. A separate module from
+`pelican-metrics`, so that a service wanting one vendor's API does not acquire
+the other's.
 
 ### Unhandled exceptions
 
@@ -954,7 +969,7 @@ Eight things that wanted a page rather than a section, and one benchmark:
 | [Importing an OpenAPI document](docs/importing.md) | A document somebody else wrote, read into descriptions: what comes out, what is refused, and how to get past a document you do not own. |
 | [The same endpoints, by hand](docs/by-hand.md) | The same two endpoints written directly against Pekko HTTP, so what the descriptions buy is legible rather than asserted. |
 | [Golden files](docs/golden-testing.md) | A test that fails when a change would break the callers you already have — a new required field, a deleted endpoint — and stays quiet when it would not. |
-| [Modules](docs/modules.md) | What each of the nineteen modules is for and what it depends on, for deciding which ones your build needs. |
+| [Modules](docs/modules.md) | What each of the twenty modules is for and what it depends on, for deciding which ones your build needs. |
 | [What it costs](docs/what-it-costs.md) | The interpreter measured by JMH against the hand-written routes it replaces, with the baselines that comparison needs and the error bars it came with. |
 | [Roadmap](docs/roadmap.md) | What is not built yet and the order it is worth building in — a different list from the deliberate refusals, and the argument for the order written down so it can be disagreed with. |
 
@@ -970,6 +985,7 @@ Eight things that wanted a page rather than a section, and one benchmark:
 ./gradlew :example:runCodecs             # all three JSON libraries at once, on :8080-:8082
 ./gradlew :example:runSecured            # a filter enforcing the security the descriptions declare
 ./gradlew :example:runMetrics            # Micrometer meters tagged from the descriptions, at /admin/meters
+./gradlew :example:runTracing            # OpenTelemetry spans from the same descriptions, at /admin/traces
 ./gradlew :example:generateOrdersDocument  # the spec, with no server started
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ```
