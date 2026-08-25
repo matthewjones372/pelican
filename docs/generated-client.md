@@ -98,9 +98,8 @@ fun interface ClientTransport {
 }
 ```
 
-`pelican-client-java` is the adapter over the JDK's own `HttpClient` and the
-default: add the module and a client finds it through `ServiceLoader`, with no
-line to write.
+`pelican-client-java` is the adapter over the JDK's own `HttpClient`: add the
+module and a client finds it through `ServiceLoader`, with no line to write.
 
 ```kotlin
 dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
@@ -108,13 +107,26 @@ dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 ```
 
-A service that already runs an HTTP client passes that one instead, as the
-third argument, and gets its pooling, its metrics and its tuning rather than a
-second stack:
+`pelican-client-pekko` is the second one, over Pekko HTTP's client, and the one
+a service already running Pekko wants — it takes the `ActorSystem` that service
+already has, so the calls go out on its dispatchers and under its
+configuration:
+
+```kotlin
+val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTransport(system))
+```
+
+More generally, a service that already runs an HTTP client passes that one as
+the third argument and gets its pooling, its metrics and its tuning rather than
+a second stack:
 
 ```kotlin
 val client = OrdersClient("https://orders.internal", JacksonCodecs, ourOwnTransport)
 ```
+
+Naming it is also what a classpath carrying *both* adapters has to do:
+`ServiceLoader` finds two and the client refuses to guess between them, saying
+so where it is constructed.
 
 The stage is what makes that possible. The interface has to be the widest
 shape, because an asynchronous transport can serve a blocking caller and a

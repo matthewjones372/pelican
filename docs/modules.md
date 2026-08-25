@@ -1,10 +1,10 @@
 # Modules
 
-Linked from the [README](../README.md). What each of the nineteen modules is
+Linked from the [README](../README.md). What each of the twenty modules is
 for, and what it depends on — the list to read when deciding which ones a
 build actually needs.
 
-Nineteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
+Twenty modules and a Gradle plugin; you take four or five. The layering is enforced by tests
 rather than convention.
 
 | Module | Depends on | Contains |
@@ -17,6 +17,7 @@ rather than convention.
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | core | where a generated client's requests go, over the JDK's `HttpClient` |
+| `pelican-client-pekko` | core + pekko-http | the same, over Pekko HTTP's client |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
 | `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
@@ -29,6 +30,8 @@ asserts Pekko is absent so docs can be generated in a build task with no server
 present, each backend asserts the document generator and the other backends are
 absent, `pelican-metrics` asserts it is core plus a meter API and no server
 library, `pelican-client-java` asserts it carries no HTTP library beyond the
-JDK's, and `pelican-test` asserts it drags in no server library and no matcher
-library. The full breakdown is in
+JDK's, `pelican-client-pekko` asserts it carries Pekko and no second stack —
+and not the Pekko *interpreter* either, since making calls and serving routes
+are separate decisions — and `pelican-test` asserts it drags in no server
+library and no matcher library. The full breakdown is in
 [docs/reference.md](reference.md#modules).

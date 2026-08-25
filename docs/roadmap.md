@@ -30,8 +30,11 @@ worth keeping next to the result of following it.
 - **Item 2** shipped as [Choosing between Pelican and the alternatives](choosing.md).
 - **Item 3** shipped its first phase, and then the two things that phase was
   supposed to make cheap:
-  - `ClientTransport` lives in core, and `pelican-client-java` sends over the
-    JDK's own `HttpClient`.
+  - `ClientTransport` lives in core, `pelican-client-java` sends over the JDK's
+    own `HttpClient`, and `pelican-client-pekko` over Pekko HTTP's. The second
+    adapter made the classpath question real rather than hypothetical:
+    `ClientTransport.default()` refuses to choose between two providers, so a
+    build carrying both names the transport at each client it constructs.
   - The `suspend` surface is `callStyle.set("suspending")` on a client entry —
     one call shape per generated file, the same methods either way, and
     kotlinx.coroutines on the classpath of the callers who asked for it rather
@@ -41,7 +44,7 @@ worth keeping next to the result of following it.
     decorator in core, no line of it generated, and no retries at all unless
     somebody wrapped a transport in one.
 
-  The Ktor and Pekko adapters are the last of this item.
+  The Ktor adapter is the last of this item.
 - **Item 8** shipped: `pelican-openapi` writes 3.2.0 as well as 3.1.0, and the
   survey that item asked for came back with more than a number. Two things
   Pelican describes every day — cookie parameters and streamed responses —

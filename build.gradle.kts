@@ -71,6 +71,7 @@ val moduleDescriptions = mapOf(
     "pelican-ktor-docs" to "Serves the OpenAPI document and Swagger UI on Ktor.",
     "pelican-metrics" to "Micrometer meters for a Pelican service, dimensioned by the descriptions.",
     "pelican-client-java" to "A generated client's transport, over the JDK's own HttpClient.",
+    "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
     "pelican-test-golden" to "Golden files per endpoint that fail on a change breaking existing callers.",
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",
