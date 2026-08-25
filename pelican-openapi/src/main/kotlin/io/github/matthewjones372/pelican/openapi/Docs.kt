@@ -15,4 +15,13 @@ class Docs(
      * token. Register `<docsPath>/oauth2-redirect.html` with the provider.
      */
     val oauth: DocsOAuth? = null,
+
+    /**
+     * Which revision of the specification the served document is written
+     * against. The default is [OpenApiVersion.V3_1_0], for the reasons on that
+     * type; a service whose readers all run tooling that has caught up can say
+     * `Docs(version = OpenApiVersion.V3_2_0)` and get the document that
+     * describes its cookies and its streams correctly.
+     */
+    val version: OpenApiVersion = OpenApiVersion.V3_1_0,
 )

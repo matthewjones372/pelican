@@ -76,6 +76,7 @@ class PelicanPlugin : Plugin<Project> {
             task.baseUrl.set(client.baseUrl)
             task.includeHidden.set(client.includeHidden)
             task.codec.set(client.codec)
+            task.callStyle.set(client.callStyle)
             task.outputDir.set(client.outputDir)
         }
 
@@ -89,6 +90,7 @@ class PelicanPlugin : Plugin<Project> {
             task.baseUrl.set(client.baseUrl)
             task.includeHidden.set(client.includeHidden)
             task.codec.set(client.codec)
+            task.callStyle.set(client.callStyle)
             task.outputDir.set(client.outputDir)
         }
 
@@ -174,6 +176,7 @@ class PelicanPlugin : Plugin<Project> {
             task.specClass.set(document.specClass)
             task.specFunction.set(document.specFunction)
             task.format.set(document.format)
+            task.openApiVersion.set(document.openApiVersion)
             task.outputFile.set(document.outputFile)
         }
 
@@ -195,6 +198,7 @@ class PelicanPlugin : Plugin<Project> {
             task.specClass.set(document.specClass)
             task.specFunction.set(document.specFunction)
             task.baseline.set(document.baseline)
+            task.openApiVersion.set(document.openApiVersion)
             task.entryName.set(document.name)
         }
 

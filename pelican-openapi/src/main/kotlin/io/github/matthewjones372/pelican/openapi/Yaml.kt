@@ -7,7 +7,8 @@ import io.github.matthewjones372.pelican.*
  * [JsonValue], not a second document, so the two cannot disagree. No YAML
  * library for the same reason there is no JSON one.
  */
-fun ApiSpec.openApiYaml(): String = openApi().renderYaml()
+fun ApiSpec.openApiYaml(version: OpenApiVersion = OpenApiVersion.V3_1_0): String =
+    openApi(version).renderYaml()
 
 /**
  * Renders the tree as YAML. Public because the JSON counterpart is: a caller

@@ -4,16 +4,18 @@ The long version: every module, every trade-off, and the limitations spelled
 out. Start with the [README](../README.md) if you have not read it yet.
 
 Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
-`HttpHandler`, a set of Ktor routes, and an OpenAPI 3.1.0 document.
+`HttpHandler`, a set of Ktor routes, and an OpenAPI document — 3.1.0 or
+3.2.0, whichever the people reading it can use.
 
 ## Modules
 
 | Module | Depends on | Contains |
 |---|---|---|
 | `pelican-core` | **nothing** | endpoint descriptions, plain-value codecs, a minimal JSON tree. No HTTP library, no JSON library. |
-| `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 document, in JSON or YAML, and two documents → what changed for callers |
+| `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 or 3.2.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
+| `pelican-client-pekko` | core, pekko-http | the same seam over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-kotlinx` | core, kotlinx.serialization | the alternative `Codecs` |
@@ -25,6 +27,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-ktor` | core, ktor-server-core, ktor-server-cio | descriptions → Ktor routes, with `suspend` handlers and `Flow` streams |
 | `pelican-ktor-docs` | ktor, openapi | the same two pages, on Ktor |
 | `pelican-metrics` | core, micrometer-core | descriptions → Micrometer meters, tagged from what the descriptions already say |
+| `pelican-metrics-otel` | core, opentelemetry-api | descriptions → OpenTelemetry server spans and the specified duration histogram |
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
@@ -54,9 +57,20 @@ The layering is load-bearing, not decorative, and each edge is a test:
   and a `Filter`, neither of which knows which interpreter is serving it, and
   that is what lets one `metrics(registry)` line mean the same thing on all
   three backends.
+- `pelican-metrics-otel` asserts the mirror image: core plus the OpenTelemetry
+  API, no server library, and — the reason it is a module rather than a second
+  file next door — no Micrometer. `pelican-metrics` asserts it carries no
+  OpenTelemetry in the same breath. The two vendors' APIs are the same size as
+  each other and neither audience asked for the other's, so a service that
+  wanted meters does not ship a tracer to get them.
 - `pelican-client-java` asserts the same shape on the caller's side: core, the
   JDK, and no second HTTP stack. An adapter a caller adds in order to *choose*
   a client library would be worth very little if it brought one along.
+- `pelican-client-pekko` asserts the same claim with Pekko in the place of the
+  JDK: core, Pekko HTTP's own closure, and nothing else. It also asserts that
+  `pelican-pekko` is absent, which is the edge worth having — the interpreter
+  and the transport are both Pekko, and a caller who only makes calls should
+  not compile a route builder in to do it.
 - `pelican-import` depends on `pelican-codegen` rather than on core directly,
   and shares its schema-to-Kotlin generator outright. A client generated from a
   document and a client generated from endpoint values should not disagree
@@ -342,6 +356,8 @@ val spec = ApiSpec(
 spec.openApiJson()      // String
 spec.openApiYaml()      // the same document, written as YAML
 spec.openApi()          // JsonObj — core's own tree, if you want to post-process it
+
+spec.openApiJson(OpenApiVersion.V3_2_0)   // the same descriptions, written against 3.2
 ```
 
 **Served by the running app** — opt in with `pelican-pekko-docs`:
@@ -358,12 +374,145 @@ ordersApi().startWithDocs(port = 8080, docs = Docs(openApiPath = "/v1/openapi.js
 Set either path to `null` to turn that page off. `docsRoutes(docs)` hands back
 the routes on their own if the service already has a route to concat with.
 
+### Which version the document says, and how to choose
+
+Two are written: `3.1.0`, which is the default, and `3.2.0`, which is the
+current specification and the one in which these documents are actually
+correct. The choice is an argument to the renderer, a property on the Gradle
+entry, or a field on `Docs`:
+
+```kotlin
+spec.openApiJson()                          // 3.1.0
+spec.openApiJson(OpenApiVersion.V3_2_0)     // 3.2.0
+spec.openApiYaml(OpenApiVersion.V3_2_0)     // likewise
+```
+
+```kotlin
+pelican {
+    documents {
+        create("orders") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("ordersSpec")
+            openApiVersion.set("3.2.0")
+        }
+    }
+}
+```
+
+```kotlin
+ordersApi().startWithDocs(port = 8080, docs = Docs(version = OpenApiVersion.V3_2_0))
+```
+
+#### Why it is a choice at all
+
+Because the number at the top of the document is not decoration. The
+specification's own versioning rule promises compatibility only within one
+`major.minor` feature set — "Tooling which supports OAS 3.1 SHOULD be
+compatible with all OAS 3.1.\* versions" — and reserves the right to make
+non-backwards-compatible changes in a minor release. A consumer that reads 3.1
+is promised nothing about a document that says 3.2.
+
+In practice it is worse than "not promised". swagger-parser, which
+`openapi-generator` and a great deal of the JVM ecosystem is built on, models
+`SpecVersion.V30` and `SpecVersion.V31` and nothing after them, and hands back
+`null` for a 3.2.0 document with an empty list of messages — no error, no
+warning, nothing to catch. That silence is why raising the number quietly for
+everybody would have been the wrong change, and why 3.1 is still what a caller
+who does not choose gets.
+
+#### Why 3.2 is nonetheless the better document
+
+Two things Pelican says every day are things 3.1 has no vocabulary for, and
+saying them wrong is not made better by everyone else saying them wrong too.
+
+**Cookies.** `Cookies.render` joins pairs with `"; "` and passes values through
+exactly as they were written — RFC 6265 already excludes `;`, `,`, space and
+the control characters, and percent-decoding would corrupt a value containing
+a `%`. That is precisely what 3.2 named `style: "cookie"`. The `form` that both
+revisions assume at `in: "cookie"` means something else: percent-encoded values
+joined by `&`. 3.2's Appendix D says so outright, that `form`'s default
+`explode: true` "uses the wrong delimiter for cookies (`&` instead of `;`
+followed by a single space)". Under 3.2 every cookie parameter carries
+`style: "cookie"`, list or not. Under 3.1 it carries nothing, because there was
+nothing true to write.
+
+**Streams.** `application/x-ndjson` and `text/event-stream` are what 3.2 calls
+*sequential media types*, and it is explicit that `schema` applies to the
+complete content — the whole stream read as though the frames were an array —
+while `itemSchema` applies to each item independently. What a Pelican
+description knows is the frame, so under 3.2 the frame goes under `itemSchema`.
+Under 3.1 it goes under `schema`, which is what everything generating streamed
+responses did before `itemSchema` existed and which 3.2 now says is the wrong
+field.
+
+`sse<T>` moves further than that. 3.2 requires an implementation to work with
+event data *after* it has been parsed as `text/event-stream`, and what that
+parse yields is an event — `data`, and possibly `event`, `id` and `retry` — not
+the payload. So a 3.2 document describes the event, with the payload inside
+`data` through the `contentMediaType`/`contentSchema` pair 3.2 points at for
+exactly this:
+
+```yaml
+text/event-stream:
+  itemSchema:
+    type: object
+    properties:
+      event: { type: string, const: order }
+      data:
+        type: string
+        contentMediaType: application/json
+        contentSchema: { $ref: '#/components/schemas/Tick' }
+    required: [event, data]
+```
+
+`id` and `retry` are absent because `sse(...)` never sends them, on the same
+principle that stops a response header being documented and not sent. `event`
+is absent too where the output does not name one.
+
+A streamed JSON array is *not* sequential under either revision — it is one
+document with brackets round it that happens to arrive in pieces — so
+`jsonArray<T>` keeps `schema: {type: array}` throughout.
+
+Those three things are the whole difference. A test compares the two documents
+wholesale and fails on a fourth.
+
+#### What 3.2 added that is not emitted
+
+Not refusals so much as fields nothing in an endpoint description answers:
+
+- **`$self`** names the document's own URI, and nothing here says where the
+  document will be published.
+- **`Server.name`**, and the `servers` list is a list of URL strings.
+- **`Tag.summary`, `parent` and `kind`.** A tag is a bare string on an
+  endpoint; no Tag Objects are written at all, so there is nothing to hang a
+  hierarchy off.
+- **`Response.summary`**, alongside the description an output already carries.
+- **`additionalOperations` and the `query` path-item field**, which describe
+  methods `Method` does not have.
+- **`Parameter` at `in: "querystring"`**, which takes the whole query string as
+  one value with an `Encoding` over it; Pelican describes named parameters.
+- **`prefixEncoding` and `itemEncoding`** on a multipart body, which order the
+  parts positionally. `multipart(...)` names its parts, so `encoding` is the
+  field that fits.
+- **`SecurityScheme.deprecated` and `oauth2MetadataUrl`**, and the
+  `deviceAuthorization` OAuth flow, none of which a `SecurityScheme` carries.
+- **`Discriminator.defaultMapping`**, `XML.nodeType`, `Components.mediaTypes`
+  and the Example Object's `dataValue`/`serializedValue`, all of which are
+  about parts of a document Pelican does not write.
+
+Nothing Pelican emits today is deprecated in 3.2. The deprecations it carries —
+the Example Object's `value` for non-JSON targets, `XML.attribute` and
+`XML.wrapped`, and `allowEmptyValue` — are all fields that were never written.
+The singular `example` on a parameter or a response header, which *is* written,
+is not among them.
+
 ### Moving from 3.0.3 to 3.1.0
 
-The emitter used to write `"openapi": "3.0.3"`. It now writes `"openapi":
-"3.1.0"`, whose schema dialect is JSON Schema 2020-12 rather than the modified
-subset 3.0 defined for itself. Nothing about how you describe an endpoint
-changed — this is entirely about what comes out the other end.
+Older history, kept because a document written by an earlier Pelican is still
+out there. The emitter used to write `"openapi": "3.0.3"`. Since then the floor
+has been `3.1.0`, whose schema dialect is JSON Schema 2020-12 rather than the
+modified subset 3.0 defined for itself. Nothing about how you describe an
+endpoint changed — this was entirely about what comes out the other end.
 
 Five things a consumer will see differently:
 
@@ -397,12 +546,13 @@ synthesises an `examples` array for you, because the only example Pelican knows
 about belongs to the parameter and is already on it.
 
 `webhooks` is a 3.1 feature and *is* emitted, from the `webhooks` a spec
-carries — see [Webhooks](#webhooks-the-calls-the-service-sends). The top-level
-`$self` is not: it names the document's own retrieval URI, and nothing in a set
-of endpoint descriptions says where the document will be published.
+carries — see [Webhooks](#webhooks-the-calls-the-service-sends).
 
-**There is no way to ask for 3.0 output, and that is deliberate.** A version
-argument would have to reach the schema sources, because nullability is spelled
+**3.0 is not on the list of versions you can ask for, and will not be.** Note
+that this is a different question from 3.1 against 3.2, above: those two differ
+in three fields at the surface of the document, and 3.0 differs in how every
+schema in it is spelled. A version argument would have to reach the schema
+sources, because nullability is spelled
 *inside* a schema and not around it — so either core's `SchemaSource` grows an
 OpenAPI version parameter, a type whose whole purpose is that documentation can
 be generated without core knowing what OpenAPI is, or `pelican-openapi` gains a
@@ -416,7 +566,7 @@ If you have a consumer that reads only 3.0, `spec.openApi()` hands you the
 document as core's own `JsonObj` before it is rendered, and down-converting a
 known-shaped document outside the library is a smaller and more honest job than
 maintaining a second emitter inside it. Swagger UI, Redoc, Stoplight and
-openapi-generator all read 3.1.
+openapi-generator all read 3.1, which is the reason the default is where it is.
 
 ### A `servers` entry pins "Try it out"
 
@@ -712,6 +862,7 @@ and Gradle's are not the same Jackson.
 | `codec` | clients | unset: `jackson`. `kotlinx` annotates the payload types for the other library. See below |
 | `outputDir` | clients | `build/generated/pelican/<name>` |
 | `format` | documents | `JSON`; `YAML` writes the same document the other way |
+| `openApiVersion` | documents | unset: `3.1.0`. `"3.2.0"` writes the current specification instead. See [Which version the document says](#which-version-the-document-says-and-how-to-choose) |
 | `outputFile` | documents | `build/generated/pelican/<name>/openapi.<format>` |
 | `baseline` | documents | unset. A committed document to check against; setting it registers `check<Name>Document` and wires it into `check`. See below |
 | `document` | endpoints | — required: the OpenAPI document to read |
@@ -829,6 +980,24 @@ claim: it generates a client for a kotlinx service, builds a payload out of the
 discriminator and branch names the *generated file* declares, and decodes it
 with the real `KotlinxCodecs`.
 
+### Whether its methods block or suspend
+
+The other setting on a client entry, and the same shape of decision:
+
+```kotlin
+create("orders") {
+    specClass.set("com.example.OrdersSpecKt")
+    packageName.set("com.example.orders")
+    callStyle.set("suspending")   // or "blocking", the default
+}
+```
+
+`suspending` makes every generated method a `suspend` method and the file
+depend on `org.jetbrains.kotlinx:kotlinx-coroutines-core`; nothing else about
+it moves. Why it is one shape per file rather than both on one class, and what
+a cancelled coroutine does to a call in flight, is in
+[Blocking or suspending](#blocking-or-suspending).
+
 ### Without the plugin
 
 Both generators are ordinary functions, and a build that would rather call them
@@ -866,8 +1035,10 @@ way.
 
 ### Choosing one
 
-`pelican-client-java` is the adapter over the JDK's own `HttpClient`, and a
-generated client finds it without being told:
+Two adapters are written. `pelican-client-java` is the one over the JDK's own
+`HttpClient`; `pelican-client-pekko` is the one over Pekko HTTP's client, for a
+service that already runs Pekko and would rather not start a second HTTP stack
+to call out of. A generated client finds either without being told:
 
 ```kotlin
 dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
@@ -879,6 +1050,22 @@ It is a `ServiceLoader` provider, so adding the module is the whole of choosing
 it — core cannot name an adapter it does not depend on. With none on the
 classpath the client says so when it is constructed, and with more than one it
 asks to be told which, since nothing there could pick for you.
+
+Which is the one case finding-by-classpath cannot serve, and it is worth
+knowing what it looks like before you meet it. Put both adapters on one
+classpath and every client built without a named transport fails where it is
+constructed:
+
+```
+Several transports are on the classpath — [..JavaHttpTransport, ..PekkoHttpTransport]
+— and nothing here can say which one this client should use. Pass one.
+```
+
+The way through is to name the transport at each construction site. That is
+what `example`'s own suite does: it compiles both adapters in order to run the
+generated client over each, so every `OrdersClient` there is built with the one
+it means. Nothing is lost but the defaulted argument, and the failure is loud
+and immediate rather than a client that quietly sends on the wrong stack.
 
 Handing one over is the other spelling, and the one to reach for when the
 process already has a client worth sharing:
@@ -910,10 +1097,85 @@ since coroutines would be a third-party dependency.
 It is also the shape core already uses for exactly this job in the other
 direction: `ServerEndpoint.invoke` is a `(Params) -> CompletionStage<Any?>`.
 
-The generated methods still block, and are unchanged from what they were: they
-`join` the stage and unwrap the `CompletionException`, so what a caller catches
-is the `IOException` or the timeout the transport raised rather than a wrapper
-that the choice of transport put around it.
+What the generated methods do with the stage is the next section: a blocking
+client joins it, a suspending client awaits it, and the interface underneath is
+the same interface either way. That is the point of choosing the widest shape —
+the two call surfaces are two readings of one transport rather than two
+transports.
+
+### Blocking or suspending
+
+The generated client has one call surface, and which one is decided when it is
+generated:
+
+```kotlin
+create("orders") {
+    specClass.set("com.example.OrdersSpecKt")
+    packageName.set("com.example.orders")
+    callStyle.set("suspending")   // or "blocking", the default
+}
+```
+
+Everything else about the file is the same file. The class name, the method
+names, the parameters and their defaults, the payload types, the sealed
+failures, the `Streamed<T>`: all of it comes from the descriptions, and none of
+it comes from the call shape. What changes is the keyword on each method and
+what the file waits on:
+
+```kotlin
+// blocking
+fun getUser(userId: Long): Outcome<GetUserFailure, User>
+
+// suspending
+suspend fun getUser(userId: Long): Outcome<GetUserFailure, User>
+```
+
+**One or the other rather than both.** A class carrying both would have two
+methods per endpoint, spelled differently enough to tell apart — which is the
+one thing a client with one method per endpoint under the endpoint's own name
+should not have. It would also put kotlinx.coroutines on the classpath of every
+caller that generated a client, including those that will never call a
+suspending method, and leave a blocking method within reach of a coroutine that
+calls it by accident and parks a dispatcher thread for the length of an HTTP
+call — which is the cost the suspending surface exists to avoid.
+
+The usual objection to picking one is that it splits the audience. It does not
+split this one, because the file is generated in the *calling* project rather
+than published from the described one: each caller generates the surface it
+wants, from the same descriptions, and a repository that genuinely wants both
+generates two entries into two packages. This one does exactly that, so that
+both are compiled and run against a real server by its own suite.
+
+**Where the coroutines live.** Not in `pelican-core`, which has the Kotlin
+standard library on its runtime classpath and nothing else, and not in a module
+of their own either. `suspend` is a language feature rather than a dependency,
+and the only thing the generated file needs from the library is the bridge from
+a `CompletionStage`, which is one function:
+
+```kotlin
+private suspend fun exchange(request: ClientRequest): ClientResponse =
+    transport.send(request).await()
+```
+
+So a suspending client needs `org.jetbrains.kotlinx:kotlinx-coroutines-core`
+beside `pelican-core`, and a blocking one needs what it always needed. The
+generated file says so in its own header.
+
+**Cancellation.** `await` resumes with what the transport raised rather than
+with the `CompletionException` a stage wraps around it — the same unwrapping
+the blocking form does by hand — and a coroutine cancelled while it is waiting
+cancels the `CompletableFuture` underneath it. An adapter has to carry that the
+rest of the way: `JavaHttpTransport` cancels the exchange the response was
+derived from, because cancellation travels down a chain of stages and not back
+up it, and a stage cancelled without that would leave the request running with
+nobody left to read it.
+
+**What still blocks.** Reading a body is a socket read wherever it happens. The
+generated suspending client reads a whole body inside `withContext(
+Dispatchers.IO)`, so it is not the caller's dispatcher that waits for it. A
+`Streamed<T>` cannot be handled the same way, because the caller decides when to
+ask for the next element: iterate one inside `withContext(Dispatchers.IO)`, or
+turn it into a `flow { }` with `flowOn(Dispatchers.IO)`.
 
 ### Streams cross both ways
 
@@ -923,7 +1185,11 @@ what the descriptions already promise:
 - A multipart file part is a `ClientRequest.Body.Streaming`, which is a
   function returning an `InputStream` rather than a stream, so a transport that
   has to send the request twice — a redirect, a retry — has a way to ask for
-  the bytes again. Nothing buffers the upload.
+  the bytes again. Nothing buffers the upload. Whether asking twice *works* is
+  a fact about the function: one that opens a file by name can be asked again,
+  and the generated client's own — a raw body is the stream its caller handed
+  over, and a file part is an `UploadedFile`, which holds one stream and hands
+  that same one out — cannot. See [Retrying](#retrying-and-what-is-safe-to-retry).
 - `ndjson`, `sse`, `jsonArray` and `bytes()` responses arrive as an unread
   `ClientResponse.body`, and `Streamed<T>` decodes off it as elements land,
   exactly as before. A call that is not streaming reads the body whole, once,
@@ -938,17 +1204,122 @@ blocking and carries a `String` body on purpose, because a test asserts on a
 result it already has — which is exactly why the typed test client
 [cannot upload binary](#what-isnt-here). Right taste, wrong constraints.
 
+### On Pekko HTTP
+
+`PekkoHttpTransport` takes an actor system, or does without one:
+
+```kotlin
+val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTransport(system))
+```
+
+A service that already runs Pekko passes the system it has, and calls made
+through it get that system's dispatchers, its configuration and its shutdown. A
+caller that does not run Pekko passes nothing and never has to learn that an
+actor system was involved: the module keeps one for that case, started on the
+first request rather than in the constructor, shared by every transport that
+asked for none, and configured `daemonic` so that a transport nobody was handed
+a close for cannot be what keeps a finished process alive. Nothing in the
+adapter terminates a system — two transports sharing one must not be able to
+shut each other down — so a caller who wants that control is the caller who
+passed one in.
+
+Both body crossings are `StreamConverters`. A `Body.Streaming` becomes a
+`Source` built from the `open` function, so an upload is read at the speed the
+socket drains it and a request Pekko materialises a second time asks for the
+bytes a second time rather than sending a stream already consumed. The response
+entity's `Source[ByteString]` is run into `StreamConverters.asInputStream()`,
+which hands back a stream fed by a bounded queue: a slow reader backpressures
+the connection instead of filling memory, and closing the stream cancels the
+source. A caller who neither reads nor closes is the one case that cannot be
+covered from here — the stream stays materialised, backpressuring, until the
+pool's idle timeout fails it.
+
+`Content-Type` and `Content-Length` need saying separately, because Pekko keeps
+neither in its header list. They belong to the entity, and a header added under
+either name is dropped as the request renders. So the adapter reads them off
+the `ClientRequest` and builds the entity from them — a streamed body whose
+length the caller knew is sent sized rather than chunked, which is the
+difference between an upload a proxy will size-check and one it may refuse —
+and puts them back into `ClientResponse.headers` on the way out. A round trip
+through this adapter carries the same two headers a round trip through the JDK
+one does, once each.
+
+The per-request timeout is the one thing that does not map exactly, so it is
+worth saying what it does instead of implying it maps. Pekko's timeouts are
+connection-pool settings, and handing per-request settings to `singleRequest`
+keys a new pool per distinct value, so the deadline is imposed on the stage
+rather than on Pekko. That bounds the arrival of the response head — which is
+what the JDK adapter's `HttpRequest.timeout` bounds too — and not the reading
+of a streamed body, which stays governed by the pool's own idle timeout: an
+`sse` response outliving the client's thirty-second default is the endpoint
+working rather than failing. What is raised on expiry is a
+`java.util.concurrent.TimeoutException` naming the call, rather than the JDK's
+`HttpTimeoutException`, so a caller catching a timeout by type catches the one
+its own transport raises.
+### Retrying, and what is safe to retry
+
+Nothing retries unless somebody wrapped a transport in something that does:
+
+```kotlin
+val client = OrdersClient(
+    "https://orders.internal",
+    JacksonCodecs,
+    ClientTransport.default().retrying(),
+)
+```
+
+`retrying(policy)` is `RetryingTransport(this, policy)`, and both live in
+`pelican-core` beside the interface they decorate — no library, so every
+adapter inherits them. Retrying is a decorator rather than generated code
+because that is what the seam is for: retries, request logging and per-call
+metrics are the same shape, a transport wrapped around a transport, and none of
+them wants a line per operation in a file somebody regenerates. It also means
+the behaviour is visible where it was chosen, in the constructor call, rather
+than buried in a client that quietly sends twice.
+
+The default is no retries at all, which is what a client built without that
+wrapper does. A retry a caller did not ask for turns one failed call into
+several, and the call it multiplies is the one already arriving at a service in
+trouble.
+
+`RetryPolicy()` is the policy you get by naming none, and every default in it
+is narrow, because the cost of retrying something that was not transient is
+paid by the server rather than by whoever chose the default:
+
+| Setting | Default | Why |
+| --- | --- | --- |
+| `maxAttempts` | `3` | Two retries. The first covers the pooled connection the server closed while it was idle; the second covers a retry that landed on the same unhealthy node. A fourth is queueing work against a service that has now failed three times |
+| `initialBackoff`, `backoffMultiplier`, `maxBackoff` | `100ms`, `2.0`, `2s` | Doubling reaches a wait that matters within two retries without a first retry a caller would notice. The ceiling is there so that raising `maxAttempts` does not silently put a minute inside somebody's request |
+| `jitter` | `0.5` | Half of each wait is random. Clients that failed together compute the same backoff at the same instant and re-form the same herd; randomising *all* of it would let the wait collapse to nothing |
+| `statuses` | `408, 429, 502, 503, 504` | Each says the request did not get a fair hearing. **Not 500**: the common cause is an unhandled exception in a handler, and sending the same request again produces the same exception with the work done twice |
+| `methods` | `GET, HEAD, PUT, DELETE, OPTIONS` | HTTP's own idempotent set, which is all a description knows about whether a second send does a second thing. A POST that carries an idempotency key is safe and its caller is the one who knows that: name `Method.POST` here |
+| `retryStreamedBodies` | `false` | Whether `open()` can be called again is a fact about the function that was passed, and nothing here can see it. On, the request is handed to the transport again unchanged and the transport opens a fresh stream for itself |
+| `honourRetryAfter`, `retryAfterCap` | `true`, `10s` | A server that names a number knows something no curve here does, and waiting less than it asked is the one answer that is certainly wrong. Past the cap the policy stops retrying rather than waiting: the server has said it will not be ready inside anything the caller would call a call |
+| `failures` | `it is IOException` | A refused connection, a reset, a request that timed out — the socket-level accidents a second attempt may genuinely not repeat. A bug or a refusal survives being sent again |
+
+Only the delta-seconds form of `Retry-After` is read. The HTTP-date form would
+have to be compared against this machine's clock, and importing the skew
+between two clocks into a wait we already have a defensible value for buys
+nothing.
+
+Three details that are easy to get wrong, and are asserted by tests rather than
+promised here. A response that is going to be retried has its body closed
+first, because it is a live connection until somebody closes it. The wait is
+scheduled rather than slept through, so a policy that waits two seconds costs a
+timer entry and not a parked thread — which is what the asynchronous shape of
+`send` was for. And cancelling what the caller holds cancels both the exchange
+in flight and the retry that was going to follow it.
+
 ### Writing another one
 
-An adapter is small, and the two obvious ones are not written yet. A Ktor
-adapter would launch each `send` on its own scope, call `prepareRequest(...)`
-and `execute { }`, bridge the response's `ByteReadChannel` to an `InputStream`,
-and complete the stage with a `ClientResponse` over it, keeping the block open
-until that stream is closed — which is what makes a Ktor client's laziness
-survive the crossing. A Pekko adapter would map the request onto
-`Http().singleRequest(...)`, whose `CompletionStage<HttpResponse>` is already
-the right shape, and run the response entity's `Source[ByteString]` through
-`StreamConverters.asInputStream()`.
+An adapter is small, and the Ktor one is not written yet. It would launch each
+`send` on its own scope, call `prepareRequest(...)` and `execute { }`, bridge
+the response's `ByteReadChannel` to an `InputStream`, and complete the stage
+with a `ClientResponse` over it, keeping the block open until that stream is
+closed — which is what makes a Ktor client's laziness survive the crossing.
+`pelican-client-pekko` is that shape already, at about 240 lines including the
+comments, and most of what took thought there was the stream bridge rather than
+the mapping.
 
 ## Importing an OpenAPI document
 
@@ -1352,10 +1723,10 @@ the branches rather than dropped, because a `oneOf` branch is the whole payload
 inherits it.
 
 Which spelling to publish was the choice, and `oneOf` won on three counts: the
-documents are 3.1, where it is the native spelling; the 3.0 spelling has nowhere
-to put a `mapping`, which is the fact being rescued; and two codecs publishing
-one shape means a service can swap JSON libraries without its published document
-changing shape underneath its readers. Matching classes back to the components
+documents are 3.1 or later, where it is the native spelling; the 3.0 spelling
+has nowhere to put a `mapping`, which is the fact being rescued; and two codecs
+publishing one shape means a service can swap JSON libraries without its
+published document changing shape underneath its readers. Matching classes back to the components
 swagger-core named them under is what makes it possible at all, and it has to
 hold for a hierarchy reached anywhere — a property of a payload, an element of a
 list, a branch of another hierarchy — not only for one an operation names at the
@@ -1625,7 +1996,7 @@ upgrade.
 
 ### Three dialects, one shape
 
-3.1, 3.0 and Swagger 2.0 are all read. 2.0 is converted first — bodies are
+3.2, 3.1, 3.0 and Swagger 2.0 are all read. 2.0 is converted first — bodies are
 parameters there, media types hang off the operation, schemas live under
 `definitions` — and 3.0's `nullable: true` becomes 3.1's `"null"` among the
 types, which is the spelling everything downstream reads. A 2.0 document and
@@ -1636,6 +2007,16 @@ Nothing is decided in the conversion that the mapping would decide differently.
 A 2.0 operation that `produces` two media types becomes a response offering
 two, and is refused there — the same fact about the same operation gets the
 same message it would have got in a 3.x document.
+
+3.2 needs no conversion pass, because what changed at the top is a number the
+importer never switched on: it reads objects, and takes any document that
+carries an `openapi` field. What it did need is the three places 3.2 says
+something new, and it reads all three — a streamed response's frame from
+`itemSchema` as readily as from `schema`, an `sse<T>`'s payload out of the
+`contentSchema` inside a described event, and a cookie's `style: "cookie"` as
+the same list `form` used to stand for. Which matters here rather than in the
+abstract: the example generates its own document and imports it back, so a
+Pelican document written against 3.2 has to survive the round trip.
 
 ### The judgement calls
 
@@ -2024,9 +2405,10 @@ Two meters carry them: `http.server.requests`, a counter, and
 its own, so the counter looks redundant until the timer is aggregated —
 percentile histograms are configured per meter and are often turned off for
 cheapness, and a service that has done so still wants the rate of 5xx. The names
-follow the OpenTelemetry semantic conventions rather than Micrometer's own, so
-that an OpenTelemetry module can publish the same series under the same names
-later without renaming anybody's dashboard.
+follow the OpenTelemetry semantic conventions rather than Micrometer's own,
+which is why `pelican-metrics-otel` below publishes its histogram under the
+name this timer already carries: a service moving from one to the other keeps
+its dashboards.
 
 The `path` tag is why this is worth a module rather than a paragraph of advice.
 A meter tagged with the request's *path* grows a time series per order id, which
@@ -2062,6 +2444,149 @@ Two things to know before drawing conclusions from the numbers:
 this way — a 200, a declared 404, a 201 and a deprecated endpoint, with
 `/admin/meters` rendering what was recorded. Run it with
 `./gradlew :example:runMetrics`.
+
+### OpenTelemetry, from the same descriptions
+
+`pelican-metrics-otel` is the same idea through the other vendor's API, and it
+carries traces as well as metrics:
+
+```kotlin
+Api(routes, JacksonCodecs, filters = listOf(openTelemetry(sdk)))
+```
+
+That produces a `SERVER` span per request and records the
+`http.server.request.duration` histogram the semantic conventions specify. The
+span is named `GET /orders/{orderId}` — `{method} {http.route}`, which is what
+the conventions ask a server span to be called — and both halves of that name,
+like every attribute below, are read off the endpoint:
+
+| Attribute | Where it comes from |
+|---|---|
+| `http.request.method` | `endpoint.method` |
+| `http.route` | `endpoint.pathSpec.template` |
+| `http.response.status_code` | what the interpreter is about to answer with |
+| `error.type` | the status as a string, when it is a 5xx |
+| `pelican.operation_id` | `endpoint.operationId`, or `unnamed` |
+| `pelican.deprecated` | `endpoint.deprecated` |
+
+`http.route` is the attribute worth the module. A general-purpose agent
+instrumenting Pekko or http4k sees a routing tree it has no way to name, so it
+either leaves the route off — which costs every per-endpoint view a trace
+backend offers — or falls back to the request's own path and produces one
+distinct operation per order id. Pelican has the template because the route was
+built from it.
+
+The last two attributes are in a namespace of their own because the conventions
+have no key for either, and neither adds a dimension: both are a function of the
+method and the route, which are attributes already, so a metric split by them
+has exactly the series it had before.
+
+Span status follows the conventions rather than intuition. It is left **unset**
+for a 4xx on a server span — a declared 404 is the endpoint doing its job, and
+an error rate that counts it is measuring how often callers ask for things that
+do not exist — and set to `ERROR` for a 5xx. A 5xx that came from a throwable
+also records that throwable as a span event, which is the one place its message
+is both useful and safe: `renderError` deliberately keeps it out of the response
+body, so without the span it goes nowhere at all.
+
+#### Which conventions, and checked against what
+
+The attribute names above are the *stable* HTTP names, the ones adopted when
+those conventions were declared stable — `http.request.method` rather than
+`http.method`, `http.response.status_code` rather than `http.status_code`,
+`url.path` rather than `http.target`. They were read from the OpenTelemetry
+specification rather than from memory, at
+[HTTP spans](https://opentelemetry.io/docs/specs/semconv/http/http-spans/),
+[HTTP metrics](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/)
+and the
+[HTTP attribute registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/http/),
+which is also where the span-status rule and the recommended bucket boundaries
+come from. Anything emitting the older spellings is emitting attributes the
+registry now marks deprecated.
+
+#### Continuing a caller's trace
+
+An inbound `traceparent` should continue the caller's trace rather than start a
+new one, and doing that needs a header nobody declared:
+
+```kotlin
+val pekkoHeaders = object : TextMapGetter<Params> {
+    override fun keys(carrier: Params) = carrier.request.headers.map { it.lowercaseName() }
+    override fun get(carrier: Params?, key: String) =
+        carrier?.request?.getHeader(key)?.map { it.value() }?.orElse(null)
+}
+
+Api(routes, JacksonCodecs, filters = listOf(openTelemetry(sdk, incomingHeaders = pekkoHeaders)))
+```
+
+Six lines, written once per service, and they are the one thing this module
+cannot write for you. `Params` carries the inputs the endpoint *declared*, and
+an incoming trace context is not part of an API's contract — it should not
+appear in its OpenAPI document — so the only route to the header is
+`Params.underlying`, which is the backend's own request object. Naming that type
+is exactly what a filter working identically on three interpreters must not do.
+
+Left out, the parent is `Context.current()` instead, which is not a stub: a
+service running the OpenTelemetry Java agent already has the caller's context
+current on the request thread, so the span becomes a child of the agent's and
+adds the route the agent could not know to a trace it had already joined
+correctly. Note also that an SDK's default propagator is a no-op one — a service
+that never calls `setPropagators` extracts nothing however good its getter is.
+
+What was deliberately **not** done:
+
+- **Nothing is injected on the way out.** Pelican does not add `traceparent` to
+  a response, and it has no client side to add one to a request it makes.
+  Outbound propagation belongs to whichever HTTP client the service calls with,
+  and every one of them already has an instrumentation for it.
+- **Baggage is extracted but not read.** Whatever propagators the SDK is
+  configured with run, so `baggage` arrives in the context if a service
+  registered that propagator; nothing here turns any of it into span
+  attributes, because which baggage entries are safe to record is a decision
+  about a particular deployment.
+- **The context is not carried across the asynchronous boundary.** The span is
+  made current only for as long as this module holds the request thread; a
+  handler returning a `CompletionStage` completes wherever its own executor
+  decides. A handler that wants to nest a span reads `params[otelContext]` and
+  passes it to `setParent`, which is one line and is reliable.
+
+#### The same two blind spots
+
+Nothing about OpenTelemetry closes the gaps described above for the meters, and
+the new documentation should not read as though it did:
+
+- **Requests answered before the chain is entered are invisible.** A path
+  parameter that will not decode, a body over `maxBodyBytes`, a `Content-Type`
+  nothing declared: no filter is asked, so there is no span and no measurement.
+  The 4xx rate here is the rate of *handled* 4xx, on both instruments.
+- **A response that fails while it is being written** becomes a 500 after the
+  chain has unwound, so the span carries the status the handler asked for rather
+  than the one the caller received.
+
+One more, particular to spans: the attributes the conventions mark required for
+a server span and this module does not set — `url.path`, `url.scheme`, and the
+recommended `server.address`, `client.address` and `network.*` — are left off
+rather than guessed. Every one of them is a property of the socket rather than
+of the description, and a filter that behaves identically on three interpreters
+is looking at the description. A service that wants them supplies them from a
+filter that knows its own backend, or runs the agent, whose server span is the
+one carrying them.
+
+#### Why a second module
+
+`pelican-metrics` promises a consumer core plus a meter API and nothing else. A
+consumer asking for OpenTelemetry should get core plus the OpenTelemetry API and
+nothing else, and Micrometer is not "nothing else". One module carrying both
+would have to put each vendor's API in front of the audience that did not ask
+for it, or make both `compileOnly` — which would take Micrometer off the
+classpath of every service already calling `metrics(registry)` and turn a
+working deployment into a `NoClassDefFoundError`. Two modules, a
+`NoOtherDependenciesTest` in each, and neither audience pays for the other.
+
+`example/src/main/kotlin/example/tracing/TracedOrders.kt` is a service wired
+this way, with `/admin/traces` rendering the spans it produced and a deliberate
+500 to show what a span says that a response body does not. Run it with
+`./gradlew :example:runTracing`.
 
 ## Errors, and what a caller is told
 
@@ -3504,7 +4029,10 @@ own — with a floor of 80% wired into `check`. It sits at 87% line, 70% branch.
 **OpenApiSpecQualityTest** reads the emitted documents back with
 swagger-parser, an implementation that did not write them: `$ref`s resolved,
 3.1 conformance, every path keeping its operations and responses, every
-security requirement naming a scheme the document defines. A generator marking
+security requirement naming a scheme the document defines. It also pins the
+fact that keeps 3.1 the default — that swagger-parser still reads a 3.2.0
+document as nothing at all — so that when the parsers catch up, the reason for
+the default expires loudly rather than quietly. A generator marking
 its own homework is the failure mode it rules out, and it caught a wrong
 assumption the first time it ran. The YAML rendering is held to the same
 standard and to one more: the parser has to read it into the same document it
@@ -3585,12 +4113,19 @@ open  localhost:8080/api-docs                                 # Swagger UI
   endpoint is bound.
 - **`filename*` in RFC 5987 form.** A part's `filename` is read from the plain
   parameter; the extended, charset-tagged spelling is not decoded.
-- **OpenAPI 3.0.** The emitter writes 3.1.0 and nothing else. The reasoning,
-  and what to do if your tooling only reads 3.0, are under
+- **OpenAPI 3.0.** The emitter writes 3.1.0 or 3.2.0 — see
+  [Which version the document says](#which-version-the-document-says-and-how-to-choose)
+  — and it will not write 3.0. The reasoning, and what to do if your tooling
+  only reads 3.0, are under
   [Moving from 3.0.3 to 3.1.0](#moving-from-303-to-310). The *importer* reads
-  3.1, 3.0 and Swagger 2.0 alike, which is a different question: reading an old
-  document costs one normalising pass, and writing one would cost a second
-  emitter that could not be faithful anyway.
+  3.2, 3.1, 3.0 and Swagger 2.0 alike, which is a different question: reading
+  an old document costs one normalising pass, and writing one would cost a
+  second emitter that could not be faithful anyway.
+- **The 3.2 fields nothing in a description answers** — `$self`, `Server.name`,
+  Tag Objects and their `parent`/`kind`, `additionalOperations`,
+  `in: "querystring"`, `prefixEncoding`, the `deviceAuthorization` flow and the
+  rest. The full list, with what each would need in order to be written, is
+  under [What 3.2 added that is not emitted](#what-32-added-that-is-not-emitted).
 - **A lenient import.** `pelican-import` refuses an operation it cannot fully
   describe rather than generating a weaker one, and the way through is a
   per-operation `exclude` list, or a per-schema `discriminator(...)` where what
@@ -3609,11 +4144,12 @@ open  localhost:8080/api-docs                                 # Swagger UI
   nothing to add: a webhook you receive arrives at a path on your own service,
   so it is an ordinary `endpoint(...)` with a handler. `webhook(...)` is for the
   half you send.
-- **A Ktor or Pekko client transport.** `ClientTransport` is core's, and
-  `pelican-client-java` is the one adapter written — see
+- **A Ktor client transport.** `ClientTransport` is core's, and
+  `pelican-client-java` and `pelican-client-pekko` are the adapters written —
+  see
   [The transport a generated client sends with](#the-transport-a-generated-client-sends-with),
-  which says what each of the other two would do. A service that wants one
-  before they are written can implement the interface itself; it is one method.
+  which says what the Ktor one would do. A service that wants it before it is
+  written can implement the interface itself; it is one method.
 - **A fourth server backend.** `pelican-ktor` was the third, and cost what
   `pelican-http4k` cost: the binders above, a request-to-`Params` step and a
   response writer, in about 500 lines including the comments.

@@ -576,6 +576,19 @@ class OrdersClient(
         )
     }
 
+    private fun TextResponse.succeeded(): Boolean = status in 200..299
+
+    private fun ClientResponse.succeeded(): Boolean = status in 200..299
+
+    private fun failed(method: Method, path: String, response: TextResponse): Nothing =
+        throw ApiCallFailed(response.status, method.name, path, response.body)
+
+    /** A failed streaming response's body is the one time it is small enough to read whole. */
+    private fun drain(response: ClientResponse): String = response.text()
+
+    private fun failedStream(method: Method, path: String, response: ClientResponse): Nothing =
+        throw ApiCallFailed(response.status, method.name, path, drain(response))
+
     /**
      * The exchange, waited for.
      *
@@ -599,19 +612,6 @@ class OrdersClient(
         exchange(request).let { TextResponse(it, it.text()) }
 
     private fun stream(request: ClientRequest): ClientResponse = exchange(request)
-
-    private fun TextResponse.succeeded(): Boolean = status in 200..299
-
-    private fun ClientResponse.succeeded(): Boolean = status in 200..299
-
-    private fun failed(method: Method, path: String, response: TextResponse): Nothing =
-        throw ApiCallFailed(response.status, method.name, path, response.body)
-
-    /** A failed streaming response's body is the one time it is small enough to read whole. */
-    private fun drain(response: ClientResponse): String = response.text()
-
-    private fun failedStream(method: Method, path: String, response: ClientResponse): Nothing =
-        throw ApiCallFailed(response.status, method.name, path, drain(response))
 
     private val apiErrorCodec: BodyCodec<ApiError> = codecs.codec(typeOf<ApiError>())
     private val userCodec: BodyCodec<User> = codecs.codec(typeOf<User>())

@@ -14,6 +14,7 @@ import example.generated.StreamOrdersFailure
 import example.generated.SubmitOrderFailure
 import example.generated.SubmitOrderResult
 import io.github.matthewjones372.pelican.UploadedFile
+import io.github.matthewjones372.pelican.client.JavaHttpTransport
 import io.github.matthewjones372.pelican.codegen.kotlinClient
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
@@ -55,7 +56,11 @@ class GeneratedKotlinClientTest {
     @BeforeAll
     fun setUp() {
         server = ordersApi().start(port = 0, systemName = "orders-generated-client")
-        client = OrdersClient(server.baseUrl, codecs)
+        // Named rather than defaulted: this source set carries both adapters,
+        // and `ClientTransport.default()` refuses to choose between two
+        // providers. `PekkoTransportClientTest` runs the same client over the
+        // other one.
+        client = OrdersClient(server.baseUrl, codecs, JavaHttpTransport())
     }
 
     @AfterAll

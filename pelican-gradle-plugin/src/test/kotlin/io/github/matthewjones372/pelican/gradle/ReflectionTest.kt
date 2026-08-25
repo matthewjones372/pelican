@@ -14,19 +14,22 @@ class ReflectionTest {
     @Test
     fun `calls a top-level function`() {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
-        Pelican.document(loader, spec, DocumentFormat.JSON) shouldBe """{"title":"Orders"}"""
+        Pelican.document(loader, spec, DocumentFormat.JSON, null) shouldBe
+            """{"openapi":"3.1.0","title":"Orders"}"""
     }
 
     @Test
     fun `calls a member of an object`() {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.Specs", "spec")
-        Pelican.document(loader, spec, DocumentFormat.YAML) shouldBe "title: Bookmarks\n"
+        Pelican.document(loader, spec, DocumentFormat.YAML, null) shouldBe
+            "openapi: 3.1.0\ntitle: Bookmarks\n"
     }
 
     @Test
     fun `calls a member of a class it has to instantiate`() {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.Holder", "spec")
-        Pelican.document(loader, spec, DocumentFormat.JSON) shouldBe """{"title":"Reports"}"""
+        Pelican.document(loader, spec, DocumentFormat.JSON, null) shouldBe
+            """{"openapi":"3.1.0","title":"Reports"}"""
     }
 
     @Test
@@ -73,7 +76,7 @@ class ReflectionTest {
     fun `names the module to add when the library is not on the classpath`() {
         val empty = java.net.URLClassLoader(emptyArray(), ClassLoader.getPlatformClassLoader())
         shouldThrow<PelicanFailure> {
-            Pelican.document(empty, "not a spec", DocumentFormat.JSON)
+            Pelican.document(empty, "not a spec", DocumentFormat.JSON, null)
         }.message.orEmpty() shouldContain "pelican-core"
     }
 
@@ -83,18 +86,43 @@ class ReflectionTest {
         val written = Pelican.writeClient(loader, spec, dir, "example.generated", null, null, false, null)
 
         written shouldBe File(dir, "example/generated/OrdersClient.kt")
-        // title | package | client | base URL | hidden | codec
-        written.readText().trim() shouldBe "Orders|example.generated|OrdersClient|https://orders.test|false|JACKSON"
+        // title | package | client | base URL | hidden | codec | call style
+        written.readText().trim() shouldBe
+            "Orders|example.generated|OrdersClient|https://orders.test|false|JACKSON|BLOCKING"
     }
 
     @Test
     fun `passes what the entry set instead`(@TempDir dir: File) {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
-        val written =
-            Pelican.writeClient(loader, spec, dir, "example", "Internal", "https://elsewhere.test", true, "kotlinx")
+        val written = Pelican.writeClient(
+            loader,
+            spec,
+            dir,
+            "example",
+            "Internal",
+            "https://elsewhere.test",
+            true,
+            "kotlinx",
+            "suspending",
+        )
 
         written shouldBe File(dir, "example/Internal.kt")
-        written.readText().trim() shouldBe "Orders|example|Internal|https://elsewhere.test|true|KOTLINX"
+        written.readText().trim() shouldBe "Orders|example|Internal|https://elsewhere.test|true|KOTLINX|SUSPENDING"
+    }
+
+    /**
+     * The same matching the codec gets, for the same reason: the build file
+     * writes `suspending` and the library declares `SUSPENDING`.
+     */
+    @Test
+    fun `names the call styles the library offers when the entry names one it does not`(@TempDir dir: File) {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.writeClient(loader, spec, dir, "example", null, null, false, null, "reactive")
+        }
+
+        failure.message.orEmpty() shouldContain "No call style called 'reactive'"
+        failure.message.orEmpty() shouldContain "BLOCKING, SUSPENDING"
     }
 
     /**
@@ -182,16 +210,59 @@ class ReflectionTest {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "serverlessSpec")
         val written = Pelican.writeClient(loader, spec, dir, "example", null, null, false, null)
 
-        written.readText().trim() shouldBe "Orders|example|OrdersClient|null|false|JACKSON"
+        written.readText().trim() shouldBe "Orders|example|OrdersClient|null|false|JACKSON|BLOCKING"
     }
 
     // ------------------------------------------------ the older libraries
 
+    @Test
+    fun `writes the OpenAPI version the entry named`() {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+
+        Pelican.document(loader, spec, DocumentFormat.JSON, "3.2.0") shouldBe
+            """{"openapi":"3.2.0","title":"Orders"}"""
+        // The Kotlin name for the same constant, so neither spelling is a mistake.
+        Pelican.document(loader, spec, DocumentFormat.JSON, "V3_2_0") shouldBe
+            """{"openapi":"3.2.0","title":"Orders"}"""
+    }
+
+    @Test
+    fun `names the versions the library writes when the entry names one it does not`() {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.document(loader, spec, DocumentFormat.JSON, "3.0.3")
+        }
+
+        failure.message.orEmpty() shouldContain "'3.0.3'"
+        failure.message.orEmpty() shouldContain "'3.1.0', '3.2.0'"
+    }
+
+    private val previousCodegen = Class.forName("io.github.matthewjones372.pelican.previous.codegen.KotlinClientKt")
     private val olderCodegen = Class.forName("io.github.matthewjones372.pelican.older.codegen.KotlinClientKt")
     private val previousImporter = Class.forName("io.github.matthewjones372.pelican.previous.importer.ImportKt")
     private val olderImporter = Class.forName("io.github.matthewjones372.pelican.older.importer.ImportKt")
     private val oldestImporter = Class.forName("io.github.matthewjones372.pelican.oldest.importer.ImportKt")
     private val apiSpec = Class.forName("io.github.matthewjones372.pelican.ApiSpec")
+
+    private val olderOpenApi = Class.forName("io.github.matthewjones372.pelican.older.openapi.OpenApiKt")
+
+    @Test
+    fun `writes a document through the arity an older library published`() {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+
+        Pelican.document(olderOpenApi, apiSpec, "openApiJson", spec, null) shouldBe """{"title":"Orders"}"""
+    }
+
+    @Test
+    fun `says which library is too old to carry the version the entry set`() {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.document(olderOpenApi, apiSpec, "openApiJson", spec, "3.2.0")
+        }
+
+        failure.message.orEmpty() shouldContain "pelican-openapi"
+        failure.message.orEmpty() shouldContain "openApiVersion"
+    }
 
     @Test
     fun `writes a client through the arity an older library published`(@TempDir dir: File) {
@@ -201,6 +272,27 @@ class ReflectionTest {
 
         written shouldBe File(dir, "example/OrdersClient.kt")
         written.readText().trim() shouldBe "Orders|example|OrdersClient|https://orders.test|false"
+    }
+
+    /** One step down: the codec still carried, and the call style not yet a parameter. */
+    @Test
+    fun `writes a client through the arity published before the call style`(@TempDir dir: File) {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val written =
+            Pelican.writeClient(previousCodegen, apiSpec, spec, dir, "example", null, null, false, "kotlinx")
+
+        written.readText().trim() shouldBe "Orders|example|OrdersClient|https://orders.test|false|KOTLINX"
+    }
+
+    @Test
+    fun `says which library is too old to carry the call style the entry set`(@TempDir dir: File) {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.writeClient(previousCodegen, apiSpec, spec, dir, "example", null, null, false, null, "suspending")
+        }
+
+        failure.message.orEmpty() shouldContain "pelican-codegen"
+        failure.message.orEmpty() shouldContain "takes no call style"
     }
 
     @Test

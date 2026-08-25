@@ -47,10 +47,11 @@ enum class ListStyle(
 fun defaultStyleAt(location: String): String = if (location in simpleLocations) "simple" else "form"
 
 /**
- * The `explode` OpenAPI assumes for [style]. False everywhere but `form`, which
- * is the one place a document says `explode: false` to get the comma.
+ * The `explode` OpenAPI assumes for [style]. False everywhere but `form` and
+ * the `cookie` that 3.2 added beside it — the two places a document says
+ * `explode: false` to get the comma rather than saying `true` to be rid of it.
  */
-fun defaultExplodeFor(style: String): Boolean = style == "form"
+fun defaultExplodeFor(style: String): Boolean = style == "form" || style == "cookie"
 
 private val simpleLocations = setOf("path", "header")
 

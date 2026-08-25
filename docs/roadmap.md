@@ -20,17 +20,51 @@ rewriting — and what the caller gets.
 
 ## What has since landed
 
-Two of the items below are partly done, and the page says so here rather than
-being quietly rewritten, because the argument for the order is worth keeping
-next to the result of following it.
+Four of the items below are done or partly done, and the page says so here
+rather than being quietly rewritten, because the argument for the order is
+worth keeping next to the result of following it.
 
-- **Item 1** shipped as `pelican-metrics`: `Endpoint.statusFor` resolves the
-  status once in core, `afterStatus` hands it to a filter, and a counter and a
-  timer come out tagged from the description. OpenTelemetry is still to do.
+- **Item 1** is done. `Endpoint.statusFor` resolves the status once in core and
+  `afterStatus` hands it to a filter; `pelican-metrics` turns that into a
+  Micrometer counter and timer, and `pelican-metrics-otel` turns the same
+  reading into an OpenTelemetry `SERVER` span per request — named
+  `GET /orders/{orderId}` from the description, with `http.route`,
+  `http.request.method`, `http.response.status_code` and a span status set from
+  the outcome — alongside the `http.server.request.duration` histogram the
+  semantic conventions specify. A second module rather than a second file,
+  because a service that wanted Micrometer must not acquire the OpenTelemetry
+  API for it, and each module has a dependency test saying so.
+
+  Two things item 1 asked for and did not get, both recorded in
+  [Metrics](reference.md#metrics) rather than left to be discovered: continuing
+  an inbound trace needs six lines per service, because reading an undeclared
+  header is the one thing a backend-agnostic filter cannot do; and requests
+  answered before the filter chain is entered are invisible to either
+  instrument, which remains true and would need metering inside each
+  interpreter to fix.
 - **Item 2** shipped as [Choosing between Pelican and the alternatives](choosing.md).
-- **Item 3** shipped its first phase: `ClientTransport` in core and
-  `pelican-client-java` over the JDK's own `HttpClient`. The Ktor and Pekko
-  adapters, the `suspend` surface and the retry policy are still to do.
+- **Item 3** shipped its first phase, and then the two things that phase was
+  supposed to make cheap:
+  - `ClientTransport` lives in core, `pelican-client-java` sends over the JDK's
+    own `HttpClient`, and `pelican-client-pekko` over Pekko HTTP's. The second
+    adapter made the classpath question real rather than hypothetical:
+    `ClientTransport.default()` refuses to choose between two providers, so a
+    build carrying both names the transport at each client it constructs.
+  - The `suspend` surface is `callStyle.set("suspending")` on a client entry —
+    one call shape per generated file, the same methods either way, and
+    kotlinx.coroutines on the classpath of the callers who asked for it rather
+    than of everyone who generated a client. A cancelled coroutine cancels the
+    exchange.
+  - The retry policy is `ClientTransport.default().retrying(policy)`: a
+    decorator in core, no line of it generated, and no retries at all unless
+    somebody wrapped a transport in one.
+
+  The Ktor adapter is the last of this item.
+- **Item 8** shipped: `pelican-openapi` writes 3.2.0 as well as 3.1.0, and the
+  survey that item asked for came back with more than a number. Two things
+  Pelican describes every day — cookie parameters and streamed responses —
+  turned out to be things 3.1 has no vocabulary for, and 3.2 does. The default
+  stayed at 3.1.0 all the same, and the argument for that is below.
 
 ## 1. Metrics and traces, from the description
 
@@ -144,6 +178,17 @@ arrives with them rather than as separate work.
 - **An asynchronous surface.** The generated methods block. Both shapes fall
   out of the SPI rather than being generated twice.
 
+Both of those are done, and the estimate above was right about the shape and
+half right about the cost. The retry policy is a decorator over the interface
+and nothing else, exactly as predicted. The `suspend` surface did fall out of
+the SPI, but "rather than being generated twice" turned out to be the wrong
+target: a file carrying both shapes would double every operation's surface and
+put coroutines on the classpath of callers who never asked for one, so the
+generator emits one shape per file and the caller says which. See
+[Blocking or suspending](reference.md#blocking-or-suspending) for the argument,
+and [Retrying](reference.md#retrying-and-what-is-safe-to-retry) for the
+defaults and the defence of each.
+
 Writing a connection pool, a circuit breaker and a load balancer is a different
 project and is not this one. Each adapter inherits whatever its library already
 does about all three.
@@ -154,6 +199,8 @@ emits, three new adapter modules, `docs/generated-client.md`.
 one test, blocking and `suspend` call shapes both generate, a retry policy is a
 constructor argument defaulting to no retries, and each adapter module's
 dependency test asserts it drags in core and one HTTP library and nothing else.
+Two of those four are done; what is left is the two adapters and the test that
+runs one client against all three.
 
 ## 4. A filter that can change the response
 
@@ -198,20 +245,51 @@ fuller orders service is wired on Pekko and http4k only. "The backend is just a
 choice" is a claim the examples should demonstrate rather than assert, so the
 Ktor wiring should exist too.
 
-## 8. OpenAPI 3.2.0
+## 8. OpenAPI 3.2.0 — done, and what the survey found
 
-The emitter writes 3.1.0 and nothing else, and the reference manual frames that
-as a deliberate step forward under the heading "Moving from 3.0.3 to 3.1.0".
-That framing has expired: 3.2.0 has been the current specification since
-19 September 2025, and http4k's own renderer already defaults to it. Writing
-3.1.0 is now neither the floor nor the ceiling, and a reader whose tooling
-dictates a version rules Pelican out on it faster than on anything else here.
+Kept rather than deleted, because the argument this item made turned out to be
+half right and the half it got wrong is the more interesting one.
 
-This is late in the list only because it was written after the rest. On cost
-against value it belongs near the top: the document is emitted from one place,
-and what changed between 3.1 and 3.2 is additive for what Pelican describes.
-What it needs first is a survey of exactly what differs, so that emitting the
-newer number is not a claim the document cannot support.
+The item assumed the problem was a number: that 3.1.0 was "neither the floor
+nor the ceiling", and that raising it was mostly a matter of not claiming more
+than the document could support. The survey found two places where the document
+Pelican was already emitting was *wrong*, and had been wrong since 3.1 was the
+only thing it wrote.
+
+- **Cookie parameters.** Pelican joins cookie pairs with `"; "` and passes the
+  values through unescaped. Both revisions assume `style: "form"` at
+  `in: "cookie"`, and `form` means percent-encoded values joined by `&` — 3.2's
+  Appendix D says in as many words that it "uses the wrong delimiter for
+  cookies". 3.2 added `style: "cookie"` for what Pelican actually does. 3.1 has
+  no way to say it.
+- **Streamed responses.** `application/x-ndjson` and `text/event-stream` are
+  sequential media types, where 3.2 is explicit that `schema` describes the
+  whole stream and `itemSchema` describes one frame. Pelican knows the frame,
+  and had nowhere but `schema` to put it. Worse for `sse<T>`: 3.2 says an item
+  of an event stream is the *parsed event*, so naming the payload there
+  described a stream nobody sends.
+
+So the newer number was not a claim to be careful about making. It was the only
+number under which two of Pelican's own claims are true.
+
+**The default did not move, and that is the part worth disagreeing with.** A
+consumer reading 3.1 is promised nothing about a document saying 3.2 — the
+specification's versioning rule only covers a `major.minor` feature set — and
+swagger-parser, which `openapi-generator` and most of the JVM ecosystem stands
+on, hands back `null` for a 3.2.0 document with an empty message list. No
+error, no warning. Defaulting to a document that the dominant parser silently
+turns into nothing would be a worse failure than being a revision behind, so
+3.1.0 is what a caller who does not choose still gets, and `OpenApiVersion` is
+one argument away. A test asserts that swagger-parser still cannot read 3.2, so
+the reason for the default expires loudly rather than quietly.
+
+**What is left.** Move the default to 3.2.0 when that test starts failing. And
+the 3.2 fields nothing in an endpoint description answers — `$self`,
+`Server.name`, Tag Objects with `parent` and `kind`, `additionalOperations`,
+the `deviceAuthorization` flow — are listed in
+[What isn't here](reference.md#what-isnt-here) rather than here, because each
+of them needs something added to the *description* first, and that is a
+different argument from this one.
 
 ## Not on this list
 

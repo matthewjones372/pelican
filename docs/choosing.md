@@ -54,11 +54,12 @@ meet it. Since v6 the artifact is called `http4k-api-openapi` rather than
 It emits more of OpenAPI than Pelican does. The `OpenApiVersion` enum in
 6.58.0.0 has four entries — `_2_0_0`, `_3_0_0`, `_3_1_0` and `_3_2_0` — and the
 `OpenApi3` renderer takes the version as a constructor parameter, defaulting to
-3.2.0. `OpenApi2` renders Swagger 2.0. Pelican's emitter writes 3.1.0 and
-refuses to write anything else, so http4k covers both the older version your
-vendor's tooling may still require and the current one that Pelican does not
-write at all. That is not a small difference if a consumer of your document
-gets to dictate its version.
+3.2.0. `OpenApi2` renders Swagger 2.0. Pelican writes two of those four: 3.1.0,
+which is its default, and 3.2.0, selectable the same way. So the gap has
+narrowed to the old end of the range — http4k still covers the 3.0 and 2.0 your
+vendor's tooling may require, and Pelican refuses both on the grounds that it
+could not write them faithfully. That is not a small difference if a consumer
+of your document gets to dictate its version and dictates an old one.
 
 It is enormously broader. The 6.58.0.0 API documentation publishes 221 modules.
 Beyond API description there is chaos engineering, Servirtium service
@@ -81,7 +82,7 @@ both and an in-memory fake substitutes for a real call without any adapter.
 
 **Take http4k's contracts instead when** you are already an http4k shop and the
 cost of a second description library is not obviously repaid; when you need to
-publish OpenAPI 3.0 or 3.2; when your endpoints have more than six typed inputs
+publish OpenAPI 3.0 or Swagger 2.0; when your endpoints have more than six typed inputs
 and you would rather keep them typed than drop to a bag; or when you want any
 of the two hundred other things in that repository and would rather have one
 vendor than two.
@@ -307,9 +308,12 @@ libraries are in the same place, for what is probably the same reason.
 This is the option most teams actually take, and the one a library like Pelican
 has to argue with rather than dismiss.
 
-The specification is at 3.2.0, published 19 September 2025. That is worth
-noting before anything else, because it means the version Pelican emits is
-already one behind the current one.
+The specification is at 3.2.0, published 19 September 2025, and Pelican now
+writes it — though not by default, because swagger-parser and the JVM tooling
+built on it still read a 3.2.0 document as nothing at all. Which is worth
+noting before anything else, because it is a problem a hand-written document
+has in exactly the same way: choosing 3.2 is choosing what your consumers'
+tools can read, not what the specification says.
 
 **What it does better.**
 
@@ -383,12 +387,15 @@ only, and the client contract suite runs against those two.
 is a documented decision with reasoning in the reference manual, not a gap
 waiting on a release:
 
-- **OpenAPI 3.0 is not emitted, and neither is 3.2.** The emitter writes 3.1.0
-  and nothing else. Since 3.2.0 has been the current specification since
-  September 2025, this is now a version behind at the top as well as unable to
-  reach down. If a consumer of your document dictates its version, check that
-  first, because it is the fastest way to rule Pelican out. The *importer* reads
-  3.1, 3.0 and Swagger 2.0, which is the other direction and does not help here.
+- **OpenAPI 3.0 is not emitted, and neither is Swagger 2.0.** 3.1.0 and 3.2.0
+  are both written — 3.1.0 by default, because swagger-parser and the tooling
+  built on it still read a 3.2.0 document as nothing at all — so the current
+  specification is reachable and the old ones are not. Writing 3.0 would mean a
+  second emitter that could not be faithful, since 3.0 cannot say that a `$ref`
+  may be null. If a consumer of your document dictates a version below 3.1,
+  check that first, because it is the fastest way to rule Pelican out. The
+  *importer* reads 3.2, 3.1, 3.0 and Swagger 2.0, which is the other direction
+  and does not help here.
 - **`callbacks` are not described.** A callback URL taken out of an operation's
   own payload through a runtime expression has no equivalent in an endpoint
   description. Top-level `webhooks` are described and generated; if what you
@@ -415,13 +422,20 @@ generates a real Kotlin client from the descriptions: one method per operation,
 sealed failure types, streamed responses, a per-request timeout, and a
 `ClientTransport` it sends through rather than an HTTP library it is welded to.
 That is more than a toy. But there is no published client artifact — the file is
-generated into your build, and you own it. Only one transport is written,
-`pelican-client-java`, over the JDK's own `HttpClient`; a service that already
-runs and tunes a Ktor or a Pekko client still cannot hand that one over, because
-those adapters do not exist yet. The generated methods block, joining the stage
-the transport answers with, so there is no suspending or asynchronous variant to
-call. And nothing in the generated file does retries, backoff, circuit breaking
-or metrics; if you want those you write them around the transport. The client that `pelican-test` derives is explicitly narrower still,
+generated into your build, and you own it. Two transports are written:
+`pelican-client-java` over the JDK's own `HttpClient`, and
+`pelican-client-pekko` over Pekko HTTP's client, which takes the `ActorSystem`
+a Pekko service already has. A service that already runs and tunes a Ktor
+client still cannot hand that one over, because that adapter does not exist
+yet. A build carrying both of the ones that do exist has to name the transport
+at each client it constructs, since nothing can choose between two providers on
+one classpath. The generated methods block by default, joining the stage the
+transport answers with; a `suspend` surface is generated instead when the client
+entry asks for one, and the choice belongs to whoever generates the file. Retries
+are a decorator over a transport rather than generated code, and are off unless
+somebody wraps one — but nothing here does circuit breaking or per-call metrics,
+and those you still write around the transport yourself. The client that
+`pelican-test` derives is explicitly narrower still,
 scoped at testing, blocking, with no retries and no pooling worth the name, and
 it cannot upload a binary file part because its `RequestSpec` carries a `String`
 body.

@@ -51,7 +51,7 @@ file â€” one `TODO()` per operation, in the right binder for each output kind â€
 and never overwrites it again, because after the first run it is your service
 rather than generated code.
 
-JSON or YAML, and 3.1, 3.0 and Swagger 2.0 alike: a 2.0 document and its 3.0
+JSON or YAML, and 3.2, 3.1, 3.0 and Swagger 2.0 alike: a 2.0 document and its 3.0
 twin generate the same descriptions, which is the claim `VersionsTest` makes.
 References to other files are followed and the schemas they name keep those
 names; references to another *host* are refused, because a build that fetches a

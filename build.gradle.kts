@@ -57,7 +57,7 @@ spotless {
 /** One line per module, so a Maven search result says what the artifact is. */
 val moduleDescriptions = mapOf(
     "pelican-core" to "Endpoint descriptions as values. No dependencies.",
-    "pelican-openapi" to "Endpoint descriptions to an OpenAPI 3.1.0 document.",
+    "pelican-openapi" to "Endpoint descriptions to an OpenAPI 3.1.0 or 3.2.0 document.",
     "pelican-codegen" to "Endpoint descriptions to a Kotlin client, as source.",
     "pelican-import" to "An OpenAPI document to endpoint descriptions, as source.",
     "pelican-jackson" to "Jackson codecs and swagger-core schemas for Pelican.",
@@ -70,7 +70,9 @@ val moduleDescriptions = mapOf(
     "pelican-ktor" to "Endpoint descriptions to Ktor routes, with suspend handlers.",
     "pelican-ktor-docs" to "Serves the OpenAPI document and Swagger UI on Ktor.",
     "pelican-metrics" to "Micrometer meters for a Pelican service, dimensioned by the descriptions.",
+    "pelican-metrics-otel" to "OpenTelemetry spans and metrics for a Pelican service, from the descriptions.",
     "pelican-client-java" to "A generated client's transport, over the JDK's own HttpClient.",
+    "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
     "pelican-test-golden" to "Golden files per endpoint that fail on a change breaking existing callers.",
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",

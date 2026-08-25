@@ -84,7 +84,15 @@ internal class Responses(private val reader: Reader, private val operation: Oper
         if (content == null || content.fields.isEmpty()) return IrSuccess.Empty(status)
 
         val (mediaType, node) = single(content, path / "content", "$status response")
-        val schema = (node as? JsonObj)?.get("schema")?.let(::normaliseSchema)
+        val media = node as? JsonObj
+        val schema = media?.get("schema")?.let(::normaliseSchema)
+
+        // OpenAPI 3.2 puts a sequential media type's frame under `itemSchema`,
+        // a field it added because `schema` means the whole stream read as an
+        // array. Both spellings are read: a document reaching this importer
+        // may have been written against either revision, and the frame is what
+        // an endpoint description needs either way.
+        val item = media?.get("itemSchema")
 
         return when {
             mediaType.isJson() -> IrSuccess.Json(
@@ -94,12 +102,16 @@ internal class Responses(private val reader: Reader, private val operation: Oper
 
             mediaType == "application/x-ndjson" -> IrSuccess.Ndjson(
                 status,
-                schema ?: unsupported(path, "The $status NDJSON response declares no schema."),
+                item?.let(::normaliseSchema)
+                    ?: schema
+                    ?: unsupported(path, "The $status NDJSON response declares no schema."),
             )
 
             mediaType == "text/event-stream" -> IrSuccess.Sse(
                 status,
-                schema ?: unsupported(path, "The $status event stream declares no schema."),
+                item?.let { sseFrame(it, status, path) }
+                    ?: schema
+                    ?: unsupported(path, "The $status event stream declares no schema."),
             )
 
             mediaType == "text/plain" -> {
@@ -116,6 +128,35 @@ internal class Responses(private val reader: Reader, private val operation: Oper
                 "The $status response is $mediaType, and there is no output that describes it.",
             )
         }
+    }
+
+    /**
+     * The payload inside a 3.2 event stream's `itemSchema`.
+     *
+     * An item of a `text/event-stream` is the event as the SSE parser hands it
+     * over — `data`, and possibly `event`, `id` and `retry` — rather than the
+     * payload, and 3.2 points at `contentMediaType` with `contentSchema` for
+     * saying what a `data` field carrying JSON holds. `sse<T>` is that `T`, so
+     * this is where it is read back out. Anything else is refused rather than
+     * guessed at: a `data` described only as a string says nothing about what
+     * the stream carries, and there would be no type to name.
+     */
+    private fun sseFrame(item: io.github.matthewjones372.pelican.JsonValue, status: Int, path: JsonPath): JsonObj {
+        val data = (item as? JsonObj)?.obj("properties")?.obj("data")
+            ?: unsupported(
+                path,
+                "The $status event stream describes each item with `itemSchema`, and an item of an event " +
+                    "stream is the parsed event, so its schema is an object with a `data` property. This one " +
+                    "has none.",
+            )
+        val carried = data["contentSchema"]
+            ?: unsupported(
+                path,
+                "The $status event stream's `data` says it is a string and does not say what is inside it. " +
+                    "An `sse<T>` needs the `T`: add `contentMediaType: application/json` and a " +
+                    "`contentSchema`, or exclude the operation.",
+            )
+        return normaliseSchema(carried)
     }
 
     private fun failure(status: Int?, at: JsonPath, node: io.github.matthewjones372.pelican.JsonValue): IrFailure {

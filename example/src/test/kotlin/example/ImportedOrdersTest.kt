@@ -1,6 +1,7 @@
 package example
 
 import example.imported.importedSpec
+import example.imported32.imported32Spec
 import io.github.matthewjones372.pelican.JsonArr
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
@@ -25,6 +26,25 @@ class ImportedOrdersTest {
     fun `and with its own schemas it comes back whole`() {
         canonical(withoutSuccessDescriptions(importedSpec().openApi())) shouldBe
             canonical(withoutSuccessDescriptions(ordersSpec().openApi()))
+    }
+
+    /**
+     * Choosing 3.2 changes what the document says, not what it means.
+     *
+     * `imported32Spec` is generated from the same endpoints written against
+     * OpenAPI 3.2 — a separate `documents` entry with `openApiVersion` set, and
+     * a separate `endpoints` entry reading what it wrote. Three fields moved in
+     * that rendering, and the orders service exercises all three: two NDJSON
+     * responses and an event stream, whose frames leave `schema` for
+     * `itemSchema` and whose payload ends up two levels inside a described SSE
+     * event, and two cookie parameters that acquire `style: "cookie"`.
+     *
+     * If the emitter ever says something under 3.2 that the importer cannot
+     * read back, it fails here, against a real document rather than a fixture.
+     */
+    @Test
+    fun `the 3_2 rendering reads back as exactly the same descriptions`() {
+        canonical(imported32Spec().openApi()) shouldBe canonical(importedSpec().openApi())
     }
 
     /** The same document with every object's keys in one order, rendered. */

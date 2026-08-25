@@ -17,6 +17,8 @@ internal object Pelican {
     private const val REPORT = "io.github.matthewjones372.pelican.openapi.ReportKt"
     private const val IMPORT = "io.github.matthewjones372.pelican.importer.ImportKt"
     private const val CODEC_ANNOTATIONS = "io.github.matthewjones372.pelican.codegen.CodecAnnotations"
+    private const val OPEN_API_VERSION = "io.github.matthewjones372.pelican.openapi.OpenApiVersion"
+    private const val CALL_STYLE = "io.github.matthewjones372.pelican.codegen.CallStyle"
 
     /**
      * What an entry naming no codec means. A copy of a default the library
@@ -25,9 +27,21 @@ internal object Pelican {
      */
     private const val DEFAULT_CODEC = "JACKSON"
 
+    /**
+     * What an entry naming no OpenAPI version means, and a copy of the
+     * library's own default for the same reason [DEFAULT_CODEC] is one. It is
+     * written as the document writes it, since that is the spelling a build
+     * file uses.
+     */
+    private const val DEFAULT_OPEN_API_VERSION = "3.1.0"
+
+    /** The same, for an entry that does not say whether its methods suspend. */
+    private const val DEFAULT_CALL_STYLE = "BLOCKING"
+
     // Named as the reader's build file and dependency block spell them.
     private const val CODEGEN_MODULE = "pelican-codegen"
     private const val IMPORT_MODULE = "pelican-import"
+    private const val OPEN_API_MODULE = "pelican-openapi"
     private const val WRITES_CLIENT = "writeKotlinClient"
     private const val IMPORTS = "importEndpoints"
 
@@ -85,6 +99,7 @@ internal object Pelican {
         baseUrl: String?,
         includeHidden: Boolean,
         codec: String?,
+        callStyle: String? = null,
     ): File = writeClient(
         load(loader, CLIENT, "pelican-codegen"),
         load(loader, API_SPEC, "pelican-core"),
@@ -95,14 +110,15 @@ internal object Pelican {
         baseUrl,
         includeHidden,
         codec,
+        callStyle,
     )
 
     /**
      * The same, against classes that are already resolved. The seam is here for
-     * the test: the two arities below are two releases of one library, and
-     * without it the older path would run only on a consumer's machine.
+     * the test: the arities below are successive releases of one library, and
+     * without it the older paths would run only on a consumer's machine.
      */
-    @Suppress("LongParameterList")
+    @Suppress("LongParameterList", "ReturnCount")
     fun writeClient(
         codegen: Class<*>,
         apiSpec: Class<*>,
@@ -113,62 +129,94 @@ internal object Pelican {
         baseUrl: String?,
         includeHidden: Boolean,
         codec: String?,
+        callStyle: String? = null,
     ): File {
         val name = clientName ?: defaultClientName(codegen, spec)
         val url = baseUrl ?: firstServer(spec)
 
-        val withCodec = runCatching {
-            val annotations = Class.forName(CODEC_ANNOTATIONS, true, codegen.classLoader)
-            annotations to codegen.getMethod(
-                "writeKotlinClient",
-                apiSpec,
-                File::class.java,
-                String::class.java,
-                String::class.java,
-                String::class.java,
-                Boolean::class.javaPrimitiveType,
-                annotations,
-            )
-        }.getOrNull()
+        val annotations = enumNamed(codegen, CODEC_ANNOTATIONS)
+        val styles = enumNamed(codegen, CALL_STYLE)
 
-        if (withCodec != null) {
-            val (annotations, method) = withCodec
-            return method.invokeUnwrapped(
-                null,
-                spec,
-                sourceRoot,
-                packageName,
-                name,
-                url,
-                includeHidden,
-                codecConstant(annotations, codec),
-            ) as File
+        // Nested rather than joined into one condition, because inside the
+        // block the two enums are known to be there and can be passed as
+        // themselves.
+        if (annotations != null && styles != null) {
+            val newest = clientWriter(codegen, apiSpec, annotations, styles)
+            if (newest != null) {
+                return newest.invokeUnwrapped(
+                    null,
+                    spec,
+                    sourceRoot,
+                    packageName,
+                    name,
+                    url,
+                    includeHidden,
+                    constant(annotations, codec, DEFAULT_CODEC, "codec"),
+                    constant(styles, callStyle, DEFAULT_CALL_STYLE, "call style"),
+                ) as File
+            }
         }
 
-        if (codec != null) throw PelicanFailure(tooOld("codec", CODEGEN_MODULE, WRITES_CLIENT, "no codec"))
+        if (callStyle != null) refuse(tooOld("callStyle", CODEGEN_MODULE, WRITES_CLIENT, "no call style"))
 
-        val method = codegen.getMethod(
-            "writeKotlinClient",
+        if (annotations != null) {
+            val withCodec = clientWriter(codegen, apiSpec, annotations)
+            if (withCodec != null) {
+                return withCodec.invokeUnwrapped(
+                    null,
+                    spec,
+                    sourceRoot,
+                    packageName,
+                    name,
+                    url,
+                    includeHidden,
+                    constant(annotations, codec, DEFAULT_CODEC, "codec"),
+                ) as File
+            }
+        }
+
+        if (codec != null) refuse(tooOld("codec", CODEGEN_MODULE, WRITES_CLIENT, "no codec"))
+
+        val oldest = clientWriter(codegen, apiSpec) ?: refuse(
+            "`${codegen.name}` has no `$WRITES_CLIENT` this plugin knows how to call. The " +
+                "`$CODEGEN_MODULE` on this task's classpath is not one this plugin supports.",
+        )
+        return oldest.invokeUnwrapped(null, spec, sourceRoot, packageName, name, url, includeHidden) as File
+    }
+
+    /** `writeKotlinClient` with these trailing parameters after the six every arity takes, or null. */
+    private fun clientWriter(codegen: Class<*>, apiSpec: Class<*>, vararg trailing: Class<*>): Method? = runCatching {
+        @Suppress("SpreadOperator") // Two class literals at most; the copy is the readable spelling.
+        codegen.getMethod(
+            WRITES_CLIENT,
             apiSpec,
             File::class.java,
             String::class.java,
             String::class.java,
             String::class.java,
             Boolean::class.javaPrimitiveType,
+            *trailing,
         )
-        return method.invokeUnwrapped(null, spec, sourceRoot, packageName, name, url, includeHidden) as File
-    }
+    }.getOrNull()
+
+    /**
+     * An enum the library publishes, by name, or null where the library on this
+     * task's classpath is older than the setting it stands for.
+     */
+    private fun enumNamed(codegen: Class<*>, className: String): Class<*>? =
+        runCatching { Class.forName(className, true, codegen.classLoader) }.getOrNull()
 
     /**
      * The enum constant the entry named, matched case-insensitively:
-     * `codec.set("kotlinx")` is how a build file says `KOTLINX`.
+     * `codec.set("kotlinx")` is how a build file says `KOTLINX`, and
+     * `callStyle.set("suspending")` how it says `SUSPENDING`.
      */
-    private fun codecConstant(annotations: Class<*>, codec: String?): Any {
-        val constants = annotations.enumConstants.orEmpty().filterIsInstance<Enum<*>>()
-        val chosen = codec ?: DEFAULT_CODEC
+    private fun constant(type: Class<*>, named: String?, fallback: String, what: String): Any {
+        val constants = type.enumConstants.orEmpty().filterIsInstance<Enum<*>>()
+        val chosen = named ?: fallback
         return constants.firstOrNull { it.name.equals(chosen, ignoreCase = true) }
             ?: throw PelicanFailure(
-                "No codec called '$chosen'. It is one of ${constants.joinToString { it.name }}.",
+                "No $what called '$chosen'. It is one of ${constants.joinToString { it.name }}.",
             )
     }
 
@@ -339,14 +387,56 @@ internal object Pelican {
             "`$function` takes $missing. Upgrade $module, or remove the setting."
 
     /** The document, rendered the way the entry asked for. */
-    fun document(loader: ClassLoader, spec: Any, format: DocumentFormat): String {
+    fun document(loader: ClassLoader, spec: Any, format: DocumentFormat, version: String?): String {
         val apiSpec = load(loader, API_SPEC, "pelican-core")
         val (className, function) = when (format) {
             DocumentFormat.JSON -> OPEN_API to "openApiJson"
             DocumentFormat.YAML -> YAML to "openApiYaml"
         }
-        val renderer = load(loader, className, "pelican-openapi")
+        return document(load(loader, className, OPEN_API_MODULE), apiSpec, function, spec, version)
+    }
+
+    /**
+     * The same, against classes that are already resolved. The seam is here
+     * for the test, as it is on [writeClient]: the two arities below are two
+     * releases of one library, and without it the older path would run only on
+     * a consumer's machine.
+     */
+    fun document(renderer: Class<*>, apiSpec: Class<*>, function: String, spec: Any, version: String?): String {
+        // A `pelican-openapi` from before the version was selectable has a
+        // renderer that takes the spec and nothing else.
+        val withVersion = runCatching {
+            val versions = Class.forName(OPEN_API_VERSION, true, renderer.classLoader)
+            versions to renderer.getMethod(function, apiSpec, versions)
+        }.getOrNull()
+
+        if (withVersion != null) {
+            val (versions, method) = withVersion
+            return method.invokeUnwrapped(null, spec, versionConstant(versions, version)) as String
+        }
+
+        if (version != null) {
+            throw PelicanFailure(tooOld("openApiVersion", OPEN_API_MODULE, function, "no version"))
+        }
+
         return renderer.getMethod(function, apiSpec).invokeUnwrapped(null, spec) as String
+    }
+
+    /**
+     * The enum constant the entry named. `openApiVersion.set("3.2.0")` is how
+     * a build file asks for it — the number the document will carry rather
+     * than the Kotlin name for it, because the number is the thing a
+     * consumer's tooling dictated. The Kotlin name is accepted too, so neither
+     * spelling is a mistake.
+     */
+    private fun versionConstant(versions: Class<*>, version: String?): Any {
+        val constants = versions.enumConstants.orEmpty().filterIsInstance<Enum<*>>()
+        val chosen = version ?: DEFAULT_OPEN_API_VERSION
+        return constants.firstOrNull { it.toString() == chosen || it.name.equals(chosen, ignoreCase = true) }
+            ?: throw PelicanFailure(
+                "`openApiVersion` is set to '$chosen', and the versions `$OPEN_API_MODULE` writes are " +
+                    constants.joinToString { "'$it'" } + ".",
+            )
     }
 
     /**

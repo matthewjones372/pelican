@@ -27,6 +27,13 @@ dependencies {
     // Meters, which are opt-in in the same way serving the docs is: this is the
     // module that adds them, and `example.metrics` is what it looks like.
     implementation(project(":pelican-metrics"))
+    // The same idea through the other vendor's API, and a separate module for
+    // exactly that reason: `example.tracing` is what it looks like. The SDK is
+    // declared here rather than arriving through the module, because which SDK
+    // a service runs — or whether it runs one at all — is the service's choice
+    // and not the library's.
+    implementation(project(":pelican-metrics-otel"))
+    implementation("io.opentelemetry:opentelemetry-sdk:1.65.0")
     // The other two codec modules, for `example.codecs`: the same endpoints and
     // handlers served three times, once per JSON library. `pelican-kotlinx` also
     // carries the parser the assertions use — the tests read responses off a
@@ -43,10 +50,25 @@ dependencies {
     testImplementation("io.swagger.parser.v3:swagger-parser:2.1.47")
 
     // The generated client is compiled in this source set, and a generated
-    // client needs a transport. This is the adapter it finds by default; a
-    // consumer already running Ktor would take that adapter instead and pass
-    // the engine it has.
+    // client needs a transport. Both adapters are here so the suite runs the
+    // same client over each of them — which is also what makes this the one
+    // classpath in the repository where `ClientTransport.default()` finds two
+    // providers and refuses to choose. Every client built here therefore names
+    // the transport it wants; see GeneratedKotlinClientTest.
     testImplementation(project(":pelican-client-java"))
+    testImplementation(project(":pelican-client-pekko"))
+
+    // What the suspending client generated below is written against. Declared
+    // rather than inherited: it arrives transitively with Ktor, and a version a
+    // generated file depends on should not be whichever one a server module
+    // happened to bring.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+
+    // The in-memory metric reader `TracedOrdersTest` collects the histogram
+    // through. The in-memory *span* exporter lives in the same artifact, but
+    // the example writes its own so that the runnable service does not have to
+    // ship a testing library to render `/admin/traces`.
+    testImplementation("io.opentelemetry:opentelemetry-sdk-testing:1.65.0")
 
     testImplementation(project(":pelican-test"))
     // The in-memory transports are per-backend, so the suites that run twice
@@ -123,6 +145,14 @@ tasks.register<JavaExec>("runMetrics") {
     mainClass.set("example.metrics.MeteredOrdersKt")
 }
 
+/** The traced service: `curl` it, then read `/admin/traces` to see the spans that produced. */
+tasks.register<JavaExec>("runTracing") {
+    group = "application"
+    description = "Runs the Orders example with OpenTelemetry spans taken from the descriptions"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.tracing.TracedOrdersKt")
+}
+
 /** The README's "Your first endpoint", kept runnable for the same reason. */
 tasks.register<JavaExec>("runFirstEndpoint") {
     group = "application"
@@ -167,6 +197,16 @@ pelican {
             format.set(DocumentFormat.YAML)
             outputFile.set(layout.buildDirectory.file("openapi.yaml"))
         }
+        // And the same endpoints written against the current specification.
+        // Not a third thing to publish: it is what the round trip below reads,
+        // so that the three fields 3.2 moved are exercised by a real document
+        // through the real plugin rather than by a fixture somebody typed.
+        create("orders32") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("ordersSpec")
+            openApiVersion.set("3.2.0")
+            outputFile.set(layout.buildDirectory.file("openapi-3.2.json"))
+        }
     }
     clients {
         create("orders") {
@@ -174,6 +214,24 @@ pelican {
             specFunction.set("ordersSpec")
             packageName.set("example.generated")
             outputDir.set(layout.projectDirectory.dir("src/test/kotlin"))
+        }
+        // The same descriptions, generated the other way round: one method per
+        // endpoint again, each of them `suspend`. Two entries rather than a
+        // switch on the first, because the two shapes are two audiences and
+        // this repository is both of them — the suite calls the blocking client
+        // from a test method and the suspending one from a coroutine, against
+        // the same server.
+        //
+        // Not committed, unlike the entry above. Where that one is a reviewable
+        // file with a `checkOrdersClient` behind it, this one takes the
+        // default: written into `build/`, compiled by the test source set, and
+        // regenerated on every run. Both paths are ones a consumer takes, and
+        // each is exercised once here.
+        create("ordersSuspending") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("ordersSpec")
+            packageName.set("example.generated.suspending")
+            callStyle.set("suspending")
         }
     }
     /**
@@ -189,22 +247,56 @@ pelican {
             // real backend, for every output kind the example describes.
             handlers.set("pekko")
         }
+        /**
+         * The same descriptions, read back out of the 3.2 rendering.
+         *
+         * The claim being tested is that choosing a version changes what the
+         * document says and not what it means: `ImportedOrdersTest` compares
+         * these descriptions against the ones above and expects no difference.
+         * It is worth a second entry because 3.2 puts a streamed response's
+         * schema in a different field and an event stream's payload two levels
+         * further in, and the orders service has both.
+         *
+         * No `handlers` here — the stubs the entry above writes are the same
+         * stubs, and writing them twice would prove nothing new.
+         */
+        create("imported32") {
+            document.set(layout.buildDirectory.file("openapi-3.2.json"))
+            packageName.set("example.imported32")
+            classpath.setFrom(pelicanImport)
+        }
     }
 }
 
 // The document is generated by this build, so the import waits for it. A
 // consumer importing a document somebody published has nothing to wait for.
 tasks.named("generateImportedEndpoints") { dependsOn("generateOrdersDocument") }
+tasks.named("generateImported32Endpoints") { dependsOn("generateOrders32Document") }
 
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/imported"))
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/imported32"))
+
+// The suspending client, which is generated rather than committed: the
+// directory the task defaults to, added to the source set that calls it.
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/ordersSuspending"))
 
 // Generated source compiled here but written by another module's tests. detekt
 // filters by the path *inside* the source root, so this is that path rather
 // than the `build/generated` one a reader would expect — a consumer pointing
 // the task at a source root of their own has the same line to write, and the
 // reference manual says so.
-tasks.withType<dev.detekt.gradle.Detekt>().configureEach { exclude("example/imported/**") }
+tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
+    exclude("example/imported/**")
+    exclude("example/imported32/**")
+    exclude("example/generated/suspending/**")
+}
 
-tasks.named("compileTestKotlin") { dependsOn("generateImportedEndpoints") }
+tasks.named("compileTestKotlin") {
+    dependsOn(
+        "generateImportedEndpoints",
+        "generateImported32Endpoints",
+        "generateOrdersSuspendingClient",
+    )
+}
 
 // The benchmarks are a JMH harness in `:benchmarks`: `./gradlew :benchmarks:jmh`.
