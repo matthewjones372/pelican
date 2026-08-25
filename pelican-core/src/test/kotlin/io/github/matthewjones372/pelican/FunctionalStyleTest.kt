@@ -68,6 +68,9 @@ class FunctionalStyleTest {
 
         "pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Interpreter.kt" to
             "the per-request value bag handed to Params",
+        "pelican-http4k/src/main/kotlin/io/github/matthewjones372/pelican/http4k/IndexedRoutes.kt" to
+            "the values the index decoded while matching are held for the handler http4k invokes a " +
+            "moment later, rather than the path being walked and decoded twice",
         "pelican-http4k/src/main/kotlin/io/github/matthewjones372/pelican/http4k/Interpreter.kt" to
             "the per-request value bag handed to Params",
         "pelican-ktor/src/main/kotlin/io/github/matthewjones372/pelican/ktor/Interpreter.kt" to
