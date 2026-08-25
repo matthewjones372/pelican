@@ -193,7 +193,7 @@ class ApiClient(
      */
     @JvmName("callFallible")
     @Suppress("UNCHECKED_CAST")
-    fun <I, E, T> call(endpoint: Endpoint<I, Fallible<E, T>>, input: I): T {
+    fun <I, E, T> call(endpoint: Endpoint<I, Outcome<E, T>>, input: I): T {
         val req = request(endpoint, input)
         val res = transport.send(req)
         if (!res.isSuccess) throw ApiCallFailed(endpoint, req, res)
@@ -220,7 +220,7 @@ class ApiClient(
      * come back on it, decoded by their own codecs.
      */
     @Suppress("UNCHECKED_CAST")
-    fun <I, E, T> outcome(endpoint: Endpoint<I, Fallible<E, T>>, input: I): Outcome<E, T> {
+    fun <I, E, T> outcome(endpoint: Endpoint<I, Outcome<E, T>>, input: I): Outcome<E, T> {
         val req = request(endpoint, input)
         val res = transport.send(req)
         val out = endpoint.output as FallibleOutput<E, T>
@@ -285,7 +285,7 @@ class ApiClient(
      */
     @JvmName("collectFallible")
     @Suppress("UNCHECKED_CAST")
-    fun <I, E, T> collect(endpoint: Endpoint<I, Fallible<E, StreamOf<T>>>, input: I): List<T> {
+    fun <I, E, T> collect(endpoint: Endpoint<I, Outcome<E, StreamOf<T>>>, input: I): List<T> {
         val req = request(endpoint, input)
         val res = transport.send(req)
         if (!res.isSuccess) throw ApiCallFailed(endpoint, req, res)

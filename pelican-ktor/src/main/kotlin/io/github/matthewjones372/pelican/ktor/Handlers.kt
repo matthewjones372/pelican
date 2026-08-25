@@ -3,7 +3,6 @@ package io.github.matthewjones372.pelican.ktor
 import io.github.matthewjones372.pelican.ByteStream
 import io.github.matthewjones372.pelican.ByteStreamHandle
 import io.github.matthewjones372.pelican.Endpoint
-import io.github.matthewjones372.pelican.Fallible
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Params
@@ -41,7 +40,7 @@ infix fun <I> Endpoint<I, Unit>.handledWith(f: suspend Params.(I) -> Unit): Serv
 
 // ------------------------------------------------------------- declared failures
 //
-// `orFail` makes an `Endpoint<I, Fallible<E, T>>`, and these are the only
+// `orFail` makes an `Endpoint<I, Outcome<E, T>>`, and these are the only
 // binders that fit it: the handler returns an `Outcome`, so an undeclared
 // error is a compile error.
 //
@@ -49,24 +48,24 @@ infix fun <I> Endpoint<I, Unit>.handledWith(f: suspend Params.(I) -> Unit): Serv
 // inferred after overload resolution.
 
 /** Binds an endpoint that either succeeds with [T] or returns a declared failure. */
-infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOrFail(
+infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledOrFail(
     f: suspend Params.(I) -> Outcome<E, T>,
 ): ServerEndpoint = ServerEndpoint(this) { p -> p.launch { p.f(inputs.extract(p)) } }
 
 // ------------------------------------------------------------- several successes
 //
 // The same binder under the name that reads right when the alternatives are
-// not failures — `Fallible<Nothing, T>` is the shape above with an empty
+// not failures — `Outcome<Nothing, T>` is the shape above with an empty
 // failure side. Two names because `handledOrFail` on an endpoint declaring no
 // failure reads as a mistake.
 
 /** Binds an endpoint that answers with one of several declared responses. */
-infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOneOf(
+infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledOneOf(
     f: suspend Params.(I) -> Outcome<E, T>,
 ): ServerEndpoint = handledOrFail(f)
 
 /** Binds a streaming endpoint that may fail before the first element. */
-infix fun <I, E : Any, T> Endpoint<I, Fallible<E, StreamOf<T>>>.streamedOrFail(
+infix fun <I, E : Any, T> Endpoint<I, Outcome<E, StreamOf<T>>>.streamedOrFail(
     f: suspend Params.(I) -> Outcome<E, Flow<T>>,
 ): ServerEndpoint = ServerEndpoint(this) { p -> p.launch { p.f(inputs.extract(p)) } }
 

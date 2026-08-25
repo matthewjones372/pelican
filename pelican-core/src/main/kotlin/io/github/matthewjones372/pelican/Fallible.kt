@@ -4,12 +4,6 @@ import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
 /**
- * Phantom marker for "the handler names which declared response it is
- * producing" — a success carrying [T], or a failure carrying [E].
- */
-class Fallible<E, T> private constructor()
-
-/**
  * One of the declared responses, carrying its payload.
  */
 sealed interface Outcome<out E, out T> {
@@ -206,7 +200,7 @@ class FallibleOutput<E, T> internal constructor(
     /** In declaration order. The first is the one a bare [ok] means. */
     val successes: List<Output<out T>>,
     val failures: List<ErrorOutput<E>>,
-) : Output<Fallible<E, T>>() {
+) : Output<Outcome<E, T>>() {
     /** The first declared success, which the three overrides below report. */
     val success: Output<out T> get() = successes.first()
 
