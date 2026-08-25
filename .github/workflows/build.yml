@@ -83,3 +83,71 @@ jobs:
       # depends on it. This says it in the terms a reviewer reads: the diff.
       - name: The checked-in client is what the descriptions generate
         run: git diff --exit-code -- example/src/test/kotlin/example/generated
+
+  # The coverage number the README shows, taken from the report `check` already
+  # produces rather than from a service that would need an account and a secret.
+  # It lands on an orphan `badges` branch, so shields.io reads a live number and
+  # nobody has to remember to edit a percentage into the README.
+  coverage:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Measure
+        run: ./gradlew koverXmlReport
+
+      - name: Write the badge
+        run: |
+          python3 - <<'PY' > /tmp/coverage.json
+          import json, xml.etree.ElementTree as ET
+          root = ET.parse("build/reports/kover/report.xml").getroot()
+          line = next(c for c in root.findall("counter") if c.get("type") == "LINE")
+          covered, missed = int(line.get("covered")), int(line.get("missed"))
+          pct = round(100.0 * covered / (covered + missed), 1)
+          # The floor `check` enforces is 80, so the bands are drawn around it.
+          colour = ("brightgreen" if pct >= 90 else
+                    "green" if pct >= 85 else
+                    "yellowgreen" if pct >= 80 else
+                    "orange")
+          print(json.dumps({
+              "schemaVersion": 1,
+              "label": "coverage",
+              "message": f"{pct}%",
+              "color": colour,
+          }))
+          PY
+          cat /tmp/coverage.json
+
+      - name: Publish it
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          remote="https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          rm -rf /tmp/badges
+          if git clone --depth 1 --branch badges "$remote" /tmp/badges 2>/dev/null; then
+            :
+          else
+            git clone --depth 1 "$remote" /tmp/badges
+            git -C /tmp/badges switch --orphan badges
+            git -C /tmp/badges rm -rqf . || true
+          fi
+          cp /tmp/coverage.json /tmp/badges/coverage.json
+          cd /tmp/badges
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coverage.json
+          # Nothing to say when the number has not moved.
+          git diff --staged --quiet || {
+            git commit -m "chore: coverage $(python3 -c "import json;print(json.load(open('coverage.json'))['message'])")"
+            git push origin badges
+          }
