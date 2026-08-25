@@ -42,6 +42,9 @@ Facts worth having before anything else:
   per-endpoint snapshots that fail when a change breaks an existing caller.
 - [Importing](https://github.com/matthewjones372/pelican/blob/main/docs/importing.md):
   an existing OpenAPI document, read back as endpoint descriptions.
+- [A schema that resolves on its own](https://github.com/matthewjones372/pelican/blob/main/docs/schemas.md):
+  a derived JSON Schema for something that does not hold the OpenAPI document,
+  and what a union's branches carry instead of a `discriminator`.
 - [The same endpoints by hand](https://github.com/matthewjones372/pelican/blob/main/docs/by-hand.md):
   what the descriptions buy, written out directly against Pekko HTTP.
 

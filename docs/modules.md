@@ -1,10 +1,10 @@
 # Modules
 
-Linked from the [README](../README.md). What each of the twenty-two modules is
+Linked from the [README](../README.md). What each of the twenty-three modules is
 for, and what it depends on — the list to read when deciding which ones a
 build actually needs.
 
-Twenty-two modules and a Gradle plugin; you take four or five. The layering is enforced by tests
+Twenty-three modules and a Gradle plugin; you take four or five. The layering is enforced by tests
 rather than convention.
 
 | Module | Depends on | Contains |
@@ -16,6 +16,7 @@ rather than convention.
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
+| `pelican-schema` | core | one type → a JSON Schema 2020-12 document that resolves on its own |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | core | where a generated client's requests go, over the JDK's `HttpClient` |
 | `pelican-client-pekko` | core + pekko-http | the same, over Pekko HTTP's client |
@@ -31,7 +32,9 @@ runtime classpath holds nothing but the Kotlin standard library, `pelican-openap
 asserts Pekko is absent so docs can be generated in a build task with no server
 present, each backend asserts the document generator and the other backends are
 absent, `pelican-metrics` asserts it is core plus a meter API and no server
-library, `pelican-metrics-otel` asserts the mirror image — core plus the
+library, `pelican-schema` asserts it carries no document generator and no
+codec — the three codecs are test-scoped, which is where the claim that spans
+them is made, `pelican-metrics-otel` asserts the mirror image — core plus the
 OpenTelemetry API, and neither Micrometer nor a server library — which is the
 whole reason the two telemetry vendors are two modules, `pelican-client-java`
 asserts it carries no HTTP library beyond the JDK's, `pelican-client-pekko` and

@@ -14,6 +14,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-core` | **nothing** | endpoint descriptions, plain-value codecs, a minimal JSON tree. No HTTP library, no JSON library. |
 | `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 or 3.2.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
+| `pelican-schema` | **core** | one type → a self-contained JSON Schema 2020-12 document: pointers under `$defs`, a union's branches carrying the property that picks them. No document generator, no codec |
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
 | `pelican-client-pekko` | core, pekko-http | the same seam over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-client-ktor` | core, ktor-client-cio | the same seam over Ktor's `HttpClient`, for a service that already runs one. Not `pelican-ktor`: calling is not interpreting |
@@ -655,6 +656,61 @@ and a live transport is pointed at the one server the suite is asserting about.
 Following a per-operation URL would send one call in the suite to a host nothing
 is running. A generated client honours it because it calls a service somebody
 else runs; a test client calls the service under test.
+
+## A schema that resolves on its own
+
+`SchemaSource` describes a type as JSON Schema 2020-12, which is the dialect
+OpenAPI 3.1 embeds — but what it publishes is a *fragment* of a document.
+Pointers are absolute to `#/components/schemas/`, and a sealed hierarchy leaves
+the property that tells its branches apart in OpenAPI's `discriminator`, a
+keyword JSON Schema does not have.
+
+Inside the document both are correct. Handed to anything else — a validator, a
+registry with its own layout, a tool description a model reads — the first is a
+dangling reference and the second is worse: a branch schema the validator
+accepts and the codec that described it then refuses, for want of a property
+that belongs to no Kotlin type and that all three codecs synthesise when
+encoding.
+
+`pelican-schema` is that pass, and it is core-only:
+
+```kotlin
+val schemas = StandaloneSchemas(JacksonCodecs)
+
+schemas.schema(typeOf<PaymentMethod>())
+// { "$ref": "#/$defs/PaymentMethod",
+//   "$defs": { "PaymentMethod": { "oneOf": [ {"$ref": "#/$defs/Card"}, … ] },
+//              "Card": { "type": "object",
+//                        "properties": { "number": {"type": "string"},
+//                                        "expiry": {"type": "string"},
+//                                        "method": {"const": "card"} },
+//                        "required": ["expiry", "number", "method"] } } }
+```
+
+Every pointer is rebased onto `$defs`, including the ones inside a
+`discriminator` mapping — bare strings rather than `$ref` objects, which a
+naive walk carries straight past. Then each branch is given the property that
+picks it, as a `const`, required, and the `discriminator` is dropped: it now
+says nothing the branches do not.
+
+The property and the value are read rather than derived, which is what lets one
+pass cover three sources that agree on almost nothing else — Jackson takes them
+from `@JsonTypeInfo` and `@JsonSubTypes`, kotlinx.serialization from
+`@JsonClassDiscriminator` and `@SerialName`, jsoniter from the class's own name
+under a `type` property. The test builds each branch's smallest acceptable
+payload out of the schema alone and decodes it through the codec that wrote the
+schema, for all three.
+
+Two things are refused rather than half-described. kotlinx.serialization's open
+polymorphism registers its subclasses at run time, so no closed schema of it is
+honest; make the hierarchy `sealed`, or describe the property as one branch. And
+a class that is a branch of two hierarchies picking it differently would need
+both properties at once, which is a payload neither codec writes.
+
+The emitted OpenAPI document is untouched by any of this: `#/components/schemas/`
+is where its schemas actually are, and `discriminator` is how 3.1 says which
+branch is which — the generated client and the importer both read it. See
+[docs/schemas.md](schemas.md).
 
 ## Webhooks: the calls the service sends
 

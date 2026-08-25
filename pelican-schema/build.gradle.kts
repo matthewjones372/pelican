@@ -16,3 +16,19 @@ dependencies {
     testImplementation(project(":pelican-kotlinx"))
     testImplementation(project(":pelican-jsoniter"))
 }
+
+tasks.test {
+    // The main runtime classpath, so the dependency test can assert on what is
+    // actually shipped rather than on what the test JVM happens to load — the
+    // three codecs being test-scoped, it loads a good deal more.
+    val mainRuntime = configurations.runtimeClasspath
+    inputs.files(mainRuntime).withPropertyName("mainRuntimeClasspath")
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            listOf(
+                "-Dpelican.schema.runtimeClasspath=" +
+                    mainRuntime.get().joinToString(File.pathSeparator) { it.name },
+            )
+        },
+    )
+}
