@@ -67,10 +67,10 @@ cannot drift.
 
 ## Stack
 
-- [ ] **`spec-0006-parameter-names`** — duplicate query, header and cookie names refused in `validate`, by identity first.
-      Done when: two different parameters under one name and location is a refusal, the same value declared twice is not, and the message names both.
-- [ ] **`spec-0006-operation-and-route`** — `operationId` uniqueness and the route clash, both in `ApiSpec.init`; `Api` keeps its own wording.
-      Done when: an `ApiSpec` holding two `GET /clash` endpoints is refused, and so is a shared explicit `operationId`.
+- [x] **`spec-0006-parameter-names`** — duplicate query, header and cookie names refused in `validate`, by identity first.
+      Done when: two different parameters under one name and location is a refusal, the same value declared twice is not, and the message names both. Landed in [#37](https://github.com/matthewjones372/pelican/pull/37).
+- [x] **`spec-0006-operation-and-route`** — `operationId` uniqueness and the route clash, both in `ApiSpec.init`; `Api` keeps its own wording.
+      Done when: an `ApiSpec` holding two `GET /clash` endpoints is refused, and so is a shared explicit `operationId`. Landed in [#38](https://github.com/matthewjones372/pelican/pull/38).
 
 ## Acceptance
 

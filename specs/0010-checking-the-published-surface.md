@@ -71,8 +71,18 @@ real edits happen and it can be split by module without a red build in between.
       Done when: core builds warning-free under the flag, and every declaration made `internal` is one no example and no test used.
 - [ ] **`spec-0010-explicit-api-strict`** — the remaining modules, then `explicitApi()` strict.
       Done when: `./gradlew build` is green with strict mode on, and each module's newly `internal` declarations are listed in the PR body.
-- [ ] **`spec-0010-abi-dump`** — `binary-compatibility-validator`, checked-in `.api` files, wired into `check`; the two stale refusals deleted and the test that stops them coming back.
-      Done when: adding a public function to core fails `apiCheck` until the dump is regenerated, and the refusals test fails if a "What isn't here" bullet names a module in `settings.gradle.kts`.
+- [x] **`spec-0010-abi-dump`** — `binary-compatibility-validator`, checked-in `.api` files, wired into `check`; the two stale refusals deleted and the test that stops them coming back.
+      Done when: adding a public function to core fails `apiCheck` until the dump is regenerated, and the refusals test fails if a "What isn't here" bullet names a module in `settings.gradle.kts`. Landed in [#69](https://github.com/matthewjones372/pelican/pull/69).
+
+> **The two `explicitApi` entries are deliberately not done, and the order
+> changed.** Turning `explicitApiWarning()` on measured 99 warnings in
+> `Inputs.kt`, 87 in `Endpoint.kt` and 423 across core's top eight files, every
+> one a mechanical `public` keyword — not a reviewable change even split per
+> module. The dump landed first instead ([#69](https://github.com/matthewjones372/pelican/pull/69)),
+> which gets what this spec wanted — know what you publish, notice when it
+> changes — with no source churn, and makes `explicitApi` an informed decision:
+> the 1,429 declarations it pins are the list to read before deciding what
+> should have been `internal`. Rewrite these two against that dump.
 
 ## Acceptance
 

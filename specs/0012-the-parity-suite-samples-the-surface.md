@@ -71,12 +71,12 @@ directions. Not recommended.
 
 ## Stack
 
-- [ ] **`spec-0012-parity-value-outputs`** — `text()` and a routed `empty(204)` on the shared descriptions, bound on all three, with cases.
-      Done when: both answer identically on all three, `Content-Type` included, and a 204 carries no body anywhere.
-- [ ] **`spec-0012-parity-stream-outputs`** — `jsonArray`, `bytes` and `rawBody` likewise; the duplicated half of both `TestApi.kt` files deleted.
-      Done when: the three backends produce byte-identical bodies for the array and the echo, and neither module describes an endpoint the other also describes.
-- [ ] **`spec-0012-parity-sse`** — `sse<Tick>` on the shared surface; frame format, `event:` line and `data:` payload.
-      Done when: the three write the same frames, and `SseKeepAliveTest` stays per-backend and green.
+- [x] **`spec-0012-parity-value-outputs`** — `text()` and a routed `empty(204)` on the shared descriptions, bound on all three, with cases.
+      Done when: both answer identically on all three, `Content-Type` included, and a 204 carries no body anywhere. Landed in [#57](https://github.com/matthewjones372/pelican/pull/57).
+- [x] **`spec-0012-parity-stream-outputs`** — `jsonArray`, `bytes` and `rawBody` likewise; the duplicated half of both `TestApi.kt` files deleted.
+      Done when: the three backends produce byte-identical bodies for the array and the echo, and neither module describes an endpoint the other also describes. Landed in [#58](https://github.com/matthewjones372/pelican/pull/58).
+- [x] **`spec-0012-parity-sse`** — `sse<Tick>` on the shared surface; frame format, `event:` line and `data:` payload.
+      Done when: the three write the same frames, and `SseKeepAliveTest` stays per-backend and green. Landed in [#59](https://github.com/matthewjones372/pelican/pull/59).
 ## Acceptance
 
 ```bash

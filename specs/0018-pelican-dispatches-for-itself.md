@@ -95,12 +95,12 @@ that ceiling, and the fix is available precisely because descriptions are values
 
 ## Stack
 
-- [ ] **`spec-0018-route-index`** — `RouteIndex` in core: build from `List<ServerEndpoint>`, walk per request, literal before capture, captures collected into the values map.
-      Done when: a unit suite covers a literal beating a capture at the same position, a trailing capture, two methods on one path, and no match — and `declaredInputCount` sizing still holds.
-- [ ] **`spec-0018-pekko-and-http4k`** — both interpreters register one route over the index; rejection preserved.
-      Done when: `AllBackendsTest`, `ConcatenatedRoutesTest`, `MountedAlongsideTest`, `MethodMismatchTest` and `CorsTest` are unchanged and green.
-- [ ] **`spec-0018-the-guard`** — a CI job asserting the curve stays flat.
-      Done when: a change that reintroduces an ordered scan fails the build, and the assertion is a ratio rather than a wall-clock number.
+- [x] **`spec-0018-route-index`** — `RouteIndex` in core: build from `List<ServerEndpoint>`, walk per request, literal before capture, captures collected into the values map.
+      Done when: a unit suite covers a literal beating a capture at the same position, a trailing capture, two methods on one path, and no match — and `declaredInputCount` sizing still holds. Landed in [#65](https://github.com/matthewjones372/pelican/pull/65).
+- [x] **`spec-0018-pekko-and-http4k`** — both interpreters register one route over the index; rejection preserved.
+      Done when: `AllBackendsTest`, `ConcatenatedRoutesTest`, `MountedAlongsideTest`, `MethodMismatchTest` and `CorsTest` are unchanged and green. Landed in [#66](https://github.com/matthewjones372/pelican/pull/66).
+- [x] **`spec-0018-the-guard`** — a CI job asserting the curve stays flat.
+      Done when: a change that reintroduces an ordered scan fails the build, and the assertion is a ratio rather than a wall-clock number. Landed in [#68](https://github.com/matthewjones372/pelican/pull/68).
 
 ## Acceptance
 

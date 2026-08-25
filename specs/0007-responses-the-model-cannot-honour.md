@@ -74,12 +74,12 @@ byte stream that 404s before its first byte is an ordinary requirement, and
 
 ## Stack
 
-- [ ] **`spec-0007-undeclared-response`** — `UndeclaredResponse`, thrown by both checks, in `described()`; the three interpreters unchanged otherwise.
-      Done when: returning an undeclared failure answers a 500 whose body names the failure and the declared set, and `AllBackendsTest` says the same on all three.
-- [ ] **`spec-0007-bytes-or-fail`** — `bytesOrFail` on Pekko, http4k and Ktor.
-      Done when: `bytes() orFail gone` binds, streams on success, and answers the declared 410 with its JSON body.
-- [ ] **`spec-0007-docs`** — the trade-off under `orFail` in `docs/reference.md`.
-      Done when: the page says declaring two failures over a sealed supertype widens `E`, what that stops the compiler catching, and that a single failure pins it exactly.
+- [x] **`spec-0007-undeclared-response`** — `UndeclaredResponse`, thrown by both checks, in `described()`; the three interpreters unchanged otherwise.
+      Done when: returning an undeclared failure answers a 500 whose body names the failure and the declared set, and `AllBackendsTest` says the same on all three. Landed in [#43](https://github.com/matthewjones372/pelican/pull/43).
+- [x] **`spec-0007-bytes-or-fail`** — `bytesOrFail` on Pekko, http4k and Ktor.
+      Done when: `bytes() orFail gone` binds, streams on success, and answers the declared 410 with its JSON body. Landed in [#45](https://github.com/matthewjones372/pelican/pull/45).
+- [x] **`spec-0007-docs`** — the trade-off under `orFail` in `docs/reference.md`.
+      Done when: the page says declaring two failures over a sealed supertype widens `E`, what that stops the compiler catching, and that a single failure pins it exactly. Landed in [#48](https://github.com/matthewjones372/pelican/pull/48).
 
 ## Acceptance
 

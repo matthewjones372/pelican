@@ -65,12 +65,20 @@ capture at the first segment means, which a bucket sidesteps by scanning both.
 
 ## Stack
 
-- [ ] **`spec-0011-routing-at-scale`** — the decoy parameter on the Pekko and http4k harnesses; the new section in `docs/what-it-costs.md`.
-      Done when: the page reports per-request cost at 1, 50 and 200 endpoints for both, and says plainly whether the curve is flat.
+- [x] **`spec-0011-routing-at-scale`** — the decoy parameter on the Pekko and http4k harnesses; the new section in `docs/what-it-costs.md`.
+      Done when: the page reports per-request cost at 1, 50 and 200 endpoints for both, and says plainly whether the curve is flat. Landed in [#63](https://github.com/matthewjones372/pelican/pull/63).
 - [ ] **`spec-0011-ktor-benchmark`** — a Ktor harness beside the other two, same endpoint, same decoys.
       Done when: all three backends appear in the table and Ktor's curve is measured rather than asserted from its router.
 - [ ] **`spec-0011-segment-index`** — *conditional.* A first-literal-segment bucket in `orderedEndpoints`, Pekko and http4k.
       Done when: the 200-endpoint number is within noise of the 1-endpoint one, and `AllBackendsTest`, `ConcatenatedRoutesTest` and `Http4kInterpreterTest` are unchanged and green. Delete this entry if the first one shows a flat curve.
+
+> **The remaining two entries were overtaken.** The measurement showed the
+> curve was not flat, so the conditional third entry became
+> [spec 0018](0018-pelican-dispatches-for-itself.md), which replaced the ordered
+> scan outright rather than indexing it — both backends are now flat and ahead
+> of hand-written routing at every size. The Ktor harness is still unwritten:
+> Ktor uses its own routing tree and is exempt by construction, so it is the
+> least urgent of the three and the claim remains unmeasured.
 
 ## Acceptance
 

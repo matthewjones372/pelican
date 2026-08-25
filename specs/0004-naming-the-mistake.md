@@ -85,10 +85,10 @@ what they read second.
 
 ## Stack
 
-- [ ] **`spec-0004-outcome-in-place-of-fallible`** — `Fallible` deleted; `FallibleOutput : Output<Outcome<E, T>>`; the binder receivers in three `Handlers.kt`; the three comments corrected; `ApiClient` and `DeclaredFailuresTest`'s annotations.
-      Done when: `handledNow` on an endpoint declaring a failure reports `expected 'Outcome<…>'`, `./gradlew build` is green, and no `Fallible` remains outside `FallibleOutput`.
-- [ ] **`spec-0004-negative-compilation`** — a harness compiling fixture sources through the Kotlin compiler API, asserting each fails with a named substring.
-      Done when: the message above is pinned by a test, and changing the phantom back turns it red.
+- [x] **`spec-0004-outcome-in-place-of-fallible`** — `Fallible` deleted; `FallibleOutput : Output<Outcome<E, T>>`; the binder receivers in three `Handlers.kt`; the three comments corrected; `ApiClient` and `DeclaredFailuresTest`'s annotations.
+      Done when: `handledNow` on an endpoint declaring a failure reports `expected 'Outcome<…>'`, `./gradlew build` is green, and no `Fallible` remains outside `FallibleOutput`. Landed in [#36](https://github.com/matthewjones372/pelican/pull/36).
+- [x] **`spec-0004-negative-compilation`** — a harness compiling fixture sources through the Kotlin compiler API, asserting each fails with a named substring.
+      Done when: the message above is pinned by a test, and changing the phantom back turns it red. Landed in [#76](https://github.com/matthewjones372/pelican/pull/76).
 
 ## Acceptance
 

@@ -60,12 +60,12 @@ thrown away when the request is refused.
 
 ## Stack
 
-- [ ] **`spec-0005-http4k-bounded-body`** — bounded byte read on http4k; refusal on bytes.
-      Done when: a chunked body of `maxBodyBytes + 1` bytes made of three-byte characters is a 413, and the process never held the whole body.
-- [ ] **`spec-0005-ktor-bounded-body`** — the same on Ktor, off the IO dispatcher as the multipart read already is.
-      Done when: as above.
-- [ ] **`spec-0005-slow-body-parity`** — Pekko's `toStrict` timeout mapped to 408; the divergence that remains written down.
-      Done when: `AllBackendsTest` asserts one status for an oversized chunked body across all three, and `Api.strictBodyTimeoutMillis` says http4k has none.
+- [x] **`spec-0005-http4k-bounded-body`** — bounded byte read on http4k; refusal on bytes.
+      Done when: a chunked body of `maxBodyBytes + 1` bytes made of three-byte characters is a 413, and the process never held the whole body. Landed in [#40](https://github.com/matthewjones372/pelican/pull/40).
+- [x] **`spec-0005-ktor-bounded-body`** — the same on Ktor, off the IO dispatcher as the multipart read already is.
+      Done when: as above. Landed in [#41](https://github.com/matthewjones372/pelican/pull/41).
+- [x] **`spec-0005-slow-body-parity`** — Pekko's `toStrict` timeout mapped to 408; the divergence that remains written down.
+      Done when: `AllBackendsTest` asserts one status for an oversized chunked body across all three, and `Api.strictBodyTimeoutMillis` says http4k has none. Landed in [#42](https://github.com/matthewjones372/pelican/pull/42).
 
 ## Acceptance
 

@@ -68,10 +68,10 @@ schema, on the same principle as swagger-parser reading the document.
 
 ## Stack
 
-- [ ] **`spec-0009-schema-agreement-harness`** — the validator dependency, the `Shape` fixture, the three claims, and the rows already covered by `ThreeCodecsTest`.
-      Done when: a deliberately broken schema in a fake `SchemaSource` turns the suite red, and `pelican-schema`'s dependency test still says no server library.
-- [ ] **`spec-0009-schema-agreement-matrix`** — the hard rows: nested generics, recursion, value classes, `Map<String, List<T?>>`, a Java record, an enum with a renamed constant, a sealed type nested in a sealed type.
-      Done when: every row is green or `@Disabled` naming the spec that will fix it, and `docs/reference.md` says which shapes the three libraries describe identically.
+- [x] **`spec-0009-schema-agreement-harness`** — the validator dependency, the `Shape` fixture, the three claims, and the rows already covered by `ThreeCodecsTest`.
+      Done when: a deliberately broken schema in a fake `SchemaSource` turns the suite red, and `pelican-schema`'s dependency test still says no server library. Landed in [#54](https://github.com/matthewjones372/pelican/pull/54).
+- [x] **`spec-0009-schema-agreement-matrix`** — the hard rows: nested generics, recursion, value classes, `Map<String, List<T?>>`, a Java record, an enum with a renamed constant, a sealed type nested in a sealed type.
+      Done when: every row is green or `@Disabled` naming the spec that will fix it, and `docs/reference.md` says which shapes the three libraries describe identically. Landed in [#55](https://github.com/matthewjones372/pelican/pull/55).
 
 ## Acceptance
 

@@ -85,12 +85,20 @@ and the two existing files are 349 lines that would then need keeping in step.
 
 ## Stack
 
-- [ ] **`spec-0016-telemetry-service`** — `example/telemetry`: the descriptions, the five endpoints, both filters, the gate.
-      Done when: `./gradlew :example:runTelemetry` serves all five, and one suite asserts each produces the status its description promises.
+- [x] **`spec-0016-telemetry-service`** — `example/telemetry`: the descriptions, the five endpoints, both filters, the gate.
+      Done when: `./gradlew :example:runTelemetry` serves all five, and one suite asserts each produces the status its description promises. Landed in [#77](https://github.com/matthewjones372/pelican/pull/77).
 - [ ] **`spec-0016-the-report`** — calls, errors, p50 and p99 per operation, from the registry; the last trace as a tree.
       Done when: the slow endpoint's p99 is visibly apart from its p50, the thrown one shows as an error in both instruments, and the declared 404 shows as neither.
 - [ ] **`spec-0016-retire-the-old-two`** — `example/metrics` and `example/tracing` deleted, their run tasks replaced, `docs/reference.md`'s Metrics and OpenTelemetry sections pointed at the new file.
       Done when: no link in `docs/` or `README.md` names a file that is gone, and `MeteredOrdersTest`/`TracedOrdersTest`'s claims all have a home in the new suite.
+
+> **The report landed with the service** rather than after it
+> ([#77](https://github.com/matthewjones372/pelican/pull/77)): the endpoints
+> exist to make the report worth reading, and splitting them would have shipped
+> a service whose whole point was in the next PR. **Retiring the old two is
+> still open** — deleting `example/metrics` and `example/tracing` touches two
+> `docs/reference.md` sections, two run tasks and two suites. Until it lands
+> there are three examples of one idea, which this spec argues against.
 
 ## Acceptance
 
