@@ -90,6 +90,12 @@ val misdeclared = endpoint {
 
 fun items(count: Int): Sequence<Item> = (1..count).asSequence().map { Item(it.toLong(), "item-$it") }
 
+/** Bytes that may not be there: `bytes()` with a declared failure beside it. */
+val fetchBlob = endpoint(itemId) {
+    get("blobs" / itemId)
+    bytes("application/octet-stream") orFail noSuchItem
+}
+
 fun testApi(extra: List<ServerEndpoint> = emptyList()): Api = Api(
     endpoints = listOf(
         getItem handledOrFail { id ->
@@ -110,6 +116,9 @@ fun testApi(extra: List<ServerEndpoint> = emptyList()): Api = Api(
         echo bytesNow { body -> body.toStream() },
         boom handledNow { _ -> error("handler blew up") },
         misdeclared handledOrFail { _ -> notMine(ApiError(409, "Not this endpoint's failure")) },
+        fetchBlob bytesOrFail { id ->
+            if (id == 1L) ok("blobby".byteInputStream()) else noSuchItem(ApiError(404, "No blob $id"))
+        },
     ) + extra,
     codecs = JacksonCodecs,
     title = "Items",

@@ -103,6 +103,13 @@ infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedBy(
 infix fun <I> Endpoint<I, ByteStream>.bytesNow(f: Params.(I) -> Source<ByteString, NotUsed>): ServerEndpoint =
     ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
 
+/** Binds an endpoint streaming opaque bytes that may fail before the first one. */
+infix fun <I, E : Any> Endpoint<I, Outcome<E, ByteStream>>.bytesOrFail(
+    f: Params.(I) -> Outcome<E, Source<ByteString, NotUsed>>,
+): ServerEndpoint = ServerEndpoint(this) { p ->
+    CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?)
+}
+
 // ------------------------------------------------------------- accessors
 
 internal class PekkoByteStream(val source: Source<ByteString, Any>) : ByteStreamHandle
