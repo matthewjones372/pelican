@@ -28,6 +28,15 @@ fun greetingsApi(
      * `MethodMismatchTest` — passes an empty list to say so out loud.
      */
     covers: List<Endpoint<*, *>> = greetingEndpoints,
+
+    /**
+     * Filters to run *outside* this service's own, for a suite that wants to
+     * watch every request rather than change one. Outside rather than inside
+     * because anything observing the whole request — a metric, an access log —
+     * belongs where it can also see the ones [gate] refuses: rejecting is
+     * throwing, so a filter listed after [gate] never hears about a 403.
+     */
+    outerFilters: List<Filter> = emptyList(),
 ): Api = Api(
     endpoints = routes,
     codecs = JacksonCodecs,
@@ -37,7 +46,7 @@ fun greetingsApi(
 
     cors = cors("https://console.example.com"),
 
-    filters = listOf(stamping, gate),
+    filters = outerFilters + listOf(stamping, gate),
 
     // Small enough to prove in a test without shipping a megabyte. The default
     // is 8 MiB; a service that takes larger documents raises it, or takes the

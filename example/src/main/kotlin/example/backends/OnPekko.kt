@@ -1,6 +1,7 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOneOf
@@ -43,16 +44,17 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
     filters handledNow { (tags, ids, features, seen) -> filtersOf(tags, ids, features, seen) },
 )
 
-fun pekkoApi(): Api = greetingsApi(pekkoRoutes)
+fun pekkoApi(outerFilters: List<Filter> = emptyList()): Api =
+    greetingsApi(pekkoRoutes, outerFilters = outerFilters)
 
 object OnPekko : Backend {
     override val name = "pekko"
 
-    override fun api(): Api = pekkoApi()
+    override fun api(outerFilters: List<Filter>): Api = pekkoApi(outerFilters)
 
-    override fun start(port: Int): Running {
+    override fun start(port: Int, outerFilters: List<Filter>): Running {
         // The actor system is this backend's alone; nothing outside sees it.
-        val server = api().start(port = port, systemName = "greetings-pekko")
+        val server = api(outerFilters).start(port = port, systemName = "greetings-pekko")
         return object : Running {
             override val baseUrl = server.baseUrl
             override fun stop() {

@@ -1,6 +1,7 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.ktor.handledNow
 import io.github.matthewjones372.pelican.ktor.handledOneOf
@@ -48,15 +49,16 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
     filters handledNow { (tags, ids, features, seen) -> filtersOf(tags, ids, features, seen) },
 )
 
-fun ktorApi(): Api = greetingsApi(ktorRoutes)
+fun ktorApi(outerFilters: List<Filter> = emptyList()): Api =
+    greetingsApi(ktorRoutes, outerFilters = outerFilters)
 
 object OnKtor : Backend {
     override val name = "ktor"
 
-    override fun api(): Api = ktorApi()
+    override fun api(outerFilters: List<Filter>): Api = ktorApi(outerFilters)
 
-    override fun start(port: Int): Running {
-        val server = api().start(port = port)
+    override fun start(port: Int, outerFilters: List<Filter>): Running {
+        val server = api(outerFilters).start(port = port)
         return object : Running {
             override val baseUrl = server.baseUrl
             override fun stop() = server.stop()

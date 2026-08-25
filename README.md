@@ -121,7 +121,7 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-All eighteen modules are on Maven Central under `io.github.matthewjones372`,
+All nineteen modules are on Maven Central under `io.github.matthewjones372`,
 with sources and an empty javadoc jar.
 
 ```kotlin
@@ -679,6 +679,22 @@ compiled on every build.
 the caller to it. Add an endpoint with `security(idp, "reports:admin")` and it is
 covered before it is bound, with no second list to keep up to date.
 
+### Meters, from the same descriptions
+
+A filter can read the endpoint, so a metric does not have to be hand-written per
+route either. `pelican-metrics` is one line:
+
+```kotlin
+Api(endpoints, JacksonCodecs, filters = listOf(metrics(registry)))
+```
+
+That gives a Micrometer counter and timer for every endpoint, tagged with the
+method, the path *template* — `/orders/{orderId}`, so one series per route
+rather than one per order id — the operation id, the status, and whether the
+endpoint is deprecated. Nothing is passed in and nothing has to be kept in step
+with the router, because all of it is already written down on the endpoint. See
+[Metrics](docs/reference.md#metrics) for what it does and does not see.
+
 ### Unhandled exceptions
 
 ```
@@ -928,7 +944,7 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 ## Longer documents
 
-Seven things that wanted a page rather than a section, and one benchmark:
+Eight things that wanted a page rather than a section, and one benchmark:
 
 | Page | What it answers |
 |---|---|
@@ -938,7 +954,7 @@ Seven things that wanted a page rather than a section, and one benchmark:
 | [Importing an OpenAPI document](docs/importing.md) | A document somebody else wrote, read into descriptions: what comes out, what is refused, and how to get past a document you do not own. |
 | [The same endpoints, by hand](docs/by-hand.md) | The same two endpoints written directly against Pekko HTTP, so what the descriptions buy is legible rather than asserted. |
 | [Golden files](docs/golden-testing.md) | A test that fails when a change would break the callers you already have — a new required field, a deleted endpoint — and stays quiet when it would not. |
-| [Modules](docs/modules.md) | What each of the eighteen modules is for and what it depends on, for deciding which ones your build needs. |
+| [Modules](docs/modules.md) | What each of the nineteen modules is for and what it depends on, for deciding which ones your build needs. |
 | [What it costs](docs/what-it-costs.md) | The interpreter measured by JMH against the hand-written routes it replaces, with the baselines that comparison needs and the error bars it came with. |
 | [Roadmap](docs/roadmap.md) | What is not built yet and the order it is worth building in — a different list from the deliberate refusals, and the argument for the order written down so it can be disagreed with. |
 
@@ -953,6 +969,7 @@ Seven things that wanted a page rather than a section, and one benchmark:
 ./gradlew :example:runBackends           # all three backends at once, on :8080-:8082
 ./gradlew :example:runCodecs             # all three JSON libraries at once, on :8080-:8082
 ./gradlew :example:runSecured            # a filter enforcing the security the descriptions declare
+./gradlew :example:runMetrics            # Micrometer meters tagged from the descriptions, at /admin/meters
 ./gradlew :example:generateOrdersDocument  # the spec, with no server started
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ```
@@ -964,9 +981,6 @@ on core alone, so neither needs an HTTP library present.
 
 ## Versions
 
-Kotlin 2.2.20 · Pekko 1.6.0 · Pekko HTTP 1.4.0 · http4k 6.22.0.0 · Ktor 3.5.2 ·
-Jackson 2.22.2 · swagger-core 2.2.54 · kotlinx.serialization 1.9.0 ·
-slf4j-api 2.0.17 · snakeyaml-engine 2.10 · JDK 21 · Gradle 8.14.3
-
-http4k is pinned to the last release built against Kotlin 2.2.20. A newer one
-ships stdlib metadata this compiler will not read, so bump both together.
+Which Kotlin, which Pekko, which JDK: the reference manual holds the list, at
+[Versions](docs/reference.md#versions). It was copied here too until the two
+copies drifted apart, so there is one of them now.

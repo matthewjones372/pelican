@@ -24,6 +24,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-http4k-docs` | http4k, openapi | the same two pages, on http4k |
 | `pelican-ktor` | core, ktor-server-core, ktor-server-cio | descriptions → Ktor routes, with `suspend` handlers and `Flow` streams |
 | `pelican-ktor-docs` | ktor, openapi | the same two pages, on Ktor |
+| `pelican-metrics` | core, micrometer-core | descriptions → Micrometer meters, tagged from what the descriptions already say |
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
@@ -48,6 +49,11 @@ The layering is load-bearing, not decorative, and each edge is a test:
   `org.apache.pekko` is absent: a second backend sharing a server library with
   the first would be no evidence that the abstractions in core hold.
 - `pelican-ktor` asserts all three: no `pelican-openapi`, no Pekko, no http4k.
+- `pelican-metrics` asserts that what a consumer gets is core plus a meter API
+  and nothing besides — no server library in particular. It reads a description
+  and a `Filter`, neither of which knows which interpreter is serving it, and
+  that is what lets one `metrics(registry)` line mean the same thing on all
+  three backends.
 - `pelican-client-java` asserts the same shape on the caller's side: core, the
   JDK, and no second HTTP stack. An adapter a caller adds in order to *choose*
   a client library would be worth very little if it brought one along.
@@ -1901,6 +1907,54 @@ val timing = Filter { params, next ->
 without the fold, and `onlyWhen { endpoint -> ... }` narrows a filter to the
 endpoints it applies to.
 
+### The status, on the way out
+
+`after` is told what the handler *returned*, which is one step short of what an
+access log or a metric wants. A handler answering `notFound(id)` is a 404 and a
+handler answering `noSuchOrder(ApiError(...))` is also a 404, but nothing about
+either value says so: the number is on the endpoint's declaration, because that
+is where a response's status is written down. `afterStatus` does that reading:
+
+```kotlin
+val accessLog = afterStatus { params, status, _ ->
+    log.info("{} {} -> {}", params.endpoint?.method, params.endpoint?.pathSpec?.template, status)
+}
+```
+
+The status is worked out by `Endpoint.statusFor(result, error)` in
+`pelican-core`, which is the same module that decides what each declared
+response and each throwable becomes. That matters more than the convenience
+does. A filter runs *inside* the interpreter — the chain returns, and only then
+is a response built — so a filter cannot be handed the status the interpreter
+rendered, and something has to work it out from the description instead. Doing
+that once, in core, beside the code that renders it, is what stops the metric
+and the response from drifting apart; doing it three times, once per backend, or
+once per service that wants a request count, is what guarantees they eventually
+will. `MetricsAcrossBackendsTest` in the example holds all three interpreters to
+that agreement by comparing what a filter was told against what came back over
+the socket.
+
+Two things `afterStatus` sees that `after` does not, and one that neither can:
+
+- **A refusal raised further in.** Rejecting is throwing, and `before` throws
+  where it stands rather than failing a stage, so a throwable from a filter
+  leaves the chain past anything built on `handle` alone. A 401 is exactly the
+  request a log or a rate-of-refusals graph exists for, so `afterStatus` catches
+  that case. Writing the full `Filter { }` form and wanting the same, call
+  `attempt(params, next)` rather than `next(params)`: it hands back the rest of
+  the chain as a stage that fails rather than throws, and swallows nothing.
+- **A request that matched no description.** `afterStatus` says nothing about
+  one, because the status is read off the endpoint and there is no endpoint to
+  read it off. In a served request that never happens; a hand-built `Params` in
+  a unit test is the case.
+- **A response that fails while it is being written.** A codec that throws
+  half-way through, or a handler naming a success the endpoint never declared,
+  becomes a 500 *after* the chain has unwound. A filter records the status the
+  handler asked for rather than the one the caller received. It is rare, it is a
+  bug in the service rather than in a request, and the alternative would be
+  holding the chain open until the last byte is on the wire — which would change
+  what a filter is.
+
 ### Attributes
 
 What a filter works out has to reach the handler, and going back to the raw
@@ -1943,6 +1997,71 @@ A list of requirements means *any one will do*, which is how OpenAPI reads it
 and therefore how it has to be read here. `example/secured/SecuredReports.kt` is
 this, complete and tested, with an operator basic-auth login and an external
 OAuth provider side by side.
+
+## Metrics
+
+`pelican-metrics` is one filter and one dependency: `pelican-core` plus
+Micrometer.
+
+```kotlin
+Api(routes, JacksonCodecs, filters = listOf(metrics(registry)))
+```
+
+That is the whole of the instrumentation. There is no per-route registration and
+no tag list to keep in step with the router, because every dimension is read off
+the `Endpoint` the request matched:
+
+| Tag | Where it comes from |
+|---|---|
+| `method` | `endpoint.method` |
+| `path` | `endpoint.pathSpec.template` — `/orders/{orderId}`, never the id |
+| `operation` | `endpoint.operationId`, or `unnamed` |
+| `status` | what the interpreter is about to answer with |
+| `deprecated` | `endpoint.deprecated` |
+
+Two meters carry them: `http.server.requests`, a counter, and
+`http.server.request.duration`, a timer. A Micrometer timer publishes a count of
+its own, so the counter looks redundant until the timer is aggregated —
+percentile histograms are configured per meter and are often turned off for
+cheapness, and a service that has done so still wants the rate of 5xx. The names
+follow the OpenTelemetry semantic conventions rather than Micrometer's own, so
+that an OpenTelemetry module can publish the same series under the same names
+later without renaming anybody's dashboard.
+
+The `path` tag is why this is worth a module rather than a paragraph of advice.
+A meter tagged with the request's *path* grows a time series per order id, which
+is how a monitoring bill and then a monitoring outage are made; a meter tagged
+with the request's *template* has one series per route. Pelican has the template
+because the route was built from it, so nothing has to reverse-engineer it from
+the URL that arrived — and nothing has to remember to.
+
+`deprecated` is there because announcing that an endpoint is going away is only
+half the conversation. The other half is whether anybody is still calling it,
+and that should be a query rather than a survey of downstream teams.
+
+`metrics(registry, prefix = "orders.http")` moves both names, for a service
+already publishing something under the defaults — a servlet container's own
+instrumentation, say. Everything else Micrometer answers better than a parameter
+here could: percentiles, SLO boundaries, common tags and dropping a meter
+altogether are all `MeterFilter`s on the registry.
+
+Two things to know before drawing conclusions from the numbers:
+
+- **Put it first in the list.** Filters run outermost-first, so a `metrics(...)`
+  listed after an authentication filter never hears about the requests that
+  filter refuses. Outermost is where anything measuring the whole request
+  belongs.
+- **Requests that never reach a filter are not counted.** A path parameter that
+  will not decode, a body over `maxBodyBytes`, a `Content-Type` nothing
+  declared: these are answered before the chain is entered, so no filter sees
+  them and neither do the meters. The 4xx rate here is therefore the rate of
+  *handled* 4xx. Closing that gap means metering inside each interpreter, which
+  is three implementations of what is currently one, and it has not been done.
+
+`example/src/main/kotlin/example/metrics/MeteredOrders.kt` is a service wired
+this way — a 200, a declared 404, a 201 and a deprecated endpoint, with
+`/admin/meters` rendering what was recorded. Run it with
+`./gradlew :example:runMetrics`.
 
 ## Errors, and what a caller is told
 
@@ -3567,7 +3686,11 @@ open  localhost:8080/api-docs                                 # Swagger UI
 
 Kotlin 2.4.10 · Pekko 1.7.0 · Pekko HTTP 1.4.0 · http4k 6.58.0.0 · Ktor 3.5.2 ·
 Jackson 2.22.2 · swagger-core 2.2.54 · kotlinx.serialization 1.11.0 ·
-slf4j-api 2.0.17 · JDK 21 · Gradle 9.7.1
+jsoniter 0.9.23 · slf4j-api 2.0.18 · snakeyaml-engine 2.10 · JDK 21 ·
+Gradle 9.7.1
+
+This is the only copy of that list. The README carried a second one until the
+two disagreed about half of it, and now points here instead.
 
 http4k built against a newer stdlib than the compiler reading it fails on
 metadata, so the two are bumped together; `pelican-http4k/build.gradle.kts`

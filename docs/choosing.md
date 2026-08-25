@@ -412,13 +412,16 @@ waiting on a release:
 
 **There is no production client story yet, only most of one.** `pelican-codegen`
 generates a real Kotlin client from the descriptions: one method per operation,
-sealed failure types, streamed responses, an injectable JDK `HttpClient` and a
-per-request timeout. That is more than a toy. But there is no published client
-artifact — the file is generated into your build, and you own it. Calls are
-synchronous `HttpClient.send`, so there is no suspending or asynchronous
-variant. And nothing in the generated file does retries, backoff, circuit
-breaking, connection-pool tuning or metrics; if you want those you write them
-around it. The client that `pelican-test` derives is explicitly narrower still,
+sealed failure types, streamed responses, a per-request timeout, and a
+`ClientTransport` it sends through rather than an HTTP library it is welded to.
+That is more than a toy. But there is no published client artifact — the file is
+generated into your build, and you own it. Only one transport is written,
+`pelican-client-java`, over the JDK's own `HttpClient`; a service that already
+runs and tunes a Ktor or a Pekko client still cannot hand that one over, because
+those adapters do not exist yet. The generated methods block, joining the stage
+the transport answers with, so there is no suspending or asynchronous variant to
+call. And nothing in the generated file does retries, backoff, circuit breaking
+or metrics; if you want those you write them around the transport. The client that `pelican-test` derives is explicitly narrower still,
 scoped at testing, blocking, with no retries and no pooling worth the name, and
 it cannot upload a binary file part because its `RequestSpec` carries a `String`
 body.

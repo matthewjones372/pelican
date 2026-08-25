@@ -67,11 +67,25 @@ private fun <T : Any> headerValue(headers: List<Pair<String, String>>, header: R
 fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)
 
 /**
+ * Which declared success an [Outcome.Ok] names, and nothing else: a bare
+ * `ok(value)` names none, and the first declared success is what that means.
+ *
+ * Separate from [successNamedBy] because the two readers want different things
+ * from the same rule. An interpreter about to write a response wants the checks
+ * as well, and would rather refuse than send something undescribed. A filter
+ * working out what status is going out wants the answer alone — it is
+ * measuring, and a metric that throws is a worse outage than the missing
+ * measurement it was trying to avoid.
+ */
+internal fun FallibleOutput<*, *>.chosenSuccess(ok: Outcome.Ok<*>): Output<*> =
+    ok.declared ?: successes.first()
+
+/**
  * Which declared success an [Outcome.Ok] names, and the one place a success is
  * checked against what it promised.
  */
 fun FallibleOutput<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
-    val chosen = ok.declared ?: successes.first()
+    val chosen = chosenSuccess(ok)
     check(successes.any { it === chosen }) {
         "$chosen was returned by a handler but $this never declared it"
     }
