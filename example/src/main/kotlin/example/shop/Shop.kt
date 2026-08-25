@@ -2,6 +2,7 @@ package example.shop
 
 import io.github.matthewjones372.pelican.*
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.pekko.*
 import io.github.matthewjones372.pelican.pekko.docs.Docs
@@ -330,7 +331,7 @@ fun shopSpec(): ApiSpec = ApiSpec(
 
 fun main(args: Array<String>) {
     val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
-    val server = shopApi().startWithDocs(port = port, docs = Docs(docsPath = "/api-docs"))
+    val server = shopApi().startWithDocs(port = port, docs = docs { docsPath = "/api-docs" })
     println("Rookery Books on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
     Runtime.getRuntime().addShutdownHook(Thread { server.stop().toCompletableFuture().join() })
     Thread.currentThread().join()

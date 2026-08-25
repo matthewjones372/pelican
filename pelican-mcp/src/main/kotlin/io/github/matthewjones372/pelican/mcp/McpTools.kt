@@ -48,7 +48,7 @@ class McpTool(
 )
 
 /** Which endpoints a model is told about, and what is supplied on its behalf. */
-class McpOptions(
+class McpOptions internal constructor(
     /**
      * Default: everything the document describes. `hidden` already means "still
      * served, not written down", and a tool list is somewhere it is written down.
@@ -69,6 +69,22 @@ class McpOptions(
 )
 
 /**
+ * What a model is told about, and the defaults above where the block says
+ * nothing: every endpoint the document describes, and no headers supplied.
+ */
+fun mcpOptions(configure: McpOptionsBuilder.() -> Unit = {}): McpOptions =
+    McpOptionsBuilder().apply(configure).build()
+
+/** What [mcpOptions]'s block writes into. Each setting is documented on [McpOptions]. */
+class McpOptionsBuilder internal constructor() {
+
+    var include: (Endpoint<*, *>) -> Boolean = { !it.hidden }
+    var headers: Map<String, String> = emptyMap()
+
+    internal fun build(): McpOptions = McpOptions(include = include, headers = headers)
+}
+
+/**
  * The endpoints as tool descriptions, derived from the same values the routes
  * and the document come from.
  *
@@ -76,7 +92,7 @@ class McpOptions(
  * `Authorization` or an `X-Api-Key` invents one. A credential reaches the
  * service from whatever serves these tools, not from the model.
  */
-fun ApiSpec.mcpTools(options: McpOptions = McpOptions()): List<McpTool> {
+fun ApiSpec.mcpTools(options: McpOptions = mcpOptions()): List<McpTool> {
     val standalone = StandaloneSchemas(schemas)
     return endpoints.filter(options.include).map { it.mcpTool(standalone, options) }
 }
@@ -159,23 +175,23 @@ private fun Endpoint<*, *>.refuseWhatMcpCannotCarry(options: McpOptions) {
     require(output.isOneAnswer()) {
         "$operationName answers with $output, and a tool call has one result to put an answer in — " +
             "a stream of rows or events has nowhere to go. Leave it out with " +
-            "McpOptions(include = { ... }), and let a caller that can stream have it over HTTP."
+            "mcpOptions { include = { ... } }, and let a caller that can stream have it over HTTP."
     }
     require(bodyInput.isReadable()) {
         "$operationName takes $bodyInput, which is bytes rather than a payload a model could write. " +
-            "Leave it out with McpOptions(include = { ... })."
+            "Leave it out with mcpOptions { include = { ... } }."
     }
     require(cookieParams.isEmpty()) {
         "$operationName reads the cookie(s) ${cookieParams.joinToString { it.name }}, and a tool call has " +
-            "no browser behind it. Leave it out with McpOptions(include = { ... }), or read the value " +
+            "no browser behind it. Leave it out with mcpOptions { include = { ... } }, or read the value " +
             "from somewhere a caller without cookies can supply it."
     }
     val missing = headerParams.filter { it.required && it.name !in options.headers }
     require(missing.isEmpty()) {
         "$operationName requires the header(s) ${missing.joinToString { it.name }}, and a header is not a " +
             "tool argument — a model asked for one invents it. Supply the value with " +
-            "McpOptions(headers = mapOf(\"${missing.first().name}\" to ...)), or leave the endpoint out " +
-            "with McpOptions(include = { ... })."
+            "mcpOptions { headers = mapOf(\"${missing.first().name}\" to ...) }, or leave the endpoint out " +
+            "with mcpOptions { include = { ... } }."
     }
 }
 

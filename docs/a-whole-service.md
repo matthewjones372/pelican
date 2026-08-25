@@ -109,7 +109,7 @@ fun main() {
         title = "Bookmarks"
         version = "1.0.0"
     }
-    val server = api.startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
+    val server = api.startWithDocs(port = 8080, docs = docs { docsPath = "/api-docs" })
     println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
 }
 ```

@@ -33,12 +33,46 @@ class RetryTest {
     private val post = ClientRequest(Method.POST, "https://orders.internal/orders")
 
     /** No jitter, so a wait is the number the curve says rather than a range. */
-    private val exact = RetryPolicy(jitter = 0.0)
+    private val exact = retryPolicy { jitter = 0.0 }
 
     private fun response(status: Int, headers: List<Pair<String, String>> = emptyList()) =
         ClientResponse(status, headers, ByteArrayInputStream(ByteArray(0)))
 
     // ------------------------------------------------------------ the policy
+
+    /** The numbers the class documentation argues for, pinned against the block. */
+    @Test
+    fun `a block that says nothing leaves every setting where it has always been`() {
+        val policy = retryPolicy()
+
+        policy.maxAttempts shouldBe 3
+        policy.initialBackoff shouldBe Duration.ofMillis(100)
+        policy.backoffMultiplier shouldBe 2.0
+        policy.maxBackoff shouldBe Duration.ofSeconds(2)
+        policy.jitter shouldBe 0.5
+        policy.statuses shouldBe TRANSIENT_STATUSES
+        policy.methods shouldBe IDEMPOTENT_METHODS
+        policy.retryStreamedBodies shouldBe false
+        policy.honourRetryAfter shouldBe true
+        policy.retryAfterCap shouldBe Duration.ofSeconds(10)
+        policy.failures(IOException("refused")) shouldBe true
+        policy.failures(IllegalStateException("bug")) shouldBe false
+    }
+
+    @Test
+    fun `a builder written into after the policy is built cannot change it`() {
+        lateinit var escaped: RetryPolicyBuilder
+        val policy = retryPolicy {
+            escaped = this
+            maxAttempts = 2
+        }
+
+        escaped.maxAttempts = 9
+        escaped.honourRetryAfter = false
+
+        policy.maxAttempts shouldBe 2
+        policy.honourRetryAfter shouldBe true
+    }
 
     @Test
     fun `a policy retries a transient status on an idempotent method`() {
@@ -67,7 +101,7 @@ class RetryTest {
     fun `a method that is not idempotent is never sent twice unless it was named`() {
         exact.retryDelay(post, response(503), attempt = 1).shouldBeNull()
 
-        val told = RetryPolicy(jitter = 0.0, methods = IDEMPOTENT_METHODS + Method.POST)
+        val told = retryPolicy { jitter = 0.0; methods = IDEMPOTENT_METHODS + Method.POST }
         told.retryDelay(post, response(503), attempt = 1) shouldBe Duration.ofMillis(100)
     }
 
@@ -80,7 +114,7 @@ class RetryTest {
         )
 
         exact.retryDelay(streamed, response(503), attempt = 1).shouldBeNull()
-        RetryPolicy(jitter = 0.0, retryStreamedBodies = true)
+        retryPolicy { jitter = 0.0; retryStreamedBodies = true }
             .retryDelay(streamed, response(503), attempt = 1) shouldBe Duration.ofMillis(100)
     }
 
@@ -109,14 +143,14 @@ class RetryTest {
 
     @Test
     fun `the curve is capped, so a policy with more attempts does not wait for ever`() {
-        val patient = RetryPolicy(maxAttempts = 10, jitter = 0.0)
+        val patient = retryPolicy { maxAttempts = 10; jitter = 0.0 }
         patient.retryDelay(get, response(503), attempt = 9) shouldBe Duration.ofSeconds(2)
     }
 
     @Test
     fun `jitter spreads a wait over the fraction it was given`() {
         val waits = (1..50).map {
-            RetryPolicy().retryDelay(get, response(503), attempt = 1).shouldNotBeNull().toMillis()
+            retryPolicy().retryDelay(get, response(503), attempt = 1).shouldNotBeNull().toMillis()
         }
 
         waits.forEach {
@@ -133,7 +167,7 @@ class RetryTest {
 
     @Test
     fun `a policy of one attempt is a policy that never retries`() {
-        val once = RetryPolicy(maxAttempts = 1)
+        val once = retryPolicy { maxAttempts = 1 }
         once.retryDelay(get, response(503), attempt = 1).shouldBeNull()
         once.retryDelay(get, IOException("reset"), attempt = 1).shouldBeNull()
     }
@@ -148,7 +182,7 @@ class RetryTest {
             CompletableFuture.completedFuture(if (number < 3) response(503) else response(200))
         }
 
-        val answered = transport.retrying(RetryPolicy(jitter = 0.0, initialBackoff = Duration.ZERO))
+        val answered = transport.retrying(retryPolicy { jitter = 0.0; initialBackoff = Duration.ZERO })
             .send(get)
             .toCompletableFuture()
             .get(5, TimeUnit.SECONDS)
@@ -168,7 +202,7 @@ class RetryTest {
             )
         }
 
-        transport.retrying(RetryPolicy(jitter = 0.0, initialBackoff = Duration.ZERO))
+        transport.retrying(retryPolicy { jitter = 0.0; initialBackoff = Duration.ZERO })
             .send(get)
             .toCompletableFuture()
             .get(5, TimeUnit.SECONDS)
@@ -198,7 +232,7 @@ class RetryTest {
         }
 
         val failed = assertFailsWith<CompletionException> {
-            transport.retrying(RetryPolicy(jitter = 0.0, initialBackoff = Duration.ZERO))
+            transport.retrying(retryPolicy { jitter = 0.0; initialBackoff = Duration.ZERO })
                 .send(get)
                 .toCompletableFuture()
                 .join()
@@ -230,7 +264,7 @@ class RetryTest {
         // Long enough that the retry is still waiting when the cancellation
         // arrives, and short enough that a mistake here shows up as a failure
         // rather than as a slow suite.
-        val waiting = RetryPolicy(jitter = 0.0, initialBackoff = Duration.ofMillis(500))
+        val waiting = retryPolicy { jitter = 0.0; initialBackoff = Duration.ofMillis(500) }
         val answer = transport.retrying(waiting).send(get).toCompletableFuture()
 
         answer.cancel(true)

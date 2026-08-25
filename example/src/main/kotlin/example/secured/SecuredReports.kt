@@ -3,6 +3,8 @@ package example.secured
 import io.github.matthewjones372.pelican.*
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.openapi.DocsOAuth
+import io.github.matthewjones372.pelican.openapi.docs
+import io.github.matthewjones372.pelican.openapi.docsOAuth
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.pekko.*
@@ -364,20 +366,19 @@ const val DOCS_PATH = "/api-docs"
  * The docs page as an OAuth client of its own, which is what makes "Try it out"
  * send a real token rather than nothing.
  */
-val securedDocs = Docs(
-    docsPath = DOCS_PATH,
-    oauth = DocsOAuth(
-        clientId = "reports-docs-ui",
-        usePkce = true,
+val securedDocs = docs {
+    docsPath = DOCS_PATH
+    oauth = docsOAuth("reports-docs-ui") {
+        usePkce = true
         // Ticked when the Authorize dialog opens; a reader can still tick more.
-        scopes = listOf("reports:read"),
-        appName = "Reports API reference",
+        scopes = listOf("reports:read")
+        appName = "Reports API reference"
         // Provider-specific extras ride along on the authorize request. Auth0
         // needs `audience` to issue an access token for an API rather than an
         // ID token; delete this line for a provider that does not want it.
-        additionalQueryStringParams = mapOf("audience" to "https://api.example.com/reports"),
-    ),
-)
+        additionalQueryStringParams = mapOf("audience" to "https://api.example.com/reports")
+    }
+}
 
 fun main(args: Array<String>) {
     val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT

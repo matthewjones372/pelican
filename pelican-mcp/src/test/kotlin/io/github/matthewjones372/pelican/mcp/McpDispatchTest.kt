@@ -52,7 +52,7 @@ class McpDispatchTest {
     }
 
     /** The credential the service requires, supplied by what serves the tools rather than by the model. */
-    private val supplied = McpOptions(headers = mapOf("X-Api-Key" to "let-me-in"))
+    private val supplied = mcpOptions { headers = mapOf("X-Api-Key" to "let-me-in") }
 
     private fun api(seen: Seen = Seen(), options: McpOptions = supplied): McpDispatch = api(
         endpoints = listOf(
@@ -164,7 +164,7 @@ class McpDispatchTest {
 
     // ------------------------------------------------------------- refusals
 
-    private fun refusalFor(vararg endpoints: Endpoint<*, *>, options: McpOptions = McpOptions()): String =
+    private fun refusalFor(vararg endpoints: Endpoint<*, *>, options: McpOptions = mcpOptions()): String =
         shouldThrow<IllegalArgumentException> {
             ApiSpec(endpoints.toList(), JacksonCodecs).mcpTools(options)
         }.message.orEmpty()
@@ -212,7 +212,7 @@ class McpDispatchTest {
         message shouldContain "headers"
 
         ApiSpec(listOf(placeOrder), JacksonCodecs)
-            .mcpTools(McpOptions(headers = mapOf("X-Api-Key" to "let-me-in")))
+            .mcpTools(mcpOptions { headers = mapOf("X-Api-Key" to "let-me-in") })
             .single().name shouldBe "placeOrder"
     }
 }

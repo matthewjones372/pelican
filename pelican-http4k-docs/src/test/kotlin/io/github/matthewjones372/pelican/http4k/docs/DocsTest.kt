@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.http4k.handledNow
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pathParam
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
@@ -42,7 +43,7 @@ class DocsTest {
 
     @Test
     fun `the document and the page are served alongside the endpoints`() {
-        val handler = api().handlerWithDocs(Docs(docsPath = "/api-docs"))
+        val handler = api().handlerWithDocs(docs { docsPath = "/api-docs" })
 
         val spec = handler(Request(Method.GET, "/openapi.json"))
         spec.status.code shouldBe 200
@@ -60,11 +61,11 @@ class DocsTest {
 
     @Test
     fun `each page can be switched off on its own`() {
-        val specOnly = api().handlerWithDocs(Docs(docsPath = null))
+        val specOnly = api().handlerWithDocs(docs { docsPath = null })
         specOnly(Request(Method.GET, "/openapi.json")).status.code shouldBe 200
         specOnly(Request(Method.GET, "/docs")).status.code shouldBe 404
 
-        val pageOnly = api().handlerWithDocs(Docs(openApiPath = null))
+        val pageOnly = api().handlerWithDocs(docs { openApiPath = null })
         pageOnly(Request(Method.GET, "/openapi.json")).status.code shouldBe 404
         // With no spec endpoint the page embeds the document rather than fetching it.
         pageOnly(Request(Method.GET, "/docs")).bodyString() shouldContain "\"openapi\""
@@ -93,7 +94,7 @@ class DocsTest {
 
     @Test
     fun `with both switched off the handler is the endpoints alone`() {
-        val handler = api().handlerWithDocs(Docs(openApiPath = null, docsPath = null))
+        val handler = api().handlerWithDocs(docs { openApiPath = null; docsPath = null })
         handler(Request(Method.GET, "/docs")).status.code shouldBe 404
         handler(Request(Method.GET, "/widgets/1")).status.code shouldBe 200
     }

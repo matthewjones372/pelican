@@ -11,10 +11,15 @@ public final class io/github/matthewjones372/pelican/mcp/McpDispatchKt {
 
 public final class io/github/matthewjones372/pelican/mcp/McpOptions {
 	public fun <init> ()V
-	public fun <init> (Lkotlin/jvm/functions/Function1;Ljava/util/Map;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getHeaders ()Ljava/util/Map;
 	public final fun getInclude ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class io/github/matthewjones372/pelican/mcp/McpOptionsBuilder {
+	public final fun getHeaders ()Ljava/util/Map;
+	public final fun getInclude ()Lkotlin/jvm/functions/Function1;
+	public final fun setHeaders (Ljava/util/Map;)V
+	public final fun setInclude (Lkotlin/jvm/functions/Function1;)V
 }
 
 public final class io/github/matthewjones372/pelican/mcp/McpTool {
@@ -28,6 +33,8 @@ public final class io/github/matthewjones372/pelican/mcp/McpTool {
 }
 
 public final class io/github/matthewjones372/pelican/mcp/McpToolsKt {
+	public static final fun mcpOptions (Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/mcp/McpOptions;
+	public static synthetic fun mcpOptions$default (Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/mcp/McpOptions;
 	public static final fun mcpTools (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/mcp/McpOptions;)Ljava/util/List;
 	public static synthetic fun mcpTools$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/mcp/McpOptions;ILjava/lang/Object;)Ljava/util/List;
 	public static final fun toJson (Lio/github/matthewjones372/pelican/mcp/McpTool;)Lio/github/matthewjones372/pelican/JsonObj;

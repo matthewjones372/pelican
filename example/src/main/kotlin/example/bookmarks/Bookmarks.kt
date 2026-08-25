@@ -2,6 +2,7 @@ package example.bookmarks
 
 import io.github.matthewjones372.pelican.*
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.pekko.*
 import io.github.matthewjones372.pelican.pekko.docs.Docs
@@ -178,7 +179,7 @@ fun bookmarksApi(): Api = api(
 }
 
 /** Docs are opt-in, so where they live is stated separately from the API. */
-val bookmarksDocs = Docs(docsPath = "/api-docs")
+val bookmarksDocs = docs { docsPath = "/api-docs" }
 
 fun main(args: Array<String>) {
     val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT

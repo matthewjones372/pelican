@@ -3,6 +3,8 @@ package example
 import io.github.matthewjones372.pelican.*
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.openapi.DocsOAuth
+import io.github.matthewjones372.pelican.openapi.docs
+import io.github.matthewjones372.pelican.openapi.docsOAuth
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.docs.Docs
@@ -455,7 +457,7 @@ class SwaggerUiOAuthTest {
         }.startWithDocs(
             port = 0,
             systemName = "swagger-oauth-test",
-            docs = Docs(docsPath = "/api-docs", oauth = docsOAuth),
+            docs = docs { docsPath = "/api-docs"; oauth = docsOAuth },
         )
         try {
             block(server.baseUrl)
@@ -471,7 +473,7 @@ class SwaggerUiOAuthTest {
 
     @Test
     fun `the page authorizes as the configured client and serves its own redirect target`() {
-        serve(DocsOAuth(clientId = "docs-ui", scopes = listOf("orders:read"))) { base ->
+        serve(docsOAuth("docs-ui") { scopes = listOf("orders:read") }) { base ->
             val page = fetch("$base/api-docs").body()
             page shouldContain "initOAuth"
             page shouldContain """"clientId":"docs-ui""""
@@ -519,7 +521,7 @@ class SwaggerUiTest {
         }.startWithDocs(
             port = 0,
             systemName = "swagger-ui-test",
-            docs = Docs(openApiPath = openApi, docsPath = docs),
+            docs = docs { openApiPath = openApi; docsPath = docs },
         )
         try {
             block(server.baseUrl)
@@ -575,7 +577,7 @@ class SwaggerUiTest {
         }.startWithDocs(
             port = 0,
             systemName = "swagger-escape-test",
-            docs = Docs(openApiPath = null, docsPath = "/api-docs"),
+            docs = docs { openApiPath = null; docsPath = "/api-docs" },
         )
         try {
             val body = fetch("${server.baseUrl}/api-docs").body()

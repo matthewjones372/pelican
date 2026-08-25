@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsoniter.JsoniterCodecs
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.openapi.Docs
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.github.matthewjones372.pelican.pekko.handledNow
 import kotlinx.serialization.SerialName
@@ -104,7 +105,7 @@ fun notesSpec(schemas: SchemaSource): ApiSpec = ApiSpec(
 /** `./gradlew :example:runCodecs` — Jackson :8080, kotlinx :8081, jsoniter :8082. */
 fun main(args: Array<String>) {
     val basePort = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
-    val docs = Docs(docsPath = "/api-docs")
+    val docs = docs { docsPath = "/api-docs" }
 
     val jackson = notesApi(JacksonCodecs)
         .startWithDocs(port = basePort, docs = docs, systemName = "notes-jackson")

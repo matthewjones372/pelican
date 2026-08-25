@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer
 import io.github.matthewjones372.pelican.ClientRequest
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.RetryPolicy
+import io.github.matthewjones372.pelican.retryPolicy
 import io.github.matthewjones372.pelican.retrying
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -47,7 +48,7 @@ class RetryingTransportTest {
     private val base = "http://localhost:${server.address.port}"
 
     /** No jitter and no waiting: the pause is asserted in core, not here. */
-    private val impatient = RetryPolicy(jitter = 0.0, initialBackoff = Duration.ZERO, retryStreamedBodies = true)
+    private val impatient = retryPolicy { jitter = 0.0; initialBackoff = Duration.ZERO; retryStreamedBodies = true }
 
     private val transport = JavaHttpTransport().retrying(impatient)
 

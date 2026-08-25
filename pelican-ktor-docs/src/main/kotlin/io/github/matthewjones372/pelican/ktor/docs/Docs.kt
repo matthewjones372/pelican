@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.ktor.PelicanServer
 import io.github.matthewjones372.pelican.ktor.pelican
 import io.github.matthewjones372.pelican.ktor.start
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectHtml
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
 import io.github.matthewjones372.pelican.openapi.openApiJson
@@ -38,7 +39,7 @@ typealias Docs = io.github.matthewjones372.pelican.openapi.Docs
  * service that does not publish docs depends on `pelican-ktor` alone and never
  * compiles or ships the generator.
  */
-fun Route.pelicanDocs(api: Api, docs: Docs = Docs()) {
+fun Route.pelicanDocs(api: Api, docs: Docs = docs()) {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }
     val uiPath = docs.docsPath?.takeIf { it.isNotBlank() }
     if (specPath == null && uiPath == null) return
@@ -73,7 +74,7 @@ fun Route.pelicanDocs(api: Api, docs: Docs = Docs()) {
  * API that routes `/docs` itself does not shadow the page — though that API
  * should pass a [Docs] with different paths rather than rely on order.
  */
-fun Application.pelicanWithDocs(api: Api, docs: Docs = Docs()) {
+fun Application.pelicanWithDocs(api: Api, docs: Docs = docs()) {
     routing {
         pelicanDocs(api, docs)
         pelican(api)
@@ -85,7 +86,7 @@ fun Api.startWithDocs(
     port: Int = 8080,
     host: String = "0.0.0.0",
     factory: ApplicationEngineFactory<out ApplicationEngine, *> = CIO,
-    docs: Docs = Docs(),
+    docs: Docs = docs(),
 ): PelicanServer = start(port, host, factory) { pelicanWithDocs(it, docs) }
 
 /**

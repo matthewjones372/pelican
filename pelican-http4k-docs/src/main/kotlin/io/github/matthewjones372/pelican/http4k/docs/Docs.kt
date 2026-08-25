@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.http4k.PelicanServer
 import io.github.matthewjones372.pelican.http4k.StreamingSunHttp
 import io.github.matthewjones372.pelican.http4k.start
 import io.github.matthewjones372.pelican.http4k.toHttpHandler
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectHtml
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
 import io.github.matthewjones372.pelican.openapi.openApiJson
@@ -38,7 +39,7 @@ typealias Docs = io.github.matthewjones372.pelican.openapi.Docs
  * and the document interpreter. A service that does not publish docs depends on
  * `pelican-http4k` alone and never compiles or ships the generator.
  */
-fun Api.docsRoutes(docs: Docs = Docs()): List<RoutingHttpHandler> {
+fun Api.docsRoutes(docs: Docs = docs()): List<RoutingHttpHandler> {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }
     val uiPath = docs.docsPath?.takeIf { it.isNotBlank() }
     if (specPath == null && uiPath == null) return emptyList()
@@ -75,14 +76,14 @@ fun Api.docsRoutes(docs: Docs = Docs()): List<RoutingHttpHandler> {
 /**
  * The endpoints and the documentation, as one handler.
  */
-fun Api.handlerWithDocs(docs: Docs = Docs()): RoutingHttpHandler =
+fun Api.handlerWithDocs(docs: Docs = docs()): RoutingHttpHandler =
     routes(docsRoutes(docs) + toHttpHandler())
 
 /** [start], with the document and the Swagger UI page served alongside. */
 fun Api.startWithDocs(
     port: Int = 8080,
     config: ServerConfig = StreamingSunHttp(port),
-    docs: Docs = Docs(),
+    docs: Docs = docs(),
 ): PelicanServer = start(port, config) { handlerWithDocs(docs) }
 
 /**

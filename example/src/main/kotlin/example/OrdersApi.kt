@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pekko.*
 import io.github.matthewjones372.pelican.pekko.docs.Docs
 import io.github.matthewjones372.pelican.unauthorized
@@ -150,4 +151,4 @@ fun ordersApi(): Api = api(
  * serving docs is opt-in, and `start()` alone serves the endpoints and nothing
  * else. `startWithDocs(docs = ordersDocs)` is what adds the two pages.
  */
-val ordersDocs = Docs(docsPath = "/api-docs")
+val ordersDocs = docs { docsPath = "/api-docs" }

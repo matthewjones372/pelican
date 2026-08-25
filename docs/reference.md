@@ -431,7 +431,7 @@ import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 
 ordersApi().start(port = 8080)              // endpoints only; no OpenAPI code on the classpath
 ordersApi().startWithDocs(port = 8080)      // plus /openapi.json and /docs
-ordersApi().startWithDocs(port = 8080, docs = Docs(openApiPath = "/v1/openapi.json", docsPath = "/api-docs"))
+ordersApi().startWithDocs(port = 8080, docs = docs { openApiPath = "/v1/openapi.json"; docsPath = "/api-docs" })
 ```
 
 Set either path to `null` to turn that page off. `docsRoutes(docs)` hands back
@@ -463,7 +463,7 @@ pelican {
 ```
 
 ```kotlin
-ordersApi().startWithDocs(port = 8080, docs = Docs(version = OpenApiVersion.V3_2_0))
+ordersApi().startWithDocs(port = 8080, docs = docs { version = OpenApiVersion.V3_2_0 })
 ```
 
 #### Why it is a choice at all
@@ -656,10 +656,10 @@ page, and the document is embedded in the page instead rather than leaving it
 pointed at nothing:
 
 ```kotlin
-api.startWithDocs(docs = Docs(
-    openApiPath = null,         // no /openapi.json
-    docsPath = "/api-docs",     // still works; the spec ships inside the page
-))
+api.startWithDocs(docs = docs {
+    openApiPath = null          // no /openapi.json
+    docsPath = "/api-docs"      // still works; the spec ships inside the page
+})
 ```
 
 An `Api` (handlers included) can hand back its description half with
@@ -804,7 +804,7 @@ HTTP is separate, and not built yet.
 What a tool call cannot carry is refused where the tools are derived rather
 than at the call: a streamed answer, a multipart or raw body, a cookie
 parameter, and a required header with no value behind it — a header being
-something a model asked for would invent, so `McpOptions(headers = ...)` is
+something a model asked for would invent, so `mcpOptions { headers = ... }` is
 where a credential comes from. Response headers do not survive a tool result
 at all, which is worth knowing before pointing a model at a service that says
 `Retry-After` on its 429. [docs/mcp.md](mcp.md) has the mapping table, a worked
@@ -1551,7 +1551,7 @@ wrapper does. A retry a caller did not ask for turns one failed call into
 several, and the call it multiplies is the one already arriving at a service in
 trouble.
 
-`RetryPolicy()` is the policy you get by naming none, and every default in it
+`retryPolicy()` is the policy you get by naming none, and every default in it
 is narrow, because the cost of retrying something that was not transient is
 paid by the server rather than by whoever chose the default:
 
@@ -2562,10 +2562,10 @@ token:
 ```kotlin
 ordersApi().startWithDocs(
     port = 8080,
-    docs = Docs(
-        docsPath = "/api-docs",
-        oauth = DocsOAuth(clientId = "orders-docs-ui", scopes = listOf("orders:read")),
-    ),
+    docs = docs {
+        docsPath = "/api-docs"
+        oauth = docsOAuth("orders-docs-ui") { scopes = listOf("orders:read") }
+    },
 )
 ```
 
@@ -2576,7 +2576,7 @@ provider. The page resolves it against the origin the reader is actually on, so
 
 There is no client secret to set. The docs page is a public client running in a
 browser, so a secret shipped to it is not secret; PKCE replaces it and is on by
-default (`DocsOAuth(usePkce = false)` if your provider cannot do PKCE).
+default (`docsOAuth(clientId) { usePkce = false }` if your provider cannot do PKCE).
 `additionalQueryStringParams` covers providers that want an extra parameter on
 the authorize request — Auth0's `audience`, for instance.
 

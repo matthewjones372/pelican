@@ -56,7 +56,7 @@ class McpToolsTest {
 
     // `placeOrder` requires an X-Api-Key, and a required header with nothing
     // behind it is refused: see McpDispatchTest.
-    private val options = McpOptions(headers = mapOf("X-Api-Key" to "let-me-in"))
+    private val options = mcpOptions { headers = mapOf("X-Api-Key" to "let-me-in") }
 
     private fun toolsFor(vararg endpoints: Endpoint<*, *>): List<McpTool> =
         ApiSpec(endpoints.toList(), JacksonCodecs).mcpTools(options)

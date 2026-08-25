@@ -121,7 +121,7 @@ class JavaHttpTransportTest {
     @Test
     fun `a per-request timeout is the transport's to honour`() {
         val failure = assertFailsWith<CompletionException> {
-            send(ClientRequest(Method.GET, "$base/slow", timeout = Duration.ofMillis(TIMEOUT_MILLIS)))
+            send(ClientRequest(Method.GET, "$base/slow").withTimeout(Duration.ofMillis(TIMEOUT_MILLIS)))
         }
 
         // `is`, not an exact type. A budget this short can be spent before the

@@ -367,7 +367,7 @@ class KtorHttpTransportTest {
     fun `a per-request timeout is the transport's to honour`() {
         val started = System.nanoTime()
         val failure = assertFailsWith<CompletionException> {
-            send(ClientRequest(Method.GET, "$base/slow", timeout = Duration.ofMillis(TIMEOUT_MILLIS)))
+            send(ClientRequest(Method.GET, "$base/slow").withTimeout(Duration.ofMillis(TIMEOUT_MILLIS)))
         }
         val elapsedMs = (System.nanoTime() - started) / 1_000_000
 
@@ -392,7 +392,7 @@ class KtorHttpTransportTest {
             val started = System.nanoTime()
             val failure = assertFailsWith<CompletionException> {
                 send(
-                    ClientRequest(Method.GET, "$base/slow", timeout = Duration.ofMillis(TIMEOUT_MILLIS)),
+                    ClientRequest(Method.GET, "$base/slow").withTimeout(Duration.ofMillis(TIMEOUT_MILLIS)),
                     on = KtorHttpTransport(plain),
                 )
             }

@@ -88,7 +88,7 @@ import kotlin.random.Random
  *   not repeat. Anything else is a bug or a refusal, and both survive being
  *   sent again.
  */
-class RetryPolicy(
+class RetryPolicy internal constructor(
     val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
     val initialBackoff: Duration = Duration.ofMillis(DEFAULT_INITIAL_BACKOFF_MILLIS),
     val backoffMultiplier: Double = DEFAULT_BACKOFF_MULTIPLIER,
@@ -170,6 +170,46 @@ class RetryPolicy(
 }
 
 /**
+ * A [RetryPolicy] as its block describes it, and the defaults above where it
+ * says nothing.
+ *
+ * A block rather than eleven constructor parameters, for the reason in [api]:
+ * a policy gains a setting without every caller having to be recompiled.
+ */
+fun retryPolicy(configure: RetryPolicyBuilder.() -> Unit = {}): RetryPolicy =
+    RetryPolicyBuilder().apply(configure).build()
+
+/** What [retryPolicy]'s block writes into. Each setting is documented on [RetryPolicy]. */
+class RetryPolicyBuilder internal constructor() {
+
+    var maxAttempts: Int = DEFAULT_MAX_ATTEMPTS
+    var initialBackoff: Duration = Duration.ofMillis(DEFAULT_INITIAL_BACKOFF_MILLIS)
+    var backoffMultiplier: Double = DEFAULT_BACKOFF_MULTIPLIER
+    var maxBackoff: Duration = Duration.ofSeconds(DEFAULT_MAX_BACKOFF_SECONDS)
+    var jitter: Double = DEFAULT_JITTER
+    var statuses: Set<Int> = TRANSIENT_STATUSES
+    var methods: Set<Method> = IDEMPOTENT_METHODS
+    var retryStreamedBodies: Boolean = false
+    var honourRetryAfter: Boolean = true
+    var retryAfterCap: Duration = Duration.ofSeconds(DEFAULT_RETRY_AFTER_CAP_SECONDS)
+    var failures: (Throwable) -> Boolean = { it is IOException }
+
+    internal fun build(): RetryPolicy = RetryPolicy(
+        maxAttempts = maxAttempts,
+        initialBackoff = initialBackoff,
+        backoffMultiplier = backoffMultiplier,
+        maxBackoff = maxBackoff,
+        jitter = jitter,
+        statuses = statuses,
+        methods = methods,
+        retryStreamedBodies = retryStreamedBodies,
+        honourRetryAfter = honourRetryAfter,
+        retryAfterCap = retryAfterCap,
+        failures = failures,
+    )
+}
+
+/**
  * A [ClientTransport] that sends again when [policy] says the last attempt was
  * worth repeating.
  *
@@ -198,7 +238,7 @@ class RetryPolicy(
  */
 class RetryingTransport(
     private val delegate: ClientTransport,
-    private val policy: RetryPolicy = RetryPolicy(),
+    private val policy: RetryPolicy = retryPolicy(),
 ) : ClientTransport {
 
     override fun send(request: ClientRequest): CompletionStage<ClientResponse> {
@@ -290,7 +330,7 @@ class RetryingTransport(
  * The same transport with [policy] wrapped around it, which is how this reads
  * at the point a client is constructed.
  */
-fun ClientTransport.retrying(policy: RetryPolicy = RetryPolicy()): ClientTransport = RetryingTransport(this, policy)
+fun ClientTransport.retrying(policy: RetryPolicy = retryPolicy()): ClientTransport = RetryingTransport(this, policy)
 
 /** What a `CompletionStage` callback was handed, unwrapped to what was thrown. */
 private fun unwrapped(failure: Throwable): Throwable =

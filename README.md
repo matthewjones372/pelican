@@ -194,7 +194,7 @@ fun greetings() = api(
 }
 
 fun main() {
-    greetings().startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
+    greetings().startWithDocs(port = 8080, docs = docs { docsPath = "/api-docs" })
 }
 ```
 

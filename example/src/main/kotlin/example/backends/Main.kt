@@ -1,6 +1,7 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.openapi.Docs
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.http4k.docs.startWithDocs as startHttp4kWithDocs
 import io.github.matthewjones372.pelican.ktor.docs.startWithDocs as startKtorWithDocs
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs as startPekkoWithDocs
@@ -19,7 +20,7 @@ import io.github.matthewjones372.pelican.pekko.docs.startWithDocs as startPekkoW
  */
 fun main(args: Array<String>) {
     val basePort = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
-    val docs = Docs(docsPath = "/api-docs")
+    val docs = docs { docsPath = "/api-docs" }
 
     val pekko = pekkoApi().startPekkoWithDocs(port = basePort, docs = docs)
     val http4k = http4kApi().startHttp4kWithDocs(port = basePort + 1, docs = docs)

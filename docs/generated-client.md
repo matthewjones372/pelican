@@ -277,11 +277,11 @@ a decorator over the same interface rather than anything in the generated file:
 val client = OrdersClient(
     "https://orders.internal",
     JacksonCodecs,
-    ClientTransport.default().retrying(),          // RetryPolicy(), or one of your own
+    ClientTransport.default().retrying(),          // retryPolicy(), or one of your own
 )
 ```
 
-`RetryPolicy()` sends three times at most, waits 100ms and then 200ms with half
+`retryPolicy()` sends three times at most, waits 100ms and then 200ms with half
 of each wait randomised, and retries only 408, 429, 502, 503 and 504, only on
 the methods HTTP calls idempotent, and only for an `IOException`. It is not
 retrying a 500, a POST, or a body it cannot ask for twice. A `Retry-After` is

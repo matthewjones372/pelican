@@ -9,6 +9,7 @@ package example.hello
 
 import io.github.matthewjones372.pelican.*
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pekko.*
 import io.github.matthewjones372.pelican.pekko.docs.Docs
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
@@ -32,6 +33,6 @@ fun greetings() = api(
 }
 
 fun main() {
-    val server = greetings().startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
+    val server = greetings().startWithDocs(port = 8080, docs = docs { docsPath = "/api-docs" })
     println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
 }

@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.CorsHeaders
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.corsPolicy
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectHtml
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
 import io.github.matthewjones372.pelican.openapi.openApiJson
@@ -33,7 +34,7 @@ typealias Docs = io.github.matthewjones372.pelican.openapi.Docs
  * The document and the page, as routes — nothing else. Combine them yourself if
  * the service already has a route of its own to concat with.
  */
-fun Api.docsRoutes(docs: Docs = Docs()): List<Route> {
+fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }
     val uiPath = docs.docsPath?.takeIf { it.isNotBlank() }
     if (specPath == null && uiPath == null) return emptyList()
@@ -70,7 +71,7 @@ fun Api.docsRoutes(docs: Docs = Docs()): List<Route> {
 }
 
 /** The endpoints and the documentation, as one route. */
-fun Api.routeWithDocs(system: ClassicActorSystemProvider, docs: Docs = Docs()): Route {
+fun Api.routeWithDocs(system: ClassicActorSystemProvider, docs: Docs = docs()): Route {
     val routes = listOf(toRoute(system)) + docsRoutes(docs)
     return routes.reduce { left, right -> Directives.concat(left, right) }
 }
@@ -80,7 +81,7 @@ fun Api.startWithDocs(
     host: String = "127.0.0.1",
     port: Int = 8080,
     systemName: String = "pelican",
-    docs: Docs = Docs(),
+    docs: Docs = docs(),
 ): PelicanServer = start(host, port, systemName) { system: ActorSystem<Void> ->
     routeWithDocs(system, docs)
 }
@@ -94,7 +95,7 @@ fun Api.startWithDocs(
     system: ActorSystem<Void>,
     host: String = "127.0.0.1",
     port: Int = 8080,
-    docs: Docs = Docs(),
+    docs: Docs = docs(),
 ): PelicanServer = start(system, host, port) { on: ActorSystem<Void> ->
     routeWithDocs(on, docs)
 }

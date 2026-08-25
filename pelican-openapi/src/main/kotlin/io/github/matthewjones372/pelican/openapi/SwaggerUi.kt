@@ -11,7 +11,7 @@ import io.github.matthewjones372.pelican.jsonStrings
 /**
  * How the docs page authenticates when a reader clicks "Authorize".
  */
-class DocsOAuth(
+class DocsOAuth internal constructor(
     val clientId: String,
     val usePkce: Boolean = true,
     /** Scopes ticked by default in the Authorize dialog. */
@@ -20,6 +20,30 @@ class DocsOAuth(
     /** Extra parameters on the authorize request, e.g. `audience` for Auth0. */
     val additionalQueryStringParams: Map<String, String> = emptyMap(),
 )
+
+/**
+ * The OAuth flow the docs page runs, for the client the provider registered as
+ * [clientId]. Everything else has a default the block can move.
+ */
+fun docsOAuth(clientId: String, configure: DocsOAuthBuilder.() -> Unit = {}): DocsOAuth =
+    DocsOAuthBuilder().apply(configure).build(clientId)
+
+/** What [docsOAuth]'s block writes into. Each setting is documented on [DocsOAuth]. */
+class DocsOAuthBuilder internal constructor() {
+
+    var usePkce: Boolean = true
+    var scopes: List<String> = emptyList()
+    var appName: String? = null
+    var additionalQueryStringParams: Map<String, String> = emptyMap()
+
+    internal fun build(clientId: String): DocsOAuth = DocsOAuth(
+        clientId = clientId,
+        usePkce = usePkce,
+        scopes = scopes,
+        appName = appName,
+        additionalQueryStringParams = additionalQueryStringParams,
+    )
+}
 
 /**
  * A Swagger UI page for [spec]. With a [specPath] the page fetches the document

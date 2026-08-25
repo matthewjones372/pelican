@@ -6,6 +6,7 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ktor.handledNow
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pathParam
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
@@ -41,7 +42,7 @@ class DocsTest {
 
     @Test
     fun `the document and the page are served alongside the endpoints`() = testApplication {
-        application { pelicanWithDocs(api(), Docs(docsPath = "/api-docs")) }
+        application { pelicanWithDocs(api(), docs { docsPath = "/api-docs" }) }
 
         val spec = client.get("/openapi.json")
         spec.status.value shouldBe 200
@@ -59,21 +60,21 @@ class DocsTest {
 
     @Test
     fun `each page can be switched off on its own`() = testApplication {
-        application { pelicanWithDocs(api(), Docs(docsPath = null)) }
+        application { pelicanWithDocs(api(), docs { docsPath = null }) }
         client.get("/openapi.json").status.value shouldBe 200
         client.get("/docs").status.value shouldBe 404
     }
 
     @Test
     fun `with no document route the page embeds the document instead of fetching it`() = testApplication {
-        application { pelicanWithDocs(api(), Docs(openApiPath = null)) }
+        application { pelicanWithDocs(api(), docs { openApiPath = null }) }
         client.get("/openapi.json").status.value shouldBe 404
         client.get("/docs").bodyAsText() shouldContain "\"openapi\""
     }
 
     @Test
     fun `with both switched off the application is the endpoints alone`() = testApplication {
-        application { pelicanWithDocs(api(), Docs(openApiPath = null, docsPath = null)) }
+        application { pelicanWithDocs(api(), docs { openApiPath = null; docsPath = null }) }
         client.get("/docs").status.value shouldBe 404
         client.get("/widgets/1").status.value shouldBe 200
     }

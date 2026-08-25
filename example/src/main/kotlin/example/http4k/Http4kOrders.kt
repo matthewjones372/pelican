@@ -43,6 +43,7 @@ import io.github.matthewjones372.pelican.http4k.toStream
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.unauthorized
 
 /**
@@ -175,7 +176,7 @@ fun ordersApi(): Api = api(
 fun main(args: Array<String>) {
     // `./gradlew :example:runHttp4k --args=8081` when 8080 is taken.
     val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
-    val server = ordersApi().startWithDocs(port = port, docs = Docs(docsPath = "/api-docs"))
+    val server = ordersApi().startWithDocs(port = port, docs = docs { docsPath = "/api-docs" })
     println(
         """
         |Orders API listening on ${server.baseUrl}, served by http4k

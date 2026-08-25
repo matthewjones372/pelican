@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.jsonArr
 import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.mcp.McpOptions
 import io.github.matthewjones372.pelican.mcp.mcpDispatch
+import io.github.matthewjones372.pelican.mcp.mcpOptions
 import io.github.matthewjones372.pelican.mcp.mcpTools
 import io.github.matthewjones372.pelican.mcp.toJson
 import io.github.matthewjones372.pelican.renderPretty
@@ -38,12 +39,12 @@ class McpToolsFromOrdersTest {
         "getUser", "placeOrder", "submitOrder", "placeOrderForm", "payOrder", "cancelOrder",
     )
 
-    private val options = McpOptions(
-        include = { it.operationId in callable },
+    private val options = mcpOptions {
+        include = { it.operationId in callable }
         // The credential the service requires, supplied by whatever serves the
         // tools. A model asked for an X-Api-Key would invent one.
-        headers = mapOf("X-Api-Key" to "let-me-in"),
-    )
+        headers = mapOf("X-Api-Key" to "let-me-in")
+    }
 
     private val tools = ordersSpec().mcpTools(options)
 
@@ -55,7 +56,7 @@ class McpToolsFromOrdersTest {
     @Test
     fun `an endpoint MCP cannot carry is refused by name, rather than quietly left out`() {
         val message = shouldThrow<IllegalArgumentException> {
-            ordersSpec().mcpTools(McpOptions(headers = options.headers))
+            ordersSpec().mcpTools(mcpOptions { headers = options.headers })
         }.message.orEmpty()
 
         message shouldContain "streamOrders"

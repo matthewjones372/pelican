@@ -55,8 +55,7 @@ private fun request(
         url = origin + path + if (search.isEmpty()) "" else "?$search",
         headers = sent,
         body = multipart?.body ?: body,
-        timeout = deadline,
-    )
+    ).withTimeout(deadline)
 }
 
 private fun TextResponse.succeeded(): Boolean = status in 200..299

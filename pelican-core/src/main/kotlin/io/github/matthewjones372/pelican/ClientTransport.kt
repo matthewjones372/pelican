@@ -15,7 +15,7 @@ import java.util.concurrent.CompletionStage
  * business rather than the transport's, and two transports working it out
  * separately would be two chances to disagree.
  */
-class ClientRequest(
+class ClientRequest internal constructor(
     val method: Method,
     /** Absolute, already percent-encoded, query string included. */
     val url: String,
@@ -23,15 +23,35 @@ class ClientRequest(
      * In the order the client wrote them, one pair per occurrence, so a header
      * a caller sent twice arrives twice.
      */
-    val headers: List<Pair<String, String>> = emptyList(),
-    val body: Body = Body.Empty,
+    val headers: List<Pair<String, String>>,
+    val body: Body,
     /**
      * How long the exchange may take, or null to leave it to the transport's
      * own configuration. Per request rather than per transport because one
      * client's slow report and its cheap lookup are the same connection pool.
      */
-    val timeout: Duration? = null,
+    val timeout: Duration?,
 ) {
+    /**
+     * What a request always has. Anything beyond it is a `with` below rather
+     * than a parameter here, so that a setting added later leaves the calls a
+     * generated client already makes exactly where they are.
+     */
+    constructor(
+        method: Method,
+        url: String,
+        headers: List<Pair<String, String>> = emptyList(),
+        body: Body = Body.Empty,
+    ) : this(method, url, headers, body, null)
+
+    /** The same request, with how long the exchange may take. */
+    fun withTimeout(timeout: Duration?): ClientRequest =
+        ClientRequest(method, url, headers, body, timeout)
+
+    /** The same request carrying one more header, in the place it was added. */
+    fun withHeader(name: String, value: String): ClientRequest =
+        ClientRequest(method, url, headers + (name to value), body, timeout)
+
     /** The first value sent under [name], matched without regard to case. */
     fun header(name: String): String? =
         headers.firstOrNull { it.first.equals(name, ignoreCase = true) }?.second

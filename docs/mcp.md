@@ -97,10 +97,10 @@ because `CreateOrder` gives it a default. The call:
 
 ```kotlin
 val dispatch = ordersApi().mcpDispatch(
-    McpOptions(
-        include = { it.operationId in callable },
-        headers = mapOf("X-Api-Key" to System.getenv("ORDERS_API_KEY")),
-    ),
+    mcpOptions {
+        include = { it.operationId in callable }
+        headers = mapOf("X-Api-Key" to System.getenv("ORDERS_API_KEY"))
+    },
 )
 
 dispatch.call("placeOrder", jsonObj {
@@ -138,7 +138,7 @@ refusal names the endpoint and the way past.
 | a streamed answer — `ndjson`, `sse`, `jsonArray`, `bytes` | one tool call has one result, and a stream of rows or events has nowhere to go in it | leave it out with `include`, and let callers that can stream have it over HTTP |
 | a multipart body, or a raw body | bytes rather than a payload a model could write | leave it out with `include` |
 | a cookie parameter | a tool call has no browser behind it | leave it out, or read the value from somewhere a caller without cookies can supply |
-| a required header parameter with no value behind it | a model asked for a credential invents one | supply it with `McpOptions(headers = ...)`, or leave the endpoint out |
+| a required header parameter with no value behind it | a model asked for a credential invents one | supply it with `mcpOptions { headers = ... }`, or leave the endpoint out |
 | two endpoints with one `operationName` | a tool name is one name; the second would replace the first | give them `operationId`s of their own |
 
 Refused rather than quietly dropped, so that an endpoint a model does not get
@@ -155,7 +155,7 @@ accepts it has a hole rather than a tool.
 So the credential comes from whatever serves the tools:
 
 ```kotlin
-McpOptions(headers = mapOf("X-Api-Key" to System.getenv("ORDERS_API_KEY")))
+mcpOptions { headers = mapOf("X-Api-Key" to System.getenv("ORDERS_API_KEY")) }
 ```
 
 which is the same place a header that is not a credential comes from — a

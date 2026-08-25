@@ -14,6 +14,7 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.start
+import io.github.matthewjones372.pelican.retryPolicy
 import io.github.matthewjones372.pelican.retrying
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -74,7 +75,7 @@ class RetryingClientTest {
 
     /** No jitter and no waiting; what the wait would have been is core's test. */
     private fun impatient(statuses: Set<Int>) =
-        RetryPolicy(jitter = 0.0, initialBackoff = Duration.ZERO, statuses = statuses)
+        retryPolicy { jitter = 0.0; initialBackoff = Duration.ZERO; this.statuses = statuses }
 
     @Test
     fun `a call through a retrying transport is the call it always was`() {
@@ -119,17 +120,17 @@ class RetryingClientTest {
     /** And it is sent twice where the caller has said that this POST may be. */
     @Test
     fun `unless the caller has said this one may be`() {
-        val told = RetryPolicy(
-            jitter = 0.0,
-            initialBackoff = Duration.ZERO,
-            statuses = setOf(429),
-            methods = setOf(Method.POST),
-            maxAttempts = 2,
+        val told = retryPolicy {
+            jitter = 0.0
+            initialBackoff = Duration.ZERO
+            statuses = setOf(429)
+            methods = setOf(Method.POST)
+            maxAttempts = 2
             // This server asks for thirty seconds, and a test that honoured it
             // would take thirty seconds. What happens to a `Retry-After` this
             // long is the next test's subject.
-            honourRetryAfter = false,
-        )
+            honourRetryAfter = false
+        }
 
         clientWith(told).placeOrder(1L, CreateOrder("anvil", quantity = 5_000), xApiKey = "let-me-in")
 
@@ -143,12 +144,12 @@ class RetryingClientTest {
      */
     @Test
     fun `a Retry-After beyond the cap ends the retrying rather than shortening the wait`() {
-        val patient = RetryPolicy(
-            jitter = 0.0,
-            initialBackoff = Duration.ZERO,
-            statuses = setOf(429),
-            methods = setOf(Method.POST),
-        )
+        val patient = retryPolicy {
+            jitter = 0.0
+            initialBackoff = Duration.ZERO
+            statuses = setOf(429)
+            methods = setOf(Method.POST)
+        }
 
         clientWith(patient).placeOrder(1L, CreateOrder("anvil", quantity = 5_000), xApiKey = "let-me-in")
 
