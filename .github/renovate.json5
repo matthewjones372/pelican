@@ -1,0 +1,160 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+
+  // Renovate rather than Dependabot because the versions in this repository
+  // are Kotlin DSL literals -- `val pekkoVersion = "1.7.0"` used three lines
+  // later, `id(...) version "..."` in a `plugins` block, an included build of
+  // its own. Renovate reads all of that; Dependabot's Gradle support wants a
+  // version catalog this repository does not have.
+  extends: [
+    "config:recommended",
+    ":dependencyDashboard",
+    // The history is Conventional Commits, and a bot PR should not be the one
+    // exception.
+    ":semanticCommits",
+  ],
+
+  // One batch a week, opened before the working week rather than during it.
+  // Times are UTC unless a `timezone` says otherwise.
+  schedule: ["before 6am on monday"],
+
+  // A wall of open PRs is a wall nobody reads. The dashboard issue holds
+  // everything over the limit, so nothing is lost -- only deferred.
+  prConcurrentLimit: 6,
+  prHourlyLimit: 0,
+
+  // The build matrix is three JDKs plus an artifacts job. Rebasing every open
+  // branch on every push to main would spend that four times over for no
+  // answer anyone is waiting on.
+  rebaseWhen: "conflicted",
+
+  // `build.yml` runs on `push: branches: ["**"]`, so a Renovate branch is
+  // already tested before its PR is looked at. Automerge below rides on that.
+  // GitHub's own auto-merge is used where the repository allows it, which
+  // needs "Allow auto-merge" on and at least one required status check.
+  platformAutomerge: true,
+
+  // Nothing here is at 0.x or on an alpha by accident. Renovate only follows a
+  // prerelease line when the current version is itself a prerelease, which is
+  // the behaviour detekt's 2.0.0-alpha wants.
+  packageRules: [
+    // ---- Grouping. One PR per upstream project, not per artifact. ----
+    // `groupName` sets the group; it never selects. Every rule below carries
+    // its own match.
+    {
+      groupName: "kotlin",
+      matchPackageNames: [
+        "org.jetbrains.kotlin{/,}**",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json",
+      ],
+    },
+    { groupName: "pekko", matchPackageNames: ["org.apache.pekko{/,}**"] },
+    { groupName: "ktor", matchPackageNames: ["io.ktor{/,}**"] },
+    { groupName: "http4k", matchPackageNames: ["org.http4k{/,}**"] },
+    { groupName: "jackson", matchPackageNames: ["com.fasterxml.jackson{/,}**"] },
+    {
+      // swagger-core writes the schemas, swagger-parser reads the documents.
+      // Different artifacts, same upstream, and they move together.
+      groupName: "swagger",
+      matchPackageNames: ["io.swagger{/,}**"],
+    },
+    { groupName: "junit", matchPackageNames: ["org.junit{/,}**", "junit:junit"] },
+    { groupName: "github actions", matchManagers: ["github-actions"] },
+    {
+      // Everything that shapes the build rather than the published bytecode.
+      groupName: "build tooling",
+      matchPackageNames: [
+        "com.diffplug.spotless{/,}**",
+        "com.pinterest.ktlint{/,}**",
+        "org.jetbrains.kotlinx.kover{/,}**",
+        "pl.allegro.tech.build.axion-release{/,}**",
+        "com.vanniktech.maven.publish{/,}**",
+        "com.gradle.plugin-publish{/,}**",
+        "org.gradle.toolchains.foojay-resolver-convention{/,}**",
+      ],
+    },
+    {
+      groupName: "detekt",
+      matchPackageNames: ["dev.detekt{/,}**", "io.gitlab.arturbosch.detekt{/,}**"],
+    },
+
+    // ---- Automerge. A patch that keeps three JDKs green is not news. ----
+    { matchUpdateTypes: ["patch", "pin", "digest"], automerge: true },
+    {
+      // Test and build-time dependencies never reach a consumer's classpath,
+      // so a minor bump there is worth no more attention than a patch.
+      matchDepTypes: ["testImplementation", "testRuntimeOnly", "testCompileOnly"],
+      matchUpdateTypes: ["minor"],
+      automerge: true,
+    },
+    {
+      matchPackageNames: [
+        "com.diffplug.spotless{/,}**",
+        "com.pinterest.ktlint{/,}**",
+        "org.jetbrains.kotlinx.kover{/,}**",
+        "pl.allegro.tech.build.axion-release{/,}**",
+        "com.vanniktech.maven.publish{/,}**",
+        "com.gradle.plugin-publish{/,}**",
+        "org.gradle.toolchains.foojay-resolver-convention{/,}**",
+      ],
+      matchUpdateTypes: ["minor"],
+      automerge: true,
+    },
+    { matchManagers: ["github-actions"], matchUpdateTypes: ["minor"], automerge: true },
+
+    // ---- Read these ones. Later rules win, so the overrides come last. ----
+    {
+      // A published `api(...)` dependency is part of this library's own ABI.
+      // A minor bump there can change what a consumer compiles against, so it
+      // gets a human even though the build is green.
+      matchDepTypes: ["api"],
+      matchUpdateTypes: ["minor"],
+      automerge: false,
+    },
+    {
+      // 2.0.0-alpha.N to 2.0.0-alpha.N+1 is a patch by the version comparison
+      // and anything at all in practice.
+      matchPackageNames: ["dev.detekt{/,}**", "io.gitlab.arturbosch.detekt{/,}**"],
+      automerge: false,
+    },
+    {
+      // Kotlin is the compiler. It moves with the language version, the
+      // toolchain, and every plugin that embeds it.
+      matchPackageNames: ["org.jetbrains.kotlin{/,}**"],
+      automerge: false,
+    },
+    {
+      // The wrapper decides which Gradle every contributor and every CI job
+      // runs. Never silent.
+      matchManagers: ["gradle-wrapper"],
+      automerge: false,
+    },
+    {
+      // A green matrix says a major compiles here. It does not say what it
+      // does to a consumer.
+      matchUpdateTypes: ["major"],
+      automerge: false,
+    },
+  ],
+
+  // Spotless takes ktlint as a version string handed to a function, not as a
+  // coordinate, so the Gradle manager cannot see it. Both spellings the repo
+  // uses are matched: the `val` in the root build and the literal argument in
+  // the plugin build.
+  customManagers: [
+    {
+      customType: "regex",
+      managerFilePatterns: ["/\\.gradle\\.kts$/"],
+      matchStrings: [
+        "val ktlintVersion\\s*=\\s*\"(?<currentValue>[^\"]+)\"",
+        "ktlint\\(\"(?<currentValue>[^\"]+)\"\\)",
+      ],
+      depNameTemplate: "com.pinterest.ktlint:ktlint-cli",
+      datasourceTemplate: "maven",
+    },
+  ],
+
+  // The dashboard is the backlog: anything held back by the concurrency limit,
+  // and anything Renovate could not parse, shows up there rather than nowhere.
+  dependencyDashboardTitle: "Dependency dashboard",
+}
