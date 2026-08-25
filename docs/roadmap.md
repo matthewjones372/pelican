@@ -291,6 +291,36 @@ the `deviceAuthorization` flow — are listed in
 of them needs something added to the *description* first, and that is a
 different argument from this one.
 
+## 9. A model that can call the service
+
+The descriptions half of this has landed, and the page says so here rather than
+being quietly rewritten, for the reason items 1, 3 and 8 do.
+
+`pelican-mcp` derives MCP tool descriptions from the endpoints — name, input
+schema, output schema — and `mcpDispatch` runs a tool call through the same
+codecs and refinements a request goes through and into the handler the route
+already has. `pelican-schema` came first and for the same reason: a schema that
+resolves only inside an OpenAPI document is no use to a model, and a union
+branch missing the property that picks it is a schema a validator passes and
+the codec then refuses. Both are described in [Tools a model can call](mcp.md).
+
+What is not built is the serving half: stdio and Streamable HTTP, an SDK
+mapping, and the initialise handshake. That is a small piece of work now the
+tool list exists, and it is the piece that needs an MCP SDK and a server — so it
+belongs in a module of its own, exactly as serving the OpenAPI document does.
+
+This sits here rather than higher because the argument for it is the same
+argument the rest of the library makes, and the same objection applies: an
+endpoint that streams, uploads or requires a credential is not a tool, and
+pretending otherwise would describe a call the service cannot honour. Those are
+refused rather than half-served, which means a service publishing tools has
+decided which of its endpoints a model gets.
+
+**Touches** a new module carrying the SDK and the transports; nothing in
+`pelican-core`.
+**Done when** a model client can list and call the example service's tools over
+stdio, and the tool list it sees is the committed golden.
+
 ## Not on this list
 
 Things that look like gaps and are not, with the reasoning in

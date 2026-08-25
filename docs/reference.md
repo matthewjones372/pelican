@@ -15,6 +15,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 or 3.2.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-schema` | **core** | one type → a self-contained JSON Schema 2020-12 document: pointers under `$defs`, a union's branches carrying the property that picks them. No document generator, no codec |
+| `pelican-mcp` | core, schema | descriptions → MCP tool descriptions, and a dispatch that decodes a tool call into the handler the route already has. No MCP SDK, no transport |
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
 | `pelican-client-pekko` | core, pekko-http | the same seam over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-client-ktor` | core, ktor-client-cio | the same seam over Ktor's `HttpClient`, for a service that already runs one. Not `pelican-ktor`: calling is not interpreting |
@@ -711,6 +712,49 @@ The emitted OpenAPI document is untouched by any of this: `#/components/schemas/
 is where its schemas actually are, and `discriminator` is how 3.1 says which
 branch is which — the generated client and the importer both read it. See
 [docs/schemas.md](schemas.md).
+
+## Tools a model can call
+
+An endpoint already says everything an MCP tool description has to say. What is
+normally thirty hand-written lines per tool — an `inputSchema` built as a JSON
+literal, then `arguments?.get("qty")?.jsonPrimitive` in the handler, neither
+checked against the service — is derived:
+
+```kotlin
+val tools = ordersSpec().mcpTools(options)         // descriptions only
+val dispatch = ordersApi().mcpDispatch(options)    // descriptions, and callable
+dispatch.call("placeOrder", arguments)             // CompletionStage<ToolResult>
+```
+
+The name is `operationName`, so a tool, the document's `operationId` and the
+generated client's method are one string. Path and query parameters are named
+arguments through the same `openApiSchema()` the document uses, which is what
+puts `between(1, 100)` in front of a model as `minimum`/`maximum` rather than
+as a 400 it has to discover. The body is one `body` argument, its types under
+`$defs` beside it — `pelican-schema`, whose stamp pass is why a union branch
+arrives carrying the property that says which branch it is. An `outputSchema`
+is published only where exactly one JSON success declares its type, since
+`structuredContent` is validated against it the moment one exists.
+
+Dispatch decodes arguments through the codecs and refinements HTTP uses, builds
+the `Params` the endpoint declared, and runs the handler the route runs, filters
+included. A declared failure, a missing argument and a value a refinement
+rejects all come back as a `ToolResult` carrying `isError` and a sentence the
+model can act on. What nobody declared still throws.
+
+`pelican-mcp` carries no MCP SDK and no transport: `McpTool` and `ToolResult`
+are its own values, so a tool list can be derived, asserted and recorded as a
+golden with no server on the classpath. Serving them over stdio and Streamable
+HTTP is separate, and not built yet.
+
+What a tool call cannot carry is refused where the tools are derived rather
+than at the call: a streamed answer, a multipart or raw body, a cookie
+parameter, and a required header with no value behind it — a header being
+something a model asked for would invent, so `McpOptions(headers = ...)` is
+where a credential comes from. Response headers do not survive a tool result
+at all, which is worth knowing before pointing a model at a service that says
+`Retry-After` on its 429. [docs/mcp.md](mcp.md) has the mapping table, a worked
+example and every refusal with its reason.
 
 ## Webhooks: the calls the service sends
 
