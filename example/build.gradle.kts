@@ -48,6 +48,12 @@ dependencies {
     // the engine it has.
     testImplementation(project(":pelican-client-java"))
 
+    // What the suspending client generated below is written against. Declared
+    // rather than inherited: it arrives transitively with Ktor, and a version a
+    // generated file depends on should not be whichever one a server module
+    // happened to bring.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+
     testImplementation(project(":pelican-test"))
     // The in-memory transports are per-backend, so the suites that run twice
     // ask for the one they need. `pelican-test` itself stays backend-agnostic.
@@ -185,6 +191,24 @@ pelican {
             packageName.set("example.generated")
             outputDir.set(layout.projectDirectory.dir("src/test/kotlin"))
         }
+        // The same descriptions, generated the other way round: one method per
+        // endpoint again, each of them `suspend`. Two entries rather than a
+        // switch on the first, because the two shapes are two audiences and
+        // this repository is both of them — the suite calls the blocking client
+        // from a test method and the suspending one from a coroutine, against
+        // the same server.
+        //
+        // Not committed, unlike the entry above. Where that one is a reviewable
+        // file with a `checkOrdersClient` behind it, this one takes the
+        // default: written into `build/`, compiled by the test source set, and
+        // regenerated on every run. Both paths are ones a consumer takes, and
+        // each is exercised once here.
+        create("ordersSuspending") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("ordersSpec")
+            packageName.set("example.generated.suspending")
+            callStyle.set("suspending")
+        }
     }
     /**
      * The same document, read back the other way.
@@ -228,6 +252,10 @@ tasks.named("generateImported32Endpoints") { dependsOn("generateOrders32Document
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/imported"))
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/imported32"))
 
+// The suspending client, which is generated rather than committed: the
+// directory the task defaults to, added to the source set that calls it.
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/ordersSuspending"))
+
 // Generated source compiled here but written by another module's tests. detekt
 // filters by the path *inside* the source root, so this is that path rather
 // than the `build/generated` one a reader would expect — a consumer pointing
@@ -236,10 +264,15 @@ sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/im
 tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     exclude("example/imported/**")
     exclude("example/imported32/**")
+    exclude("example/generated/suspending/**")
 }
 
 tasks.named("compileTestKotlin") {
-    dependsOn("generateImportedEndpoints", "generateImported32Endpoints")
+    dependsOn(
+        "generateImportedEndpoints",
+        "generateImported32Endpoints",
+        "generateOrdersSuspendingClient",
+    )
 }
 
 // The benchmarks are a JMH harness in `:benchmarks`: `./gradlew :benchmarks:jmh`.

@@ -86,18 +86,43 @@ class ReflectionTest {
         val written = Pelican.writeClient(loader, spec, dir, "example.generated", null, null, false, null)
 
         written shouldBe File(dir, "example/generated/OrdersClient.kt")
-        // title | package | client | base URL | hidden | codec
-        written.readText().trim() shouldBe "Orders|example.generated|OrdersClient|https://orders.test|false|JACKSON"
+        // title | package | client | base URL | hidden | codec | call style
+        written.readText().trim() shouldBe
+            "Orders|example.generated|OrdersClient|https://orders.test|false|JACKSON|BLOCKING"
     }
 
     @Test
     fun `passes what the entry set instead`(@TempDir dir: File) {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
-        val written =
-            Pelican.writeClient(loader, spec, dir, "example", "Internal", "https://elsewhere.test", true, "kotlinx")
+        val written = Pelican.writeClient(
+            loader,
+            spec,
+            dir,
+            "example",
+            "Internal",
+            "https://elsewhere.test",
+            true,
+            "kotlinx",
+            "suspending",
+        )
 
         written shouldBe File(dir, "example/Internal.kt")
-        written.readText().trim() shouldBe "Orders|example|Internal|https://elsewhere.test|true|KOTLINX"
+        written.readText().trim() shouldBe "Orders|example|Internal|https://elsewhere.test|true|KOTLINX|SUSPENDING"
+    }
+
+    /**
+     * The same matching the codec gets, for the same reason: the build file
+     * writes `suspending` and the library declares `SUSPENDING`.
+     */
+    @Test
+    fun `names the call styles the library offers when the entry names one it does not`(@TempDir dir: File) {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.writeClient(loader, spec, dir, "example", null, null, false, null, "reactive")
+        }
+
+        failure.message.orEmpty() shouldContain "No call style called 'reactive'"
+        failure.message.orEmpty() shouldContain "BLOCKING, SUSPENDING"
     }
 
     /**
@@ -185,7 +210,7 @@ class ReflectionTest {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "serverlessSpec")
         val written = Pelican.writeClient(loader, spec, dir, "example", null, null, false, null)
 
-        written.readText().trim() shouldBe "Orders|example|OrdersClient|null|false|JACKSON"
+        written.readText().trim() shouldBe "Orders|example|OrdersClient|null|false|JACKSON|BLOCKING"
     }
 
     // ------------------------------------------------ the older libraries
@@ -212,6 +237,7 @@ class ReflectionTest {
         failure.message.orEmpty() shouldContain "'3.1.0', '3.2.0'"
     }
 
+    private val previousCodegen = Class.forName("io.github.matthewjones372.pelican.previous.codegen.KotlinClientKt")
     private val olderCodegen = Class.forName("io.github.matthewjones372.pelican.older.codegen.KotlinClientKt")
     private val previousImporter = Class.forName("io.github.matthewjones372.pelican.previous.importer.ImportKt")
     private val olderImporter = Class.forName("io.github.matthewjones372.pelican.older.importer.ImportKt")
@@ -246,6 +272,27 @@ class ReflectionTest {
 
         written shouldBe File(dir, "example/OrdersClient.kt")
         written.readText().trim() shouldBe "Orders|example|OrdersClient|https://orders.test|false"
+    }
+
+    /** One step down: the codec still carried, and the call style not yet a parameter. */
+    @Test
+    fun `writes a client through the arity published before the call style`(@TempDir dir: File) {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val written =
+            Pelican.writeClient(previousCodegen, apiSpec, spec, dir, "example", null, null, false, "kotlinx")
+
+        written.readText().trim() shouldBe "Orders|example|OrdersClient|https://orders.test|false|KOTLINX"
+    }
+
+    @Test
+    fun `says which library is too old to carry the call style the entry set`(@TempDir dir: File) {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.writeClient(previousCodegen, apiSpec, spec, dir, "example", null, null, false, null, "suspending")
+        }
+
+        failure.message.orEmpty() shouldContain "pelican-codegen"
+        failure.message.orEmpty() shouldContain "takes no call style"
     }
 
     @Test

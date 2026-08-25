@@ -89,6 +89,10 @@ abstract class GenerateKotlinClientTask : SpecTask() {
     @get:Optional
     abstract val codec: Property<String>
 
+    @get:Input
+    @get:Optional
+    abstract val callStyle: Property<String>
+
     /**
      * Not `@OutputDirectory`: whether Gradle tracks it is decided at
      * registration, because pointing it at a source root would otherwise make
@@ -117,6 +121,7 @@ abstract class GenerateKotlinClientTask : SpecTask() {
             it.baseUrl.set(baseUrl)
             it.includeHidden.set(includeHidden)
             it.codec.set(codec)
+            it.callStyle.set(callStyle)
             it.outputDir.set(target)
         }
     }
@@ -147,6 +152,10 @@ abstract class CheckKotlinClientTask : SpecTask() {
     @get:Optional
     abstract val codec: Property<String>
 
+    @get:Input
+    @get:Optional
+    abstract val callStyle: Property<String>
+
     /**
      * Read, never written: the generated copy goes to a temporary directory and
      * the two are compared there. No outputs, so it always runs — what it
@@ -169,6 +178,7 @@ abstract class CheckKotlinClientTask : SpecTask() {
             it.baseUrl.set(baseUrl)
             it.includeHidden.set(includeHidden)
             it.codec.set(codec)
+            it.callStyle.set(callStyle)
             it.outputDir.set(outputDir)
         }
     }

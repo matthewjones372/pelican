@@ -18,6 +18,7 @@ internal object Pelican {
     private const val IMPORT = "io.github.matthewjones372.pelican.importer.ImportKt"
     private const val CODEC_ANNOTATIONS = "io.github.matthewjones372.pelican.codegen.CodecAnnotations"
     private const val OPEN_API_VERSION = "io.github.matthewjones372.pelican.openapi.OpenApiVersion"
+    private const val CALL_STYLE = "io.github.matthewjones372.pelican.codegen.CallStyle"
 
     /**
      * What an entry naming no codec means. A copy of a default the library
@@ -33,6 +34,8 @@ internal object Pelican {
      * file uses.
      */
     private const val DEFAULT_OPEN_API_VERSION = "3.1.0"
+    /** The same, for an entry that does not say whether its methods suspend. */
+    private const val DEFAULT_CALL_STYLE = "BLOCKING"
 
     // Named as the reader's build file and dependency block spell them.
     private const val CODEGEN_MODULE = "pelican-codegen"
@@ -95,6 +98,7 @@ internal object Pelican {
         baseUrl: String?,
         includeHidden: Boolean,
         codec: String?,
+        callStyle: String? = null,
     ): File = writeClient(
         load(loader, CLIENT, "pelican-codegen"),
         load(loader, API_SPEC, "pelican-core"),
@@ -105,14 +109,15 @@ internal object Pelican {
         baseUrl,
         includeHidden,
         codec,
+        callStyle,
     )
 
     /**
      * The same, against classes that are already resolved. The seam is here for
-     * the test: the two arities below are two releases of one library, and
-     * without it the older path would run only on a consumer's machine.
+     * the test: the arities below are successive releases of one library, and
+     * without it the older paths would run only on a consumer's machine.
      */
-    @Suppress("LongParameterList")
+    @Suppress("LongParameterList", "ReturnCount")
     fun writeClient(
         codegen: Class<*>,
         apiSpec: Class<*>,
@@ -123,62 +128,94 @@ internal object Pelican {
         baseUrl: String?,
         includeHidden: Boolean,
         codec: String?,
+        callStyle: String? = null,
     ): File {
         val name = clientName ?: defaultClientName(codegen, spec)
         val url = baseUrl ?: firstServer(spec)
 
-        val withCodec = runCatching {
-            val annotations = Class.forName(CODEC_ANNOTATIONS, true, codegen.classLoader)
-            annotations to codegen.getMethod(
-                "writeKotlinClient",
-                apiSpec,
-                File::class.java,
-                String::class.java,
-                String::class.java,
-                String::class.java,
-                Boolean::class.javaPrimitiveType,
-                annotations,
-            )
-        }.getOrNull()
+        val annotations = enumNamed(codegen, CODEC_ANNOTATIONS)
+        val styles = enumNamed(codegen, CALL_STYLE)
 
-        if (withCodec != null) {
-            val (annotations, method) = withCodec
-            return method.invokeUnwrapped(
-                null,
-                spec,
-                sourceRoot,
-                packageName,
-                name,
-                url,
-                includeHidden,
-                codecConstant(annotations, codec),
-            ) as File
+        // Nested rather than joined into one condition, because inside the
+        // block the two enums are known to be there and can be passed as
+        // themselves.
+        if (annotations != null && styles != null) {
+            val newest = clientWriter(codegen, apiSpec, annotations, styles)
+            if (newest != null) {
+                return newest.invokeUnwrapped(
+                    null,
+                    spec,
+                    sourceRoot,
+                    packageName,
+                    name,
+                    url,
+                    includeHidden,
+                    constant(annotations, codec, DEFAULT_CODEC, "codec"),
+                    constant(styles, callStyle, DEFAULT_CALL_STYLE, "call style"),
+                ) as File
+            }
         }
 
-        if (codec != null) throw PelicanFailure(tooOld("codec", CODEGEN_MODULE, WRITES_CLIENT, "no codec"))
+        if (callStyle != null) refuse(tooOld("callStyle", CODEGEN_MODULE, WRITES_CLIENT, "no call style"))
 
-        val method = codegen.getMethod(
-            "writeKotlinClient",
+        if (annotations != null) {
+            val withCodec = clientWriter(codegen, apiSpec, annotations)
+            if (withCodec != null) {
+                return withCodec.invokeUnwrapped(
+                    null,
+                    spec,
+                    sourceRoot,
+                    packageName,
+                    name,
+                    url,
+                    includeHidden,
+                    constant(annotations, codec, DEFAULT_CODEC, "codec"),
+                ) as File
+            }
+        }
+
+        if (codec != null) refuse(tooOld("codec", CODEGEN_MODULE, WRITES_CLIENT, "no codec"))
+
+        val oldest = clientWriter(codegen, apiSpec) ?: refuse(
+            "`${codegen.name}` has no `$WRITES_CLIENT` this plugin knows how to call. The " +
+                "`$CODEGEN_MODULE` on this task's classpath is not one this plugin supports.",
+        )
+        return oldest.invokeUnwrapped(null, spec, sourceRoot, packageName, name, url, includeHidden) as File
+    }
+
+    /** `writeKotlinClient` with these trailing parameters after the six every arity takes, or null. */
+    private fun clientWriter(codegen: Class<*>, apiSpec: Class<*>, vararg trailing: Class<*>): Method? = runCatching {
+        @Suppress("SpreadOperator") // Two class literals at most; the copy is the readable spelling.
+        codegen.getMethod(
+            WRITES_CLIENT,
             apiSpec,
             File::class.java,
             String::class.java,
             String::class.java,
             String::class.java,
             Boolean::class.javaPrimitiveType,
+            *trailing,
         )
-        return method.invokeUnwrapped(null, spec, sourceRoot, packageName, name, url, includeHidden) as File
-    }
+    }.getOrNull()
+
+    /**
+     * An enum the library publishes, by name, or null where the library on this
+     * task's classpath is older than the setting it stands for.
+     */
+    private fun enumNamed(codegen: Class<*>, className: String): Class<*>? =
+        runCatching { Class.forName(className, true, codegen.classLoader) }.getOrNull()
 
     /**
      * The enum constant the entry named, matched case-insensitively:
-     * `codec.set("kotlinx")` is how a build file says `KOTLINX`.
+     * `codec.set("kotlinx")` is how a build file says `KOTLINX`, and
+     * `callStyle.set("suspending")` how it says `SUSPENDING`.
      */
-    private fun codecConstant(annotations: Class<*>, codec: String?): Any {
-        val constants = annotations.enumConstants.orEmpty().filterIsInstance<Enum<*>>()
-        val chosen = codec ?: DEFAULT_CODEC
+    private fun constant(type: Class<*>, named: String?, fallback: String, what: String): Any {
+        val constants = type.enumConstants.orEmpty().filterIsInstance<Enum<*>>()
+        val chosen = named ?: fallback
         return constants.firstOrNull { it.name.equals(chosen, ignoreCase = true) }
             ?: throw PelicanFailure(
-                "No codec called '$chosen'. It is one of ${constants.joinToString { it.name }}.",
+                "No $what called '$chosen'. It is one of ${constants.joinToString { it.name }}.",
             )
     }
 

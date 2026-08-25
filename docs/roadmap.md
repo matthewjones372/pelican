@@ -28,9 +28,20 @@ worth keeping next to the result of following it.
   status once in core, `afterStatus` hands it to a filter, and a counter and a
   timer come out tagged from the description. OpenTelemetry is still to do.
 - **Item 2** shipped as [Choosing between Pelican and the alternatives](choosing.md).
-- **Item 3** shipped its first phase: `ClientTransport` in core and
-  `pelican-client-java` over the JDK's own `HttpClient`. The Ktor and Pekko
-  adapters, the `suspend` surface and the retry policy are still to do.
+- **Item 3** shipped its first phase, and then the two things that phase was
+  supposed to make cheap:
+  - `ClientTransport` lives in core, and `pelican-client-java` sends over the
+    JDK's own `HttpClient`.
+  - The `suspend` surface is `callStyle.set("suspending")` on a client entry —
+    one call shape per generated file, the same methods either way, and
+    kotlinx.coroutines on the classpath of the callers who asked for it rather
+    than of everyone who generated a client. A cancelled coroutine cancels the
+    exchange.
+  - The retry policy is `ClientTransport.default().retrying(policy)`: a
+    decorator in core, no line of it generated, and no retries at all unless
+    somebody wrapped a transport in one.
+
+  The Ktor and Pekko adapters are the last of this item.
 - **Item 8** shipped: `pelican-openapi` writes 3.2.0 as well as 3.1.0, and the
   survey that item asked for came back with more than a number. Two things
   Pelican describes every day — cookie parameters and streamed responses —
@@ -149,6 +160,17 @@ arrives with them rather than as separate work.
 - **An asynchronous surface.** The generated methods block. Both shapes fall
   out of the SPI rather than being generated twice.
 
+Both of those are done, and the estimate above was right about the shape and
+half right about the cost. The retry policy is a decorator over the interface
+and nothing else, exactly as predicted. The `suspend` surface did fall out of
+the SPI, but "rather than being generated twice" turned out to be the wrong
+target: a file carrying both shapes would double every operation's surface and
+put coroutines on the classpath of callers who never asked for one, so the
+generator emits one shape per file and the caller says which. See
+[Blocking or suspending](reference.md#blocking-or-suspending) for the argument,
+and [Retrying](reference.md#retrying-and-what-is-safe-to-retry) for the
+defaults and the defence of each.
+
 Writing a connection pool, a circuit breaker and a load balancer is a different
 project and is not this one. Each adapter inherits whatever its library already
 does about all three.
@@ -159,6 +181,8 @@ emits, three new adapter modules, `docs/generated-client.md`.
 one test, blocking and `suspend` call shapes both generate, a retry policy is a
 constructor argument defaulting to no retries, and each adapter module's
 dependency test asserts it drags in core and one HTTP library and nothing else.
+Two of those four are done; what is left is the two adapters and the test that
+runs one client against all three.
 
 ## 4. A filter that can change the response
 

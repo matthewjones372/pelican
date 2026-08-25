@@ -71,6 +71,19 @@ abstract class ClientSpec @Inject constructor(private val name: String) : SpecSo
     abstract val codec: Property<String>
 
     /**
+     * Whether the generated methods block or suspend — `blocking` or
+     * `suspending` — or unset for blocking.
+     *
+     * One or the other rather than both, because both would put two methods per
+     * endpoint on the class and kotlinx.coroutines on the classpath of every
+     * caller, including the ones that never wanted it. A `suspending` client
+     * needs `org.jetbrains.kotlinx:kotlinx-coroutines-core` alongside
+     * `pelican-core`; everything else about it — the method names, the
+     * parameters, the payload types, the sealed failures — is the same file.
+     */
+    abstract val callStyle: Property<String>
+
+    /**
      * The source root written into, defaulting to `build/generated/pelican/
      * <name>`. Point it at a real source root and the client becomes a
      * reviewable file — which is also what turns `check<Name>Client` on.

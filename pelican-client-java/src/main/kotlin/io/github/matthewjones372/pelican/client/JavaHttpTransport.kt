@@ -8,6 +8,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletionStage
 
 /**
@@ -32,16 +33,27 @@ class JavaHttpTransport @JvmOverloads constructor(
      * the socket by whoever reads the stream. A caller that wants the body
      * whole reads it whole.
      */
-    override fun send(request: ClientRequest): CompletionStage<ClientResponse> =
-        http.sendAsync(jdkRequest(request), HttpResponse.BodyHandlers.ofInputStream())
-            .thenApply { response ->
-                ClientResponse(
-                    status = response.statusCode(),
-                    headers = response.headers().map().entries
-                        .flatMap { (name, values) -> values.map { name to it } },
-                    body = response.body(),
-                )
-            }
+    override fun send(request: ClientRequest): CompletionStage<ClientResponse> {
+        val sent = http.sendAsync(jdkRequest(request), HttpResponse.BodyHandlers.ofInputStream())
+        val answer = sent.thenApply { response ->
+            ClientResponse(
+                status = response.statusCode(),
+                headers = response.headers().map().entries
+                    .flatMap { (name, values) -> values.map { name to it } },
+                body = response.body(),
+            )
+        }
+
+        // Cancellation travels down a chain of stages and not back up it, so
+        // cancelling the one handed out here would otherwise leave the exchange
+        // it was derived from running: a socket held open, and a response body
+        // nobody is left to read. A caller who gives up — a coroutine cancelled
+        // while it was awaiting this — is asking for the request to stop, so
+        // the cancellation is carried back to the exchange by hand.
+        answer.whenComplete { _, failure -> if (failure is CancellationException) sent.cancel(true) }
+
+        return answer
+    }
 
     private fun jdkRequest(request: ClientRequest): HttpRequest {
         val builder = HttpRequest

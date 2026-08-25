@@ -116,12 +116,69 @@ second stack:
 val client = OrdersClient("https://orders.internal", JacksonCodecs, ourOwnTransport)
 ```
 
-The stage is what makes that possible. The generated methods block — they
-`join` it and unwrap the `CompletionException`, so a caller catches what the
-transport actually raised — but the interface has to be the widest shape,
-because an asynchronous transport can serve a blocking caller and a blocking
-one cannot serve an asynchronous caller without a thread per call. Streams
-cross it in both directions: a file part is a body the transport opens and
-drains rather than one it is handed whole, and a streamed response arrives as
-an unread stream that `Streamed<T>` decodes off as elements land. The reasoning
-is in [docs/reference.md](reference.md#the-transport-a-generated-client-sends-with).
+The stage is what makes that possible. The interface has to be the widest
+shape, because an asynchronous transport can serve a blocking caller and a
+blocking one cannot serve an asynchronous caller without a thread per call.
+Streams cross it in both directions: a file part is a body the transport opens
+and drains rather than one it is handed whole, and a streamed response arrives
+as an unread stream that `Streamed<T>` decodes off as elements land. The
+reasoning is in
+[docs/reference.md](reference.md#the-transport-a-generated-client-sends-with).
+
+## Blocking or suspending
+
+A generated client's methods block by default: they join the stage and unwrap
+the `CompletionException`, so a caller catches what the transport actually
+raised. One line on the entry generates the other surface instead:
+
+```kotlin
+clients {
+    create("orders") {
+        specClass.set("com.example.OrdersSpecKt")
+        packageName.set("com.example.orders")
+        callStyle.set("suspending")   // or "blocking", the default
+    }
+}
+```
+
+```kotlin
+suspend fun place(key: String): Order? = when (val result = client.placeOrder(1L, CreateOrder("anvil"), key)) {
+    is Outcome.Ok  -> result.value
+    is Outcome.Err -> null
+}
+```
+
+Same class, same method names, same parameters, same sealed failures — the
+methods suspend, and the file needs `kotlinx-coroutines-core` beside
+`pelican-core`. One shape per file rather than both on one class: both would
+put two methods per endpoint on a class whose appeal is one method per
+endpoint, and leave a blocking method where a coroutine could call it and park
+a dispatcher thread for the length of an HTTP call. The choice belongs to
+whoever generates the client, which is the caller, so it divides nothing.
+
+A coroutine cancelled while a call is outstanding cancels the exchange rather
+than leaving it running. Reading a whole body — a socket read, wherever it
+happens — is done on `Dispatchers.IO`; a `Streamed<T>` is read by whoever
+iterates it, so iterate one inside `withContext(Dispatchers.IO)`.
+
+## Retrying
+
+Nothing retries unless a transport is wrapped in something that does, which is
+a decorator over the same interface rather than anything in the generated file:
+
+```kotlin
+val client = OrdersClient(
+    "https://orders.internal",
+    JacksonCodecs,
+    ClientTransport.default().retrying(),          // RetryPolicy(), or one of your own
+)
+```
+
+`RetryPolicy()` sends three times at most, waits 100ms and then 200ms with half
+of each wait randomised, and retries only 408, 429, 502, 503 and 504, only on
+the methods HTTP calls idempotent, and only for an `IOException`. It is not
+retrying a 500, a POST, or a body it cannot ask for twice. A `Retry-After` is
+honoured where it is longer than the computed wait, and where it asks for more
+than ten seconds the policy stops retrying rather than waiting that long. Every
+one of those is a constructor argument. The defence of each default is in
+[docs/reference.md](reference.md#retrying-and-what-is-safe-to-retry).

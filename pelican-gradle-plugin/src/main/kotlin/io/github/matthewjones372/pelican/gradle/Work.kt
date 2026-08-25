@@ -26,6 +26,7 @@ internal interface ClientParameters : SpecParameters {
     val baseUrl: Property<String>
     val includeHidden: Property<Boolean>
     val codec: Property<String>
+    val callStyle: Property<String>
     val outputDir: DirectoryProperty
 }
 
@@ -199,6 +200,7 @@ private fun ClientParameters.writeClientInto(sourceRoot: File): File {
         baseUrl.orNull,
         includeHidden.get(),
         codec.orNull,
+        callStyle.orNull,
     )
 }
 
