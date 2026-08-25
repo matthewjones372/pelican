@@ -944,7 +944,7 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 ## Longer documents
 
-Seven things that wanted a page rather than a section, and one benchmark:
+Eight things that wanted a page rather than a section, and one benchmark:
 
 | Page | What it answers |
 |---|---|
