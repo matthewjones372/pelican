@@ -17,7 +17,8 @@ route, the OpenAPI document and a typed client from that one description.
 [![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 [Getting started](#getting-started) · [Describing endpoints](#describing-endpoints) ·
-[Serving and testing](#serving-and-testing) · [Reference manual](docs/reference.md)
+[Serving and testing](#serving-and-testing) · [Cookbook](docs/cookbook.md) ·
+[Reference manual](docs/reference.md) · [Choosing](docs/choosing.md)
 
 </div>
 
@@ -964,10 +965,11 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 ## Longer documents
 
-Eight things that wanted a page rather than a section, and one benchmark:
+Nine things that wanted a page rather than a section, and one benchmark:
 
 | Page | What it answers |
 |---|---|
+| [Cookbook](docs/cookbook.md) | Complete recipes in the order people need them — typed inputs, declared failures, forms, uploads, streaming, security, filters, testing — each one whole rather than a fragment to assemble. |
 | [Choosing between Pelican and the alternatives](docs/choosing.md) | Where http4k's contracts, Ktor's plugins, Spring, Micronaut, Quarkus, tapir or a hand-written document are the better answer — and the projects that should not use a 0.1 library at all. |
 | [A whole service, in one file](docs/a-whole-service.md) | What all of it looks like at once — models, inputs, endpoints, handlers, store, server, docs. Compiled every build as `ReadmeExample.kt`. |
 | [A generated Kotlin client](docs/generated-client.md) | What callers who cannot hold the descriptions get instead, and what the generator does with a union, a failure or a stream. |

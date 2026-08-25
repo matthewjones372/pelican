@@ -1,0 +1,32 @@
+# Jekyll, for the GitHub Pages build in `.github/workflows/pages.yml`.
+#
+# Deliberately small. The manual is markdown that reads well as markdown; a
+# theme's job here is to render it and stay out of the way.
+title: Pelican
+description: >-
+  Type-safe HTTP for Kotlin. Describe an endpoint once — get the server route,
+  the OpenAPI document and a typed client from that one description.
+theme: jekyll-theme-primer
+
+plugins:
+  # Rewrites `reference.md` to `reference.html` at build time, which is what
+  # lets the same relative links work in the repository and on the site.
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-titles-from-headings
+  - jekyll-seo-tag
+
+relative_links:
+  enabled: true
+  collections: true
+
+# Markdown files without front matter are pages too — the manual has none.
+optional_front_matter:
+  remove_originals: true
+
+titles_from_headings:
+  enabled: true
+  strip_title: false
+
+exclude:
+  - assets/*.afdesign

@@ -1,0 +1,73 @@
+# The docs site: https://matthewjones372.github.io/pelican/
+#
+# The markdown in `docs/` is the manual, and it is written to be read in the
+# repository — with relative links like `reference.md` and `../README.md`. So
+# the site is staged as a mirror of the repository's own layout rather than as
+# a rearrangement of it: the root files at the root, `docs/` underneath. Every
+# link that resolves on GitHub resolves here, and nothing in the manual has to
+# know a site exists.
+#
+# `jekyll-relative-links` rewrites `foo.md` to `foo.html` at build time, so the
+# same link works in both places without a redirect table.
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'TODO.md'
+      - 'AGENTS.md'
+      - 'CHANGELOG.md'
+      - 'llms.txt'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# One deployment at a time, and never cancelling one that is mid-flight: a
+# half-published site is worse than a stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage the site as a mirror of the repository
+        run: |
+          mkdir -p _site_src/docs
+          cp -r docs/. _site_src/docs/
+          cp README.md TODO.md AGENTS.md CHANGELOG.md LICENSE _site_src/
+          # The landing page is the README, so the front page of the site and
+          # the front page of the repository cannot drift apart.
+          cp README.md _site_src/index.md
+          # llms.txt belongs at the site root by convention. It is optional
+          # here so a missing file does not fail the build.
+          cp llms.txt _site_src/ 2>/dev/null || true
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: _site_src
+          destination: ./_site
+
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
