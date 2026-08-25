@@ -1020,11 +1020,7 @@ private fun escapeTemplate(value: String): String =
 private fun banner(title: String): String =
     "// " + "-".repeat((BANNER_WIDTH - title.length).coerceAtLeast(MIN_BANNER_RULE)) + " $title"
 
-private fun resource(name: String): String =
-    KotlinClientEmitter::class.java.getResourceAsStream(name)
-        ?.bufferedReader()
-        ?.use { it.readText() }
-        ?: error("Missing generator resource: $name")
+private fun resource(name: String): String = template(KotlinClientEmitter::class.java, name)
 
 private val IMPORTS = """
     import io.github.matthewjones372.pelican.BodyCodec
