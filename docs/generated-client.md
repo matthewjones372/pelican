@@ -98,9 +98,8 @@ fun interface ClientTransport {
 }
 ```
 
-`pelican-client-java` is the adapter over the JDK's own `HttpClient` and the
-default: add the module and a client finds it through `ServiceLoader`, with no
-line to write.
+`pelican-client-java` is the adapter over the JDK's own `HttpClient`: add the
+module and a client finds it through `ServiceLoader`, with no line to write.
 
 ```kotlin
 dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
@@ -108,13 +107,32 @@ dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 ```
 
-A service that already runs an HTTP client passes that one instead, as the
-third argument, and gets its pooling, its metrics and its tuning rather than a
-second stack:
+`pelican-client-ktor` is the second one, over Ktor's `HttpClient`, and the one
+a service already running Ktor wants — it takes the client that service has
+already configured, so the calls go out through its engine, its plugins and its
+connection pool:
+
+```kotlin
+val client = OrdersClient("https://orders.internal", JacksonCodecs, KtorHttpTransport(http))
+```
+
+Passing nothing there is also allowed, and then the adapter keeps a CIO client
+of its own: a caller who has not chosen a Ktor engine does not have to choose
+one to make a call. The suspending client behind the `CompletionStage`, and
+what a per-request timeout does and does not bound there, are in
+[docs/reference.md](reference.md#on-ktor).
+
+More generally, a service that already runs an HTTP client passes that one as
+the third argument and gets its pooling, its metrics and its tuning rather than
+a second stack:
 
 ```kotlin
 val client = OrdersClient("https://orders.internal", JacksonCodecs, ourOwnTransport)
 ```
+
+Naming it is also what a classpath carrying *both* adapters has to do:
+`ServiceLoader` finds two and the client refuses to guess between them, saying
+so where it is constructed.
 
 The stage is what makes that possible. The generated methods block — they
 `join` it and unwrap the `CompletionException`, so a caller catches what the

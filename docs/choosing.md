@@ -415,12 +415,15 @@ generates a real Kotlin client from the descriptions: one method per operation,
 sealed failure types, streamed responses, a per-request timeout, and a
 `ClientTransport` it sends through rather than an HTTP library it is welded to.
 That is more than a toy. But there is no published client artifact — the file is
-generated into your build, and you own it. Only one transport is written,
-`pelican-client-java`, over the JDK's own `HttpClient`; a service that already
-runs and tunes a Ktor or a Pekko client still cannot hand that one over, because
-those adapters do not exist yet. The generated methods block, joining the stage
-the transport answers with, so there is no suspending or asynchronous variant to
-call. And nothing in the generated file does retries, backoff, circuit breaking
+generated into your build, and you own it. Two transports are written:
+`pelican-client-java` over the JDK's own `HttpClient`, and `pelican-client-ktor`
+over Ktor's, which takes the `HttpClient` a Ktor service already configures. A
+service that already runs and tunes a Pekko client still cannot hand that one
+over, because that adapter does not exist yet. A build carrying both of the
+ones that do exist has to name the transport at each client it constructs,
+since nothing can choose between two providers on one classpath. The generated
+methods block, joining the stage the transport answers with, so there is no
+suspending or asynchronous variant to call. And nothing in the generated file does retries, backoff, circuit breaking
 or metrics; if you want those you write them around the transport. The client that `pelican-test` derives is explicitly narrower still,
 scoped at testing, blocking, with no retries and no pooling worth the name, and
 it cannot upload a binary file part because its `RequestSpec` carries a `String`

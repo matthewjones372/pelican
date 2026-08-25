@@ -29,6 +29,7 @@ include(
     "pelican-ktor-docs",
     "pelican-metrics",
     "pelican-client-java",
+    "pelican-client-ktor",
     "pelican-test",
     "pelican-test-golden",
     "pelican-test-pekko",

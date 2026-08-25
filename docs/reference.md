@@ -14,6 +14,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
+| `pelican-client-ktor` | core, ktor-client-cio | the same seam over Ktor's `HttpClient`, for a service that already runs one. Not `pelican-ktor`: calling is not interpreting |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-kotlinx` | core, kotlinx.serialization | the alternative `Codecs` |
@@ -57,6 +58,12 @@ The layering is load-bearing, not decorative, and each edge is a test:
 - `pelican-client-java` asserts the same shape on the caller's side: core, the
   JDK, and no second HTTP stack. An adapter a caller adds in order to *choose*
   a client library would be worth very little if it brought one along.
+- `pelican-client-ktor` asserts the same claim with Ktor in the place of the
+  JDK: core, Ktor's client and its own closure, and nothing else — no OkHttp
+  and no Apache client, which is most of what choosing CIO for the engine is
+  about. It also asserts that `pelican-ktor` is absent, which is the edge worth
+  having: the interpreter and the transport are both Ktor, and a caller who
+  only makes calls should not compile a route builder in to do it.
 - `pelican-import` depends on `pelican-codegen` rather than on core directly,
   and shares its schema-to-Kotlin generator outright. A client generated from a
   document and a client generated from endpoint values should not disagree
@@ -866,8 +873,10 @@ way.
 
 ### Choosing one
 
-`pelican-client-java` is the adapter over the JDK's own `HttpClient`, and a
-generated client finds it without being told:
+Two adapters are written. `pelican-client-java` is the one over the JDK's own
+`HttpClient`; `pelican-client-ktor` is the one over Ktor's, for a service that
+already runs Ktor and would rather not start a second HTTP stack to call out
+of. A generated client finds either without being told:
 
 ```kotlin
 dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
@@ -879,6 +888,22 @@ It is a `ServiceLoader` provider, so adding the module is the whole of choosing
 it — core cannot name an adapter it does not depend on. With none on the
 classpath the client says so when it is constructed, and with more than one it
 asks to be told which, since nothing there could pick for you.
+
+Which is the one case finding-by-classpath cannot serve, and it is worth
+knowing what it looks like before you meet it. Put both adapters on one
+classpath and every client built without a named transport fails where it is
+constructed:
+
+```
+Several transports are on the classpath — [..JavaHttpTransport, ..KtorHttpTransport]
+— and nothing here can say which one this client should use. Pass one.
+```
+
+The way through is to name the transport at each construction site. That is
+what `example`'s own suite does: it compiles both adapters in order to run the
+generated client over each, so every `OrdersClient` there is built with the one
+it means. Nothing is lost but the defaulted argument, and the failure is loud
+and immediate rather than a client that quietly sends on the wrong stack.
 
 Handing one over is the other spelling, and the one to reach for when the
 process already has a client worth sharing:
@@ -938,17 +963,144 @@ blocking and carries a `String` body on purpose, because a test asserts on a
 result it already has — which is exactly why the typed test client
 [cannot upload binary](#what-isnt-here). Right taste, wrong constraints.
 
+### On Ktor
+
+`KtorHttpTransport` takes an `HttpClient`, or does without one:
+
+```kotlin
+val client = OrdersClient("https://orders.internal", JacksonCodecs, KtorHttpTransport(http))
+```
+
+A service that already runs Ktor passes the client it has, and the calls go out
+through that client's engine, its plugins and its connection pool. Closing it
+stays that service's business — nothing in the adapter closes a client it was
+handed, because two transports sharing one must not be able to shut each other
+down. A caller that does not run Ktor passes nothing and never has to choose an
+engine: the module keeps a CIO client for that case, built on the first request
+rather than in the constructor, shared by every transport that asked for none,
+and closed by nobody, which is why its threads have to be — and are — daemons.
+
+CIO is the default engine because it is Ktor's own networking rather than a
+second HTTP stack wearing a Ktor interface: adding this adapter adds no OkHttp
+and no Apache client, and a service already using `pelican-ktor` has most of
+what CIO needs on the classpath already, since that module ships
+`ktor-server-cio`. An engine anyone prefers is a client away — build the
+`HttpClient` with it and hand that over.
+
+#### A suspending client behind a `CompletionStage`
+
+Ktor's client suspends and `ClientTransport` does not, and the bridge is the
+part of this adapter worth reading. Each `send` launches a coroutine and
+returns a `CompletableFuture` that the coroutine completes when the response
+head arrives; no thread waits anywhere, and the caller's `join` is the only
+blocking in the picture. The coroutine is launched in a scope built from the
+client's own context with a `SupervisorJob` under the client's job, so the
+adapter starts no dispatcher and keeps no scope of its own: a closed client
+cancels the calls made on it, and one failed exchange is one failed exchange
+rather than the end of the others.
+
+Cancellation runs both ways across that seam, and both are needed. Cancelling
+the stage cancels the coroutine, which unwinds Ktor's `execute` block and
+releases the connection rather than leaving it open for a response nobody will
+read — including the race where the cancellation arrives while the head is
+still in flight, which is why the coroutine checks whether its
+`CompletableFuture.complete` was the one that won. In the other direction, an
+exchange that fails before the head arrives fails the stage. Neither can happen
+twice, because a `CompletableFuture` completes once.
+
+#### Streams, in both directions
+
+`prepareRequest(...)` and `execute { }` are what leave the response body on the
+socket: inside that block the body is a live `ByteReadChannel`, and Ktor
+releases the connection as soon as the block returns. So the block does not
+return until the caller has finished with the stream — the coroutine hands the
+`ClientResponse` over and then waits, and closing the body, or reading it to
+its end, is what lets it go. A caller who does neither is the one case this
+cannot cover; the exchange stays open, holding its connection, until the client
+is closed or a timeout ends it.
+
+The channel reaches the SPI as an `InputStream` through Ktor's own
+`toInputStream()`, wrapped for two reasons. One is the release just described.
+The other is a defect worth knowing about if you write this bridge yourself:
+`InputStream.read(b, off, 0)` must return zero, and Ktor's bridge waits for
+content before it looks at the length, so the zero-length read that every
+`readNBytes` ends with blocks until the next chunk arrives. A caller taking a
+fixed number of bytes off an `sse` stream would wait for a chunk it had already
+been handed the bytes of. The wrapper answers that read itself.
+
+Going out, a `Body.Streaming` becomes a `WriteChannelContent` that opens the
+stream when the connection is ready to take the bytes, and opens it again if
+Ktor sends the request a second time after a redirect — which is what `open`
+being a function is for. Writing to a full channel suspends, so an upload is
+read at the speed the socket drains it and nothing is held but one buffer. A
+caller who said how long the body is gets a sized request rather than a chunked
+one, so the `Content-Length` they wrote is the one that goes out.
+
+#### `Content-Type`, `Content-Length` and repeats
+
+Ktor renders those two off the body rather than out of the header list, and
+prefers the body's copy where both exist. So the adapter reads them off the
+`ClientRequest` and builds the content from them, which is the difference
+between a declared type arriving once and arriving twice — or not at all.
+Coming back they need nothing: Ktor hands over the response headers as they
+were received, both among them, and adding either back from the body would be
+what doubled it.
+
+One rendering does differ from the JDK adapter's, and it is worth knowing
+rather than discovering. A header a caller wrote twice goes out once, carrying
+both values separated by a comma, because that is what Ktor's engines do with
+repeats — the form RFC 9110 makes equivalent for every list-valued header. The
+generated client's own cookies are unaffected: it joins them into one `Cookie`
+header itself, with the `; ` that header requires.
+
+#### Deadlines, and the one thing that does not map
+
+A `ClientRequest.timeout` becomes Ktor's per-request `requestTimeoutMillis`,
+and what it bounds is not quite what the JDK adapter's `HttpRequest.timeout`
+bounds: Ktor's request timeout ends the whole exchange, the reading of a
+streamed body included, where the JDK's bounds the arrival of the response head
+and leaves the body alone. Given a timeout, an `ndjson` or `sse` response that
+outlives it is cut off rather than left running. That is Ktor's semantics and
+the adapter does not paper over it; a caller streaming a long response through
+this transport should leave the per-request timeout unset, exactly as Ktor's
+own SSE client does.
+
+Two consequences follow from the same place. The first is that the client this
+module keeps installs `HttpTimeout` with an infinite request timeout, because
+CIO's own default is fifteen seconds and it is a deadline on the whole
+exchange: left alone it would cut off every response that stayed open longer,
+including the ones whose callers set no timeout at all. A client you hand over
+keeps whatever deadline you configured on it, that fifteen seconds included.
+
+The second is that a request's timeout is a *capability*, and only the
+`HttpTimeout` plugin turns a capability into a cancellation. A client handed
+over without that plugin installed would drop the deadline in silence, which is
+not a thing an adapter may do to a promise the SPI makes — so where the client
+cannot honour it, the adapter imposes it on the stage instead, and raises the
+`HttpRequestTimeoutException` Ktor would have raised, so that a caller catching
+a timeout by type catches it whichever of the two imposed it. That fallback
+bounds the arrival of the head only, like the JDK adapter's.
+
+Ktor's client has no size limit to lift: nothing in it caps a response body
+read as a channel, so a `bytes()` response larger than the process crosses on
+the strength of never being buffered. What bounds a large response there is
+time, which is the paragraph above.
+
+Two smaller decisions round it out. Every request is sent with
+`expectSuccess = false`, whatever the handed-over client was configured with,
+because a declared failure is a status this client is expected to *read* rather
+than an exception to be thrown at it. And the method is `HttpMethod.parse`,
+which mints an unknown method rather than refusing it.
+
 ### Writing another one
 
-An adapter is small, and the two obvious ones are not written yet. A Ktor
-adapter would launch each `send` on its own scope, call `prepareRequest(...)`
-and `execute { }`, bridge the response's `ByteReadChannel` to an `InputStream`,
-and complete the stage with a `ClientResponse` over it, keeping the block open
-until that stream is closed — which is what makes a Ktor client's laziness
-survive the crossing. A Pekko adapter would map the request onto
-`Http().singleRequest(...)`, whose `CompletionStage<HttpResponse>` is already
-the right shape, and run the response entity's `Source[ByteString]` through
-`StreamConverters.asInputStream()`.
+An adapter is small, and the Pekko one is not written yet. It would map the
+request onto `Http().singleRequest(...)`, whose `CompletionStage<HttpResponse>`
+is already the right shape, and run the response entity's `Source[ByteString]`
+through `StreamConverters.asInputStream()`. `pelican-client-ktor` is that shape
+already, at about 250 lines including the comments, and nearly all of what took
+thought there was the stream bridge and the cancellation rather than the
+mapping.
 
 ## Importing an OpenAPI document
 
@@ -3609,11 +3761,12 @@ open  localhost:8080/api-docs                                 # Swagger UI
   nothing to add: a webhook you receive arrives at a path on your own service,
   so it is an ordinary `endpoint(...)` with a handler. `webhook(...)` is for the
   half you send.
-- **A Ktor or Pekko client transport.** `ClientTransport` is core's, and
-  `pelican-client-java` is the one adapter written — see
+- **A Pekko client transport.** `ClientTransport` is core's, and
+  `pelican-client-java` and `pelican-client-ktor` are the adapters written —
+  see
   [The transport a generated client sends with](#the-transport-a-generated-client-sends-with),
-  which says what each of the other two would do. A service that wants one
-  before they are written can implement the interface itself; it is one method.
+  which says what the Pekko one would do. A service that wants it before it is
+  written can implement the interface itself; it is one method.
 - **A fourth server backend.** `pelican-ktor` was the third, and cost what
   `pelican-http4k` cost: the binders above, a request-to-`Params` step and a
   response writer, in about 500 lines including the comments.
