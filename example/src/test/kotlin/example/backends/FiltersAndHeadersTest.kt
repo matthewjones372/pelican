@@ -105,6 +105,23 @@ class FiltersAndHeadersTest {
         withClue(res.body.take(200)) { res.body shouldNotContain "xxxx" }
     }
 
+    /**
+     * The limit is bytes. Two of the three backends counted `String.length`,
+     * which is UTF-16 code units, so a body of 2,000 CJK characters — 6,000
+     * bytes against a 4,096-byte limit — was inside a limit it was well past.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `the limit counts bytes, whatever characters the caller chose`(name: String, client: ApiClient) {
+        val wide = "五".repeat(2_000)
+        val res = client.transport.send(client.request(echo, In2(null, Note(wide))))
+
+        withClue(name) {
+            res shouldHaveStatus 413
+            res.body shouldContain "Payload too large"
+        }
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a body under the limit is unaffected`(name: String, client: ApiClient) {
