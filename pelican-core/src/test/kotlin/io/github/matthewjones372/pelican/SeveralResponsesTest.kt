@@ -218,8 +218,10 @@ class SeveralResponsesTest {
     fun `a response the output never declared is refused wherever it came from`() {
         val elsewhere = json<Order>(status = 203)
 
-        shouldThrow<IllegalStateException> { twoWays.successNamedBy(elsewhere(Order(1)) as Outcome.Ok) }
-            .message shouldContain "never declared it"
+        // Its own type, so a handler's bookkeeping mistake is distinguishable
+        // from any other throwable by whatever is watching `onServerError`.
+        shouldThrow<UndeclaredResponse> { twoWays.successNamedBy(elsewhere(Order(1)) as Outcome.Ok) }
+            .message shouldContain "json:203"
     }
 
     // ------------------------------------------------------------ what is refused

@@ -116,14 +116,7 @@ private fun failureResponse(
     err: Outcome.Err<*>,
     codecs: EndpointCodecs,
 ): HttpResponse {
-    val declared = err.declared
-    check(out.failures.any { it === declared }) {
-        "$declared was returned by a handler but $out never declared it"
-    }
-    val cls = declared.type.classifier as? KClass<*>
-    check(cls == null || cls.isInstance(err.error)) {
-        "$declared carries ${declared.type} but the handler returned ${err.error?.let { it::class }}"
-    }
+    val declared = out.failureNamedBy(err)
     val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
     return HttpResponse.create()
         .withStatus(statusOf(declared.status))
