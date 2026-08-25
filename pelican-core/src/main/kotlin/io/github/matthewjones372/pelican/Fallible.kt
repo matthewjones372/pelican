@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican
 
+import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
@@ -80,8 +81,11 @@ internal fun FallibleOutput<*, *>.chosenSuccess(ok: Outcome.Ok<*>): Output<*> =
  */
 fun FallibleOutput<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
     val chosen = chosenSuccess(ok)
-    check(successes.any { it === chosen }) {
-        "$chosen was returned by a handler but $this never declared it"
+    if (successes.none { it === chosen }) {
+        throw UndeclaredResponse(
+            "$chosen was returned by a handler but $this never declared it. It declares " +
+                (successes + failures).joinToString(),
+        )
     }
 
     val promised = chosen.headers.filter { header ->
@@ -95,6 +99,35 @@ fun FallibleOutput<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
             "responseHeader(...).optional() if it is only sometimes sent."
     }
     return chosen
+}
+
+/**
+ * Which declared failure an [Outcome.Err] names, and the one place a failure is
+ * checked against what it promised.
+ *
+ * The sibling of [successNamedBy], and here for the same reason: `E` widens to
+ * the common supertype of the failures an endpoint declares, so a handler may
+ * name a failure belonging to a different endpoint of the same hierarchy and
+ * the compiler will not say. Three interpreters deciding that separately is
+ * three chances to send an undescribed response.
+ */
+fun FallibleOutput<*, *>.failureNamedBy(err: Outcome.Err<*>): ErrorOutput<*> {
+    val declared = err.declared
+    if (failures.none { it === declared }) {
+        throw UndeclaredResponse(
+            "$declared was returned by a handler but $this never declared it. It declares " +
+                (successes + failures).joinToString() +
+                ". A handler may name a failure another endpoint declared, because `orFail` widens E to " +
+                "the common supertype of the failures it is given; declare it here, or return one of these.",
+        )
+    }
+    val carried = declared.type.classifier as? KClass<*>
+    if (carried != null && !carried.isInstance(err.error)) {
+        throw UndeclaredResponse(
+            "$declared carries ${declared.type} but the handler returned ${err.error?.let { it::class }}",
+        )
+    }
+    return declared
 }
 
 /**

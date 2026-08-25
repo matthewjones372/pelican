@@ -14,6 +14,7 @@ import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.TextOutput
+import io.github.matthewjones372.pelican.failureNamedBy
 import io.github.matthewjones372.pelican.renderError
 import io.github.matthewjones372.pelican.successNamedBy
 import org.http4k.core.MemoryBody
@@ -122,14 +123,7 @@ private fun failureResponse(
     err: Outcome.Err<*>,
     codecs: EndpointCodecs,
 ): Response {
-    val declared = err.declared
-    check(out.failures.any { it === declared }) {
-        "$declared was returned by a handler but $out never declared it"
-    }
-    val cls = declared.type.classifier as? KClass<*>
-    check(cls == null || cls.isInstance(err.error)) {
-        "$declared carries ${declared.type} but the handler returned ${err.error?.let { it::class }}"
-    }
+    val declared = out.failureNamedBy(err)
     val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
     // Encoded and checked when the handler produced the failure.
     return jsonResponse(declared.status, codec.encodeToString(err.error), err.headers)
