@@ -34,8 +34,6 @@ one.
 - **`docs/roadmap.md`** — what is not built yet and the argument for the order.
 - **`docs/cookbook.md`** — complete recipes rather than fragments.
 - **`CHANGELOG.md`**, **`CLAUDE.md`**, **`TODO.md`** and **`llms.txt`**.
-- **A docs site**, built by GitHub Actions from a staging directory that
-  mirrors the repository layout, so relative links resolve in both places.
 
 ### Changed
 

@@ -19,9 +19,10 @@ Free, and mostly absent today.
       ```bash
       gh repo edit --add-topic kotlin --add-topic openapi --add-topic http4k --add-topic ktor --add-topic pekko --add-topic type-safe --add-topic api-first --add-topic rest-api --add-topic kotlin-library --add-topic openapi-generator
       ```
-- [!] **Homepage URL.** Empty. Point it at the docs site.
+- [!] **Homepage URL.** Empty. Point it at the Maven Central listing, since
+      there is no docs site and the repository is its own front page.
       ```bash
-      gh repo edit --homepage https://matthewjones372.github.io/pelican/
+      gh repo edit --homepage https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core
       ```
 - [!] **Social preview.** `docs/assets/social-preview.png`, uploaded under
       Settings → General → Social preview. GitHub does not read it from the
@@ -41,7 +42,7 @@ Free, and mostly absent today.
 - [x] **`CLAUDE.md`** points at it.
 - [x] **`docs/cookbook.md`** — complete recipes. Agents copy whole working
       examples, not fragments.
-- [x] **`llms.txt`**, at the docs-site root.
+- [x] **`llms.txt`**, pointing at the files in this repository.
 - [x] **Dokka fills the javadoc jar.** It was `JavadocJar.Empty()`, so
       javadoc.io showed nothing and the KDoc was unreadable without a clone.
 - [ ] **Error message quality.** A typed DSL suits coding agents because they
@@ -49,13 +50,22 @@ Free, and mostly absent today.
       actually print — an inference failure that names neither the endpoint nor
       the declared type costs a retry loop its convergence.
 
-## The docs site
+## A docs site — not now
 
-- [x] GitHub Pages, built from a staging directory that mirrors the repository
-      layout, so every relative link in `docs/` resolves unchanged in both
-      places.
-- [!] Settings → Pages → source: **GitHub Actions**. The workflow cannot enable
-      itself.
+Tried and removed. GitHub renders this repository's markdown better than a
+stock Jekyll build does: the front page arrived on Pages as one paragraph of
+literal source, because kramdown does not parse markdown inside the README's
+centring `<div>` and GitHub's renderer does. A `github.io` subdomain also
+ranks below `github.com` for the searches that matter, and the site carried no
+theme, no navigation and no search — everything that would make a site beat a
+repository.
+
+Worth revisiting only as a real one: MkDocs Material or Dokka-integrated docs
+with sidebar navigation, search and versioning, once there are users asking
+questions the README does not answer.
+
+The one thing GitHub cannot render is API documentation, and that ships through
+javadoc.io from the Dokka javadoc jar, which needs no site.
 
 ## Announcing — after the above
 
