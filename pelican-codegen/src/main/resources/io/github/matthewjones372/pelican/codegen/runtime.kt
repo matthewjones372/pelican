@@ -34,6 +34,29 @@ fun <F, T> Outcome<F, T>.orThrow(): T = when (this) {
 }
 
 /**
+ * A response read whole.
+ *
+ * Every call but a streaming one needs its body as text, and needs it after it
+ * has looked at the status: a declared failure decodes the body, and so does
+ * the throw for a status nothing declared. Reading it once, here, is what stops
+ * those two from being a first reader and an empty stream.
+ */
+class TextResponse internal constructor(
+    private val response: ClientResponse,
+    /** The whole body, decoded as UTF-8. */
+    val body: String,
+) {
+    val status: Int get() = response.status
+
+    /**
+     * One header off the response, as the string it travelled as. Null when it
+     * was not sent — which the declared failures below carry through, rather
+     * than insisting on a header the server may have had nothing to say about.
+     */
+    fun header(name: String): String? = response.header(name)
+}
+
+/**
  * A response read as it arrives, rather than after it has all arrived.
  *
  * Iterating to the end closes the connection. Stopping early does not, so a
@@ -158,16 +181,17 @@ internal fun jsonArrayFrames(reader: Reader): Sequence<String> = sequence {
  * a caller to be able to make that mistake.
  */
 class MultipartContent internal constructor(
-    internal val publisher: HttpRequest.BodyPublisher,
+    internal val body: ClientRequest.Body,
     internal val contentType: String,
 )
 
 /**
  * Builds the envelope without holding a file in memory.
  *
- * The parts are chained as streams and handed to `ofInputStream`, so an upload
- * is read from wherever it lives at the speed the socket drains — the same
- * promise the server makes when it hands a file part to a handler unread.
+ * The parts are chained as streams and handed over as a streaming body, so an
+ * upload is read from wherever it lives at the speed the transport drains it —
+ * the same promise the server makes when it hands a file part to a handler
+ * unread.
  *
  * The parts arrive here already in the order a server reads them — everything
  * it reads as it arrives, and then the streamed part it stops at — because that
@@ -207,7 +231,7 @@ internal fun multipart(
 
     val body = SequenceInputStream(Collections.enumeration(parts))
     return MultipartContent(
-        HttpRequest.BodyPublishers.ofInputStream { body },
+        ClientRequest.Body.Streaming { body },
         "multipart/form-data; boundary=$boundary",
     )
 }

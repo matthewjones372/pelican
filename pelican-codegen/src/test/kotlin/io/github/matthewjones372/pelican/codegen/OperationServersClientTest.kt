@@ -59,7 +59,7 @@ class OperationServersClientTest {
 
     @Test
     fun `every other method keeps the client's base url`() {
-        client shouldContain """text(request("GET", "/orders"))"""
+        client shouldContain """text(request(Method.GET, "/orders"))"""
         client shouldContain """private const val DEFAULT_BASE_URL = "https://orders.example.com""""
     }
 

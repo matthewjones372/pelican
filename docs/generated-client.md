@@ -67,7 +67,7 @@ xSignature)`, with the destination first because the document does not know it.
 See [Webhooks](#webhooks).
 
 The generated file needs `pelican-core`, which has no dependencies of its own,
-and a `Codecs` chosen by the caller. Transport is the JDK's `HttpClient`. The
+a `Codecs` chosen by the caller, and a `ClientTransport` to send with. The
 example checks its generated client into the repo and runs the suite against a
 real server, so a test fails if the file drifts from the descriptions.
 
@@ -82,3 +82,46 @@ is Jackson, and a spec with no union generates the same client either way.
 `ordersSpec().writeKotlinClient(sourceRoot, packageName = "com.example.orders")`
 is the same thing without the build task, for a build that would rather make the
 call itself.
+
+## Where the requests go
+
+The generated code never names an HTTP library. It builds a `ClientRequest` —
+a method, an assembled and already-encoded URL, headers, a per-request timeout,
+and a body that is empty, text or a stream — and hands it to a
+`ClientTransport`, which answers with a `CompletionStage<ClientResponse>`.
+Both types are core's, so the file still compiles against `pelican-core` and
+nothing else.
+
+```kotlin
+fun interface ClientTransport {
+    fun send(request: ClientRequest): CompletionStage<ClientResponse>
+}
+```
+
+`pelican-client-java` is the adapter over the JDK's own `HttpClient` and the
+default: add the module and a client finds it through `ServiceLoader`, with no
+line to write.
+
+```kotlin
+dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
+
+val client = OrdersClient("https://orders.internal", JacksonCodecs)
+```
+
+A service that already runs an HTTP client passes that one instead, as the
+third argument, and gets its pooling, its metrics and its tuning rather than a
+second stack:
+
+```kotlin
+val client = OrdersClient("https://orders.internal", JacksonCodecs, ourOwnTransport)
+```
+
+The stage is what makes that possible. The generated methods block — they
+`join` it and unwrap the `CompletionException`, so a caller catches what the
+transport actually raised — but the interface has to be the widest shape,
+because an asynchronous transport can serve a blocking caller and a blocking
+one cannot serve an asynchronous caller without a thread per call. Streams
+cross it in both directions: a file part is a body the transport opens and
+drains rather than one it is handed whole, and a streamed response arrives as
+an unread stream that `Streamed<T>` decodes off as elements land. The reasoning
+is in [docs/reference.md](reference.md#the-transport-a-generated-client-sends-with).

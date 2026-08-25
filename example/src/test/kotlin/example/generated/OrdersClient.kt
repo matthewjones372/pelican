@@ -5,7 +5,9 @@
 // the parameter names and the payload types are the ones the server routes
 // and the document publishes.
 //
-// Needs pelican-core on the classpath, and a Codecs to read bodies with.
+// Needs pelican-core on the classpath, a Codecs to read bodies with, and
+// a ClientTransport to send with — pelican-client-java, unless you have
+// an HTTP client of your own to hand over.
 @file:Suppress("unused", "RedundantVisibilityModifier")
 
 package example.generated
@@ -13,7 +15,11 @@ package example.generated
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import io.github.matthewjones372.pelican.BodyCodec
+import io.github.matthewjones372.pelican.ClientRequest
+import io.github.matthewjones372.pelican.ClientResponse
+import io.github.matthewjones372.pelican.ClientTransport
 import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.UploadedFile
 import io.github.matthewjones372.pelican.formCodec
 import java.io.BufferedReader
@@ -21,15 +27,12 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.Reader
 import java.io.SequenceInputStream
-import java.net.URI
 import java.net.URLEncoder
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.util.Collections
 import java.util.UUID
+import java.util.concurrent.CompletionException
 import kotlin.reflect.typeOf
 
 // ------------------------------------------------------------------ runtime
@@ -65,6 +68,29 @@ fun <F, T> Outcome<F, T>.valueOrNull(): T? = (this as? Outcome.Ok)?.value
 fun <F, T> Outcome<F, T>.orThrow(): T = when (this) {
     is Outcome.Ok -> value
     is Outcome.Err -> throw IllegalStateException("Call failed: $failure")
+}
+
+/**
+ * A response read whole.
+ *
+ * Every call but a streaming one needs its body as text, and needs it after it
+ * has looked at the status: a declared failure decodes the body, and so does
+ * the throw for a status nothing declared. Reading it once, here, is what stops
+ * those two from being a first reader and an empty stream.
+ */
+class TextResponse internal constructor(
+    private val response: ClientResponse,
+    /** The whole body, decoded as UTF-8. */
+    val body: String,
+) {
+    val status: Int get() = response.status
+
+    /**
+     * One header off the response, as the string it travelled as. Null when it
+     * was not sent — which the declared failures below carry through, rather
+     * than insisting on a header the server may have had nothing to say about.
+     */
+    fun header(name: String): String? = response.header(name)
 }
 
 /**
@@ -192,16 +218,17 @@ internal fun jsonArrayFrames(reader: Reader): Sequence<String> = sequence {
  * a caller to be able to make that mistake.
  */
 class MultipartContent internal constructor(
-    internal val publisher: HttpRequest.BodyPublisher,
+    internal val body: ClientRequest.Body,
     internal val contentType: String,
 )
 
 /**
  * Builds the envelope without holding a file in memory.
  *
- * The parts are chained as streams and handed to `ofInputStream`, so an upload
- * is read from wherever it lives at the speed the socket drains — the same
- * promise the server makes when it hands a file part to a handler unread.
+ * The parts are chained as streams and handed over as a streaming body, so an
+ * upload is read from wherever it lives at the speed the transport drains it —
+ * the same promise the server makes when it hands a file part to a handler
+ * unread.
  *
  * The parts arrive here already in the order a server reads them — everything
  * it reads as it arrives, and then the streamed part it stops at — because that
@@ -241,7 +268,7 @@ internal fun multipart(
 
     val body = SequenceInputStream(Collections.enumeration(parts))
     return MultipartContent(
-        HttpRequest.BodyPublishers.ofInputStream { body },
+        ClientRequest.Body.Streaming { body },
         "multipart/form-data; boundary=$boundary",
     )
 }
@@ -470,9 +497,14 @@ private const val DEFAULT_BASE_URL = "http://localhost:8080"
 class OrdersClient(
     baseUrl: String = DEFAULT_BASE_URL,
     private val codecs: Codecs,
-    private val http: HttpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(5))
-        .build(),
+    /**
+     * Where a built request goes. The default is whichever `ClientTransport`
+     * the classpath supplies — `pelican-client-java`, over the JDK's own
+     * `HttpClient`, unless the build says otherwise — so a service that already
+     * runs and tunes an HTTP client can hand that one over rather than acquire
+     * a second HTTP stack because it generated a client.
+     */
+    private val transport: ClientTransport = ClientTransport.default(),
     private val timeout: Duration = Duration.ofSeconds(30),
     /**
      * Sent with every request. A function rather than a map because it is
@@ -495,6 +527,10 @@ class OrdersClient(
      * Every call goes through here. An absent query parameter or header is left
      * off rather than sent empty, so the server applies its own default.
      *
+     * What comes out is a `ClientRequest`, which is core's own vocabulary rather
+     * than any HTTP library's: the URL is assembled and encoded here, where the
+     * description is, and the transport is left with nothing to decide.
+     *
      * [origin] is this client's own base URL, except for a method the document said
      * is served somewhere else: those pass the host that operation's `servers`
      * block named, since that is where the service answers it. A webhook passes the
@@ -505,63 +541,77 @@ class OrdersClient(
      * presents to the API and a subscriber's endpoint is not the API.
      */
     private fun request(
-        method: String,
+        method: Method,
         path: String,
         query: List<Pair<String, Any?>> = emptyList(),
         headerParams: List<Pair<String, Any?>> = emptyList(),
         cookies: List<Pair<String, Any?>> = emptyList(),
-        body: HttpRequest.BodyPublisher = HttpRequest.BodyPublishers.noBody(),
+        body: ClientRequest.Body = ClientRequest.Body.Empty,
         contentType: String? = null,
         multipart: MultipartContent? = null,
         origin: String = base,
         standingHeaders: Map<String, String> = headers(),
-    ): HttpRequest {
+    ): ClientRequest {
         val search = query
             .flatMap { (name, value) -> occurrences(name, value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
             .joinToString("&")
-
-        val builder = HttpRequest
-            .newBuilder(URI.create(origin + path + if (search.isEmpty()) "" else "?$search"))
-            .timeout(timeout)
-            .method(method, multipart?.publisher ?: body)
-
-        (multipart?.contentType ?: contentType)?.let { builder.header("Content-Type", it) }
-        standingHeaders.forEach { (name, value) -> builder.header(name, value) }
-        headerParams.forEach { (name, value) -> plain(value)?.let { builder.header(name, it) } }
 
         // One header carries all of them, so an absent optional cookie is simply
         // not written rather than sent empty — the same bargain every other
         // optional parameter makes.
         val jar = cookies.flatMap { (name, value) -> occurrences(name, value).map { "$name=$it" } }
-        if (jar.isNotEmpty()) builder.header("Cookie", jar.joinToString("; "))
 
-        return builder.build()
+        val sent =
+            listOfNotNull((multipart?.contentType ?: contentType)?.let { "Content-Type" to it }) +
+                standingHeaders.map { (name, value) -> name to value } +
+                headerParams.mapNotNull { (name, value) -> plain(value)?.let { name to it } } +
+                (if (jar.isEmpty()) emptyList() else listOf("Cookie" to jar.joinToString("; ")))
+
+        return ClientRequest(
+            method = method,
+            url = origin + path + if (search.isEmpty()) "" else "?$search",
+            headers = sent,
+            body = multipart?.body ?: body,
+            timeout = timeout,
+        )
     }
 
-    private fun text(request: HttpRequest): HttpResponse<String> =
-        http.send(request, HttpResponse.BodyHandlers.ofString())
-
-    private fun stream(request: HttpRequest): HttpResponse<InputStream> =
-        http.send(request, HttpResponse.BodyHandlers.ofInputStream())
-
-    private fun HttpResponse<*>.succeeded(): Boolean = statusCode() in 200..299
-
     /**
-     * One header off the response, as the string it travelled as. Null when it was
-     * not sent — which the declared failures below carry through, rather than
-     * insisting on a header the server may have had nothing to say about.
+     * The exchange, waited for.
+     *
+     * A transport answers with a `CompletionStage` because that is the one shape
+     * every transport can offer: an asynchronous client serves a blocking caller
+     * with a join, and a blocking one cannot serve an asynchronous caller without
+     * a thread per call. This is that join.
+     *
+     * A `CompletionException` is unwrapped on the way out, so what a caller catches
+     * is the failure the transport actually raised — an `IOException`, a timeout —
+     * rather than a wrapper the choice of transport put around it.
      */
-    private fun HttpResponse<*>.header(name: String): String? = headers().firstValue(name).orElse(null)
+    private fun exchange(request: ClientRequest): ClientResponse =
+        try {
+            transport.send(request).toCompletableFuture().join()
+        } catch (failed: CompletionException) {
+            throw failed.cause ?: failed
+        }
 
-    private fun failed(method: String, path: String, response: HttpResponse<String>): Nothing =
-        throw ApiCallFailed(response.statusCode(), method, path, response.body())
+    private fun text(request: ClientRequest): TextResponse =
+        exchange(request).let { TextResponse(it, it.text()) }
+
+    private fun stream(request: ClientRequest): ClientResponse = exchange(request)
+
+    private fun TextResponse.succeeded(): Boolean = status in 200..299
+
+    private fun ClientResponse.succeeded(): Boolean = status in 200..299
+
+    private fun failed(method: Method, path: String, response: TextResponse): Nothing =
+        throw ApiCallFailed(response.status, method.name, path, response.body)
 
     /** A failed streaming response's body is the one time it is small enough to read whole. */
-    private fun drain(response: HttpResponse<InputStream>): String =
-        response.body().use { it.readBytes().toString(Charsets.UTF_8) }
+    private fun drain(response: ClientResponse): String = response.text()
 
-    private fun failedStream(method: String, path: String, response: HttpResponse<InputStream>): Nothing =
-        throw ApiCallFailed(response.statusCode(), method, path, drain(response))
+    private fun failedStream(method: Method, path: String, response: ClientResponse): Nothing =
+        throw ApiCallFailed(response.status, method.name, path, drain(response))
 
     private val apiErrorCodec: BodyCodec<ApiError> = codecs.codec(typeOf<ApiError>())
     private val userCodec: BodyCodec<User> = codecs.codec(typeOf<User>())
@@ -580,12 +630,12 @@ class OrdersClient(
      * `GET /users/{userId}`
      */
     fun getUser(userId: Long): Outcome<GetUserFailure, User> {
-        val response = text(request("GET", "/users/${segment(userId)}"))
-        when (response.statusCode()) {
-            404 -> return Outcome.Err(GetUserFailure.NotFound(apiErrorCodec.decodeFromString(response.body())))
+        val response = text(request(Method.GET, "/users/${segment(userId)}"))
+        when (response.status) {
+            404 -> return Outcome.Err(GetUserFailure.NotFound(apiErrorCodec.decodeFromString(response.body)))
         }
-        if (!response.succeeded()) failed("GET", "/users/{userId}", response)
-        return Outcome.Ok(userCodec.decodeFromString(response.body()))
+        if (!response.succeeded()) failed(Method.GET, "/users/{userId}", response)
+        return Outcome.Ok(userCodec.decodeFromString(response.body))
     }
 
     /**
@@ -596,12 +646,12 @@ class OrdersClient(
      * `GET /users/{userId}/orders`
      */
     fun streamOrders(userId: Long, limit: Int? = null, status: OrderStatus? = null, xTraceId: String? = null): Outcome<StreamOrdersFailure, Streamed<Order>> {
-        val response = stream(request("GET", "/users/${segment(userId)}/orders", query = listOf("limit" to limit, "status" to status), headerParams = listOf("X-Trace-Id" to xTraceId)))
-        when (response.statusCode()) {
+        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders", query = listOf("limit" to limit, "status" to status), headerParams = listOf("X-Trace-Id" to xTraceId)))
+        when (response.status) {
             404 -> return Outcome.Err(StreamOrdersFailure.NotFound(apiErrorCodec.decodeFromString(drain(response))))
         }
-        if (!response.succeeded()) failedStream("GET", "/users/{userId}/orders", response)
-        val body = response.body()
+        if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders", response)
+        val body = response.body
         return Outcome.Ok(Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decodeFromString(it) }))
     }
 
@@ -611,9 +661,9 @@ class OrdersClient(
      * `GET /users/{userId}/orders/watch`
      */
     fun watchOrders(userId: Long, limit: Int? = null): Streamed<Tick> {
-        val response = stream(request("GET", "/users/${segment(userId)}/orders/watch", query = listOf("limit" to limit)))
-        if (!response.succeeded()) failedStream("GET", "/users/{userId}/orders/watch", response)
-        val body = response.body()
+        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/watch", query = listOf("limit" to limit)))
+        if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders/watch", response)
+        val body = response.body
         return Streamed(body, sseFrames(body.bufferedReader()).map { tickCodec.decodeFromString(it) })
     }
 
@@ -625,9 +675,9 @@ class OrdersClient(
      * `GET /users/{userId}/orders/list`
      */
     fun listOrders(userId: Long, limit: Int? = null): Streamed<Order> {
-        val response = stream(request("GET", "/users/${segment(userId)}/orders/list", query = listOf("limit" to limit)))
-        if (!response.succeeded()) failedStream("GET", "/users/{userId}/orders/list", response)
-        val body = response.body()
+        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/list", query = listOf("limit" to limit)))
+        if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders/list", response)
+        val body = response.body
         return Streamed(body, jsonArrayFrames(body.reader()).map { orderCodec.decodeFromString(it) })
     }
 
@@ -637,14 +687,14 @@ class OrdersClient(
      * `POST /users/{userId}/orders`
      */
     fun placeOrder(userId: Long, body: CreateOrder, xApiKey: String): Outcome<PlaceOrderFailure, Order> {
-        val response = text(request("POST", "/users/${segment(userId)}/orders", headerParams = listOf("X-Api-Key" to xApiKey), body = HttpRequest.BodyPublishers.ofString(createOrderCodec.encodeToString(body)), contentType = "application/json"))
-        when (response.statusCode()) {
-            401 -> return Outcome.Err(PlaceOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body())))
-            404 -> return Outcome.Err(PlaceOrderFailure.NotFound(apiErrorCodec.decodeFromString(response.body())))
-            429 -> return Outcome.Err(PlaceOrderFailure.TooManyRequests(apiErrorCodec.decodeFromString(response.body()), response.header("Retry-After")?.toLongOrNull()))
+        val response = text(request(Method.POST, "/users/${segment(userId)}/orders", headerParams = listOf("X-Api-Key" to xApiKey), body = ClientRequest.Body.Text(createOrderCodec.encodeToString(body)), contentType = "application/json"))
+        when (response.status) {
+            401 -> return Outcome.Err(PlaceOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body)))
+            404 -> return Outcome.Err(PlaceOrderFailure.NotFound(apiErrorCodec.decodeFromString(response.body)))
+            429 -> return Outcome.Err(PlaceOrderFailure.TooManyRequests(apiErrorCodec.decodeFromString(response.body), response.header("Retry-After")?.toLongOrNull()))
         }
-        if (!response.succeeded()) failed("POST", "/users/{userId}/orders", response)
-        return Outcome.Ok(orderCodec.decodeFromString(response.body()))
+        if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders", response)
+        return Outcome.Ok(orderCodec.decodeFromString(response.body))
     }
 
     /**
@@ -653,15 +703,15 @@ class OrdersClient(
      * `POST /users/{userId}/orders/submit`
      */
     fun submitOrder(userId: Long, body: CreateOrder, xApiKey: String): Outcome<SubmitOrderFailure, SubmitOrderResult> {
-        val response = text(request("POST", "/users/${segment(userId)}/orders/submit", headerParams = listOf("X-Api-Key" to xApiKey), body = HttpRequest.BodyPublishers.ofString(createOrderCodec.encodeToString(body)), contentType = "application/json"))
-        when (response.statusCode()) {
-            401 -> return Outcome.Err(SubmitOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body())))
+        val response = text(request(Method.POST, "/users/${segment(userId)}/orders/submit", headerParams = listOf("X-Api-Key" to xApiKey), body = ClientRequest.Body.Text(createOrderCodec.encodeToString(body)), contentType = "application/json"))
+        when (response.status) {
+            401 -> return Outcome.Err(SubmitOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body)))
         }
-        if (!response.succeeded()) failed("POST", "/users/{userId}/orders/submit", response)
-        return when (response.statusCode()) {
-            201 -> Outcome.Ok(SubmitOrderResult.Created(orderCodec.decodeFromString(response.body()), response.header("Location")))
-            202 -> Outcome.Ok(SubmitOrderResult.Accepted(queuedCodec.decodeFromString(response.body())))
-            else -> failed("POST", "/users/{userId}/orders/submit", response)
+        if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders/submit", response)
+        return when (response.status) {
+            201 -> Outcome.Ok(SubmitOrderResult.Created(orderCodec.decodeFromString(response.body), response.header("Location")))
+            202 -> Outcome.Ok(SubmitOrderResult.Accepted(queuedCodec.decodeFromString(response.body)))
+            else -> failed(Method.POST, "/users/{userId}/orders/submit", response)
         }
     }
 
@@ -671,9 +721,9 @@ class OrdersClient(
      * `POST /users/{userId}/orders/form`
      */
     fun placeOrderForm(userId: Long, body: CreateOrder): Order {
-        val response = text(request("POST", "/users/${segment(userId)}/orders/form", body = HttpRequest.BodyPublishers.ofString(createOrderFormCodec.encodeToString(body)), contentType = "application/x-www-form-urlencoded"))
-        if (!response.succeeded()) failed("POST", "/users/{userId}/orders/form", response)
-        return orderCodec.decodeFromString(response.body())
+        val response = text(request(Method.POST, "/users/${segment(userId)}/orders/form", body = ClientRequest.Body.Text(createOrderFormCodec.encodeToString(body)), contentType = "application/x-www-form-urlencoded"))
+        if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders/form", response)
+        return orderCodec.decodeFromString(response.body)
     }
 
     /**
@@ -682,9 +732,9 @@ class OrdersClient(
      * `POST /users/{userId}/orders/import`
      */
     fun importOrders(userId: Long, label: String, manifest: UploadedFile, file: UploadedFile, session: String? = null): ImportResult {
-        val response = text(request("POST", "/users/${segment(userId)}/orders/import", cookies = listOf("session" to session), multipart = multipart(fields = listOf("label" to label), files = listOf("manifest" to manifest, "file" to file))))
-        if (!response.succeeded()) failed("POST", "/users/{userId}/orders/import", response)
-        return importResultCodec.decodeFromString(response.body())
+        val response = text(request(Method.POST, "/users/${segment(userId)}/orders/import", cookies = listOf("session" to session), multipart = multipart(fields = listOf("label" to label), files = listOf("manifest" to manifest, "file" to file))))
+        if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders/import", response)
+        return importResultCodec.decodeFromString(response.body)
     }
 
     /**
@@ -693,13 +743,13 @@ class OrdersClient(
      * `POST /users/{userId}/orders/{orderId}/payment`
      */
     fun payOrder(userId: Long, orderId: Long, body: PaymentMethod, xApiKey: String): Outcome<PayOrderFailure, Receipt> {
-        val response = text(request("POST", "/users/${segment(userId)}/orders/${segment(orderId)}/payment", headerParams = listOf("X-Api-Key" to xApiKey), body = HttpRequest.BodyPublishers.ofString(paymentMethodCodec.encodeToString(body)), contentType = "application/json"))
-        when (response.statusCode()) {
-            401 -> return Outcome.Err(PayOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body())))
-            404 -> return Outcome.Err(PayOrderFailure.NotFound(apiErrorCodec.decodeFromString(response.body())))
+        val response = text(request(Method.POST, "/users/${segment(userId)}/orders/${segment(orderId)}/payment", headerParams = listOf("X-Api-Key" to xApiKey), body = ClientRequest.Body.Text(paymentMethodCodec.encodeToString(body)), contentType = "application/json"))
+        when (response.status) {
+            401 -> return Outcome.Err(PayOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body)))
+            404 -> return Outcome.Err(PayOrderFailure.NotFound(apiErrorCodec.decodeFromString(response.body)))
         }
-        if (!response.succeeded()) failed("POST", "/users/{userId}/orders/{orderId}/payment", response)
-        return Outcome.Ok(receiptCodec.decodeFromString(response.body()))
+        if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders/{orderId}/payment", response)
+        return Outcome.Ok(receiptCodec.decodeFromString(response.body))
     }
 
     /**
@@ -708,8 +758,8 @@ class OrdersClient(
      * `DELETE /users/{userId}/orders/{orderId}`
      */
     fun cancelOrder(userId: Long, orderId: Long, xApiKey: String) {
-        val response = text(request("DELETE", "/users/${segment(userId)}/orders/${segment(orderId)}", headerParams = listOf("X-Api-Key" to xApiKey)))
-        if (!response.succeeded()) failed("DELETE", "/users/{userId}/orders/{orderId}", response)
+        val response = text(request(Method.DELETE, "/users/${segment(userId)}/orders/${segment(orderId)}", headerParams = listOf("X-Api-Key" to xApiKey)))
+        if (!response.succeeded()) failed(Method.DELETE, "/users/{userId}/orders/{orderId}", response)
     }
 
     /**
@@ -718,9 +768,9 @@ class OrdersClient(
      * `POST /echo`
      */
     fun echo(body: InputStream): InputStream {
-        val response = stream(request("POST", "/echo", body = HttpRequest.BodyPublishers.ofInputStream { body }, contentType = "application/octet-stream"))
-        if (!response.succeeded()) failedStream("POST", "/echo", response)
-        return response.body()
+        val response = stream(request(Method.POST, "/echo", body = ClientRequest.Body.Streaming { body }, contentType = "application/octet-stream"))
+        if (!response.succeeded()) failedStream(Method.POST, "/echo", response)
+        return response.body
     }
 
     /**
@@ -729,9 +779,9 @@ class OrdersClient(
      * `GET /search`
      */
     fun searchOrders(limit: Int? = null, status: OrderStatus? = null, item: List<String>? = null, tag: List<String>? = null, sort: List<String>? = null, fields: List<String>? = null, xTraceId: String? = null, xFeature: List<String>? = null, seen: List<Long>? = null): Streamed<Order> {
-        val response = stream(request("GET", "/search", query = listOf("limit" to limit, "status" to status, "item" to joined("item", item, ","), "tag" to tag, "sort" to joined("sort", sort, "|"), "fields" to joined("fields", fields, " ")), headerParams = listOf("X-Trace-Id" to xTraceId, "X-Feature" to joined("X-Feature", xFeature, ",")), cookies = listOf("seen" to seen)))
-        if (!response.succeeded()) failedStream("GET", "/search", response)
-        val body = response.body()
+        val response = stream(request(Method.GET, "/search", query = listOf("limit" to limit, "status" to status, "item" to joined("item", item, ","), "tag" to tag, "sort" to joined("sort", sort, "|"), "fields" to joined("fields", fields, " ")), headerParams = listOf("X-Trace-Id" to xTraceId, "X-Feature" to joined("X-Feature", xFeature, ",")), cookies = listOf("seen" to seen)))
+        if (!response.succeeded()) failedStream(Method.GET, "/search", response)
+        val body = response.body
         return Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decodeFromString(it) })
     }
 
@@ -755,7 +805,7 @@ class OrdersClient(
      * this description nobody publishing it controls.
      */
     fun orderPlaced(url: String, body: Order, xSignature: String) {
-        val response = text(request("POST", "", origin = url, standingHeaders = emptyMap(), headerParams = listOf("X-Signature" to xSignature), body = HttpRequest.BodyPublishers.ofString(orderCodec.encodeToString(body)), contentType = "application/json"))
-        if (!response.succeeded()) failed("POST", url, response)
+        val response = text(request(Method.POST, "", origin = url, standingHeaders = emptyMap(), headerParams = listOf("X-Signature" to xSignature), body = ClientRequest.Body.Text(orderCodec.encodeToString(body)), contentType = "application/json"))
+        if (!response.succeeded()) failed(Method.POST, url, response)
     }
 }

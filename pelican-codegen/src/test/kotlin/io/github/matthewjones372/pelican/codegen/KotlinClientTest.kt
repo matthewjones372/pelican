@@ -233,7 +233,11 @@ class KotlinClientTest {
         val imports = client.lines().filter { it.startsWith("import ") }.toSet()
         imports.filterNot { it.startsWith("import java") || it.startsWith("import kotlin") }.toSet() shouldBe setOf(
             "import io.github.matthewjones372.pelican.BodyCodec",
+            "import io.github.matthewjones372.pelican.ClientRequest",
+            "import io.github.matthewjones372.pelican.ClientResponse",
+            "import io.github.matthewjones372.pelican.ClientTransport",
             "import io.github.matthewjones372.pelican.Codecs",
+            "import io.github.matthewjones372.pelican.Method",
             "import io.github.matthewjones372.pelican.UploadedFile",
             "import io.github.matthewjones372.pelican.formCodec",
         )
@@ -250,7 +254,7 @@ class KotlinClientTest {
 
     @Test
     fun `path parameters are positional and percent-encoded`() {
-        client shouldContain """request("GET", "/widgets/${'$'}{segment(widgetId)}")"""
+        client shouldContain """request(Method.GET, "/widgets/${'$'}{segment(widgetId)}")"""
     }
 
     @Test
@@ -272,10 +276,10 @@ class KotlinClientTest {
     @Test
     fun `a json body goes through the codec, a raw body through the stream`() {
         client shouldContain
-            "body = HttpRequest.BodyPublishers.ofString(newWidgetCodec.encodeToString(body)), " +
+            "body = ClientRequest.Body.Text(newWidgetCodec.encodeToString(body)), " +
             "contentType = \"application/json\""
         client shouldContain "fun uploadWidget(body: InputStream): InputStream {"
-        client shouldContain "body = HttpRequest.BodyPublishers.ofInputStream { body }"
+        client shouldContain "body = ClientRequest.Body.Streaming { body }"
     }
 
     @Test
@@ -288,7 +292,7 @@ class KotlinClientTest {
     fun `a form body goes through a codec that reads the published schema`() {
         client shouldContain "fun signInWidget(body: NewWidget)"
         client shouldContain
-            "body = HttpRequest.BodyPublishers.ofString(newWidgetFormCodec.encodeToString(body)), " +
+            "body = ClientRequest.Body.Text(newWidgetFormCodec.encodeToString(body)), " +
             "contentType = \"application/x-www-form-urlencoded\""
         client shouldContain
             "private val newWidgetFormCodec: BodyCodec<NewWidget> = codecs.formCodec(typeOf<NewWidget>())"
@@ -298,7 +302,7 @@ class KotlinClientTest {
     fun `a body with several encodings is sent as the first the endpoint declared`() {
         client shouldContain "fun postWidgetEitherWay(body: NewWidget)"
         client shouldContain
-            "body = HttpRequest.BodyPublishers.ofString(newWidgetCodec.encodeToString(body)), " +
+            "body = ClientRequest.Body.Text(newWidgetCodec.encodeToString(body)), " +
             "contentType = \"application/json\""
     }
 
@@ -360,8 +364,8 @@ class KotlinClientTest {
         client shouldContain "fun getWidget(widgetId: Long): Outcome<GetWidgetFailure, Widget> {"
         client shouldContain
             "404 -> return Outcome.Err(GetWidgetFailure.NotFound(" +
-            "problemCodec.decodeFromString(response.body())))"
-        client shouldContain "return Outcome.Ok(widgetCodec.decodeFromString(response.body()))"
+            "problemCodec.decodeFromString(response.body)))"
+        client shouldContain "return Outcome.Ok(widgetCodec.decodeFromString(response.body))"
     }
 
     @Test
@@ -370,14 +374,14 @@ class KotlinClientTest {
             "data class TooManyRequests(val body: Problem, val retryAfter: Long?) : PokeWidgetFailure {"
         client shouldContain
             "429 -> return Outcome.Err(PokeWidgetFailure.TooManyRequests(" +
-            "problemCodec.decodeFromString(response.body()), " +
+            "problemCodec.decodeFromString(response.body), " +
             """response.header("Retry-After")?.toLongOrNull()))"""
     }
 
     @Test
     fun `an endpoint with no declared failures returns the value and throws otherwise`() {
         client shouldNotContain "DeleteWidgetFailure"
-        client shouldContain """if (!response.succeeded()) failed("DELETE", "/widgets/{widgetId}", response)"""
+        client shouldContain """if (!response.succeeded()) failed(Method.DELETE, "/widgets/{widgetId}", response)"""
     }
 
     // ------------------------------------------------------------ payloads
