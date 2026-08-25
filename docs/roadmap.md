@@ -24,9 +24,24 @@ Four of the items below are done or partly done, and the page says so here
 rather than being quietly rewritten, because the argument for the order is
 worth keeping next to the result of following it.
 
-- **Item 1** shipped as `pelican-metrics`: `Endpoint.statusFor` resolves the
-  status once in core, `afterStatus` hands it to a filter, and a counter and a
-  timer come out tagged from the description. OpenTelemetry is still to do.
+- **Item 1** is done. `Endpoint.statusFor` resolves the status once in core and
+  `afterStatus` hands it to a filter; `pelican-metrics` turns that into a
+  Micrometer counter and timer, and `pelican-metrics-otel` turns the same
+  reading into an OpenTelemetry `SERVER` span per request — named
+  `GET /orders/{orderId}` from the description, with `http.route`,
+  `http.request.method`, `http.response.status_code` and a span status set from
+  the outcome — alongside the `http.server.request.duration` histogram the
+  semantic conventions specify. A second module rather than a second file,
+  because a service that wanted Micrometer must not acquire the OpenTelemetry
+  API for it, and each module has a dependency test saying so.
+
+  Two things item 1 asked for and did not get, both recorded in
+  [Metrics](reference.md#metrics) rather than left to be discovered: continuing
+  an inbound trace needs six lines per service, because reading an undeclared
+  header is the one thing a backend-agnostic filter cannot do; and requests
+  answered before the filter chain is entered are invisible to either
+  instrument, which remains true and would need metering inside each
+  interpreter to fix.
 - **Item 2** shipped as [Choosing between Pelican and the alternatives](choosing.md).
 - **Item 3** shipped its first phase, and then the two things that phase was
   supposed to make cheap:

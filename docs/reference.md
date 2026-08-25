@@ -27,6 +27,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-ktor` | core, ktor-server-core, ktor-server-cio | descriptions → Ktor routes, with `suspend` handlers and `Flow` streams |
 | `pelican-ktor-docs` | ktor, openapi | the same two pages, on Ktor |
 | `pelican-metrics` | core, micrometer-core | descriptions → Micrometer meters, tagged from what the descriptions already say |
+| `pelican-metrics-otel` | core, opentelemetry-api | descriptions → OpenTelemetry server spans and the specified duration histogram |
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
@@ -56,6 +57,12 @@ The layering is load-bearing, not decorative, and each edge is a test:
   and a `Filter`, neither of which knows which interpreter is serving it, and
   that is what lets one `metrics(registry)` line mean the same thing on all
   three backends.
+- `pelican-metrics-otel` asserts the mirror image: core plus the OpenTelemetry
+  API, no server library, and — the reason it is a module rather than a second
+  file next door — no Micrometer. `pelican-metrics` asserts it carries no
+  OpenTelemetry in the same breath. The two vendors' APIs are the same size as
+  each other and neither audience asked for the other's, so a service that
+  wanted meters does not ship a tracer to get them.
 - `pelican-client-java` asserts the same shape on the caller's side: core, the
   JDK, and no second HTTP stack. An adapter a caller adds in order to *choose*
   a client library would be worth very little if it brought one along.
@@ -2398,9 +2405,10 @@ Two meters carry them: `http.server.requests`, a counter, and
 its own, so the counter looks redundant until the timer is aggregated —
 percentile histograms are configured per meter and are often turned off for
 cheapness, and a service that has done so still wants the rate of 5xx. The names
-follow the OpenTelemetry semantic conventions rather than Micrometer's own, so
-that an OpenTelemetry module can publish the same series under the same names
-later without renaming anybody's dashboard.
+follow the OpenTelemetry semantic conventions rather than Micrometer's own,
+which is why `pelican-metrics-otel` below publishes its histogram under the
+name this timer already carries: a service moving from one to the other keeps
+its dashboards.
 
 The `path` tag is why this is worth a module rather than a paragraph of advice.
 A meter tagged with the request's *path* grows a time series per order id, which
@@ -2436,6 +2444,149 @@ Two things to know before drawing conclusions from the numbers:
 this way — a 200, a declared 404, a 201 and a deprecated endpoint, with
 `/admin/meters` rendering what was recorded. Run it with
 `./gradlew :example:runMetrics`.
+
+### OpenTelemetry, from the same descriptions
+
+`pelican-metrics-otel` is the same idea through the other vendor's API, and it
+carries traces as well as metrics:
+
+```kotlin
+Api(routes, JacksonCodecs, filters = listOf(openTelemetry(sdk)))
+```
+
+That produces a `SERVER` span per request and records the
+`http.server.request.duration` histogram the semantic conventions specify. The
+span is named `GET /orders/{orderId}` — `{method} {http.route}`, which is what
+the conventions ask a server span to be called — and both halves of that name,
+like every attribute below, are read off the endpoint:
+
+| Attribute | Where it comes from |
+|---|---|
+| `http.request.method` | `endpoint.method` |
+| `http.route` | `endpoint.pathSpec.template` |
+| `http.response.status_code` | what the interpreter is about to answer with |
+| `error.type` | the status as a string, when it is a 5xx |
+| `pelican.operation_id` | `endpoint.operationId`, or `unnamed` |
+| `pelican.deprecated` | `endpoint.deprecated` |
+
+`http.route` is the attribute worth the module. A general-purpose agent
+instrumenting Pekko or http4k sees a routing tree it has no way to name, so it
+either leaves the route off — which costs every per-endpoint view a trace
+backend offers — or falls back to the request's own path and produces one
+distinct operation per order id. Pelican has the template because the route was
+built from it.
+
+The last two attributes are in a namespace of their own because the conventions
+have no key for either, and neither adds a dimension: both are a function of the
+method and the route, which are attributes already, so a metric split by them
+has exactly the series it had before.
+
+Span status follows the conventions rather than intuition. It is left **unset**
+for a 4xx on a server span — a declared 404 is the endpoint doing its job, and
+an error rate that counts it is measuring how often callers ask for things that
+do not exist — and set to `ERROR` for a 5xx. A 5xx that came from a throwable
+also records that throwable as a span event, which is the one place its message
+is both useful and safe: `renderError` deliberately keeps it out of the response
+body, so without the span it goes nowhere at all.
+
+#### Which conventions, and checked against what
+
+The attribute names above are the *stable* HTTP names, the ones adopted when
+those conventions were declared stable — `http.request.method` rather than
+`http.method`, `http.response.status_code` rather than `http.status_code`,
+`url.path` rather than `http.target`. They were read from the OpenTelemetry
+specification rather than from memory, at
+[HTTP spans](https://opentelemetry.io/docs/specs/semconv/http/http-spans/),
+[HTTP metrics](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/)
+and the
+[HTTP attribute registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/http/),
+which is also where the span-status rule and the recommended bucket boundaries
+come from. Anything emitting the older spellings is emitting attributes the
+registry now marks deprecated.
+
+#### Continuing a caller's trace
+
+An inbound `traceparent` should continue the caller's trace rather than start a
+new one, and doing that needs a header nobody declared:
+
+```kotlin
+val pekkoHeaders = object : TextMapGetter<Params> {
+    override fun keys(carrier: Params) = carrier.request.headers.map { it.lowercaseName() }
+    override fun get(carrier: Params?, key: String) =
+        carrier?.request?.getHeader(key)?.map { it.value() }?.orElse(null)
+}
+
+Api(routes, JacksonCodecs, filters = listOf(openTelemetry(sdk, incomingHeaders = pekkoHeaders)))
+```
+
+Six lines, written once per service, and they are the one thing this module
+cannot write for you. `Params` carries the inputs the endpoint *declared*, and
+an incoming trace context is not part of an API's contract — it should not
+appear in its OpenAPI document — so the only route to the header is
+`Params.underlying`, which is the backend's own request object. Naming that type
+is exactly what a filter working identically on three interpreters must not do.
+
+Left out, the parent is `Context.current()` instead, which is not a stub: a
+service running the OpenTelemetry Java agent already has the caller's context
+current on the request thread, so the span becomes a child of the agent's and
+adds the route the agent could not know to a trace it had already joined
+correctly. Note also that an SDK's default propagator is a no-op one — a service
+that never calls `setPropagators` extracts nothing however good its getter is.
+
+What was deliberately **not** done:
+
+- **Nothing is injected on the way out.** Pelican does not add `traceparent` to
+  a response, and it has no client side to add one to a request it makes.
+  Outbound propagation belongs to whichever HTTP client the service calls with,
+  and every one of them already has an instrumentation for it.
+- **Baggage is extracted but not read.** Whatever propagators the SDK is
+  configured with run, so `baggage` arrives in the context if a service
+  registered that propagator; nothing here turns any of it into span
+  attributes, because which baggage entries are safe to record is a decision
+  about a particular deployment.
+- **The context is not carried across the asynchronous boundary.** The span is
+  made current only for as long as this module holds the request thread; a
+  handler returning a `CompletionStage` completes wherever its own executor
+  decides. A handler that wants to nest a span reads `params[otelContext]` and
+  passes it to `setParent`, which is one line and is reliable.
+
+#### The same two blind spots
+
+Nothing about OpenTelemetry closes the gaps described above for the meters, and
+the new documentation should not read as though it did:
+
+- **Requests answered before the chain is entered are invisible.** A path
+  parameter that will not decode, a body over `maxBodyBytes`, a `Content-Type`
+  nothing declared: no filter is asked, so there is no span and no measurement.
+  The 4xx rate here is the rate of *handled* 4xx, on both instruments.
+- **A response that fails while it is being written** becomes a 500 after the
+  chain has unwound, so the span carries the status the handler asked for rather
+  than the one the caller received.
+
+One more, particular to spans: the attributes the conventions mark required for
+a server span and this module does not set — `url.path`, `url.scheme`, and the
+recommended `server.address`, `client.address` and `network.*` — are left off
+rather than guessed. Every one of them is a property of the socket rather than
+of the description, and a filter that behaves identically on three interpreters
+is looking at the description. A service that wants them supplies them from a
+filter that knows its own backend, or runs the agent, whose server span is the
+one carrying them.
+
+#### Why a second module
+
+`pelican-metrics` promises a consumer core plus a meter API and nothing else. A
+consumer asking for OpenTelemetry should get core plus the OpenTelemetry API and
+nothing else, and Micrometer is not "nothing else". One module carrying both
+would have to put each vendor's API in front of the audience that did not ask
+for it, or make both `compileOnly` — which would take Micrometer off the
+classpath of every service already calling `metrics(registry)` and turn a
+working deployment into a `NoClassDefFoundError`. Two modules, a
+`NoOtherDependenciesTest` in each, and neither audience pays for the other.
+
+`example/src/main/kotlin/example/tracing/TracedOrders.kt` is a service wired
+this way, with `/admin/traces` rendering the spans it produced and a deliberate
+500 to show what a span says that a response body does not. Run it with
+`./gradlew :example:runTracing`.
 
 ## Errors, and what a caller is told
 

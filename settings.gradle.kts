@@ -28,6 +28,7 @@ include(
     "pelican-ktor",
     "pelican-ktor-docs",
     "pelican-metrics",
+    "pelican-metrics-otel",
     "pelican-client-java",
     "pelican-client-pekko",
     "pelican-test",

@@ -429,9 +429,13 @@ a Pekko service already has. A service that already runs and tunes a Ktor
 client still cannot hand that one over, because that adapter does not exist
 yet. A build carrying both of the ones that do exist has to name the transport
 at each client it constructs, since nothing can choose between two providers on
-one classpath. The generated methods block, joining the stage the transport
-answers with, so there is no suspending or asynchronous variant to call. And nothing in the generated file does retries, backoff, circuit breaking
-or metrics; if you want those you write them around the transport. The client that `pelican-test` derives is explicitly narrower still,
+one classpath. The generated methods block by default, joining the stage the
+transport answers with; a `suspend` surface is generated instead when the client
+entry asks for one, and the choice belongs to whoever generates the file. Retries
+are a decorator over a transport rather than generated code, and are off unless
+somebody wraps one — but nothing here does circuit breaking or per-call metrics,
+and those you still write around the transport yourself. The client that
+`pelican-test` derives is explicitly narrower still,
 scoped at testing, blocking, with no retries and no pooling worth the name, and
 it cannot upload a binary file part because its `RequestSpec` carries a `String`
 body.
