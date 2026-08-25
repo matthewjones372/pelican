@@ -24,6 +24,9 @@ dependencies {
     implementation(project(":pelican-ktor"))
     implementation(project(":pelican-ktor-docs"))
     implementation(project(":pelican-jackson"))
+    // Meters, which are opt-in in the same way serving the docs is: this is the
+    // module that adds them, and `example.metrics` is what it looks like.
+    implementation(project(":pelican-metrics"))
     // The other two codec modules, for `example.codecs`: the same endpoints and
     // handlers served three times, once per JSON library. `pelican-kotlinx` also
     // carries the parser the assertions use — the tests read responses off a
@@ -104,6 +107,14 @@ tasks.register<JavaExec>("runCodecs") {
     description = "Runs the notes example on Jackson, kotlinx.serialization and jsoniter side by side"
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("example.codecs.ThreeCodecsKt")
+}
+
+/** The metered service: `curl` it, then read `/admin/meters` to see what that recorded. */
+tasks.register<JavaExec>("runMetrics") {
+    group = "application"
+    description = "Runs the Orders example with Micrometer meters taken from the descriptions"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.metrics.MeteredOrdersKt")
 }
 
 /** The README's "Your first endpoint", kept runnable for the same reason. */

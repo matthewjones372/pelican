@@ -121,7 +121,7 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-All seventeen modules are on Maven Central under `io.github.matthewjones372`,
+All eighteen modules are on Maven Central under `io.github.matthewjones372`,
 with sources and an empty javadoc jar.
 
 ```kotlin
@@ -679,6 +679,22 @@ compiled on every build.
 the caller to it. Add an endpoint with `security(idp, "reports:admin")` and it is
 covered before it is bound, with no second list to keep up to date.
 
+### Meters, from the same descriptions
+
+A filter can read the endpoint, so a metric does not have to be hand-written per
+route either. `pelican-metrics` is one line:
+
+```kotlin
+Api(endpoints, JacksonCodecs, filters = listOf(metrics(registry)))
+```
+
+That gives a Micrometer counter and timer for every endpoint, tagged with the
+method, the path *template* — `/orders/{orderId}`, so one series per route
+rather than one per order id — the operation id, the status, and whether the
+endpoint is deprecated. Nothing is passed in and nothing has to be kept in step
+with the router, because all of it is already written down on the endpoint. See
+[Metrics](docs/reference.md#metrics) for what it does and does not see.
+
 ### Unhandled exceptions
 
 ```
@@ -937,7 +953,7 @@ Six things that wanted a page rather than a section, and one benchmark:
 | [Importing an OpenAPI document](docs/importing.md) | A document somebody else wrote, read into descriptions: what comes out, what is refused, and how to get past a document you do not own. |
 | [The same endpoints, by hand](docs/by-hand.md) | The same two endpoints written directly against Pekko HTTP, so what the descriptions buy is legible rather than asserted. |
 | [Golden files](docs/golden-testing.md) | A test that fails when a change would break the callers you already have — a new required field, a deleted endpoint — and stays quiet when it would not. |
-| [Modules](docs/modules.md) | What each of the seventeen modules is for and what it depends on, for deciding which ones your build needs. |
+| [Modules](docs/modules.md) | What each of the eighteen modules is for and what it depends on, for deciding which ones your build needs. |
 | [What it costs](docs/what-it-costs.md) | The interpreter measured by JMH against the hand-written routes it replaces, with the baselines that comparison needs and the error bars it came with. |
 
 ---
@@ -951,6 +967,7 @@ Six things that wanted a page rather than a section, and one benchmark:
 ./gradlew :example:runBackends           # all three backends at once, on :8080-:8082
 ./gradlew :example:runCodecs             # all three JSON libraries at once, on :8080-:8082
 ./gradlew :example:runSecured            # a filter enforcing the security the descriptions declare
+./gradlew :example:runMetrics            # Micrometer meters tagged from the descriptions, at /admin/meters
 ./gradlew :example:generateOrdersDocument  # the spec, with no server started
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ```

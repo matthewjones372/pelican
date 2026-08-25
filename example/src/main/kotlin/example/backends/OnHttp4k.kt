@@ -1,6 +1,7 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.http4k.handledNow
 import io.github.matthewjones372.pelican.http4k.handledOneOf
@@ -46,15 +47,16 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
     filters handledNow { (tags, ids, features, seen) -> filtersOf(tags, ids, features, seen) },
 )
 
-fun http4kApi(): Api = greetingsApi(http4kRoutes)
+fun http4kApi(outerFilters: List<Filter> = emptyList()): Api =
+    greetingsApi(http4kRoutes, outerFilters = outerFilters)
 
 object OnHttp4k : Backend {
     override val name = "http4k"
 
-    override fun api(): Api = http4kApi()
+    override fun api(outerFilters: List<Filter>): Api = http4kApi(outerFilters)
 
-    override fun start(port: Int): Running {
-        val server = api().start(port = port)
+    override fun start(port: Int, outerFilters: List<Filter>): Running {
+        val server = api(outerFilters).start(port = port)
         return object : Running {
             override val baseUrl = server.baseUrl
             override fun stop() = server.stop()

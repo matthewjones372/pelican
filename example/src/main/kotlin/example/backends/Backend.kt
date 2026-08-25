@@ -1,6 +1,7 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.Filter
 
 /**
  * A backend, reduced to what anything outside it needs: bind the shared
@@ -20,11 +21,16 @@ interface Backend {
 
     /**
      * The shared endpoint descriptions bound to this backend's handlers.
+     *
+     * [outerFilters] run outside the service's own; see `greetingsApi`. It is
+     * here rather than in each suite's own wiring so that a test which needs to
+     * watch every request — `MetricsAcrossBackendsTest` does — can still ask
+     * all three backends the same question through this one seam.
      */
-    fun api(): Api
+    fun api(outerFilters: List<Filter> = emptyList()): Api
 
     /** Binds [api] on [port]; pass 0 to let the OS choose, which is what tests do. */
-    fun start(port: Int = 0): Running
+    fun start(port: Int = 0, outerFilters: List<Filter> = emptyList()): Running
 }
 
 /** A started server, and the two things a caller needs from one. */
