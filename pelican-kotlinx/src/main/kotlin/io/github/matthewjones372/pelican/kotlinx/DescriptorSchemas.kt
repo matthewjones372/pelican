@@ -37,7 +37,17 @@ internal class DescriptorSchemas(
         return if (desc.isNullable) base.orNull() else base
     }
 
-    private fun build(desc: SerialDescriptor): JsonObj = when (desc.kind) {
+    private fun build(desc: SerialDescriptor): JsonObj = when {
+        // A value class travels as the thing inside it — that is what `@JvmInline`
+        // means on the wire — so it is described as that. `ReflectionSchemas`
+        // already did this; without it the document said `object` where the codec
+        // wrote a number.
+        desc.isInline && desc.elementsCount == 1 -> schemaFor(desc.getElementDescriptor(0))
+
+        else -> buildKind(desc)
+    }
+
+    private fun buildKind(desc: SerialDescriptor): JsonObj = when (desc.kind) {
         PrimitiveKind.STRING, PrimitiveKind.CHAR -> prim("string")
 
         PrimitiveKind.BOOLEAN -> prim("boolean")

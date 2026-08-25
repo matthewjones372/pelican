@@ -64,10 +64,13 @@ class McpDispatchTest {
                     else ok(Order(1, "a-widget"))
                 completed(outcome)
             },
+            // `placeOrder` declares one response, so its handler returns the
+            // payload — an `Outcome` here would be the wrapper, which is what
+            // `handledNow` hands over and what the codec is asked to write.
             ServerEndpoint(placeOrder) { p ->
                 seen.apiKey = p[apiKey]
                 seen.body = p[newOrder]
-                completed(ok(Order(2, p[newOrder].item)))
+                completed(Order(2, p[newOrder].item))
             },
         ),
         codecs = JacksonCodecs,
