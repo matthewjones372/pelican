@@ -73,10 +73,10 @@ compile; there is no shape that silently keeps working and means something else.
 
 ## Stack
 
-- [ ] **`spec-0017-zero-is-zero`** — the overload returns `Endpoint<Unit, R>`; `noInputs` removed; every in-repo lens user moved to `endpoint(lensInputs)`.
-      Done when: `./gradlew build` is green, no `noInputs` remains, and an endpoint declaring inputs in its block reads them through a `Params` it asked for by name.
-- [ ] **`spec-0017-docs`** — `docs/reference.md`'s input section, the cookbook's lens recipe, and the "more than six typed inputs" refusal.
-      Done when: no page shows `endpoint(noInputs)`, and the lens form is introduced as what it is rather than as the default.
+- [x] **`spec-0017-zero-is-zero`** — the overload returns `Endpoint<Unit, R>`; `noInputs` removed; every in-repo lens user moved to `endpoint(lensInputs)`.
+      Done when: `./gradlew build` is green, no `noInputs` remains, and an endpoint declaring inputs in its block reads them through a `Params` it asked for by name. Landed in [#61](https://github.com/matthewjones372/pelican/pull/61).
+- [x] **`spec-0017-docs`** — `docs/reference.md`'s input section, the cookbook's lens recipe, and the "more than six typed inputs" refusal.
+      Done when: no page shows `endpoint(noInputs)`, and the lens form is introduced as what it is rather than as the default. Landed in [#62](https://github.com/matthewjones372/pelican/pull/62).
 
 ## Acceptance
 

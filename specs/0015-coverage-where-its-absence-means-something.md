@@ -70,16 +70,16 @@ overloads take a `List<String>` and build a `Map`, which is a place to be wrong.
 
 ## Stack
 
-- [ ] **`spec-0015-honest-denominator`** — Kover excludes for demo runners and `main`s, each with the reason beside it.
-      Done when: `./gradlew koverXmlReport` counts no `main`, and the excluded list names why rather than what.
-- [ ] **`spec-0015-security-builders`** — every builder in `Security.kt` constructed and asserted through `securitySchemesOf` and the emitted document.
-      Done when: each of the four flows, both scope spellings, and all three `apiKey` locations appear in a document that `OpenApiSpecQualityTest`'s parser accepts.
-- [ ] **`spec-0015-comparison-branches`** — the `Comparison` branches nothing reaches: a removed response, a narrowed schema, a parameter that becomes required, a `default` appearing.
-      Done when: each classifies as the spec's table says, and a `COSMETIC` change to a description never reads as `BREAKING`.
-- [ ] **`spec-0015-in-memory-http4k`** — `pelican-test-http4k`'s transport, exercised as `pelican-test-pekko`'s already is.
-      Done when: the module has a test, and the two in-memory transports answer one suite alike.
-- [ ] **`spec-0015-raise-the-floor`** — the floor moved to the whole number below where the work above lands.
-      Done when: `koverVerify` fails if the number drops, and the comment still says it is a ratchet.
+- [x] **`spec-0015-honest-denominator`** — Kover excludes for demo runners and `main`s, each with the reason beside it.
+      Done when: `./gradlew koverXmlReport` counts no `main`, and the excluded list names why rather than what. Landed in [#70](https://github.com/matthewjones372/pelican/pull/70).
+- [x] **`spec-0015-security-builders`** — every builder in `Security.kt` constructed and asserted through `securitySchemesOf` and the emitted document.
+      Done when: each of the four flows, both scope spellings, and all three `apiKey` locations appear in a document that `OpenApiSpecQualityTest`'s parser accepts. Landed in [#71](https://github.com/matthewjones372/pelican/pull/71).
+- [x] **`spec-0015-comparison-branches`** — the `Comparison` branches nothing reaches: a removed response, a narrowed schema, a parameter that becomes required, a `default` appearing.
+      Done when: each classifies as the spec's table says, and a `COSMETIC` change to a description never reads as `BREAKING`. Landed in [#74](https://github.com/matthewjones372/pelican/pull/74).
+- [x] **`spec-0015-in-memory-http4k`** — `pelican-test-http4k`'s transport, exercised as `pelican-test-pekko`'s already is.
+      Done when: the module has a test, and the two in-memory transports answer one suite alike. Landed in [#72](https://github.com/matthewjones372/pelican/pull/72).
+- [x] **`spec-0015-raise-the-floor`** — the floor moved to the whole number below where the work above lands.
+      Done when: `koverVerify` fails if the number drops, and the comment still says it is a ratchet. Landed in [#75](https://github.com/matthewjones372/pelican/pull/75).
 
 ## Acceptance
 

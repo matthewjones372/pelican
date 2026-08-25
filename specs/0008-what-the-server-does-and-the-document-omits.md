@@ -65,12 +65,12 @@ reached the line that sets it.
 
 ## Stack
 
-- [ ] **`spec-0008-headers-on-failures`** — `ep.responseHeaders` published on declared failures.
-      Done when: an endpoint with `emits(requestId)` and a declared 429 documents `X-Request-Id` on both, and the golden moves.
-- [ ] **`spec-0008-parameter-defaults`** — `default` in the parameter schema for query, header and cookie.
-      Done when: `.default(50)` publishes `"default":50`, `.optional()` publishes none, and a list-valued default publishes an array.
-- [ ] **`spec-0008-success-descriptions`** — `description` on `json`, `text`, `empty`, `ndjson`, `sse`, `jsonArray`, `bytes`, on both the member and the free function.
-      Done when: two successes carry two descriptions, and one that says nothing still gets the table's text.
+- [x] **`spec-0008-headers-on-failures`** — `ep.responseHeaders` published on declared failures.
+      Done when: an endpoint with `emits(requestId)` and a declared 429 documents `X-Request-Id` on both, and the golden moves. Landed in [#49](https://github.com/matthewjones372/pelican/pull/49).
+- [x] **`spec-0008-parameter-defaults`** — `default` in the parameter schema for query, header and cookie.
+      Done when: `.default(50)` publishes `"default":50`, `.optional()` publishes none, and a list-valued default publishes an array. Landed in [#50](https://github.com/matthewjones372/pelican/pull/50).
+- [x] **`spec-0008-success-descriptions`** — `description` on `json`, `text`, `empty`, `ndjson`, `sse`, `jsonArray`, `bytes`, on both the member and the free function.
+      Done when: two successes carry two descriptions, and one that says nothing still gets the table's text. Landed in [#51](https://github.com/matthewjones372/pelican/pull/51).
 
 ## Acceptance
 

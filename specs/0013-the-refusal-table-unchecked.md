@@ -72,8 +72,8 @@ can drift the same way the code did. Not recommended.
 
 ## Stack
 
-- [ ] **`spec-0013-refusal-parity`** — malformed JSON, and a required query parameter, header and cookie left off; `ContentNegotiationTest` parameterised.
-      Done when: each condition is one case answering one status and one body shape on all three, and deleting a clause from `described` turns three invocations red rather than one.
+- [x] **`spec-0013-refusal-parity`** — malformed JSON, and a required query parameter, header and cookie left off; `ContentNegotiationTest` parameterised.
+      Done when: each condition is one case answering one status and one body shape on all three, and deleting a clause from `described` turns three invocations red rather than one. Landed in [#39](https://github.com/matthewjones372/pelican/pull/39).
 
 ## Acceptance
 
