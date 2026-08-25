@@ -45,6 +45,8 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
     uploadFile handledNow { (caption, notes, file) -> uploaded(caption, notes, file) },
 
     filters handledNow { (tags, ids, features, seen) -> filtersOf(tags, ids, features, seen) },
+
+    strict handledNow { (term, key, jar) -> Strictly(term, key, jar) },
 )
 
 fun http4kApi(outerFilters: List<Filter> = emptyList()): Api =
