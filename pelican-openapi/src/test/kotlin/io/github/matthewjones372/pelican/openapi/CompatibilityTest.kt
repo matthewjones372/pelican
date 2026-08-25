@@ -276,6 +276,143 @@ class CompatibilityTest {
         reported.single().compatibility shouldBe Compatibility.COSMETIC
     }
 
+    // ------------------------------------------- the branches nothing reached
+    //
+    // Each of these is a rule the classifier already had and nothing exercised,
+    // which is the shape of mistake that matters here: an unreached branch does
+    // not fail loudly, it files a breaking change as compatible and a reviewer
+    // reads the summary rather than the diff.
+
+    @Test
+    fun `a response that stopped being sent is a caller matching on a status it will never see`() {
+        val two = endpoint {
+            get("orders")
+            operationId = "getOrder"
+            json<Order>() or empty(202)
+        }
+
+        onlyBreaking(spec(listOf(two, placeOrder)), spec()).what shouldContain "202"
+    }
+
+    @Test
+    fun `a new response beside the old one costs nobody anything`() {
+        val two = endpoint {
+            get("orders")
+            operationId = "getOrder"
+            json<Order>() or empty(202)
+        }
+
+        breaking(spec(), spec(listOf(two, placeOrder))).shouldBeEmpty()
+    }
+
+    @Test
+    fun `a response header that is gone is one a caller was reading`() {
+        val header = responseHeader<String>("X-Cursor")
+        val paged = endpoint {
+            get("orders")
+            operationId = "getOrder"
+            emits(header)
+            json<Order>()
+        }
+
+        onlyBreaking(spec(listOf(paged, placeOrder)), spec()).what shouldContain "X-Cursor"
+    }
+
+    @Test
+    fun `a response header that became optional is a promise withdrawn`() {
+        val always = responseHeader<String>("X-Cursor")
+        val sometimes = responseHeader<String>("X-Cursor").optional()
+
+        fun withHeader(h: ResponseHeader<*>) = endpoint {
+            get("orders")
+            operationId = "getOrder"
+            emits(h)
+            json<Order>()
+        }
+
+        onlyBreaking(spec(listOf(withHeader(always), placeOrder)), spec(listOf(withHeader(sometimes), placeOrder)))
+            .what shouldContain "X-Cursor"
+    }
+
+    @Test
+    fun `a request body that is no longer read cannot refuse anybody`() {
+        val without = endpoint {
+            post("orders")
+            operationId = "placeOrder"
+            json<Order>(status = 201)
+        }
+
+        breaking(spec(), spec(listOf(getOrder, without))).shouldBeEmpty()
+    }
+
+    @Test
+    fun `a media type dropped from a response is one a caller was asking for`() {
+        val negotiated = endpoint(jsonBody<CreateOrder>() or formBody<CreateOrder>()) {
+            post("orders")
+            operationId = "placeOrder"
+            json<Order>(status = 201)
+        }
+
+        onlyBreaking(spec(listOf(getOrder, negotiated)), spec()).what shouldContain "form-urlencoded"
+    }
+
+    @Test
+    fun `a media type added to a request is one more way to call it`() {
+        val negotiated = endpoint(jsonBody<CreateOrder>() or formBody<CreateOrder>()) {
+            post("orders")
+            operationId = "placeOrder"
+            json<Order>(status = 201)
+        }
+
+        breaking(spec(), spec(listOf(getOrder, negotiated))).shouldBeEmpty()
+    }
+
+    @Test
+    fun `a pattern a request field did not have to match before refuses what used to be sent`() {
+        val loose = mapOf("CreateOrder" to shape(Triple("item", true, string)))
+        val strict = mapOf(
+            "CreateOrder" to shape(
+                Triple("item", true, jsonObj { "type" to "string"; "pattern" to "^[a-z]+$" }),
+            ),
+        )
+
+        onlyBreaking(spec(shapes = loose), spec(shapes = strict)).what shouldContain "must match `^[a-z]+$` now"
+    }
+
+    @Test
+    fun `an operation marked deprecated still answers, so nobody is broken yet`() {
+        val going = endpoint {
+            get("orders")
+            operationId = "getOrder"
+            deprecated = true
+            json<Order>()
+        }
+
+        val found = changes(spec(), spec(listOf(going, placeOrder)))
+        breaking(spec(), spec(listOf(going, placeOrder))).shouldBeEmpty()
+        found.map { it.what }.joinToString() shouldContain "deprecated"
+    }
+
+    @Test
+    fun `a requirement dropped is one fewer thing a caller has to send`() {
+        val scheme = bearerAuth()
+        breaking(spec(security = listOf(scheme.requires())), spec()).shouldBeEmpty()
+    }
+
+    @Test
+    fun `prose never reads as a change to the contract`() {
+        val described = endpoint {
+            get("orders")
+            operationId = "getOrder"
+            summary = "Fetch the orders"
+            description = "Every order this caller may see"
+            json<Order>()
+        }
+
+        changes(spec(), spec(listOf(described, placeOrder)))
+            .forEach { it.compatibility shouldBe Compatibility.COSMETIC }
+    }
+
     @Test
     fun `a webhook is the same rules with the arrows reversed`() {
         val event = jsonBody<OrderEvent>()
