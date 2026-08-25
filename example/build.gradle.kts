@@ -174,6 +174,13 @@ tasks.register<JavaExec>("runTracing") {
     mainClass.set("example.tracing.TracedOrdersKt")
 }
 
+tasks.register<JavaExec>("runTelemetry") {
+    group = "application"
+    description = "One service, metered and traced, with a report that answers both."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.telemetry.MainKt")
+}
+
 /** The README's "Your first endpoint", kept runnable for the same reason. */
 tasks.register<JavaExec>("runFirstEndpoint") {
     group = "application"
