@@ -247,9 +247,29 @@ val filters = endpoint(tags, ids, features, seenBefore) {
     json<Filters>()
 }
 
+/**
+ * Three inputs nobody may leave out, which is what the rest of this file has
+ * none of: every other query, header and cookie here is optional or defaulted,
+ * so the 400 each interpreter raises for a missing one had nothing to raise it
+ * for. One endpoint, so that refusal is asked of all three backends.
+ */
+val requiredTerm = queryParam<String>("term", description = "What to look for")
+val requiredKey = headerParam<String>("X-Key", description = "Who is asking")
+val requiredJar = cookieParam<String>("jar", description = "A cookie with no default")
+
+data class Strictly(val term: String, val key: String, val jar: String)
+
+val strict = endpoint(requiredTerm, requiredKey, requiredJar) {
+    get("strict")
+    summary = "Answer only when every declared input arrived"
+    operationId = "strict"
+    tag("greetings")
+    json<Strictly>()
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
-    listOf(greet, countdown, echo, remember, preferences, signIn, uploadFile, filters)
+    listOf(greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict)
 
 /**
  * What a subscriber signs the notification with. An ordinary header input: a
