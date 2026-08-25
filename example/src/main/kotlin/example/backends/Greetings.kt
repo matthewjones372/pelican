@@ -19,6 +19,7 @@ import io.github.matthewjones372.pelican.formBody
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.jsonBody
+import io.github.matthewjones372.pelican.noInputs
 import io.github.matthewjones372.pelican.nonEmpty
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
@@ -267,9 +268,33 @@ val strict = endpoint(requiredTerm, requiredKey, requiredJar) {
     json<Strictly>()
 }
 
+/**
+ * Plain text and a routed 204. Neither was on the shared surface, so neither was
+ * ever asked of all three backends — they were described twice instead, once in
+ * `pelican-http4k`'s test fixtures and once in `pelican-ktor`'s, and not at all
+ * on Pekko.
+ */
+val motd = endpoint(noInputs) {
+    get("motd")
+    summary = "A line of text, as text"
+    operationId = "motd"
+    tag("greetings")
+    emits(requestId)
+    text()
+}
+
+val forget = endpoint(name) {
+    delete("greetings" / name)
+    summary = "Forget a remembered greeting"
+    operationId = "forget"
+    tag("greetings")
+    emits(requestId)
+    empty(204)
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
-    listOf(greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict)
+    listOf(greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict, motd, forget)
 
 /**
  * What a subscriber signs the notification with. An ordinary header input: a

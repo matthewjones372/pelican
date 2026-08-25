@@ -6,6 +6,7 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.ktor.handledNow
 import io.github.matthewjones372.pelican.ktor.handledOneOf
 import io.github.matthewjones372.pelican.ktor.handledOrFail
+import io.github.matthewjones372.pelican.ktor.handledWith
 import io.github.matthewjones372.pelican.ktor.start
 import io.github.matthewjones372.pelican.ktor.streamedNow
 import kotlinx.coroutines.delay
@@ -49,6 +50,10 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
     filters handledNow { (tags, ids, features, seen) -> filtersOf(tags, ids, features, seen) },
 
     strict handledNow { (term, key, jar) -> Strictly(term, key, jar) },
+
+    motd handledNow { "Be excellent to each other." },
+
+    forget handledWith { _ -> },
 )
 
 fun ktorApi(outerFilters: List<Filter> = emptyList()): Api =

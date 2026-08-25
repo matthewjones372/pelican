@@ -6,6 +6,7 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOneOf
 import io.github.matthewjones372.pelican.pekko.handledOrFail
+import io.github.matthewjones372.pelican.pekko.handledWith
 import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.pekko.streamedNow
 import org.apache.pekko.stream.javadsl.Source
@@ -44,6 +45,10 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
     filters handledNow { (tags, ids, features, seen) -> filtersOf(tags, ids, features, seen) },
 
     strict handledNow { (term, key, jar) -> Strictly(term, key, jar) },
+
+    motd handledNow { "Be excellent to each other." },
+
+    forget handledWith { _ -> },
 )
 
 fun pekkoApi(outerFilters: List<Filter> = emptyList()): Api =

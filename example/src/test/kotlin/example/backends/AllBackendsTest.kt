@@ -71,6 +71,42 @@ class AllBackendsTest {
         }
     }
 
+    // ------------------------------------------------------ text, and no body
+    //
+    // Two output kinds that were described once per backend, in two
+    // near-identical `TestApi.kt` files, and not at all on Pekko.
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `plain text arrives as text, with the media type that says so`(name: String, client: ApiClient) {
+        val res = client.response(motd, Unit)
+
+        withClue(name) {
+            res shouldHaveStatus 200
+            res.body shouldBe "Be excellent to each other."
+            res shouldHaveContentType "text/plain"
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a 204 carries no body at all`(name: String, client: ApiClient) {
+        val res = client.response(forget, "ada")
+
+        withClue(name) {
+            res shouldHaveStatus 204
+            res.body shouldBe ""
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `and still carries the header the endpoint emits`(name: String, client: ApiClient) {
+        // The value is minted per request by a filter, so what is asserted is
+        // that it is there at all.
+        withClue(name) { client.response(forget, "ada").header("X-Request-Id").shouldNotBeNull() }
+    }
+
     // ------------------------------------------------------------- a simple GET
 
     @ParameterizedTest(name = "{0}")
