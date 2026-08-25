@@ -34,6 +34,7 @@ internal object Pelican {
      * file uses.
      */
     private const val DEFAULT_OPEN_API_VERSION = "3.1.0"
+
     /** The same, for an entry that does not say whether its methods suspend. */
     private const val DEFAULT_CALL_STYLE = "BLOCKING"
 

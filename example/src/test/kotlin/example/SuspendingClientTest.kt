@@ -10,6 +10,7 @@ import example.generated.suspending.PlaceOrderFailure
 import example.generated.suspending.User
 import io.github.matthewjones372.pelican.ClientResponse
 import io.github.matthewjones372.pelican.ClientTransport
+import io.github.matthewjones372.pelican.client.JavaHttpTransport
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -57,7 +58,10 @@ class SuspendingClientTest {
     @BeforeAll
     fun setUp() {
         server = ordersApi().start(port = 0, systemName = "orders-suspending-client")
-        client = OrdersClient(server.baseUrl, codecs)
+        // Named rather than defaulted: this module carries both the JDK and the
+        // Pekko adapters, so `ClientTransport.default()` has two providers to
+        // choose between and rightly refuses to.
+        client = OrdersClient(server.baseUrl, codecs, JavaHttpTransport())
     }
 
     @AfterAll
