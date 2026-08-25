@@ -131,13 +131,13 @@ private fun parameters(ep: Endpoint<*, *>, version: OpenApiVersion): List<JsonVa
         add(parameter(p.name, "path", true, p.codec, p.description, version))
     }
     ep.queries.forEach { q ->
-        add(parameter(q.name, "query", q.required, q.codec, q.description, version, q.listStyle))
+        add(parameter(q.name, "query", q.required, q.codec, q.description, version, q.listStyle, q.default))
     }
     ep.headerParams.forEach { h ->
-        add(parameter(h.name, "header", h.required, h.codec, h.description, version, h.listStyle))
+        add(parameter(h.name, "header", h.required, h.codec, h.description, version, h.listStyle, h.default))
     }
     ep.cookieParams.forEach { c ->
-        add(parameter(c.name, "cookie", c.required, c.codec, c.description, version, c.listStyle))
+        add(parameter(c.name, "cookie", c.required, c.codec, c.description, version, c.listStyle, c.default))
     }
 }
 
@@ -486,6 +486,7 @@ private fun successDescription(out: Output<*>): String = when (out) {
  * everywhere it is used. Refinements ride along in the schema, so the document
  * states the constraint the server enforces.
  */
+@Suppress("LongParameterList") // One declaration's facets; they travel together.
 private fun parameter(
     name: String,
     location: String,
@@ -494,6 +495,7 @@ private fun parameter(
     description: String?,
     version: OpenApiVersion,
     listStyle: ListStyle? = null,
+    default: Any? = null,
 ): JsonObj = jsonObj {
     "name" to name
     "in" to location
@@ -502,7 +504,28 @@ private fun parameter(
     // A list's example is an example of its element, and lives in `items`.
     if (listStyle == null) putIfNotNull("example", codec.example)
     serialisation(listStyle, location, version)
-    put("schema", if (listStyle == null) codec.openApiSchema() else listSchema(codec))
+    // What the server puts in when the caller leaves it out. It reaches the
+    // document through the same codec the wire does, so the two spell it alike
+    // — `AGENTS.md` asks that of a refinement, and a default is the same claim
+    // pointing the other way.
+    val schema = if (listStyle == null) codec.openApiSchema() else listSchema(codec)
+    put("schema", if (default == null) schema else schema + jsonObj { put("default", defaultOf(codec, default)) })
+}
+
+/**
+ * A default as the JSON type its own schema describes: `50` under
+ * `type: integer`, `"en"` under `type: string`. A number written as a string
+ * would fail the schema it sits in.
+ */
+private fun defaultOf(codec: PlainCodec<*>, value: Any): JsonValue {
+    @Suppress("UNCHECKED_CAST")
+    val encoded = (codec as PlainCodec<Any>).encode(value)
+    return when (codec.openApiType) {
+        "integer" -> encoded.toLongOrNull()?.let { JsonNum(it) } ?: JsonStr(encoded)
+        "number" -> encoded.toDoubleOrNull()?.let { JsonNum(it) } ?: JsonStr(encoded)
+        "boolean" -> encoded.toBooleanStrictOrNull()?.let { JsonBool(it) } ?: JsonStr(encoded)
+        else -> JsonStr(encoded)
+    }
 }
 
 /**
