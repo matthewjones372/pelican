@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.ktor
 
 import io.github.matthewjones372.pelican.*
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -99,6 +100,12 @@ fun items(count: Int): Flow<Item> = flow {
     for (i in 1..count) emit(Item(i.toLong(), "item-$i"))
 }
 
+/** Bytes that may not be there: `bytes()` with a declared failure beside it. */
+val fetchBlob = endpoint(itemId) {
+    get("blobs" / itemId)
+    bytes("application/octet-stream") orFail noSuchItem
+}
+
 fun testApi(extra: List<ServerEndpoint> = emptyList()): Api = Api(
     endpoints = listOf(
         getItem handledOrFail { id ->
@@ -119,6 +126,9 @@ fun testApi(extra: List<ServerEndpoint> = emptyList()): Api = Api(
         echo bytesNow { body -> body.toChannel() },
         boom handledNow { _ -> error("handler blew up") },
         misdeclared handledOrFail { _ -> notMine(ApiError(409, "Not this endpoint's failure")) },
+        fetchBlob bytesOrFail { id ->
+            if (id == 1L) ok(ByteReadChannel("blobby")) else noSuchItem(ApiError(404, "No blob $id"))
+        },
     ) + extra,
     codecs = JacksonCodecs,
     title = "Items",

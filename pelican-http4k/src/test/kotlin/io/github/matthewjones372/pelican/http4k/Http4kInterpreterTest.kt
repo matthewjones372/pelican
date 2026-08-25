@@ -160,6 +160,17 @@ class Http4kInterpreterTest {
     }
 
     @Test
+    fun `a byte stream can fail before its first byte`() {
+        val ok = get("/blobs/1")
+        ok.status.code shouldBe 200
+        ok.bodyString() shouldBe "blobby"
+
+        val missing = get("/blobs/9")
+        missing.status.code shouldBe 404
+        missing.bodyString() shouldContain "No blob 9"
+    }
+
+    @Test
     fun `returning another endpoint's failure is a 500, not an undocumented status`() {
         val res = get("/misdeclared")
         res.status.code shouldBe 500

@@ -121,6 +121,13 @@ infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedBy(
 infix fun <I> Endpoint<I, ByteStream>.bytesNow(f: Params.(I) -> InputStream): ServerEndpoint =
     ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
 
+/** Binds an endpoint streaming opaque bytes that may fail before the first one. */
+infix fun <I, E : Any> Endpoint<I, Outcome<E, ByteStream>>.bytesOrFail(
+    f: Params.(I) -> Outcome<E, InputStream>,
+): ServerEndpoint = ServerEndpoint(this) { p ->
+    CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?)
+}
+
 // ------------------------------------------------------------- accessors
 
 internal class Http4kByteStream(val body: Body) : ByteStreamHandle

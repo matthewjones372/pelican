@@ -82,6 +82,11 @@ infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedNow(f: suspend Params.(I) -> F
 infix fun <I> Endpoint<I, ByteStream>.bytesNow(f: suspend Params.(I) -> ByteReadChannel): ServerEndpoint =
     ServerEndpoint(this) { p -> p.launch { p.f(inputs.extract(p)) } }
 
+/** Binds an endpoint streaming opaque bytes that may fail before the first one. */
+infix fun <I, E : Any> Endpoint<I, Outcome<E, ByteStream>>.bytesOrFail(
+    f: suspend Params.(I) -> Outcome<E, ByteReadChannel>,
+): ServerEndpoint = ServerEndpoint(this) { p -> p.launch { p.f(inputs.extract(p)) } }
+
 // ------------------------------------------------------------- accessors
 
 internal class KtorByteStream(val channel: ByteReadChannel) : ByteStreamHandle

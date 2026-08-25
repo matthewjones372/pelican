@@ -173,6 +173,17 @@ class KtorInterpreterTest {
     }
 
     @Test
+    fun `a byte stream can fail before its first byte`() = served { client ->
+        val ok = client.get("/blobs/1")
+        ok.status.value shouldBe 200
+        ok.bodyAsText() shouldBe "blobby"
+
+        val missing = client.get("/blobs/9")
+        missing.status.value shouldBe 404
+        missing.bodyAsText() shouldContain "No blob 9"
+    }
+
+    @Test
     fun `returning another endpoint's failure is a 500, not an undocumented status`() = served { client ->
         client.get("/misdeclared").status.value shouldBe 500
     }
