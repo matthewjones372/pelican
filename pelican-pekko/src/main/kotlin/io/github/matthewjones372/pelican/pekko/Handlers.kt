@@ -37,7 +37,7 @@ infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoi
 
 // ------------------------------------------------------------- declared failures
 //
-// `orFail` makes an `Endpoint<I, Fallible<E, T>>`, and these are the only
+// `orFail` makes an `Endpoint<I, Outcome<E, T>>`, and these are the only
 // binders that fit it: the handler returns an `Outcome`, so an undeclared
 // error is a compile error.
 //
@@ -45,43 +45,43 @@ infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoi
 // inferred after overload resolution.
 
 /** Binds an endpoint that either succeeds with [T] or returns a declared failure. */
-infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOrFail(
+infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledOrFail(
     f: Params.(I) -> Outcome<E, T>,
 ): ServerEndpoint = ServerEndpoint(this) { p ->
     CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?)
 }
 
 /** As [handledOrFail], for a handler that answers asynchronously. */
-infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledByOrFail(
+infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledByOrFail(
     f: Params.(I) -> CompletionStage<Outcome<E, T>>,
 ): ServerEndpoint = ServerEndpoint(this) { p -> p.f(inputs.extract(p)).thenApply { it as Any? } }
 
 // ------------------------------------------------------------- several successes
 //
 // The same binder under the name that reads right when the alternatives are
-// not failures — `Fallible<Nothing, T>` is the shape above with an empty
+// not failures — `Outcome<Nothing, T>` is the shape above with an empty
 // failure side. Two names because `handledOrFail` on an endpoint declaring no
 // failure reads as a mistake.
 
 /** Binds an endpoint that answers with one of several declared responses. */
-infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOneOf(
+infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledOneOf(
     f: Params.(I) -> Outcome<E, T>,
 ): ServerEndpoint = handledOrFail(f)
 
 /** As [handledOneOf], for a handler that answers asynchronously. */
-infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledByOneOf(
+infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledByOneOf(
     f: Params.(I) -> CompletionStage<Outcome<E, T>>,
 ): ServerEndpoint = handledByOrFail(f)
 
 /** Binds a streaming endpoint that may fail before the first element. */
-infix fun <I, E : Any, T> Endpoint<I, Fallible<E, StreamOf<T>>>.streamedOrFail(
+infix fun <I, E : Any, T> Endpoint<I, Outcome<E, StreamOf<T>>>.streamedOrFail(
     f: Params.(I) -> Outcome<E, Source<T, NotUsed>>,
 ): ServerEndpoint = ServerEndpoint(this) { p ->
     CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?)
 }
 
 /** As [streamedOrFail], for a handler that decides asynchronously. */
-infix fun <I, E : Any, T> Endpoint<I, Fallible<E, StreamOf<T>>>.streamedByOrFail(
+infix fun <I, E : Any, T> Endpoint<I, Outcome<E, StreamOf<T>>>.streamedByOrFail(
     f: Params.(I) -> CompletionStage<Outcome<E, Source<T, NotUsed>>>,
 ): ServerEndpoint = ServerEndpoint(this) { p -> p.f(inputs.extract(p)).thenApply { it as Any? } }
 

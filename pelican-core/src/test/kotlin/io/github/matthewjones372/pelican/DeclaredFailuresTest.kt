@@ -129,7 +129,7 @@ class DeclaredFailuresTest {
         // The declared type on the left is the assertion: inference that
         // stopped producing the sealed supertype would leave a handler unable
         // to answer with a `when` over Trouble.
-        val ep: Endpoint<Long, Fallible<Trouble, Widget>> = endpoint(widgetId) {
+        val ep: Endpoint<Long, Outcome<Trouble, Widget>> = endpoint(widgetId) {
             get("widgets" / widgetId)
             json<Widget>().orFail(gone, denied)
         }
