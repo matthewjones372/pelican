@@ -13,13 +13,11 @@ import example.generated.PlaceOrderFailure
 import example.generated.StreamOrdersFailure
 import example.generated.SubmitOrderFailure
 import example.generated.SubmitOrderResult
+import io.github.matthewjones372.pelican.InMemoryClientTransport
 import io.github.matthewjones372.pelican.UploadedFile
-import io.github.matthewjones372.pelican.client.JavaHttpTransport
 import io.github.matthewjones372.pelican.codegen.kotlinClient
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
-import io.github.matthewjones372.pelican.pekko.PelicanServer
-import io.github.matthewjones372.pelican.pekko.start
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
@@ -30,14 +28,10 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayInputStream
 import java.io.File
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GeneratedKotlinClientTest {
 
     /**
@@ -50,23 +44,18 @@ class GeneratedKotlinClientTest {
         defaultMapper().setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL),
     )
 
-    private lateinit var server: PelicanServer
-    private lateinit var client: OrdersClient
-
-    @BeforeAll
-    fun setUp() {
-        server = ordersApi().start(port = 0, systemName = "orders-generated-client")
-        // Named rather than defaulted: this source set carries both adapters,
-        // and `ClientTransport.default()` refuses to choose between two
-        // providers. `PekkoTransportClientTest` runs the same client over the
-        // other one.
-        client = OrdersClient(server.baseUrl, codecs, JavaHttpTransport())
-    }
-
-    @AfterAll
-    fun tearDown() {
-        server.stop().toCompletableFuture().join()
-    }
+    /**
+     * No port, no bind, no adapter: the requests this client builds are handed
+     * to the API as a function. What they cross is the routing, the decoding,
+     * the filters and the handlers a bound server runs, so what is asserted
+     * below is still the service — `PekkoTransportClientTest` and
+     * `KtorTransportClientTest` are where the same calls go over a socket.
+     */
+    private val client = OrdersClient(
+        baseUrl = "http://orders.test",
+        codecs = codecs,
+        transport = InMemoryClientTransport(example.http4k.ordersApi()),
+    )
 
     // ------------------------------------------------------------ plain calls
 
@@ -227,12 +216,6 @@ class GeneratedKotlinClientTest {
         )
 
         result.session.shouldBeNull()
-    }
-
-    @Test
-    fun `a raw body is echoed back as an opaque stream`() {
-        val echoed = client.echo(ByteArrayInputStream("hello pelican".toByteArray()))
-        echoed.use { it.readBytes().toString(Charsets.UTF_8) } shouldBe "hello pelican"
     }
 
     // ------------------------------------------------------------ streaming

@@ -1400,6 +1400,53 @@ blocking and carries a `String` body on purpose, because a test asserts on a
 result it already has — which is exactly why the typed test client
 [cannot upload binary](#what-isnt-here). Right taste, wrong constraints.
 
+### Without a socket
+
+The fourth implementation of the interface carries nothing anywhere.
+`InMemoryClientTransport(api)` answers a `ClientRequest` by calling the `Api`
+it was given:
+
+```kotlin
+val client = OrdersClient("http://orders.test", JacksonCodecs, InMemoryClientTransport(api))
+```
+
+It is in `pelican-core` because everything it needs is already there. `Api` and
+`ClientTransport` are core types, the handler chain is `CompletionStage`-based,
+and routing, input decoding, error rendering and response framing are core's
+own — so the bridge is a reading of the same values rather than a fourth
+backend, and it adds nothing to a runtime classpath that is still the Kotlin
+standard library.
+
+What crosses is the server. The trie matches the path, the declared inputs are
+decoded by their own codecs, the `Api`'s filters run in the order they were
+listed, the handler is the bound one, and the response is built from the
+declaration the handler named — including a declared failure's status and
+headers, and a 500 with a reference for anything nobody described. A test
+written against it is a test of the service; what it saves is the port, the
+bind and the milliseconds.
+
+Two things cannot cross, and both are refused by name rather than by the
+`ClassCastException` that would otherwise arrive a moment later:
+
+- **A `bytes(...)` request body.** The handle a handler reads it through is
+  `Http4kByteStream`, `PekkoByteStream` or `KtorByteStream` — the backend's own
+  type, held behind that backend's own accessor. Core has no value to hand
+  over, and says so naming the endpoint.
+- **A streamed response that is not a `Sequence`.** http4k's binders hand back
+  a `Sequence` and it crosses whole; Pekko's hand back a `Source` and Ktor's a
+  `Flow`, which core cannot read without becoming a dependent of that library.
+
+Both are `UnsupportedInMemoryCall`, and both mean the same thing: that call
+belongs against a bound server. `example` runs `GeneratedKotlinClientTest` this
+way — eighteen calls including multipart uploads, NDJSON, SSE and a chunked
+JSON array, with no port bound — and keeps the byte-stream echo in
+`PekkoTransportClientTest`, where there is a socket for it.
+
+One thing a bound server does that this does not: log. Core has no logger, so
+an unexpected failure reaches `Api.onServerError` where one is set and is
+otherwise reported by the reference in the response body alone. Set the hook if
+a 500 in a test should say what caused it.
+
 ### On Pekko HTTP
 
 `PekkoHttpTransport` takes an actor system, or does without one:

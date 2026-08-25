@@ -50,6 +50,12 @@ one.
   `ignoreUnknownKeys`, `encodeDefaults` and `explicitNulls` are what it reads.
   And a success carrying a payload its response never declared is now an
   `UndeclaredResponse` naming both types, the check a failure already had.
+- **`InMemoryClientTransport(api)`**, in `pelican-core`: a `ClientTransport`
+  that answers a generated client's requests by calling the `Api` in memory —
+  the same routing, decoding, filters, handlers and response building a bound
+  server runs, with no port and no mock. A `bytes(...)` request body and a
+  streamed response that is not a `Sequence` are refused by name, because the
+  values behind those belong to a backend rather than to core.
 
 ### Changed
 

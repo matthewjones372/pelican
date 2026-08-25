@@ -602,6 +602,11 @@ public final class io/github/matthewjones372/pelican/In6 {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/InMemoryClientTransport : io/github/matthewjones372/pelican/ClientTransport {
+	public fun <init> (Lio/github/matthewjones372/pelican/Api;)V
+	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
+}
+
 public final class io/github/matthewjones372/pelican/Inputs {
 	public fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
 	public final fun getExtract ()Lkotlin/jvm/functions/Function1;
@@ -1431,6 +1436,10 @@ public final class io/github/matthewjones372/pelican/TuplesKt {
 }
 
 public final class io/github/matthewjones372/pelican/UndeclaredResponse : java/lang/RuntimeException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class io/github/matthewjones372/pelican/UnsupportedInMemoryCall : java/lang/RuntimeException {
 	public fun <init> (Ljava/lang/String;)V
 }
 

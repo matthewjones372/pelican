@@ -82,6 +82,18 @@ class PekkoTransportClientTest {
         result.session shouldBe "s-42"
     }
 
+    /**
+     * The one call no in-memory transport can carry: the handle a `bytes(...)`
+     * handler reads its body through is the backend's own type, so this is
+     * asserted here, over a socket, rather than in `GeneratedKotlinClientTest`.
+     */
+    @Test
+    fun `a raw body is echoed back as an opaque stream`() {
+        val echoed = client.echo(ByteArrayInputStream("hello pelican".toByteArray()))
+
+        echoed.use { it.readBytes().toString(Charsets.UTF_8) } shouldBe "hello pelican"
+    }
+
     @Test
     fun `ndjson arrives as a sequence of the element type`() {
         val orders = (client.streamOrders(1L, limit = 3, status = OrderStatus.SHIPPED) as Outcome.Ok).value.toList()

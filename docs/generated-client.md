@@ -160,6 +160,33 @@ as an unread stream that `Streamed<T>` decodes off as elements land. The
 reasoning is in
 [docs/reference.md](reference.md#the-transport-a-generated-client-sends-with).
 
+## Calling it without a socket
+
+`InMemoryClientTransport` is a `ClientTransport` over an `Api` value, so a
+generated client can be pointed at the service in the same process:
+
+```kotlin
+val client = OrdersClient("http://orders.test", JacksonCodecs, InMemoryClientTransport(api))
+
+client.getUser(1L) shouldBe Outcome.Ok(User(1L, "Ada Lovelace", "ada@example.com"))
+```
+
+No port is bound and nothing is mocked. Routing, input decoding, the filters
+the `Api` declares, the handlers and the response building are the ones a bound
+server runs, because they are the same functions reading the same descriptions
+— a test written this way is a test of the service, and it starts in
+microseconds. It lives in `pelican-core`, so it is also available to production
+wiring that would rather call a service it happens to be hosting than send a
+request to itself.
+
+Two things a backend owns cannot cross, and both are refused by name rather
+than by `ClassCastException`. A `bytes(...)` request body: the handle a handler
+reads it through is that backend's own type, and core has no value to hand
+over. And a streamed response a handler produced as something other than a
+`Sequence` — Pekko's `Source`, Ktor's `Flow` — which core cannot read without
+depending on that library. An http4k binding streams as a `Sequence` and
+crosses whole; for the other two, those calls belong against a bound server.
+
 ## Blocking or suspending
 
 A generated client's methods block by default: they join the stage and unwrap

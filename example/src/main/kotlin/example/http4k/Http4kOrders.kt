@@ -19,10 +19,12 @@ import example.payOrder
 import example.placeOrder
 import example.placeOrderForm
 import example.reindex
+import example.retryAfter
 import example.searchOrders
 import example.statusFilter
 import example.streamOrders
 import example.submitOrder
+import example.throttled
 import example.watchOrders
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
@@ -84,7 +86,14 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     placeOrder handledOrFail { (id, key, req) ->
         when {
             key != "let-me-in" -> badApiKey(ApiError(401, "Bad API key"))
+
             Store.user(id) == null -> noSuchUser(ApiError(404, "No user $id"))
+
+            req.quantity > Store.BURST_LIMIT -> throttled(
+                ApiError(429, "At most ${Store.BURST_LIMIT} of anything in one order"),
+                retryAfter of Store.RETRY_AFTER_SECONDS,
+            )
+
             else -> ok(Store.create(id, req))
         }
     },
