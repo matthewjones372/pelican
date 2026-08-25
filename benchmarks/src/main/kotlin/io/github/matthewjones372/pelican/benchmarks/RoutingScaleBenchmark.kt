@@ -49,9 +49,9 @@ import io.github.matthewjones372.pelican.pekko.handledNow as handledOnPekko
  * between services. Pekko's interpreter reduces its routes with
  * `Directives.concat` and http4k's `routes(...)` tries them in order, so both
  * are an ordered scan: a request runs a method comparison and, where that
- * passes, a full path walk per candidate until one matches. Ktor is exempt —
- * `Route.pelican` installs one Ktor route per endpoint and lets Ktor's own tree
- * score them.
+ * passes, a full path walk per candidate until one matches. Ktor dispatches
+ * through the same index these two do — one route per method, and the trie
+ * decides — and is not measured here.
  *
  * The endpoint under test is declared *last*, which is the worst case an
  * ordered scan has and the one a service acquires by adding endpoints over

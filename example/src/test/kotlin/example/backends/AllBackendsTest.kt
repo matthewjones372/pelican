@@ -276,6 +276,70 @@ class AllBackendsTest {
         client.transport.send(client.request(greet, In2("ada", false)).withPath("/nope")).status shouldBe 404
     }
 
+    // ------------------------------------------------ what the request line said
+    //
+    // One decoder, in core, reached the same way by all three: the backends used
+    // to hand their router three different spellings of the same path and then
+    // decode it three different ways. `roundtrip` hands back what arrived, so
+    // every claim below is about the request line and nothing else.
+
+    /** What arrived in the path, for a line built by hand rather than from a value. */
+    private fun ApiClient.pathOf(rawPath: String): String =
+        Json.parseToJsonElement(transport.send(request(roundtrip, In2("x", null)).withPath(rawPath)).body)
+            .jsonObject["fromPath"]!!.jsonPrimitive.content
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a plus in a path segment is a plus, not a space`(name: String, client: ApiClient) {
+        withClue(name) { client.call(roundtrip, In2("c++", null)).fromPath shouldBe "c++" }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `and an unencoded one means the same thing`(name: String, client: ApiClient) {
+        // A legal request line: RFC 3986 gives `+` no meaning in a path, and
+        // only a form decoder reads it as a space.
+        withClue(name) { client.pathOf("/items/c++") shouldBe "c++" }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `an encoded slash stays inside the segment that carried it`(name: String, client: ApiClient) {
+        // The split happens before anything is decoded, so this is one segment
+        // holding a slash rather than two segments and a different route.
+        withClue(name) { client.call(roundtrip, In2("a/b", null)).fromPath shouldBe "a/b" }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `an encoded space is a space`(name: String, client: ApiClient) {
+        withClue(name) {
+            client.call(roundtrip, In2("ada lovelace", null)).fromPath shouldBe "ada lovelace"
+            client.pathOf("/items/ada%20lovelace") shouldBe "ada lovelace"
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `an escape spelling an ordinary character decodes to it`(name: String, client: ApiClient) {
+        withClue(name) { client.pathOf("/items/%61da") shouldBe "ada" }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `and decoding happens once, so an encoded escape arrives as text`(name: String, client: ApiClient) {
+        withClue(name) { client.pathOf("/items/%2561") shouldBe "%61" }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a trailing slash does not change which endpoint answers`(name: String, client: ApiClient) {
+        withClue(name) {
+            client.pathOf("/items/x/") shouldBe "x"
+            client.transport.send(client.request(motd, Unit).withPath("/motd/")).status shouldBe 200
+        }
+    }
+
     // ------------------------------------------------------------ the contract
 
     @ParameterizedTest(name = "{0}")

@@ -54,6 +54,8 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
 
     strict handledNow { (term, key, jar) -> Strictly(term, key, jar) },
 
+    roundtrip handledNow { (inPath, inQuery) -> RoundTrip(inPath, inQuery) },
+
     motd handledNow { "Be excellent to each other." },
 
     forget handledWith { _ -> },

@@ -9,8 +9,6 @@ import org.apache.pekko.http.javadsl.server.Route
 import org.apache.pekko.stream.javadsl.Source
 import org.apache.pekko.stream.javadsl.StreamConverters
 import org.apache.pekko.util.ByteString
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
@@ -89,6 +87,11 @@ private fun methodRoute(
 
         // A path that decodes into the wrong type is a 400 naming the
         // parameter, which is what the scan did when it decoded a capture.
+        //
+        // `getPathString` renders Pekko's parsed path back out, so what the
+        // index gets still carries every escape that changes what a segment is
+        // — `%2F` stays `%2F` rather than becoming a separator. The index does
+        // the decoding, once, after splitting.
         val matched = try {
             index.match(method, req.uri.getPathString(), values)
         } catch (t: Throwable) {

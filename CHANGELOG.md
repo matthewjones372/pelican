@@ -14,7 +14,25 @@ one.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **A path segment is decoded as a path, not as a form.** A `+` in a captured
+  segment arrived as a space, because captures were decoded with `URLDecoder`;
+  `/tags/c++` now reaches a handler as `c++`. Literals are matched decoded too,
+  so `/users/%61dmin` finds the route declared `/users/admin`. A malformed
+  escape is a 400 naming the segment rather than a 500 out of an interpreter's
+  last-resort catch.
+- **An encoded slash stays inside the segment that carried it.** The path is
+  split on `/` before anything is decoded, so `/items/a%2Fb` is one captured
+  value and never two segments and a different route.
+
+### Changed
+
+- **Ktor dispatches through `RouteIndex`**, as the other two backends already
+  did, rather than installing one Ktor route per endpoint. Decoding, precedence
+  and the trailing-slash rule are one answer on all three. Where a request lands
+  is still Ktor's: a constant segment scores above the tailcard these routes
+  install, so routes written by hand beside them keep the paths they describe.
 
 ## [0.2.0]
 

@@ -19,10 +19,10 @@ import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.Params
-import io.github.matthewjones372.pelican.PathSegment
 import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.RequestBodyCodecs
+import io.github.matthewjones372.pelican.RouteIndex
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.acceptable
 import io.github.matthewjones372.pelican.corsPolicy
@@ -31,8 +31,8 @@ import io.github.matthewjones372.pelican.decodeList
 import io.github.matthewjones372.pelican.handlerFor
 import io.github.matthewjones372.pelican.readStrictBody
 import io.github.matthewjones372.pelican.requestBodyCodec
+import io.github.matthewjones372.pelican.routeIndex
 import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
@@ -50,15 +50,20 @@ import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.IdentityHashMap
+import java.util.concurrent.CompletionStage
 
 /**
- * Interprets an [Api] as Ktor routes: each endpoint becomes
- * `route(template, method) { handle { ... } }`, so matching and the 404/405
- * rules are Ktor's own. A [PathSpec.template] is already Ktor's syntax, so the
- * two agree by construction rather than by translation.
+ * Interprets an [Api] as Ktor routes: one route per method the descriptions
+ * use, each dispatching through the same [RouteIndex] the other two backends
+ * walk, so a request line means one thing whichever server reads it.
  *
- * Nothing is sorted here, unlike the other two backends: Ktor's routing tree
- * scores a constant segment above a parameter. `RoutingTest` asserts that.
+ * Ktor's own tree used to do the matching, from `PathSpec.template`. It decoded
+ * a segment its own way, applied its own trailing-slash rule and could not be
+ * asked what the other two would have answered — three routers to keep in step
+ * rather than one to prove. What is still Ktor's is where a request lands: a
+ * constant segment scores above a tailcard, so routes written by hand beside
+ * these keep winning the paths they describe, and a path nothing here describes
+ * is the same 404 as before.
  *
  * A `Route` extension, because that is the unit a Ktor service composes — put
  * the endpoints under `authenticate { }`, behind a `route("/v2")`, or beside
@@ -74,44 +79,67 @@ fun Route.pelican(api: Api) {
 
     // Once per endpoint, captured by the routes: KType -> JavaType reflection
     // is not free, and a broken codec becomes a startup failure.
-    for (se in api.endpoints) {
-        val codecs = se.endpoint.resolveCodecs(api.codecs)
-        // Folded around the handler once rather than per request, likewise.
-        val bound = api.handlerFor(se)
-        route(se.endpoint.pathSpec.template, se.endpoint.method.toKtor()) {
-            handle {
-                // Ktor sends headers with the first byte of the body, and a
-                // stream writes that as soon as its first frame is encoded.
-                call.addCorsHeaders(cors)
-                invoke(se, api, codecs, bound, call)
-            }
+    val codecs = api.endpoints.associateWith { it.endpoint.resolveCodecs(api.codecs) }
+
+    // Folded around each handler once rather than per request, likewise.
+    val handlers = api.endpoints.associateWith { api.handlerFor(it) }
+
+    val index = api.endpoints.routeIndex()
+
+    // Per method rather than one route overall, so a verb no endpoint declares
+    // anywhere never reaches this and stays Ktor's own 404. The extra `OPTIONS`
+    // is the preflight a browser sends; an API declaring `OPTIONS` itself is
+    // dispatched through the index like anything else.
+    val declared = api.endpoints.map { it.endpoint.method }.distinct()
+    val methods = if (cors == null || Method.OPTIONS in declared) declared else declared + Method.OPTIONS
+
+    methods.forEach { method ->
+        route(ANY_PATH, method.toKtor()) {
+            handle { call.dispatch(method, api, index, codecs, handlers, cors) }
         }
     }
-
-    preflightRoutes(api, cors)
 }
 
 /**
- * One `OPTIONS` route per declared path, for a browser's preflight. A path that
- * declares its own `OPTIONS` endpoint keeps it.
+ * Every path under this route, because the index is what decides which endpoint
+ * answers. Unnamed, so Ktor does not build a parameter list nothing reads.
  */
-private fun Route.preflightRoutes(api: Api, cors: CorsPolicy?) {
-    if (cors == null) return
+private const val ANY_PATH = "{...}"
 
-    val declaresOptions = api.endpoints
-        .filter { it.endpoint.method == Method.OPTIONS }
-        .map { it.endpoint.pathSpec.template }
-        .toSet()
+/** The endpoint the index finds, the preflight nobody described, or a 404. */
+@Suppress("LongParameterList") // The route's whole world, resolved once and captured.
+private suspend fun ApplicationCall.dispatch(
+    method: Method,
+    api: Api,
+    index: RouteIndex,
+    codecs: Map<ServerEndpoint, EndpointCodecs>,
+    handlers: Map<ServerEndpoint, (Params) -> CompletionStage<Any?>>,
+    cors: CorsPolicy?,
+) {
+    val values = LinkedHashMap<ParamKey<*>, Any?>()
 
-    api.endpoints
-        .map { it.endpoint.pathSpec.template }
-        .distinct()
-        .filterNot { it in declaresOptions }
-        .forEach { template ->
-            route(template, HttpMethod.Options) {
-                handle { call.respondPreflight(cors) }
-            }
+    // The raw request path: the index splits on `/` before it decodes anything,
+    // so an encoded slash stays inside the segment that carried it. A capture
+    // that will not decode, or an escape that is not one, is a 400 naming what
+    // was wrong rather than somebody else's 404.
+    val matched = try {
+        index.match(method, request.path(), values)
+    } catch (t: Throwable) {
+        return respondError(t, api)
+    }
+
+    when {
+        matched != null -> {
+            // Ktor sends headers with the first byte of the body, and a stream
+            // writes that as soon as its first frame is encoded.
+            addCorsHeaders(cors)
+            invoke(matched, api, codecs.getValue(matched), handlers.getValue(matched), this, values)
         }
+
+        method == Method.OPTIONS && cors != null -> respondPreflight(cors)
+
+        else -> respond(HttpStatusCode.NotFound)
+    }
 }
 
 private suspend fun ApplicationCall.respondPreflight(cors: CorsPolicy) {
@@ -201,18 +229,7 @@ private fun decodePlainInputs(
     call: ApplicationCall,
     into: MutableMap<ParamKey<*>, Any?>,
 ) = with(into) {
-    // A loop rather than `filterIsInstance`, which allocates a list per
-    // request to hold what is walked once.
-    ep.pathSpec.segments.forEach { segment ->
-        if (segment is PathSegment.Capture) {
-            val param = segment.param
-            // Present by construction: this handler only runs for a request
-            // the template matched.
-            val raw = call.parameters[param.name]
-                ?: error("$ep matched ${call.request.local.uri} but captured no '${param.name}'")
-            put(param, param.codec.decode(param.name, raw))
-        }
-    }
+    // Path captures are already here: the index decoded them as it matched.
 
     ep.queries.forEach { q ->
         val style = q.listStyle
@@ -337,15 +354,16 @@ private suspend fun readBody(
     }
 }
 
+@Suppress("LongParameterList") // One request's world, threaded rather than held.
 private suspend fun invoke(
     se: ServerEndpoint,
     api: Api,
     codecs: EndpointCodecs,
-    bound: (Params) -> java.util.concurrent.CompletionStage<Any?>,
+    bound: (Params) -> CompletionStage<Any?>,
     call: ApplicationCall,
+    values: MutableMap<ParamKey<*>, Any?>,
 ) {
     val ep = se.endpoint
-    val values = LinkedHashMap<ParamKey<*>, Any?>()
 
     // Built before decoding, so a filter or a failing decode can still put a
     // header on the way out.

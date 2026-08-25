@@ -163,6 +163,31 @@ At scale, `example/OrdersApi.kt` and `example/http4k/Http4kOrders.kt` bind the
 same endpoint list on either backend, and `ClientContractTest` — written entirely
 against descriptions — runs against both, so any divergence is a failing test.
 
+### What the request line says
+
+All three hand the path, as it arrived, to the same router. `RouteIndex` splits
+it on `/` **first** and then percent-decodes each segment once, so a request
+line means one thing whichever server read it:
+
+| the line | what the handler is given |
+|---|---|
+| `/tags/c++` | `c++` — a path is not a form, and RFC 3986 gives `+` no other meaning |
+| `/tags/c%2B%2B` | `c++`, the same value spelled the other way |
+| `/items/a%2Fb` | one segment, `a/b`. Never two segments and a different route |
+| `/users/%61dmin` | the route declared `/users/admin`; a literal is matched decoded too |
+| `/items/%2561` | `%61`. Decoding happens once |
+| `/orders/`, `//orders` | `/orders`. A repeated or trailing slash collapses |
+| `/items/%zz` | **400**, naming the segment. Not a 404, and not a 500 |
+
+Two of these used to be wrong three different ways. Captures were decoded with
+`URLDecoder`, which is `application/x-www-form-urlencoded` and reads `+` as a
+space; literals were matched raw while captures were matched decoded; and a
+malformed escape threw where a backend's last-resort catch turned it into a 500.
+
+Query values are a different question with a different answer: `+` there *does*
+mean a space, because that is what the form encoding a browser sends says, and
+each backend's own parser reads the query string.
+
 ### The server underneath
 
 `pelican-http4k` interprets an API into a plain `HttpHandler`; which http4k

@@ -114,8 +114,9 @@ What replaced what: an earlier attempt grouped the routes under a prefix using
 http4k's own nesting, and measured 155µs at two hundred — an outer scan is still
 a scan. Only owning the dispatch moves the number.
 
-Ktor is exempt by construction — `Route.pelican` installs one Ktor route per
-endpoint and lets Ktor's own tree score them — and is not yet measured here.
+Ktor dispatches through the same index — `Route.pelican` installs one route per
+method the descriptions use and the trie decides which endpoint answers — and is
+not yet measured here.
 
 ## An endpoint with nothing to decode
 

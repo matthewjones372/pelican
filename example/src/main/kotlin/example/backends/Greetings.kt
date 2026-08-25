@@ -269,6 +269,29 @@ val strict = endpoint(requiredTerm, requiredKey, requiredJar) {
 }
 
 /**
+ * One value in the path and the same value in the query, handed straight back.
+ *
+ * Everything else here decodes a segment into a `Long`, a `Boolean` or a name,
+ * and none of those can carry a `+`, a `%2F` or a space. This one is a string
+ * that goes nowhere near a domain, so what comes back is only what the request
+ * line said — which is what `AllBackendsTest` and `RequestLinePropertyTest` ask
+ * of all three backends.
+ */
+data class RoundTrip(val fromPath: String, val fromQuery: String?)
+
+val segment = pathParam<String>("segment", description = "Whatever the caller put in the path")
+val q = queryParam<String>("q", description = "Whatever the caller put in the query").optional()
+
+val roundtrip = endpoint(segment, q) {
+    get("items" / segment)
+    summary = "Hand back the path segment and the query value, decoded"
+    operationId = "roundtrip"
+    tag("greetings")
+    emits(requestId)
+    json<RoundTrip>()
+}
+
+/**
  * Plain text and a routed 204. Neither was on the shared surface, so neither was
  * ever asked of all three backends — they were described twice instead, once in
  * `pelican-http4k`'s test fixtures and once in `pelican-ktor`'s, and not at all
@@ -342,7 +365,7 @@ val ticker = endpoint {
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
-        motd, forget, everyone, logo, echoRaw, ticker,
+        roundtrip, motd, forget, everyone, logo, echoRaw, ticker,
     )
 
 /**
