@@ -46,11 +46,66 @@ fun Api.toRoute(system: ClassicActorSystemProvider): Route {
     // Folded around each handler once rather than per request, likewise.
     val handlers = endpoints.associateWith { handlerFor(it) }
 
-    val routes = orderedEndpoints().map {
-        routeFor(it, this, codecs.getValue(it), handlers.getValue(it), cors, system)
-    } + listOfNotNull(cors?.let(::preflightRoute))
-    require(routes.isNotEmpty()) { "This API has no endpoints." }
+    require(endpoints.isNotEmpty()) { "This API has no endpoints." }
+
+    // One route per *method* rather than one per endpoint. Inside each, the
+    // index finds the endpoint by walking the path's segments, so the work does
+    // not grow with the number of endpoints — two hundred of them used to cost
+    // about 150µs a request, which is what an ordered scan costs and is the
+    // same registered by hand.
+    //
+    // Per method rather than one route overall because Pekko's method rejection
+    // is what produces a 405 for a verb no endpoint declares anywhere. A single
+    // route would answer every one of those as a 404 instead.
+    val index = endpoints.routeIndex()
+    val routes = endpoints
+        .map { it.endpoint.method }
+        .distinct()
+        .map { method -> methodRoute(method, this, index, codecs, handlers, cors, system) } +
+        listOfNotNull(cors?.let(::preflightRoute))
+
     return routes.reduce { left, right -> Directives.concat(left, right) }
+}
+
+/**
+ * Everything this API answers under one method, dispatched by the index.
+ *
+ * A path the index does not know rejects, so a Pelican route concatenated with
+ * hand-written ones passes on what it does not describe — the property
+ * `ConcatenatedRoutesTest` and `MountedAlongsideTest` are about.
+ */
+@Suppress("LongParameterList") // The route's whole world, resolved once and captured.
+private fun methodRoute(
+    method: Method,
+    api: Api,
+    index: RouteIndex,
+    codecs: Map<ServerEndpoint, EndpointCodecs>,
+    handlers: Map<ServerEndpoint, (Params) -> CompletionStage<Any?>>,
+    cors: CorsPolicy?,
+    system: ClassicActorSystemProvider,
+): Route = Directives.method(method.toPekko()) {
+    Directives.extractRequest { req ->
+        val values = LinkedHashMap<ParamKey<*>, Any?>()
+
+        // A path that decodes into the wrong type is a 400 naming the
+        // parameter, which is what the scan did when it decoded a capture.
+        val matched = try {
+            index.match(method, req.uri.getPathString(), values)
+        } catch (t: Throwable) {
+            return@extractRequest Directives.complete(errorResponse(t, api))
+        }
+
+        if (matched == null) {
+            Directives.reject()
+        } else {
+            val answered =
+                invoke(matched, api, codecs.getValue(matched), handlers.getValue(matched), req, values, system)
+            Directives.completeWithFuture(
+                if (cors == null) answered
+                else answered.thenApply { res -> res.withCorsHeaders(cors.actualResponseHeaders(originOf(req))) },
+            )
+        }
+    }
 }
 
 /**
@@ -124,31 +179,6 @@ internal fun Api.orderedEndpoints(): List<ServerEndpoint> =
         }.thenBy { it.index },
     ).map { it.value }
 
-private fun routeFor(
-    se: ServerEndpoint,
-    api: Api,
-    codecs: EndpointCodecs,
-    handler: (Params) -> CompletionStage<Any?>,
-    cors: CorsPolicy?,
-    system: ClassicActorSystemProvider,
-): Route = Directives.method(se.endpoint.method.toPekko()) {
-    Directives.extractRequest { req ->
-        val captures = matchPath(se.endpoint.pathSpec, req)
-        if (captures == null) {
-            Directives.reject()
-        } else {
-            val answered = invoke(se, api, codecs, handler, req, captures, system)
-            Directives.completeWithFuture(
-                if (cors == null) {
-                    answered
-                } else {
-                    answered.thenApply { res -> res.withCorsHeaders(cors.actualResponseHeaders(originOf(req))) }
-                },
-            )
-        }
-    }
-}
-
 /**
  * Refuses a request whose `Accept` takes nothing this endpoint sends. The types
  * come from [Output.produces] and the decision from [acceptable], so the three
@@ -165,56 +195,6 @@ private fun negotiate(ep: Endpoint<*, *>, req: HttpRequest) {
 private fun originOf(req: HttpRequest): String? =
     req.getHeader(CorsHeaders.ORIGIN).orElse(null)?.value()
 
-/** Returns the captured segments, or null when this request is for another endpoint. */
-private fun matchPath(spec: PathSpec, req: HttpRequest): Map<PathParam<*>, String>? {
-    // One pass over the path string rather than three lists and a map: this
-    // runs per candidate route, for a comparison that mostly fails.
-    val path = req.uri.getPathString()
-    val segments = spec.segments
-
-    // Allocated once, and only when the route has something to capture.
-    val captured =
-        if (spec.captures.isEmpty()) null else LinkedHashMap<PathParam<*>, String>(spec.captures.size)
-
-    var index = 0
-    var at = 0
-
-    while (at < path.length) {
-        if (path[at] == '/') { at++; continue }
-        val end = segmentEnd(path, at)
-        if (index == segments.size) return null
-
-        when (val segment = segments[index]) {
-            // In place: a literal decides whether this route is a candidate.
-            is PathSegment.Literal -> if (!segment.matchesAt(path, at, end)) return null
-
-            is PathSegment.Capture -> captured?.put(segment.param, decodeSegment(path, at, end))
-        }
-
-        index++
-        at = end
-    }
-
-    return if (index != segments.size) null else captured.orEmpty()
-}
-
-/** Where this path segment ends: the next slash, or the end of the path. */
-private fun segmentEnd(path: String, from: Int): Int {
-    val next = path.indexOf('/', from)
-    return if (next < 0) path.length else next
-}
-
-/** A literal segment, compared against the path in place rather than copied out of it. */
-private fun PathSegment.Literal.matchesAt(path: String, from: Int, to: Int): Boolean =
-    value.length == to - from && path.regionMatches(from, value, 0, to - from)
-
-/** Decoding allocates, and most path segments have nothing in them to decode. */
-private fun decodeSegment(path: String, from: Int, to: Int): String {
-    val raw = path.substring(from, to)
-    val encoded = raw.any { it == '%' || it == '+' }
-    return if (encoded) URLDecoder.decode(raw, StandardCharsets.UTF_8) else raw
-}
-
 /** Every field line under this name, in the order they arrived. */
 private fun HttpRequest.headerValues(name: String): List<String> =
     getHeaders().filter { it.name().equals(name, ignoreCase = true) }.map { it.value() }
@@ -226,12 +206,10 @@ private fun HttpRequest.headerValues(name: String): List<String> =
 private fun decodePlainInputs(
     ep: Endpoint<*, *>,
     req: HttpRequest,
-    captures: Map<PathParam<*>, String>,
     into: MutableMap<ParamKey<*>, Any?>,
 ) = with(into) {
+    // Path captures are already here: the index decoded them as it matched.
     val query = req.uri.query()
-
-    captures.forEach { (param, raw) -> put(param, param.codec.decode(param.name, raw)) }
 
     ep.queries.forEach { q ->
         val style = q.listStyle
@@ -421,11 +399,10 @@ private fun invoke(
     codecs: EndpointCodecs,
     handler: (Params) -> CompletionStage<Any?>,
     req: HttpRequest,
-    captures: Map<PathParam<*>, String>,
+    values: MutableMap<ParamKey<*>, Any?>,
     system: ClassicActorSystemProvider,
 ): CompletionStage<HttpResponse> {
     val ep = se.endpoint
-    val values = LinkedHashMap<ParamKey<*>, Any?>()
 
     // Built before decoding, so a filter or a failing decode can still put a
     // header on the way out.
@@ -444,7 +421,7 @@ private fun invoke(
 
     // ---- plain inputs: path, query, headers, cookies ----------------------
     try {
-        decodePlainInputs(ep, req, captures, values)
+        decodePlainInputs(ep, req, values)
     } catch (t: Throwable) {
         return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params))
     }
