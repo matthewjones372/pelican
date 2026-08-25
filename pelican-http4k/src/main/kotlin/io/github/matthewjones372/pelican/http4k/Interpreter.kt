@@ -29,6 +29,7 @@ import io.github.matthewjones372.pelican.declaredInputCount
 import io.github.matthewjones372.pelican.decode
 import io.github.matthewjones372.pelican.decodeList
 import io.github.matthewjones372.pelican.handlerFor
+import io.github.matthewjones372.pelican.readStrictBody
 import io.github.matthewjones372.pelican.requestBodyCodec
 import org.http4k.core.HttpHandler
 import org.http4k.core.Request
@@ -303,12 +304,14 @@ private fun readBody(
         )
 
         is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
-            // Checked before the body is pulled into a String, so an
-            // oversized payload is refused rather than allocated — and again
-            // on what arrived, because a request may declare no length.
+            // A declared length is refused before a byte is transferred; a
+            // chunked body that declares none is counted as it is read, so an
+            // oversized one is refused rather than allocated whole and measured
+            // afterwards. Both are bytes — `String.length` is UTF-16 code
+            // units, and a limit checked against it admits about three times
+            // as much CJK as it promises.
             refuseIfOversize(req.header("Content-Length")?.toLongOrNull(), api.maxBodyBytes)
-            val text = req.bodyString()
-            refuseIfOversize(text.length.toLong(), api.maxBodyBytes)
+            val text = readStrictBody(req.body.stream, api.maxBodyBytes)
             // Which codec, and what a media type nobody declared means, are
             // core's answers — see `RequestBodyCodecs`. So is wrapping whatever
             // the codec threw, which is what keeps this file codec-agnostic.
