@@ -27,6 +27,7 @@ include(
     "pelican-http4k-docs",
     "pelican-ktor",
     "pelican-ktor-docs",
+    "pelican-client-java",
     "pelican-test",
     "pelican-test-golden",
     "pelican-test-pekko",

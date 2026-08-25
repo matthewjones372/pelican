@@ -48,10 +48,13 @@ import kotlin.reflect.KType
  * [writeKotlinClient] lays out the package directories and writes the file;
  * this returns the same thing as a string.
  *
- * The generated file needs `pelican-core` and a `Codecs` on its classpath, and
- * nothing else — the transport is the JDK's own `HttpClient`. Payload types
- * come from the [ApiSpec]'s own `SchemaSource`, so the client's types and the
- * document's schemas are the same schemas.
+ * The generated file needs `pelican-core`, a `Codecs`, and a `ClientTransport`
+ * on its classpath, and nothing else. The transport is an interface core owns
+ * rather than an HTTP library, so a caller already running one supplies it;
+ * `pelican-client-java` is the adapter over the JDK's own `HttpClient` and the
+ * one a client finds unless the build names another. Payload types come from
+ * the [ApiSpec]'s own `SchemaSource`, so the client's types and the document's
+ * schemas are the same schemas.
  *
  * @param packageName the package the generated file declares.
  * @param clientName the class name; defaults to the title, e.g. `OrdersClient`.
@@ -290,7 +293,9 @@ private class KotlinClientEmitter(
         // the parameter names and the payload types are the ones the server routes
         // and the document publishes.
         //
-        // Needs pelican-core on the classpath, and a Codecs to read bodies with.
+        // Needs pelican-core on the classpath, a Codecs to read bodies with, and
+        // a ClientTransport to send with — pelican-client-java, unless you have
+        // an HTTP client of your own to hand over.
         @file:Suppress("unused", "RedundantVisibilityModifier")
         """.trimIndent()
 
@@ -339,7 +344,7 @@ private class KotlinClientEmitter(
         call: Call,
         successes: List<Output<*>>,
     ): String = buildString {
-        val method = kotlinString(ep.method.name)
+        val method = "Method.${ep.method.name}"
         // What an unexpected status is reported against. A webhook has no path,
         // so it is the URL the caller sent it to — which is the only thing about
         // that call worth naming in the failure.
@@ -362,17 +367,17 @@ private class KotlinClientEmitter(
 
         val produced = when {
             isStream(out) -> {
-                appendLine("val body = response.body()")
+                appendLine("val body = response.body")
                 "Streamed(body, ${frames(out)}.map { ${decodeExpression(elementType(out), "it")} })"
             }
 
-            out is ByteStreamOutput -> "response.body()"
+            out is ByteStreamOutput -> "response.body"
 
-            out is TextOutput -> "response.body()"
+            out is TextOutput -> "response.body"
 
             out is EmptyOutput -> null
 
-            out is JsonOutput<*> -> decodeExpression(out.type, "response.body()")
+            out is JsonOutput<*> -> decodeExpression(out.type, "response.body")
 
             else -> null
         }
@@ -399,9 +404,9 @@ private class KotlinClientEmitter(
         failures: List<ErrorOutput<*>>,
         streamed: Boolean,
     ): String = buildString {
-        appendLine("when (response.statusCode()) {")
+        appendLine("when (response.status) {")
         failures.forEach { failure ->
-            val payload = decodeExpression(failure.type, if (streamed) "drain(response)" else "response.body()")
+            val payload = decodeExpression(failure.type, if (streamed) "drain(response)" else "response.body")
             val headers = failure.headers.joinToString("") { ", ${headerRead(it)}" }
             appendLine(
                 "    ${failure.status} -> return Outcome.Err(" +
@@ -422,7 +427,7 @@ private class KotlinClientEmitter(
         failures: List<ErrorOutput<*>>,
         otherwise: String,
     ): String = buildString {
-        appendLine("return when (response.statusCode()) {")
+        appendLine("return when (response.status) {")
         successes.forEach { success ->
             appendLine("    ${success.status} -> ${wrap(resultExpression(ep, successes, success), failures)}")
         }
@@ -443,8 +448,8 @@ private class KotlinClientEmitter(
 
     /** What this response's body decodes to, or null where it carries none. */
     private fun bodyExpression(out: Output<*>): String? = when (out) {
-        is JsonOutput<*> -> decodeExpression(out.type, "response.body()")
-        is TextOutput -> "response.body()"
+        is JsonOutput<*> -> decodeExpression(out.type, "response.body")
+        is TextOutput -> "response.body"
         else -> null
     }
 
@@ -516,7 +521,7 @@ private class KotlinClientEmitter(
             // and the pairs on the wire are the ones that type decodes back
             // from.
             val codec = if (input is FormBody<*>) formCodecName(type) else codecName(type)
-            return "body = HttpRequest.BodyPublishers.ofString($codec.encodeToString($bodyName)), " +
+            return "body = ClientRequest.Body.Text($codec.encodeToString($bodyName)), " +
                 "contentType = ${kotlinString(input.mediaType)}"
         }
 
@@ -558,7 +563,7 @@ private class KotlinClientEmitter(
 
             is RawBody -> {
                 required += "$bodyName: InputStream"
-                "body = HttpRequest.BodyPublishers.ofInputStream { $bodyName }, " +
+                "body = ClientRequest.Body.Streaming { $bodyName }, " +
                     "contentType = \"application/octet-stream\""
             }
 
@@ -570,7 +575,7 @@ private class KotlinClientEmitter(
         ep.cookieParams.forEach { parameter(it.name, it.codec, it.required, it.listStyle, cookiePairs) }
 
         val arguments = buildList {
-            add(kotlinString(ep.method.name))
+            add("Method.${ep.method.name}")
             // A webhook has no path: the URL it was given is the whole address,
             // and appending anything to it would be this client inventing a
             // route on a host it does not own.
@@ -922,7 +927,11 @@ private fun resource(name: String): String =
 
 private val IMPORTS = """
     import io.github.matthewjones372.pelican.BodyCodec
+    import io.github.matthewjones372.pelican.ClientRequest
+    import io.github.matthewjones372.pelican.ClientResponse
+    import io.github.matthewjones372.pelican.ClientTransport
     import io.github.matthewjones372.pelican.Codecs
+    import io.github.matthewjones372.pelican.Method
     import io.github.matthewjones372.pelican.UploadedFile
     import io.github.matthewjones372.pelican.formCodec
     import java.io.BufferedReader
@@ -930,15 +939,12 @@ private val IMPORTS = """
     import java.io.InputStream
     import java.io.Reader
     import java.io.SequenceInputStream
-    import java.net.URI
     import java.net.URLEncoder
-    import java.net.http.HttpClient
-    import java.net.http.HttpRequest
-    import java.net.http.HttpResponse
     import java.nio.charset.StandardCharsets
     import java.time.Duration
     import java.util.Collections
     import java.util.UUID
+    import java.util.concurrent.CompletionException
     import kotlin.reflect.typeOf
 """.trimIndent()
 
