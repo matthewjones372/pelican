@@ -160,6 +160,24 @@ class AllBackendsTest {
         }
     }
 
+    // ------------------------------------------------------------ server-sent events
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `sse frames are core's, so all three write the same ones`(name: String, client: ApiClient) {
+        val res = client.response(ticker, Unit)
+
+        withClue(name) {
+            res shouldHaveStatus 200
+            res shouldHaveContentType "text/event-stream"
+            // `event:` then `data:` then a blank line, which is what
+            // `SseOutput.frame` writes and what a conformant client parses.
+            res.body shouldBe
+                "event: tick\ndata: {\"seq\":1,\"at\":\"one\"}\n\n" +
+                "event: tick\ndata: {\"seq\":2,\"at\":\"two\"}\n\n"
+        }
+    }
+
     // ------------------------------------------------------------- a simple GET
 
     @ParameterizedTest(name = "{0}")
