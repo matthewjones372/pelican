@@ -3,13 +3,34 @@
 // Fixed. Nothing here depends on a particular API — only on how Pelican frames
 // its responses, which is the same for every endpoint.
 
-/** A response with a status the endpoint never declared. */
+/**
+ * A response this client cannot turn into a value: a status the endpoint never
+ * declared, or a body its codec could not read. [cause] is the codec's own
+ * failure in the second case and null in the first.
+ */
 class ApiCallFailed(
     val status: Int,
     val method: String,
     val path: String,
-    val body: String,
-) : RuntimeException("$method $path -> $status: ${body.take(500)}")
+    body: String,
+    cause: Throwable? = null,
+) : RuntimeException("$method $path -> $status: ${body.take(MESSAGE_BODY_CHARS)}", cause) {
+
+    /**
+     * What arrived, up to the cap. A proxy's error page is as long as the proxy
+     * cares to make it, and this is held for as long as something holds the
+     * failure.
+     */
+    val body: String =
+        if (body.length <= MAX_BODY_CHARS) body
+        else body.take(MAX_BODY_CHARS) + "… (truncated; ${body.length} characters in all)"
+}
+
+/** Eight KiB of it, which is enough of a gateway's HTML to recognise it by. */
+private const val MAX_BODY_CHARS = 8 * 1024
+
+/** Less again in the message, which is the part that reaches a log line. */
+private const val MESSAGE_BODY_CHARS = 500
 
 /**
  * A call that either succeeded or came back as one of the failures its endpoint

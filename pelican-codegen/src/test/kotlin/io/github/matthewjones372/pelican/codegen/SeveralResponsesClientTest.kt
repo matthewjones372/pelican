@@ -61,9 +61,10 @@ class SeveralResponsesClientTest {
         client shouldContain "fun submitOrder(body: Order): Outcome<SubmitOrderFailure, SubmitOrderResult>"
         client shouldContain "return when (response.status) {"
         client shouldContain "201 -> Outcome.Ok(SubmitOrderResult.Created(" +
-            "orderCodec.decodeFromString(response.body), response.header(\"Location\")))"
-        client shouldContain "202 -> Outcome.Ok(SubmitOrderResult.Accepted(queuedCodec.decodeFromString(" +
-            "response.body)))"
+            "orderCodec.decoded(response.body, Method.POST, \"/orders\", response.status), " +
+            "response.header(\"Location\")))"
+        client shouldContain "202 -> Outcome.Ok(SubmitOrderResult.Accepted(queuedCodec.decoded(" +
+            "response.body, Method.POST, \"/orders\", response.status)))"
     }
 
     /** A 2xx the endpoint never declared is a response outside the contract. */
@@ -75,7 +76,8 @@ class SeveralResponsesClientTest {
     @Test
     fun `with no failures declared the sealed type is the return type itself`() {
         client shouldContain "fun rememberOrder(body: Order): RememberOrderResult"
-        client shouldContain "200 -> RememberOrderResult.Ok(orderCodec.decodeFromString(response.body))"
+        client shouldContain "200 -> RememberOrderResult.Ok(" +
+            "orderCodec.decoded(response.body, Method.PUT, \"/orders\", response.status))"
         client shouldNotContain "Outcome.Ok(RememberOrderResult"
     }
 

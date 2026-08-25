@@ -56,6 +56,14 @@ as properties, typed from the schema the document publishes — nullable, becaus
 this is the reading end and a client that threw over a header would have thrown
 away the failure it was handed.
 
+Anything the endpoint did not describe is an `ApiCallFailed`, carrying the
+status, the method, the path template and the body that arrived — capped at
+8 KiB and marked where it was cut. A body the codec cannot read is refused the
+same way even at a status the endpoint declared, because a proxy's HTML 404
+satisfies the status and nothing else; the codec's own exception is the
+`cause`. See
+[docs/reference.md](reference.md#what-a-call-refuses-with).
+
 An operation the document says is served somewhere else — an upload host, a
 read replica — is called there. `servers("https://uploads.example.com")` on an
 endpoint reaches the document and the generated method, which sends that one

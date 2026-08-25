@@ -40,13 +40,34 @@ import kotlin.reflect.typeOf
 // Fixed. Nothing here depends on a particular API — only on how Pelican frames
 // its responses, which is the same for every endpoint.
 
-/** A response with a status the endpoint never declared. */
+/**
+ * A response this client cannot turn into a value: a status the endpoint never
+ * declared, or a body its codec could not read. [cause] is the codec's own
+ * failure in the second case and null in the first.
+ */
 class ApiCallFailed(
     val status: Int,
     val method: String,
     val path: String,
-    val body: String,
-) : RuntimeException("$method $path -> $status: ${body.take(500)}")
+    body: String,
+    cause: Throwable? = null,
+) : RuntimeException("$method $path -> $status: ${body.take(MESSAGE_BODY_CHARS)}", cause) {
+
+    /**
+     * What arrived, up to the cap. A proxy's error page is as long as the proxy
+     * cares to make it, and this is held for as long as something holds the
+     * failure.
+     */
+    val body: String =
+        if (body.length <= MAX_BODY_CHARS) body
+        else body.take(MAX_BODY_CHARS) + "… (truncated; ${body.length} characters in all)"
+}
+
+/** Eight KiB of it, which is enough of a gateway's HTML to recognise it by. */
+private const val MAX_BODY_CHARS = 8 * 1024
+
+/** Less again in the message, which is the part that reaches a log line. */
+private const val MESSAGE_BODY_CHARS = 500
 
 /**
  * A call that either succeeded or came back as one of the failures its endpoint
@@ -583,6 +604,22 @@ class OrdersClient(
     private fun failed(method: Method, path: String, response: TextResponse): Nothing =
         throw ApiCallFailed(response.status, method.name, path, response.body)
 
+    /**
+     * The body decoded, or a refusal naming the call it came back on.
+     *
+     * A status this endpoint declared is not a promise about what a proxy in front
+     * of it sends: an HTML 404 and a plain-text 502 both arrive here, and a bare
+     * codec exception would carry neither the status, the path, nor the bytes that
+     * would explain it. [raw] is whatever the codec was handed — a whole body, or
+     * one frame of a stream.
+     */
+    private fun <T> BodyCodec<T>.decoded(raw: String, method: Method, path: String, status: Int): T =
+        try {
+            decodeFromString(raw)
+        } catch (failure: Exception) {
+            throw ApiCallFailed(status, method.name, path, raw, failure)
+        }
+
     /** A failed streaming response's body is the one time it is small enough to read whole. */
     private fun drain(response: ClientResponse): String = response.text()
 
@@ -632,10 +669,10 @@ class OrdersClient(
     fun getUser(userId: Long): Outcome<GetUserFailure, User> {
         val response = text(request(Method.GET, "/users/${segment(userId)}"))
         when (response.status) {
-            404 -> return Outcome.Err(GetUserFailure.NotFound(apiErrorCodec.decodeFromString(response.body)))
+            404 -> return Outcome.Err(GetUserFailure.NotFound(apiErrorCodec.decoded(response.body, Method.GET, "/users/{userId}", response.status)))
         }
         if (!response.succeeded()) failed(Method.GET, "/users/{userId}", response)
-        return Outcome.Ok(userCodec.decodeFromString(response.body))
+        return Outcome.Ok(userCodec.decoded(response.body, Method.GET, "/users/{userId}", response.status))
     }
 
     /**
@@ -648,11 +685,11 @@ class OrdersClient(
     fun streamOrders(userId: Long, limit: Int? = null, status: OrderStatus? = null, xTraceId: String? = null): Outcome<StreamOrdersFailure, Streamed<Order>> {
         val response = stream(request(Method.GET, "/users/${segment(userId)}/orders", query = listOf("limit" to limit, "status" to status), headerParams = listOf("X-Trace-Id" to xTraceId)))
         when (response.status) {
-            404 -> return Outcome.Err(StreamOrdersFailure.NotFound(apiErrorCodec.decodeFromString(drain(response))))
+            404 -> return Outcome.Err(StreamOrdersFailure.NotFound(apiErrorCodec.decoded(drain(response), Method.GET, "/users/{userId}/orders", response.status)))
         }
         if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders", response)
         val body = response.body
-        return Outcome.Ok(Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decodeFromString(it) }))
+        return Outcome.Ok(Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decoded(it, Method.GET, "/users/{userId}/orders", response.status) }))
     }
 
     /**
@@ -664,7 +701,7 @@ class OrdersClient(
         val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/watch", query = listOf("limit" to limit)))
         if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders/watch", response)
         val body = response.body
-        return Streamed(body, sseFrames(body.bufferedReader()).map { tickCodec.decodeFromString(it) })
+        return Streamed(body, sseFrames(body.bufferedReader()).map { tickCodec.decoded(it, Method.GET, "/users/{userId}/orders/watch", response.status) })
     }
 
     /**
@@ -678,7 +715,7 @@ class OrdersClient(
         val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/list", query = listOf("limit" to limit)))
         if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders/list", response)
         val body = response.body
-        return Streamed(body, jsonArrayFrames(body.reader()).map { orderCodec.decodeFromString(it) })
+        return Streamed(body, jsonArrayFrames(body.reader()).map { orderCodec.decoded(it, Method.GET, "/users/{userId}/orders/list", response.status) })
     }
 
     /**
@@ -689,12 +726,12 @@ class OrdersClient(
     fun placeOrder(userId: Long, body: CreateOrder, xApiKey: String): Outcome<PlaceOrderFailure, Order> {
         val response = text(request(Method.POST, "/users/${segment(userId)}/orders", headerParams = listOf("X-Api-Key" to xApiKey), body = ClientRequest.Body.Text(createOrderCodec.encodeToString(body)), contentType = "application/json"))
         when (response.status) {
-            401 -> return Outcome.Err(PlaceOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body)))
-            404 -> return Outcome.Err(PlaceOrderFailure.NotFound(apiErrorCodec.decodeFromString(response.body)))
-            429 -> return Outcome.Err(PlaceOrderFailure.TooManyRequests(apiErrorCodec.decodeFromString(response.body), response.header("Retry-After")?.toLongOrNull()))
+            401 -> return Outcome.Err(PlaceOrderFailure.Unauthorized(apiErrorCodec.decoded(response.body, Method.POST, "/users/{userId}/orders", response.status)))
+            404 -> return Outcome.Err(PlaceOrderFailure.NotFound(apiErrorCodec.decoded(response.body, Method.POST, "/users/{userId}/orders", response.status)))
+            429 -> return Outcome.Err(PlaceOrderFailure.TooManyRequests(apiErrorCodec.decoded(response.body, Method.POST, "/users/{userId}/orders", response.status), response.header("Retry-After")?.toLongOrNull()))
         }
         if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders", response)
-        return Outcome.Ok(orderCodec.decodeFromString(response.body))
+        return Outcome.Ok(orderCodec.decoded(response.body, Method.POST, "/users/{userId}/orders", response.status))
     }
 
     /**
@@ -705,12 +742,12 @@ class OrdersClient(
     fun submitOrder(userId: Long, body: CreateOrder, xApiKey: String): Outcome<SubmitOrderFailure, SubmitOrderResult> {
         val response = text(request(Method.POST, "/users/${segment(userId)}/orders/submit", headerParams = listOf("X-Api-Key" to xApiKey), body = ClientRequest.Body.Text(createOrderCodec.encodeToString(body)), contentType = "application/json"))
         when (response.status) {
-            401 -> return Outcome.Err(SubmitOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body)))
+            401 -> return Outcome.Err(SubmitOrderFailure.Unauthorized(apiErrorCodec.decoded(response.body, Method.POST, "/users/{userId}/orders/submit", response.status)))
         }
         if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders/submit", response)
         return when (response.status) {
-            201 -> Outcome.Ok(SubmitOrderResult.Created(orderCodec.decodeFromString(response.body), response.header("Location")))
-            202 -> Outcome.Ok(SubmitOrderResult.Accepted(queuedCodec.decodeFromString(response.body)))
+            201 -> Outcome.Ok(SubmitOrderResult.Created(orderCodec.decoded(response.body, Method.POST, "/users/{userId}/orders/submit", response.status), response.header("Location")))
+            202 -> Outcome.Ok(SubmitOrderResult.Accepted(queuedCodec.decoded(response.body, Method.POST, "/users/{userId}/orders/submit", response.status)))
             else -> failed(Method.POST, "/users/{userId}/orders/submit", response)
         }
     }
@@ -723,7 +760,7 @@ class OrdersClient(
     fun placeOrderForm(userId: Long, body: CreateOrder): Order {
         val response = text(request(Method.POST, "/users/${segment(userId)}/orders/form", body = ClientRequest.Body.Text(createOrderFormCodec.encodeToString(body)), contentType = "application/x-www-form-urlencoded"))
         if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders/form", response)
-        return orderCodec.decodeFromString(response.body)
+        return orderCodec.decoded(response.body, Method.POST, "/users/{userId}/orders/form", response.status)
     }
 
     /**
@@ -734,7 +771,7 @@ class OrdersClient(
     fun importOrders(userId: Long, label: String, manifest: UploadedFile, file: UploadedFile, session: String? = null): ImportResult {
         val response = text(request(Method.POST, "/users/${segment(userId)}/orders/import", cookies = listOf("session" to session), multipart = multipart(fields = listOf("label" to label), files = listOf("manifest" to manifest, "file" to file))))
         if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders/import", response)
-        return importResultCodec.decodeFromString(response.body)
+        return importResultCodec.decoded(response.body, Method.POST, "/users/{userId}/orders/import", response.status)
     }
 
     /**
@@ -745,11 +782,11 @@ class OrdersClient(
     fun payOrder(userId: Long, orderId: Long, body: PaymentMethod, xApiKey: String): Outcome<PayOrderFailure, Receipt> {
         val response = text(request(Method.POST, "/users/${segment(userId)}/orders/${segment(orderId)}/payment", headerParams = listOf("X-Api-Key" to xApiKey), body = ClientRequest.Body.Text(paymentMethodCodec.encodeToString(body)), contentType = "application/json"))
         when (response.status) {
-            401 -> return Outcome.Err(PayOrderFailure.Unauthorized(apiErrorCodec.decodeFromString(response.body)))
-            404 -> return Outcome.Err(PayOrderFailure.NotFound(apiErrorCodec.decodeFromString(response.body)))
+            401 -> return Outcome.Err(PayOrderFailure.Unauthorized(apiErrorCodec.decoded(response.body, Method.POST, "/users/{userId}/orders/{orderId}/payment", response.status)))
+            404 -> return Outcome.Err(PayOrderFailure.NotFound(apiErrorCodec.decoded(response.body, Method.POST, "/users/{userId}/orders/{orderId}/payment", response.status)))
         }
         if (!response.succeeded()) failed(Method.POST, "/users/{userId}/orders/{orderId}/payment", response)
-        return Outcome.Ok(receiptCodec.decodeFromString(response.body))
+        return Outcome.Ok(receiptCodec.decoded(response.body, Method.POST, "/users/{userId}/orders/{orderId}/payment", response.status))
     }
 
     /**
@@ -782,7 +819,7 @@ class OrdersClient(
         val response = stream(request(Method.GET, "/search", query = listOf("limit" to limit, "status" to status, "item" to joined("item", item, ","), "tag" to tag, "sort" to joined("sort", sort, "|"), "fields" to joined("fields", fields, " ")), headerParams = listOf("X-Trace-Id" to xTraceId, "X-Feature" to joined("X-Feature", xFeature, ",")), cookies = listOf("seen" to seen)))
         if (!response.succeeded()) failedStream(Method.GET, "/search", response)
         val body = response.body
-        return Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decodeFromString(it) })
+        return Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decoded(it, Method.GET, "/search", response.status) })
     }
 
     // ----------------------------------------------------------- webhooks sent

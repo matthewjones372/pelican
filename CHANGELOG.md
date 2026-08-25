@@ -68,6 +68,13 @@ one.
   and all three still write it. A response body carrying nullable fields is
   shorter and no longer carries their names; pass your own mapper or `Json` to
   write them back.
+- **A generated client refuses a body it cannot read, naming the call.** A
+  declared status arriving with something the codec cannot decode — a proxy's
+  HTML 404, a gateway's plain-text 502 — used to let a bare Jackson or kotlinx
+  exception escape with no status, path or body attached. It is now an
+  `ApiCallFailed` like any undeclared status, carrying the status, the method,
+  the path template, the body capped at 8 KiB with a marker where it was cut,
+  and the codec's failure as its `cause`. Regenerate to pick it up.
 
 ## [0.2.0]
 

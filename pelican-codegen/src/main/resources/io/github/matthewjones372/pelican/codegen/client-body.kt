@@ -58,6 +58,22 @@ private fun ClientResponse.succeeded(): Boolean = status in 200..299
 private fun failed(method: Method, path: String, response: TextResponse): Nothing =
     throw ApiCallFailed(response.status, method.name, path, response.body)
 
+/**
+ * The body decoded, or a refusal naming the call it came back on.
+ *
+ * A status this endpoint declared is not a promise about what a proxy in front
+ * of it sends: an HTML 404 and a plain-text 502 both arrive here, and a bare
+ * codec exception would carry neither the status, the path, nor the bytes that
+ * would explain it. [raw] is whatever the codec was handed — a whole body, or
+ * one frame of a stream.
+ */
+private fun <T> BodyCodec<T>.decoded(raw: String, method: Method, path: String, status: Int): T =
+    try {
+        decodeFromString(raw)
+    } catch (failure: Exception) {
+        throw ApiCallFailed(status, method.name, path, raw, failure)
+    }
+
 /** A failed streaming response's body is the one time it is small enough to read whole. */
 private fun drain(response: ClientResponse): String = response.text()
 

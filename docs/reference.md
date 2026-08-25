@@ -1159,6 +1159,40 @@ it moves. Why it is one shape per file rather than both on one class, and what
 a cancelled coroutine does to a call in flight, is in
 [Blocking or suspending](#blocking-or-suspending).
 
+### What a call refuses with
+
+A declared failure is a value: it comes back on the `Err` side of an `Outcome`,
+typed. Everything else is an `ApiCallFailed`, which carries the status, the
+method, the path template and the body that arrived:
+
+```kotlin
+class ApiCallFailed(
+    val status: Int,
+    val method: String,
+    val path: String,
+    val body: String,      // capped at 8 KiB, marked where it was cut
+    cause: Throwable?,     // the codec's failure, where one is what went wrong
+) : RuntimeException
+```
+
+Two things reach it. A status nothing declared — the `502` a load balancer
+answered with while the service was restarting — and a body the codec could not
+read at a status that *was* declared, which is the same event seen from the
+other end: a proxy's HTML 404 satisfies the status the endpoint promised and
+nothing else about it. Both are refused the same way, so a caller has one
+vocabulary rather than a typed failure beside a bare `JsonParseException` with
+no status, path or body on it. The codec's own exception is the `cause`.
+
+The body is capped at 8 KiB with a marker naming what the whole length was: an
+error page is as long as whatever sent it cares to make it, and the failure is
+held for as long as something holds a reference to it. The exception's
+*message* carries less again — the first 500 characters — because that is the
+part that reaches a log line.
+
+A streamed call is refused the same way at both points: before the first
+element, where the status decides, and while iterating, where a frame that does
+not decode names the call it arrived on rather than the codec that read it.
+
 ### Without the plugin
 
 Both generators are ordinary functions, and a build that would rather call them

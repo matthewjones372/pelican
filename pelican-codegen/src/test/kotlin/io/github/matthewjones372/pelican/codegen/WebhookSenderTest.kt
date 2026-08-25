@@ -93,7 +93,8 @@ class WebhookSenderTest {
         )
 
         withPayload shouldContain "fun orderRejected(url: String, body: OrderPlaced): Rejected {"
-        withPayload shouldContain "return rejectedCodec.decodeFromString(response.body)"
+        // A webhook has no path of its own, so a refusal names where it went.
+        withPayload shouldContain "return rejectedCodec.decoded(response.body, Method.POST, url, response.status)"
         withPayload shouldContain "The response below is the one the *receiver* sends"
     }
 

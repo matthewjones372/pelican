@@ -450,26 +450,27 @@ private class KotlinClientEmitter(
         // so it is the URL the caller sent it to — which is the only thing about
         // that call worth naming in the failure.
         val template = call.target ?: kotlinString(ep.pathSpec.template)
+        val at = CallSite(method, template)
         val out = successes.first()
         val streamed = isStream(out) || out is ByteStreamOutput
         val failures = declaredFailures(ep)
 
         appendLine("val response = ${if (streamed) "stream" else "text"}(${call.request})")
 
-        if (failures.isNotEmpty()) appendLine(declaredFailureBranches(ep, failures, streamed))
+        if (failures.isNotEmpty()) appendLine(declaredFailureBranches(ep, failures, streamed, at))
 
         val fail = if (streamed) "failedStream" else "failed"
         appendLine("if (!response.succeeded()) $fail($method, $template, response)")
 
         if (successes.size > 1) {
-            append(chosenByStatus(ep, successes, failures, "$fail($method, $template, response)"))
+            append(chosenByStatus(ep, successes, failures, "$fail($method, $template, response)", at))
             return@buildString
         }
 
         val produced = when {
             isStream(out) -> {
                 appendLine("val body = response.body")
-                "Streamed(body, ${frames(out)}.map { ${decodeExpression(elementType(out), "it")} })"
+                "Streamed(body, ${frames(out)}.map { ${decodeExpression(elementType(out), "it", at)} })"
             }
 
             out is ByteStreamOutput -> "response.body"
@@ -478,7 +479,7 @@ private class KotlinClientEmitter(
 
             out is EmptyOutput -> null
 
-            out is JsonOutput<*> -> decodeExpression(out.type, "response.body")
+            out is JsonOutput<*> -> decodeExpression(out.type, "response.body", at)
 
             else -> null
         }
@@ -504,10 +505,12 @@ private class KotlinClientEmitter(
         ep: Endpoint<*, *>,
         failures: List<ErrorOutput<*>>,
         streamed: Boolean,
+        at: CallSite,
     ): String = buildString {
         appendLine("when (response.status) {")
         failures.forEach { failure ->
-            val payload = decodeExpression(failure.type, if (streamed) "drain(response)" else "response.body")
+            val payload =
+                decodeExpression(failure.type, if (streamed) "drain(response)" else "response.body", at)
             val headers = failure.headers.joinToString("") { ", ${headerRead(it)}" }
             appendLine(
                 "    ${failure.status} -> return Outcome.Err(" +
@@ -527,10 +530,11 @@ private class KotlinClientEmitter(
         successes: List<Output<*>>,
         failures: List<ErrorOutput<*>>,
         otherwise: String,
+        at: CallSite,
     ): String = buildString {
         appendLine("return when (response.status) {")
         successes.forEach { success ->
-            appendLine("    ${success.status} -> ${wrap(resultExpression(ep, successes, success), failures)}")
+            appendLine("    ${success.status} -> ${wrap(resultExpression(ep, successes, success, at), failures)}")
         }
         appendLine("    else -> $otherwise")
         append("}")
@@ -541,15 +545,20 @@ private class KotlinClientEmitter(
         if (failures.isEmpty()) expression else "Outcome.Ok($expression)"
 
     /** One member of an endpoint's result type, built from the response body and its headers. */
-    private fun resultExpression(ep: Endpoint<*, *>, successes: List<Output<*>>, success: Output<*>): String {
+    private fun resultExpression(
+        ep: Endpoint<*, *>,
+        successes: List<Output<*>>,
+        success: Output<*>,
+        at: CallSite,
+    ): String {
         val name = "${resultType(ep, successes)}.${successMember(success.status)}"
-        val arguments = listOfNotNull(bodyExpression(success)) + success.headers.map(::headerRead)
+        val arguments = listOfNotNull(bodyExpression(success, at)) + success.headers.map(::headerRead)
         return if (arguments.isEmpty()) name else "$name(${arguments.joinToString()})"
     }
 
     /** What this response's body decodes to, or null where it carries none. */
-    private fun bodyExpression(out: Output<*>): String? = when (out) {
-        is JsonOutput<*> -> decodeExpression(out.type, "response.body")
+    private fun bodyExpression(out: Output<*>, at: CallSite): String? = when (out) {
+        is JsonOutput<*> -> decodeExpression(out.type, "response.body", at)
         is TextOutput -> "response.body"
         else -> null
     }
@@ -562,6 +571,13 @@ private class KotlinClientEmitter(
      * Carried here because a failed send names the URL it went to.
      */
     private class Call(val parameters: String, val request: String, val target: String? = null)
+
+    /**
+     * What a refusal names the call by, as the expressions the generated method
+     * has them under: `Method.GET` and either the path template or, for a
+     * webhook, the parameter holding the subscriber's URL.
+     */
+    private class CallSite(val method: String, val path: String)
 
     // Assembles one client method from one description: the parameter list,
     // the naming that keeps it collision-free, the body, and the call. The
@@ -875,8 +891,13 @@ private class KotlinClientEmitter(
 
     private fun typeFor(type: KType): String = types.type(schema(type), "Payload")
 
-    private fun decodeExpression(type: KType, from: String): String =
-        "${codecName(typeFor(type))}.decodeFromString($from)"
+    /**
+     * A decode that says which call it was decoding for. The status comes off
+     * the response rather than the declaration, so a 404 that arrived as a
+     * gateway's HTML is reported as the 404 it was.
+     */
+    private fun decodeExpression(type: KType, from: String, at: CallSite): String =
+        "${codecName(typeFor(type))}.decoded($from, ${at.method}, ${at.path}, response.status)"
 
     /** The `BodyCodec` val for a payload type, declared on first use. */
     private fun codecName(type: String): String =

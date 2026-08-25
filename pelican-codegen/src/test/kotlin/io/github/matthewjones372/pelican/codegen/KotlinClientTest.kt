@@ -364,8 +364,10 @@ class KotlinClientTest {
         client shouldContain "fun getWidget(widgetId: Long): Outcome<GetWidgetFailure, Widget> {"
         client shouldContain
             "404 -> return Outcome.Err(GetWidgetFailure.NotFound(" +
-            "problemCodec.decodeFromString(response.body)))"
-        client shouldContain "return Outcome.Ok(widgetCodec.decodeFromString(response.body))"
+            "problemCodec.decoded(response.body, Method.GET, \"/widgets/{widgetId}\", response.status)))"
+        client shouldContain
+            "return Outcome.Ok(widgetCodec.decoded(" +
+            "response.body, Method.GET, \"/widgets/{widgetId}\", response.status))"
     }
 
     @Test
@@ -374,7 +376,7 @@ class KotlinClientTest {
             "data class TooManyRequests(val body: Problem, val retryAfter: Long?) : PokeWidgetFailure {"
         client shouldContain
             "429 -> return Outcome.Err(PokeWidgetFailure.TooManyRequests(" +
-            "problemCodec.decodeFromString(response.body), " +
+            "problemCodec.decoded(response.body, Method.POST, \"/widgets/{widgetId}/poke\", response.status), " +
             """response.header("Retry-After")?.toLongOrNull()))"""
     }
 
