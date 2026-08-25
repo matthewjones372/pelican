@@ -191,6 +191,34 @@ Work out which of these a change can break:
 - **The round trip.** `ImportedOrdersTest` imports the published document back
   into descriptions and compiles them.
 
+### Pekko tests go through the testkit, registered as a JUnit 5 extension
+
+An actor system belongs to the test class and is started and stopped by JUnit,
+never by hand. `PekkoRouteTestKit` is that wrapper, held as a field:
+
+```kotlin
+companion object {
+    @JvmField
+    @RegisterExtension
+    val pekko = PekkoRouteTestKit("pelican-bytes-or-fail")
+}
+```
+
+Pekko's own `JUnitRouteTest` drives its `ActorSystemResource` from a JUnit 4
+`@Rule`, which Jupiter does not run, so without the extension nothing creates
+the system. `@JvmField` because the extension is found by reflection over real
+fields.
+
+**A route built from it is `by lazy`, not an instance field.** `beforeAll` runs
+after the instance is constructed, so a field initialiser calling
+`pekko.system()` gets null and the class fails with an `initializationError`
+naming a line that looks fine.
+
+Bind a real server only for what the route testkit cannot answer — chunk
+framing over a socket, connection handling. Everything decided by the routing
+tree is asked of `testRoute`, which seals the route exactly as a bound server
+does, and costs no port.
+
 Kover is aggregated across modules with a floor of 80% on `check`.
 
 ## Verifying
