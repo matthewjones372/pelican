@@ -29,6 +29,7 @@ import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.positive
 import io.github.matthewjones372.pelican.queryParam
+import io.github.matthewjones372.pelican.rawBody
 import io.github.matthewjones372.pelican.repeated
 import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.textPart
@@ -292,9 +293,44 @@ val forget = endpoint(name) {
     empty(204)
 }
 
+/**
+ * The three remaining output kinds core frames itself, and the one input it
+ * hands over unread. Same reason as [motd]: described once here rather than
+ * twice in two backends' fixtures and nowhere on the third.
+ */
+val everyone = endpoint(noInputs) {
+    get("everyone")
+    summary = "The whole list, framed as an array while it is produced"
+    operationId = "everyone"
+    tag("greetings")
+    emits(requestId)
+    jsonArray<Greeting>()
+}
+
+val logo = endpoint(noInputs) {
+    get("logo")
+    summary = "Opaque bytes, with the media type the description gave them"
+    operationId = "logo"
+    tag("greetings")
+    emits(requestId)
+    bytes("image/png")
+}
+
+val echoRaw = endpoint(rawBody(description = "Whatever was sent, unread")) {
+    post("echo-raw")
+    summary = "Hand the body straight back without reading it"
+    operationId = "echoRaw"
+    tag("greetings")
+    emits(requestId)
+    bytes()
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
-    listOf(greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict, motd, forget)
+    listOf(
+        greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
+        motd, forget, everyone, logo, echoRaw,
+    )
 
 /**
  * What a subscriber signs the notification with. An ordinary header input: a
@@ -316,6 +352,17 @@ val greetingRecorded = webhook("greetingRecorded") {
 
 /** The calls this service makes, kept apart from the ones it answers for the same reason. */
 val greetingWebhooks: List<Webhook> = listOf(greetingRecorded)
+
+/**
+ * What `logo` serves. Deliberately ASCII: `pelican-test` reads a response body
+ * as a `String`, so a real PNG header would come back with its high bytes
+ * replaced and the assertion would be about the test client rather than about
+ * the endpoint. The media type is the claim; these bytes only have to survive.
+ */
+val LOGO_BYTES: ByteArray = "PELICAN".toByteArray(Charsets.US_ASCII)
+
+/** A short, fixed list, so three backends can be compared byte for byte. */
+fun greetingsOf(): List<Greeting> = listOf(Greeting("Hello", "en"), Greeting("Bonjour", "fr"))
 
 internal fun greetingOf(who: String, shout: Boolean): Greeting {
     val text = "Hello, $who!"

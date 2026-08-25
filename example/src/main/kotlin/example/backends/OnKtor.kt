@@ -3,13 +3,16 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.ktor.bytesNow
 import io.github.matthewjones372.pelican.ktor.handledNow
 import io.github.matthewjones372.pelican.ktor.handledOneOf
 import io.github.matthewjones372.pelican.ktor.handledOrFail
 import io.github.matthewjones372.pelican.ktor.handledWith
 import io.github.matthewjones372.pelican.ktor.start
 import io.github.matthewjones372.pelican.ktor.streamedNow
+import io.github.matthewjones372.pelican.ktor.toChannel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.flow
 
 /**
@@ -54,6 +57,11 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
     motd handledNow { "Be excellent to each other." },
 
     forget handledWith { _ -> },
+    everyone streamedNow { greetingsOf().asFlow() },
+
+    logo bytesNow { io.ktor.utils.io.ByteReadChannel(LOGO_BYTES) },
+
+    echoRaw bytesNow { body -> body.toChannel() },
 )
 
 fun ktorApi(outerFilters: List<Filter> = emptyList()): Api =
