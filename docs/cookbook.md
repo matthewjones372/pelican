@@ -141,7 +141,7 @@ val badApiKey  = errorJson<ApiError>(401, "Missing or bad API key")
 val getUser = endpoint(userId) {
     get("users" / userId)
     json<User>() orFail noSuchUser
-}                                  // Endpoint<Long, Fallible<ApiError, User>>
+}                                  // Endpoint<Long, Outcome<ApiError, User>>
 
 getUser handledOrFail { id ->
     Store.user(id)?.let { ok(it) } ?: noSuchUser(ApiError(404, "No user $id"))
