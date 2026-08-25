@@ -42,8 +42,14 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
     override fun <T> codec(type: KType): BodyCodec<T> {
         // Once, when the Api is assembled: KType -> JavaType is reflection.
         val javaType = mapper.constructType(type.javaType)
+        // `writerFor`, not `writeValueAsString`. The latter serialises against
+        // the value's runtime class, and for the *elements* of a collection
+        // that leaves the declared element type as `Object` — which carries no
+        // `@JsonTypeInfo`, so a `List<PaymentMethod>` went out with no
+        // discriminator on any of its members and could not be read back.
+        val writer = mapper.writerFor(javaType)
         return object : BodyCodec<T> {
-            override fun encodeToString(value: T): String = mapper.writeValueAsString(value)
+            override fun encodeToString(value: T): String = writer.writeValueAsString(value)
             override fun decodeFromString(text: String): T = mapper.readValue(text, javaType)
         }
     }

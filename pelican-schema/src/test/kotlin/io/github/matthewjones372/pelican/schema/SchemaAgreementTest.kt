@@ -68,6 +68,24 @@ class SchemaAgreementTest {
     @Serializable
     data class Envelope(val item: Item, val state: State)
 
+    // ------------------------------------------------------- the harder ones
+
+    @Serializable
+    data class Node(val name: String, val children: List<Node>)
+
+    @JvmInline
+    @Serializable
+    value class UserId(val raw: Long)
+
+    @Serializable
+    data class Wrapped(val who: UserId, val tags: Map<String, List<Long?>>)
+
+    @Serializable
+    enum class Level { LOW, HIGH }
+
+    @Serializable
+    data class Scored(val level: Level, val score: Double)
+
     /** One shape and a value of it, which is the pair every claim below needs. */
     private class Shape(val name: String, val type: KType, val value: Any)
 
@@ -79,6 +97,14 @@ class SchemaAgreementTest {
         Shape("a sealed branch", typeOf<State>(), Draft("ada")),
         Shape("the other branch", typeOf<State>(), Published("yesterday")),
         Shape("a union nested in a record", typeOf<Envelope>(), Envelope(Item(1, "w", null), Draft("ada"))),
+        Shape("a recursive type", typeOf<Node>(), Node("root", listOf(Node("leaf", emptyList())))),
+        Shape(
+            "a value class and a map of nullable lists",
+            typeOf<Wrapped>(),
+            Wrapped(UserId(7), mapOf("a" to listOf(1L, null))),
+        ),
+        Shape("an enum and a double", typeOf<Scored>(), Scored(Level.HIGH, 0.5)),
+        Shape("a list of unions", typeOf<List<State>>(), listOf(Draft("ada"), Published("y"))),
     )
 
     private val sources = listOf(
