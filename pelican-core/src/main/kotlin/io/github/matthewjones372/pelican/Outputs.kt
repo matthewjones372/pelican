@@ -22,6 +22,14 @@ sealed class Output<R> {
     abstract val status: Int
     abstract val mediaType: String?
 
+    /**
+     * What this response means, for the document. Null takes the wording the
+     * media type implies — "Success.", "No content." and the rest — which is
+     * all there was until an endpoint could declare two successes and both
+     * arrived saying the same thing.
+     */
+    open val description: String? get() = null
+
     /** The payload type, or null when there is no body. */
     open val payloadType: KType? = null
 
@@ -87,6 +95,7 @@ class JsonOutput<T> @PublishedApi internal constructor(
     override val status: Int,
     val type: KType,
     override val headers: List<ResponseHeader<*>> = emptyList(),
+    override val description: String? = null,
 ) : Output<T>() {
     override val mediaType = "application/json"
     override val payloadType get() = type
@@ -97,6 +106,7 @@ class JsonOutput<T> @PublishedApi internal constructor(
 class TextOutput @PublishedApi internal constructor(
     override val status: Int,
     override val headers: List<ResponseHeader<*>> = emptyList(),
+    override val description: String? = null,
 ) : Output<String>() {
     override val mediaType = "text/plain"
 
@@ -106,6 +116,7 @@ class TextOutput @PublishedApi internal constructor(
 class EmptyOutput @PublishedApi internal constructor(
     override val status: Int,
     override val headers: List<ResponseHeader<*>> = emptyList(),
+    override val description: String? = null,
 ) : Output<Unit>() {
     override val mediaType: String? = null
 
@@ -116,6 +127,7 @@ class EmptyOutput @PublishedApi internal constructor(
 class NdjsonOutput<T> @PublishedApi internal constructor(
     override val status: Int,
     val type: KType,
+    override val description: String? = null,
 ) : Output<StreamOf<T>>() {
     override val mediaType = "application/x-ndjson"
     override val payloadType get() = type
@@ -136,6 +148,7 @@ class SseOutput<T> @PublishedApi internal constructor(
      * indistinguishable from a dead one, and proxies drop it accordingly.
      */
     val keepAlive: Duration? = null,
+    override val description: String? = null,
 ) : Output<StreamOf<T>>() {
     override val mediaType = "text/event-stream"
     override val payloadType get() = type
@@ -165,6 +178,7 @@ class SseOutput<T> @PublishedApi internal constructor(
 class JsonArrayOutput<T> @PublishedApi internal constructor(
     override val status: Int,
     val type: KType,
+    override val description: String? = null,
 ) : Output<StreamOf<T>>() {
     override val mediaType = "application/json"
     override val payloadType get() = type
@@ -175,6 +189,7 @@ class JsonArrayOutput<T> @PublishedApi internal constructor(
 class ByteStreamOutput @PublishedApi internal constructor(
     override val status: Int,
     override val mediaType: String,
+    override val description: String? = null,
 ) : Output<ByteStream>() {
     init { checkStatus(toString(), status, carriesBody = true) }
 }
@@ -186,13 +201,16 @@ class ByteStreamOutput @PublishedApi internal constructor(
  */
 
 /** A single JSON value. See [EndpointBuilder.json]. */
-inline fun <reified T> json(status: Int = 200, vararg headers: ResponseHeader<*>): JsonOutput<T> =
-    JsonOutput(status, typeOf<T>(), headers.toList())
+inline fun <reified T> json(
+    status: Int = 200,
+    vararg headers: ResponseHeader<*>,
+    description: String? = null,
+): JsonOutput<T> = JsonOutput(status, typeOf<T>(), headers.toList(), description)
 
 /** Plain text. See [EndpointBuilder.text]. */
-fun text(status: Int = 200, vararg headers: ResponseHeader<*>): TextOutput =
-    TextOutput(status, headers.toList())
+fun text(status: Int = 200, vararg headers: ResponseHeader<*>, description: String? = null): TextOutput =
+    TextOutput(status, headers.toList(), description)
 
 /** No body at all. See [EndpointBuilder.empty]. */
-fun empty(status: Int = 204, vararg headers: ResponseHeader<*>): EmptyOutput =
-    EmptyOutput(status, headers.toList())
+fun empty(status: Int = 204, vararg headers: ResponseHeader<*>, description: String? = null): EmptyOutput =
+    EmptyOutput(status, headers.toList(), description)

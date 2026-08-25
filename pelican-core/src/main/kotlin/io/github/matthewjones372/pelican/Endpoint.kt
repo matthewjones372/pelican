@@ -244,16 +244,19 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     /**
      * A single JSON value. Handler produces `T`.
      */
-    inline fun <reified T> json(status: Int = 200, vararg headers: ResponseHeader<*>): JsonOutput<T> =
-        JsonOutput(status, typeOf<T>(), headers.toList())
+    inline fun <reified T> json(
+        status: Int = 200,
+        vararg headers: ResponseHeader<*>,
+        description: String? = null,
+    ): JsonOutput<T> = JsonOutput(status, typeOf<T>(), headers.toList(), description)
 
     /** Newline-delimited JSON. Handler produces the backend's stream of `T`. */
-    inline fun <reified T> ndjson(status: Int = 200): NdjsonOutput<T> =
-        NdjsonOutput(status, typeOf<T>())
+    inline fun <reified T> ndjson(status: Int = 200, description: String? = null): NdjsonOutput<T> =
+        NdjsonOutput(status, typeOf<T>(), description)
 
     /** A streamed JSON array, flushed as elements are produced. */
-    inline fun <reified T> jsonArray(status: Int = 200): JsonArrayOutput<T> =
-        JsonArrayOutput(status, typeOf<T>())
+    inline fun <reified T> jsonArray(status: Int = 200, description: String? = null): JsonArrayOutput<T> =
+        JsonArrayOutput(status, typeOf<T>(), description)
 
     /**
      * Server-sent events. Handler produces the backend's stream of `T`.
@@ -263,19 +266,23 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
         status: Int = 200,
         eventName: String? = null,
         keepAlive: Duration? = null,
-    ): SseOutput<T> = SseOutput(status, typeOf<T>(), eventName, keepAlive)
+        description: String? = null,
+    ): SseOutput<T> = SseOutput(status, typeOf<T>(), eventName, keepAlive, description)
 
     /** An opaque byte stream. Handler produces the backend's stream of bytes. */
-    fun bytes(mediaType: String = "application/octet-stream", status: Int = 200): ByteStreamOutput =
-        ByteStreamOutput(status, mediaType)
+    fun bytes(
+        mediaType: String = "application/octet-stream",
+        status: Int = 200,
+        description: String? = null,
+    ): ByteStreamOutput = ByteStreamOutput(status, mediaType, description)
 
     /** Plain text. [headers] as on [json]. */
-    fun text(status: Int = 200, vararg headers: ResponseHeader<*>): TextOutput =
-        TextOutput(status, headers.toList())
+    fun text(status: Int = 200, vararg headers: ResponseHeader<*>, description: String? = null): TextOutput =
+        TextOutput(status, headers.toList(), description)
 
     /** No body at all — a 204, or the `202 Accepted` beside a `200`. [headers] as on [json]. */
-    fun empty(status: Int = 204, vararg headers: ResponseHeader<*>): EmptyOutput =
-        EmptyOutput(status, headers.toList())
+    fun empty(status: Int = 204, vararg headers: ResponseHeader<*>, description: String? = null): EmptyOutput =
+        EmptyOutput(status, headers.toList(), description)
 }
 
 /**

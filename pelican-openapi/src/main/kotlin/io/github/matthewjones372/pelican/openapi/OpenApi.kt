@@ -471,7 +471,10 @@ private fun multipartEncoding(body: MultipartBody): JsonObj? {
     }
 }
 
-private fun successDescription(out: Output<*>): String = when (out) {
+private fun successDescription(out: Output<*>): String = out.description ?: impliedDescription(out)
+
+/** What the media type says when the response does not say for itself. */
+private fun impliedDescription(out: Output<*>): String = when (out) {
     is NdjsonOutput<*> -> "A newline-delimited JSON stream. Chunked; consume incrementally."
     is JsonArrayOutput<*> -> "A JSON array, chunked; elements are flushed as they are produced."
     is SseOutput<*> -> "A server-sent event stream."
