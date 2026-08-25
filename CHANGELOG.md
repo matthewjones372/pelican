@@ -35,6 +35,10 @@ one.
   decode direction that catches the whole class: for every shape it covers, the
   smallest payload each codec's own schema accepts must decode through that
   codec.
+- **A nullable scalar in a form body keeps its type.** `FormShape` read only the
+  string spelling of `type`, so the `["integer","null"]` OpenAPI 3.1 publishes
+  for an `Int?` fell through to a string and the value reached the codec quoted
+  — a 400 on jsoniter and a silent coercion on the other two.
 
 ### Changed
 

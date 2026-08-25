@@ -25,7 +25,13 @@ import kotlin.reflect.typeOf
  */
 class FormBodyTest {
 
-    data class SignIn(val user: String, val remember: Boolean, val visits: Int, val tags: List<String>)
+    data class SignIn(
+        val user: String,
+        val remember: Boolean,
+        val visits: Int,
+        val tags: List<String>,
+        val age: Int?,
+    )
 
     data class Nested(val inner: SignIn)
 
@@ -63,6 +69,16 @@ class FormBodyTest {
                                         put("items", jsonObj { "type" to "string" })
                                     },
                                 )
+                                // What all three schema sources publish for an
+                                // `Int?`: OpenAPI 3.1 spells nullable as a type
+                                // array rather than a `nullable` flag.
+                                put(
+                                    "age",
+                                    jsonObj {
+                                        put("type", jsonStrings(listOf("integer", "null")))
+                                        "format" to "int32"
+                                    },
+                                )
                             },
                         )
                     },
@@ -85,6 +101,16 @@ class FormBodyTest {
     fun `each field becomes the JSON type its schema declares`() {
         codec.decodeFromString("user=ada&remember=true&visits=3") shouldBe
             """{"user":"ada","remember":true,"visits":3}"""
+    }
+
+    @Test
+    fun `a nullable field is the type the schema names, not the null beside it`() {
+        codec.decodeFromString("age=41") shouldBe """{"age":41}"""
+    }
+
+    @Test
+    fun `an empty value for a nullable number is absence, as it is for any other`() {
+        codec.decodeFromString("user=ada&age=") shouldBe """{"user":"ada"}"""
     }
 
     @Test

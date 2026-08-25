@@ -128,7 +128,7 @@ private class FormShape(private val fields: Map<String, Field>) {
         }
 
         private fun field(name: String, owner: KType, schema: JsonObj, components: SchemaRegistry): Field {
-            val type = (schema["type"] as? JsonStr)?.value
+            val type = schema.declaredType()
             if (type == "array") {
                 val items = resolve(schema["items"] as? JsonObj ?: emptyJsonObj, components)
                 val element = field(name, owner, items, components)
@@ -150,6 +150,19 @@ private class FormShape(private val fields: Map<String, Field>) {
                 )
             }
             return Field(kind, repeated = false)
+        }
+
+        /**
+         * What a schema calls itself, reading past the `"null"` a nullable
+         * property adds. OpenAPI 3.1 spells nullable as a type array, and all
+         * three schema sources emit it, so reading only the string spelling
+         * left an `Int?` field a string — a form value that then reached the
+         * codec quoted.
+         */
+        private fun JsonObj.declaredType(): String? = when (val type = this["type"]) {
+            is JsonStr -> type.value
+            is JsonArr -> type.items.filterIsInstance<JsonStr>().map { it.value }.firstOrNull { it != "null" }
+            else -> null
         }
 
         /** A `$ref` followed to the schema it names; a form needs the properties. */

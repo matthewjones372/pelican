@@ -3447,6 +3447,10 @@ other codec, so:
 - **A field the schema does not describe is dropped.** Browsers send the name of
   the button that was clicked and whatever hidden inputs the page had; refusing
   those would make an ordinary HTML form impossible to point at an endpoint.
+- **A nullable field is still the type the schema names.** OpenAPI 3.1 spells
+  `Int?` as `type: ["integer","null"]`, which is what all three schema sources
+  publish, so the type array is read rather than treated as a schema naming no
+  type at all.
 - **Only scalars and arrays of scalars.** A nested object would need a bracket
   convention nobody agrees on — `user[name]` in PHP, `user.name` in Spring —
   and inventing a fourth is worse than saying no. Saying no happens when the

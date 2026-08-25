@@ -12,6 +12,7 @@ import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.emptyJsonObj
+import io.github.matthewjones372.pelican.formCodec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsoniter.JsoniterCodecs
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
@@ -94,6 +95,9 @@ class SchemaAgreementTest {
     @Serializable
     data class Scored(val level: Level, val score: Double)
 
+    @Serializable
+    data class Signup(val name: String, val visits: Int?)
+
     /** One shape and a value of it, which is the pair every claim below needs. */
     private class Shape(val name: String, val type: KType, val value: Any)
 
@@ -162,6 +166,23 @@ class SchemaAgreementTest {
                     withClue("$library published a schema that accepts $minimal, and refuses it: $refusal") {
                         refusal shouldBe null
                     }
+                }
+            }
+        }
+
+    /**
+     * The one place a published schema decides how a request is *read* rather
+     * than how it is documented, so a disagreement here is a 400. All three
+     * sources spell a nullable Int the 3.1 way, as a type array.
+     */
+    @TestFactory
+    fun `a form field its own schema calls a nullable integer arrives as an integer`(): List<DynamicTest> =
+        sources.map { (library, codecs) ->
+            DynamicTest.dynamicTest(library) {
+                val codec = codecs.formCodec<Signup>(typeOf<Signup>())
+
+                withClue("$library read visits=3 as something other than the 3 its schema describes") {
+                    codec.decodeFromString("name=ada&visits=3") shouldBe Signup("ada", 3)
                 }
             }
         }
