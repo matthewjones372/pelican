@@ -10,7 +10,7 @@
  * because Gradle is the one that has to know them.
  */
 val styledModules = listOf(
-    "pelican-core", "pelican-openapi", "pelican-codegen", "pelican-jackson", "pelican-kotlinx",
+    "pelican-core", "pelican-openapi", "pelican-schema", "pelican-codegen", "pelican-jackson", "pelican-kotlinx",
     "pelican-pekko", "pelican-http4k", "pelican-ktor",
     "pelican-metrics",
     "pelican-metrics-otel",

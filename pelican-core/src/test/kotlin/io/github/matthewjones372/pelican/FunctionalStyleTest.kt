@@ -50,6 +50,8 @@ class FunctionalStyleTest {
             "codecs are resolved once per type and cached against it",
         "pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/OpenApi.kt" to
             "component schemas are collected as the document is walked, then emitted once",
+        "pelican-schema/src/main/kotlin/io/github/matthewjones372/pelican/schema/StandaloneSchemas.kt" to
+            "SchemaComponents is written into as a type is walked, and the document freezes it into `\$defs`",
         "pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/KotlinClient.kt" to
             "the emitter builds one client method's parameter list, keeping names unique as it goes",
         "pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/KotlinTypes.kt" to

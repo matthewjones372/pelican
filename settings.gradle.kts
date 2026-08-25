@@ -16,6 +16,7 @@ rootProject.name = "pelican"
 include(
     "pelican-core",
     "pelican-openapi",
+    "pelican-schema",
     "pelican-codegen",
     "pelican-import",
     "pelican-jackson",
