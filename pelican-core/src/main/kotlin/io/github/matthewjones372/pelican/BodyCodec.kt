@@ -1,5 +1,8 @@
 package io.github.matthewjones372.pelican
 
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.nio.charset.StandardCharsets
 import kotlin.reflect.KType
 
 /**
@@ -117,6 +120,53 @@ class RequestBodyCodecs internal constructor(private val byMediaType: Map<String
         )
     }
 }
+
+/**
+ * A strict request body as the text a codec reads, refusing anything past
+ * [limit] with [PayloadTooLarge].
+ *
+ * Bytes rather than characters. `String.length` counts UTF-16 code units, so a
+ * limit checked against it admits about three times as much CJK as it says, and
+ * a body has to be whole in memory before it can be counted at all — which is
+ * the thing the limit exists to prevent. Counting as it reads refuses on the
+ * byte that crosses the line.
+ *
+ * A little past the limit is still read before the refusal goes out. Unread
+ * bytes are bytes the client is still writing, and answering mid-upload gives it
+ * a broken pipe instead of the status; the same reason, and the same overrun,
+ * that the multipart reader drains.
+ */
+fun readStrictBody(input: InputStream, limit: Long): String {
+    val out = ByteArrayOutputStream()
+    val buffer = ByteArray(STRICT_READ_BUFFER_BYTES)
+    var remaining = limit
+    while (true) {
+        val read = input.read(buffer, 0, buffer.size)
+        if (read < 0) return String(out.toByteArray(), StandardCharsets.UTF_8)
+        if (read > remaining) {
+            drain(input, STRICT_DRAIN_OVERRUN_BYTES)
+            throw PayloadTooLarge(limit)
+        }
+        remaining -= read
+        out.write(buffer, 0, read)
+    }
+}
+
+/** Reads and discards up to [bytes], so the connection is whole when the refusal goes out. */
+private fun drain(input: InputStream, bytes: Long) {
+    val scratch = ByteArray(STRICT_READ_BUFFER_BYTES)
+    var remaining = bytes
+    while (remaining > 0) {
+        val read = input.read(scratch, 0, minOf(scratch.size.toLong(), remaining).toInt())
+        if (read < 0) return
+        remaining -= read
+    }
+}
+
+private const val STRICT_READ_BUFFER_BYTES = 4096
+
+/** Sixty-four kilobytes, the same overrun the multipart reader allows. */
+private const val STRICT_DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
 
 /**
  * Which codec reads this request body, or null for the ones no codec reads — a
