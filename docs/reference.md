@@ -2378,7 +2378,7 @@ Set an API-wide requirement and let endpoints opt out of it:
 ```kotlin
 Api(routes, codecs = JacksonCodecs, security = listOf(oauth.requires("orders:read")))
 
-val health = endpoint(noInputs) {
+val health = endpoint {
     get("health")
     noSecurity()        // documented as public: `security: []`
     text()
@@ -3075,10 +3075,14 @@ What it does **not** catch, honestly:
   an input, so no handler could read it
   ```
 
+No arguments means no inputs: `endpoint { }` is an `Endpoint<Unit, R>` and its
+handler is given nothing, because there is nothing to give it.
+
 Past six inputs there is no overload, and tuples have stopped paying for
-themselves anyway. Drop to the lens style — `endpoint { }` with
-`query(...)`/`header(...)`, handler receives `Params`, read by key. The trade is that reading an undeclared key throws at
-request time instead of failing to compile.
+themselves anyway. Ask for the whole bag by name — `endpoint(lensInputs) { }`
+with `query(...)`/`header(...)`, handler receives `Params`, read by key. The
+trade is that reading an undeclared key throws at request time instead of
+failing to compile, which is why it is a name rather than the default.
 
 ## Refined inputs
 
@@ -4513,7 +4517,7 @@ open  localhost:8080/api-docs                                 # Swagger UI
   global switch and no branch inference, on purpose — see
   [Importing an OpenAPI document](#importing-an-openapi-document).
 - **More than six typed inputs.** `endpoint(a..f)` is the largest overload;
-  past that the lens form takes the whole `Params`.
+  past that `endpoint(lensInputs)` takes the whole `Params`.
 - **`callbacks`.** A request made *during* an operation, to a URL taken out of
   that operation's own payload through a runtime expression, and nothing in an
   endpoint description evaluates one. Its neighbour in the specification, a
