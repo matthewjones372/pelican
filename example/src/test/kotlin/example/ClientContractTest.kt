@@ -400,9 +400,12 @@ class UndeclaredFailureTest {
             // The internal message — the one naming the endpoint and the stray
             // declaration — is what a caller must not be handed.
             body shouldNotContain "never declared"
-            body shouldNotContain "410"
+            body shouldNotContain "error:410"
             body shouldContain "Internal server error"
-            body shouldContain "Reference: "
+            // The whole detail, not a substring of it: a bare `shouldNotContain
+            // "410"` also failed whenever the random reference happened to
+            // contain those three characters, which is one run in about 450.
+            body shouldContain Regex("\"detail\":\"Reference: [0-9a-f]{12}\"")
         }
     }
 
