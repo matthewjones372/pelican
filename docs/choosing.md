@@ -423,19 +423,18 @@ sealed failure types, streamed responses, a per-request timeout, and a
 `ClientTransport` it sends through rather than an HTTP library it is welded to.
 That is more than a toy. But there is no published client artifact — the file is
 generated into your build, and you own it. Two transports are written:
-`pelican-client-java` over the JDK's own `HttpClient`, and
-`pelican-client-pekko` over Pekko HTTP's client, which takes the `ActorSystem`
-a Pekko service already has. A service that already runs and tunes a Ktor
-client still cannot hand that one over, because that adapter does not exist
-yet. A build carrying both of the ones that do exist has to name the transport
-at each client it constructs, since nothing can choose between two providers on
-one classpath. The generated methods block by default, joining the stage the
-transport answers with; a `suspend` surface is generated instead when the client
-entry asks for one, and the choice belongs to whoever generates the file. Retries
-are a decorator over a transport rather than generated code, and are off unless
-somebody wraps one — but nothing here does circuit breaking or per-call metrics,
-and those you still write around the transport yourself. The client that
-`pelican-test` derives is explicitly narrower still,
+`pelican-client-java` over the JDK's own `HttpClient`, `pelican-client-pekko`
+over Pekko HTTP's client, which takes the `ActorSystem` a Pekko service already
+has, and `pelican-client-ktor` over Ktor's, which takes the `HttpClient` a Ktor
+service already configures. A build carrying more than one has to name the
+transport at each client it constructs, since nothing can choose between two
+providers on one classpath. The generated methods block by default, joining the
+stage the transport answers with; a `suspend` surface is generated instead when
+the client entry asks for one, and the choice belongs to whoever generates the
+file. Retries are a decorator over a transport rather than generated code, and
+are off unless somebody wraps one — but nothing here does circuit breaking or
+per-call metrics, and those you still write around the transport yourself. The
+client that `pelican-test` derives is explicitly narrower still,
 scoped at testing, blocking, with no retries and no pooling worth the name, and
 it cannot upload a binary file part because its `RequestSpec` carries a `String`
 body.

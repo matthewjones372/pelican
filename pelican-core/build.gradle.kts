@@ -14,7 +14,7 @@ val styledModules = listOf(
     "pelican-pekko", "pelican-http4k", "pelican-ktor",
     "pelican-metrics",
     "pelican-metrics-otel",
-    "pelican-client-java", "pelican-client-pekko",
+    "pelican-client-java", "pelican-client-pekko", "pelican-client-ktor",
     "pelican-test", "pelican-test-pekko", "pelican-test-http4k",
 )
 
