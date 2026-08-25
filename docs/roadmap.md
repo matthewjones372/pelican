@@ -28,9 +28,13 @@ next to the result of following it.
   status once in core, `afterStatus` hands it to a filter, and a counter and a
   timer come out tagged from the description. OpenTelemetry is still to do.
 - **Item 2** shipped as [Choosing between Pelican and the alternatives](choosing.md).
-- **Item 3** shipped its first phase: `ClientTransport` in core and
-  `pelican-client-java` over the JDK's own `HttpClient`. The Ktor and Pekko
-  adapters, the `suspend` surface and the retry policy are still to do.
+- **Item 3** shipped its first two phases: `ClientTransport` in core,
+  `pelican-client-java` over the JDK's own `HttpClient`, and
+  `pelican-client-pekko` over Pekko HTTP's. The Ktor adapter, the `suspend`
+  surface and the retry policy are still to do. The second adapter also made
+  the classpath question real rather than hypothetical: `ClientTransport
+  .default()` refuses to choose between two providers, so a build carrying both
+  names the transport at each client it constructs.
 
 ## 1. Metrics and traces, from the description
 

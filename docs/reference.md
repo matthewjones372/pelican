@@ -14,6 +14,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
+| `pelican-client-pekko` | core, pekko-http | the same seam over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-kotlinx` | core, kotlinx.serialization | the alternative `Codecs` |
@@ -57,6 +58,11 @@ The layering is load-bearing, not decorative, and each edge is a test:
 - `pelican-client-java` asserts the same shape on the caller's side: core, the
   JDK, and no second HTTP stack. An adapter a caller adds in order to *choose*
   a client library would be worth very little if it brought one along.
+- `pelican-client-pekko` asserts the same claim with Pekko in the place of the
+  JDK: core, Pekko HTTP's own closure, and nothing else. It also asserts that
+  `pelican-pekko` is absent, which is the edge worth having — the interpreter
+  and the transport are both Pekko, and a caller who only makes calls should
+  not compile a route builder in to do it.
 - `pelican-import` depends on `pelican-codegen` rather than on core directly,
   and shares its schema-to-Kotlin generator outright. A client generated from a
   document and a client generated from endpoint values should not disagree
@@ -866,8 +872,10 @@ way.
 
 ### Choosing one
 
-`pelican-client-java` is the adapter over the JDK's own `HttpClient`, and a
-generated client finds it without being told:
+Two adapters are written. `pelican-client-java` is the one over the JDK's own
+`HttpClient`; `pelican-client-pekko` is the one over Pekko HTTP's client, for a
+service that already runs Pekko and would rather not start a second HTTP stack
+to call out of. A generated client finds either without being told:
 
 ```kotlin
 dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
@@ -879,6 +887,22 @@ It is a `ServiceLoader` provider, so adding the module is the whole of choosing
 it — core cannot name an adapter it does not depend on. With none on the
 classpath the client says so when it is constructed, and with more than one it
 asks to be told which, since nothing there could pick for you.
+
+Which is the one case finding-by-classpath cannot serve, and it is worth
+knowing what it looks like before you meet it. Put both adapters on one
+classpath and every client built without a named transport fails where it is
+constructed:
+
+```
+Several transports are on the classpath — [..JavaHttpTransport, ..PekkoHttpTransport]
+— and nothing here can say which one this client should use. Pass one.
+```
+
+The way through is to name the transport at each construction site. That is
+what `example`'s own suite does: it compiles both adapters in order to run the
+generated client over each, so every `OrdersClient` there is built with the one
+it means. Nothing is lost but the defaulted argument, and the failure is loud
+and immediate rather than a client that quietly sends on the wrong stack.
 
 Handing one over is the other spelling, and the one to reach for when the
 process already has a client worth sharing:
@@ -938,17 +962,69 @@ blocking and carries a `String` body on purpose, because a test asserts on a
 result it already has — which is exactly why the typed test client
 [cannot upload binary](#what-isnt-here). Right taste, wrong constraints.
 
+### On Pekko HTTP
+
+`PekkoHttpTransport` takes an actor system, or does without one:
+
+```kotlin
+val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTransport(system))
+```
+
+A service that already runs Pekko passes the system it has, and calls made
+through it get that system's dispatchers, its configuration and its shutdown. A
+caller that does not run Pekko passes nothing and never has to learn that an
+actor system was involved: the module keeps one for that case, started on the
+first request rather than in the constructor, shared by every transport that
+asked for none, and configured `daemonic` so that a transport nobody was handed
+a close for cannot be what keeps a finished process alive. Nothing in the
+adapter terminates a system — two transports sharing one must not be able to
+shut each other down — so a caller who wants that control is the caller who
+passed one in.
+
+Both body crossings are `StreamConverters`. A `Body.Streaming` becomes a
+`Source` built from the `open` function, so an upload is read at the speed the
+socket drains it and a request Pekko materialises a second time asks for the
+bytes a second time rather than sending a stream already consumed. The response
+entity's `Source[ByteString]` is run into `StreamConverters.asInputStream()`,
+which hands back a stream fed by a bounded queue: a slow reader backpressures
+the connection instead of filling memory, and closing the stream cancels the
+source. A caller who neither reads nor closes is the one case that cannot be
+covered from here — the stream stays materialised, backpressuring, until the
+pool's idle timeout fails it.
+
+`Content-Type` and `Content-Length` need saying separately, because Pekko keeps
+neither in its header list. They belong to the entity, and a header added under
+either name is dropped as the request renders. So the adapter reads them off
+the `ClientRequest` and builds the entity from them — a streamed body whose
+length the caller knew is sent sized rather than chunked, which is the
+difference between an upload a proxy will size-check and one it may refuse —
+and puts them back into `ClientResponse.headers` on the way out. A round trip
+through this adapter carries the same two headers a round trip through the JDK
+one does, once each.
+
+The per-request timeout is the one thing that does not map exactly, so it is
+worth saying what it does instead of implying it maps. Pekko's timeouts are
+connection-pool settings, and handing per-request settings to `singleRequest`
+keys a new pool per distinct value, so the deadline is imposed on the stage
+rather than on Pekko. That bounds the arrival of the response head — which is
+what the JDK adapter's `HttpRequest.timeout` bounds too — and not the reading
+of a streamed body, which stays governed by the pool's own idle timeout: an
+`sse` response outliving the client's thirty-second default is the endpoint
+working rather than failing. What is raised on expiry is a
+`java.util.concurrent.TimeoutException` naming the call, rather than the JDK's
+`HttpTimeoutException`, so a caller catching a timeout by type catches the one
+its own transport raises.
+
 ### Writing another one
 
-An adapter is small, and the two obvious ones are not written yet. A Ktor
-adapter would launch each `send` on its own scope, call `prepareRequest(...)`
-and `execute { }`, bridge the response's `ByteReadChannel` to an `InputStream`,
-and complete the stage with a `ClientResponse` over it, keeping the block open
-until that stream is closed — which is what makes a Ktor client's laziness
-survive the crossing. A Pekko adapter would map the request onto
-`Http().singleRequest(...)`, whose `CompletionStage<HttpResponse>` is already
-the right shape, and run the response entity's `Source[ByteString]` through
-`StreamConverters.asInputStream()`.
+An adapter is small, and the Ktor one is not written yet. It would launch each
+`send` on its own scope, call `prepareRequest(...)` and `execute { }`, bridge
+the response's `ByteReadChannel` to an `InputStream`, and complete the stage
+with a `ClientResponse` over it, keeping the block open until that stream is
+closed — which is what makes a Ktor client's laziness survive the crossing.
+`pelican-client-pekko` is that shape already, at about 240 lines including the
+comments, and most of what took thought there was the stream bridge rather than
+the mapping.
 
 ## Importing an OpenAPI document
 
@@ -3609,11 +3685,12 @@ open  localhost:8080/api-docs                                 # Swagger UI
   nothing to add: a webhook you receive arrives at a path on your own service,
   so it is an ordinary `endpoint(...)` with a handler. `webhook(...)` is for the
   half you send.
-- **A Ktor or Pekko client transport.** `ClientTransport` is core's, and
-  `pelican-client-java` is the one adapter written — see
+- **A Ktor client transport.** `ClientTransport` is core's, and
+  `pelican-client-java` and `pelican-client-pekko` are the adapters written —
+  see
   [The transport a generated client sends with](#the-transport-a-generated-client-sends-with),
-  which says what each of the other two would do. A service that wants one
-  before they are written can implement the interface itself; it is one method.
+  which says what the Ktor one would do. A service that wants it before it is
+  written can implement the interface itself; it is one method.
 - **A fourth server backend.** `pelican-ktor` was the third, and cost what
   `pelican-http4k` cost: the binders above, a request-to-`Params` step and a
   response writer, in about 500 lines including the comments.
