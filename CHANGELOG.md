@@ -46,6 +46,10 @@ one.
 
 ### Fixed
 
+- **Generation under a parallel build.** The generator templates are read
+  through a connection of their own rather than a stream the worker's
+  classloader owns and closes, which failed `generate<Name>Endpoints` with
+  `java.io.IOException: Stream closed` whenever another task finished first.
 - jsoniter binds a value class as the value inside it, and honours jsoniter's
   own settings and config contract.
 - The transport is named where two adapters are present.
