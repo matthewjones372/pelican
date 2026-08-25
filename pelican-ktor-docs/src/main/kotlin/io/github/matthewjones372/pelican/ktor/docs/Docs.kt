@@ -44,7 +44,7 @@ fun Route.pelicanDocs(api: Api, docs: Docs = Docs()) {
     if (specPath == null && uiPath == null) return
 
     // Generated once and captured by the routes, rather than once per request.
-    val document = api.spec().openApiJson()
+    val document = api.spec().openApiJson(docs.version)
 
     // The API's own CORS setting covers the document as well: a spec a browser
     // tool cannot fetch is the same complaint as an endpoint it cannot call.

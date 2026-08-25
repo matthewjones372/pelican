@@ -9,15 +9,30 @@ package io.github.matthewjones372.pelican.openapi
 import io.github.matthewjones372.pelican.*
 
 /**
- * Interprets endpoint descriptions as an OpenAPI 3.1.0 document.
+ * Interprets endpoint descriptions as an OpenAPI document, written against
+ * [version].
  *
- * 3.1 only, deliberately. Nullability is spelled inside a schema rather than
- * around it, so a selectable version would need either an OpenAPI argument on
- * core's [SchemaSource] — a type that exists so core need not know what OpenAPI
- * is — or a second emitter pattern-matching the first one's output. Neither
- * could be faithful: 3.0's `nullable` cannot say "this reference may be null".
+ * The two revisions describe the same endpoints and differ in three places,
+ * all of them cases where 3.1 has no vocabulary for something the server
+ * actually does:
+ *
+ * - **The `openapi` field**, `3.1.0` or `3.2.0`.
+ * - **Cookie parameters** carry `style: "cookie"` under 3.2. Pelican joins
+ *   cookie pairs with `"; "` and passes values through unescaped, which is
+ *   what that style means and is not what the `form` both revisions assume at
+ *   this location means. See [serialisation].
+ * - **NDJSON and SSE responses** put their schema under `itemSchema` under
+ *   3.2, which is the field 3.2 added for exactly this and describes one frame
+ *   rather than the whole stream. See [successBody].
+ *
+ * 3.0 is not on the list and will not be. Nullability is spelled inside a
+ * schema rather than around it, so writing it would need either an OpenAPI
+ * argument on core's [SchemaSource] — a type that exists so core need not know
+ * what OpenAPI is — or a second emitter pattern-matching the first one's
+ * output. Neither could be faithful: 3.0's `nullable` cannot say "this
+ * reference may be null".
  */
-fun ApiSpec.openApi(): JsonObj {
+fun ApiSpec.openApi(version: OpenApiVersion = OpenApiVersion.V3_1_0): JsonObj {
     val components = SchemaRegistry()
 
     // path template -> method -> operation
@@ -28,7 +43,7 @@ fun ApiSpec.openApi(): JsonObj {
 
     for (ep in documented) {
         val byMethod = paths.getOrPut(ep.pathSpec.template) { LinkedHashMap() }
-        byMethod[ep.method.name.lowercase()] = operation(ep, schemas, components)
+        byMethod[ep.method.name.lowercase()] = operation(ep, version, schemas, components)
     }
 
     // A webhook says hidden the same way an endpoint does.
@@ -43,19 +58,18 @@ fun ApiSpec.openApi(): JsonObj {
     )
 
     return jsonObj {
-        "openapi" to "3.1.0"
-        // `jsonSchemaDialect` is omitted: 2020-12 is what 3.1 already means,
-        // and writing it down is a second place for it to be wrong.
-        put("info", jsonObj {
-            "title" to title
-            "version" to version
-            putIfNotNull("description", description)
-        })
+        "openapi" to version.field
+        // `jsonSchemaDialect` is omitted: 2020-12 is what both revisions
+        // already mean, and writing it down is a second place for it to be
+        // wrong. `$self`, which 3.2 adds beside it, is omitted for a different
+        // reason — it names the document's own retrieval URI, and nothing in a
+        // set of endpoint descriptions says where the document gets published.
+        put("info", info())
         if (servers.isNotEmpty()) put("servers", serverList(servers))
         put("paths", JsonObj(paths.mapValues { (_, ops) -> JsonObj(ops.toMap()) }))
         // The order the specification lists the fields in; a document is read
         // by people too.
-        if (sent.isNotEmpty()) put("webhooks", webhookItems(sent, schemas, components))
+        if (sent.isNotEmpty()) put("webhooks", webhookItems(sent, version, schemas, components))
         if (security.isNotEmpty()) put("security", requirements(security))
         put("components", jsonObj {
             put("schemas", components.all())
@@ -66,7 +80,24 @@ fun ApiSpec.openApi(): JsonObj {
     }
 }
 
-fun ApiSpec.openApiJson(): String = openApi().renderPretty()
+fun ApiSpec.openApiJson(version: OpenApiVersion = OpenApiVersion.V3_1_0): String =
+    openApi(version).renderPretty()
+
+/**
+ * What the document says about the API itself.
+ *
+ * A function of its own, and not four lines inlined above, because two
+ * different things here are called a version: `info.version` is the API's,
+ * which the service names and bumps, and the argument to [openApi] is the
+ * specification's. Written in one scope the second would quietly shadow the
+ * first, and the document would lose a required field without anything
+ * complaining.
+ */
+private fun ApiSpec.info(): JsonObj = jsonObj {
+    "title" to title
+    "version" to version
+    putIfNotNull("description", description)
+}
 
 /**
  * A `servers` list, the same Server Object at document level and on an
@@ -82,30 +113,31 @@ private fun serverList(urls: List<String>): JsonArr =
  */
 private fun webhookItems(
     webhooks: List<Webhook>,
+    version: OpenApiVersion,
     schemas: SchemaSource,
     components: SchemaComponents,
 ): JsonObj {
     val items = LinkedHashMap<String, MutableMap<String, JsonValue>>()
     webhooks.forEach { hook ->
         items.getOrPut(hook.name) { LinkedHashMap() }[hook.operation.method.name.lowercase()] =
-            operation(hook.operation, schemas, components)
+            operation(hook.operation, version, schemas, components)
     }
     return JsonObj(items.mapValues { (_, ops) -> JsonObj(ops.toMap()) })
 }
 
 /** Every declared input that travels outside the body, in the order a reader expects them. */
-private fun parameters(ep: Endpoint<*, *>): List<JsonValue> = buildList {
+private fun parameters(ep: Endpoint<*, *>, version: OpenApiVersion): List<JsonValue> = buildList {
     ep.pathSpec.captures.forEach { p ->
-        add(parameter(p.name, "path", true, p.codec, p.description))
+        add(parameter(p.name, "path", true, p.codec, p.description, version))
     }
     ep.queries.forEach { q ->
-        add(parameter(q.name, "query", q.required, q.codec, q.description, q.listStyle))
+        add(parameter(q.name, "query", q.required, q.codec, q.description, version, q.listStyle))
     }
     ep.headerParams.forEach { h ->
-        add(parameter(h.name, "header", h.required, h.codec, h.description, h.listStyle))
+        add(parameter(h.name, "header", h.required, h.codec, h.description, version, h.listStyle))
     }
     ep.cookieParams.forEach { c ->
-        add(parameter(c.name, "cookie", c.required, c.codec, c.description, c.listStyle))
+        add(parameter(c.name, "cookie", c.required, c.codec, c.description, version, c.listStyle))
     }
 }
 
@@ -177,16 +209,17 @@ private fun requestBody(ep: Endpoint<*, *>, schemas: SchemaSource, components: S
  * One entry per successful response the output describes, and one per declared
  * failure — each with its own schema and media type.
  */
-private fun responses(ep: Endpoint<*, *>, schemas: SchemaSource, components: SchemaComponents): JsonObj = jsonObj {
+private fun responses(
+    ep: Endpoint<*, *>,
+    version: OpenApiVersion,
+    schemas: SchemaSource,
+    components: SchemaComponents,
+): JsonObj = jsonObj {
     successesOf(ep.output).forEach { out ->
         put(out.status.toString(), jsonObj {
             "description" to successDescription(out)
             responseHeaders(ep.responseHeaders + out.headers)?.let { put("headers", it) }
-            val media = out.mediaType
-            val schema = schemaOf(out, schemas, components)
-            if (media != null && schema != null) {
-                put("content", jsonObj { put(media, jsonObj { put("schema", schema) }) })
-            }
+            successBody(out, version, schemas, components)?.let { put("content", it) }
         })
     }
     ep.errors.forEach { err ->
@@ -209,8 +242,87 @@ private fun responses(ep: Endpoint<*, *>, schemas: SchemaSource, components: Sch
 private fun successesOf(out: Output<*>): List<Output<*>> =
     if (out is FallibleOutput<*, *>) out.successes else listOf(out)
 
+/**
+ * The `content` of a successful response: which media type it is, and which
+ * field the schema goes under.
+ *
+ * NDJSON and SSE are what 3.2 calls *sequential media types* — a repeating
+ * structure with no header, footer or envelope around it, and both are named
+ * in its list of them. It is explicit about the consequence: `schema` "MUST be
+ * applied to the complete content", the whole stream read as though the frames
+ * were an array, while `itemSchema` "MUST be applied to each item in the
+ * stream independently". One frame is the thing an endpoint description knows
+ * about, so under 3.2 the document puts it in the field that means it. Under
+ * 3.1 there is only `schema`, and the frame's schema goes there — the reading
+ * everything generating streamed responses used before `itemSchema` existed,
+ * and the one 3.2 now says is the wrong field.
+ *
+ * A streamed JSON array is not sequential under either revision: it is one
+ * document with brackets round it that happens to arrive in pieces. So
+ * [JsonArrayOutput] keeps `schema: {"type": "array"}` throughout.
+ */
+private fun successBody(
+    out: Output<*>,
+    version: OpenApiVersion,
+    schemas: SchemaSource,
+    components: SchemaComponents,
+): JsonObj? {
+    if (out is FallibleOutput<*, *>) return successBody(out.success, version, schemas, components)
+    val media = out.mediaType ?: return null
+    val schema = schemaOf(out, version, schemas, components) ?: return null
+    val field = if (version == OpenApiVersion.V3_2_0 && out.isSequential()) "itemSchema" else "schema"
+    return jsonObj { put(media, jsonObj { put(field, schema) }) }
+}
+
+/** The outputs whose media type repeats one structure with nothing around it. */
+private fun Output<*>.isSequential(): Boolean = this is NdjsonOutput<*> || this is SseOutput<*>
+
+/**
+ * One event of a `text/event-stream`, as 3.2 asks for it to be described.
+ *
+ * An item of an event stream is not the payload. 3.2 requires implementations
+ * to "work with event data after it has been parsed according to the
+ * `text/event-stream` specification", and what that parse yields is an event
+ * with `data`, `event`, `id` and `retry` fields — so saying `itemSchema` is
+ * the payload type would describe a stream nobody sends. [SseOutput.frame]
+ * writes an `event:` line when the output names one and a `data:` line
+ * carrying the payload as the body codec encoded it, and it writes neither
+ * `id` nor `retry`; those two are therefore absent here, on the same principle
+ * that stops a response header being documented and not sent.
+ *
+ * `data` is a string, because every SSE field is. What is inside the string is
+ * said with `contentMediaType` and `contentSchema`, which is the pair 3.2
+ * points at for this exact case: some users of `text/event-stream` put JSON in
+ * the `data` field, and those are the keywords for describing it.
+ */
+private fun sseEventSchema(
+    out: SseOutput<*>,
+    schemas: SchemaSource,
+    components: SchemaComponents,
+): JsonObj = jsonObj {
+    "type" to "object"
+    // In the order the frame writes them, since a document is read by people too.
+    put("properties", jsonObj {
+        out.eventName?.let { name ->
+            put("event", jsonObj {
+                "type" to "string"
+                "const" to name
+            })
+        }
+        put("data", jsonObj {
+            "type" to "string"
+            "contentMediaType" to "application/json"
+            put("contentSchema", schemas.schema(out.type, components))
+        })
+    })
+    // Every frame carries both, so both are required. A named stream always
+    // writes its name; an unnamed one never does.
+    put("required", jsonStrings(listOfNotNull(out.eventName?.let { "event" }, "data")))
+}
+
 private fun operation(
     ep: Endpoint<*, *>,
+    version: OpenApiVersion,
     schemas: SchemaSource,
     components: SchemaComponents,
 ): JsonObj = jsonObj {
@@ -228,21 +340,23 @@ private fun operation(
     // document's own list and from the same function.
     if (ep.servers.isNotEmpty()) put("servers", serverList(ep.servers))
 
-    val params = parameters(ep)
+    val params = parameters(ep, version)
     if (params.isNotEmpty()) put("parameters", jsonArr(params))
 
     requestBody(ep, schemas, components)?.let { put("requestBody", it) }
 
-    put("responses", responses(ep, schemas, components))
+    put("responses", responses(ep, version, schemas, components))
 }
 
 /**
  * Reads the payload schema out of an output description. The streaming outputs
- * document the *element* schema — one NDJSON line and one SSE frame each hold
- * a single `T` — except [JsonArrayOutput], which holds all of them.
+ * document one *item* — an NDJSON line, an SSE event — except [JsonArrayOutput],
+ * which is a whole array; [successBody] decides which field that item goes
+ * under.
  */
 private fun schemaOf(
     out: Output<*>,
+    version: OpenApiVersion,
     schemas: SchemaSource,
     components: SchemaComponents,
 ): JsonObj? = when (out) {
@@ -250,7 +364,12 @@ private fun schemaOf(
 
     is NdjsonOutput<*> -> schemas.schema(out.type, components)
 
-    is SseOutput<*> -> schemas.schema(out.type, components)
+    // An SSE item is the parsed event rather than the payload, which is a
+    // thing only 3.2 gives the vocabulary to say; see [sseEventSchema].
+    is SseOutput<*> -> when (version) {
+        OpenApiVersion.V3_2_0 -> sseEventSchema(out, schemas, components)
+        OpenApiVersion.V3_1_0 -> schemas.schema(out.type, components)
+    }
 
     is JsonArrayOutput<*> -> jsonObj {
         "type" to "array"
@@ -264,7 +383,7 @@ private fun schemaOf(
     is EmptyOutput -> null
 
     // Failures are documented from ep.errors, so this is the success schema.
-    is FallibleOutput<*, *> -> schemaOf(out.success, schemas, components)
+    is FallibleOutput<*, *> -> schemaOf(out.success, version, schemas, components)
 }
 
 /**
@@ -365,6 +484,7 @@ private fun parameter(
     required: Boolean,
     codec: PlainCodec<*>,
     description: String?,
+    version: OpenApiVersion,
     listStyle: ListStyle? = null,
 ): JsonObj = jsonObj {
     "name" to name
@@ -373,7 +493,7 @@ private fun parameter(
     putIfNotNull("description", description ?: codec.description)
     // A list's example is an example of its element, and lives in `items`.
     if (listStyle == null) putIfNotNull("example", codec.example)
-    listStyle?.let { serialisation(it, location) }
+    serialisation(listStyle, location, version)
     put("schema", if (listStyle == null) codec.openApiSchema() else listSchema(codec))
 }
 
@@ -381,8 +501,28 @@ private fun parameter(
  * `style` and `explode`, written only where they differ from what OpenAPI
  * assumes at this location — so a reader who meets one can conclude something
  * unusual is being said.
+ *
+ * A cookie is the exception under 3.2, where the style is written whether or
+ * not the parameter carries a list. `Cookies.render` joins pairs with `"; "`
+ * and passes values through exactly as they were given, refusing the
+ * characters RFC 6265 excludes rather than escaping them — which is what 3.2
+ * defines `style: "cookie"` to mean, and is not what the `form` that both
+ * revisions still assume at this location means. Appendix D says so directly:
+ * `form`'s default `explode: true` "uses the wrong delimiter for cookies (`&`
+ * instead of `;` followed by a single space)", and `form` percent-encodes
+ * where `cookie` does not. 3.1 defines no `cookie` style, so under 3.1 the
+ * document says the nearest thing available to it and a reader has to know
+ * that cookies are not really `form`.
  */
-private fun JsonObjBuilder.serialisation(style: ListStyle, location: String) {
+private fun JsonObjBuilder.serialisation(style: ListStyle?, location: String, version: OpenApiVersion) {
+    if (location == "cookie" && version == OpenApiVersion.V3_2_0) {
+        "style" to "cookie"
+        // Nothing follows it. `explode` defaults to true for `cookie` exactly
+        // as it does for `form`, and `repeated()` is the only list a cookie
+        // can carry, so the default is always the truth here.
+        return
+    }
+    if (style == null) return
     val named = style.styleAt(location)
     if (named != defaultStyleAt(location)) "style" to named
     if (style.explode != defaultExplodeFor(named)) "explode" to style.explode

@@ -3,6 +3,7 @@ package example
 import example.bookmarks.bookmarksSpec
 import example.secured.securedSpec
 import io.github.matthewjones372.pelican.ApiSpec
+import io.github.matthewjones372.pelican.openapi.OpenApiVersion
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.openapi.openApiYaml
 import io.kotest.assertions.withClue
@@ -13,6 +14,11 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.swagger.v3.parser.OpenAPIV3Parser
 import io.swagger.v3.parser.core.models.ParseOptions
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.params.ParameterizedTest
@@ -37,11 +43,16 @@ import org.junit.jupiter.params.provider.MethodSource
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OpenApiSpecQualityTest {
 
-    data class Spec(val name: String, val json: String, val yaml: String) {
+    data class Spec(val name: String, val json: String, val yaml: String, val json32: String) {
         override fun toString() = name
     }
 
-    private fun spec(name: String, spec: ApiSpec) = Spec(name, spec.openApiJson(), spec.openApiYaml())
+    private fun spec(name: String, spec: ApiSpec) = Spec(
+        name,
+        spec.openApiJson(),
+        spec.openApiYaml(),
+        spec.openApiJson(OpenApiVersion.V3_2_0),
+    )
 
     @Suppress("unused") // @MethodSource
     private fun specs() = listOf(
@@ -83,6 +94,69 @@ class OpenApiSpecQualityTest {
 
         parsed.openapi shouldBe "3.1.0"
         parsed.jsonSchemaDialect.shouldBeNull()
+    }
+
+    /**
+     * Why 3.1 is still the default, asserted rather than only written down.
+     *
+     * `pelican-openapi` can write 3.2, and the reference manual argues that
+     * 3.2 is the revision in which these documents are actually correct about
+     * cookies and streams. It is not the default because the JVM tooling has
+     * not arrived: swagger-parser 2.1.47 is the newest release, `swagger-models`
+     * knows `SpecVersion.V30` and `V31` and nothing after them, and a 3.2.0
+     * document comes back as nothing at all — with an empty `messages` list, so
+     * a caller who does not check for null never learns why.
+     *
+     * When that stops being true this test fails, and the failure is the signal
+     * to move the default. That is the whole point of writing it down here: the
+     * reason for a default should expire loudly.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("specs")
+    fun `the 3_2 rendering is still unreadable to swagger-parser, which is why 3_1 is the default`(spec: Spec) {
+        val parsed = parse(spec.json32)
+
+        withClue("swagger-parser reads 3.2 now — move the default and delete this test") {
+            parsed.openAPI.shouldBeNull()
+        }
+    }
+
+    /**
+     * The 3.2 rendering says the three things 3.1 could not, and the rest of
+     * the document is the one the parser above already validated.
+     *
+     * Whole-document validation of the 3.2 rendering is not available from any
+     * parser this build can depend on, so what is checked here is the delta:
+     * every difference from the 3.1 document is one of the three the emitter
+     * documents, and each of them says what it should.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("specs")
+    fun `the 3_2 rendering differs from the 3_1 one only where the emitter says it does`(spec: Spec) {
+        val v31 = Json.parseToJsonElement(spec.json).jsonObject
+        val v32 = Json.parseToJsonElement(spec.json32).jsonObject
+
+        val moved = differences(v31, v32).map { it.substringAfterLast('/') }.toSet()
+
+        withClue("differences at: ${differences(v31, v32)}") {
+            moved shouldBe moved.intersect(setOf("openapi", "schema", "itemSchema", "style"))
+        }
+        withClue("a 3.2 document that changed nothing would pass the assertion above vacuously") {
+            differences(v31, v32) shouldContain "/openapi"
+        }
+    }
+
+    /** Every path at which two documents disagree, as JSON pointers. */
+    private fun differences(left: JsonElement?, right: JsonElement?, at: String = ""): List<String> = when {
+        left is JsonObject && right is JsonObject ->
+            (left.keys + right.keys).sorted().flatMap { key -> differences(left[key], right[key], "$at/$key") }
+
+        left is JsonArray && right is JsonArray && left.size == right.size ->
+            left.indices.flatMap { i -> differences(left[i], right[i], "$at/$i") }
+
+        left == right -> emptyList()
+
+        else -> listOf(at)
     }
 
     @ParameterizedTest(name = "{0}")

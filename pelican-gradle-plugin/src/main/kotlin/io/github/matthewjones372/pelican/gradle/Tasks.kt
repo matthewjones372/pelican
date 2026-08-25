@@ -310,6 +310,10 @@ abstract class GenerateDocumentTask : SpecTask() {
     @get:Input
     abstract val format: Property<DocumentFormat>
 
+    @get:Input
+    @get:Optional
+    abstract val openApiVersion: Property<String>
+
     /** `@Internal` for the same reason the client's output is; see there. */
     @get:Internal
     abstract val outputFile: RegularFileProperty
@@ -320,6 +324,7 @@ abstract class GenerateDocumentTask : SpecTask() {
             it.specClass.set(specClass)
             it.specFunction.set(specFunction)
             it.format.set(format)
+            it.openApiVersion.set(openApiVersion)
             it.outputFile.set(outputFile)
         }
     }
@@ -340,6 +345,11 @@ abstract class CheckDocumentTask : SpecTask() {
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val baseline: RegularFileProperty
 
+    /** The revision the baseline was written against; see the generating task. */
+    @get:Input
+    @get:Optional
+    abstract val openApiVersion: Property<String>
+
     /** The name the failure spells the entry with. */
     @get:Input
     abstract val entryName: Property<String>
@@ -354,6 +364,7 @@ abstract class CheckDocumentTask : SpecTask() {
             it.specClass.set(specClass)
             it.specFunction.set(specFunction)
             it.baseline.set(baseline)
+            it.openApiVersion.set(openApiVersion)
             it.entryName.set(entryName)
         }
     }

@@ -13,7 +13,7 @@ route, the OpenAPI document and a typed client from that one description.
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.matthewjones372/pelican-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core)
 [![build](https://github.com/matthewjones372/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
 [![Kotlin 2.4.10](https://img.shields.io/badge/Kotlin-2.4.10-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
-[![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1-6BA539?logo=openapiinitiative&logoColor=white)](https://spec.openapis.org/oas/v3.1.0)
+[![OpenAPI 3.1 and 3.2](https://img.shields.io/badge/OpenAPI-3.1%20%7C%203.2-6BA539?logo=openapiinitiative&logoColor=white)](https://spec.openapis.org/oas/v3.2.0)
 [![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 [Getting started](#getting-started) · [Describing endpoints](#describing-endpoints) ·
@@ -61,7 +61,12 @@ the handler stops compiling.
 
 **Your docs cannot drift.** The OpenAPI document is generated from the endpoint
 values your server is built from, so there is no second source of truth to
-forget. No annotations scanned at startup, no YAML written twice.
+forget. No annotations scanned at startup, no YAML written twice. It is written
+against OpenAPI 3.1.0, or against 3.2.0 for one argument — 3.1.0 by default
+because the JVM parsers have not caught up, and 3.2.0 available because it is
+the revision in which the document is actually correct about cookies and
+streams. See
+[Which version the document says](docs/reference.md#which-version-the-document-says-and-how-to-choose).
 
 **Handlers get typed arguments.** A path parameter declared as `Long` arrives as
 a `Long`. No `Params` bag, no casting, no `String.toLong()` in every handler.

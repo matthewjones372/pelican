@@ -20,9 +20,9 @@ rewriting — and what the caller gets.
 
 ## What has since landed
 
-Two of the items below are partly done, and the page says so here rather than
-being quietly rewritten, because the argument for the order is worth keeping
-next to the result of following it.
+Four of the items below are done or partly done, and the page says so here
+rather than being quietly rewritten, because the argument for the order is
+worth keeping next to the result of following it.
 
 - **Item 1** shipped as `pelican-metrics`: `Endpoint.statusFor` resolves the
   status once in core, `afterStatus` hands it to a filter, and a counter and a
@@ -31,6 +31,11 @@ next to the result of following it.
 - **Item 3** shipped its first phase: `ClientTransport` in core and
   `pelican-client-java` over the JDK's own `HttpClient`. The Ktor and Pekko
   adapters, the `suspend` surface and the retry policy are still to do.
+- **Item 8** shipped: `pelican-openapi` writes 3.2.0 as well as 3.1.0, and the
+  survey that item asked for came back with more than a number. Two things
+  Pelican describes every day — cookie parameters and streamed responses —
+  turned out to be things 3.1 has no vocabulary for, and 3.2 does. The default
+  stayed at 3.1.0 all the same, and the argument for that is below.
 
 ## 1. Metrics and traces, from the description
 
@@ -198,20 +203,51 @@ fuller orders service is wired on Pekko and http4k only. "The backend is just a
 choice" is a claim the examples should demonstrate rather than assert, so the
 Ktor wiring should exist too.
 
-## 8. OpenAPI 3.2.0
+## 8. OpenAPI 3.2.0 — done, and what the survey found
 
-The emitter writes 3.1.0 and nothing else, and the reference manual frames that
-as a deliberate step forward under the heading "Moving from 3.0.3 to 3.1.0".
-That framing has expired: 3.2.0 has been the current specification since
-19 September 2025, and http4k's own renderer already defaults to it. Writing
-3.1.0 is now neither the floor nor the ceiling, and a reader whose tooling
-dictates a version rules Pelican out on it faster than on anything else here.
+Kept rather than deleted, because the argument this item made turned out to be
+half right and the half it got wrong is the more interesting one.
 
-This is late in the list only because it was written after the rest. On cost
-against value it belongs near the top: the document is emitted from one place,
-and what changed between 3.1 and 3.2 is additive for what Pelican describes.
-What it needs first is a survey of exactly what differs, so that emitting the
-newer number is not a claim the document cannot support.
+The item assumed the problem was a number: that 3.1.0 was "neither the floor
+nor the ceiling", and that raising it was mostly a matter of not claiming more
+than the document could support. The survey found two places where the document
+Pelican was already emitting was *wrong*, and had been wrong since 3.1 was the
+only thing it wrote.
+
+- **Cookie parameters.** Pelican joins cookie pairs with `"; "` and passes the
+  values through unescaped. Both revisions assume `style: "form"` at
+  `in: "cookie"`, and `form` means percent-encoded values joined by `&` — 3.2's
+  Appendix D says in as many words that it "uses the wrong delimiter for
+  cookies". 3.2 added `style: "cookie"` for what Pelican actually does. 3.1 has
+  no way to say it.
+- **Streamed responses.** `application/x-ndjson` and `text/event-stream` are
+  sequential media types, where 3.2 is explicit that `schema` describes the
+  whole stream and `itemSchema` describes one frame. Pelican knows the frame,
+  and had nowhere but `schema` to put it. Worse for `sse<T>`: 3.2 says an item
+  of an event stream is the *parsed event*, so naming the payload there
+  described a stream nobody sends.
+
+So the newer number was not a claim to be careful about making. It was the only
+number under which two of Pelican's own claims are true.
+
+**The default did not move, and that is the part worth disagreeing with.** A
+consumer reading 3.1 is promised nothing about a document saying 3.2 — the
+specification's versioning rule only covers a `major.minor` feature set — and
+swagger-parser, which `openapi-generator` and most of the JVM ecosystem stands
+on, hands back `null` for a 3.2.0 document with an empty message list. No
+error, no warning. Defaulting to a document that the dominant parser silently
+turns into nothing would be a worse failure than being a revision behind, so
+3.1.0 is what a caller who does not choose still gets, and `OpenApiVersion` is
+one argument away. A test asserts that swagger-parser still cannot read 3.2, so
+the reason for the default expires loudly rather than quietly.
+
+**What is left.** Move the default to 3.2.0 when that test starts failing. And
+the 3.2 fields nothing in an endpoint description answers — `$self`,
+`Server.name`, Tag Objects with `parent` and `kind`, `additionalOperations`,
+the `deviceAuthorization` flow — are listed in
+[What isn't here](reference.md#what-isnt-here) rather than here, because each
+of them needs something added to the *description* first, and that is a
+different argument from this one.
 
 ## Not on this list
 

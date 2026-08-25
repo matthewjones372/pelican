@@ -14,19 +14,22 @@ class ReflectionTest {
     @Test
     fun `calls a top-level function`() {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
-        Pelican.document(loader, spec, DocumentFormat.JSON) shouldBe """{"title":"Orders"}"""
+        Pelican.document(loader, spec, DocumentFormat.JSON, null) shouldBe
+            """{"openapi":"3.1.0","title":"Orders"}"""
     }
 
     @Test
     fun `calls a member of an object`() {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.Specs", "spec")
-        Pelican.document(loader, spec, DocumentFormat.YAML) shouldBe "title: Bookmarks\n"
+        Pelican.document(loader, spec, DocumentFormat.YAML, null) shouldBe
+            "openapi: 3.1.0\ntitle: Bookmarks\n"
     }
 
     @Test
     fun `calls a member of a class it has to instantiate`() {
         val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.Holder", "spec")
-        Pelican.document(loader, spec, DocumentFormat.JSON) shouldBe """{"title":"Reports"}"""
+        Pelican.document(loader, spec, DocumentFormat.JSON, null) shouldBe
+            """{"openapi":"3.1.0","title":"Reports"}"""
     }
 
     @Test
@@ -73,7 +76,7 @@ class ReflectionTest {
     fun `names the module to add when the library is not on the classpath`() {
         val empty = java.net.URLClassLoader(emptyArray(), ClassLoader.getPlatformClassLoader())
         shouldThrow<PelicanFailure> {
-            Pelican.document(empty, "not a spec", DocumentFormat.JSON)
+            Pelican.document(empty, "not a spec", DocumentFormat.JSON, null)
         }.message.orEmpty() shouldContain "pelican-core"
     }
 
@@ -187,11 +190,53 @@ class ReflectionTest {
 
     // ------------------------------------------------ the older libraries
 
+    @Test
+    fun `writes the OpenAPI version the entry named`() {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+
+        Pelican.document(loader, spec, DocumentFormat.JSON, "3.2.0") shouldBe
+            """{"openapi":"3.2.0","title":"Orders"}"""
+        // The Kotlin name for the same constant, so neither spelling is a mistake.
+        Pelican.document(loader, spec, DocumentFormat.JSON, "V3_2_0") shouldBe
+            """{"openapi":"3.2.0","title":"Orders"}"""
+    }
+
+    @Test
+    fun `names the versions the library writes when the entry names one it does not`() {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.document(loader, spec, DocumentFormat.JSON, "3.0.3")
+        }
+
+        failure.message.orEmpty() shouldContain "'3.0.3'"
+        failure.message.orEmpty() shouldContain "'3.1.0', '3.2.0'"
+    }
+
     private val olderCodegen = Class.forName("io.github.matthewjones372.pelican.older.codegen.KotlinClientKt")
     private val previousImporter = Class.forName("io.github.matthewjones372.pelican.previous.importer.ImportKt")
     private val olderImporter = Class.forName("io.github.matthewjones372.pelican.older.importer.ImportKt")
     private val oldestImporter = Class.forName("io.github.matthewjones372.pelican.oldest.importer.ImportKt")
     private val apiSpec = Class.forName("io.github.matthewjones372.pelican.ApiSpec")
+
+    private val olderOpenApi = Class.forName("io.github.matthewjones372.pelican.older.openapi.OpenApiKt")
+
+    @Test
+    fun `writes a document through the arity an older library published`() {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+
+        Pelican.document(olderOpenApi, apiSpec, "openApiJson", spec, null) shouldBe """{"title":"Orders"}"""
+    }
+
+    @Test
+    fun `says which library is too old to carry the version the entry set`() {
+        val spec = Pelican.spec(loader, "io.github.matthewjones372.pelican.gradle.SpecsKt", "ordersSpec")
+        val failure = shouldThrow<PelicanFailure> {
+            Pelican.document(olderOpenApi, apiSpec, "openApiJson", spec, "3.2.0")
+        }
+
+        failure.message.orEmpty() shouldContain "pelican-openapi"
+        failure.message.orEmpty() shouldContain "openApiVersion"
+    }
 
     @Test
     fun `writes a client through the arity an older library published`(@TempDir dir: File) {

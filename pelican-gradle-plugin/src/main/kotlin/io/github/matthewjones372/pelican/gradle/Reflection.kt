@@ -17,6 +17,7 @@ internal object Pelican {
     private const val REPORT = "io.github.matthewjones372.pelican.openapi.ReportKt"
     private const val IMPORT = "io.github.matthewjones372.pelican.importer.ImportKt"
     private const val CODEC_ANNOTATIONS = "io.github.matthewjones372.pelican.codegen.CodecAnnotations"
+    private const val OPEN_API_VERSION = "io.github.matthewjones372.pelican.openapi.OpenApiVersion"
 
     /**
      * What an entry naming no codec means. A copy of a default the library
@@ -25,9 +26,18 @@ internal object Pelican {
      */
     private const val DEFAULT_CODEC = "JACKSON"
 
+    /**
+     * What an entry naming no OpenAPI version means, and a copy of the
+     * library's own default for the same reason [DEFAULT_CODEC] is one. It is
+     * written as the document writes it, since that is the spelling a build
+     * file uses.
+     */
+    private const val DEFAULT_OPEN_API_VERSION = "3.1.0"
+
     // Named as the reader's build file and dependency block spell them.
     private const val CODEGEN_MODULE = "pelican-codegen"
     private const val IMPORT_MODULE = "pelican-import"
+    private const val OPEN_API_MODULE = "pelican-openapi"
     private const val WRITES_CLIENT = "writeKotlinClient"
     private const val IMPORTS = "importEndpoints"
 
@@ -339,14 +349,56 @@ internal object Pelican {
             "`$function` takes $missing. Upgrade $module, or remove the setting."
 
     /** The document, rendered the way the entry asked for. */
-    fun document(loader: ClassLoader, spec: Any, format: DocumentFormat): String {
+    fun document(loader: ClassLoader, spec: Any, format: DocumentFormat, version: String?): String {
         val apiSpec = load(loader, API_SPEC, "pelican-core")
         val (className, function) = when (format) {
             DocumentFormat.JSON -> OPEN_API to "openApiJson"
             DocumentFormat.YAML -> YAML to "openApiYaml"
         }
-        val renderer = load(loader, className, "pelican-openapi")
+        return document(load(loader, className, OPEN_API_MODULE), apiSpec, function, spec, version)
+    }
+
+    /**
+     * The same, against classes that are already resolved. The seam is here
+     * for the test, as it is on [writeClient]: the two arities below are two
+     * releases of one library, and without it the older path would run only on
+     * a consumer's machine.
+     */
+    fun document(renderer: Class<*>, apiSpec: Class<*>, function: String, spec: Any, version: String?): String {
+        // A `pelican-openapi` from before the version was selectable has a
+        // renderer that takes the spec and nothing else.
+        val withVersion = runCatching {
+            val versions = Class.forName(OPEN_API_VERSION, true, renderer.classLoader)
+            versions to renderer.getMethod(function, apiSpec, versions)
+        }.getOrNull()
+
+        if (withVersion != null) {
+            val (versions, method) = withVersion
+            return method.invokeUnwrapped(null, spec, versionConstant(versions, version)) as String
+        }
+
+        if (version != null) {
+            throw PelicanFailure(tooOld("openApiVersion", OPEN_API_MODULE, function, "no version"))
+        }
+
         return renderer.getMethod(function, apiSpec).invokeUnwrapped(null, spec) as String
+    }
+
+    /**
+     * The enum constant the entry named. `openApiVersion.set("3.2.0")` is how
+     * a build file asks for it — the number the document will carry rather
+     * than the Kotlin name for it, because the number is the thing a
+     * consumer's tooling dictated. The Kotlin name is accepted too, so neither
+     * spelling is a mistake.
+     */
+    private fun versionConstant(versions: Class<*>, version: String?): Any {
+        val constants = versions.enumConstants.orEmpty().filterIsInstance<Enum<*>>()
+        val chosen = version ?: DEFAULT_OPEN_API_VERSION
+        return constants.firstOrNull { it.toString() == chosen || it.name.equals(chosen, ignoreCase = true) }
+            ?: throw PelicanFailure(
+                "`openApiVersion` is set to '$chosen', and the versions `$OPEN_API_MODULE` writes are " +
+                    constants.joinToString { "'$it'" } + ".",
+            )
     }
 
     /**

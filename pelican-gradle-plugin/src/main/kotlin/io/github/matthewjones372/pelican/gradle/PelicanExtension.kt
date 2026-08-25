@@ -85,6 +85,19 @@ abstract class DocumentSpec @Inject constructor(private val name: String) : Spec
     /** JSON or YAML. Both are rendered from the same document; see `openApiYaml`. */
     abstract val format: Property<DocumentFormat>
 
+    /**
+     * Which revision of the OpenAPI Specification the document is written
+     * against — `"3.1.0"` or `"3.2.0"` — or unset for 3.1.0.
+     *
+     * It is a real choice rather than a number that should always be the
+     * newest: a consumer reading 3.1 is promised nothing about a document that
+     * says 3.2, and the JVM parsers mostly still turn one into nothing at all.
+     * What 3.2 buys is a document that is *correct* about cookie parameters
+     * and streamed responses, which 3.1 has no way to state. The reasoning is
+     * on `OpenApiVersion` and in the reference manual.
+     */
+    abstract val openApiVersion: Property<String>
+
     /** Defaults to `build/generated/pelican/<name>/openapi.<format>`. */
     abstract val outputFile: RegularFileProperty
 

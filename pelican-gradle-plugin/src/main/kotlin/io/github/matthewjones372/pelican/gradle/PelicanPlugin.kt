@@ -174,6 +174,7 @@ class PelicanPlugin : Plugin<Project> {
             task.specClass.set(document.specClass)
             task.specFunction.set(document.specFunction)
             task.format.set(document.format)
+            task.openApiVersion.set(document.openApiVersion)
             task.outputFile.set(document.outputFile)
         }
 
@@ -195,6 +196,7 @@ class PelicanPlugin : Plugin<Project> {
             task.specClass.set(document.specClass)
             task.specFunction.set(document.specFunction)
             task.baseline.set(document.baseline)
+            task.openApiVersion.set(document.openApiVersion)
             task.entryName.set(document.name)
         }
 

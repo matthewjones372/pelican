@@ -57,7 +57,7 @@ spotless {
 /** One line per module, so a Maven search result says what the artifact is. */
 val moduleDescriptions = mapOf(
     "pelican-core" to "Endpoint descriptions as values. No dependencies.",
-    "pelican-openapi" to "Endpoint descriptions to an OpenAPI 3.1.0 document.",
+    "pelican-openapi" to "Endpoint descriptions to an OpenAPI 3.1.0 or 3.2.0 document.",
     "pelican-codegen" to "Endpoint descriptions to a Kotlin client, as source.",
     "pelican-import" to "An OpenAPI document to endpoint descriptions, as source.",
     "pelican-jackson" to "Jackson codecs and swagger-core schemas for Pelican.",

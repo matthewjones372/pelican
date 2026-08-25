@@ -14,7 +14,7 @@ rather than convention.
 | `pelican-pekko` / `-http4k` / `-ktor` | core + one server library | descriptions → that server's routes |
 | `pelican-*-docs` | its backend, openapi | serves the document and Swagger UI |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
-| `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 |
+| `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | core | where a generated client's requests go, over the JDK's `HttpClient` |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |

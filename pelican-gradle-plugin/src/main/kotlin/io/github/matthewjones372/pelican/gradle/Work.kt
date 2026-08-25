@@ -52,11 +52,13 @@ internal interface LockParameters : WorkParameters {
 
 internal interface DocumentParameters : SpecParameters {
     val format: Property<DocumentFormat>
+    val openApiVersion: Property<String>
     val outputFile: RegularFileProperty
 }
 
 internal interface CompatibilityParameters : SpecParameters {
     val baseline: RegularFileProperty
+    val openApiVersion: Property<String>
     val entryName: Property<String>
 }
 
@@ -135,7 +137,14 @@ internal abstract class GenerateDocumentWork : WorkAction<DocumentParameters> {
         val spec = Pelican.spec(javaClass.classLoader, parameters.specClass.get(), parameters.specFunction.get())
         val target = parameters.outputFile.get().asFile
         target.parentFile?.mkdirs()
-        target.writeText(Pelican.document(javaClass.classLoader, spec, parameters.format.get()))
+        target.writeText(
+            Pelican.document(
+                javaClass.classLoader,
+                spec,
+                parameters.format.get(),
+                parameters.openApiVersion.orNull,
+            ),
+        )
         logger.lifecycle("Wrote $target")
     }
 }
@@ -155,10 +164,14 @@ internal abstract class CheckDocumentWork : WorkAction<CompatibilityParameters> 
         val spec = Pelican.spec(loader, parameters.specClass.get(), parameters.specFunction.get())
         val baseline = parameters.baseline.get().asFile
 
+        // The same revision the baseline was written against, since the entry
+        // generates both. Comparing a 3.1 baseline against a 3.2 proposal
+        // would report the difference between the two revisions as though the
+        // service had changed, which is the one thing this check must not do.
         val (report, breaking) = Pelican.compatibility(
             loader,
             baseline.readText(),
-            Pelican.document(loader, spec, DocumentFormat.JSON),
+            Pelican.document(loader, spec, DocumentFormat.JSON, parameters.openApiVersion.orNull),
             baseline.name,
         )
 

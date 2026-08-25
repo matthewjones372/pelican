@@ -4,14 +4,15 @@ The long version: every module, every trade-off, and the limitations spelled
 out. Start with the [README](../README.md) if you have not read it yet.
 
 Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
-`HttpHandler`, a set of Ktor routes, and an OpenAPI 3.1.0 document.
+`HttpHandler`, a set of Ktor routes, and an OpenAPI document — 3.1.0 or
+3.2.0, whichever the people reading it can use.
 
 ## Modules
 
 | Module | Depends on | Contains |
 |---|---|---|
 | `pelican-core` | **nothing** | endpoint descriptions, plain-value codecs, a minimal JSON tree. No HTTP library, no JSON library. |
-| `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 document, in JSON or YAML, and two documents → what changed for callers |
+| `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 or 3.2.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
@@ -342,6 +343,8 @@ val spec = ApiSpec(
 spec.openApiJson()      // String
 spec.openApiYaml()      // the same document, written as YAML
 spec.openApi()          // JsonObj — core's own tree, if you want to post-process it
+
+spec.openApiJson(OpenApiVersion.V3_2_0)   // the same descriptions, written against 3.2
 ```
 
 **Served by the running app** — opt in with `pelican-pekko-docs`:
@@ -358,12 +361,145 @@ ordersApi().startWithDocs(port = 8080, docs = Docs(openApiPath = "/v1/openapi.js
 Set either path to `null` to turn that page off. `docsRoutes(docs)` hands back
 the routes on their own if the service already has a route to concat with.
 
+### Which version the document says, and how to choose
+
+Two are written: `3.1.0`, which is the default, and `3.2.0`, which is the
+current specification and the one in which these documents are actually
+correct. The choice is an argument to the renderer, a property on the Gradle
+entry, or a field on `Docs`:
+
+```kotlin
+spec.openApiJson()                          // 3.1.0
+spec.openApiJson(OpenApiVersion.V3_2_0)     // 3.2.0
+spec.openApiYaml(OpenApiVersion.V3_2_0)     // likewise
+```
+
+```kotlin
+pelican {
+    documents {
+        create("orders") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("ordersSpec")
+            openApiVersion.set("3.2.0")
+        }
+    }
+}
+```
+
+```kotlin
+ordersApi().startWithDocs(port = 8080, docs = Docs(version = OpenApiVersion.V3_2_0))
+```
+
+#### Why it is a choice at all
+
+Because the number at the top of the document is not decoration. The
+specification's own versioning rule promises compatibility only within one
+`major.minor` feature set — "Tooling which supports OAS 3.1 SHOULD be
+compatible with all OAS 3.1.\* versions" — and reserves the right to make
+non-backwards-compatible changes in a minor release. A consumer that reads 3.1
+is promised nothing about a document that says 3.2.
+
+In practice it is worse than "not promised". swagger-parser, which
+`openapi-generator` and a great deal of the JVM ecosystem is built on, models
+`SpecVersion.V30` and `SpecVersion.V31` and nothing after them, and hands back
+`null` for a 3.2.0 document with an empty list of messages — no error, no
+warning, nothing to catch. That silence is why raising the number quietly for
+everybody would have been the wrong change, and why 3.1 is still what a caller
+who does not choose gets.
+
+#### Why 3.2 is nonetheless the better document
+
+Two things Pelican says every day are things 3.1 has no vocabulary for, and
+saying them wrong is not made better by everyone else saying them wrong too.
+
+**Cookies.** `Cookies.render` joins pairs with `"; "` and passes values through
+exactly as they were written — RFC 6265 already excludes `;`, `,`, space and
+the control characters, and percent-decoding would corrupt a value containing
+a `%`. That is precisely what 3.2 named `style: "cookie"`. The `form` that both
+revisions assume at `in: "cookie"` means something else: percent-encoded values
+joined by `&`. 3.2's Appendix D says so outright, that `form`'s default
+`explode: true` "uses the wrong delimiter for cookies (`&` instead of `;`
+followed by a single space)". Under 3.2 every cookie parameter carries
+`style: "cookie"`, list or not. Under 3.1 it carries nothing, because there was
+nothing true to write.
+
+**Streams.** `application/x-ndjson` and `text/event-stream` are what 3.2 calls
+*sequential media types*, and it is explicit that `schema` applies to the
+complete content — the whole stream read as though the frames were an array —
+while `itemSchema` applies to each item independently. What a Pelican
+description knows is the frame, so under 3.2 the frame goes under `itemSchema`.
+Under 3.1 it goes under `schema`, which is what everything generating streamed
+responses did before `itemSchema` existed and which 3.2 now says is the wrong
+field.
+
+`sse<T>` moves further than that. 3.2 requires an implementation to work with
+event data *after* it has been parsed as `text/event-stream`, and what that
+parse yields is an event — `data`, and possibly `event`, `id` and `retry` — not
+the payload. So a 3.2 document describes the event, with the payload inside
+`data` through the `contentMediaType`/`contentSchema` pair 3.2 points at for
+exactly this:
+
+```yaml
+text/event-stream:
+  itemSchema:
+    type: object
+    properties:
+      event: { type: string, const: order }
+      data:
+        type: string
+        contentMediaType: application/json
+        contentSchema: { $ref: '#/components/schemas/Tick' }
+    required: [event, data]
+```
+
+`id` and `retry` are absent because `sse(...)` never sends them, on the same
+principle that stops a response header being documented and not sent. `event`
+is absent too where the output does not name one.
+
+A streamed JSON array is *not* sequential under either revision — it is one
+document with brackets round it that happens to arrive in pieces — so
+`jsonArray<T>` keeps `schema: {type: array}` throughout.
+
+Those three things are the whole difference. A test compares the two documents
+wholesale and fails on a fourth.
+
+#### What 3.2 added that is not emitted
+
+Not refusals so much as fields nothing in an endpoint description answers:
+
+- **`$self`** names the document's own URI, and nothing here says where the
+  document will be published.
+- **`Server.name`**, and the `servers` list is a list of URL strings.
+- **`Tag.summary`, `parent` and `kind`.** A tag is a bare string on an
+  endpoint; no Tag Objects are written at all, so there is nothing to hang a
+  hierarchy off.
+- **`Response.summary`**, alongside the description an output already carries.
+- **`additionalOperations` and the `query` path-item field**, which describe
+  methods `Method` does not have.
+- **`Parameter` at `in: "querystring"`**, which takes the whole query string as
+  one value with an `Encoding` over it; Pelican describes named parameters.
+- **`prefixEncoding` and `itemEncoding`** on a multipart body, which order the
+  parts positionally. `multipart(...)` names its parts, so `encoding` is the
+  field that fits.
+- **`SecurityScheme.deprecated` and `oauth2MetadataUrl`**, and the
+  `deviceAuthorization` OAuth flow, none of which a `SecurityScheme` carries.
+- **`Discriminator.defaultMapping`**, `XML.nodeType`, `Components.mediaTypes`
+  and the Example Object's `dataValue`/`serializedValue`, all of which are
+  about parts of a document Pelican does not write.
+
+Nothing Pelican emits today is deprecated in 3.2. The deprecations it carries —
+the Example Object's `value` for non-JSON targets, `XML.attribute` and
+`XML.wrapped`, and `allowEmptyValue` — are all fields that were never written.
+The singular `example` on a parameter or a response header, which *is* written,
+is not among them.
+
 ### Moving from 3.0.3 to 3.1.0
 
-The emitter used to write `"openapi": "3.0.3"`. It now writes `"openapi":
-"3.1.0"`, whose schema dialect is JSON Schema 2020-12 rather than the modified
-subset 3.0 defined for itself. Nothing about how you describe an endpoint
-changed — this is entirely about what comes out the other end.
+Older history, kept because a document written by an earlier Pelican is still
+out there. The emitter used to write `"openapi": "3.0.3"`. Since then the floor
+has been `3.1.0`, whose schema dialect is JSON Schema 2020-12 rather than the
+modified subset 3.0 defined for itself. Nothing about how you describe an
+endpoint changed — this was entirely about what comes out the other end.
 
 Five things a consumer will see differently:
 
@@ -397,12 +533,13 @@ synthesises an `examples` array for you, because the only example Pelican knows
 about belongs to the parameter and is already on it.
 
 `webhooks` is a 3.1 feature and *is* emitted, from the `webhooks` a spec
-carries — see [Webhooks](#webhooks-the-calls-the-service-sends). The top-level
-`$self` is not: it names the document's own retrieval URI, and nothing in a set
-of endpoint descriptions says where the document will be published.
+carries — see [Webhooks](#webhooks-the-calls-the-service-sends).
 
-**There is no way to ask for 3.0 output, and that is deliberate.** A version
-argument would have to reach the schema sources, because nullability is spelled
+**3.0 is not on the list of versions you can ask for, and will not be.** Note
+that this is a different question from 3.1 against 3.2, above: those two differ
+in three fields at the surface of the document, and 3.0 differs in how every
+schema in it is spelled. A version argument would have to reach the schema
+sources, because nullability is spelled
 *inside* a schema and not around it — so either core's `SchemaSource` grows an
 OpenAPI version parameter, a type whose whole purpose is that documentation can
 be generated without core knowing what OpenAPI is, or `pelican-openapi` gains a
@@ -416,7 +553,7 @@ If you have a consumer that reads only 3.0, `spec.openApi()` hands you the
 document as core's own `JsonObj` before it is rendered, and down-converting a
 known-shaped document outside the library is a smaller and more honest job than
 maintaining a second emitter inside it. Swagger UI, Redoc, Stoplight and
-openapi-generator all read 3.1.
+openapi-generator all read 3.1, which is the reason the default is where it is.
 
 ### A `servers` entry pins "Try it out"
 
@@ -712,6 +849,7 @@ and Gradle's are not the same Jackson.
 | `codec` | clients | unset: `jackson`. `kotlinx` annotates the payload types for the other library. See below |
 | `outputDir` | clients | `build/generated/pelican/<name>` |
 | `format` | documents | `JSON`; `YAML` writes the same document the other way |
+| `openApiVersion` | documents | unset: `3.1.0`. `"3.2.0"` writes the current specification instead. See [Which version the document says](#which-version-the-document-says-and-how-to-choose) |
 | `outputFile` | documents | `build/generated/pelican/<name>/openapi.<format>` |
 | `baseline` | documents | unset. A committed document to check against; setting it registers `check<Name>Document` and wires it into `check`. See below |
 | `document` | endpoints | — required: the OpenAPI document to read |
@@ -1352,10 +1490,10 @@ the branches rather than dropped, because a `oneOf` branch is the whole payload
 inherits it.
 
 Which spelling to publish was the choice, and `oneOf` won on three counts: the
-documents are 3.1, where it is the native spelling; the 3.0 spelling has nowhere
-to put a `mapping`, which is the fact being rescued; and two codecs publishing
-one shape means a service can swap JSON libraries without its published document
-changing shape underneath its readers. Matching classes back to the components
+documents are 3.1 or later, where it is the native spelling; the 3.0 spelling
+has nowhere to put a `mapping`, which is the fact being rescued; and two codecs
+publishing one shape means a service can swap JSON libraries without its
+published document changing shape underneath its readers. Matching classes back to the components
 swagger-core named them under is what makes it possible at all, and it has to
 hold for a hierarchy reached anywhere — a property of a payload, an element of a
 list, a branch of another hierarchy — not only for one an operation names at the
@@ -1625,7 +1763,7 @@ upgrade.
 
 ### Three dialects, one shape
 
-3.1, 3.0 and Swagger 2.0 are all read. 2.0 is converted first — bodies are
+3.2, 3.1, 3.0 and Swagger 2.0 are all read. 2.0 is converted first — bodies are
 parameters there, media types hang off the operation, schemas live under
 `definitions` — and 3.0's `nullable: true` becomes 3.1's `"null"` among the
 types, which is the spelling everything downstream reads. A 2.0 document and
@@ -1636,6 +1774,16 @@ Nothing is decided in the conversion that the mapping would decide differently.
 A 2.0 operation that `produces` two media types becomes a response offering
 two, and is refused there — the same fact about the same operation gets the
 same message it would have got in a 3.x document.
+
+3.2 needs no conversion pass, because what changed at the top is a number the
+importer never switched on: it reads objects, and takes any document that
+carries an `openapi` field. What it did need is the three places 3.2 says
+something new, and it reads all three — a streamed response's frame from
+`itemSchema` as readily as from `schema`, an `sse<T>`'s payload out of the
+`contentSchema` inside a described event, and a cookie's `style: "cookie"` as
+the same list `form` used to stand for. Which matters here rather than in the
+abstract: the example generates its own document and imports it back, so a
+Pelican document written against 3.2 has to survive the round trip.
 
 ### The judgement calls
 
@@ -3504,7 +3652,10 @@ own — with a floor of 80% wired into `check`. It sits at 87% line, 70% branch.
 **OpenApiSpecQualityTest** reads the emitted documents back with
 swagger-parser, an implementation that did not write them: `$ref`s resolved,
 3.1 conformance, every path keeping its operations and responses, every
-security requirement naming a scheme the document defines. A generator marking
+security requirement naming a scheme the document defines. It also pins the
+fact that keeps 3.1 the default — that swagger-parser still reads a 3.2.0
+document as nothing at all — so that when the parsers catch up, the reason for
+the default expires loudly rather than quietly. A generator marking
 its own homework is the failure mode it rules out, and it caught a wrong
 assumption the first time it ran. The YAML rendering is held to the same
 standard and to one more: the parser has to read it into the same document it
@@ -3585,12 +3736,19 @@ open  localhost:8080/api-docs                                 # Swagger UI
   endpoint is bound.
 - **`filename*` in RFC 5987 form.** A part's `filename` is read from the plain
   parameter; the extended, charset-tagged spelling is not decoded.
-- **OpenAPI 3.0.** The emitter writes 3.1.0 and nothing else. The reasoning,
-  and what to do if your tooling only reads 3.0, are under
+- **OpenAPI 3.0.** The emitter writes 3.1.0 or 3.2.0 — see
+  [Which version the document says](#which-version-the-document-says-and-how-to-choose)
+  — and it will not write 3.0. The reasoning, and what to do if your tooling
+  only reads 3.0, are under
   [Moving from 3.0.3 to 3.1.0](#moving-from-303-to-310). The *importer* reads
-  3.1, 3.0 and Swagger 2.0 alike, which is a different question: reading an old
-  document costs one normalising pass, and writing one would cost a second
-  emitter that could not be faithful anyway.
+  3.2, 3.1, 3.0 and Swagger 2.0 alike, which is a different question: reading
+  an old document costs one normalising pass, and writing one would cost a
+  second emitter that could not be faithful anyway.
+- **The 3.2 fields nothing in a description answers** — `$self`, `Server.name`,
+  Tag Objects and their `parent`/`kind`, `additionalOperations`,
+  `in: "querystring"`, `prefixEncoding`, the `deviceAuthorization` flow and the
+  rest. The full list, with what each would need in order to be written, is
+  under [What 3.2 added that is not emitted](#what-32-added-that-is-not-emitted).
 - **A lenient import.** `pelican-import` refuses an operation it cannot fully
   describe rather than generating a weaker one, and the way through is a
   per-operation `exclude` list, or a per-schema `discriminator(...)` where what

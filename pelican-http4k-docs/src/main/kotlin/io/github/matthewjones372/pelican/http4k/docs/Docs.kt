@@ -44,7 +44,7 @@ fun Api.docsRoutes(docs: Docs = Docs()): List<RoutingHttpHandler> {
     if (specPath == null && uiPath == null) return emptyList()
 
     // Generated once and shared by the routes, rather than once per route.
-    val document = spec().openApiJson()
+    val document = spec().openApiJson(docs.version)
 
     // The API's own CORS setting covers the document as well: a spec a browser
     // tool cannot fetch is the same complaint as an endpoint it cannot call.

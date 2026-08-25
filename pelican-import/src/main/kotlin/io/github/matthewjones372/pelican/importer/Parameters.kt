@@ -92,7 +92,12 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
         val explode = if (param["explode"] == null) defaultExplodeFor(style) else param.bool("explode")
 
         if (schema.scalarType() != "array") {
-            if (style != fallback) {
+            // `style: "cookie"` on a single value is the exception, and it is
+            // not about boundaries at all: 3.2 added it to say that a cookie's
+            // value travels unescaped, which is what Pelican does with every
+            // cookie whether or not it carries a list. There is nothing to
+            // read off it, and nothing to complain about either.
+            if (style != fallback && !(location == "cookie" && style == "cookie")) {
                 unsupported(
                     path,
                     "Parameter '$name' is encoded as '$style', which says how a value with parts is spread out, " +
@@ -146,9 +151,14 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
 
         location == "header" -> ListStyle.COMMA
 
-        location == "cookie" && style != "form" -> unsupported(
+        // `cookie` is 3.2's name for what a cookie has always actually been,
+        // and `form` is what a document had to say before that name existed.
+        // Both read the same way here, since the difference between them is
+        // escaping rather than boundaries.
+        location == "cookie" && style != "form" && style != "cookie" -> unsupported(
             path,
-            "Parameter '$name' is a cookie encoded as '$style', and a cookie is written as `form`.",
+            "Parameter '$name' is a cookie encoded as '$style', and a cookie is written as `cookie`, or as " +
+                "`form` in a document older than OpenAPI 3.2.",
         )
 
         location == "cookie" && explode -> ListStyle.REPEATED
