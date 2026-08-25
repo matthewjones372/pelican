@@ -4,15 +4,6 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import org.junit.jupiter.api.Test
 
-/**
- * Three claims about this module's classpath, stated as tests.
- *
- * A third backend is only evidence that the abstractions in `pelican-core` work
- * if it is genuinely a third one — so this module must not be able to see
- * either of the others. And serving documentation is opt-in here for the same
- * reason it is everywhere else: a service that only serves endpoints should not
- * compile the document generator in.
- */
 class DecouplingTest {
 
     @Test

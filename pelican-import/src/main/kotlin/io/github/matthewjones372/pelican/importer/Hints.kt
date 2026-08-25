@@ -10,37 +10,9 @@ import java.util.IdentityHashMap
 /**
  * The `discriminator` a document never wrote down, supplied by the reader.
  *
- * A `oneOf` with no `discriminator` is refused, and that refusal is not
- * overturned here: a decoder that has to try each branch and keep the first
- * that parsed is wrong on the first payload two branches both accept, and
- * wrong silently. What is answered is the other half of the problem — the
- * document belongs to somebody else, the missing fact is known, and until now
- * the only way past it was to `exclude` the whole operation.
- *
- * So the fact is stated where a fact about somebody else's document can be
- * reviewed: the build file, per schema, beside the `exclude` list and for the
- * same reason. A global "guess at unions" switch would have been less typing
- * and would have answered a different question — it says "and whatever else
- * turns up", where this says "this union, told apart by this property".
- *
- * What a hint does is write the `discriminator` the document should have
- * carried *into* the document, before anything reads it. Nothing downstream
- * learns that a hint existed: the union is read by the one function that reads
- * every union, the branches are named by the one rule that names every branch,
- * and the schemas the generated file publishes carry the discriminator and its
- * mapping exactly as a document that had stated it would. The alternative — a
- * second path through the type generator that knew about hints — would have
- * been two readings of one `oneOf`, which is the arrangement this module is
- * built to avoid.
- *
- * The `mapping` is written out rather than left implicit, because the wire
- * value is the fact being rescued. A branch declaring `kind: { const: card }`
- * has said `card` on the wire; OpenAPI's rule that an unmapped branch is
- * selected by its own schema name never applies here, because the document
- * never claimed a `discriminator` for that rule to fill in. Reading the `const`
- * is therefore reading the document, and ignoring it would publish
- * `CardPayment` where the document said `card` — confidently wrong, which is
- * the failure this module exists to rule out.
+ * The `mapping` is written out because the wire value is the fact being
+ * rescued — OpenAPI's implicit rule never applies here, so ignoring a branch's
+ * `const` would publish `CardPayment` where the document said `card`.
  */
 internal class Hints(private val declared: Map<String, String>) {
 
@@ -48,14 +20,6 @@ internal class Hints(private val declared: Map<String, String>) {
 
     /**
      * Hint -> the `discriminator` object it wrote, held by identity.
-     *
-     * Identity rather than position, because a hint is used or unused
-     * according to what survives into the generated file, and the surviving
-     * schemas have been copied out of the document by then — [normaliseSchema]
-     * rebuilds every object it walks. It carries a `discriminator` across
-     * untouched, though, so the object written here is the object emitted, and
-     * looking for it is an exact answer where a second pointer walk would be a
-     * second guess at the same question.
      */
     private val written = LinkedHashMap<Hint, JsonObj>()
 
@@ -73,15 +37,6 @@ internal class Hints(private val declared: Map<String, String>) {
 
     /**
      * Fails on a hint nothing generated needed.
-     *
-     * An unused `exclude` is left alone and an unused hint is not, and that is
-     * a difference between what the two say rather than an inconsistency. An
-     * exclude naming an operation that is not there has weakened nothing:
-     * every operation still in the document is still held to the same
-     * standard. A hint is a standing claim about a payload format, and the day
-     * the document states its own `discriminator` — or nothing reaches the
-     * schema any more — that claim stops being checked against anything. A
-     * claim nobody checks is the silent weakening a strict import is for.
      */
     fun failIfUnused(generated: List<JsonValue>) {
         if (written.isEmpty()) return
@@ -110,16 +65,7 @@ internal class Hints(private val declared: Map<String, String>) {
     }
 
     /**
-     * The `discriminator` this hint asks for, or a refusal saying why there is
-     * none.
-     *
-     * Every refusal in here is the hint being wrong about the document rather
-     * than the document being undescribable, so each one names the hint as the
-     * build file writes it and the position it addresses. They are the same
-     * four questions the existing union reader asks — is this a union, does
-     * anything name the property, what selects each branch, and does one value
-     * select two — asked one step earlier, where the answer is a build file to
-     * correct rather than a document somebody else owns.
+     * The `discriminator` this hint asks for, or a refusal saying why not.
      */
     private fun discriminatorFor(hint: Hint, schema: JsonObj, components: JsonObj): JsonObj {
         val branches = schema.branches()
@@ -132,11 +78,6 @@ internal class Hints(private val declared: Map<String, String>) {
         }
 
         val wired = resolved.mapIndexed { index, (branch, target) ->
-            // A `const` first, then the name of the schema the branch points
-            // at. A branch that has neither is refused rather than given a
-            // positional name: `Variant1` would be a wire value nobody wrote,
-            // and a client sending it would be sending a string the service
-            // has never heard of.
             val wire = target.constant(hint.property)
                 ?: branch.reference()
                 ?: reject(hint.pointer() / "oneOf" / index, unselectable(hint.property))
@@ -192,13 +133,6 @@ internal class Hints(private val declared: Map<String, String>) {
 /**
  * One hint: which schema, and which of its properties tells the branches apart.
  *
- * [address] is deliberately more than a component name. A named component is
- * the easy half — most published unions have a name — but a `oneOf` written
- * out under a property has none at all, and a hint that could only address the
- * named ones would leave the other half of the problem exactly where it was:
- * `exclude`, and lose the operation. So the address is a JSON pointer, with
- * the two shortenings that cover what people actually have to write:
- *
  * - `Payment` — no slash, so a component: `#/components/schemas/Payment`.
  * - `Order/properties/payment` — relative to `#/components/schemas`, which is
  *   where a union written under a named schema lives.
@@ -240,13 +174,10 @@ private fun JsonObj.branches(): List<JsonObj> =
 private fun JsonObj.reference(): String? = str("\$ref")?.substringAfterLast('/')
 
 /**
- * The value this schema declares for [property]: `kind: { const: card }`, or
- * the single-valued `enum` that says the same thing.
- *
- * The same two spellings `pelican-codegen` reads off an inline branch. They
- * are read again here rather than shared, because the question is a different
- * one: there, what an unmapped inline branch is already called; here, what to
- * write in a mapping that does not exist yet.
+ * The value this schema declares for [property]: `kind: { const: card }`, or the
+ * single-valued `enum` saying the same. Read again rather than shared with
+ * `pelican-codegen`, which asks what an unmapped branch is already called where
+ * this asks what to write in a mapping that does not exist yet.
  */
 private fun JsonObj.constant(property: String): String? {
     val declared = obj("properties")?.obj(property) ?: return null

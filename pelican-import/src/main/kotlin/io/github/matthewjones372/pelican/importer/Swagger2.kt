@@ -8,18 +8,6 @@ import io.github.matthewjones372.pelican.JsonValue
 
 /**
  * Swagger 2.0, read as the 3.x document it would be today.
- *
- * A separate reader rather than a normalising pass, because 2.0 is a different
- * document: bodies are parameters, media types are lists hanging off the
- * operation, and schemas live under `definitions`. Everything after this point
- * reads one shape, which is what keeps the mapping proper from growing a
- * version check per field.
- *
- * Nothing is decided here that the mapping would decide differently. An
- * operation that `produces` two media types is converted into a response
- * offering two, and refused there, with the message a 3.x document would have
- * got — because it is the same fact about the same operation, and a reader
- * should not get a different answer for having written it in an older dialect.
  */
 internal object Swagger2 {
 

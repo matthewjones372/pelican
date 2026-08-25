@@ -7,19 +7,6 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-/**
- * Where a generated method sends its call.
- *
- * This is the reading of `servers` on an operation that has to honour it. The
- * document publishes the URL and a server ignores it — it serves what it
- * serves — but a client is the thing making the call, and a client that sent
- * one to its own base URL because that is where the other methods go would be
- * calling a host the document said does not answer this.
- *
- * Text only, as in [KotlinClientTest]: whether it compiles is asserted in
- * `:example`, whose checked-in client is generated from this code and run
- * against a real server.
- */
 class OperationServersClientTest {
 
     object Schemas : SchemaSource {
@@ -76,10 +63,6 @@ class OperationServersClientTest {
         client shouldContain """private const val DEFAULT_BASE_URL = "https://orders.example.com""""
     }
 
-    /**
-     * The surprise is worth a line: every other method on the class goes where
-     * the caller pointed it, and this one does not, whatever they passed.
-     */
     @Test
     fun `the method says where it is served`() {
         client shouldContain "Served from https://uploads.example.com, which this operation declares"

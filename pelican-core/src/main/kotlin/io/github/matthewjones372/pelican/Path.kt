@@ -8,10 +8,6 @@ sealed interface PathSegment {
 
 /**
  * A path built with the `/` operator:
- *
- * ```
- * "users" / userId / "orders"
- * ```
  */
 class PathSpec(val segments: List<PathSegment>) {
     /** OpenAPI-style template, e.g. `/users/{userId}/orders`. */

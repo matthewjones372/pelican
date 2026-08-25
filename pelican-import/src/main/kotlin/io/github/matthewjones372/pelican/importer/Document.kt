@@ -16,19 +16,6 @@ import java.net.URI
 
 /**
  * Reading a document off disk, as one self-contained tree.
- *
- * YAML 1.2 is a superset of JSON, so the same parser reads both and the file
- * extension decides nothing. What comes back is core's [JsonValue] — the type
- * `pelican-openapi` writes documents out of — so the two directions are
- * reading and writing the same shape rather than two models of it.
- *
- * References to other files are resolved here rather than left to whatever
- * reads the tree next, and references to other *hosts* are refused unless the
- * build file named the host. A build that fetches a URL to know what to
- * compile is a build that compiles something different depending on the
- * network, and the failure mode of that is a generated client nobody can
- * reproduce — so where fetching is allowed at all, [Remote] is what makes the
- * fetched half a fixed input again.
  */
 internal object Document {
 
@@ -46,13 +33,9 @@ internal object Document {
     }
 
     /**
-     * The same parse for text that never was a file.
-     *
-     * [label] is what a failure calls it — a path for a file, a URL for a
-     * fetched document. One parser for both, because a document that arrived
-     * over HTTP is read by exactly the same rules as one on disk: a second
-     * reading of YAML would be a second place for duplicate keys to become
-     * last-one-wins.
+     * The same parse for text that never was a file; [label] is what a failure
+     * calls it. One parser for both, or a second reading of YAML would be a
+     * second place for duplicate keys to become last-one-wins.
      */
     fun parse(text: String, label: String): JsonObj {
         val loaded = try {
@@ -123,14 +106,7 @@ internal class JsonPath private constructor(private val parent: JsonPath?, priva
 }
 
 /**
- * Where a value was read from, and what a `$ref` written inside it means.
- *
- * A file on disk and a fetched URL answer the same two questions — what does
- * a reference written here resolve to, and what does a failure call this — so
- * they answer them behind one type. Keeping them apart would have meant a
- * second walk of the tree for the fetched half, and the two walks would
- * eventually come to disagree about how a `#/...` inside a pulled-in document
- * is read: the bug this type exists to make impossible.
+ * Where a value was read from, and what a `$ref` inside it means.
  */
 internal sealed class Source {
 
@@ -168,10 +144,6 @@ internal class UrlSource(private val uri: URI) : Source() {
     override val id: String = uri.toString()
     override val stem: String = uri.path.orEmpty().substringAfterLast('/').substringBeforeLast('.')
 
-    // Relative and absolute alike: `./common.yaml` beside a fetched document
-    // is another document on that host, and it is checked against the
-    // allowlist exactly as the first one was. A fetched document naming a
-    // second host is followed only where the build file named that host too.
     override fun sibling(ref: String, path: JsonPath, remote: Remote): Source = remote.source(ref, uri, path)
 
     override fun read(remote: Remote, path: JsonPath): JsonObj = remote.document(uri, path)
@@ -179,13 +151,6 @@ internal class UrlSource(private val uri: URI) : Source() {
 
 /**
  * The `$ref`s that point out of this file, resolved into it.
- *
- * A reference to another file's schema is hoisted into `components/schemas`
- * under its own name, because a type that had a name in the file it came from
- * should keep it — the generated Kotlin is named after that, and a spec split
- * across files would otherwise generate `OrderShipping`-style names invented
- * from where each type happened to be used. Everything else is inlined where
- * it stood.
  */
 private class Bundle(root: JsonObj, private val rootSource: Source, private val remote: Remote) {
     /** (document, pointer) -> the name it was hoisted under, so one type is hoisted once. */

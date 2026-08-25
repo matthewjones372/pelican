@@ -4,20 +4,6 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
-/**
- * References, followed as far as the disk and no further.
- *
- * A document split across files is ordinary once it is large, so those are
- * read. A document that references another host is not read, and that is the
- * decision worth testing: a build that fetches a URL to know what to generate
- * produces different code on a different day, and no amount of convenience is
- * worth a generated client nobody can reproduce.
- *
- * It is the default rather than the only answer — `allowRemote` names a host
- * on purpose and a lockfile pins what it served — and `RemoteReferencesTest`
- * is where that bargain is asserted. What is asserted here is that nobody who
- * has not made it gets any of it.
- */
 class ReferencesTest {
 
     @Test

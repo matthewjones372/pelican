@@ -14,17 +14,6 @@ import io.github.matthewjones372.pelican.codegen.unique
 
 /**
  * Endpoint descriptions, written out as Kotlin.
- *
- * What comes out is meant to be read, not just compiled: inputs as named
- * values at the top, payload types under them, and one `endpoint(...)` per
- * operation in the order the document listed them. It is the file somebody
- * would have written by hand from the same document, which matters because
- * they are going to be reading it for as long as they call the API.
- *
- * Declaration order is load-bearing. Top-level values in Kotlin initialise in
- * source order, so an endpoint naming a failure declared below it would read a
- * null at class-init time. Inputs, failures and schemes therefore all come
- * before the endpoints that use them.
  */
 internal class Emitter(private val api: IrApi, private val options: ImportOptions) {
 
@@ -46,10 +35,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     /**
      * Schemas the document wrote out where they were used, under the name the
      * type generator gave each one.
-     *
-     * The generated schema source needs them: a response whose schema was
-     * written inline has no name in `components` to look up, and re-deriving
-     * it from the Kotlin class is the thing being avoided.
      */
     private val inlineSchemas = LinkedHashMap<String, JsonObj>()
 
@@ -142,11 +127,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     /**
      * The document's own schemas, as a `SchemaSource` in the generated file.
-     *
-     * It is what makes an imported description self-contained: the spec can be
-     * published, and a client generated from it, with no codec module present
-     * — and what a caller reads is what the document said rather than a codec's
-     * reading of the classes generated from it.
      */
     private fun schemaSource(): String {
         val blob = jsonObjOf(
@@ -211,13 +191,9 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     }
 
     /**
-     * The handlers, once, as a starting point.
-     *
-     * Every one of them is a `TODO()`, which is the honest state of a service
-     * nobody has written yet: it compiles, it routes, and it throws the moment
-     * a request reaches something unimplemented. The file is written once and
-     * never overwritten — see [Import.write] — because after the first run it
-     * is not generated code any more.
+     * The handlers, once, as a starting point: every one a `TODO()`, so the
+     * service compiles and routes and throws where nothing is written yet.
+     * Written once and never overwritten — see [Import.write].
      */
     private fun handlersFile(backend: Backend): String = buildString {
         appendLine(stubBanner)
@@ -281,13 +257,10 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     }
 
     /**
-     * A call the document says the service sends.
-     *
-     * The same block as an endpoint's, minus the two lines that would describe
-     * a URL — there is no route to write, and the method is what `webhook(...)`
-     * takes instead. The inputs are declared inside whatever there are of them:
-     * the tuple form of `endpoint(...)` exists to type a handler's parameter,
-     * and nothing binds a handler to one of these.
+     * A call the document says the service sends — an endpoint's block minus
+     * the URL, since `webhook(...)` takes the method instead. Inputs are
+     * declared inside: the tuple form exists to type a handler's parameter, and
+     * nothing binds a handler to one of these.
      */
     private fun webhook(hook: IrWebhook): String = buildString {
         val ep = hook.operation
@@ -392,14 +365,10 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     }
 
     /**
-     * A response the endpoint describes and the handler never returns: one the
-     * handler throws, or the `default` nothing can produce at all.
-     *
-     * The `default` keeps its payload type where it has one. Writing it as a
-     * bare `defaultResponse(...)` would have been simpler and would have
-     * dropped the schema, which is the silent weakening this importer refuses
-     * everywhere else — a document saying "and any other error is a Problem"
-     * would have come back saying only "and any other error".
+     * A response the handler never returns: one it throws, or the `default`
+     * nothing can produce. The `default` keeps its payload type, since a bare
+     * `defaultResponse(...)` would turn "any other error is a Problem" back
+     * into "any other error".
      */
     private fun documented(ep: IrEndpoint, failure: IrFailure): String {
         val headers = failure.headers.joinToString("") { ", ${headerName(it)}" }
@@ -590,11 +559,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     /**
      * How several values are told apart, where the parameter carries several.
-     *
-     * It comes before `optional()` because that is the only order that
-     * compiles: spreading turns a `QueryParam<Int>` into a
-     * `QueryParam<List<Int>>`, and the modifier below then makes that
-     * nullable.
      */
     private fun spread(param: IrParam): String = when (param.listStyle) {
         null -> ""
@@ -658,18 +622,8 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     // ------------------------------------------------------- values on the wire
 
     /**
-     * A schema for a value that travels as one string, as the Kotlin type it
-     * decodes to and the codec that decodes it.
-     *
-     * A codec is only written out when there is something to say beyond the
-     * type — a constraint, or a format core has no reified type for. Without
-     * one the declaration is `queryParam<Int>("limit")`, which is what somebody
-     * would have written, and core resolves the codec from the type.
-     *
-     * Constraints become refinements rather than comments, because a
-     * refinement is both: `atLeast(1)` rejects a zero *and* documents
-     * `minimum: 1`, so the imported endpoint enforces what the document
-     * promised rather than merely restating it.
+     * A schema for a value travelling as one string, as its Kotlin type and the
+     * codec that decodes it.
      */
     private fun plain(schema: JsonObj, context: String): Plain {
         if (schema["enum"] != null) return Plain(typeFor(schema, context), null)
@@ -693,11 +647,6 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     /**
      * The same value, carrying the sample the document offered.
-     *
-     * An example belongs to the *type* in Pelican rather than to one use of
-     * it, which is `describedAs`. Writing it out forces the codec form even
-     * where nothing else needed one — a reified `queryParam<Int>("limit")` has
-     * nowhere to hang it.
      */
     private fun Plain.exampled(example: String?): Plain {
         if (example == null) return this
@@ -835,13 +784,9 @@ private fun namedDescription(text: String?) =
 private fun describedBy(text: String?) = if (text == null) "" else kotlinString(text)
 
 /**
- * One payload under several media types, as the `or` a hand-written
- * description would use — so a reader of the generated file learns the library
- * rather than the importer.
- *
- * The description goes on the first alternative alone, which is where `or`
- * reads it from; writing it on each would publish the same sentence twice for
- * one body.
+ * One payload under several media types, as the `or` a hand-written description
+ * would use. The description goes on the first alternative alone, which is
+ * where `or` reads it from.
  */
 private fun negotiatedDeclaration(body: IrBody.Negotiated, type: String): String =
     body.encodings.mapIndexed { index, encoding ->
@@ -899,10 +844,6 @@ private const val RULE_WIDTH = 68
 
 /**
  * A security scheme as the builder call that makes one.
- *
- * Text, like everything else down here, once the *name* the value is bound to
- * is somebody else's problem: the emitter mints that, because it has to stay
- * unique against every other declaration in the file.
  */
 private fun schemeCall(scheme: IrScheme): String {
     val shared = buildList {

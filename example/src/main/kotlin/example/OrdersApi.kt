@@ -17,13 +17,6 @@ import java.time.Duration
  * The Pekko wiring: every description from Endpoints.kt paired with its
  * implementation. This is the only file in the example that knows a stream is a
  * `Source` — the descriptions don't, and neither does the OpenAPI generator.
- *
- * Each handler's parameters come from the inputs its endpoint lists, already
- * decoded and typed. Add a parameter to the description and this file stops
- * compiling until the handler accounts for it.
- *
- * A plain list of values: nothing is registered anywhere, so it can be built,
- * filtered or concatenated like any other list.
  */
 val ordersRoutes: List<ServerEndpoint> = listOf(
     // Declared failures are returned, not thrown: the endpoint's type says
@@ -52,10 +45,6 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
             .throttle(1, Duration.ofMillis(50))
     },
 
-    // The 429 declares a `Retry-After`, so returning it means supplying one.
-    // Leaving it out is not a document quietly disagreeing with the wire: it
-    // throws where the failure is produced, which is the one place the
-    // declaration and the value are both in hand.
     placeOrder handledOrFail { (id, key, req) ->
         when {
             key != "let-me-in" -> badApiKey(ApiError(401, "Bad API key"))
@@ -71,10 +60,6 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
         }
     },
 
-    // Two successes and a failure on one endpoint. `ok(...)` is not used here:
-    // with more than one success, saying which is the whole point, and the
-    // status comes from the declaration that was named rather than from the
-    // payload — which is what lets a 202 carry a different type from the 201.
     submitOrder handledOneOf { (id, key, req) ->
         when {
             key != "let-me-in" -> badApiKey(ApiError(401, "Bad API key"))
@@ -94,10 +79,6 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     // The upload arrives as a stream. Counting lines never holds the file, and
     // neither would writing it somewhere; `bytes()` is what would.
     importOrders handledNow { (_, session, label, manifest, file) ->
-        // The manifest was read before the handler ran, within the bound its
-        // declaration named; the file was not read at all. Both arrive as an
-        // UploadedFile, so what changes between them is where the bytes are and
-        // not what a handler has to say about them.
         val declared = manifest.text().trim()
         ImportResult(
             label,

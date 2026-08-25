@@ -2,11 +2,15 @@ package io.github.matthewjones372.pelican.jsoniter
 
 import com.jsoniter.JsonIterator
 import com.jsoniter.ValueType
+import com.jsoniter.output.EncodingMode
 import com.jsoniter.output.JsonStream
 import com.jsoniter.spi.Config
 import com.jsoniter.spi.Decoder
+import com.jsoniter.spi.DecodingMode
 import com.jsoniter.spi.Encoder
 import com.jsoniter.spi.JsonException
+import com.jsoniter.spi.JsoniterSpi
+import com.jsoniter.spi.OmitValue
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.time.Duration
@@ -19,21 +23,23 @@ import java.time.ZonedDateTime
 import java.util.UUID
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
+import kotlin.reflect.KProperty1
 import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.jvm.isAccessible
+import kotlin.reflect.jvm.javaGetter
 
 /**
  * jsoniter's `Config`, taught how to read and write Kotlin.
  *
  * jsoniter was finished in 2018 and binds a JSON object to a Java bean: a
- * no-argument constructor, then a field or setter per property. A Kotlin data
- * class has neither. Its constructor takes every property at once, and that
- * constructor is also the only thing that knows which properties have defaults
- * — so a binder that sets fields one at a time does not merely need help, it
- * produces the wrong object silently: an absent `quantity: Int = 1` arrives as
- * `0`, because that is what an unset field holds.
+ * no-argument constructor, then a field or setter per property. A data class
+ * has no no-argument constructor, so jsoniter refuses one outright — `no
+ * constructor for: class Line`. Its own answer to that is `@JsonCreator` on the
+ * constructor, which builds the object and loses every Kotlin default: an
+ * absent `quantity: Int = 1` arrives as a null that the constructor call throws
+ * on, because the defaults live in a synthetic constructor nothing here calls.
  *
  * So the binding is done here instead, through [Extension][com.jsoniter.spi.Extension]'s
  * two hooks, which jsoniter consults before it reaches for a bean binder. Every
@@ -49,6 +55,23 @@ import kotlin.reflect.jvm.isAccessible
  */
 internal class JsoniterConfig private constructor(name: String, builder: Builder) : Config(name, builder) {
 
+    init {
+        // The codegen modes compile decoders with javassist, which is optional
+        // in jsoniter's own pom and not a dependency here. Refused at assembly
+        // rather than as a NoClassDefFoundError on the first request. The mode
+        // also arrives from JSONITER_DECODING_MODE, so the check is on the
+        // config rather than on the builder call.
+        require(decodingMode() == DecodingMode.REFLECTION_MODE) {
+            "pelican-jsoniter needs jsoniter's REFLECTION_MODE: ${decodingMode()} generates decoders with javassist"
+        }
+        require(encodingMode() == EncodingMode.REFLECTION_MODE) {
+            "pelican-jsoniter needs jsoniter's REFLECTION_MODE: ${encodingMode()} generates encoders with javassist"
+        }
+    }
+
+    /** jsoniter's own rule for what `omitDefaultValue` leaves out, or null when it is off. */
+    fun omitted(type: Type): OmitValue? = if (omitDefaultValue()) createOmitValue(type) else null
+
     class Builder : Config.Builder() {
         override fun doBuild(configName: String): Config = JsoniterConfig(configName, this)
 
@@ -59,9 +82,9 @@ internal class JsoniterConfig private constructor(name: String, builder: Builder
         override fun toString(): String = "pelican-jsoniter{${super.toString()}}"
     }
 
-    override fun createDecoder(cacheKey: String, type: Type): Decoder? = decoderFor(type)
+    override fun createDecoder(cacheKey: String, type: Type): Decoder? = decoderFor(type, this)
 
-    override fun createEncoder(cacheKey: String, type: Type): Encoder? = encoderFor(type)
+    override fun createEncoder(cacheKey: String, type: Type): Encoder? = encoderFor(type, this)
 }
 
 /**
@@ -70,14 +93,10 @@ internal class JsoniterConfig private constructor(name: String, builder: Builder
  * The settings are jsoniter's own — `escapeUnicode`, `indentionStep` and the
  * rest are on the builder this hands you:
  *
- * ```
- * JsoniterCodecs(jsoniterConfig { escapeUnicode(false) })
- * ```
- *
- * Decoding and encoding stay in jsoniter's reflection mode, which is its
- * default here and the mode that needs no bytecode generation — the
- * alternatives generate classes with javassist at startup, which buys a payload
- * type nothing once the binding above is doing the object work anyway.
+ * Decoding and encoding stay in jsoniter's reflection mode, the one that needs
+ * no bytecode generation: the codegen modes want javassist, which this module
+ * does not depend on, and they are refused rather than accepted and then failed
+ * on.
  */
 fun jsoniterConfig(configure: Config.Builder.() -> Unit = {}): Config =
     JsoniterConfig.Builder().apply(configure).build()
@@ -92,7 +111,7 @@ fun jsoniterConfig(configure: Config.Builder.() -> Unit = {}): Config =
  * reimplementing a JSON library rather than binding one. Only the shapes Kotlin
  * spells differently from Java are answered here.
  */
-private fun decoderFor(type: Type): Decoder? {
+private fun decoderFor(type: Type, config: JsoniterConfig): Decoder? {
     generic(type)?.let { refusal -> return Decoder { throw JsonException(refusal) } }
     val java = type as? Class<*> ?: return null
     val scalar = scalars[java]
@@ -102,7 +121,8 @@ private fun decoderFor(type: Type): Decoder? {
         !java.isKotlin -> null
         kclass.java.isEnum -> enumDecoder(kclass)
         kclass.objectInstance != null -> Decoder { iter -> iter.readAny(); kclass.objectInstance }
-        kclass.isSealed -> unionDecoder(kclass)
+        kclass.isValue -> valueDecoder(kclass)
+        kclass.isSealed -> unionDecoder(kclass, config)
         kclass.primaryConstructor != null -> ObjectDecoder(kclass)
         else -> null
     }
@@ -117,16 +137,13 @@ private fun decoderFor(type: Type): Decoder? {
  * missing property that is merely nullable becomes null, and a missing property
  * that is neither is the error, named, rather than an exception from inside a
  * constructor call that mentions no field at all.
- *
- * A property the class does not declare is skipped rather than refused, which
- * is the same lenience `defaultMapper()` and `defaultJson()` are configured
- * for: an unknown field is a caller running ahead of this server, not a bad
- * request.
  */
 private class ObjectDecoder(private val kclass: KClass<*>) : Decoder {
 
     private val ctor = requireNotNull(kclass.primaryConstructor).also { it.isAccessible = true }
     private val byName = ctor.parameters.associateBy { it.name }
+    private val types = ctor.parameters.associateWith { it.type.toJsoniterType() }
+    private val wrappers = ctor.parameters.associateWith { it.wrapper() }
 
     override fun decode(iter: JsonIterator): Any? {
         if (iter.readNull()) return null
@@ -135,7 +152,16 @@ private class ObjectDecoder(private val kclass: KClass<*>) : Decoder {
         var field = iter.readObject()
         while (field != null) {
             val parameter = byName[field]
-            if (parameter == null) iter.skip() else arguments[parameter] = iter.read(parameter.type.toJsoniterType())
+            if (parameter == null) {
+                iter.skip()
+            } else {
+                val read = iter.read(types.getValue(parameter))
+                // `callBy` wants the wrapper where a parameter is a value
+                // class, and the type jsoniter was given is the one the JVM
+                // signature carries — which, for most of them, is what is
+                // inside the wrapper rather than the wrapper itself.
+                arguments[parameter] = wrappers.getValue(parameter)?.box(read) ?: read
+            }
             field = iter.readObject()
         }
 
@@ -149,6 +175,18 @@ private class ObjectDecoder(private val kclass: KClass<*>) : Decoder {
 
         return ctor.callBy(arguments)
     }
+}
+
+/**
+ * A value class, read as the value inside it and wrapped.
+ *
+ * The null is checked here rather than left to what is inside: a nullable
+ * value class over a primitive keeps its wrapper in the JVM signature, so this
+ * is the decoder a null arrives at, and `readInt` on one reports a parse error.
+ */
+private fun valueDecoder(kclass: KClass<*>): Decoder {
+    val underlying = kclass.underlying()
+    return Decoder { iter -> if (iter.readNull()) null else kclass.box(iter.read(underlying)) }
 }
 
 /** An enum, read by constant name, and told what the names were when it is not one. */
@@ -174,27 +212,49 @@ private fun enumDecoder(kclass: KClass<*>): Decoder {
  * value, paid only by payloads that are actually unions, and the alternative is
  * to require callers to put a field first.
  */
-private fun unionDecoder(kclass: KClass<*>): Decoder {
+private fun unionDecoder(kclass: KClass<*>, config: JsoniterConfig): Decoder {
     val branches = kclass.leaves().associateBy { it.discriminatorValue() }
     return Decoder { iter ->
         if (iter.readNull()) {
             null
         } else {
             val payload = iter.readAny()
+            // Taken before the discriminator is read out: an `Any` hands back
+            // the text it was parsed from until a key is looked up, and prints
+            // the parsed values back into JSON from then on.
+            val text = payload.toString()
             val name = payload.get(UNION_DISCRIMINATOR).takeIf { it.valueType() == ValueType.STRING }
                 ?.toString()
                 ?: throw JsonException("A ${kclass.simpleName} needs a '$UNION_DISCRIMINATOR' saying which one it is")
             val branch = branches[name]
                 ?: throw JsonException("'$name' is not one of ${branches.keys.joinToString()}")
-            JsonIterator.deserialize(payload.toString().toByteArray(), branch.java)
+            branchOf(text, branch, config)
         }
+    }
+}
+
+/**
+ * One branch of a union, read from the text the union was read from.
+ *
+ * The config is put back by hand because jsoniter does not: every
+ * `deserialize(config, …)` ends at `clearCurrentConfig`, which restores the
+ * *default* config rather than the one that was current — so a nested call
+ * leaves the rest of the enclosing payload being read by a jsoniter that has
+ * never heard of Kotlin.
+ */
+private fun branchOf(text: String, branch: KClass<*>, config: JsoniterConfig): Any? {
+    val enclosing = JsoniterSpi.getCurrentConfig()
+    try {
+        return JsonIterator.deserialize(config, text.toByteArray(), branch.java)
+    } finally {
+        JsoniterSpi.setCurrentConfig(enclosing)
     }
 }
 
 // ------------------------------------------------------------------ encoding
 
 /** The encoder for [type], or null where jsoniter's own is right. Mirrors [decoderFor]. */
-private fun encoderFor(type: Type): Encoder? {
+private fun encoderFor(type: Type, config: JsoniterConfig): Encoder? {
     generic(type)?.let { refusal -> return Encoder { _, _ -> throw JsonException(refusal) } }
     val java = type as? Class<*> ?: return null
     val scalar = scalars[java]
@@ -204,8 +264,9 @@ private fun encoderFor(type: Type): Encoder? {
         !java.isKotlin -> null
         kclass.java.isEnum -> Encoder { value, stream -> stream.writeVal((value as Enum<*>).name) }
         kclass.objectInstance != null -> Encoder { _, stream -> stream.writeEmptyObject() }
-        kclass.isSealed -> unionEncoder(kclass)
-        kclass.primaryConstructor != null -> ObjectEncoder(kclass)
+        kclass.isValue -> valueEncoder(kclass)
+        kclass.isSealed -> unionEncoder(kclass, config)
+        kclass.primaryConstructor != null -> ObjectEncoder(kclass, config)
         else -> null
     }
 }
@@ -213,28 +274,31 @@ private fun encoderFor(type: Type): Encoder? {
 /**
  * A Kotlin class, written as its constructor declares it.
  *
- * Constructor order rather than reflection order, because the constructor is
- * the declaration a reader of the class sees, and `Class.getDeclaredFields`
- * makes no promise about order at all.
+ * The constructor rather than the class's fields, because the schema is read
+ * off the constructor too: a `val` declared in the body has a backing field
+ * jsoniter's own encoder would write and no property in the document to match.
+ * Its order is the declared one, which `Class.getDeclaredFields` does not
+ * promise.
  *
- * Every property is written, including one that holds null or its default. An
- * absent field and a null one mean different things to a document that says the
- * field is nullable, and this is the same choice `defaultMapper()` and
- * `defaultJson()` make — a payload should not change shape because a value
- * happened to equal a default.
- *
- * [discriminator], when there is one, is the branch marker a union writes ahead
- * of the branch's own properties.
+ * Every property is written, including one that holds null or its default,
+ * unless the config asks for `omitDefaultValue` — jsoniter's own setting,
+ * applied by jsoniter's own rule. Off, which is the default, an absent field
+ * and a null one keep the different meanings a document that marks the field
+ * nullable gives them, the same choice `defaultMapper()` and `defaultJson()`
+ * make.
  */
-private class ObjectEncoder(kclass: KClass<*>, private val discriminator: String? = null) : Encoder {
+private class ObjectEncoder(
+    kclass: KClass<*>,
+    config: JsoniterConfig,
+    private val discriminator: String? = null,
+) : Encoder {
 
-    private class Property(val name: String, val type: Type, val read: (Any) -> Any?)
+    private class Property(val name: String, val type: Type, val omit: OmitValue?, val read: (Any) -> Any?)
 
     private val properties = requireNotNull(kclass.primaryConstructor).parameters.mapNotNull { parameter ->
         val property = kclass.memberProperties.firstOrNull { it.name == parameter.name } ?: return@mapNotNull null
-        property.isAccessible = true
-        val read = { value: Any -> property.getter.call(value) }
-        Property(requireNotNull(parameter.name), parameter.type.toJsoniterType(), read)
+        val type = parameter.type.toJsoniterType()
+        Property(requireNotNull(parameter.name), type, config.omitted(type), readerOf(property))
     }
 
     override fun encode(value: Any?, stream: JsonStream) {
@@ -245,17 +309,56 @@ private class ObjectEncoder(kclass: KClass<*>, private val discriminator: String
         stream.writeObjectStart()
         var first = true
         if (discriminator != null) {
+            stream.writeIndention()
             stream.writeObjectField(UNION_DISCRIMINATOR)
             stream.writeVal(discriminator)
             first = false
         }
         for (property in properties) {
-            if (!first) stream.writeMore()
+            val held = property.read(value)
+            if (property.omit?.shouldOmit(held) == true) continue
+            if (first) stream.writeIndention() else stream.writeMore()
             first = false
             stream.writeObjectField(property.name)
-            stream.writeVal(property.type, property.read(value))
+            stream.writeVal(property.type, held)
         }
         stream.writeObjectEnd()
+    }
+}
+
+/**
+ * How a property is read out of a value.
+ *
+ * The JVM getter where there is one, for two reasons. It is faster —
+ * `KProperty.getter.call` goes through kotlin-reflect for every value encoded.
+ * And it agrees with the type jsoniter was handed: both come from the JVM
+ * signature, so a value-class property yields what is inside the wrapper,
+ * which is what `KParameter.type.javaType` said the property was.
+ */
+private fun readerOf(property: KProperty1<out Any, *>): (Any) -> Any? {
+    val getter = property.javaGetter
+    if (getter == null) {
+        property.isAccessible = true
+        return { value -> property.getter.call(value) }
+    }
+    getter.isAccessible = true
+    return { value -> getter.invoke(value) }
+}
+
+/**
+ * A value class, written as the value inside it.
+ *
+ * Reached only where the wrapper survives to the JVM — a nullable one over a
+ * primitive, or a payload that is a value class in its own right. Everywhere
+ * else the signature carries the value itself and jsoniter never asks about
+ * the wrapper at all.
+ */
+private fun valueEncoder(kclass: KClass<*>): Encoder {
+    val property = kclass.valueProperty()
+    val type = property.returnType.toJsoniterType()
+    val read = readerOf(property)
+    return Encoder { value, stream ->
+        if (value == null) stream.writeNull() else stream.writeVal(type, read(value))
     }
 }
 
@@ -263,8 +366,8 @@ private class ObjectEncoder(kclass: KClass<*>, private val discriminator: String
  * A sealed hierarchy, written as its branch plus the marker saying which branch
  * it was. The branches are resolved once, here, rather than per value.
  */
-private fun unionEncoder(kclass: KClass<*>): Encoder {
-    val branches = kclass.leaves().associateWith { ObjectEncoder(it, it.discriminatorValue()) }
+private fun unionEncoder(kclass: KClass<*>, config: JsoniterConfig): Encoder {
+    val branches = kclass.leaves().associateWith { ObjectEncoder(it, config, it.discriminatorValue()) }
     return Encoder { value, stream ->
         if (value == null) {
             stream.writeNull()
@@ -306,13 +409,31 @@ private fun generic(type: Type): String? {
 /**
  * Whether a class was written in Kotlin, which is the line between what this
  * module binds and what it leaves to jsoniter.
- *
- * It has to be asked of the Java class rather than of the Kotlin one, because
- * `KClass` answers for types that have no Kotlin behind them at all: a
- * `java.lang.String` reflects as `kotlin.String`, primary constructor and all,
- * and a binder that trusted that would read every string as an object.
  */
 private val Class<*>.isKotlin: Boolean get() = isAnnotationPresent(Metadata::class.java)
+
+/** The single property a value class wraps. */
+internal fun KClass<*>.valueProperty(): KProperty1<out Any, *> {
+    val name = requireNotNull(primaryConstructor).parameters.single().name
+    return memberProperties.first { it.name == name }
+}
+
+/** What is inside a value class, as jsoniter's type. */
+private fun KClass<*>.underlying(): Type = requireNotNull(primaryConstructor).parameters.single().type.toJsoniterType()
+
+/**
+ * [value] in this value class's wrapper.
+ *
+ * Already-wrapped is left alone: a nullable value class over a primitive keeps
+ * its wrapper in the JVM signature, so that one arrives wrapped already.
+ */
+private fun KClass<*>.box(value: Any?): Any? = when {
+    value == null || isInstance(value) -> value
+    else -> requireNotNull(primaryConstructor).also { it.isAccessible = true }.call(value)
+}
+
+/** The value class this parameter is declared as, or null where it is not one. */
+private fun KParameter.wrapper(): KClass<*>? = (type.classifier as? KClass<*>)?.takeIf { it.isValue }
 
 /** The branches of a sealed hierarchy, flattened — a sealed branch is not a branch. */
 internal fun KClass<*>.leaves(): List<KClass<*>> =

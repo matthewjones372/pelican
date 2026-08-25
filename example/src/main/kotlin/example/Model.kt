@@ -3,17 +3,11 @@ package example
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 
-/*
+/**
  * Plain data classes. Nothing here is annotated for a particular JSON library
  * — Jackson reads them through jackson-module-kotlin, and swagger-core
  * describes them by reading the same metadata Jackson does — with one
  * exception, and it is an exception for a reason: `PaymentMethod` below.
- *
- * A sealed hierarchy is the one shape no JSON library can read off the Kotlin.
- * Nothing in `sealed interface PaymentMethod` says which property carries the
- * branch or what string selects each one, so it has to be written down, and
- * it can only be written down in one library's vocabulary. Everything else
- * here stays library-agnostic.
  */
 
 enum class OrderStatus { PENDING, SHIPPED, DELIVERED, CANCELLED }
@@ -37,12 +31,6 @@ data class Tick(val seq: Int, val label: String)
 
 /**
  * How an order was paid for: one of three shapes, told apart by `method`.
- *
- * The names are the interesting part. `bank_transfer` is what goes on the
- * wire, `BankTransfer` is what the class is called, and the two have no reason
- * to match — a wire format is somebody else's convention. The published
- * document carries both, which is what lets a client generated from it decode
- * a payload this service actually sends; see `ImportedOrdersTest`.
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "method")
 @JsonSubTypes(

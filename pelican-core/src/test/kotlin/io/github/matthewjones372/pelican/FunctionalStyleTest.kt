@@ -25,12 +25,11 @@ import java.io.File
  * it — a new mutable accumulator has to be argued for here, in writing, before
  * the build goes green again.
  *
- * Which sources it judges is not decided here: the build hands them over, and
- * declares the same directories as inputs of the task that runs this test. It
- * used to find them itself, by resolving the repository root from the working
- * directory, and Gradle had no way to know that this test read anything at all
- * — so a violation rode several green builds and only surfaced under
- * `--rerun-tasks`. See `pelican-core/build.gradle.kts`.
+ * Which sources it judges is not decided here: the build hands them over and
+ * declares the same directories as inputs of the task that runs this test. A
+ * test that resolved them itself would read files Gradle knows nothing about,
+ * and a violation would ride green builds until `--rerun-tasks`. See
+ * `pelican-core/build.gradle.kts`.
  */
 class FunctionalStyleTest {
 
@@ -62,10 +61,6 @@ class FunctionalStyleTest {
         "pelican-kotlinx/src/main/kotlin/io/github/matthewjones372/pelican/kotlinx/DescriptorSchemas.kt" to
             "the same, for kotlinx.serialization descriptors",
 
-        // The three interpreters fill one bag of decoded values per request and
-        // hand it to Params, which is the request's own scope and nothing
-        // wider. Everything decidable before that — the inputs themselves — is
-        // built as values by `plainInputs` and merged in.
         "pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Interpreter.kt" to
             "the per-request value bag handed to Params",
         "pelican-http4k/src/main/kotlin/io/github/matthewjones372/pelican/http4k/Interpreter.kt" to

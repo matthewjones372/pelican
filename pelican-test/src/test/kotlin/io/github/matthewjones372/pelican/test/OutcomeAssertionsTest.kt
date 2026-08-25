@@ -11,15 +11,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
-/**
- * What an assertion on an `Outcome` should read like, and what it should say
- * when it fails.
- *
- * The `when` this replaces had to spell out a branch that must not happen and
- * put an `error("...")` in it, which is three lines of scaffolding around one
- * line of assertion — and the failure message was whatever the test author
- * happened to type there.
- */
 class OutcomeAssertionsTest {
 
     private data class NoSuchBookmark(val id: Long, val message: String)

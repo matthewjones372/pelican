@@ -6,14 +6,6 @@ import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import java.io.File
 
-/**
- * What a document becomes, checked as text.
- *
- * Text is all this module can check: whether the result compiles, and whether
- * it describes the same API it came from, is asserted in `:example`, where the
- * document this build generates is imported, compiled, and published again for
- * comparison. See `ImportedOrdersTest`.
- */
 class ImportTest {
 
     private val bookmarks = imported(File("src/test/resources/bookmarks.yaml"), ImportOptions("app", "bookmarks"))
@@ -48,12 +40,6 @@ class ImportTest {
         bookmarks shouldNotContain "errorJson<Any"
     }
 
-    /**
-     * The pair the import used to refuse: a 429 with a problem body *and* a
-     * `Retry-After`. It is one declaration — the payload and the header on the
-     * same `errorJson`, which is what the handler returns and what the document
-     * publishes again.
-     */
     @Test
     fun `a failure carrying both a body and a header is one declared failure`() {
         val throttling = imported(
@@ -86,15 +72,6 @@ class ImportTest {
         throttling shouldContain "orFail listOrdersFailureTooManyRequests"
     }
 
-    /**
-     * A `default` carrying a payload, which is how most documents say "and any
-     * other error is a Problem".
-     *
-     * The schema comes with it — `defaultJson<T>` publishes it again — and the
-     * handler is unaffected: `default` is the one response nothing can produce,
-     * so the stub is bound with `handledNow` rather than `handledOrFail` and
-     * there is no failure for the endpoint's type to carry.
-     */
     @Test
     fun `a default response is documentation, payload and all, and no handler returns it`() {
         val yaml = document(
@@ -127,13 +104,6 @@ class ImportTest {
             """listOrders handledNow { TODO("listOrders") }"""
     }
 
-    /**
-     * The refusal this replaced: `200 Order` beside `202 Accepted` was two
-     * answers to a question an endpoint could give one answer to. Both are read
-     * now, and the header on the 201 belongs to the 201 — where a
-     * single-response operation puts its headers on `emits(...)`, because there
-     * they are the endpoint's.
-     */
     @Test
     fun `two successful responses become two declared responses, each with its own headers`() {
         val submitting = imported(
@@ -208,12 +178,6 @@ class ImportTest {
         bookmarks shouldContain """servers = listOf("https://bookmarks.example.com/v1")"""
     }
 
-    /**
-     * The refusal this replaced: an operation with its own `servers` was one
-     * "an endpoint description carries no server of its own". It carries one
-     * now — as documentation and as a client's instruction, never as a routing
-     * decision, since a server serves what it serves.
-     */
     @Test
     fun `an operation served from somewhere else says where`() {
         val elsewhere = imported(
@@ -315,14 +279,6 @@ class ImportTest {
 
     // -------------------------------------------------- more than one value
 
-    /**
-     * One operation whose parameters are all lists, so the four encodings and
-     * the three locations are read from one document rather than seven.
-     *
-     * The declarations asserted below are the ones somebody would have written
-     * by hand: the encoding is a modifier on the parameter, not a codec of its
-     * own, because what an element decodes to has not changed.
-     */
     private val lists = imported(
         document(
             """

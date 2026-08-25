@@ -9,16 +9,10 @@ import org.junit.jupiter.api.Test
 /**
  * The claim this module makes about its own classpath, stated as a test.
  *
- * `pelican-test` used to declare `api(project(":pelican-pekko"))` for the sake
- * of one in-memory transport and one convenience function, which meant a Ktor
- * or http4k service that wanted a typed client got Pekko HTTP and Pekko streams
- * on its test classpath as well. The backend-specific pieces moved to
- * `pelican-test-pekko` and `pelican-test-http4k`; this is what stops them
- * moving back.
- *
- * Every other module in the repository has a guard like this one —
- * `NoThirdPartyDependenciesTest` on core, `DecouplingTest` on each backend.
- * This module was the hole in that story.
+ * A backend on `pelican-test` reaches every consumer of a typed client: a Ktor
+ * service asking for one would get Pekko HTTP and Pekko streams with it. The
+ * in-memory transports live in `pelican-test-pekko` and `pelican-test-http4k`
+ * for that reason, and this is what keeps them there.
  */
 class DecouplingTest {
 

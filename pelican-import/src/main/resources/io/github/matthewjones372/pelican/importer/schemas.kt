@@ -1,15 +1,13 @@
 /**
  * The payload schemas, exactly as the document declared them.
  *
- * Handed to `ApiSpec` in place of a codec's schema source, which is what lets
- * an imported description publish the document it was imported from — and lets
- * a client be generated from it without a JSON library present at all. A codec
- * re-deriving these from the generated Kotlin classes would produce something
- * very close and not the same thing, and the difference would be a document
- * that says something the original did not.
+ * Handed to `ApiSpec` in place of a codec's schema source, so an imported
+ * description publishes the document it came from and a client can be generated
+ * with no JSON library present. A codec re-deriving these from the generated
+ * classes would produce something very close and not the same.
  *
- * Pass a codec's own source instead — `%SPEC%(JacksonCodecs)` — where the
- * *classes* are the source of truth: a service that has since edited them.
+ * Pass a codec's own source — `%SPEC%(JacksonCodecs)` — where the classes are
+ * the source of truth instead.
  */
 object %NAME% : SchemaSource {
 

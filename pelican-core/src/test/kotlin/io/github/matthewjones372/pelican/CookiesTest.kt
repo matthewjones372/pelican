@@ -9,10 +9,6 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
-/**
- * The `Cookie` header, read and written in core so that the three backends
- * cannot come to different conclusions about the same request.
- */
 class CookiesTest {
 
     @Test

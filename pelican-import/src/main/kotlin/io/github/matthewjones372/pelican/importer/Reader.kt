@@ -7,14 +7,6 @@ import java.io.File
 
 /**
  * A document, read as endpoint descriptions.
- *
- * The version differences are gone before this starts: [Swagger2] turns a 2.0
- * document into a 3.x one and [normaliseSchemas] turns 3.0's spelling of
- * nullability into 3.1's, so what is read here is one shape. What is left is
- * the mapping proper, and its only interesting decision is what to refuse.
- *
- * Refusing is per operation and it is recorded rather than thrown, so one run
- * reports every operation that cannot be described. See [Problems].
  */
 internal class Reader(private val options: ImportOptions) {
 
@@ -75,11 +67,6 @@ internal class Reader(private val options: ImportOptions) {
 
     /**
      * One operation as a description, or null with the reason recorded.
-     *
-     * Recorded rather than thrown so that one run reports every operation that
-     * could not be described — see [Problems]. Shared by the two passes because
-     * the refusals are the same refusals: a webhook is read by the same reader
-     * that reads a route, which is the whole reason it can be imported at all.
      */
     private fun describe(operation: Operation): IrEndpoint? = try {
         endpoint(operation)
@@ -90,17 +77,6 @@ internal class Reader(private val options: ImportOptions) {
 
     /**
      * The named schemas the imported endpoints actually reach, checked.
-     *
-     * Only the ones reached: a document's `components` is a library, and a
-     * type nobody uses is not worth failing an import over — nor worth
-     * generating a Kotlin class for. Excluding an operation therefore excludes
-     * the schemas only it used, which is what makes the exclude list a way
-     * through a document with one unmodellable corner.
-     *
-     * Reached and unmodellable is a different matter, and it fails the import
-     * outright rather than per operation: a `oneOf` under `Order` is not one
-     * operation's problem, and no list of operations to leave out would be the
-     * honest answer to it.
      */
     private fun used(endpoints: List<IrEndpoint>, declared: JsonObj): JsonObj {
         val reachable = Schemas.reachable(endpoints.flatMap { it.schemas() }, declared)
@@ -134,16 +110,9 @@ internal class Reader(private val options: ImportOptions) {
     private fun servers(): List<String> = serverUrls(document, "servers")
 
     /**
-     * A `servers` list, wherever it sits: the document's, or one operation's.
-     *
-     * One reading for both, because they are the same list in the same shape —
-     * a second one would be somewhere for the two to come to disagree about
-     * what a templated URL means. [where] is what a failure calls it.
-     *
-     * A variable with no default fails the import outright rather than being
-     * recorded against the operation, wherever the list sits. It is a document
-     * that does not say what its own URL is, and leaving out the operation
-     * would not make the remaining ones any better described.
+     * A `servers` list, wherever it sits. One reading for both, or the two
+     * would come to disagree about what a templated URL means. [where] is what
+     * a failure calls it.
      */
     private fun serverUrls(node: JsonObj, where: String): List<String> =
         node.arr("servers").mapIndexedNotNull { i, server ->
@@ -160,13 +129,9 @@ internal class Reader(private val options: ImportOptions) {
         }
 
     /**
-     * The schemes something actually requires.
-     *
-     * A document's `securitySchemes` is a list of what is available, and a
-     * scheme nothing points at does not reach the document Pelican writes back
-     * out — core collects those from the requirements, so that a scheme cannot
-     * be declared and left unused. Emitting the unused ones here would put a
-     * value in the generated file whose only effect is to be unused.
+     * The schemes something actually requires. `securitySchemes` lists what is
+     * available, and core collects the published ones from the requirements —
+     * so emitting the unused ones would only put unused values in the file.
      */
     private fun schemes(required: List<IrRequirement>): List<IrScheme> {
         val declared = document.obj("components")?.obj("securitySchemes")
@@ -226,18 +191,6 @@ internal class Reader(private val options: ImportOptions) {
 
     /**
      * Every operation in the document, named and in document order.
-     *
-     * The name is the `operationId` and it is required here, unlike in the
-     * document. Pelican names the generated value, the generated client's
-     * method and the handler stub after it; deriving one from the method and
-     * the path instead would produce `getOrdersByOrderIdItems`, and would
-     * rename half the generated file the day somebody reorganises a route.
-     *
-     * One pass over both sections, because that requirement is about the
-     * document as a whole: a webhook and a route are two values in one
-     * generated file, so an id shared between them is a clash whichever section
-     * each sits in. Everything else about a webhook is a Path Item Object,
-     * which is why the same reader reads both.
      */
     private fun operations(): Found {
         val naming = Naming()
@@ -356,16 +309,10 @@ internal class Reader(private val options: ImportOptions) {
     /**
      * What a webhook may say that a route may, and does not mean here.
      *
-     * `servers` on a webhook is the one worth spelling out. OpenAPI is silent
-     * on what it would mean — a webhook is sent to a URL a subscriber
-     * registered out of band, and this document has never seen it — so reading
-     * it as a destination would be inventing a rule, and dropping it would be
-     * the silent weakening this importer refuses everywhere else. It is recorded
-     * per operation, so `exclude` is the way past it.
-     *
-     * A streamed response is refused for the reason core refuses to describe
-     * one: a webhook's response comes back from the subscriber, and nothing on
-     * this side consumes a stream from a subscriber.
+     * OpenAPI is silent on what `servers` would mean on a webhook, whose
+     * destination is a URL this document has never seen — so reading it would
+     * invent a rule and dropping it would be a silent weakening. Recorded per
+     * operation, so `exclude` is the way past.
      */
     private fun checkWebhook(operation: Operation, responses: Responses.Result) {
         if (operation.node.arr("servers").isNotEmpty()) {
@@ -390,14 +337,12 @@ internal class Reader(private val options: ImportOptions) {
     // ---------------------------------------------------------------- shared
 
     /**
-     * Requirements as Pelican reads them: a list of alternatives, each naming
-     * one scheme.
+     * Requirements as Pelican reads them: alternatives, each naming one scheme.
      *
-     * OpenAPI's inner object is an *and* — two schemes, both required — and
-     * there is nothing in an endpoint description that says that. It is rare
-     * enough to be worth refusing rather than approximating: an endpoint
-     * documented as needing either of two credentials, when it needs both, is
-     * a client that fails at runtime with a correct-looking document.
+     * OpenAPI's inner object is an *and*, which no endpoint description says.
+     * Refused rather than approximated: documenting "either credential" for an
+     * endpoint needing both is a client that fails against a correct-looking
+     * document.
      */
     fun requirements(entries: List<JsonValue>, path: JsonPath): List<IrRequirement> =
         entries.mapIndexedNotNull { i, entry ->
@@ -424,13 +369,9 @@ internal class Reader(private val options: ImportOptions) {
         }
 
     /**
-     * Follows a local `$ref` to what it points at.
-     *
-     * Only the ones that are not schemas: a schema reference is a *name*, and
-     * the generated Kotlin is named after it, so those are left standing and
-     * read by the type generator. Everything else — a shared parameter, a
-     * shared response — has no name in the generated source, so it is resolved
-     * here and the rest of the reader never learns it was shared.
+     * Follows a local `$ref`, except to a schema: a schema reference is a name
+     * the generated Kotlin takes, so those are left for the type generator.
+     * Everything else has no name in the source and is resolved here.
      */
     fun deref(node: JsonValue?, path: JsonPath): Pair<JsonObj, JsonPath> {
         var here = node as? JsonObj ?: JsonObj(emptyMap())

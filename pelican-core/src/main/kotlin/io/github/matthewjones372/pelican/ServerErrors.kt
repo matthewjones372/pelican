@@ -3,20 +3,8 @@ package io.github.matthewjones372.pelican
 import java.util.concurrent.CompletionException
 
 /**
- * What one throwable should become on the wire, decided in core so the three
- * backends cannot drift apart about it.
- *
- * The distinction that matters is [unexpected]. A [DecodeFailure] is the
- * caller's mistake and its message is written for them; anything that escapes
- * a handler is *ours*, and its message was written for a log — it may name a
- * table, a host, a file, or a query. So the two are rendered differently:
- *
- *  - expected failures carry their own detail out to the caller, as before;
- *  - an unexpected one carries only a [reference], and the throwable is handed
- *    back for the interpreter to log against that same reference.
- *
- * Which means a 500 now leaves a trace on the server and nothing useful for
- * anyone reading the response. Before this, it was exactly the other way round.
+ * What one throwable becomes on the wire, decided in core so the three backends
+ * cannot drift.
  */
 class RenderedError(
     val error: ApiError,
@@ -28,11 +16,8 @@ class RenderedError(
 )
 
 /**
- * Decides the response for a throwable.
- *
- * [exposeInternalDetail] puts an unexpected throwable's own message back in the
- * body. For a local run or a test fixture; leaving it on in production is how
- * a stack trace ends up in someone else's browser.
+ * Decides the response for a throwable. [exposeInternalDetail] puts an
+ * unexpected message back in the body — for a local run, not production.
  */
 fun renderError(raw: Throwable, exposeInternalDetail: Boolean = false): RenderedError {
     val t = unwrapCompletion(raw)
@@ -53,6 +38,13 @@ fun renderError(raw: Throwable, exposeInternalDetail: Boolean = false): Rendered
 
         is BodyDecodeFailure -> RenderedError(
             ApiError(400, "Malformed request body", t.message),
+            emptyList(),
+            unexpected = null,
+            reference = null,
+        )
+
+        is NotAcceptable -> RenderedError(
+            ApiError(406, "Not acceptable", t.message),
             emptyList(),
             unexpected = null,
             reference = null,

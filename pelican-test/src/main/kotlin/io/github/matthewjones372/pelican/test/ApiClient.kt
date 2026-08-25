@@ -17,76 +17,31 @@ class ApiCallFailed(
 /**
  * A client built out of the endpoint descriptions themselves.
  *
- * ```
- * val app = ordersApi().inMemory()
- *
- * val user: User = app.call(getUser, 1L)
- * val orders: List<Order> = app.collect(streamOrders, In4(1L, 7, null, null))
- * assertEquals(401, app.response(placeOrder, In3(1L, "wrong", CreateOrder("anvil"))).status)
- * ```
- *
- * Two things follow from building the request out of the description rather
- * than out of a string.
- *
- * The first is that it is type-checked: `call(getUser, 1L)` returns `User`
- * because `getUser` is an `Endpoint<Long, User>`, and passing anything but a
- * `Long` does not compile. Rename a path parameter or change an input's type
- * and the *tests* stop compiling, rather than starting to 404.
- *
- * The second is that a passing test is evidence about the documented contract,
- * not just the served one. The path template, the parameter names and the
- * payload types used here are the same values the OpenAPI interpreter reads.
- *
- * The response is decoded with the [Codecs] the API is configured with — the
- * same instance that encoded it — so a green test also proves the codec
- * round-trips.
+ * Two things follow from building a request from the description rather than
+ * from a string. It is type-checked — `call(getUser, 1L)` returns `User`, and
+ * renaming an input stops the tests compiling rather than starting to 404. And
+ * a passing test is evidence about the *documented* contract, since the path
+ * template and payload types are the ones the OpenAPI interpreter reads.
  */
 class ApiClient(
     val transport: Transport,
     val codecs: Codecs,
     /**
      * Which encoding to send where an endpoint declares several — see
-     * [sending]. Null takes the first the endpoint declared, which is what a
-     * generated client does and what every call made before there was anything
-     * to choose between did.
+     * [sending]. Null takes the first declared, as a generated client does.
      */
     val prefers: String? = null,
 ) : AutoCloseable {
 
     /**
-     * The same client, sending a negotiated body as [mediaType]:
-     *
-     * ```
-     * client.sending("application/json").call(placeOrderForm, In2(1L, order))
-     * ```
-     *
-     * A test that asserts the server reads *both* encodings has to be able to
-     * send both, and the alternative was a media type parameter on `call`,
-     * `response` and `request` alike — three signatures widened for the one
-     * endpoint in a suite that declares a choice. A media type this endpoint
-     * did not declare is left to the server to refuse, deliberately: that
-     * refusal is a thing worth asserting on.
+     * The same client, sending a negotiated body as [mediaType]. A client
+     * rather than a parameter on `call`, `response` and `request` alike, which
+     * would widen three signatures for the one endpoint that declares a choice.
      */
     fun sending(mediaType: String): ApiClient = ApiClient(transport, codecs, mediaType)
 
     /**
      * Builds the request an endpoint call would send, without sending it.
-     *
-     * An endpoint's own `servers` is deliberately not read here. A
-     * [RequestSpec] is a method, a path and a body — it names no host, because
-     * the transport is what decides where it goes: an in-memory route table has
-     * no host at all, and a live transport is pointed at the one server the
-     * suite is asserting about. Honouring a per-operation URL would mean this
-     * client leaving that server mid-suite for a host nothing here is running,
-     * which is a worse answer than ignoring a field that is documentation. A
-     * generated client honours it, because a client calling somebody else's
-     * service is the reading that has to.
-     *
-     * A webhook's operation is refused outright rather than merely unhelpful.
-     * It has no path, so this would build `POST /` and assert about a 404 —
-     * and the service under test does not serve webhooks, because nothing
-     * serves them. Sending one is a generated client's job; see
-     * `io.github.matthewjones372.pelican.Webhook`.
      */
     fun <I> request(endpoint: Endpoint<I, *>, input: I): RequestSpec {
         require(endpoint.webhookName == null) {
@@ -110,12 +65,9 @@ class ApiClient(
             }
         }
 
-        // Absent optional inputs are simply not sent, which is what exercises
-        // the server's own defaulting rather than duplicating it here.
+        // Not sent at all, which exercises the server's own defaulting.
         val query = endpoint.queries.flatMap { q -> wire(q.name, q.codec, q.listStyle, values[q]) }
-        // Cookies travel as one header, so they are gathered rather than
-        // mapped one to one — which is also why an absent optional cookie
-        // costs nothing here.
+        // Cookies travel as one header, so they are gathered.
         val cookies = endpoint.cookieParams.flatMap { c -> wire(c.name, c.codec, c.listStyle, values[c]) }
 
         val payload = payload(endpoint, values)
@@ -134,9 +86,7 @@ class ApiClient(
         when (val input = endpoint.bodyInput) {
             null -> Payload(null)
 
-            // Left to the transport, which sends application/json when nothing
-            // says otherwise — the behaviour every suite here was written
-            // against before there was anything else to send.
+            // Left to the transport, which sends application/json by default.
             is JsonBody<*> -> Payload(
                 codecs.codec<Any?>(input.type).encodeToString(
                     values[input] ?: error("No body supplied for $endpoint"),
@@ -152,9 +102,8 @@ class ApiClient(
 
             is MultipartBody -> multipart(endpoint, input, values)
 
-            // The chosen encoding, and the header that says which it was. The
-            // value is looked up under the negotiated key, since that is the
-            // one the endpoint declared and the one a handler reads.
+            // Looked up under the negotiated key, which is what the endpoint
+            // declared and what a handler reads.
             is NegotiatedBody<*> -> {
                 val chosen = input.alternatives.firstOrNull { it.mediaType == prefers }
                     ?: input.alternatives.first()
@@ -177,20 +126,9 @@ class ApiClient(
         }
 
     /**
-     * Writes the envelope by hand, which is the honest amount of work: the
-     * parts are already described, so there is nothing to configure and
-     * nothing to keep in step.
-     *
-     * The order is the description's own `partsInWireOrder`: everything the
-     * server reads as it arrives, and then the streamed part it stops at. A
-     * client that sent them in declaration order would be able to build a
-     * request its own server refuses, which is a worse thing for a test client
-     * to be able to do than a reordering is.
-     *
-     * A part's content is a `String` here, since [RequestSpec] carries a
-     * `String` body. That is the one thing this cannot do: a file part whose
-     * bytes are not text has to go through `transport` directly. It is
-     * documented as a gap rather than hidden behind a lossy encoding.
+     * Writes the envelope by hand. The order is `partsInWireOrder`, not
+     * declaration order, so this client cannot build a request its own server
+     * refuses.
      */
     private fun multipart(
         endpoint: Endpoint<*, *>,
@@ -219,8 +157,8 @@ class ApiClient(
             }
         }
 
-        // A boundary that appears inside a part would end the envelope early,
-        // so it is chosen after the content is known rather than hoped for.
+        // A boundary appearing inside a part would end the envelope early, so
+        // it is chosen once the content is known.
         var boundary = "PelicanBoundary"
         while (sections.any { boundary in it }) boundary += "-"
 
@@ -229,15 +167,8 @@ class ApiClient(
     }
 
     /**
-     * Sends the call and hands back the undecoded response — status, headers,
-     * body — without throwing on a failure status.
-     *
-     * This is the one to reach for whenever the status itself is the subject:
-     *
-     * ```
-     * val response = app.response(getBookmark, 9_999L)
-     * response shouldHaveStatus 404
-     * ```
+     * The undecoded response — status, headers, body — without throwing on a
+     * failure status. The one to reach for when the status is the subject.
      */
     fun <I> response(endpoint: Endpoint<I, *>, input: I): ResponseSpec =
         transport.send(request(endpoint, input))
@@ -256,10 +187,9 @@ class ApiClient(
     }
 
     /**
-     * As [call], for an endpoint that declares alternatives: hands back the
-     * success value and throws [ApiCallFailed] on anything else, so a test
-     * about the happy path reads the same whether alternatives are declared or
-     * not. Use [outcome] when *which* response came back is the subject.
+     * As [call], for an endpoint declaring alternatives, so a happy-path test
+     * reads the same either way. Use [outcome] when *which* response came back
+     * is the subject.
      */
     @JvmName("callFallible")
     @Suppress("UNCHECKED_CAST")
@@ -272,16 +202,9 @@ class ApiClient(
     }
 
     /**
-     * Which declared success this response is, read the only way a caller can
-     * read it: by status. Two 2xx sharing one is refused where the output is
-     * declared, so at most one can match.
-     *
-     * With a single declared success there is nothing to choose, and this
-     * answers with it whatever status arrived — which is what a
-     * single-response endpoint always did, and a change in the status is a
-     * finding for `response(...)` to make rather than a decode that stops
-     * happening. Where there *is* a choice, a 2xx from outside the declared set
-     * is a response nothing could name, so it says so.
+     * Which declared success this is, read the only way a caller can: by
+     * status. Two 2xx sharing one are refused at declaration, so at most one
+     * matches.
      */
     private fun <E, T> chosenSuccess(out: FallibleOutput<E, T>, res: ResponseSpec): Output<out T> =
         out.successes.singleOrNull()
@@ -292,28 +215,9 @@ class ApiClient(
             )
 
     /**
-     * Sends a call to an endpoint that declares its failures, and decodes
-     * whichever of them came back — as the type the endpoint declared, not as
-     * a string to grep:
-     *
-     * ```
-     * when (val result = app.outcome(getUser, 999L)) {
-     *     is Outcome.Ok  -> fail("expected a failure")
-     *     is Outcome.Err -> result.error.error shouldBe "No user 999"
-     * }
-     * ```
-     *
-     * A status the endpoint never declared still throws [ApiCallFailed]: the
-     * point is to assert on the contract, so a response from outside it is a
-     * finding rather than a value to inspect.
-     *
-     * The headers the failure declared come back on it, decoded by their own
-     * codecs:
-     *
-     * ```
-     * val err = app.outcome(placeOrder, input) as Outcome.Err
-     * err[retryAfter] shouldBe 30L
-     * ```
+     * Decodes whichever declared response came back, as the type the endpoint
+     * declared rather than a string to grep. The headers that response declared
+     * come back on it, decoded by their own codecs.
      */
     @Suppress("UNCHECKED_CAST")
     fun <I, E, T> outcome(endpoint: Endpoint<I, Fallible<E, T>>, input: I): Outcome<E, T> {
@@ -323,20 +227,14 @@ class ApiClient(
 
         val declared = out.failures.firstOrNull { it.status == res.status }
         return when {
-            // Built rather than produced by invoking the declaration, which
-            // would apply the server's bargain to the client: a required
-            // header the server left off is a thing a test asserts about the
-            // response, not a reason for the client to throw instead of
-            // handing back the failure that did arrive.
             declared != null -> Outcome.Err(
                 declared,
                 codecs.codec<Any?>(declared.type).decodeFromString(res.body) as E,
                 declared.headers.mapNotNull { h -> res.header(h.name)?.let { h.name to it } },
             )
 
-            // Which success it was travels back on the value, so a test can
-            // assert on the alternative and not merely on the payload — two
-            // successes carrying one type is the case equality cannot settle.
+            // Which success it was travels back on the value, since two
+            // successes carrying one type is what equality cannot settle.
             res.isSuccess -> {
                 val chosen = chosenSuccess(out, res)
                 Outcome.Ok(
@@ -369,12 +267,9 @@ class ApiClient(
         }
 
     /**
-     * Sends a streaming call and collects every element.
-     *
-     * Collecting is the right default for asserting on *content*. It is the
-     * wrong tool for asserting that elements arrive as they are produced —
-     * that needs the elements as they land, which is a backend-shaped
-     * question; see `InMemoryTransport.exchange`.
+     * Sends a streaming call and collects every element — the right default for
+     * asserting on content, and the wrong tool for asserting elements arrive as
+     * produced. See `InMemoryTransport.exchange` for that.
      */
     @Suppress("UNCHECKED_CAST")
     fun <I, T> collect(endpoint: Endpoint<I, StreamOf<T>>, input: I): List<T> {
@@ -385,9 +280,8 @@ class ApiClient(
     }
 
     /**
-     * As [collect], for a stream whose endpoint declares failures. A declared
-     * failure is still a failed call here — reach for [response] or [outcome]
-     * when the error path itself is the subject.
+     * As [collect], where the endpoint declares failures. A declared failure is
+     * still a failed call here; use [response] or [outcome] for the error path.
      */
     @JvmName("collectFallible")
     @Suppress("UNCHECKED_CAST")
@@ -409,15 +303,14 @@ class ApiClient(
             is SseOutput<*> -> res.body.split("\n\n")
                 .filter { it.isNotBlank() }
                 .map { frame ->
-                    // A frame's data may be split across several `data:` lines.
+                    // A frame's data may span several `data:` lines.
                     val data = frame.lineSequence()
                         .filter { it.startsWith("data:") }
                         .joinToString("\n") { it.removePrefix("data:").removePrefix(" ") }
                     decodeElement(out.type, data)
                 }
 
-            // Pekko frames this one, so the whole body is a single JSON array
-            // and the configured codec can decode it as List<T> in one go.
+            // The whole body is one JSON array, so the codec reads List<T>.
             is JsonArrayOutput<*> ->
                 codecs.codec<List<Any?>>(listTypeOf(out.type)).decodeFromString(res.body)
 
@@ -434,15 +327,8 @@ class ApiClient(
 }
 
 /**
- * Decodes a response body as [T] with the client's own codecs.
- *
- * For the payloads a call's declared type does not cover — chiefly error
- * bodies, which is where a test most wants to assert on structure rather than
- * grep a string.
- *
- * ```
- * val error: ApiError = app.decodeBody(app.response(getBookmark, 9999L))
- * ```
+ * Decodes a response body as [T] with the client's own codecs, for payloads a
+ * call's declared type does not cover — chiefly error bodies.
  */
 inline fun <reified T> ApiClient.decodeBody(response: ResponseSpec): T =
     codecs.codec<T>(typeOf<T>()).decodeFromString(response.body)
@@ -454,13 +340,9 @@ class TextBody(val text: String) : ByteStreamHandle
 fun rawText(text: String): ByteStreamHandle = TextBody(text)
 
 /**
- * The occurrences one input puts on the wire: none for an absent optional,
- * one for an ordinary value, and for a list whatever its declared style says —
- * one per element, or one string with separators in it.
- *
- * Written from the declaration rather than from the value's Kotlin type, so a
- * request built here spreads a list exactly the way the document says the
- * server will read it back.
+ * The occurrences one input puts on the wire: none for an absent optional, one
+ * for a value, and for a list whatever its style says. From the declaration
+ * rather than the Kotlin type, so a list is spread as the document says.
  */
 private fun wire(
     name: String,

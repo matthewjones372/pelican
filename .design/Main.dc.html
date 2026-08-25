@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; }
+    a { color: #6aa9c4; } a:hover { color: #8cc3da; }
+    .lbl { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7b8a; }
+    .panel { background: #151a21; border: 1px solid #232a34; border-radius: 4px; }
+  </style>
+</helmet>
+<div style="width: 1120px; height: 940px; background: #0d1117; color: #e8eaed; padding: 52px; box-sizing: border-box; display: flex; flex-direction: column; gap: 30px">
+
+  <div style="display: flex; align-items: flex-start; gap: 36px">
+    <div style="display: flex; flex-direction: column; gap: 9px; flex-grow: 1">
+      <div class="lbl">Pelican &middot; the mark</div>
+      <div style="font-size: 30px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2">Silhouette</div>
+      <div style="font-size: 14.5px; line-height: 1.65; color: #98a3b2; max-width: 660px; text-wrap: pretty">A pelican&#39;s bill in profile: crown and upper mandible above, pouch below, one hairline of space between them. Solid mass rather than line, because a dark README header and a 16px tab strip both punish thin strokes. Two closed paths, one colour, no gradient.</div>
+    </div>
+    <div class="panel" style="display: flex; align-items: center; justify-content: center; padding: 26px 40px">
+      <svg width="164" height="164" viewBox="0 0 64 64" fill="#e8eaed" aria-label="Pelican mark">
+        <path d="M4.5 24.75 A11 11 0 0 1 26.5 22.75 L59.5 28.75 L56.5 32.25 L4.5 28.75 Z"></path>
+        <path d="M10.5 32.25 C11.5 45.75 20.5 51.75 30.5 49.75 C41.5 47.25 50.5 39.75 55.5 34.25 Z"></path>
+      </svg>
+    </div>
+    <div style="display: flex; align-items: center; justify-content: center; padding: 26px 40px; background: #f7f6f3; border: 1px solid #232a34; border-radius: 4px">
+      <svg width="164" height="164" viewBox="0 0 64 64" fill="#14171c" aria-label="Pelican mark on paper">
+        <path d="M4.5 24.75 A11 11 0 0 1 26.5 22.75 L59.5 28.75 L56.5 32.25 L4.5 28.75 Z"></path>
+        <path d="M10.5 32.25 C11.5 45.75 20.5 51.75 30.5 49.75 C41.5 47.25 50.5 39.75 55.5 34.25 Z"></path>
+      </svg>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1.35fr 1fr; gap: 20px">
+
+    <div style="display: flex; flex-direction: column; gap: 11px">
+      <div class="lbl">Size ramp &mdash; 16px is the floor</div>
+      <div class="panel" style="display: flex; align-items: center; justify-content: space-around; gap: 24px; padding: 22px 30px; flex-grow: 1">
+        <sc-for list="{{ramp}}" as="s" hint-placeholder-count="5">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+            <svg width="{{s.px}}" height="{{s.px}}" viewBox="0 0 64 64" fill="#e8eaed">
+              <path d="M4.5 24.75 A11 11 0 0 1 26.5 22.75 L59.5 28.75 L56.5 32.25 L4.5 28.75 Z"></path>
+              <path d="M10.5 32.25 C11.5 45.75 20.5 51.75 30.5 49.75 C41.5 47.25 50.5 39.75 55.5 34.25 Z"></path>
+            </svg>
+            <span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: #7b8794">{{s.px}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 11px">
+      <div class="lbl">Clear space &mdash; one crown radius, all sides</div>
+      <div class="panel" style="display: flex; align-items: center; justify-content: center; padding: 14px">
+        <svg width="248" height="193" viewBox="33 2 77 60" aria-label="Clear space diagram">
+          <rect x="38.5" y="6.5" width="65.5" height="50.5" fill="none" stroke="#3a4553" stroke-width="0.7" stroke-dasharray="3 3"></rect>
+          <rect x="47.8" y="15.8" width="46.8" height="31.8" fill="none" stroke="#4a5666" stroke-width="0.7"></rect>
+          <g transform="translate(44, 5) scale(0.85)" fill="#e8eaed">
+            <path d="M4.5 24.75 A11 11 0 0 1 26.5 22.75 L59.5 28.75 L56.5 32.25 L4.5 28.75 Z"></path>
+            <path d="M10.5 32.25 C11.5 45.75 20.5 51.75 30.5 49.75 C41.5 47.25 50.5 39.75 55.5 34.25 Z"></path>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 11px">
+    <div class="lbl">README header</div>
+    <div class="panel" style="display: flex; align-items: center; gap: 20px; padding: 26px 30px">
+      <svg width="48" height="48" viewBox="0 0 64 64" fill="#e8eaed">
+        <path d="M4.5 24.75 A11 11 0 0 1 26.5 22.75 L59.5 28.75 L56.5 32.25 L4.5 28.75 Z"></path>
+        <path d="M10.5 32.25 C11.5 45.75 20.5 51.75 30.5 49.75 C41.5 47.25 50.5 39.75 55.5 34.25 Z"></path>
+      </svg>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <div style="font-size: 30px; font-weight: 500; letter-spacing: -0.025em; line-height: 1">Pelican</div>
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; color: #7b8794">Type-safe HTTP for Kotlin</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; flex-grow: 1">
+
+    <div style="display: flex; flex-direction: column; gap: 11px">
+      <div class="lbl">Files, in docs/assets</div>
+      <div class="panel" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 9px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; color: #98a3b2">
+        <sc-for list="{{files}}" as="f" hint-placeholder-count="6">
+          <div style="display: flex; gap: 14px">
+            <span style="color: #d3d9e0; width: 176px; flex-shrink: 0">{{f.name}}</span>
+            <span style="color: #6f7b8a">{{f.note}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 11px">
+      <div class="lbl">Don&#39;t</div>
+      <div class="panel" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 9px; font-size: 13px; line-height: 1.5; color: #98a3b2">
+        <sc-for list="{{donts}}" as="d" hint-placeholder-count="4">
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#5c6673" stroke-width="1.6" stroke-linecap="round" style="flex-shrink: 0; margin-top: 3px"><path d="M4 4 L12 12 M12 4 L4 12"></path></svg>
+            <span>{{d}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      ramp: [64, 48, 32, 24, 16].map((px) => ({ px })),
+      files: [
+        { name: 'pelican-mark.svg', note: 'currentColor — inherits text colour' },
+        { name: 'pelican-mark-light.svg', note: 'ink, for light backgrounds' },
+        { name: 'pelican-mark-dark.svg', note: 'paper, for dark backgrounds' },
+        { name: 'favicon.svg', note: 'switches on prefers-color-scheme' },
+        { name: 'favicon-32.png', note: 'tab icon fallback' },
+        { name: 'favicon-180.png', note: 'apple-touch-icon' },
+      ],
+      donts: [
+        'Close the gap between mandible and pouch — it is the whole read.',
+        'Add an eye. The mark is a bill, not a face.',
+        'Outline it or apply a stroke; it is solid mass by design.',
+        'Rotate, shear, or set it below 16px.',
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

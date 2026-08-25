@@ -1,26 +1,16 @@
 package io.github.matthewjones372.pelican.http4k
 
 import io.github.matthewjones372.pelican.BodyCodec
+import io.github.matthewjones372.pelican.SseOutput
 import java.io.InputStream
+import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
 
 /**
- * A stream over frames that are produced as they are asked for.
- *
- * This is what makes a streaming endpoint stream on a server-as-a-function.
- * The server writes the response by copying this stream to the socket, and a
- * copy loop reads before it writes — so one `read` pulls exactly one element
- * from the handler's sequence, encodes it, and hands those bytes over. Nothing
- * downstream ever sees the second element until the first has been written.
- *
- * [read] deliberately returns one frame at a time even when the caller offered
- * a larger buffer. Filling the buffer would mean pulling elements the caller
- * has not asked for yet, which is precisely the buffering a streamed endpoint
- * exists to avoid.
- *
- * How promptly those bytes then leave the machine is the server backend's
- * business: a backend that aggregates small writes will hold a frame until its
- * own buffer fills. That is the one part of streaming this module cannot
- * decide — see the note in `Server.kt`.
+ * A stream over frames produced as they are asked for, which is what makes a
+ * streaming endpoint stream on a server-as-a-function: the copy loop reads
+ * before it writes, so one `read` pulls exactly one element.
  */
 internal class FrameInputStream(frames: Sequence<String>) : InputStream() {
     private val iterator = frames.iterator()
@@ -50,17 +40,85 @@ internal class FrameInputStream(frames: Sequence<String>) : InputStream() {
     }
 
     override fun available(): Int = current.size - position
+
+    /**
+     * The server closes the body once written, or once writing fails — see
+     * `respondWith`. That is the only signal a keep-alive's producer thread
+     * gets that the client has gone.
+     */
+    override fun close() {
+        (iterator as? AutoCloseable)?.close()
+    }
 }
 
 /**
- * Frames a stream of documents as one JSON array.
- *
- * Unlike NDJSON and SSE, core does not frame this one — the separators are the
- * backend's business, because Pekko already has `EntityStreamingSupport.json()`
- * and reimplementing it there would be worse. http4k has no equivalent, so the
- * commas are put in here: the opening bracket travels with the first element
- * rather than ahead of it, so an empty stream still renders `[]` and a failure
- * to produce the first element has not yet committed to an array.
+ * Injects an SSE comment down a stream that has gone quiet. Idle rather than
+ * periodic, matching `Source.keepAlive` — a busy stream sends nothing extra.
+ */
+internal fun Sequence<String>.withKeepAlive(interval: Duration?): Sequence<String> =
+    if (interval == null) this else Sequence { KeepAliveIterator(iterator(), interval) }
+
+/** The upstream sequence ended. */
+private object End
+
+/** The upstream sequence threw; [cause] is carried across to the reader's thread. */
+private class Failed(val cause: Throwable)
+
+/**
+ * Hands elements across from the thread walking the sequence, filling the
+ * silence when it has nothing yet.
+ */
+private class KeepAliveIterator(
+    upstream: Iterator<String>,
+    private val interval: Duration,
+) : AbstractIterator<String>(), AutoCloseable {
+
+    private val handoff = SynchronousQueue<Any>()
+
+    private val producer = Thread(
+        {
+            try {
+                while (upstream.hasNext()) handoff.put(upstream.next())
+                handoff.put(End)
+            } catch (ignored: InterruptedException) {
+                // Closed by the reader. There is nobody left to hand anything to.
+            } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
+                // Everything, because this is a thread boundary: a producer
+                // that died silently would leave the reader sending keep-alives
+                // down a stream that has already failed.
+                try {
+                    handoff.put(Failed(t))
+                } catch (ignored: InterruptedException) {
+                    // As above: the reader gave up before it could be told.
+                }
+            }
+        },
+        "pelican-sse-keepalive",
+    ).apply {
+        isDaemon = true
+        start()
+    }
+
+    override fun computeNext() {
+        when (val taken = handoff.poll(interval.inWholeMilliseconds, TimeUnit.MILLISECONDS)) {
+            null -> setNext(SseOutput.KEEP_ALIVE_FRAME)
+            End -> done()
+            is Failed -> throw taken.cause
+            else -> setNext(taken as String)
+        }
+    }
+
+    /** Wakes the producing thread out of `put` so it can end. */
+    override fun close() {
+        producer.interrupt()
+    }
+}
+
+/**
+ * Frames a stream of documents as one JSON array, which core leaves to the
+ * backend. The opening bracket travels with the first element rather than
+ * ahead of it, so an empty stream renders `[]` and a first-element failure has
+ * not yet committed to an array.
  */
 internal fun jsonArrayFrames(
     elements: Sequence<Any?>,

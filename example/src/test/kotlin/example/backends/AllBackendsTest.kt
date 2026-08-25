@@ -52,11 +52,6 @@ import java.io.ByteArrayInputStream
 class AllBackendsTest {
 
     companion object {
-        /**
-         * Every backend, started once on an OS-chosen port and shared by every
-         * invocation below. Three servers is three actor systems / engines, so
-         * starting them per test would dominate the run for no extra evidence.
-         */
         private val running: Map<String, Running> =
             allBackends.associate { it.name to it.start(port = 0) }
 
@@ -179,13 +174,6 @@ class AllBackendsTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `every backend answers at the URLs the descriptions publish`(name: String, client: ApiClient) {
-        // Every other test here builds its request from the description the
-        // backend also routes on, so the two agree by construction: rename
-        // `"hello"` to `"greetings"` and all of them stay green while every
-        // caller already deployed against `/hello/ada` starts getting a 404.
-        //
-        // These literals are the only thing in the suite that does not move
-        // when a description does. They are the URL a caller was given.
         val greeting = client.request(greet, In2("ada", false))
 
         greeting shouldBuild "GET /hello/ada?shout=false"
@@ -222,12 +210,6 @@ class AllBackendsTest {
 
     // --------------------------------------------- a failure that carries a header
 
-    /**
-     * The 429 `echo` declares carries a payload *and* a `Retry-After`, and both
-     * halves have to survive every backend: the body is written by the
-     * configured codec as the declared type, and the header goes on that same
-     * response.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a declared failure carries its payload and its header`(name: String, client: ApiClient) {
@@ -239,12 +221,6 @@ class AllBackendsTest {
         res.body shouldContain "Slow down"
     }
 
-    /**
-     * And read back through the descriptions rather than off the wire: the
-     * failure is the one the endpoint declared, and its header comes back as
-     * the `Long` the declaration says it is rather than as the string it
-     * travelled as.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `and hands the header back typed, on the failure itself`(name: String, client: ApiClient) {
@@ -254,11 +230,6 @@ class AllBackendsTest {
         (refused as Outcome.Err)[retryAfter] shouldBe 5L
     }
 
-    /**
-     * The reason the header is declared on the failure rather than with
-     * `emits(...)`: it belongs to the 429 and to nothing else, so the success
-     * the same handler produces cannot carry it.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a header declared on a failure is absent from the success`(name: String, client: ApiClient) {
@@ -270,12 +241,6 @@ class AllBackendsTest {
 
     // --------------------------------------------- an endpoint that answers two ways
 
-    /**
-     * `remember` declares `200 Greeting` beside `201 Greeting`. Both carry the
-     * same payload type, so nothing in the value says which response it is —
-     * the handler names one, and every backend has to answer with that status
-     * rather than with the endpoint's first.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `each declared success gets its own status`(name: String, client: ApiClient) {
@@ -283,10 +248,6 @@ class AllBackendsTest {
         client.response(remember, In2("zoe", Note("Hello, zoe!"))) shouldHaveStatus 201
     }
 
-    /**
-     * And the header declared on the 201 goes on the 201 — the same bargain
-     * the 429's `Retry-After` makes, on the success side.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a header declared on one success is absent from the other`(name: String, client: ApiClient) {
@@ -296,10 +257,6 @@ class AllBackendsTest {
         withClue(known.headers.toString()) { known.header("Location").shouldBeNull() }
     }
 
-    /**
-     * `emits(...)` is still the endpoint's own list, so the filter's
-     * `X-Request-Id` reaches both responses while the `Location` reaches one.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `the endpoint's own header still reaches every response`(name: String, client: ApiClient) {
@@ -308,11 +265,6 @@ class AllBackendsTest {
         }
     }
 
-    /**
-     * Read back through the descriptions rather than off the wire: which
-     * response arrived is the declaration the handler named, not the status
-     * as a number and not the payload, which is identical either way.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `and which success it was comes back typed`(name: String, client: ApiClient) {
@@ -336,13 +288,6 @@ class AllBackendsTest {
         withClue(document.take(300)) { document shouldContain "\"operationId\": \"greet\"" }
         withClue(document.take(300)) { document shouldContain "\"/hello/{name}\"" }
     }
-
-    /**
-     * The failure's header, in the document, on the response that carries it —
-     * published from the same declaration the handler supplied the value
-     * through, so the 429 a caller reads about and the 429 it gets are
-     * describing one another.
-     */
 
     /**
      * Both 2xx published, each with its own schema and its own headers — which
@@ -370,8 +315,6 @@ class AllBackendsTest {
         header["required"]!!.jsonPrimitive.content.toBoolean() shouldBe true
         header["schema"]!!.jsonObject["format"]!!.jsonPrimitive.content shouldBe "int64"
 
-        // With a body beside it, which is the pair that used to have no
-        // description at all.
         responses["429"]!!.jsonObject["content"]!!.jsonObject.keys shouldBe setOf("application/json")
 
         withClue("Retry-After leaked onto the success response") {
@@ -381,17 +324,6 @@ class AllBackendsTest {
 
     // --------------------------------------------------- served from elsewhere
 
-    /**
-     * `uploadFile` says it is served from an upload host, and every backend
-     * serves it here anyway.
-     *
-     * That is the claim worth testing on all three at once, because it is the
-     * one a future change could quietly break: a description that could move a
-     * route to another host would be a description deciding where a request
-     * lands. The document publishes the URL and a generated client calls it;
-     * the router does not read it, and this suite would go red on every backend
-     * the day one started to.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `an endpoint served from elsewhere is still routed here`(name: String, client: ApiClient) {
@@ -406,16 +338,6 @@ class AllBackendsTest {
 
     // ---------------------------------------------------------- and not routed
 
-    /**
-     * The webhook, on the three servers that must never answer it.
-     *
-     * `greetingRecorded` is a call this service *sends*, so it has no path —
-     * and the only URL a pathless description could be served at is `/`. All
-     * three interpreters build their routes from `Api.endpoints` and a webhook
-     * is not in that list, so all three 404. Asserted rather than reasoned
-     * about: this is the claim the whole design rests on, and it is one that
-     * would fail quietly.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a webhook is not routed by any backend`(name: String, client: ApiClient) {
@@ -444,12 +366,6 @@ class AllBackendsTest {
 
     // ------------------------------------------------------------- and together
 
-    /**
-     * The tests above assert each backend matches the description. This one
-     * asserts they match *each other*, byte for byte — the claim that would
-     * still be worth checking even if every description-level assertion above
-     * were somehow satisfied three different ways.
-     */
     @Test
     fun `all three answer identically, and generate the identical document`() {
         val bodies = clients.mapValues { (_, client) ->

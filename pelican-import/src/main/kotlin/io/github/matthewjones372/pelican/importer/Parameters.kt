@@ -8,16 +8,6 @@ import io.github.matthewjones372.pelican.defaultStyleAt
 
 /**
  * The inputs that travel outside the body.
- *
- * Two lists become one: the path item's parameters apply to every operation on
- * it, and the operation's own list overrides them by name and location, which
- * is what OpenAPI says and what a reader of the document would assume.
- *
- * A parameter here is one value or a list of them, and in either case each
- * value is one string on the wire decoded into one Kotlin value. What is
- * refused is what has no such reading: a parameter that is an object, a list
- * of objects, or a whole JSON document under `content` — the generated handler
- * would have to take something the endpoint never decoded.
  */
 internal class Parameters(private val reader: Reader, private val operation: Operation) {
 
@@ -85,13 +75,10 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
     }
 
     /**
-     * How the document says this parameter's values reach the wire, as the
-     * style Pelican describes — or null where it carries one value.
-     *
-     * `style` and `explode` are only ever about where the boundaries between
-     * several values are, so a parameter whose schema has no parts and which
-     * sets either of them is saying something it cannot mean, and is refused
-     * rather than read as the default it contradicts.
+     * How this parameter's values reach the wire, or null where it carries one.
+     * `style` and `explode` are only about boundaries between several values,
+     * so a single-valued parameter setting either is refused rather than read
+     * as the default it contradicts.
      */
     private fun serialisation(
         param: JsonObj,
@@ -122,14 +109,9 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
     }
 
     /**
-     * The four encodings a list of values has an honest reading as, and the
-     * refusals for the combinations that do not.
-     *
-     * The ones refused here are not gaps: `deepObject` describes an object
-     * spread over several names rather than a list, and the others are a
-     * keyword contradicting the one beside it. Reading either as its nearest
-     * neighbour would publish a document back that no longer said what this
-     * one said.
+     * The four encodings a list has an honest reading as. The refusals are not
+     * gaps: `deepObject` describes an object spread over several names, and the
+     * others are a keyword contradicting the one beside it.
      */
     @Suppress("CyclomaticComplexMethod") // One branch per (location, style, explode) reading; the list is the rule.
     private fun listStyle(
@@ -199,11 +181,6 @@ internal class Parameters(private val reader: Reader, private val operation: Ope
 
     /** What one element of a list parameter is, which is where its codec comes from. */
     private fun itemSchema(schema: JsonObj, name: String, path: JsonPath): JsonObj {
-        // A refinement in Pelican narrows what one value decodes to, and there
-        // is nothing it can say about how many of them arrived. `minItems: 1`
-        // would therefore be written into the document again and enforced by
-        // nobody, which is the silent weakening a strict import exists to
-        // rule out. Required already says "at least one" and is enforced.
         val unenforceable = schema.fields.keys - listKeywords
         if (unenforceable.isNotEmpty()) {
             unsupported(

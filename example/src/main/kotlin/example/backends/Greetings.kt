@@ -33,7 +33,7 @@ import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.textPart
 import io.github.matthewjones372.pelican.webhook
 
-/*
+/**
  * One description, three servers.
  *
  * This file imports `io.github.matthewjones372.pelican` and nothing else — no Pekko, no http4k, no
@@ -41,9 +41,6 @@ import io.github.matthewjones372.pelican.webhook
  * `OnPekko.kt`, `OnHttp4k.kt` and `OnKtor.kt` bind *these same values* to
  * handlers, and neither the endpoints below nor the OpenAPI document generated
  * from them knows which server ends up serving them.
- *
- * The larger orders example does the same thing at scale; this one is small
- * enough to read end to end.
  */
 
 data class Greeting(val greeting: String, val language: String)
@@ -85,15 +82,10 @@ val note = jsonBody<Note>(description = "Anything worth saying twice")
 val locale = cookieParam<String>("locale", description = "Which language to answer in").default("en")
 val session = cookieParam<String>("session", description = "An opaque session id").optional()
 
-/*
+/**
  * Four inputs carrying several values each, one per encoding OpenAPI can
  * describe — and the point of them being here is that the three interpreters
  * below read all four without any of them saying so.
- *
- * Each is optional, so an absent one arrives as `null` rather than as an empty
- * list. That distinction is the reason the modifier exists: `?tag=` carries no
- * element, so a list is never empty on the wire, and reading absence as empty
- * would leave "filtered by nothing" and "did not filter" spelled the same way.
  */
 val tags = queryParam<String>("tag", description = "Only entries with these tags").repeated().optional()
 val ids = queryParam("id", LongCodec.positive(), description = "Only these ids").commaSeparated().optional()
@@ -106,34 +98,12 @@ val seenBefore = cookieParam<String>("seen", description = "Entries this browser
 
 /**
  * The same sign-in, posted either way.
- *
- * A browser with no JavaScript on the page posts a form; the same page's script
- * posts JSON, and both are a `SignIn`. `or` is what says so — one payload, two
- * encodings, and the request's `Content-Type` picks the decode. The form comes
- * first because that is what a client with no way to ask sends, and because the
- * document's order is the answer to "which one?" everywhere else too.
- *
- * A `Content-Type` that is neither is a 415 naming the two that are, which is
- * the one thing a single-encoding body deliberately does not do: with nothing
- * to choose between, the header carries no information and a body that will not
- * decode explains itself better than a refusal to look at it would.
  */
 val credentials = formBody<SignIn>(description = "The sign-in details, as a form or as JSON") or
     jsonBody<SignIn>()
 
 /**
- * An upload: a text field and two files, which is the shape an ordinary upload
- * form has and the shape this library used to refuse.
- *
- * The refusal was sound as far as it went. Reading stops at a streamed part —
- * that is what handing a handler a live window on the request means — so a
- * second file could only ever be reached by holding the first, and holding one
- * silently is exactly what a streaming upload exists not to do.
- *
- * `bufferedFile` says it out loud instead. `maxBytes` has no default, so the
- * memory this endpoint spends on [notes] is written where somebody choosing it
- * has to look at it, and a caller who sends more gets a 413 naming the part.
- * [upload] is unchanged and still streamed, because it is declared last.
+ * An upload: a text field and two files.
  */
 val caption = textPart("caption", StringCodec.nonEmpty(), description = "What to call the file")
 val notes = bufferedFile("notes", maxBytes = 512, contentType = "text/plain", description = "A short note")
@@ -141,23 +111,11 @@ val upload = filePart("file", contentType = "text/plain", description = "The fil
 
 /**
  * A header every endpoint here sends back, declared once like any input.
- *
- * Nothing in a handler sets it — a filter on the `Api` does, for all three
- * endpoints at once (see `greetingsApi`). That is the pairing worth noticing:
- * the *declaration* is what puts it in the document and what permits it to be
- * set, and the *filter* is what sets it everywhere without a handler being
- * asked to remember.
  */
 val requestId = responseHeader<String>("X-Request-Id", description = "Correlates this answer with the server's log")
 
 /**
  * A header belonging to one *failure* rather than to the endpoint.
- *
- * [requestId] above is declared with `emits(...)`, so it is documented on the
- * success response and any handler here may set it. This one is declared on
- * the 429 below and nowhere else: it is documented on that response alone, the
- * handler supplies its value when it returns that failure, and a successful
- * echo therefore cannot carry it.
  */
 val retryAfter = responseHeader<Long>("Retry-After", description = "Seconds to wait before saying it again")
 
@@ -166,11 +124,6 @@ val tooMuch = errorJson<ApiError>(429, "The caller is being asked to slow down",
 
 /**
  * Where a newly remembered greeting lives.
- *
- * Declared on the 201 below and on nothing else, for the same reason
- * [retryAfter] is declared on the 429: a `Location` on the 200 would be
- * pointing at something that was already there, and [requestId]'s `emits(...)`
- * would have permitted exactly that.
  */
 val greetingAt = responseHeader<String>("Location", "Where the remembered greeting lives")
 
@@ -232,15 +185,6 @@ val echo = endpoint(traceId, note) {
 
 /**
  * The endpoint that answers two ways.
- *
- * `newlyLearned or alreadyKnown` is the whole declaration: an
- * `Endpoint<In2<String, Note>, Fallible<Nothing, Greeting>>`, whose binder
- * demands a handler returning an `Outcome` — so a 200 this endpoint never
- * declared does not compile, exactly as an undeclared failure does not.
- *
- * `emits(requestId)` sits beside it and is the endpoint's own header, set by a
- * filter on whichever response comes back. The `Location` belongs to the 201
- * alone. Both readings reach the document, on the responses that carry them.
  */
 val remember = endpoint(name, note) {
     put("greetings" / name)
@@ -278,14 +222,6 @@ val signIn = endpoint(credentials) {
 /**
  * A multipart upload: a text part, a small file held in memory, and a streamed
  * one after it.
- *
- * Also the one endpoint here that says it is served from somewhere else, which
- * is what an upload host usually is. That claim reaches the document and a
- * generated client and stops there: all three servers below route and answer
- * this path exactly as they do the rest, because a server serves what it
- * serves and no description moves a request. Nothing is actually running at
- * `uploads.example.com` — the URL is here to be read, and `AllBackendsTest`
- * asserts that it changes nothing about the serving.
  */
 val uploadFile = endpoint(caption, notes, upload) {
     post("upload")
@@ -323,13 +259,6 @@ val hookSignature = headerParam<String>("X-Signature", description = "HMAC of th
 
 /**
  * The one description here that is not a route.
- *
- * A webhook is the same shape as everything above — a method, a body, a
- * response — pointed the other way: this service *sends* it, to a URL somebody
- * subscribed with, and the response is what that subscriber answers. So there
- * is no path to write and nothing on this side to bind, which is exactly what
- * `AllBackendsTest` holds all three interpreters to: it reaches the document
- * and no server routes it.
  */
 val greetingRecorded = webhook("greetingRecorded") {
     body(note)
@@ -361,11 +290,6 @@ private const val WAIT_SECONDS = 5L
 /**
  * Either the echo or the declared 429, with the `Retry-After` that failure
  * promised.
- *
- * What decides it is the note rather than a counter, deliberately. A real
- * limiter has state, and this suite asks three servers the same question in
- * whatever order the runner feels like — an answer that depended on which one
- * was asked first would be a test of the runner.
  */
 internal fun echoOrRefuse(trace: String?, note: Note): Outcome<ApiError, Echoed> =
     if (note.text == FLOOD) tooMuch(ApiError(429, "Slow down"), retryAfter of WAIT_SECONDS)
@@ -376,15 +300,6 @@ private val known = setOf("ada", "grace")
 
 /**
  * Either of [remember]'s two successes, with the `Location` the 201 promised.
- *
- * What decides it is the name rather than what has been stored, deliberately,
- * and for the reason [echoOrRefuse] gives: three servers answer this suite in
- * whatever order the runner picks, so an answer that depended on which one was
- * asked first would be a test of the runner.
- *
- * Both alternatives carry a `Greeting`, so the value cannot say which response
- * this is — invoking the declaration is what does, and it is what fixes the
- * status on all three backends.
  */
 internal fun rememberGreeting(who: String, note: Note): Outcome<Nothing, Greeting> {
     val greeting = Greeting(note.text, language = "en")
@@ -401,11 +316,6 @@ internal fun sessionOf(form: SignIn) = Session(form.user, form.remember, form.vi
  * holds the whole thing in memory — the stream was handed over unread, so a
  * handler that wanted to copy it to disk a block at a time would say `stream()`
  * here instead and never allocate it.
- *
- * `notes` is the other way round: it was already read, within the bound its
- * declaration named, and the handler is handed the same [UploadedFile] either
- * way. Which is the point — where the bytes are is a decision the description
- * makes, and a handler that stops caring does not have to be rewritten.
  */
 internal fun uploaded(caption: String, notes: UploadedFile, file: UploadedFile) =
     Uploaded(caption, file.filename, file.contentType, file.text(), notes.text())

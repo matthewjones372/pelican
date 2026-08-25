@@ -24,11 +24,6 @@ import kotlin.reflect.KType
  */
 class DecouplingTest {
 
-    /**
-     * A hand-written [SchemaSource], so this module's tests need no codec
-     * module either. Any implementation will do — the interpreter only asks for
-     * a schema and gets back core's own JSON tree.
-     */
     object WidgetSchemas : SchemaSource {
         override fun schema(type: KType, components: SchemaComponents): JsonObj {
             val name = (type.classifier as KClass<*>).simpleName!!

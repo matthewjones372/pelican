@@ -73,12 +73,6 @@ class SeveralResponsesTest {
             "#/components/schemas/Queued"
     }
 
-    /**
-     * `emits(...)` is the endpoint's promise and reaches every success; a
-     * header declared on one response reaches that one. Publishing the
-     * `Location` on the 202 would be describing a header for an order that has
-     * nowhere to live yet.
-     */
     @Test
     fun `a header declared on one response is documented on that response alone`() {
         (submitted / "201" / "headers").keys() shouldBe setOf("X-Request-Id", "Location")

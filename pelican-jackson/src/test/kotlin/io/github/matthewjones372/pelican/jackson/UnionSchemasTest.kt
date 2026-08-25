@@ -133,9 +133,8 @@ class UnionSchemasTest {
      * Jackson follows `@JsonSubTypes` transitively and resolves the *declared*
      * type's type id and no other, so a `PhoneWallet` travels as
      * `kind: "phone"` and nothing on any wire is ever a `Wallet`. Listing
-     * `Wallet` as a branch of `Method` — which is what this used to publish —
-     * put a value in the document that the service never writes and never
-     * accepts.
+     * `Wallet` as a branch of `Method` would document a value the service
+     * neither writes nor accepts.
      */
     @Test
     fun `a hierarchy under a hierarchy is published flat, under the names Jackson selects`() {
@@ -154,14 +153,6 @@ class UnionSchemasTest {
         leaf["allOf"] shouldBe null
     }
 
-    /**
-     * The middle level, described as the payloads it can hold.
-     *
-     * It is not dropped, because a property or a body typed as it would leave a
-     * `$ref` pointing at nothing. What it is *not* is a branch of `Method`: it
-     * is a second reading of the same discriminator over a narrower set, which
-     * is exactly what the Kotlin says.
-     */
     @Test
     fun `the level between is described by the leaves it stands for`() {
         val wallet = schemas(typeOf<Method>())["Wallet"] as JsonObj
@@ -317,13 +308,6 @@ class UnionSchemasTest {
 
     class Under(val b: String) : Middle("")
 
-    /**
-     * A class that is both a payload and a level. Published as it stands it
-     * would be a `oneOf` branch that is itself a `oneOf`, which is the document
-     * shape `pelican-import` refuses on the way back in — so it is refused on
-     * the way out too, rather than written by one half of this repository and
-     * rejected by the other.
-     */
     @Test
     fun `a concrete class that is also a level of the hierarchy is refused`() {
         val failure = shouldThrow<IllegalStateException> { schemas(typeOf<Both>()) }.message.orEmpty()
@@ -349,11 +333,6 @@ class UnionSchemasTest {
 
     // ------------------------------------------------------------- fixtures
 
-    /**
-     * A fresh codecs each time. `JacksonCodecs` remembers every class it has
-     * described, which is the point of it — and a test sharing that memory with
-     * another test would be asserting on what ran before it.
-     */
     private fun schemas(type: KType): JsonObj {
         val registry = SchemaRegistry()
         JacksonCodecs(defaultMapper()).schema(type, registry)

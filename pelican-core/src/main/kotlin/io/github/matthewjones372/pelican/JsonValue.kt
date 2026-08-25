@@ -1,12 +1,9 @@
 package io.github.matthewjones372.pelican
 
 /**
- * A minimal JSON tree.
- *
- * Core needs to *represent* schemas, but it should not have an opinion about
- * which library *produces* JSON — that is exactly the thing being made
- * pluggable. Sixty lines here is the price of `pelican-core` having no
- * third-party dependencies at all.
+ * A minimal JSON tree. Core has to represent schemas without an opinion about
+ * which library produces JSON — that being the pluggable part — and this is
+ * the price of `pelican-core` having no third-party dependencies.
  */
 sealed interface JsonValue {
     fun render(): String = StringBuilder().also { write(it) }.toString()
@@ -103,15 +100,10 @@ fun jsonStrings(values: List<String>): JsonArr = JsonArr(values.map { JsonStr(it
 // ------------------------------------------------------------------- reading
 
 /**
- * Reads a JSON document into the tree above.
- *
- * Deliberately not a general-purpose parser and not offered as one: the
- * configured [Codecs] is what reads request and response bodies, and adding a
- * second JSON library to core would be exactly the coupling this module
- * exists to avoid. This is here because a form body has to be turned into the
- * fields it travels as, and the only description of a value core can get from
- * a `BodyCodec` is the JSON that codec produced — so something has to read it
- * back. See [formCodec].
+ * Reads a JSON document into the tree above. Not a general-purpose parser: the
+ * configured [Codecs] reads bodies. This exists because a form body has to be
+ * turned into its fields, and the only description of a value core gets from a
+ * `BodyCodec` is the JSON it produced. See [formCodec].
  */
 fun parseJson(text: String): JsonValue {
     val reader = JsonReader(text)

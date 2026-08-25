@@ -4,18 +4,9 @@ import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonValue
 
 /**
- * The request body.
- *
- * Several media types are read as several *encodings of one payload* — which
- * is what an endpoint can now say, and the only reading of a content map that
- * survives contact with a handler. `jsonBody<Order>() or formBody<Order>()` is
- * one `Order` arriving two ways, and the request's `Content-Type` picks the
- * decode.
- *
- * What stays refused is a content map whose entries describe *different
- * shapes*. That is a union of payloads wearing a content map: the handler is
- * given one value of one type, and picking one entry here would generate a
- * server that rejects half the callers the document invites.
+ * The request body. Several media types are read as several encodings of one
+ * payload, which is the only reading of a content map that survives contact
+ * with a handler: `Content-Type` picks the decode.
  */
 internal class Bodies(private val reader: Reader, private val operation: Operation) {
 
@@ -59,14 +50,10 @@ internal class Bodies(private val reader: Reader, private val operation: Operati
     }
 
     /**
-     * A body offered under several media types, which is describable in exactly
-     * one case: every entry carries the same schema, so what a `Content-Type`
-     * selects is a decode rather than a payload.
-     *
-     * The entries are compared after normalisation, so a document that spells
-     * one entry `$ref` and the other inline is still one schema — and one that
-     * genuinely describes two shapes is refused here rather than silently
-     * imported as whichever entry came first.
+     * A body offered under several media types, describable in one case only:
+     * every entry carries the same schema. Compared after normalisation, so a
+     * `$ref` and an inline copy are still one schema, and two real shapes are
+     * refused rather than imported as whichever came first.
      */
     private fun negotiated(content: JsonObj, path: JsonPath, description: String?): IrBody {
         val at = path / "content"
@@ -117,25 +104,7 @@ internal class Bodies(private val reader: Reader, private val operation: Operati
     }
 
     /**
-     * A multipart body as its parts, which is how Pelican declares one: the
-     * parts are the inputs, and the envelope holding them is assembled from
-     * the list rather than written down.
-     *
-     * Several file parts used to be refused here, because reading stops at a
-     * streamed part and a second could only be reached by holding the first.
-     * Holding one is now something a description can *say* — `bufferedFile` —
-     * so this decides which parts are held, in two steps.
-     *
-     * A `maxLength` on a file part means it is held, with that bound. That is
-     * what this library's own generator publishes for a `bufferedFile`, so a
-     * document it wrote comes back exactly as it went out, bound included.
-     *
-     * Among the parts left, which is all of them in a document written by
-     * anything else, the *last* is the streamed one and the rest are held with
-     * [DEFAULT_BUFFERED_PART_BYTES]. Last because that is the only position a
-     * streamed part can occupy: everything after it would be read after reading
-     * had stopped. The bound is written into the generated source either way,
-     * since a part that costs memory should not cost it invisibly.
+     * A multipart body as its parts, which is how Pelican declares one.
      */
     private fun parts(schema: JsonObj?, encoding: JsonObj?, path: JsonPath): List<IrPart> {
         val properties = schema?.obj("properties")
@@ -164,33 +133,25 @@ internal class Bodies(private val reader: Reader, private val operation: Operati
             else IrPart.File(it.name, it.contentType, it.required, it.description, DEFAULT_BUFFERED_PART_BYTES)
         }
 
-        // Declared last, because `endpoint(...)` refuses a streamed part with
-        // anything declared after it: reading stops there, so the declaration
-        // would describe an envelope no server could read. A property map has
-        // no order a caller can observe, so this reorders nothing a reader of
-        // the document was relying on.
+        // Last, because `endpoint(...)` refuses anything declared after a
+        // streamed part. A property map has no observable order, so this
+        // reorders nothing a reader was relying on.
         return decided.filterNot { it === streamed } + listOfNotNull(streamed)
     }
 }
 
 /**
- * What a buffered part is read with when the document says nothing: one
- * mebibyte. A number had to be picked, and this one is large enough for the
- * companion files a second part usually is — a thumbnail, a signature, a
- * checksum — and small enough that a document arriving from elsewhere cannot
- * quietly authorise a large allocation per request. It is written into the
- * generated source rather than defaulted there, so raising it is an edit to a
- * line someone can see.
+ * What a buffered part is read with when the document says nothing. Large
+ * enough for the companion files a second part usually is, small enough that a
+ * document from elsewhere cannot authorise a large allocation per request.
+ * Written into the generated source, so raising it is a visible edit.
  */
 internal const val DEFAULT_BUFFERED_PART_BYTES: Long = 1024L * 1024L
 
 /**
  * The one entry of a `content` map, or a refusal naming what else was there.
- *
- * A request body reaches this only when there is a single entry to take: several
- * are read as several encodings of one payload, above. What is left is the
- * response half, where the refusal still stands — a handler produces one value
- * and the endpoint says how it goes out, and nothing here reads `Accept`.
+ * A request body reaches this only with a single entry; the response half is
+ * where the refusal stands, a handler producing one value rendered one way.
  */
 internal fun single(content: JsonObj, path: JsonPath, what: String): Pair<String, JsonValue> {
     val entries = content.entries()
@@ -211,11 +172,9 @@ internal fun single(content: JsonObj, path: JsonPath, what: String): Pair<String
 internal fun String.isJson(): Boolean = this == "application/json" || endsWith("+json")
 
 /**
- * Whether a schema describes opaque bytes rather than a value.
- *
- * Both spellings: 3.1's `contentMediaType`, and 3.0's `format: binary`, which
- * was a format JSON Schema never defined and which the normaliser leaves alone
- * because this is the only place that has to know about it.
+ * Whether a schema describes opaque bytes. Both spellings: 3.1's
+ * `contentMediaType` and 3.0's `format: binary`, which the normaliser leaves
+ * alone because this is the only place that has to know about it.
  */
 internal fun JsonObj.isBinary(): Boolean =
     str("contentMediaType") != null ||

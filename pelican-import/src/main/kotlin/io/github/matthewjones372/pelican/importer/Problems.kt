@@ -2,18 +2,8 @@ package io.github.matthewjones372.pelican.importer
 
 /**
  * What the document says that Pelican cannot describe, collected rather than
- * thrown one at a time.
- *
- * A strict import that stopped at the first problem would be a queue: fix,
- * rerun, wait for the build, find the next one. The decision a reader has to
- * make — which operations to exclude, or what to change in a document they own
- * — is one decision about the whole list, so the whole list is what the failure
- * carries.
- *
- * One problem per operation, not all of them. Once an operation has something
- * in it that cannot be described, the rest of what it says is being read
- * through that, and a second complaint about the same operation is usually the
- * first one again in another position.
+ * thrown one at a time: stopping at the first would make a queue of fix, rerun,
+ * wait, and the decision a reader makes is one decision about the whole list.
  */
 internal class Problems {
 

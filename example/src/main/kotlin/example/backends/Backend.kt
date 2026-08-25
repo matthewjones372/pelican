@@ -13,11 +13,6 @@ import io.github.matthewjones372.pelican.Api
  * on Ktor — and the shape of a server handle: Pekko's `stop()` returns a
  * `CompletionStage`, the other two return nothing. Both differences live behind
  * this interface, and nowhere else in the example.
- *
- * Deliberately thin. It is not an abstraction over HTTP servers in general —
- * anything more would start to hide the differences the example exists to show.
- * A test that wants a backend's own types still reaches for that backend's
- * module directly, as `MethodMismatchTest` does.
  */
 interface Backend {
     /** What the parameterised tests print, and what `Main` labels a server with. */
@@ -25,10 +20,6 @@ interface Backend {
 
     /**
      * The shared endpoint descriptions bound to this backend's handlers.
-     *
-     * Every backend builds it through [greetingsApi], so the codecs, title and
-     * version cannot drift apart between them — which is what lets a test
-     * compare the generated documents byte for byte.
      */
     fun api(): Api
 
@@ -47,10 +38,5 @@ interface Running : AutoCloseable {
 
 /**
  * Every backend the example can run, in one list.
- *
- * A test parameterised over this list gains a backend by adding a line here —
- * and gains it with the same assertions, which is the point: a new interpreter
- * is not "done" because it compiles, it is done when it answers the existing
- * questions the same way.
  */
 val allBackends: List<Backend> = listOf(OnPekko, OnHttp4k, OnKtor)

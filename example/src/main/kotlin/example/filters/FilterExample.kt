@@ -1,14 +1,10 @@
 package example.filters
 
-/*
+/**
  * The README's "Filters" section, verbatim, so the two things it claims are
  * checked by the compiler rather than by the reader: that a filter puts what it
  * worked out somewhere a handler can read, and that the handler reading it did
  * not have to ask again.
- *
- * `:example:runSecured` is the same idea taken to its conclusion — one filter
- * reading `endpoint.security` rather than a hand-written list of who may call
- * what. This file is the smaller version that fits on a page.
  */
 
 import io.github.matthewjones372.pelican.Api

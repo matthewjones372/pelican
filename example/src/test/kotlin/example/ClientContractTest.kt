@@ -150,15 +150,6 @@ abstract class ClientContractTest {
         order.quantity shouldBe 1
     }
 
-    /**
-     * A union body, and the branch the server decoded it to.
-     *
-     * `bank_transfer` is the value on the wire and `BankTransfer` is the class,
-     * and the pair is a fact only the `@JsonSubTypes` annotation holds. Nothing
-     * in this test says the string — the endpoint description does not carry it
-     * either — so what is being checked is that one hierarchy is read the same
-     * way at both ends of the call.
-     */
     @Test
     fun `a union body arrives as the branch its discriminator names`() {
         val receipt = app.call(payOrder, In4(1L, 7L, "let-me-in", BankTransfer("GB33")))
@@ -328,14 +319,6 @@ abstract class ClientContractTest {
 class InMemoryContractTest : ClientContractTest() {
     override fun open(): ApiClient = ordersApi().inMemory("orders-in-memory")
 
-    /**
-     * `collect` flattens a stream, which is the wrong tool for asserting that
-     * elements arrive *as they are produced*. The transport's escape hatch
-     * hands back the response with its entity still unconsumed, so the same
-     * back-pressure assertion a socket test makes works with no socket: the
-     * source is throttled to one element per 100ms, and a buffered response
-     * would deliver the first element at the same moment as the last.
-     */
     @Test
     fun `elements are delivered as produced, not buffered until the end`() {
         val transport = app.transport as InMemoryTransport
@@ -384,20 +367,6 @@ class OverHttpContractTest : ClientContractTest() {
     }
 }
 
-/**
- * The one hole the types leave open, and what the server does about it.
- *
- * A handler must return a failure of the declared *type*, but two endpoints
- * declaring the same payload type can each hand out a failure the other never
- * listed. Nothing at compile time separates them, so the route checks it
- * rather than answering with an undocumented status.
- *
- * It is also the readiest example of an *unexpected* throwable, which makes it
- * the place to hold the line on what one of those tells a caller. The check's
- * own message names the endpoint and the declaration — useful in a log, and
- * nobody else's business — so the response carries a reference instead and the
- * throwable goes to the logger.
- */
 class UndeclaredFailureTest {
 
     private val strayFailure = errorJson<ApiError>(410, "Declared somewhere else entirely")

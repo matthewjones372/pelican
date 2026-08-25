@@ -40,59 +40,29 @@ import kotlin.reflect.KType
  * Interprets endpoint descriptions as Kotlin client source.
  *
  * A fourth reading of the same values, after the route, the document and the
- * typed test client. The test client is for callers who *hold* the
- * descriptions; this is for callers who cannot — a service in another
- * repository, another team, another release cycle. They get a file generated
- * from those descriptions instead: one method per endpoint, its parameters and
- * payloads typed from the same schemas the OpenAPI document publishes.
+ * typed test client. That one is for callers who hold the descriptions; this is
+ * for callers who cannot — another repository, another team — and gives them a
+ * file instead: one method per endpoint, typed from the same schemas the
+ * document publishes.
  *
- * ```
- * ordersSpec().writeKotlinClient(sourceRoot, packageName = "com.example.orders")
- * // -> <sourceRoot>/com/example/orders/OrdersClient.kt
- * ```
+ * [writeKotlinClient] lays out the package directories and writes the file;
+ * this returns the same thing as a string.
  *
- * [writeKotlinClient] is the one to reach for: it lays out the package
- * directories and writes the file. This function is the same thing as a string,
- * for a caller who wants to put it somewhere else.
- *
- * ```kotlin
- * val client = OrdersClient("https://orders.internal", JacksonCodecs)
- *
- * val user: User = client.getUser(1L)
- * client.listOrders(1L, limit = 3).forEach { println(it.item) }   // Streamed<Order>
- *
- * when (val result = client.placeOrder(1L, CreateOrder("anvil"), xApiKey = key)) {
- *     is Outcome.Ok  -> result.value
- *     is Outcome.Err -> when (val failure = result.failure) {     // exhaustive
- *         is PlaceOrderFailure.Unauthorized -> retryWith(freshKey())
- *         is PlaceOrderFailure.NotFound     -> null
- *     }
- * }
- * ```
- *
- * What the generated file needs on its classpath is `pelican-core`, which has
- * no third-party dependencies of its own, and a `Codecs` — `JacksonCodecs` or
- * `KotlinxCodecs`, chosen by the caller in exactly the place a server chooses
- * one. Nothing else: the transport is the JDK's own `HttpClient`.
- *
- * This module depends on `pelican-core` and nothing else either. Payload types
+ * The generated file needs `pelican-core` and a `Codecs` on its classpath, and
+ * nothing else — the transport is the JDK's own `HttpClient`. Payload types
  * come from the [ApiSpec]'s own `SchemaSource`, so the client's types and the
- * document's schemas are the same schemas, not two derivations from the same
- * Kotlin classes.
+ * document's schemas are the same schemas.
  *
  * @param packageName the package the generated file declares.
  * @param clientName the class name; defaults to the title, e.g. `OrdersClient`.
  * @param baseUrl what the client points at when its caller does not say;
- *   defaults to the spec's first server. With neither, the caller must pass one.
- *   An endpoint declaring its own `servers` is called there whatever this says —
- *   that is the document naming the host that answers it, not a default.
+ *   defaults to the spec's first server. An endpoint declaring its own
+ *   `servers` is called there whatever this says.
  * @param includeHidden hidden endpoints are left out, as they are left out of
  *   the document. Generating an internal client is what this switch is for.
- * @param codec which JSON library the payload types are annotated for. It is
- *   the same choice, spelled the same way, that `ImportOptions.codec` makes for
- *   an imported description, and it matters for exactly one shape: a sealed
- *   hierarchy, which neither library can read off the Kotlin alone. A spec with
- *   no union generates the same file either way.
+ * @param codec which JSON library the payload types are annotated for. Matters
+ *   for one shape only — a sealed hierarchy, which neither library can read off
+ *   the Kotlin alone.
  */
 fun ApiSpec.kotlinClient(
     packageName: String,
@@ -103,18 +73,9 @@ fun ApiSpec.kotlinClient(
 ): String = KotlinClientEmitter(this, packageName, clientName, baseUrl.orEmpty(), includeHidden, codec).emit()
 
 /**
- * Writes the client into [sourceRoot], under the directories [packageName]
- * implies, and returns the file it wrote.
- *
- * Point it at a source root and it lands where the compiler already looks:
- *
- * ```
- * ordersSpec().writeKotlinClient(Path("src/main/kotlin"), packageName = "com.example.orders")
- * // -> src/main/kotlin/com/example/orders/OrdersClient.kt
- * ```
- *
- * Directories are created as needed and an existing file is replaced, so a
- * regeneration is the whole update — there is nothing to move afterwards.
+ * Writes the client into [sourceRoot] under the directories [packageName]
+ * implies, and returns the file. Directories are created as needed and an
+ * existing file is replaced, so regenerating is the whole update.
  */
 fun ApiSpec.writeKotlinClient(
     sourceRoot: Path,
@@ -137,13 +98,9 @@ fun ApiSpec.writeKotlinClient(
 /**
  * As above, for callers holding a [File] — Gradle's `layout`, chiefly.
  *
- * This is the one signature the Gradle plugin looks up by name rather than
- * calling, so [codec] is declared as a second arity rather than as a defaulted
- * parameter on the first. A default would compile to one seven-argument method
- * and leave the six-argument one existing nowhere, so a plugin release and a
- * library release would have to arrive together — which is the coupling the
- * reflective lookup exists to avoid. `importEndpoints` is the same bargain,
- * made for the same reason.
+ * The Gradle plugin looks this up by name, so [codec] is a second arity rather
+ * than a defaulted parameter: a default would leave the six-argument method
+ * existing nowhere, forcing plugin and library releases to arrive together.
  */
 fun ApiSpec.writeKotlinClient(
     sourceRoot: File,
@@ -182,13 +139,9 @@ private class KotlinClientEmitter(
     private val endpoints = spec.endpoints.filter { includeHidden || !it.hidden }
 
     /**
-     * The calls this service *sends*, generated as senders on the same class.
-     *
-     * The same reading of the same descriptions: a webhook's method is built by
-     * [method] from the same [call] that builds an endpoint's, because "turn a
-     * description into an outbound HTTP call" is what this generator already
-     * does and a webhook is that description pointed the other way. What differs
-     * is two arguments to `request(...)` — see [call].
+     * The calls this service sends, generated as senders on the same class.
+     * Built by the same [method] and [call] as an endpoint's, since turning a
+     * description into an outbound call is what this generator already does.
      */
     private val webhooks = spec.webhooks.filter { includeHidden || !it.operation.hidden }
     private val components = SchemaRegistry()
@@ -201,9 +154,8 @@ private class KotlinClientEmitter(
     private val codecs = LinkedHashMap<String, String>()
 
     /**
-     * The same, for the form-encoding codecs. Kept apart because a type can be
-     * both a JSON body on one endpoint and a form on another, and the two
-     * codecs read the same type differently.
+     * The same, for form-encoding codecs. Kept apart because a type can be a
+     * JSON body on one endpoint and a form on another.
      */
     private val formCodecs = LinkedHashMap<String, String>()
 
@@ -211,16 +163,15 @@ private class KotlinClientEmitter(
     private val failures = LinkedHashMap<String, String>()
 
     /**
-     * The same, for an endpoint that declares several successful responses.
-     * Kept apart from [failures] because a caller reaches them differently: a
-     * failure arrives on the `Err` side of an `Outcome` and one of these is the
+     * The same, for an endpoint declaring several successes. Apart from
+     * [failures] because a caller reaches them differently: one of these is the
      * value the call produced.
      */
     private val results = LinkedHashMap<String, String>()
 
     fun emit(): String {
-        // Every payload type is resolved first, so the component registry is
-        // complete before any of it is turned into a declaration.
+        // Resolved first, so the registry is complete before any of it becomes
+        // a declaration.
         (endpoints + webhooks.map { it.operation }).forEach { ep ->
             when (val body = ep.bodyInput) {
                 is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> schema(checkNotNull(body.payloadType))
@@ -233,8 +184,8 @@ private class KotlinClientEmitter(
 
         val methods = endpoints.joinToString("\n\n") { method(it) }
         val senders = webhooks.joinToString("\n\n") { method(it.operation) }
-        // Written out before the imports, because an annotation the payload
-        // types turned out to need is an import the file has to declare.
+        // Before the imports: an annotation the payload types needed is an
+        // import the file has to declare.
         val declarations = types.declarations()
 
         return buildString {
@@ -257,9 +208,9 @@ private class KotlinClientEmitter(
                 section(
                     "declared responses",
                     results,
-                    "// One sealed type per endpoint that answers with more than one 2xx, so a\n" +
-                        "// `when` over what the call produced is exhaustive — and so that a 200 and\n" +
-                        "// a 201 carrying the same payload stay two different things to a caller.",
+                    "// One sealed type per endpoint answering with more than one 2xx, so a\n" +
+                        "// `when` over what the call produced is exhaustive and a 200 and a 201\n" +
+                        "// carrying the same payload stay two different things.",
                 ),
             )
             append(
@@ -283,13 +234,10 @@ private class KotlinClientEmitter(
             appendLine()
             appendLine(indent(resource("client-base.kt").trim(), "    "))
 
-            // Written between the base URL and the calls that use it, because
-            // an init block reading a property has to come after it. An empty
-            // base builds a relative URI, which the JDK's request builder
-            // refuses, so it is worth saying at construction rather than at the
-            // first call. Left out where every operation named a server of its
-            // own: there the client's base is never used, and demanding one
-            // would be demanding a URL in order to ignore it.
+            // After the base URL, because an init block reading a property
+            // must follow it. An empty base builds a relative URI, which the
+            // JDK refuses — better said at construction than at the first call.
+            // Left out where every operation named its own server.
             if (endpoints.any { it.servers.isEmpty() }) {
                 appendLine()
                 appendLine(indent(resource("client-base-check.kt").trim(), "    "))
@@ -314,9 +262,9 @@ private class KotlinClientEmitter(
         appendLine(indent(banner("webhooks sent"), "    "))
         appendLine()
         appendLine(
-            "    // One per webhook the document declares: the call this service makes to a\n" +
-                "    // subscriber, rather than one a caller makes to it. The destination is the\n" +
-                "    // first argument because the document does not know it — a subscriber does.",
+            "    // One per webhook the document declares: a call this service makes to a\n" +
+                "    // subscriber. The destination is the first argument because the document\n" +
+                "    // does not know it — a subscriber does.",
         )
         appendLine()
         appendLine(senders)
@@ -338,10 +286,9 @@ private class KotlinClientEmitter(
         // Generated by Pelican from the endpoint descriptions of
         // ${spec.title} ${spec.version}. Do not edit: regenerate.
         //
-        // Every method below is one endpoint value read a fourth way. The path, the
-        // parameter names and the payload types are the ones the server routes and
-        // the OpenAPI document publishes, so this file cannot describe a call the
-        // service does not serve.
+        // Every method below is one endpoint value read a fourth way: the path,
+        // the parameter names and the payload types are the ones the server routes
+        // and the document publishes.
         //
         // Needs pelican-core on the classpath, and a Codecs to read bodies with.
         @file:Suppress("unused", "RedundantVisibilityModifier")
@@ -443,11 +390,9 @@ private class KotlinClientEmitter(
     }.trimEnd()
 
     /**
-     * The declared failures, matched on status before anything else is read.
-     *
-     * Ahead of the success path because a declared failure is not a failed call:
-     * it is one of the answers the endpoint said it gives, and the caller gets
-     * it on the `Err` side rather than as a throw.
+     * The declared failures, matched on status first: a declared failure is not
+     * a failed call but one of the answers the endpoint said it gives, so it
+     * reaches the caller on the `Err` side rather than as a throw.
      */
     private fun declaredFailureBranches(
         ep: Endpoint<*, *>,
@@ -467,11 +412,9 @@ private class KotlinClientEmitter(
     }
 
     /**
-     * Which declared success came back, read the only way a caller can read
-     * it: by status. Two 2xx sharing one is refused where the output is
-     * declared, so at most one branch can match — and a 2xx outside the set
-     * fails the call rather than being taken for the nearest one, because the
-     * endpoint never described it.
+     * Which declared success came back, read the only way a caller can: by
+     * status. Two 2xx sharing one are refused at declaration, so at most one
+     * branch matches; a 2xx outside the set fails the call.
      */
     private fun chosenByStatus(
         ep: Endpoint<*, *>,
@@ -509,12 +452,8 @@ private class KotlinClientEmitter(
 
     /**
      * What the method declares, and the `request(...)` call that fills it in.
-     *
-     * [target] is the parameter holding a webhook's destination, or null for an
-     * endpoint — whose destination is a path this client already knows. It is
-     * carried here because the call is built in one place and read in two: a
-     * failed webhook send names the URL it went to, there being no path worth
-     * naming.
+     * [target] is a webhook's destination parameter, or null for an endpoint.
+     * Carried here because a failed send names the URL it went to.
      */
     private class Call(val parameters: String, val request: String, val target: String? = null)
 

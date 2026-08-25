@@ -9,15 +9,6 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import org.junit.jupiter.api.Test
 
-/**
- * What an assertion on a [ResponseSpec] should say when it fails.
- *
- * `assertEquals(404, res.status)` reports "expected: <404> but was: <500>" and
- * leaves you to go and find the body that would explain why. These print it,
- * because a wrong status is nearly always explained by the payload that came
- * with it — so the body appearing in the message is the behaviour under test,
- * not a detail of it.
- */
 class ResponseAssertionsTest {
 
     private val notFound = ResponseSpec(

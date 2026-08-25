@@ -3,12 +3,9 @@ package io.github.matthewjones372.pelican.test
 import io.github.matthewjones372.pelican.Method
 
 /**
- * One HTTP exchange, described in terms core already owns.
- *
- * No Pekko, no `java.net.http` — which is the point. [ApiClient] builds these
- * from endpoint descriptions and reads the results back, so the transport
- * underneath can be an in-memory route invocation or a real socket without a
- * single assertion changing.
+ * One HTTP exchange, in terms core already owns. No Pekko and no
+ * `java.net.http`, so the transport underneath can be an in-memory route
+ * invocation or a real socket without an assertion changing.
  */
 class RequestSpec(
     val method: Method,
@@ -24,11 +21,9 @@ class RequestSpec(
         else path + "?" + query.joinToString("&") { (k, v) -> "${urlEncode(k)}=${urlEncode(v)}" }
 
     /**
-     * The same request with one query parameter left off.
-     *
-     * The typed form always supplies every declared input — `limit: Int` has
-     * no way to say "absent" — so asserting that the *server* applies its own
-     * default means building the call and then dropping the parameter.
+     * The same request with one query parameter left off. The typed form always
+     * supplies every declared input, so asserting the server's own defaulting
+     * means building the call and then dropping the parameter.
      */
     fun withoutQuery(name: String): RequestSpec =
         RequestSpec(method, path, query.filterNot { it.first == name }, headers, body)
@@ -39,8 +34,7 @@ class RequestSpec(
 
     /**
      * The same request carrying one more header. No description mentions
-     * `Origin`, so a cross-origin call is a described call with the browser's
-     * headers put back on by hand.
+     * `Origin`, so a cross-origin call is a described call plus that header.
      */
     fun withHeader(name: String, value: String): RequestSpec =
         RequestSpec(method, path, query, headers.filterNot { it.first.equals(name, true) } + (name to value), body)
@@ -52,9 +46,8 @@ class RequestSpec(
     fun withMethod(method: Method): RequestSpec = RequestSpec(method, path, query, headers, body)
 
     /**
-     * The same request aimed at a different path. The typed form can only
-     * produce paths that decode, so reaching a 400 or an unrouted 404 means
-     * building a valid call and then breaking it on purpose.
+     * The same request aimed at a different path. The typed form only produces
+     * paths that decode, so a 400 or an unrouted 404 means breaking a valid one.
      */
     fun withPath(path: String): RequestSpec = RequestSpec(method, path, query, headers, body)
 
@@ -82,11 +75,9 @@ class ResponseSpec(
 }
 
 /**
- * Where a [RequestSpec] goes.
- *
- * Deliberately blocking. A test asserts on a result it already has; making the
- * suite thread `CompletionStage` through every assertion would buy nothing and
- * cost readability. Transports that are async underneath join here.
+ * Where a [RequestSpec] goes. Blocking on purpose: a test asserts on a result it
+ * already has, and threading `CompletionStage` through every assertion would buy
+ * nothing. Async transports join here.
  */
 interface Transport {
     fun send(request: RequestSpec): ResponseSpec

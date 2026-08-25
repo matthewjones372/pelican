@@ -4,62 +4,18 @@ import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
 /**
- * Phantom marker for "the handler names which of this endpoint's declared
- * responses it is producing" — one of the successes carrying [T], or one of
- * the failures carrying [E].
- *
- * Like [StreamOf] it has no instances. Its job is to put the declared types
- * into `Endpoint<I, R>` without adding a third type parameter to every
- * signature in the library: an endpoint whose output names alternatives is an
- * `Endpoint<I, Fallible<E, T>>`, and the binders for that shape demand a
- * handler returning [Outcome], so a response the endpoint never declared does
- * not compile.
- *
- * It is still called `Fallible` although failures are now one kind of
- * alternative rather than the only kind. The name is in every published binder
- * signature and in every `Endpoint<I, Fallible<E, T>>` anyone has written down;
- * a rename would have bought a better word for the `E = Nothing` case at the
- * cost of two names for one type forever, and the aliases would have outlived
- * anyone's memory of why there were two.
+ * Phantom marker for "the handler names which declared response it is
+ * producing" — a success carrying [T], or a failure carrying [E].
  */
 class Fallible<E, T> private constructor()
 
 /**
- * What a handler for such an endpoint returns: one of the declared responses,
- * carrying its payload.
- *
- * Build it by invoking the declaration itself — naming the response is what
- * fixes the status, so two responses sharing a payload type stay
- * distinguishable:
- *
- * ```
- * val badKey     = errorJson<ApiError>(401, "Missing or bad API key")
- * val noSuchUser = errorJson<ApiError>(404, "No user with that id")
- *
- * placeOrder handledOrFail { (id, key, req) ->
- *     when {
- *         key != expected        -> badKey(ApiError(401, "Bad API key"))
- *         Store.user(id) == null -> noSuchUser(ApiError(404, "No user $id"))
- *         else                   -> ok(Store.create(id, req))
- *     }
- * }
- * ```
- *
- * The success side works the same way once there is more than one of it:
- * [ok] means the first declared success, and any of them can be named instead
- * by invoking it. See [Output.invoke].
- *
- * A response that declares headers is invoked with their values as well; see
- * [Output.invoke] and [ErrorOutput.invoke].
+ * One of the declared responses, carrying its payload.
  */
 sealed interface Outcome<out E, out T> {
     /**
-     * One of the declared successes.
-     *
-     * [declared] is which one, and null means the first — that is what [ok]
-     * produces, and with a single declared success it is the only one there
-     * is. Naming it is how an endpoint declaring `200 Order` beside
-     * `201 Order` says which of the two this is, since the payload type cannot.
+     * One of the declared successes. [declared] is which; null means the
+     * first, which is what [ok] produces.
      */
     data class Ok<T>(
         val value: T,
@@ -76,46 +32,25 @@ sealed interface Outcome<out E, out T> {
         val declared: ErrorOutput<E>,
         val error: E,
         /**
-         * The headers [declared] carries, already encoded, in the order it
-         * declared them.
-         *
-         * One field, written by [ErrorOutput.invoke] on the way out and filled
-         * from the response on the way back in — so the value a handler sent
-         * and the value a client reads are the same field of the same type,
-         * rather than two readings that could disagree.
+         * The headers [declared] carries, encoded, in declaration order. One
+         * field for both directions, so what a handler sent and what a client
+         * reads cannot disagree.
          */
         val headers: List<Pair<String, String>> = emptyList(),
     ) : Outcome<E, Nothing> {
         /**
-         * One header back, decoded by its own codec:
-         *
-         * ```
-         * val refused = app.outcome(placeOrder, input) as Outcome.Err
-         * refused[retryAfter]        // Long?
-         * ```
-         *
-         * Null when it did not arrive, and equally when it arrived as
-         * something its codec cannot read. Nullable rather than throwing
-         * because this is also what a *client* reads: a server that promised a
-         * header and then left it off, or sent `Retry-After: soon`, is a
-         * finding for the test to make, not a reason to lose the failure that
-         * did arrive.
+         * One header back, decoded by its own codec. Null when it did not
+         * arrive or did not decode — a client reads this too, and a bad header
+         * is a finding for the test, not a reason to lose the failure.
          */
         operator fun <T : Any> get(header: ResponseHeader<T>): T? = headerValue(headers, header)
     }
 }
 
 /**
- * Shared by both sides of an [Outcome], because "read one declared header back
- * off this response" is one question and two readings of it would be two
- * answers.
- *
- * A value that arrived and does not decode is null, not a throw: this is the
- * reading end, and a `Retry-After: soon` loses the response it came on exactly
- * as thoroughly as a `Retry-After` nobody sent. The generated client already
- * parses its headers totally for that reason; a throw here would be core
- * answering the same question differently, and answering it by replacing what
- * the caller was asking about with a fault of the reader's own.
+ * Shared by both sides of an [Outcome]. A value that does not decode is null
+ * rather than a throw: this is the reading end, where losing the response to
+ * report a bad header would replace what the caller asked about.
  */
 @Suppress("UNCHECKED_CAST")
 private fun <T : Any> headerValue(headers: List<Pair<String, String>>, header: ResponseHeader<T>): T? =
@@ -132,31 +67,8 @@ private fun <T : Any> headerValue(headers: List<Pair<String, String>>, header: R
 fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)
 
 /**
- * Which of this output's declared successes an [Outcome.Ok] names, and the one
- * place a success is checked against what it promised on the way out.
- *
- * The three interpreters share it rather than each resolving
- * `declared ?: successes.first()` for itself, because the resolution is where
- * the thing a bare [ok] cannot say becomes visible: it names no response, so it
- * carries no headers, and the response it means may have declared one it always
- * sends. [Output.invoke] refuses a required header left out; `ok` never reached
- * that check, and three copies of this would be three chances for one backend
- * to send a 201 without the `Location` its document promises.
- *
- * Here rather than earlier, and the alternatives are worth naming. Refusing the
- * *declaration* — no success reachable by a bare `ok` may declare a required
- * header — would outlaw `json<Order>(201, location) or empty(202)`, which is
- * the ordinary create-or-accept shape and the one this mechanism exists to make
- * sayable: the declaration is not the mistake, the handler that does not name
- * its response is. Nor could `ok` be withheld where the first success promises
- * a header, since it is a free function handed a payload and never sees the
- * endpoint. So the answer is a loud 500 on the first request down that branch,
- * naming the response and the way out, rather than a quiet 201 forever.
- *
- * An endpoint with one declared success is untouched, which is every endpoint
- * written before there was a second: a header on an endpoint's only response is
- * already refused when the endpoint is built, so there is nothing here to find
- * and `ok(value)` is what it always was.
+ * Which declared success an [Outcome.Ok] names, and the one place a success is
+ * checked against what it promised.
  */
 fun FallibleOutput<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
     val chosen = ok.declared ?: successes.first()
@@ -191,27 +103,16 @@ class HeaderValue internal constructor(
 }
 
 /**
- * Supplies a declared response's header, typed by the header's own declaration:
- * a `Retry-After` declared as a `Long` takes a `Long` and nothing else.
- *
- * An infix pair rather than a `Pair`, because `to` would type the value as
- * `Any` and let `retryAfter to "soon"` compile — which is the whole of what
- * declaring the header was for.
+ * Supplies a declared response's header, typed by its declaration. Infix rather
+ * than `Pair`, because `to` would type the value as `Any` and let
+ * `retryAfter to "soon"` compile.
  */
 infix fun <T : Any> ResponseHeader<T>.of(value: T): HeaderValue = HeaderValue(this, value)
 
 /**
- * The headers one declared response is being sent with, checked against what it
- * declared and encoded in *declaration* order rather than the order this call
- * happened to list them — so two handlers producing the same response put the
- * same bytes on the wire.
- *
- * One function for successes and failures alike. The bargain is identical on
- * both sides, and the day it was written twice is the day a `Location` on a 201
- * would have been checked differently from a `Retry-After` on a 429.
- *
- * [owner] appears in the messages and is the declaration itself, so a refusal
- * names the response rather than the status alone.
+ * The headers a declared response is sent with, checked against what it
+ * declared and encoded in *declaration* order rather than call order, so two
+ * handlers producing the same response put the same bytes on the wire.
  */
 internal fun encodeDeclaredHeaders(
     owner: Any,
@@ -243,47 +144,27 @@ internal fun encodeDeclaredHeaders(
     }
 }
 
-/**
- * One declared failure: a status, a payload type, what it means, and the
- * headers it sends alongside the payload.
- */
+/** One declared failure: a status, a payload type, and the headers it sends. */
 class ErrorOutput<E> @PublishedApi internal constructor(
     val status: Int,
     val type: KType,
     val description: String,
     /**
-     * Declared here rather than with `emits(...)`, which is the *endpoint's*
-     * list: a `Retry-After` named there would be documented on every response
-     * and permitted on every response the endpoint sends, which is exactly how
-     * one ends up on a success nobody meant to throttle.
+     * Declared here rather than with `emits(...)`: a `Retry-After` on the
+     * endpoint's list would be permitted on a success nobody meant to throttle.
      */
     val headers: List<ResponseHeader<*>> = emptyList(),
 ) {
     init {
+        checkStatus("error:$status", status, carriesBody = true)
+
         val clashes = headers.groupBy { it.name.lowercase() }.filterValues { it.size > 1 }.keys
         require(clashes.isEmpty()) { "error:$status declares the header(s) $clashes more than once" }
     }
 
     /**
-     * Produces this failure, with a value for each header it declared:
-     *
-     * ```
-     * val throttled = errorJson<ApiError>(429, "Too many requests", retryAfter)
-     *
-     * throttled(ApiError(429, "Slow down"), retryAfter of 30L)
-     * ```
-     *
-     * A failure declaring no headers is invoked as it always was, with the
-     * payload alone.
-     *
-     * The headers are checked against the declaration: one this failure never
-     * declared, or a required one left out, throws here. That is stricter than
-     * [Params.setHeader], which reports a missing required header rather than
-     * failing on it — and it can be, because the two cases are not alike. A
-     * handler setting headers one at a time is never finished until the
-     * response is built, so nothing can tell mid-handler whether a promise is
-     * broken or merely not kept yet; this call *is* the whole answer, so
-     * everything needed to tell is in hand.
+     * Produces this failure, with a value for each header it declared —
+     * `throttled(ApiError(429, "Slow down"), retryAfter of 30L)`.
      */
     operator fun invoke(error: E, vararg values: HeaderValue): Outcome<E, Nothing> =
         Outcome.Err(this, error, encodeDeclaredHeaders(this, headers, values))
@@ -294,12 +175,8 @@ class ErrorOutput<E> @PublishedApi internal constructor(
 }
 
 /**
- * Declares a failure response carrying [E] as a JSON body, outside an endpoint
- * block so a handler can name it. The same function exists on
- * [EndpointBuilder] for failures declared inline.
- *
- * Any [headers] listed here are documented on that response and are the only
- * ones the failure may be sent with.
+ * Declares a failure carrying [E] as JSON, outside an endpoint block so a
+ * handler can name it. [headers] are the only ones it may be sent with.
  */
 inline fun <reified E> errorJson(
     status: Int,
@@ -310,33 +187,32 @@ inline fun <reified E> errorJson(
 /**
  * The responses one endpoint declares: at least one success, and the failures a
  * handler may return instead.
- *
- * Wrapping rather than replacing keeps every existing output usable as a
- * success — including the streaming ones, so `Fallible<E, StreamOf<T>>` still
- * means "a stream of T, or a failure decided before the first element".
  */
 class FallibleOutput<E, T> internal constructor(
     /** In declaration order. The first is the one a bare [ok] means. */
     val successes: List<Output<out T>>,
     val failures: List<ErrorOutput<E>>,
 ) : Output<Fallible<E, T>>() {
-    /**
-     * The first declared success — what a single-success endpoint has always
-     * had, and what the status, media type and payload type below report.
-     */
+    /** The first declared success, which the three overrides below report. */
     val success: Output<out T> get() = successes.first()
 
     override val status get() = success.status
     override val mediaType get() = success.mediaType
     override val payloadType get() = success.payloadType
 
+    /**
+     * Successes only. Failures are all JSON, and an endpoint whose 200 is
+     * `text/csv` should not be spared a 406 because its 404 was acceptable.
+     */
+    override val produces: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        successes.flatMap { it.produces }.toSet()
+    }
+
     init {
         require(successes.isNotEmpty()) { "An output declares at least one success" }
 
-        // Told apart by status and by nothing else: a client reading a
-        // response has the status and the bytes, and two 2xx sharing a status
-        // is a pair no reader could separate — including this library's own
-        // test client and generated client, which match on it.
+        // A reader has the status and the bytes and nothing else, so two
+        // responses sharing a status are a pair none can separate.
         val clashes = (successes.map { it.status } + failures.map { it.status })
             .groupingBy { it }
             .eachCount()
@@ -347,12 +223,9 @@ class FallibleOutput<E, T> internal constructor(
                 "An endpoint answers one status one way; give them different statuses, or declare one."
         }
 
-        // A streamed alternative would have to be *produced* by naming it, and
-        // producing a stream means handing over the backend's own type — a
-        // Source, a Flow, a Sequence — which core cannot name. The alternative
-        // would be an `invoke` per backend with the element type unchecked,
-        // which is three copies of the one thing the phantom marker exists to
-        // avoid. A stream is still a success; it is just the only one.
+        // Naming a response is what produces it, and producing a stream means
+        // handing over the backend's own type — Source, Flow, Sequence — which
+        // core cannot name. So a stream is a success, but the only one.
         if (successes.size > 1) {
             val streamed = successes.filter { it.streams() }
             require(streamed.isEmpty()) {
@@ -373,16 +246,7 @@ internal fun Output<*>.streams(): Boolean =
     this is NdjsonOutput<*> || this is SseOutput<*> || this is JsonArrayOutput<*> || this is ByteStreamOutput
 
 /**
- * Declares a second successful response beside this one:
- *
- * ```
- * json<Order>(status = 201) or empty(status = 202)
- * ```
- *
- * [T] infers to the two payload types' common supertype, so a sealed hierarchy
- * is the case worth aiming for — a handler's `when` over the result is then
- * exhaustive, and so is a caller's. With unrelated types it is `Any`, and the
- * statuses are still what tell the responses apart on the wire.
+ * Declares a second successful response — `json<Order>(201) or empty(202)`.
  */
 infix fun <T> Output<out T>.or(other: Output<out T>): FallibleOutput<Nothing, T> =
     responses(listOf(this, other), emptyList())
@@ -392,13 +256,10 @@ fun <T> Output<out T>.or(vararg others: Output<out T>): FallibleOutput<Nothing, 
     responses(listOf(this) + others, emptyList())
 
 /**
- * Another success on an output that already names alternatives, so `a or b or c`
- * keeps the payload type the first two agreed on.
- *
- * The receiver is the more specific of the two `or`s, so Kotlin picks this one
- * whenever the third response's payload still fits — and where it does not,
- * the general one above takes over and [T] widens to what they have in common.
- * Either way the alternatives end up in one list; see [responses].
+ * Another success on an output that already names alternatives, keeping the
+ * payload type the first two agreed on. The more specific receiver, so Kotlin
+ * picks it while the third payload fits and widens through the one above when
+ * it does not.
  */
 infix fun <E, T> FallibleOutput<E, T>.or(other: Output<out T>): FallibleOutput<E, T> =
     responses(listOf(this, other), emptyList())
@@ -408,21 +269,17 @@ infix fun <E, T> Output<T>.orFail(failure: ErrorOutput<E>): FallibleOutput<E, T>
     orFailAll(listOf(this), listOf(failure))
 
 /**
- * Declares the failures this output's handler may return instead. With several
- * payload types, [E] infers to their common supertype — a sealed hierarchy of
- * problems being the case worth aiming for, since the handler's `when` over it
- * is then exhaustive.
+ * Declares the failures this output's handler may return instead. [E] infers to
+ * their common supertype, so a sealed hierarchy makes the handler's `when`
+ * exhaustive.
  */
 fun <E, T> Output<T>.orFail(vararg failures: ErrorOutput<out E>): FallibleOutput<E, T> =
     orFailAll(listOf(this), failures.toList())
 
 /**
- * The same, on an output that already declares several successes:
- * `created or accepted orFail badKey`.
- *
- * Only on one that has no failures yet — `Nothing` is what [or] produces and
- * what nothing else does — so declaring failures stays a single statement and
- * [responses] still has something to refuse.
+ * The same, on an output already declaring several successes. Only where it has
+ * no failures yet (`Nothing` is what [or] produces), so declaring failures stays
+ * one statement.
  */
 infix fun <E, T> FallibleOutput<Nothing, T>.orFail(failure: ErrorOutput<E>): FallibleOutput<E, T> =
     orFailAll(listOf(this), listOf(failure))
@@ -442,14 +299,6 @@ private fun <E, T> orFailAll(
 
 /**
  * The one place a list of declared responses is assembled.
- *
- * An output that already names alternatives is spliced rather than kept: `or`
- * picks the chaining overload only while the payload types line up, and a
- * `FallibleOutput` nested inside another would be a "response" whose payload is
- * a phantom marker — rendered by nothing, documented as nothing, and reached by
- * a handler that thought it had named the third alternative. Splicing makes the
- * two readings of `a or b or c` the same list, which is what a reader assumes
- * they already are.
  */
 private fun <E, T> responses(
     declared: List<Output<*>>,

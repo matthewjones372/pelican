@@ -10,16 +10,6 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-/**
- * The document says 3.1, and then behaves like it.
- *
- * Bumping the version string is the easy half; the half that matters is that
- * nothing 3.0-shaped survives underneath it. Each test here pins one keyword
- * that changed meaning or disappeared between the two versions, because a
- * document that claims 3.1 and carries `nullable: true` is worse than one that
- * honestly claimed 3.0 — a 3.1 validator ignores the keyword rather than
- * complaining, so the field silently stops being nullable.
- */
 class OpenApi31Test {
 
     /**

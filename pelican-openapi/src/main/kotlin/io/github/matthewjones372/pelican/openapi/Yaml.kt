@@ -3,26 +3,15 @@ package io.github.matthewjones372.pelican.openapi
 import io.github.matthewjones372.pelican.*
 
 /**
- * The same document, written as YAML.
- *
- * There is no YAML library here for the same reason there is no JSON one: this
- * module depends on `pelican-core` and nothing else, and core's [JsonValue] is
- * already the document. YAML is a second rendering of that tree, not a second
- * document — [openApi] runs once and both spellings come off the same result,
- * so the two cannot disagree about anything.
- *
- * What is emitted is YAML 1.2, which is a superset of JSON: block mappings and
- * block sequences, plain scalars where a plain scalar cannot be misread, and
- * double quotes (with JSON's own escapes, which YAML shares) where it could.
- * A string with newlines in it — a description, usually — is written as a
- * literal block so it reads as the paragraph it is.
+ * The same document, written as YAML — a second rendering of core's
+ * [JsonValue], not a second document, so the two cannot disagree. No YAML
+ * library for the same reason there is no JSON one.
  */
 fun ApiSpec.openApiYaml(): String = openApi().renderYaml()
 
 /**
- * Renders the tree as YAML. Public because the JSON counterpart is: something
- * holding a document it has already built should not have to rebuild it to
- * write it out the other way.
+ * Renders the tree as YAML. Public because the JSON counterpart is: a caller
+ * holding a built document should not have to rebuild it.
  */
 fun JsonValue.renderYaml(): String = when (this) {
     is JsonObj -> if (isEmpty) "{}\n" else block(this, "")
@@ -41,8 +30,8 @@ private fun block(value: JsonValue, indent: String): String = when (value) {
     is JsonArr -> value.items.joinToString("") { item ->
         when {
             item.hasBlockForm -> {
-                // The child is laid out two columns in, then the dash is
-                // written over the indent of its first line.
+                // Laid out two columns in, then the dash written over the
+                // indent of its first line.
                 val child = block(item, "$indent  ")
                 indent + "- " + child.substring(indent.length + 2)
             }
@@ -93,25 +82,15 @@ private fun scalar(value: JsonValue): String = when (value) {
 
 /**
  * A literal block keeps a description readable as the paragraph it was written
- * as, rather than as one long line with `\n` in it:
- *
- * ```yaml
- * description: |-
- *   The first line.
- *   The second.
- * ```
- *
- * The `-` chomps the trailing newline a block would otherwise add, which is
- * why a string that already ends in one is not written this way — it would
- * need a different chomping indicator to survive the round trip, and the
- * quoted form says the same thing without the special case.
+ * as. The `-` chomps the trailing newline a block would add, so a string that
+ * already ends in one is quoted instead — it would need a different chomping
+ * indicator to survive the round trip.
  */
 private fun isLiteralBlock(text: String): Boolean {
     if ('\n' !in text || text.endsWith('\n')) return false
     val lines = text.split('\n')
     // A first line starting with a space needs an explicit indentation
-    // indicator; trailing spaces are eaten by any parser reading the block
-    // back. Neither is worth spelling out when quoting is right there.
+    // indicator, and trailing spaces are eaten on the way back.
     if (lines.first().firstOrNull()?.isWhitespace() == true) return false
     return lines.none { it != it.trimEnd() } && text.none { it < ' ' && it != '\n' }
 }
@@ -123,10 +102,9 @@ private fun literalBlock(text: String, indent: String): String =
 
 /**
  * Plain where a plain scalar reads back as the string it was, quoted where it
- * would not. The test is deliberately pessimistic: everything a YAML 1.2 core
- * schema resolves to some other type — `true`, `null`, `0x1f`, `.inf`, a
- * number — is quoted, as is anything carrying an indicator character in a
- * position where it means something. `1.0.0` stays plain; `1.0` does not.
+ * would not. Pessimistic: anything a YAML 1.2 core schema resolves to another
+ * type is quoted, as is anything with an indicator character in a position
+ * where it means something. `1.0.0` stays plain; `1.0` does not.
  */
 private fun plainOrQuoted(text: String): String =
     if (isPlainSafe(text)) text else JsonStr(text).render()

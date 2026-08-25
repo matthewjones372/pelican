@@ -13,10 +13,6 @@ import io.github.matthewjones372.pelican.pekko.docs.startWithDocs as startPekkoW
  * ./gradlew :example:runBackends --args=9000
  * ```
  *
- * The three `startWithDocs` functions come from different modules and are
- * aliased apart here only because this one file uses all of them; a real
- * service imports one.
- *
  * Note what is *not* aliased apart: the endpoint values, the handlers' logic
  * and the OpenAPI document. Those are shared, which is why the `diff` at the
  * bottom of the banner prints nothing.

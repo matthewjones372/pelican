@@ -35,10 +35,6 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
     // `Retry-After`, on all three backends, from the one description.
     echo handledOrFail { (trace, note) -> echoOrRefuse(trace, note) },
 
-    // The one endpoint here that answers two ways. The binder demands an
-    // `Outcome` for the same reason `handledOrFail` does — the handler names
-    // the response it is producing — and the name says what the alternatives
-    // are, which here is two successes rather than a failure.
     remember handledOneOf { (who, note) -> rememberGreeting(who, note) },
 
     preferences handledNow { (locale, session) -> preferencesOf(locale, session) },

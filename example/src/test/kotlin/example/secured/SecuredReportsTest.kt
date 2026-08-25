@@ -26,16 +26,6 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.Base64
 
-/**
- * The two halves of the security example, checked against each other: what the
- * document promises a caller must present, and what the running service does
- * when they present it — or don't.
- *
- * The enforcement half is one filter that reads `endpoint.security`, so these
- * assertions are also the evidence that the filter and the padlock cannot come
- * apart: every case below is stated once against the document and once against
- * the wire.
- */
 class SecuredReportsTest {
 
     companion object {

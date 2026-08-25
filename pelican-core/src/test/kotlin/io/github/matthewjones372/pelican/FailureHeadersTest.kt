@@ -6,14 +6,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
-/**
- * A declared failure that carries headers as well as a payload.
- *
- * The bargain is the one `emits(...)` makes on the success response, moved to
- * where a failure can keep it: the values go on the failure itself, so a
- * `Retry-After` declared on a 429 travels with the 429 and cannot reach the
- * success the same handler might have returned instead.
- */
 class FailureHeadersTest {
 
     data class Problem(val code: String)
@@ -55,11 +47,6 @@ class FailureHeadersTest {
         failure.message shouldContain "never declared it"
     }
 
-    /**
-     * Stricter than `Params.setHeader`, which reports a missing required header
-     * rather than failing on it — and it can be, because this call is the whole
-     * answer rather than one of several a handler might still be making.
-     */
     @Test
     fun `a required header the call left out throws, naming it`() {
         val failure = shouldThrow<IllegalStateException> { throttled(Problem("slow-down")) }
@@ -85,11 +72,6 @@ class FailureHeadersTest {
         err[quota].shouldBeNull()
     }
 
-    /**
-     * The reading end again, and the case that loses the failure just as
-     * thoroughly as an absent header does: a server that promised a `Long` and
-     * sent `soon`.
-     */
     @Test
     fun `a header that arrived but does not decode reads as null rather than throwing`() {
         // What the client builds from a response, header and all.

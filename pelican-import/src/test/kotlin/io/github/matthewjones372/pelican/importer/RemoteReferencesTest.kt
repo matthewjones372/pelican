@@ -8,23 +8,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
-/**
- * References to another host: the way through the refusal, and every place it
- * still refuses.
- *
- * The refusal itself is in `ReferencesTest`, where it belongs — a build that
- * fetches a URL to know what to generate cannot be reproduced, and that is
- * still what happens to a document nobody has said anything about. What is
- * asserted here is the bargain that makes an exception safe: the host is named
- * in the build file, every URL reached is recorded with the hash of what came
- * back, and nothing is read that has not been checked against that record.
- *
- * So the tests that matter most are the ones where something has gone wrong.
- * A fetch that works is one test; a document that changed under a recorded
- * hash, a redirect, a host nobody allowed and a cache somebody edited are the
- * rest of the file, because each of them is a way a hash check gets quietly
- * neutered.
- */
 class RemoteReferencesTest {
 
     // ------------------------------------------------------------ the way in
@@ -42,12 +25,6 @@ class RemoteReferencesTest {
         }
     }
 
-    /**
-     * A fetched document referring to its neighbour is the ordinary shape of a
-     * published spec, so the closure is followed — and every step of it is in
-     * the lockfile, which is what makes the *whole* of what a build reads
-     * something somebody reviewed rather than only the first hop.
-     */
     @Test
     fun `a fetched document's own references are followed, and every one is recorded`(@TempDir dir: File) {
         Stub()
@@ -127,11 +104,6 @@ class RemoteReferencesTest {
         }
     }
 
-    /**
-     * The whole point, in one test. Somebody else edited the document behind a
-     * URL this build reads; the build fails naming both hashes, rather than
-     * generating a different client and saying nothing.
-     */
     @Test
     fun `a document that has changed under a recorded hash fails loudly`(@TempDir dir: File) {
         Stub().serving("/common.yaml", widget).use { stub ->
@@ -234,11 +206,6 @@ class RemoteReferencesTest {
 
     // ------------------------------------------------------------ offline
 
-    /**
-     * The case CI is. The lockfile and the cache are both committed, the
-     * machine has no network, and the build generates the same code it did
-     * yesterday without opening a socket.
-     */
     @Test
     fun `a checkout with the lockfile and the cache builds with no host to reach`(@TempDir dir: File) {
         val stub = Stub().serving("/common.yaml", widget)
@@ -342,11 +309,6 @@ class RemoteReferencesTest {
         }
     }
 
-    /**
-     * The failure the allowlist would otherwise be worth nothing without: the
-     * reviewed host answers a redirect, and the document a build reads comes
-     * from wherever that points.
-     */
     @Test
     fun `a redirect is not followed, to another host or to this one`(@TempDir dir: File) {
         Stub()
@@ -383,13 +345,6 @@ class RemoteReferencesTest {
         }
     }
 
-    /**
-     * A fragment of a fetched document is the ordinary case — the whole file
-     * is a library and the `$ref` names one schema in it. A fragment naming
-     * nothing fails the same way it does for a file on disk, and it fails
-     * during the update as well, which is the point: the lockfile is not
-     * written from a document nobody could read.
-     */
     @Test
     fun `a pointer into a fetched document that is not there names the pointer`(@TempDir dir: File) {
         Stub().serving("/common.yaml", widget).use { stub ->

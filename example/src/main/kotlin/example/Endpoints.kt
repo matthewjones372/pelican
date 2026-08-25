@@ -24,16 +24,11 @@ val apiKey = headerParam(
     StringCodec.nonEmpty().describedAs("Required credential", example = "let-me-in"),
 )
 
-/*
+/**
  * Inputs that carry more than one value, one per encoding OpenAPI can
  * describe. The modifier says how the values are told apart on the wire; what
  * one of them decodes to is still the codec's business, so `item` is refined
  * exactly as a single-valued parameter would be.
- *
- * All of them are optional, and an absent one arrives as `null` rather than as
- * an empty list: `?item=` carries no element, so a list is never empty on the
- * wire, and reading absence as empty would leave "matched nothing" and "did
- * not filter" spelled the same way.
  */
 val itemFilter = queryParam("item", StringCodec.nonEmpty(), description = "Only these items")
     .commaSeparated()
@@ -62,18 +57,9 @@ val rawUpload = rawBody(description = "Anything; it is never buffered")
 // takes.
 val session = cookieParam<String>("session", description = "An opaque session id").optional()
 
-// The same order, posted either way: a form from a page with no JavaScript on
-// it, JSON from the same page's script. One payload and two encodings, which is
-// what `or` says — the request's Content-Type picks the decode, and a media
-// type neither of these names is a 415. The schema published for CreateOrder is
-// what says `quantity=2` is a number, and it is the same schema under both.
 val orderForm = formBody<CreateOrder>(description = "The order to place, as a form or as JSON") or
     jsonBody<CreateOrder>()
 
-// A multipart upload: a text field, a small file read into memory, and a large
-// one handed to the handler as a stream. The bound on the manifest is written
-// here rather than defaulted, because that is where somebody deciding whether
-// this endpoint should hold it will read it.
 val importLabel = textPart("label", StringCodec.nonEmpty(), description = "What to call this import")
 val importManifest = bufferedFile(
     "manifest",
@@ -96,12 +82,6 @@ val badApiKey = errorJson<ApiError>(401, "Missing or bad API key")
  * A failure that carries a header as well as a payload: the body says what
  * happened and the header says when to come back, which is what a 429 nearly
  * always is.
- *
- * The header is declared on the failure rather than with `emits(...)`, and
- * that is the whole distinction: `emits` describes the *success* response and
- * permits a header on every response the endpoint sends, so a `Retry-After`
- * declared there would be documented on the 201 and settable on an order that
- * was placed.
  */
 val retryAfter = responseHeader<Long>("Retry-After", description = "Seconds to wait before trying again")
 
@@ -146,11 +126,6 @@ val getUser = endpoint(userId) {
     summary = "Fetch a single user"
     operationId = "getUser"
     tag("users")
-    // The one response this endpoint describes and cannot produce. A 500 from
-    // an escaping exception is rendered as an ApiError by the library itself,
-    // and `default` is where a document says so — it is not returnable, so
-    // there is nothing here for `orFail` to take and nothing for the handler
-    // below to name.
     defaultJson<ApiError>("Any other failure, rendered as an ApiError")
     json<User>() orFail noSuchUser
 }
@@ -201,12 +176,6 @@ val placeOrder = endpoint(userId, apiKey, newOrder) {
 
 /**
  * The same question with two right answers: placed, or taken and queued.
- *
- * `orderPlaced or orderQueued` puts both in the endpoint's type, so the binder
- * demands a handler returning an `Outcome` and a status this endpoint never
- * declared does not compile — the bargain `orFail` already made, with the word
- * "fail" taken out of it. `orFail` sits beside it because a bad key is still a
- * bad key.
  */
 val submitOrder = endpoint(userId, apiKey, newOrder) {
     post("users" / userId / "orders" / "submit")
@@ -312,18 +281,6 @@ val orderPlacedEvent = jsonBody<Order>(description = "The order that was just pl
 
 /**
  * The one description in this file that is not a route.
- *
- * A webhook is a call this service *sends*: a subscriber registers a URL out of
- * band, and this says what arrives there. Everything about the description is
- * the same — a method, a body, headers, a response — except that there is no
- * path, because the path is the subscriber's and this document has never seen
- * it. So nothing binds a handler to it and nothing routes it; what reads it is
- * the document, under `webhooks`, and the generated client, which grows a
- * `orderPlaced(url, body, signature)` that sends one.
- *
- * The `204` is what the *receiver* is expected to answer with. That is the one
- * part of this description nobody publishing it controls, and it is why a
- * webhook's response is worth reading as a hint rather than as a promise.
  */
 val orderPlacedHook = webhook("orderPlaced") {
     body(orderPlacedEvent)

@@ -17,8 +17,6 @@ import java.time.Duration
  * `streamedNow` on this backend takes `(I) -> Source<T, NotUsed>`, so the
  * countdown is a throttled stream and back-pressure runs from the socket back
  * to it.
- *
- * Compare with `OnHttp4k.kt` and `OnKtor.kt`, line for line.
  */
 val pekkoRoutes: List<ServerEndpoint> = listOf(
     greet handledNow { (who, shout) -> greetingOf(who, shout) },
@@ -34,10 +32,6 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
     // `Retry-After`, on all three backends, from the one description.
     echo handledOrFail { (trace, note) -> echoOrRefuse(trace, note) },
 
-    // The one endpoint here that answers two ways. The binder demands an
-    // `Outcome` for the same reason `handledOrFail` does — the handler names
-    // the response it is producing — and the name says what the alternatives
-    // are, which here is two successes rather than a failure.
     remember handledOneOf { (who, note) -> rememberGreeting(who, note) },
 
     preferences handledNow { (locale, session) -> preferencesOf(locale, session) },

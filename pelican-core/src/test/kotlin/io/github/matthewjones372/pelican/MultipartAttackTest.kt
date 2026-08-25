@@ -7,14 +7,6 @@ import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
 import java.time.Duration
 
-/**
- * The parser, attacked rather than exercised.
- *
- * `MultipartTest` next door states what the parser is for. This one states what
- * it does when the envelope is hostile or merely broken — because it is core's
- * own parser rather than a library's, and an envelope arrives from whoever
- * chose to send it.
- */
 class MultipartAttackTest {
 
     private val caption = textPart<String>("caption")

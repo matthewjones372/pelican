@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; }
+    a { color: #6aa9c4; } a:hover { color: #8cc3da; }
+  </style>
+</helmet>
+<div style="width: 1080px; height: 760px; background: #0d1117; color: #e8eaed; padding: 56px 56px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 40px">
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #6f7b8a">Pelican &middot; logo mark &middot; directions explored</div>
+    <div style="font-size: 30px; font-weight: 500; letter-spacing: -0.015em; line-height: 1.25; max-width: 780px">The four directions, for the record.</div>
+    <div style="font-size: 15px; line-height: 1.6; color: #98a3b2; max-width: 720px; text-wrap: pretty">Every mark is the same subject: a pelican&#39;s bill in profile, upper mandible over pouch. They differ in how the form is <em style="font-style: normal; color: #d3d9e0">constructed</em> &mdash; mass, line, letterform, facet. Each is one closed colour and reads at 16px.</div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; flex-grow: 1">
+
+    <div style="display: flex; flex-direction: column; gap: 18px; background: #151a21; border: 1px solid #232a34; border-radius: 4px; padding: 24px 22px">
+      <div style="display: flex; align-items: center; justify-content: center; height: 150px">
+        <svg width="132" height="132" viewBox="0 0 64 64" style="color: {{accent}}" fill="currentColor" aria-label="Silhouette mark">
+          <path d="M4.5 24.75 A11 11 0 0 1 26.5 22.75 L59.5 28.75 L56.5 32.25 L4.5 28.75 Z"></path>
+          <path d="M10.5 32.25 C11.5 45.75 20.5 51.75 30.5 49.75 C41.5 47.25 50.5 39.75 55.5 34.25 Z"></path>
+        </svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding-bottom: 4px; border-bottom: 1px solid #232a34">
+        <svg width="24" height="24" viewBox="0 0 64 64" fill="#e8eaed"><path d="M4.5 24.75 A11 11 0 0 1 26.5 22.75 L59.5 28.75 L56.5 32.25 L4.5 28.75 Z"></path><path d="M10.5 32.25 C11.5 45.75 20.5 51.75 30.5 49.75 C41.5 47.25 50.5 39.75 55.5 34.25 Z"></path></svg>
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="#e8eaed"><path d="M4.5 24.75 A11 11 0 0 1 26.5 22.75 L59.5 28.75 L56.5 32.25 L4.5 28.75 Z"></path><path d="M10.5 32.25 C11.5 45.75 20.5 51.75 30.5 49.75 C41.5 47.25 50.5 39.75 55.5 34.25 Z"></path></svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 7px">
+        <div style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em">A &middot; Silhouette</div>
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6f7b8a">Mass</div>
+        <div style="font-size: 13.5px; line-height: 1.55; color: #98a3b2; text-wrap: pretty">Two solid shapes, one hairline of space between them. Heaviest presence in a README header; the safest read at favicon size.</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 18px; background: #151a21; border: 1px solid #232a34; border-radius: 4px; padding: 24px 22px">
+      <div style="display: flex; align-items: center; justify-content: center; height: 150px">
+        <svg width="132" height="132" viewBox="0 0 64 64" style="color: {{accent}}" fill="none" stroke="currentColor" stroke-width="5.5" aria-label="Monoline mark">
+          <path d="M8.5 28.5 A11 11 0 0 1 28 25 L58 32 L55 36"></path>
+          <path d="M10 34 C11 50 20 56 31 54 C43 51 51 43 55 36.5"></path>
+        </svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding-bottom: 4px; border-bottom: 1px solid #232a34">
+        <svg width="24" height="24" viewBox="0 0 64 64" fill="none" stroke="#e8eaed" stroke-width="5.5"><path d="M8.5 28.5 A11 11 0 0 1 28 25 L58 32 L55 36"></path><path d="M10 34 C11 50 20 56 31 54 C43 51 51 43 55 36.5"></path></svg>
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="#e8eaed" stroke-width="6.5"><path d="M8.5 28.5 A11 11 0 0 1 28 25 L58 32 L55 36"></path><path d="M10 34 C11 50 20 56 31 54 C43 51 51 43 55 36.5"></path></svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 7px">
+        <div style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em">B &middot; Monoline</div>
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6f7b8a">Line</div>
+        <div style="font-size: 13.5px; line-height: 1.55; color: #98a3b2; text-wrap: pretty">One constant stroke width throughout &mdash; the form as a drawing rather than a shape. Lightest on the page; needs a heavier weight below 20px.</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 18px; background: #151a21; border: 1px solid #232a34; border-radius: 4px; padding: 24px 22px">
+      <div style="display: flex; align-items: center; justify-content: center; height: 150px">
+        <svg width="132" height="132" viewBox="0 0 64 64" style="color: {{accent}}" aria-label="Monogram mark">
+          <g fill="none" stroke="currentColor" stroke-width="9">
+            <path d="M16.5 8 V56"></path>
+            <path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path>
+          </g>
+          <path d="M43 24 L62 33 L43 34 Z" fill="currentColor"></path>
+        </svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding-bottom: 4px; border-bottom: 1px solid #232a34">
+        <svg width="24" height="24" viewBox="0 0 64 64"><g fill="none" stroke="#e8eaed" stroke-width="9"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#e8eaed"></path></svg>
+        <svg width="16" height="16" viewBox="0 0 64 64"><g fill="none" stroke="#e8eaed" stroke-width="10"><path d="M16.5 8 V56"></path><path d="M16.5 12.5 H34 A11.5 11.5 0 0 1 34 35.5 H22"></path></g><path d="M43 24 L62 33 L43 34 Z" fill="#e8eaed"></path></svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 7px">
+        <div style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em">C &middot; Monogram</div>
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6f7b8a">Letterform</div>
+        <div style="font-size: 13.5px; line-height: 1.55; color: #98a3b2; text-wrap: pretty">A geometric P whose bowl carries the bill. Says &ldquo;library&rdquo; before it says &ldquo;bird&rdquo;; the most legible of the four at 16px.</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 18px; background: #151a21; border: 1px solid #232a34; border-radius: 4px; padding: 24px 22px">
+      <div style="display: flex; align-items: center; justify-content: center; height: 150px">
+        <svg width="132" height="132" viewBox="0 0 64 64" style="color: {{accent}}" fill="currentColor" aria-label="Facet mark">
+          <path d="M6 14 L26 14 L61 30 L57 33 L6 27 Z"></path>
+          <path d="M8 31 L57 36 L24 55 Z"></path>
+        </svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding-bottom: 4px; border-bottom: 1px solid #232a34">
+        <svg width="24" height="24" viewBox="0 0 64 64" fill="#e8eaed"><path d="M6 14 L26 14 L61 30 L57 33 L6 27 Z"></path><path d="M8 31 L57 36 L24 55 Z"></path></svg>
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="#e8eaed"><path d="M6 14 L26 14 L61 30 L57 33 L6 27 Z"></path><path d="M8 31 L57 36 L24 55 Z"></path></svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 7px">
+        <div style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em">D &middot; Facet</div>
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6f7b8a">Straight lines only</div>
+        <div style="font-size: 13.5px; line-height: 1.55; color: #98a3b2; text-wrap: pretty">No curve anywhere &mdash; seven vertices total. Reads as something drafted rather than drawn. Sharpest, and the coldest.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; color: #5c6673; letter-spacing: 0.04em">Each direction has its own artboard on this canvas &mdash; sizes, lockups and inversions.</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#e8eaed","options":["#e8eaed","#6aa9c4","#c9a227","#d9694b"]}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#e8eaed' };
+  }
+}
+</script>
+</body>
+</html>

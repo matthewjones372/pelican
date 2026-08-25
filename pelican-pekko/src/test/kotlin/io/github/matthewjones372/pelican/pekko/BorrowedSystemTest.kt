@@ -5,11 +5,13 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.actor.typed.javadsl.Behaviors
-import org.junit.jupiter.api.AfterAll
+import org.apache.pekko.actor.testkit.typed.annotations.JUnit5TestKit
+import org.apache.pekko.actor.testkit.typed.javadsl.ActorTestKit
+import org.apache.pekko.actor.testkit.typed.javadsl.JUnit5TestKitBuilder
+import org.apache.pekko.actor.testkit.typed.javadsl.TestKitJUnit5Extension
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.extension.ExtendWith
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -27,8 +29,14 @@ import java.net.http.HttpResponse
  * running, because terminating it would take the caller's cluster down with
  * their HTTP port — and the caller has no way to put it back.
  */
+@ExtendWith(TestKitJUnit5Extension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class BorrowedSystemTest {
+
+    /** Found by reflection, so the field has to be a real one: `@JvmField`. */
+    @JUnit5TestKit
+    @JvmField
+    val testKit: ActorTestKit = JUnit5TestKitBuilder().withName("borrowed-system-test").build()
 
     private val hello = endpoint {
         get("hello")
@@ -40,15 +48,8 @@ class BorrowedSystemTest {
         codecs = JacksonCodecs,
     )
 
-    /** The caller's system: created here, and this test's to terminate. */
-    @Suppress("ForbiddenVoid") // Pekko's Java DSL; see config/detekt/detekt.yml.
-    private val system = ActorSystem.create(Behaviors.empty<Void>(), "borrowed-system-test")
-
-    @AfterAll
-    fun stop() {
-        system.terminate()
-        system.whenTerminated.toCompletableFuture().join()
-    }
+    /** The caller's system: the testkit's, and the testkit's to terminate. */
+    private val system get() = testKit.system()
 
     private fun get(url: String): HttpResponse<String> =
         HttpClient.newHttpClient().send(

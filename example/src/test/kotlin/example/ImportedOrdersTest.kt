@@ -14,24 +14,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import kotlin.test.Test
 
-/**
- * The round trip: descriptions to a document, the document back to
- * descriptions, and the two documents compared.
- *
- * The descriptions on the far side are generated at build time by
- * `generateImportedEndpoints` from this module's own `openapi.json`, compiled
- * into this source set, and read here as ordinary Kotlin — so a change to
- * either direction that the other cannot follow fails the build twice: once at
- * compile time, once here.
- *
- * What is compared is the contract rather than the text. Prose does not
- * survive the trip and was never meant to: an endpoint that came back as a
- * whole JSON array rather than a streamed one describes the same payload and
- * says something different about how it is flushed, and the codec re-derives
- * every payload schema from the *generated* Kotlin class. Routes, operation
- * ids, parameters, media types and statuses are the parts a caller is holding,
- * and those come back exactly.
- */
 class ImportedOrdersTest {
 
     @Test
@@ -39,22 +21,6 @@ class ImportedOrdersTest {
         contractOf(ordersSpec().openApi()) shouldBe contractOf(importedSpec(JacksonCodecs).openApi())
     }
 
-    /**
-     * And with the document's own schemas rather than the codec's, the whole
-     * thing comes back: every path, every parameter, every schema, down to the
-     * examples and the `minimum` on a query parameter.
-     *
-     * Key order is not part of the comparison — a JSON object is a map, and
-     * the two documents build theirs by walking different things in different
-     * orders. The one exception that *is* about content is what a success
-     * response is called. Pelican writes
-     * that from the output kind — "A newline-delimited JSON stream", "No
-     * content" — so it is not a description an endpoint can carry, and the one
-     * place the two documents differ is the endpoint whose streamed JSON array
-     * came back as a whole one. That is the judgement call the importer makes
-     * and documents; blanking the field here is what stops this test asserting
-     * it away.
-     */
     @Test
     fun `and with its own schemas it comes back whole`() {
         canonical(withoutSuccessDescriptions(importedSpec().openApi())) shouldBe
@@ -127,15 +93,6 @@ class ImportedOrdersTest {
         schemaNames(ordersSpec().openApi()) shouldBe schemaNames(importedSpec(JacksonCodecs).openApi())
     }
 
-    /**
-     * The webhook makes the trip too, and lands where it cannot be served.
-     *
-     * The comparison above already covers the document — `webhooks` is part of
-     * it — so what this adds is the Kotlin in between: the importer wrote a
-     * `webhook(...)` rather than an endpoint, and the list it went into is the
-     * one no interpreter reads. An import that quietly turned it into a route
-     * would publish an identical document and serve `POST /`.
-     */
     @Test
     fun `a webhook comes back as a webhook, and not as a route`() {
         val imported = importedSpec()
@@ -153,15 +110,6 @@ class ImportedOrdersTest {
         written.readText() shouldContain "fun orderPlaced(url: String, body: Order, xSignature: String)"
     }
 
-    /**
-     * The other half of what an imported document is for: a client for
-     * somebody else's API, generated from descriptions nobody wrote.
-     *
-     * Note which schema source it runs on. The generated client's payload
-     * types come from the document's own schemas, so this whole path — read a
-     * document, describe it, generate a client for it — needs no JSON library
-     * at build time at all.
-     */
     @Test
     fun `a client generates from the imported descriptions`(@TempDir directory: File) {
         val written = importedSpec().writeKotlinClient(directory, "example.imported.client")

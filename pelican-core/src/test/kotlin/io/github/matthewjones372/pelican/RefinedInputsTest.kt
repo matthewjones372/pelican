@@ -8,12 +8,6 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
 
-/**
- * Refinements do two jobs at once, and both are asserted here: the value is
- * rejected before a handler sees it, and the constraint appears in the schema.
- * A refinement that enforced without documenting would make the spec a lie in
- * the other direction from the error-body one.
- */
 class RefinedInputsTest {
 
     private fun decode(codec: PlainCodec<*>, raw: String) = codec.decode("p", raw)

@@ -17,11 +17,9 @@ class PelicanServer internal constructor(
     val server: EmbeddedServer<*, *>,
 ) : AutoCloseable {
     /**
-     * The port actually bound, which is the one to use after asking for port 0.
-     *
-     * Ktor reports its connectors from a suspending function and this is a
-     * blocking API, so the answer is waited for here. The engine has bound by
-     * the time [start] returns, so the wait is nominal.
+     * The port actually bound, for when port 0 was asked for. Ktor reports its
+     * connectors from a suspending function and this is a blocking API, but
+     * the engine has bound by the time [start] returns.
      */
     val port: Int get() = runBlocking { server.engine.resolvedConnectors().first().port }
 
@@ -40,27 +38,12 @@ class PelicanServer internal constructor(
 }
 
 /**
- * Binds this API on [port]. Pass port 0 to let the OS choose one, which is
- * what the tests do.
+ * Binds this API on [port]; port 0 lets the OS choose. [factory] defaults to
+ * `CIO`, which ships with this module, so a Pelican service on Ktor needs no
+ * further dependency.
  *
- * [factory] is the Ktor engine. The default is `CIO`, which ships with this
- * module, so a Pelican service on Ktor needs no further dependency. Pass any
- * other engine factory to swap it, adding that Ktor module to your build:
- *
- * ```
- * ordersApi().start(port = 8080)
- * ordersApi().start(port = 8080, factory = Netty)
- * ```
- *
- * Unlike the other two backends, the engine has little say in how promptly a
- * streamed frame reaches the wire: the response writer flushes each frame as it
- * is encoded (see `Responses.kt`), so rows produced 100ms apart arrive 100ms
- * apart rather than in one burst at the end.
- *
- * [module] exists so that a module which knows more than this one — serving an
- * OpenAPI document alongside the endpoints, say — can configure the application
- * without this module having to know about it. The default is the endpoints
- * alone.
+ * [module] is how a module knowing more than this one — one serving an OpenAPI
+ * document, or a service with routes of its own — configures the application.
  */
 fun Api.start(
     port: Int = 8080,

@@ -9,34 +9,13 @@ import io.github.matthewjones372.pelican.emptyJsonObj
 
 /**
  * Which codec the generated declarations are annotated for.
- *
- * A sealed hierarchy is the one shape a JSON library cannot read off the
- * Kotlin classes alone: nothing in `sealed interface Payment` says which
- * property carries the branch, or what string selects each one. That has to be
- * written down, and the two libraries spell it differently — so the file is
- * annotated for one of them, chosen where the codec itself is chosen.
- *
- * [JACKSON] is the default because Jackson is the default codec module, and
- * because it costs a document with no union nothing at all: no annotation is
- * written unless one is generated. [KOTLINX] is not free in the same way —
- * kotlinx.serialization has no reflective fallback, so every generated payload
- * type carries `@Serializable` under it.
  */
 enum class CodecAnnotations { JACKSON, KOTLINX }
 
 /**
- * Schemas in, Kotlin declarations out.
- *
- * The schemas are whatever the spec's `SchemaSource` produced — swagger-core's
- * for Jackson, the descriptor walker for kotlinx.serialization — so this reads
- * JSON Schema and nothing else. It never sees a `KType`, which is what keeps
- * the generated payload types in step with the *documented* ones rather than
- * with a second opinion about the same Kotlin classes.
- *
- * Declarations are registered first and written last. A union is what forces
- * that: a `oneOf` reached halfway through a document decides that a class
- * declared near the top belongs to a hierarchy, and a generator that had
- * already written that class out would have no way to say so.
+ * Schemas in, Kotlin declarations out. It reads JSON Schema and never a
+ * `KType`, which keeps the generated payload types in step with the
+ * *documented* ones rather than with a second opinion about the same classes.
  */
 class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.JACKSON) {
 
@@ -78,9 +57,8 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
         this.components = components
         collectRenames(components)
         components.fields.forEach { (name, schema) -> declare(name, schema as JsonObj) }
-        // Settled here as well as at the end, so that the names a document's
-        // own components take are taken before anything written inline can
-        // claim one.
+        // Settled here too, so a document's own component names are taken
+        // before anything written inline can claim one.
         settle()
     }
 
@@ -111,8 +89,7 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
         return when {
             properties != null && !properties.isEmpty -> Shape.Klass(schema)
 
-            // Remembered against its constants as well as its name, so a
-            // property spelling the same enum inline reuses this one.
+            // Remembered by its constants too, so an inline copy reuses it.
             constants != null -> Shape.Enum(constants).also { enums.putIfAbsent(constants, name) }
 
             else -> Shape.Alias(schema)
@@ -120,12 +97,9 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
     }
 
     /**
-     * The sealed interface, and the class each branch becomes.
-     *
-     * A branch that is a reference does not get a class of its own: the
-     * component already is that class, and it is taught here that it belongs
-     * to a hierarchy. Two classes for one schema would decode the same payload
-     * into two unrelated Kotlin types.
+     * The sealed interface, and the class each branch becomes. A branch that is
+     * a reference gets no class of its own — the component already is that
+     * class, and is taught here that it belongs to a hierarchy.
      */
     private fun hierarchy(name: String, union: Composed.Union): Shape {
         val branches = union.branches.map { branch ->
@@ -139,13 +113,9 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
 
     /**
      * The renames a `discriminator.mapping` asks for, read before anything is
-     * declared: `mapping: { card: '#/components/schemas/CardPayment' }` says
-     * that this document calls that branch `card`, and the generated class is
-     * called `Card` wherever it is used.
-     *
-     * A key that would collide with a component's own name is left alone. One
-     * schema with two Kotlin names is the thing being avoided, and two schemas
-     * with one name is worse.
+     * declared: `mapping: { card: '#/.../CardPayment' }` means the generated
+     * class is `Card`. A key colliding with a component's own name is left
+     * alone — two schemas under one name is worse than one under two.
      */
     private fun collectRenames(components: JsonObj) {
         val declared = components.fields.keys.map { typeName(it) }.toSet()
@@ -162,14 +132,7 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
     // -------------------------------------------------------------- rendering
 
     /**
-     * Every declaration written out, and written again until nothing changes.
-     *
-     * Rendering a class resolves its property types, and resolving a type can
-     * declare another — an inline object, an enum, a union hoisted out of a
-     * property — which in turn can tell an already-written class which
-     * hierarchy it belongs to. One pass would leave that class out of its own
-     * union; the fixed point is what makes the order the document happened to
-     * be written in stop mattering.
+     * Every declaration written out, and again until nothing changes.
      */
     private fun settle(): List<String> {
         var written = emptyMap<String, String>()
@@ -201,11 +164,6 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
             // neither is a type expression, and both are a declaration.
             ?: hoistComposed(obj, context)
             ?: (obj["allOf"] as? JsonArr)?.items?.singleOrNull()?.let { type(it, context) }
-            // `anyOf` of one real branch and a null one is how 3.1 spells a
-            // nullable reference; the null branch is already accounted for by
-            // `admitsNull`, so what is left is the type. Anything richer is
-            // read by `composed` above, or is a union this generator does not
-            // model and falls through below.
             ?: obj.anyOfBranches()?.singleOrNull()?.let { type(it, context) }
         if (named != null) return named
 
@@ -296,11 +254,6 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
         // An optional property is nullable with a default here, because
         // Kotlin has no other way to say "may be left out".
         val kotlinType = if (!required && !declared.endsWith("?")) "$declared?" else declared
-        // The wire name is kept exactly, backticked where it has to be —
-        // renaming it would need a codec-specific annotation on every
-        // property that was renamed, where the only annotations this
-        // generator writes are the ones a sealed hierarchy cannot be read
-        // without.
         val propertyName = if (isIdentifier(property)) property else "`$property`"
         appendLine("    val $propertyName: $kotlinType${if (required) "" else " = null"},")
     }
@@ -397,11 +350,6 @@ class KotlinTypes(private val annotations: CodecAnnotations = CodecAnnotations.J
      * has for it: a `"null"` among the types, or a `"null"` branch of an
      * `anyOf` — the latter being what a nullable `$ref` has to become, since a
      * reference has no `type` of its own to widen.
-     *
-     * `nullable: true` is not read, and not as a kindness to older documents
-     * either: it is 3.0's keyword, the emitter no longer writes it, and
-     * accepting it here would mean this generator understood a document shape
-     * nothing in this repository can produce or test.
      */
     private fun JsonObj.admitsNull(): Boolean =
         NULL_TYPE in ((this["type"] as? JsonArr)?.items.orEmpty()) ||

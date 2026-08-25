@@ -1,36 +1,15 @@
 package io.github.matthewjones372.pelican
 
 /**
- * The decoded inputs for one request, and the place a handler puts anything it
- * wants on the response besides the body.
- *
- * Read values back with the same key objects you declared on the endpoint:
- *
- * ```
- * val id: Long = params[userId]
- * val lim: Int? = params[limit]
- * ```
- *
- * The cast is unchecked internally but sound by construction: a key can only
- * enter the map through the decoder that produced its declared type.
- *
- * Every handler lambda has one of these as its receiver, whatever its input
- * style — so a typed handler can still reach [setHeader], [endpoint] and the
- * backend's own request without giving up its typed inputs.
+ * The decoded inputs for one request, read back with the key objects declared
+ * on the endpoint. The internal cast is unchecked but sound: a key enters the
+ * map only through the decoder that produced its declared type.
  */
 class Params(
     private val values: Map<ParamKey<*>, Any?>,
-    /**
-     * Escape hatch. The backend puts its own request object here — Pekko's
-     * `HttpRequest`, Ktor's `ApplicationCall` — and offers a typed accessor for
-     * it. Core stays unaware of what it is.
-     */
+    /** The backend's own request object — Pekko's `HttpRequest`, Ktor's `ApplicationCall`. */
     val underlying: Any?,
-    /**
-     * The description this request matched. Null only where there is no
-     * endpoint to speak of — a hand-built [Params] in a test. Filters read it
-     * to decide what a request needs.
-     */
+    /** The description this request matched. Null only for a hand-built [Params]. */
     val endpoint: Endpoint<*, *>? = null,
 ) {
     @Suppress("UNCHECKED_CAST")
@@ -54,24 +33,13 @@ class Params(
 
     // ---------------------------------------------------------- attributes
 
-    // Created on first write rather than per request. Most requests never
-    // touch either of these maps — no filter sets an attribute, no handler
-    // sets a header — and two empty LinkedHashMaps per request was a
-    // measurable part of what the interpreter allocates over a hand-written
-    // route. See Http4kOverheadBenchmark in `benchmarks`, which reports
-    // allocation per request as well as time.
-    //
-    // Neither map was ever synchronised, and this does not change that: a
-    // Params belongs to one request. Where that request crosses a thread —
-    // a filter here, a handler there — the CompletionStage between them is
-    // what publishes the writes, as it already had to for the contents.
     @Suppress("DoubleMutabilityForCollection") // Null until first write is the point; see above.
     private var attributes: MutableMap<Attribute<*>, Any?>? = null
 
     /**
-     * Reads what a filter worked out earlier in this request. Throws if nothing
-     * set it — a handler that reads an attribute is relying on a filter having
-     * run, and a missing one is a wiring mistake worth hearing about.
+     * Reads what a filter worked out earlier. Throws if nothing set it: the
+     * handler is relying on a filter having run, and a missing one is a
+     * wiring mistake.
      */
     @Suppress("UNCHECKED_CAST")
     operator fun <T> get(key: Attribute<T>): T {
@@ -105,11 +73,8 @@ class Params(
         outgoing ?: LinkedHashMap<String, String>().also { outgoing = it }
 
     /**
-     * Sets a declared response header. The value is encoded by the header's own
-     * codec, so what goes on the wire is what the document's schema describes.
-     *
-     * Setting a header the endpoint never declared with `emits(...)` throws
-     * here rather than quietly shipping an undocumented header.
+     * Sets a declared response header, encoded by its own codec. One the
+     * endpoint never declared throws rather than shipping undocumented.
      */
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> setHeader(header: ResponseHeader<T>, value: T) {
@@ -124,28 +89,24 @@ class Params(
     }
 
     /**
-     * An undeclared header, for the things no document should promise — a
-     * one-off `X-Debug-*`, a header a proxy in front expects. Undocumented on
-     * purpose; [setHeader] is the one to reach for otherwise.
+     * An undeclared header, for what no document should promise — an
+     * `X-Debug-*`, something a proxy expects. Undocumented on purpose.
      */
     fun setRawHeader(name: String, value: String) {
         outgoing()[name] = value
     }
 
     /**
-     * What the handler asked to be sent, in the order it asked. Interpreters
-     * read this after the handler completes and put it on whatever response
-     * came back — including an error response, since a header set before a
-     * failure was still deliberate.
+     * What the handler asked to be sent, in order. Put on whatever response
+     * came back, errors included: a header set before a failure was deliberate.
      */
     fun responseHeaders(): List<Pair<String, String>> =
         outgoing?.map { it.key to it.value }.orEmpty()
 
     /**
-     * The headers a required declaration promised but nobody set. Interpreters
-     * do not police this — a promise broken on one code path is a bug in the
-     * handler, and failing the response would replace a wrong header with a
-     * 500 — but a test can assert on it.
+     * The headers a required declaration promised but nobody set. Not policed —
+     * failing the response would replace a wrong header with a 500 — but a
+     * test can assert on it.
      */
     fun missingRequiredHeaders(): List<ResponseHeader<*>> =
         endpoint?.responseHeaders.orEmpty().filter { it.required && it.name !in outgoing.orEmpty() }
@@ -160,13 +121,18 @@ class ApiException(
     override val message: String,
     val detail: String? = null,
     /**
-     * Headers to send with this failure — `Retry-After` on a 429 or a 503,
-     * `WWW-Authenticate` on a 401. Undeclared by design: a failure raised deep
-     * in a handler has no endpoint description to hand.
+     * Headers to send with this failure. Undeclared by design: a failure raised
+     * deep in a handler has no endpoint description to hand.
      */
     val headers: List<Pair<String, String>> = emptyList(),
     cause: Throwable? = null,
-) : RuntimeException(message, cause)
+) : RuntimeException(message, cause) {
+    init {
+        // Built deep inside a handler from a status that is often computed, so
+        // a throw naming it beats one from a backend's status registry later.
+        checkStatus("ApiException", status, carriesBody = true)
+    }
+}
 
 fun badRequest(message: String): Nothing = throw ApiException(400, message)
 fun notFound(message: String = "Not found"): Nothing = throw ApiException(404, message)
@@ -190,13 +156,9 @@ fun tooManyRequests(message: String = "Too many requests", retryAfterSeconds: Lo
     )
 
 /**
- * The request body was larger than [Api.maxBodyBytes]. Raised by the
- * interpreters before the body is decoded, so an oversized payload never
- * reaches a codec.
- *
- * [detail] is for the limit that is not the API's own: a multipart part
- * declares its own bound, and a 413 that named only the request would leave a
- * caller looking at the wrong number.
+ * The request body was larger than [Api.maxBodyBytes], raised before it is
+ * decoded. [detail] is for a limit that is not the API's own — a multipart
+ * part declares its own bound, and naming the wrong number misleads a caller.
  */
 class PayloadTooLarge(val limit: Long, detail: String? = null) :
     RuntimeException(detail ?: "Request body exceeds the configured limit of $limit bytes")

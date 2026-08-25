@@ -63,10 +63,6 @@ private typealias SealedRoute = Function<HttpRequest, CompletionStage<HttpRespon
  * own leaves the wrong impression: most of what an idiomatic Pekko route costs
  * is two directives, and saying so is the difference between a benchmark and
  * an advertisement.
- *
- * Mode, units, forks, iterations and the pinned heap are all as
- * [Http4kOverheadBenchmark] sets them, and for the reasons given there. They
- * have to match, or the two files are not answering the same question.
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
@@ -240,10 +236,6 @@ open class PekkoOverheadBenchmark {
     /**
      * `join` on a stage that is already complete, which is what a sealed route
      * over a strict entity returns.
-     *
-     * It is not free, and it is in every number below in equal measure — the
-     * alternative, timing the stage's completion, would mean a callback whose
-     * own cost is larger than the thing being measured.
      */
     private fun answer(route: SealedRoute, request: HttpRequest): HttpResponse =
         route.apply(request).toCompletableFuture().join()

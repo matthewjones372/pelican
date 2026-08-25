@@ -5,24 +5,11 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
-/**
- * What the import refuses, and what it says.
- *
- * The messages are asserted as well as the refusals, because a strict import
- * whose failure does not say which operation and which keyword is a strict
- * import nobody can act on. Every one of these names the operation, the place
- * in the document, and the way out.
- */
 class StrictnessTest {
 
     private fun refusing(paths: String): String =
         shouldThrow<ImportFailure> { imported(document(paths)) }.message.orEmpty()
 
-    /**
-     * The refusal this used to be is the one thing on the list that stopped
-     * being true, so the test that pinned it now pins the opposite: two 2xx
-     * read, both declared, and a handler that names the one it is producing.
-     */
     @Test
     fun `two successful responses become two declared responses`() {
         val source = imported(
@@ -40,11 +27,6 @@ class StrictnessTest {
         source shouldContain "empty(status = 200) or empty(status = 202)"
     }
 
-    /**
-     * A stream is produced in the server library's own type, which is the half
-     * of "several responses" core cannot reach — so this one is still refused,
-     * and says which way out is available.
-     */
     @Test
     fun `a streamed response beside another 2xx is a response nothing could produce`() {
         val message = refusing(
@@ -65,12 +47,6 @@ class StrictnessTest {
         message shouldContain "Document the stream as the only 2xx"
     }
 
-    /**
-     * The other refusal that stopped being one. A `default` still cannot be
-     * *returned* — a handler answers with a status, and "some other status" is
-     * not one — so what it becomes is a line in the document and nothing a
-     * binder ever sees.
-     */
     @Test
     fun `a default response is documented rather than refused`() {
         val source = imported(
@@ -90,16 +66,6 @@ class StrictnessTest {
         source shouldNotContain "orFail"
     }
 
-    /**
-     * Half of what this used to refuse turned out to be describable, and the
-     * half that is left is the half a handler could not have been given.
-     *
-     * One payload under several encodings is a choice about *decoding*, and a
-     * `Content-Type` makes it: `jsonBody<T>() or formBody<T>()`. Several
-     * schemas under several media types is a choice about what the payload *is*,
-     * and there is one handler taking one type — so that one stays refused, and
-     * the message says which of the two this document wrote.
-     */
     @Test
     fun `one payload under two media types is two encodings of one body`() {
         val source = imported(
@@ -161,13 +127,6 @@ class StrictnessTest {
         ) shouldContain "application/json, application/xml"
     }
 
-    /**
-     * The other refusal that stopped being one. Reading stops at a streamed
-     * part, so a second file could only be reached by holding the first — which
-     * is now something a description can say, so the last file is streamed and
-     * the rest are `bufferedFile`s with the bound the document published, or a
-     * default written out where a reader will see it.
-     */
     @Test
     fun `two file parts become a buffered one and a streamed one`() {
         val source = imported(
@@ -194,13 +153,6 @@ class StrictnessTest {
         source shouldContain """filePart("document""""
     }
 
-    /**
-     * A property map has no order a caller can observe, so a document is free
-     * to list its text parts after its file — and `endpoint(...)` is not, since
-     * reading stops at the streamed part. The import decides the order rather
-     * than passing the document's on and emitting a declaration that refuses
-     * itself when the generated file is loaded.
-     */
     @Test
     fun `a text part listed after the file is emitted before it`() {
         val source = imported(
@@ -284,12 +236,6 @@ class StrictnessTest {
         }.message.orEmpty()
         message shouldContain "one of several shapes"
     }
-
-    /*
-     * A list of scalars is describable, and is asserted in `ImportTest`. What
-     * follows is the rest of what an array parameter can say, each refused for
-     * a reason of its own rather than for being an array.
-     */
 
     @Test
     fun `a deepObject parameter is an object spread out, not a list`() {
@@ -510,15 +456,6 @@ class StrictnessTest {
         generated shouldNotContain "Dropped"
     }
 
-    /**
-     * `callbacks` and `webhooks` were refused together, and only one of them
-     * still is. The difference is where the request goes: a webhook is one call
-     * to a URL a subscriber registered, which a description can say and a sender
-     * can make — see [WebhooksTest]. A callback is a request the service makes
-     * *during* an operation, to a URL taken out of that operation's own
-     * parameters through a runtime expression, and there is nothing in an
-     * endpoint description that evaluates `{$request.body#/callbackUrl}`.
-     */
     @Test
     fun `callbacks are a call made during an operation, which nothing here describes`() {
         shouldThrow<ImportFailure> {

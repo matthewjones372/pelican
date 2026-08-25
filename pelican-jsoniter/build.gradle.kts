@@ -22,9 +22,5 @@ dependencies {
     testImplementation(project(":pelican-openapi"))
     testImplementation(project(":pelican-jackson"))
 
-    // And `UnionImportTest` reads a published union back into descriptions. A
-    // discriminator this module invents rather than reads off an annotation is
-    // only worth something if a reader holding nothing but the document can act
-    // on it, and the importer is exactly that reader.
     testImplementation(project(":pelican-import"))
 }

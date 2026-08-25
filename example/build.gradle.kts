@@ -2,6 +2,9 @@ import io.github.matthewjones372.pelican.gradle.DocumentFormat
 
 plugins {
     application
+    // For the codecs example, whose payload types are @Serializable so that
+    // kotlinx.serialization can be one of the three libraries reading them.
+    kotlin("plugin.serialization")
     // The build's own plugin, included from pluginManagement in settings.gradle.kts.
     // The example applies it by id exactly as a consumer would, which is what
     // keeps the plugin honest: if generation breaks, this build breaks.
@@ -21,13 +24,14 @@ dependencies {
     implementation(project(":pelican-ktor"))
     implementation(project(":pelican-ktor-docs"))
     implementation(project(":pelican-jackson"))
+    // The other two codec modules, for `example.codecs`: the same endpoints and
+    // handlers served three times, once per JSON library. `pelican-kotlinx` also
+    // carries the parser the assertions use — the tests read responses off a
+    // socket, and something has to turn them back into a tree, which
+    // `parseToJsonElement` does with no serializer of its own.
+    implementation(project(":pelican-kotlinx"))
+    implementation(project(":pelican-jsoniter"))
     runtimeOnly("ch.qos.logback:logback-classic:1.6.3")
-
-    // A JSON parser for the assertions only. The tests read responses off a
-    // socket, and something has to turn them back into a tree; this is not the
-    // example's codec, which is Jackson. No serialization compiler plugin is
-    // involved — `parseToJsonElement` needs none.
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // The OpenAPI documents this repository emits are checked by a parser that
     // is not the one that wrote them — swagger-parser reads the document back
@@ -39,6 +43,9 @@ dependencies {
     // The in-memory transports are per-backend, so the suites that run twice
     // ask for the one they need. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
+
+    // Version-less: the BOM comes transitively from pelican-pekko.
+    testImplementation("org.apache.pekko:pekko-actor-testkit-typed_2.13")
     testImplementation(project(":pelican-test-http4k"))
 
     // Matchers, declared here rather than arriving through pelican-test. The
@@ -49,12 +56,6 @@ dependencies {
 
 /**
  * What the import task runs against, kept out of the example's own classpaths.
- *
- * `pelican-import` is a build-time tool: nothing the example runs or tests
- * needs it. Its own configuration also breaks the circle a `testImplementation`
- * would make — the generated descriptions are compiled into the test source
- * set, so a task reading that source set's classpath would be waiting for
- * itself.
  */
 val pelicanImport = configurations.register("pelicanImport")
 
@@ -94,6 +95,14 @@ tasks.register<JavaExec>("runBackends") {
     mainClass.set("example.backends.MainKt")
 }
 
+/** The same service, served three times over three JSON libraries. */
+tasks.register<JavaExec>("runCodecs") {
+    group = "application"
+    description = "Runs the notes example on Jackson, kotlinx.serialization and jsoniter side by side"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.codecs.ThreeCodecsKt")
+}
+
 /** The README's "Your first endpoint", kept runnable for the same reason. */
 tasks.register<JavaExec>("runFirstEndpoint") {
     group = "application"
@@ -115,14 +124,6 @@ tasks.register<JavaExec>("runReadmeExample") {
  * and the Kotlin client. No server is started and no request is made — the
  * plugin loads `ordersSpec()` off this module's own runtime classpath and
  * generates from the values it returns.
- *
- * `./gradlew :example:generateOrdersDocument` writes build/openapi.json.
- * `./gradlew :example:generateOrdersClient` rewrites the checked-in client.
- *
- * The client is written into this module's *test* sources on purpose, so it is
- * compiled and run against a real server by `GeneratedKotlinClientTest`. That
- * is what turns on `checkOrdersClient`, which `check` depends on: a committed
- * client that no longer matches the descriptions fails the build.
  */
 pelican {
     documents {
@@ -151,13 +152,6 @@ pelican {
     }
     /**
      * The same document, read back the other way.
-     *
-     * This is the round trip, run on every build: the descriptions become a
-     * document, the document becomes descriptions again, and
-     * `ImportedOrdersTest` compares what the second set publishes against what
-     * the first one did. Two things are being checked at once, and the
-     * quieter one is the compiler — generated Kotlin that does not compile
-     * fails the build here rather than in somebody's project.
      */
     endpoints {
         create("imported") {
@@ -187,8 +181,4 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach { exclude("example/impo
 
 tasks.named("compileTestKotlin") { dependsOn("generateImportedEndpoints") }
 
-// The benchmarks used to live here, as tests that looped and timed behind a
-// `-Dbenchmark=true` switch. They are a JMH harness in `:benchmarks` now, which
-// took the flight-recording flag and the coverage-agent exemption with them —
-// JMH forks its own JVMs, so there is no test task left for an agent to attach
-// to. `./gradlew :benchmarks:jmh`.
+// The benchmarks are a JMH harness in `:benchmarks`: `./gradlew :benchmarks:jmh`.

@@ -34,18 +34,6 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 
-/**
- * The whole Bookmarks API, tested through the endpoint descriptions.
- *
- * Every call names an endpoint *value* — `getBookmark`, `createBookmark` — and
- * passes the inputs that endpoint declares. No URLs and no JSON literals,
- * except where a test deliberately breaks a valid request to reach a failure
- * the typed form cannot express.
- *
- * The suite is transport-agnostic: [InMemoryBookmarksTest] runs it through the
- * interpreted route with no socket, [OverHttpBookmarksTest] against a bound
- * server. A difference between them is a real difference in behaviour.
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class BookmarksContractTest {
 
@@ -60,10 +48,6 @@ abstract class BookmarksContractTest {
 
     private val key = "let-me-in"
 
-    /**
-     * `Bookmarks` is a process-wide store shared by both runs of this suite,
-     * so tests create their own fixtures and only ever delete those.
-     */
     private fun save(
         url: String = "https://example.com",
         title: String = "Example",
@@ -113,10 +97,6 @@ abstract class BookmarksContractTest {
         // and the same declaration is what the handler had to return.
         app.outcome(getBookmark, 9_999L) shouldBeError NoSuchBookmark(9_999L, "No bookmark 9999")
 
-        // The same assertion the other way round, when what matters is the
-        // *type* rather than the exact value: `shouldBeError()` hands back the
-        // payload, so the next step is whatever matcher library this suite
-        // already uses.
         app.outcome(getBookmark, 9_999L).shouldBeError()
             .shouldBeInstanceOf<NoSuchBookmark>()
             .id shouldBe 9_999L

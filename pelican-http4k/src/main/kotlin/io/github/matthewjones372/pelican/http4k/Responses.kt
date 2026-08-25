@@ -29,30 +29,15 @@ internal const val CONTENT_TYPE = "Content-Type"
 
 /**
  * Turns a described [Output] plus a handler's result into an http4k response.
- *
- * Note the split of responsibilities. Core knows how to render one element —
- * `NdjsonOutput.frame`, `SseOutput.frame` — and this file knows how to put
- * elements on a socket. A streaming output becomes a body backed by
- * [FrameInputStream], which encodes an element only when the server asks for
- * the bytes, so the sequence is walked at the speed the socket drains.
- *
- * [JsonArrayOutput] is the one output core does not frame; `jsonArrayFrames`
- * supplies the brackets and commas here.
- *
- * [codecs] were resolved for this endpoint when the handler was built, not
- * looked up per request.
  */
 @Suppress("UNCHECKED_CAST")
 internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs): Response {
-    // Every output carrying a payload type had its codec resolved when the
-    // handler was built, so a null here is a bug in that resolution rather
-    // than anything a request can provoke.
+    // Resolved when the handler was built, so a null is a bug in that
+    // resolution rather than anything a request can provoke.
     fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
 
-    // The handler named one of the endpoint's declared responses, and that
-    // declaration supplies the status, the media type and the type the body is
-    // written as — so this is the response the document promised, rather than
-    // whichever one happened to be first.
+    // The declaration the handler named supplies the status, the media type
+    // and the type the body is written as.
     if (out is FallibleOutput<*, *>) {
         return when (val outcome = value as Outcome<*, *>) {
             is Outcome.Ok<*> -> successResponse(out, outcome, codecs)
@@ -63,11 +48,9 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
     val response = Response(statusOf(out.status))
 
     return when (out) {
-        // Built in one construction rather than as `Response(...).header(...).body(...)`.
-        // An http4k Response is immutable, so each of those steps copies the
-        // whole thing: three objects and two header lists where one of each
-        // will do. Measured at roughly 300 bytes a request — more than
-        // everything else this interpreter allocates put together.
+        // One construction rather than `Response(...).header(...).body(...)`:
+        // an http4k Response is immutable, so each step copies the whole
+        // thing. Measured at roughly 300 bytes a request.
         is JsonOutput<*> -> jsonResponse(out.status, payload().encodeToString(value))
 
         is TextOutput -> MemoryResponse(statusOf(out.status), TEXT_HEADERS, MemoryBody(value as String))
@@ -87,7 +70,7 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
             val c = payload()
             response
                 .header(CONTENT_TYPE, "text/event-stream")
-                .streaming(elements(value).map { o.frame(c, it) })
+                .streaming(elements(value).map { o.frame(c, it) }.withKeepAlive(o.keepAlive))
         }
 
         is JsonArrayOutput<*> ->
@@ -95,8 +78,7 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
                 .header(CONTENT_TYPE, "application/json")
                 .streaming(jsonArrayFrames(elements(value), payload()))
 
-        // Handed over as it stands: whatever the handler opened is copied to
-        // the socket and closed by the server once written.
+        // Copied to the socket as it stands, and closed by the server.
         is ByteStreamOutput ->
             response
                 .header(CONTENT_TYPE, out.mediaType)
@@ -108,21 +90,17 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
 }
 
 /**
- * A body with no declared length, which is what tells a backend to chunk it.
- * Passing a length here would make the server buffer the whole stream to find
- * out what to declare.
+ * No declared length, which is what tells a backend to chunk it. Passing one
+ * would make the server buffer the whole stream to find out what to declare.
  */
 private fun Response.streaming(frames: Sequence<String>): Response =
     body(FrameInputStream(frames), null)
 
 /**
- * Renders whichever declared success the handler named.
- *
- * Which one that is, and whether it is carrying what it promised, is core's
- * answer rather than this file's — `successNamedBy` — because a bare
- * `ok(value)` names none and so carries no headers, and three interpreters
- * deciding separately what that means is three chances to send a response the
- * document does not describe.
+ * Renders whichever declared success the handler named. Which one, and whether
+ * it carries what it promised, is `successNamedBy`'s answer — a bare
+ * `ok(value)` names none, and three interpreters deciding that separately is
+ * three chances to send an undescribed response.
  */
 private fun successResponse(
     out: FallibleOutput<*, *>,
@@ -131,17 +109,13 @@ private fun successResponse(
 ): Response {
     val chosen = out.successNamedBy(ok)
     val response = buildResponse(chosen, ok.value, codecs)
-    // Encoded and checked against the declaration when the handler produced
-    // the response, so there is nothing left to decide here.
+    // Encoded and checked when the handler produced the response.
     return ok.headers.fold(response) { res, (name, value) -> res.header(name, value) }
 }
 
 /**
- * Renders one declared failure.
- *
- * The status comes from the declaration the handler named rather than from the
- * payload's type, so two failures carrying the same type under different
- * statuses stay distinct.
+ * Renders one declared failure. The status comes from the declaration rather
+ * than the payload's type, so two failures sharing a type stay distinct.
  */
 private fun failureResponse(
     out: FallibleOutput<*, *>,
@@ -157,8 +131,7 @@ private fun failureResponse(
         "$declared carries ${declared.type} but the handler returned ${err.error?.let { it::class }}"
     }
     val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
-    // Encoded and checked against the declaration when the handler produced
-    // the failure, so there is nothing left to decide here.
+    // Encoded and checked when the handler produced the failure.
     return jsonResponse(declared.status, codec.encodeToString(err.error), err.headers)
 }
 
@@ -170,7 +143,6 @@ private fun jsonResponse(status: Int, body: String, extra: List<Pair<String, Str
         MemoryBody(body),
     )
 
-// The content type of a JSON or text response is the same list every time.
 // Built once rather than per request: the list and the pair inside it are two
 // allocations that never differ.
 private val JSON_HEADERS = listOf(CONTENT_TYPE to "application/json")
@@ -185,22 +157,14 @@ private fun statusOf(code: Int): Status = Status.fromCode(code) ?: Status(code, 
 private val log: Logger = LoggerFactory.getLogger("io.github.matthewjones372.pelican.http4k")
 
 /**
- * Errors are rendered by hand, through core's own JSON tree, rather than
- * through the configured codec. A codec that has just failed is not the thing
- * to reach for when reporting that it failed.
- *
- * Which throwable becomes which response is core's decision ([renderError]), so
- * the three backends cannot drift. What is local to each is the logging: an
- * unexpected throwable is logged *here*, against the reference the caller was
- * given, because Pelican catches it and the server underneath would otherwise
- * never see it.
+ * Rendered through core's own JSON tree rather than the configured codec: a
+ * codec that has just failed is not the thing to report that it failed.
  */
 internal fun errorResponse(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): Response {
     val rendered = renderError(raw, api?.exposeInternalErrors ?: false)
 
     rendered.unexpected?.let { failure ->
-        // An unexpected failure always carries a reference; that is what
-        // renderError produced it for.
+        // Always present: renderError produces one for exactly this.
         val reference = checkNotNull(rendered.reference) { "an unexpected failure with no reference" }
         val hook = api?.onServerError
         if (hook != null) hook(reference, endpoint, failure)

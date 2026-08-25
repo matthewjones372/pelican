@@ -11,13 +11,9 @@ class DecodeFailure(
 ) : RuntimeException("Cannot decode '$raw' for '$paramName': expected $expected", cause)
 
 /**
- * Codec for a value that travels as a single string: a path segment, a query
- * parameter or a header. Carries just enough metadata to also describe itself
- * in OpenAPI.
- *
- * A parameter carrying several values is still described by one of these: what
- * an element decodes to is the same question, and only where the boundaries
- * between the values sit is new. See [ListStyle].
+ * Codec for a value travelling as a single string — a path segment, a query
+ * parameter, a header — carrying enough metadata to describe itself in
+ * OpenAPI. A multi-valued parameter uses one of these too; see [ListStyle].
  */
 interface PlainCodec<T : Any> {
     /** OpenAPI primitive type: "string", "integer", "number", "boolean". */
@@ -31,17 +27,13 @@ interface PlainCodec<T : Any> {
 
     /**
      * Whatever else the schema should say: `minLength`, `pattern`, `minimum`.
-     *
-     * A refinement rejects the value *and* documents why it would — see
-     * [refine]. Without this the document would promise `type: string` for a
-     * parameter the server will only accept non-empty.
+     * A refinement rejects the value *and* documents why — see [refine].
      */
     val schemaFacets: JsonObj get() = emptyJsonObj
 
     /**
-     * What values of this type mean, for parameters that do not say it
-     * themselves. A parameter's own `description` wins; this is what a shared
-     * type — an `Email`, a `PageSize` — carries with it everywhere it is used.
+     * What values of this type mean, for parameters that say nothing
+     * themselves. A parameter's own `description` wins.
      */
     val description: String? get() = null
 
@@ -147,20 +139,9 @@ inline fun <reified T : Any> plainCodecFor(): PlainCodec<T> {
 }
 
 /**
- * Derives a codec for a wrapper type.
- *
- * Worth doing when an endpoint takes two inputs of the same primitive type:
- * `endpoint(userId, orderId)` as two `Long`s will happily accept a handler that
- * reads them in the wrong order, because the compiler cannot tell them apart.
- * Wrap them and it can:
- *
- * ```
- * @JvmInline value class UserId(val value: Long)
- * @JvmInline value class OrderId(val value: Long)
- *
- * val userId  = pathParam("userId",  LongCodec.map(::UserId,  UserId::value))
- * val orderId = pathParam("orderId", LongCodec.map(::OrderId, OrderId::value))
- * ```
+ * Derives a codec for a wrapper type. Worth it when an endpoint takes two
+ * inputs of the same primitive: `endpoint(userId, orderId)` as two `Long`s
+ * accepts a handler that reads them in the wrong order, and wrapping does not.
  */
 fun <A : Any, B : Any> PlainCodec<A>.map(decode: (A) -> B, encode: (B) -> A): PlainCodec<B> =
     DerivedPlainCodec(this, forward = { _, _, a -> decode(a) }, backward = encode)

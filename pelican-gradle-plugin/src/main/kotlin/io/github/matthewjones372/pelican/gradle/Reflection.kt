@@ -7,15 +7,6 @@ import java.lang.reflect.Modifier
 
 /**
  * Everything the plugin knows about Pelican, in one file, by name.
- *
- * The plugin does not compile against `pelican-core`, `pelican-codegen` or
- * `pelican-openapi`. It reaches them through the classpath the consumer
- * already has, which is what allows a project to move to a new library version
- * without waiting for a plugin release — and what stops this build from
- * needing the very modules it is included by.
- *
- * The cost is that a wrong name is a runtime failure rather than a compile
- * one, so every lookup here reports what it was looking for and where.
  */
 internal object Pelican {
 
@@ -27,19 +18,13 @@ internal object Pelican {
     private const val CODEC_ANNOTATIONS = "io.github.matthewjones372.pelican.codegen.CodecAnnotations"
 
     /**
-     * What an entry naming no codec means, spelled the way the library spells
-     * it.
-     *
-     * A copy of a default the library owns, for the same reason [firstServer]
-     * is a copy of another one: the value has to be in hand before the call,
-     * and the call is the only thing that could have been asked for it. A
-     * library that changed its default would need this line changed with it,
-     * which is cheaper than an entry point existing only to be asked.
+     * What an entry naming no codec means. A copy of a default the library
+     * owns, because the value is needed before the call that would have
+     * answered it — cheaper than an entry point existing only to be asked.
      */
     private const val DEFAULT_CODEC = "JACKSON"
 
-    // The modules and the functions a fallback names when it refuses, spelled
-    // as the reader's build file and their dependency block spell them.
+    // Named as the reader's build file and dependency block spell them.
     private const val CODEGEN_MODULE = "pelican-codegen"
     private const val IMPORT_MODULE = "pelican-import"
     private const val WRITES_CLIENT = "writeKotlinClient"
@@ -112,12 +97,9 @@ internal object Pelican {
     )
 
     /**
-     * The same, against classes that are already resolved.
-     *
-     * The seam is here for the test. The two arities below are two releases of
-     * one library, and a single class carrying both would leave the older path
-     * running nowhere but on a consumer's machine — the one place nobody is
-     * watching it.
+     * The same, against classes that are already resolved. The seam is here for
+     * the test: the two arities below are two releases of one library, and
+     * without it the older path would run only on a consumer's machine.
      */
     @Suppress("LongParameterList")
     fun writeClient(
@@ -134,14 +116,6 @@ internal object Pelican {
         val name = clientName ?: defaultClientName(codegen, spec)
         val url = baseUrl ?: firstServer(spec)
 
-        // The bargain `writeEndpoints` makes as well: the arity this plugin
-        // knows about and the arity on the consumer's classpath are allowed to
-        // differ, which is the whole point of looking the function up. The
-        // signature carrying the codec is preferred wherever there is one, so
-        // upgrading the library is enough to get the setting — the plugin does
-        // not have to be released alongside it. A library old enough to have no
-        // `CodecAnnotations` at all fails the same way and lands in the same
-        // place, which is why the class is loaded inside the attempt.
         val withCodec = runCatching {
             val annotations = Class.forName(CODEC_ANNOTATIONS, true, codegen.classLoader)
             annotations to codegen.getMethod(
@@ -185,9 +159,8 @@ internal object Pelican {
     }
 
     /**
-     * The enum constant the entry named, matched case-insensitively because
-     * `codec.set("kotlinx")` is how a build file says it and `KOTLINX` is how
-     * the library declares it.
+     * The enum constant the entry named, matched case-insensitively:
+     * `codec.set("kotlinx")` is how a build file says `KOTLINX`.
      */
     private fun codecConstant(annotations: Class<*>, codec: String?): Any {
         val constants = annotations.enumConstants.orEmpty().filterIsInstance<Enum<*>>()
@@ -199,9 +172,8 @@ internal object Pelican {
     }
 
     /**
-     * Generates endpoint descriptions from a document, and returns what it
-     * wrote. Unlike everything else here it loads no spec: the input is a file
-     * the consumer wrote or published, not code they compiled.
+     * Generates endpoint descriptions from a document. Unlike everything else
+     * here it loads no spec: the input is a file, not compiled code.
      */
     @Suppress("LongParameterList")
     fun writeEndpoints(
@@ -245,20 +217,6 @@ internal object Pelican {
         allowRemote: Set<String>,
         lockfile: File?,
     ): List<*> {
-        // The bargain `writeClient` makes, two steps longer. The arity this
-        // plugin knows about and the arity the library on the consumer's
-        // classpath offers are allowed to differ — that is the whole point of
-        // looking the function up rather than compiling against it. Four
-        // releases are reachable here: one that takes the remote allowlist and
-        // its lockfile, one before it that takes the discriminator hints, one
-        // before them that still takes the codec, and one before that.
-        //
-        // Newest first, and a fallback is only taken when the setting it
-        // cannot carry was not made. Falling back past a setting somebody made
-        // would silently drop it and generate the file the setting was there
-        // to prevent, so each step down is guarded by a named refusal — the
-        // same one `writeClient` raises, written once so the two cannot come
-        // to disagree about what to say.
         val text = String::class.java
 
         val withRemote = importEndpoints(importer, text, text, Map::class.java, Set::class.java, File::class.java)
@@ -277,11 +235,6 @@ internal object Pelican {
                 lockfile,
             ) as List<*>
         }
-        // Guarded harder than the rest, because this is the one setting whose
-        // absence is a *security* difference rather than a missing annotation:
-        // an importer with no lockfile in its signature has no hash check
-        // either, and falling back to it would fetch and generate from
-        // whatever came back.
         if (allowRemote.isNotEmpty()) refuse(tooOld(REMOTE, IMPORT_MODULE, IMPORTS, "no allowlist"))
 
         val withHints = importEndpoints(importer, text, text, Map::class.java)
@@ -317,11 +270,6 @@ internal object Pelican {
     /**
      * Rewrites the lockfile of remote references, and returns the lines
      * describing what changed.
-     *
-     * No fallback ladder under this one, and deliberately so: an importer
-     * without it has no lockfile at all, so there is nothing older for it to
-     * mean. The refusal says which module to upgrade, which is the only useful
-     * answer.
      */
     @Suppress("LongParameterList")
     fun updateLock(
@@ -384,11 +332,6 @@ internal object Pelican {
     /**
      * What a setting the library cannot carry is told, in one sentence used by
      * every fallback here.
-     *
-     * Two chains fall back — the client generator's, one step long, and the
-     * importer's, two — and each step of each is a place a setting could be
-     * dropped without a word. Saying it in one function is what stops the two
-     * drifting into telling a reader different things about the same problem.
      */
     private fun tooOld(setting: String, module: String, function: String, missing: String) =
         "`$setting` is set, and the `$module` on this task's classpath is older than it: its " +
@@ -457,11 +400,6 @@ internal object Pelican {
 
 /**
  * Refusing, said the way every refusal here says it.
- *
- * A `Nothing` return rather than a `throw` at each site: half the lookups
- * below are a ladder of guards, and a guard reads as one statement — `if the
- * library cannot carry this, say so` — where a branch with a throw in it reads
- * as control flow somebody has to follow.
  */
 internal fun refuse(message: String): Nothing = throw PelicanFailure(message)
 

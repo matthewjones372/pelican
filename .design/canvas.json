@@ -1,0 +1,11 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "The mark", "x": 0, "y": 0, "w": 1120, "h": 940 },
+    { "file": "Directions.dc.html", "title": "Directions explored", "x": 1180, "y": 0, "w": 1080, "h": 760 },
+    { "file": "Silhouette.dc.html", "x": 0, "y": 1060, "w": 940, "h": 760 },
+    { "file": "Monoline.dc.html", "x": 1000, "y": 1060, "w": 940, "h": 760 },
+    { "file": "Monogram.dc.html", "x": 2000, "y": 1060, "w": 940, "h": 760 },
+    { "file": "Facet.dc.html", "x": 3000, "y": 1060, "w": 940, "h": 760 }
+  ],
+  "launch": { "view": "focused", "file": "Main.dc.html" }
+}

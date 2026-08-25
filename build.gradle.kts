@@ -147,7 +147,11 @@ subprojects {
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 
-    tasks.withType<Test>().configureEach { useJUnitPlatform() }
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform()
+
+        systemProperty("junit.jupiter.execution.timeout.default", "60s")
+    }
 
     apply(plugin = "org.jetbrains.kotlinx.kover")
 
@@ -172,10 +176,6 @@ subprojects {
         kotlin {
             target("src/**/*.kt")
             targetExclude(
-                // Output, not source. CI regenerates this client and runs
-                // `git diff --exit-code` against the checked-in copy, so if
-                // Spotless reformatted it the gate would fail for good: the
-                // generator emits the unformatted text.
                 "src/test/kotlin/example/generated/**/*.kt",
                 // String templates the generators read at runtime. They are
                 // `.kt` for editor highlighting only; some are fragments, and

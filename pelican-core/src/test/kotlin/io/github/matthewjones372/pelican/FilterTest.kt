@@ -8,10 +8,6 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.CompletionStage
 
-/**
- * The composition rules, on their own — the interpreters are held to the same
- * answers by `FiltersAndHeadersTest` in the example, across all three backends.
- */
 class FilterTest {
 
     private val endpoint = endpoint {

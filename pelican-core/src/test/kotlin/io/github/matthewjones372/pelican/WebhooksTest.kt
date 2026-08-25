@@ -7,16 +7,6 @@ import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
 
-/**
- * A call the service sends rather than answers.
- *
- * The description is an endpoint description, because that is what a webhook is
- * — a method, a body, and what comes back — and the two readings that do
- * anything with it are `pelican-openapi`, which publishes it under `webhooks`,
- * and `pelican-codegen`, which generates the sender. Both have tests of their
- * own; these are about the value, and chiefly about the one thing it must never
- * become, which is a route on this server.
- */
 class WebhooksTest {
 
     data class OrderEvent(val id: Long)
@@ -40,11 +30,6 @@ class WebhooksTest {
         orderPlaced.toString() shouldBe "webhook orderPlaced (POST)"
     }
 
-    /**
-     * The crux of the design, stated as an assertion: there is no path, because
-     * the URL belongs to whoever subscribed. What a sender is given at send
-     * time is the whole of the destination.
-     */
     @Test
     fun `it has no path at all`() {
         orderPlaced.operation.pathSpec.segments.shouldBeEmpty()
@@ -89,12 +74,6 @@ class WebhooksTest {
         }.message.orEmpty() shouldContain "the host it reaches is the subscriber's"
     }
 
-    /**
-     * A streaming output is declared in terms of a phantom marker whose whole
-     * purpose is to type a *handler* that produces the stream. Nothing produces
-     * one here, and on the reading end a subscriber streaming back at the
-     * service that called it is a shape nothing consumes.
-     */
     @Test
     fun `a webhook cannot answer with a stream`() {
         shouldThrow<IllegalStateException> {
@@ -114,16 +93,6 @@ class WebhooksTest {
 
     // ------------------------------------------------------ and never a route
 
-    /**
-     * The refusal that makes the separation hold.
-     *
-     * [Webhook.operation] is public because two other modules have to read it,
-     * so `handledNow` will accept it and produce a [ServerEndpoint] — and this
-     * is where that stops. Bound, it would be served at `/` on this service,
-     * which is neither what the description says nor a route anybody wrote.
-     * Every interpreter builds its routes from [Api.endpoints], so refusing
-     * here refuses on all three at once.
-     */
     @Test
     fun `a webhook bound as a handler cannot be served`() {
         val bound = ServerEndpoint(orderPlaced.operation) { CompletableFuture.completedFuture(null) }

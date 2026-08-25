@@ -7,21 +7,6 @@ import io.github.matthewjones372.pelican.noInputs
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-/**
- * What this client does with an endpoint served somewhere else: nothing, on
- * purpose.
- *
- * A [RequestSpec] is a method, a path and a body, and it names no host —
- * because the transport is what decides where a request goes. In memory there
- * is no host to go to; against a live server the suite pointed the transport at
- * the one thing it is asserting about. Following a per-operation URL would send
- * that one call to a host nothing here is running, which is a worse answer than
- * ignoring a field that is documentation.
- *
- * A generated client does honour it, and that is not an inconsistency: it calls
- * a service somebody else is running, at the addresses that service's document
- * gave. This one calls the service under test.
- */
 class OperationServersTest {
 
     data class Receipt(val id: Long)

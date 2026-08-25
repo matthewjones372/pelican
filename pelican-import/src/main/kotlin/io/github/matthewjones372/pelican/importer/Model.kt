@@ -4,19 +4,8 @@ import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.ListStyle
 
-/*
+/**
  * What an imported document looks like once the OpenAPI-shaped noise is gone.
- *
- * This sits between the two halves on purpose. The reader's job is to decide
- * what a document says and to refuse what Pelican cannot describe; the
- * emitter's job is to write Kotlin. Neither has to know how the other works,
- * and the version differences — 2.0's `produces`, 3.0's `nullable` — are gone
- * by the time anything here exists.
- *
- * Schemas are carried through as `JsonObj` rather than modelled. They are
- * handed to `pelican-codegen`'s type generator, which is the same code the
- * client generator uses, so the types an imported document produces and the
- * types a client generator produces cannot drift apart.
  */
 
 @Suppress("LongParameterList") // A document, field for field: every parameter is one of them.
@@ -35,11 +24,6 @@ internal class IrApi(
 
 /**
  * One entry of the document's `webhooks`.
- *
- * The operation inside is an [IrEndpoint] like any other, because that is what
- * the document holds there — a Path Item Object, read by the same reader. What
- * the name replaces is the path: [IrEndpoint.path] is empty for one of these,
- * and nothing downstream asks it for a route.
  */
 internal class IrWebhook(val name: String, val operation: IrEndpoint) {
     override fun toString() = "webhook $name (${operation.method})"
@@ -129,10 +113,6 @@ internal sealed class IrPart {
 
 /**
  * One 2xx response, as the output that describes it.
- *
- * [headers] are the ones belonging to this response alone, and are empty for an
- * operation with a single success — there they are the endpoint's, and travel
- * as [IrEndpoint.responseHeaders]. See `Responses.read`.
  */
 internal sealed class IrSuccess {
     abstract val status: Int
@@ -203,11 +183,6 @@ internal class IrFailure(
 /**
  * Whether a handler could answer with this, which decides both the binder the
  * stub is written against and whether the failure is named on the output.
- *
- * Two ways of not being returnable, and they are not the same thing. A failure
- * with no payload is a response the handler *throws* — there is nothing to
- * carry, so `errorResponse(...)` documents it and `notFound(...)` produces it.
- * A `default` is a response nothing produces at all, whatever it carries.
  */
 internal val IrFailure.returnable: Boolean get() = status != null && schema != null
 

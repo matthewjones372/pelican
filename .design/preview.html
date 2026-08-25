@@ -1,0 +1,35 @@
+<!doctype html><meta charset=utf-8>
+<style>
+body{background:#0e1116;color:#e6e8eb;font:14px system-ui;margin:0;padding:16px}
+.card{background:#161a21;padding:14px;border-radius:8px;margin-bottom:8px;display:flex;gap:24px;align-items:center}
+h3{margin:0;font:600 12px system-ui;letter-spacing:.1em;opacity:.55;width:24px}
+.small{display:flex;gap:16px;align-items:center}
+.lite{background:#f7f6f3;color:#14171c}
+</style>
+<div id=out></div>
+<script>
+const marks = {
+B1: `<g fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+  <path d="M8.5 28.5 A11 11 0 0 1 28 25 L58 32"/>
+  <path d="M10 34 C11 50 20 56 31 54 C43 51 51 43 55 36.5"/>
+</g>`,
+B2: `<g fill="none" stroke="currentColor" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="butt">
+  <path d="M8.5 28.5 A11 11 0 0 1 28 25 L58 32 L55 36"/>
+  <path d="M10 34 C11 50 20 56 31 54 C43 51 51 43 55 36.5"/>
+</g>`,
+D2: `<g fill="currentColor">
+  <path d="M6 14 L26 14 L61 30 L57 33 L6 27 Z"/>
+  <path d="M8 31 L57 36 L24 55 Z"/>
+</g>`,
+D3: `<g fill="currentColor">
+  <path d="M8 15 L27 15 L60 30 L56 33.5 L8 28 Z"/>
+  <path d="M9 32 L56 37 L27 56 Z"/>
+</g>`};
+let h='';
+for(const [k,m] of Object.entries(marks)){
+  for(const c of ['card','card lite'])
+  h+=`<div class="${c}"><h3>${k}</h3><svg width=130 height=130 viewBox="0 0 64 64">${m}</svg>
+  <div class=small>${[64,48,32,24,16].map(s=>`<svg width=${s} height=${s} viewBox="0 0 64 64">${m}</svg>`).join('')}</div></div>`;
+}
+out.innerHTML=h;
+</script>

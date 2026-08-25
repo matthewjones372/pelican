@@ -45,15 +45,6 @@ import java.util.concurrent.TimeUnit
  * difference is the interpreter: matching the description, decoding through
  * the declared codecs, and choosing the output shape.
  *
- * In-memory, so no socket, no connection handling and no OS scheduling noise
- * are in the number. That flatters both sides equally and isolates the layer
- * under test.
- *
- * [Mode.AverageTime] in nanoseconds, because the question this answers is
- * "what does one request cost", and a cost is a number you can add to the
- * database call underneath it. Throughput would answer the same question in a
- * unit nobody can add anything to.
- *
  * Three forks and five one-second iterations either side of the warmup: enough
  * that most rows close to a few per cent, few enough that the whole run is
  * under ten minutes and somebody will actually run it. Forks are what catch a
@@ -61,15 +52,6 @@ import java.util.concurrent.TimeUnit
  * rather than two because one of these benchmarks — the idiomatic http4k route
  * — genuinely lands in one of two modes about a microsecond apart. Two forks
  * reported whichever mode they both happened to hit; three say there are two.
- *
- * The heap is pinned rather than left to the default, which is a quarter of
- * the machine's RAM. These handlers allocate three or four gigabytes a second
- * and never keep any of it, so with a six-gigabyte ceiling the young
- * generation grows until its pages stop being resident — and on a workstation
- * with an IDE open the benchmark then measures the paging, in swings of five
- * and ten times. Half a gigabyte is far more than any of this needs, it is the
- * same on every machine, and it took a run reporting 491µs for a 14µs
- * operation to work that out.
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
@@ -156,10 +138,6 @@ open class Http4kOverheadBenchmark {
 
     /**
      * That every handler actually answers, checked before anything is timed.
-     *
-     * A route that fails to match returns 404 without decoding, encoding or
-     * allocating a body, and would report as a spectacular improvement. This
-     * is the difference between a benchmark and a benchmark of nothing.
      */
     @Setup
     fun verify() {

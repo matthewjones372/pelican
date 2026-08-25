@@ -14,6 +14,7 @@ import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.MultipartBody
 import io.github.matthewjones372.pelican.NegotiatedBody
+import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.Params
@@ -22,6 +23,7 @@ import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.RequestBodyCodecs
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.acceptable
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.declaredInputCount
 import io.github.matthewjones372.pelican.decode
@@ -41,37 +43,22 @@ import io.github.matthewjones372.pelican.Method as PelicanMethod
 import org.http4k.core.Method as Http4kMethod
 
 /**
- * Interprets an [Api] as an http4k [HttpHandler].
+ * Interprets an [Api] as an http4k [HttpHandler]: each endpoint becomes
+ * `template bind method to { ... }`, combined with `routes(...)`, so matching
+ * and the 404/405 rules are http4k's own. A [PathSpec.template] is already
+ * http4k's syntax, so the two agree by construction rather than by translation.
  *
- * Each endpoint becomes `template bind method to { request -> ... }` and the
- * set is combined with `routes(...)`, so path matching, template extraction and
- * the 404/405 rules are http4k's own — driven by the descriptions instead of
- * hand-written route declarations. An endpoint's [io.github.matthewjones372.pelican.PathSpec.template]
- * is already `/users/{userId}`, which is exactly http4k's template syntax, so
- * the two agree by construction rather than by translation.
- *
- * The result is a plain function from `Request` to `Response`. That is the
- * whole in-memory test story for this backend: call it. There is no equivalent
- * of `pelican-test`'s `InMemoryTransport` here because there is nothing left
- * for one to do.
- *
- * Endpoints only. Nothing here generates or serves an OpenAPI document, which
- * is why a service can depend on this module without the doc generator being
- * compiled in at all — see `pelican-http4k-docs` for `startWithDocs`.
+ * Endpoints only. See `pelican-http4k-docs` for `startWithDocs`.
  */
 fun Api.toHttpHandler(): RoutingHttpHandler {
-    // Codecs are resolved here, once per endpoint, and captured by the routes.
-    // KType -> JavaType reflection is not free, and doing it per request would
-    // put it on the hot path for no benefit. It also means a missing or broken
-    // codec is a startup failure rather than a surprise on the first request.
+    // Once per endpoint, captured by the routes: KType -> JavaType reflection
+    // is not free, and a broken codec becomes a startup failure.
     val resolved = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
 
-    // Worked out once, from the descriptions, and captured by the routes — the
-    // same shape as the codecs above and for the same reason.
+    // Worked out once from the descriptions, as with the codecs above.
     val cors = corsPolicy()
 
-    // Filters are folded around each handler here, once, rather than per
-    // request — the same reasoning as the codecs above.
+    // Folded around each handler once rather than per request, likewise.
     val handlers = endpoints.associateWith { handlerFor(it) }
 
     val ordered = orderedEndpoints()
@@ -82,13 +69,9 @@ fun Api.toHttpHandler(): RoutingHttpHandler {
 }
 
 /**
- * One `OPTIONS` route per declared path, which is what a browser asks before it
- * sends anything interesting.
- *
- * A path that already declares an `OPTIONS` endpoint of its own keeps it: an
- * endpoint someone wrote down outranks one this module would have invented. The
- * routes come after the endpoints for the same reason, since http4k tries them
- * in order.
+ * One `OPTIONS` route per declared path, for a browser's preflight. A path that
+ * declares its own `OPTIONS` endpoint keeps it, and these come last because
+ * http4k tries routes in order.
  */
 private fun preflightRoutes(
     ordered: List<ServerEndpoint>,
@@ -118,8 +101,7 @@ private fun preflightResponse(cors: CorsPolicy, req: Request): Response =
             path = req.uri.path,
         )
     ) {
-        // Not a preflight — a bare OPTIONS, or one aimed at no described path.
-        // Nothing here describes an answer to that, which is what the router
+        // A bare OPTIONS, or one aimed at no described path: what the router
         // would have said before this route existed.
         is CorsPreflight.NotPreflight ->
             errorResponse(ApiException(405, "Method not allowed", "OPTIONS ${req.uri.path}"), null)
@@ -132,18 +114,15 @@ private fun preflightResponse(cors: CorsPolicy, req: Request): Response =
     }
 
 /**
- * The codecs one endpoint needs, resolved ahead of any request.
- *
- * Both are null for an endpoint that moves no JSON — a byte-stream echo, a
- * 204 — which is why such an API needs no codec configured at all.
+ * The codecs one endpoint needs, resolved ahead of any request. Both null for
+ * an endpoint that moves no JSON, which is why such an API needs none.
  */
 internal class EndpointCodecs(
     val body: RequestBodyCodecs?,
     val payload: BodyCodec<Any?>?,
     /**
-     * One per declared response — success or failure — keyed by identity. Two
-     * responses can carry the same payload type under different statuses, so
-     * the declaration is the key rather than the type.
+     * One per declared response, keyed by identity: two can carry the same
+     * payload type under different statuses.
      */
     val alternatives: Map<Any, BodyCodec<Any?>> = emptyMap(),
 ) {
@@ -163,12 +142,9 @@ private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = Endpo
 )
 
 /**
- * More specific paths are matched first, so `/orders/watch` wins over
- * `/orders/{orderId}` no matter which was declared first. Ties keep
- * declaration order, which stays predictable.
- *
- * http4k tries routes in the order they are given, so this is the same sort
- * `pelican-pekko` applies for the same reason.
+ * More specific paths first, so `/orders/watch` wins over `/orders/{orderId}`
+ * whichever was declared first. http4k tries routes in order, so this is the
+ * same sort `pelican-pekko` applies.
  */
 private fun Api.orderedEndpoints(): List<ServerEndpoint> =
     endpoints.withIndex().sortedWith(
@@ -189,10 +165,8 @@ private fun routeFor(
 }
 
 /**
- * Adds the cross-origin headers to a finished response, whatever produced it —
- * a handler, a decode failure, an exception. A browser needs them on the error
- * as much as on the success: without them the script sees a network error
- * instead of the 400 that explains itself.
+ * Cross-origin headers on a finished response, errors included: without them a
+ * browser script sees a network error rather than the 400.
  */
 private fun Response.withCors(cors: CorsPolicy?, req: Request): Response {
     if (cors == null) return this
@@ -201,13 +175,26 @@ private fun Response.withCors(cors: CorsPolicy?, req: Request): Response {
 }
 
 /**
- * Everything decodable before the body, as values rather than as writes into a
- * map somebody else owns. One rule, written once per input kind because what
- * "present" means differs between a query parameter, a header and a cookie
+ * Everything decodable before the body. One rule, written once per input kind
+ * because "present" differs between a query parameter, a header and a cookie
  * core parsed out of the header itself.
  */
+
+/**
+ * Refuses a request whose `Accept` takes nothing this endpoint sends. The types
+ * come from [Output.produces] and the decision from [acceptable], so the three
+ * backends answer alike. An endpoint with no body never reads the header.
+ */
+private fun negotiate(ep: Endpoint<*, *>, req: Request) {
+    val produced = ep.output.produces
+    if (produced.isEmpty()) return
+    val accept = req.headerValues("Accept").filterNotNull()
+    if (accept.isEmpty()) return
+    if (!acceptable(accept, produced)) throw NotAcceptable(produced)
+}
+
 private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap<ParamKey<*>, Any?>) = with(into) {
-    // A loop rather than `filterIsInstance`, which would allocate a list per
+    // A loop rather than `filterIsInstance`, which allocates a list per
     // request to hold what is walked once.
     ep.pathSpec.segments.forEach { segment ->
         if (segment is PathSegment.Capture) {
@@ -238,9 +225,8 @@ private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap
     }
 
     ep.headerParams.forEach { h ->
-        // `header` returns the first field line; a list is declared as
-        // comma-separated and RFC 9110 says two lines mean the one joined
-        // field, so it is the only case that has to read them all.
+        // `header` returns the first line only, and RFC 9110 says two lines
+        // mean one joined field — so a list is the case that reads them all.
         if (h.listStyle != null) {
             put(h, h.decodeList(req.headerValues(h.name).filterNotNull()))
             return@forEach
@@ -260,12 +246,8 @@ private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap
 }
 
 /**
- * Cookies, parsed by core from the header rather than by http4k's own cookie
- * support — so a cookie decodes to the same value on all three backends. See
- * `Cookies`.
- *
- * Skipped entirely when nothing declared one: reading the header and parsing
- * it costs the same whether or not anybody asked for a cookie.
+ * Parsed by core rather than by http4k's own cookie support, so a cookie
+ * decodes the same on all three backends. Skipped when nothing declared one.
  */
 private fun decodeCookies(ep: Endpoint<*, *>, req: Request, into: MutableMap<ParamKey<*>, Any?>) {
     if (ep.cookieParams.isEmpty()) return
@@ -307,13 +289,12 @@ private fun readBody(
     when (val body = ep.bodyInput) {
         null -> Unit
 
-        // Handed over unconsumed. http4k's own body is already lazy, so a
-        // handler that never reads it never pulls the request into memory.
+        // http4k's own body is lazy, so a handler that never reads it never
+        // pulls the request into memory.
         is RawBody -> values[body] = Http4kByteStream(req.body)
 
-        // Exempt from the size limit for the same reason a raw body is: the
-        // streamed part is never held whole. What the parts that *are* held
-        // may cost is bounded, and that is what the limit is passed in for.
+        // Exempt from the size limit as a raw body is: the streamed part is
+        // never held whole, and the limit bounds the parts that are.
         is MultipartBody -> body.decode(
             contentType = req.header("Content-Type"),
             input = req.body.stream,
@@ -345,16 +326,21 @@ private fun invoke(
     req: Request,
 ): Response {
     val ep = se.endpoint
-    // Sized to what the endpoint declares. The default of 16 buckets is a
-    // 144-byte table for the two or three inputs an endpoint usually has.
+    // Sized to the declaration: the default 16 buckets is a 144-byte table
+    // for the two or three inputs an endpoint usually has.
     val values = LinkedHashMap<ParamKey<*>, Any?>(ep.declaredInputCount())
 
     // Built before decoding, so a filter or a failing decode can still put a
     // header on the way out.
     val params = Params(values, req, ep)
 
-    // ---- inputs: path, query, headers, body -------------------------------
+    // ---- what the caller will take, then the inputs -----------------------
+    //
+    // Negotiation first, so a caller who will not read what this endpoint sends
+    // is refused before the handler does the work.
     try {
+        negotiate(ep, req)
+
         decodePlainInputs(ep, req, values)
 
         readBody(ep, api, codecs, req, values)
@@ -364,10 +350,9 @@ private fun invoke(
 
     // ---- the handler ------------------------------------------------------
     //
-    // http4k answers on the calling thread, so a handler bound with one of the
-    // stage-taking binders is waited for here rather than handed back to the
-    // server. `strictBodyTimeoutMillis` has no equivalent: reading the body is
-    // a blocking read the server's own read timeout governs.
+    // http4k answers on the calling thread, so a stage-taking binder is waited
+    // for here. `strictBodyTimeoutMillis` has no equivalent: the body is a
+    // blocking read the server's own timeout governs.
     return try {
         val result = bound(params).toCompletableFuture().join()
         buildResponse(ep.output, result, codecs)

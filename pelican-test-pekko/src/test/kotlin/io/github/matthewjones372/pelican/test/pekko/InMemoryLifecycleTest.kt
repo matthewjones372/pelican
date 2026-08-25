@@ -12,10 +12,6 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-/**
- * An API with no codec configured at all — a text output needs none — which
- * also keeps this module's tests free of a JSON library.
- */
 private val ping = endpoint(noInputs) {
     get("ping")
     text()
@@ -34,11 +30,6 @@ class InMemoryLifecycleTest {
         }
     }
 
-    /**
-     * `terminate()` is asynchronous. Closing must not report success while the
-     * system is still running, or a suite that opens several clients quietly
-     * accumulates thread pools.
-     */
     @Test
     fun `closing waits for the actor system to actually terminate`() {
         val app = pingApi().inMemory("lifecycle-closes")

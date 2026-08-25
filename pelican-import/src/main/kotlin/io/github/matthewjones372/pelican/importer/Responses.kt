@@ -3,21 +3,9 @@ package io.github.matthewjones372.pelican.importer
 import io.github.matthewjones372.pelican.JsonObj
 
 /**
- * What an operation answers with.
- *
- * Every documented 2xx becomes a declared success and every other documented
- * status a failure the handler may return and the caller may match on — which
- * is one for one what `endpoint(...)` can now say, since a handler names the
- * response it is producing.
- *
- * `default` is the exception, and the only one: it becomes a failure with no
- * status, which is documented and never returned. See [IrFailure.returnable].
- *
- * `200 Order` beside `202 Accepted` used to be refused here, for the good
- * reason that an endpoint's output was one type and one status and picking
- * either lost the distinction. It is not refused any more; what is left of that
- * refusal is the pair below, which is genuinely unsayable rather than merely
- * unsaid.
+ * What an operation answers with: every documented 2xx a declared success, and
+ * every other status a failure the handler may return and the caller may match
+ * on — one for one with what `endpoint(...)` says.
  */
 internal class Responses(private val reader: Reader, private val operation: Operation) {
 
@@ -46,10 +34,6 @@ internal class Responses(private val reader: Reader, private val operation: Oper
             success(status, response, path) to headers(response, path)
         }
 
-        // A streamed response is produced by handing over the backend's own
-        // stream type, and naming one alternative among several is done in
-        // core, which cannot name it — so a stream is describable as the one
-        // success and not as one of two.
         if (successes.size > 1) {
             val streamed = successes.map { it.first }.filter { it.streams() }
             if (streamed.isNotEmpty()) {
@@ -65,11 +49,6 @@ internal class Responses(private val reader: Reader, private val operation: Oper
         }
 
         return Result(
-            // A header on the only success is the endpoint's own — that is what
-            // `emits(...)` says, and it is where a single-response import has
-            // always put it. With several, each response carries its own, since
-            // that is the only reading under which a `Location` on the 201 stays
-            // off the 200.
             successes = successes.map { (success, own) -> if (successes.size == 1) success else success.with(own) },
             failures = byStatus
                 .filterNot { (status, _) -> status != null && status in successful }
@@ -79,13 +58,10 @@ internal class Responses(private val reader: Reader, private val operation: Oper
     }
 
     /**
-     * What key this response is written under, as a status.
-     *
-     * Null is `default`, which is how core spells the one response an endpoint
-     * describes and cannot produce. It used to be refused outright, and what
-     * the refusal cost was every document that says "and any other error is a
-     * Problem" — which a document says far more often than it enumerates each
-     * status it might answer with.
+     * What key this response is written under, as a status. Null is `default`,
+     * core's spelling of the one response an endpoint describes and cannot
+     * produce — which documents say far more often than they enumerate every
+     * status they might answer with.
      */
     private fun statusOf(at: JsonPath, key: String): Int? = when (key) {
         "default" -> null
@@ -162,12 +138,6 @@ internal class Responses(private val reader: Reader, private val operation: Oper
         }
         val schema = (body as? JsonObj)?.get("schema")?.let(::normaliseSchema)
 
-        // Both at once is describable: `errorJson<T>(status, ..., retryAfter)`
-        // declares the payload and the headers together, and the handler
-        // supplies a value for each header when it returns the failure. This
-        // used to be refused, and a 429 with a problem body and a `Retry-After`
-        // — the commonest failure in any document with rate limiting in it —
-        // was the whole of what the refusal cost.
         return IrFailure(status, schema, description, headers(response, path))
     }
 

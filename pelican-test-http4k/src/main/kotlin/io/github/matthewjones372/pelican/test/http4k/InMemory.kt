@@ -16,11 +16,6 @@ import org.http4k.core.Method as Http4kMethod
  * no bind — but not a shortcut either: path matching, parameter decoding, body
  * handling and response building are the ones a bound server would use, because
  * they are literally the same function.
- *
- * What it does *not* exercise is everything below the handler: chunk framing on
- * the wire, connection handling, TLS. Keep a socket-level test for those — and
- * note that a streamed response is fully drained here, so this is the wrong
- * transport for asserting elements arrive as they are produced.
  */
 class InMemoryTransport(api: Api) : Transport {
 
@@ -57,11 +52,5 @@ private fun Method.toHttp4kMethod(): Http4kMethod = when (this) {
 
 /**
  * A client that talks to this API in memory, through http4k.
- *
- * ```
- * val app = ordersApi().inMemoryHttp4k()
- * ```
- *
- * Nothing to close: there is no actor system and no thread pool behind it.
  */
 fun Api.inMemoryHttp4k(): ApiClient = ApiClient(InMemoryTransport(this), codecs)

@@ -432,10 +432,6 @@ class OrdersApiTest {
     }
 }
 
-/**
- * The Authorize button only works if the page is told who it is and where the
- * identity provider may send the reader back to.
- */
 class SwaggerUiOAuthTest {
 
     private val oauth = oauth2AuthorizationCode(
@@ -507,10 +503,6 @@ class SwaggerUiOAuthTest {
     }
 }
 
-/**
- * The docs page has two ways to reach the document, and the fallback exists so
- * that switching off `/openapi.json` does not leave a page pointed at nothing.
- */
 class SwaggerUiTest {
 
     private fun serve(openApi: String?, docs: String?, block: (String) -> Unit) {

@@ -11,26 +11,17 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
 /**
- * The typed bridge between a backend-agnostic [Endpoint] and Pekko.
- *
- * Core cannot name `Source`, so it types streaming endpoints with the phantom
- * marker [StreamOf]. This file is where that marker is cashed in for a real
- * Pekko type — and the compiler still checks the element type. `pelican-ktor`
- * defines the same functions returning `Flow<T>`, and nothing in core or in the
- * endpoint descriptions changed to let it.
+ * The typed bridge between a backend-agnostic [Endpoint] and Pekko. Core cannot
+ * name `Source`, so streaming endpoints carry the phantom marker [StreamOf];
+ * this is where it is cashed in, with the element type still checked.
  */
 
 // ------------------------------------------------------------- value outputs
 //
-// Every binder takes `Params.(I) -> ...`, where I is the endpoint's declared
-// input list. With endpoint(a, b, c) that is a typed tuple; with the lens style
-// it is Params. One set of functions, both styles.
-//
-// The receiver is what lets a *typed* handler reach the things that are not
-// inputs — `setHeader`, an attribute a filter set, the backend's own request —
-// without giving up its typed inputs for the whole Params bag. A lambda that
-// ignores it is unchanged: `handledNow { id -> ... }` still compiles, and so
-// does `handledNow { (a, b) -> ... }`.
+// Every binder takes `Params.(I) -> ...` — a typed tuple with endpoint(a, b),
+// Params in the lens style. The receiver lets a typed handler still reach
+// `setHeader`, an attribute, or the backend's request. A lambda that ignores
+// it is unchanged.
 
 /** Binds an endpoint whose output is a single value. */
 infix fun <I, T : Any> Endpoint<I, T>.handledBy(f: Params.(I) -> CompletionStage<T>): ServerEndpoint =
@@ -46,14 +37,12 @@ infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoi
 
 // ------------------------------------------------------------- declared failures
 //
-// An endpoint that declares failures with `orFail` is an
-// `Endpoint<I, Fallible<E, T>>`, and these are the only binders that fit it.
-// The handler returns an `Outcome`, so producing an error the endpoint never
-// declared is a compile error rather than a 500 nobody documented.
+// `orFail` makes an `Endpoint<I, Fallible<E, T>>`, and these are the only
+// binders that fit it: the handler returns an `Outcome`, so an undeclared
+// error is a compile error.
 //
-// They are named apart from the total binders rather than overloading them:
-// a lambda's return type is inferred after overload resolution, so `(I) -> T`
-// and `(I) -> Outcome<E, T>` cannot be told apart at the call site.
+// Named apart rather than overloaded, because a lambda's return type is
+// inferred after overload resolution.
 
 /** Binds an endpoint that either succeeds with [T] or returns a declared failure. */
 infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOrFail(
@@ -70,14 +59,9 @@ infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledByOrFail(
 // ------------------------------------------------------------- several successes
 //
 // The same binder under the name that reads right when the alternatives are
-// not failures. An endpoint declaring `200 Order` beside `202 Accepted` is an
-// `Endpoint<I, Fallible<Nothing, Any>>` — the shape above with an empty failure
-// side — and a handler for it names the response it is producing by invoking
-// the declaration, exactly as it names a failure.
-//
-// Two names for one signature rather than one name for both, because
-// `handledOrFail` on an endpoint that declares no failure at all reads as a
-// mistake, and the call site is where the name is read.
+// not failures — `Fallible<Nothing, T>` is the shape above with an empty
+// failure side. Two names because `handledOrFail` on an endpoint declaring no
+// failure reads as a mistake.
 
 /** Binds an endpoint that answers with one of several declared responses. */
 infix fun <I, E : Any, T : Any> Endpoint<I, Fallible<E, T>>.handledOneOf(
