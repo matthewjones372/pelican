@@ -15,24 +15,24 @@ a public post that nobody else can make.
 
 Free, and mostly absent today.
 
-- [!] **Topics.** None set, so the repository is on no topic page.
-      ```bash
-      gh repo edit --add-topic kotlin --add-topic openapi --add-topic http4k --add-topic ktor --add-topic pekko --add-topic type-safe --add-topic api-first --add-topic rest-api --add-topic kotlin-library --add-topic openapi-generator
-      ```
-- [!] **Homepage URL.** Empty. Point it at the Maven Central listing, since
-      there is no docs site and the repository is its own front page.
-      ```bash
-      gh repo edit --homepage https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core
-      ```
+- [x] **Topics.** Set: `kotlin`, `openapi`, `http4k`, `ktor`, `pekko`,
+      `type-safe`, `api-first`, `rest-api`, `kotlin-library`,
+      `openapi-generator`.
+- [ ] **Homepage URL.** Left empty, deliberately. There is no docs site, and a
+      Sonatype artifact page is a package listing rather than a front page —
+      the badge already links it. Worth filling in when there is somewhere that
+      reads as the project's own: the published KDoc on javadoc.io once a
+      release ships the Dokka jar, or a real docs site if one is ever built.
 - [!] **Social preview.** `docs/assets/social-preview.png`, uploaded under
-      Settings → General → Social preview. GitHub does not read it from the
-      repository. Regenerate with `python3 docs/assets/social-preview.py`.
-- [!] **A GitHub release per Central version.** `v0.1.0` is tagged and
-      published; the releases page is empty. The feed reaches watchers and
-      Kotlin Weekly scrapes it.
-      ```bash
-      gh release create v0.1.0 --title "0.1.0" --notes-from-tag
-      ```
+      Settings → General → Social preview. **The only item here with no API** —
+      GitHub exposes no endpoint for it, so it has to be done in the browser.
+      GitHub does not read the file from the repository. Regenerate with
+      `python3 docs/assets/social-preview.py`.
+- [x] **A GitHub release per Central version.** `v0.1.0` is published, carrying
+      its changelog entry as the notes. `--notes-from-tag` is not enough on its
+      own: the tag sits on a merge commit, so it produced "Merge pull request
+      #2 from matthewjones372/feat/jsoniter-codecs" as the release body. Cut
+      the next one from `CHANGELOG.md`.
 - [x] **`CHANGELOG.md`.** A 0.x library promising breaking changes needs one.
 
 ## Machine-readable
