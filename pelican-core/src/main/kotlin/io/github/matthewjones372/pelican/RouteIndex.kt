@@ -48,6 +48,18 @@ class RouteIndex internal constructor(private val root: Node) {
     }
 
     /**
+     * Whether any method describes this path.
+     *
+     * For the backend that separates "no such path" from "not that method" and
+     * answers each differently. Walked only when [match] has already come back
+     * empty, which is a request that is going to be refused either way.
+     */
+    fun describesPath(path: String): Boolean =
+        Method.entries.any { method ->
+            walk(root, method, path, at = 0, captured = ArrayList(INITIAL_CAPTURES)) != null
+        }
+
+    /**
      * One segment at a time, literals before the capture.
      *
      * A literal that matches can still fail further down — `/orders/watch`

@@ -31,6 +31,7 @@ import io.github.matthewjones372.pelican.decodeList
 import io.github.matthewjones372.pelican.handlerFor
 import io.github.matthewjones372.pelican.readStrictBody
 import io.github.matthewjones372.pelican.requestBodyCodec
+import io.github.matthewjones372.pelican.routeIndex
 import org.http4k.core.HttpHandler
 import org.http4k.core.Request
 import org.http4k.core.Response
@@ -62,11 +63,23 @@ fun Api.toHttpHandler(): RoutingHttpHandler {
     // Folded around each handler once rather than per request, likewise.
     val handlers = endpoints.associateWith { handlerFor(it) }
 
-    val ordered = orderedEndpoints()
-    val routes = ordered.map { routeFor(it, this, resolved.getValue(it), handlers.getValue(it), cors) } +
-        preflightRoutes(ordered, cors)
-    require(routes.isNotEmpty()) { "This API has no endpoints." }
-    return routes(routes)
+    require(endpoints.isNotEmpty()) { "This API has no endpoints." }
+
+    // One matcher over a trie instead of one route per endpoint for http4k to
+    // walk. `routes(...)` tries its entries in turn — which is what a router
+    // does with opaque handlers, and cost about 150µs a request at two hundred
+    // endpoints, the same as those routes registered by hand.
+    val index = endpoints.routeIndex()
+    val dispatch = RoutingHttpHandler(
+        listOf(
+            IndexedRouteMatcher(index, invoke = { se, req, values ->
+                invoke(se, this, resolved.getValue(se), handlers.getValue(se), req, values).withCors(cors, req)
+            }),
+        ),
+    )
+
+    val preflight = preflightRoutes(orderedEndpoints(), cors)
+    return if (preflight.isEmpty()) dispatch else routes(listOf(dispatch) + preflight)
 }
 
 /**
@@ -154,17 +167,6 @@ private fun Api.orderedEndpoints(): List<ServerEndpoint> =
         }.thenBy { it.index },
     ).map { it.value }
 
-private fun routeFor(
-    se: ServerEndpoint,
-    api: Api,
-    codecs: EndpointCodecs,
-    bound: (Params) -> java.util.concurrent.CompletionStage<Any?>,
-    cors: CorsPolicy?,
-): RoutingHttpHandler {
-    val handler: HttpHandler = { req -> invoke(se, api, codecs, bound, req).withCors(cors, req) }
-    return se.endpoint.pathSpec.template bind se.endpoint.method.toHttp4k() to handler
-}
-
 /**
  * Cross-origin headers on a finished response, errors included: without them a
  * browser script sees a network error rather than the 400.
@@ -197,16 +199,7 @@ private fun negotiate(ep: Endpoint<*, *>, req: Request) {
 private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap<ParamKey<*>, Any?>) = with(into) {
     // A loop rather than `filterIsInstance`, which allocates a list per
     // request to hold what is walked once.
-    ep.pathSpec.segments.forEach { segment ->
-        if (segment is PathSegment.Capture) {
-            val param = segment.param
-            // Present by construction: this handler only runs for a request the
-            // template matched, and the template's captures are these params.
-            val raw = req.path(param.name)
-                ?: error("$ep matched ${req.uri.path} but captured no '${param.name}'")
-            put(param, param.codec.decode(param.name, raw))
-        }
-    }
+    // Path captures are already here: the index decoded them as it matched.
 
     ep.queries.forEach { q ->
         val style = q.listStyle
@@ -327,11 +320,9 @@ private fun invoke(
     codecs: EndpointCodecs,
     bound: (Params) -> java.util.concurrent.CompletionStage<Any?>,
     req: Request,
+    values: MutableMap<ParamKey<*>, Any?>,
 ): Response {
     val ep = se.endpoint
-    // Sized to the declaration: the default 16 buckets is a 144-byte table
-    // for the two or three inputs an endpoint usually has.
-    val values = LinkedHashMap<ParamKey<*>, Any?>(ep.declaredInputCount())
 
     // Built before decoding, so a filter or a failing decode can still put a
     // header on the way out.

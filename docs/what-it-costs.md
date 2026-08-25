@@ -90,48 +90,29 @@ adding endpoints over time.
 `./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"` — a class of its
 own, so the six-minute run above is unchanged.
 
-| endpoints | Pelican on http4k | http4k routes, by hand | **Pelican on Pekko** |
+| endpoints | **Pelican on http4k** | http4k routes, by hand | **Pelican on Pekko** |
 |---|---|---|---|
-| 1 | 1771 ± 265ns | 1646 ± 1472ns | **713 ± 23ns** |
-| 50 | 37,827ns | 62,125ns | **701 ± 122ns** |
-| 200 | 147,907ns | 146,314ns | **645 ± 28ns** |
+| 1 | **220 ± 28ns** | 1725 ± 667ns | **713 ± 23ns** |
+| 50 | **226 ± 21ns** | 37,920 ± 1095ns | **701 ± 122ns** |
+| 200 | **223 ± 9ns** | 149,170 ± 7720ns | **645 ± 28ns** |
 
-Pekko's column is flat because Pekko no longer scans: the descriptions go into a
-trie once and a request walks its own path instead of the endpoint list. Those
-are whole requests — a path parameter decoded, the handler run, the response
-encoded — not a dispatch microbenchmark. At two hundred endpoints it is **232
-times** what the same service cost before, and the row does not slope.
+Both Pelican columns are flat, and the hand-written one is not. That is the
+whole of the difference between holding descriptions and holding handlers: given
+a list of opaque handlers a router can only try them in turn, and given the path
+templates they can be walked into a trie once and matched by segment afterwards.
 
-http4k still scans, and its column is what that costs. Its interpreter is the
-next thing to move onto the index; it needs a `RoutingHttpHandler` that can
-report no-match, where Pekko already had `reject()`.
+These are whole requests — a path parameter decoded, the handler run, the
+response encoded — not a dispatch microbenchmark. At two hundred endpoints
+http4k is **669 times** what the same service cost written by hand, and Pekko is
+two orders of magnitude over its own control.
 
-At two hundred endpoints a request spends about 150µs being matched, against
-under two microseconds for the first. That is a real cost and a service with a
-hundred endpoints will pay it.
+The single-endpoint row is worth reading twice: **220ns against 1725ns**, so this
+is not only a large-service story. Matching one template through http4k's router
+costs more than walking a trie that happens to have one entry in it.
 
-**It is not the interpreter.** The middle column is the control: the same two
-hundred routes registered with http4k directly, no Pelican involved. Measured
-against each other with tighter bounds:
-
-```
-Pelican on http4k, 200 endpoints:   134,344 ± 8559ns
-the same routes written by hand:    135,104 ± 5465ns
-```
-
-The two are the same number. `routes(...)` and `Directives.concat` are ordered
-scans, and at two hundred entries that is what an ordered scan costs whoever
-built the list. Interpreting a description adds nothing measurable to it — which
-is the same finding as every table above, holding at a scale those tables do not
-reach.
-
-Two caveats worth keeping. The decoys have **distinct first path segments**,
-which is the shape most flattering to an index and least flattering to a scan; a
-service whose endpoints all sit under `/orders` would degrade differently. And
-the hand-written Pekko control is not comparable in the same way — building a
-sealed route and running one request through a materialised flow costs about
-23µs on its own, which swamps the first column, so only the http4k control is
-apples to apples.
+What replaced what: an earlier attempt grouped the routes under a prefix using
+http4k's own nesting, and measured 155µs at two hundred — an outer scan is still
+a scan. Only owning the dispatch moves the number.
 
 Ktor is exempt by construction — `Route.pelican` installs one Ktor route per
 endpoint and lets Ktor's own tree score them — and is not yet measured here.
