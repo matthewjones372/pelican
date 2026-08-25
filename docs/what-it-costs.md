@@ -78,6 +78,42 @@ is a JIT decision that goes one of two ways per process, which is exactly the
 thing a single-JVM loop cannot see and forks exist to expose. Read the row as
 "1350 or 2040, depending on the JVM", not as a number with a wobble.
 
+## What matching costs when there is more than one endpoint
+
+Every table above uses an API of **one** endpoint, which measures decoding and
+rendering and says nothing about the thing that actually varies between
+services. Pekko reduces its routes with `Directives.concat` and http4k's
+`routes(...)` tries them in order, so both are an ordered scan. The endpoint
+under test is declared last, which is the worst case a scan has and the one a
+service acquires by adding endpoints over time.
+
+`./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"` — a class of its
+own, so the six-minute run above is unchanged.
+
+| endpoints | Pelican on http4k | Pelican on Pekko |
+|---|---|---|
+| 1 | 1757 ± 265ns | 670 ± 187ns |
+| 50 | 48,511ns | 20,063ns |
+| 200 | 151,063 ± 37,778ns | 148,140 ± 16,189ns |
+
+**The curve is not flat, and this is the honest headline of the page.** At two
+hundred endpoints a request spends about 150µs being matched, against 1.8µs and
+0.7µs for the first. Allocation tells the same story: http4k goes from 4.6KB a
+request to 385KB, because each candidate that fails to match does work and
+throws it away — Pekko's rejections and http4k's route attempts both allocate.
+
+Two things to hold on to before reading it as a verdict on the library. The
+decoys have **distinct first path segments**, which is the shape most flattering
+to an index and least flattering to a scan; a service whose endpoints all sit
+under `/orders` would degrade differently. And both routers are doing the
+scanning — this is what `concat` and `routes(...)` do with the list they are
+given, not something the interpreter adds on top.
+
+What it means for a service today: a handful of endpoints costs what the tables
+above say. A hundred or more, and matching is the dominant cost of a request.
+Ktor is exempt by construction — `Route.pelican` installs one Ktor route per
+endpoint and lets Ktor's own tree score them — and is not yet measured here.
+
 ## An endpoint with nothing to decode
 
 `GET /ping`, answering text.
