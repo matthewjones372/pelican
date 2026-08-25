@@ -11,7 +11,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | Module | Depends on | Contains |
 |---|---|---|
 | `pelican-core` | **nothing** | endpoint descriptions, plain-value codecs, a minimal JSON tree. No HTTP library, no JSON library. |
-| `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 document, in JSON or YAML |
+| `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
@@ -24,6 +24,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-ktor` | core, ktor-server-core, ktor-server-cio | descriptions → Ktor routes, with `suspend` handlers and `Flow` streams |
 | `pelican-ktor-docs` | ktor, openapi | the same two pages, on Ktor |
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
+| `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
 | `pelican-test-http4k` | test, http4k | the in-memory transport, on http4k |
 | `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
@@ -684,6 +685,7 @@ and Gradle's are not the same Jackson.
 | `outputDir` | clients | `build/generated/pelican/<name>` |
 | `format` | documents | `JSON`; `YAML` writes the same document the other way |
 | `outputFile` | documents | `build/generated/pelican/<name>/openapi.<format>` |
+| `baseline` | documents | unset. A committed document to check against; setting it registers `check<Name>Document` and wires it into `check`. See below |
 | `document` | endpoints | — required: the OpenAPI document to read |
 | `packageName` | endpoints | — required |
 | `exclude` | endpoints | empty: `operationId`s to leave out. See below |
@@ -705,6 +707,49 @@ dependencies { pelicanImport("io.github.matthewjones372:pelican-import:0.1.0") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
+
+### Checking against the document callers hold
+
+A `documents` entry that names a `baseline` gets a second task,
+`check<Name>Document`, wired into `check`:
+
+```kotlin
+pelican {
+    documents {
+        create("orders") {
+            specClass.set("com.example.GenerateOpenApiKt")
+            outputFile.set(layout.buildDirectory.file("openapi.json"))
+            // The document your callers already have, committed.
+            baseline.set(layout.projectDirectory.file("api/openapi.json"))
+        }
+    }
+}
+```
+
+It compares what the descriptions publish now against that file and fails the
+build when a difference is one an existing caller cannot survive:
+
+```
+> Task :example:checkOrdersDocument FAILED
+openapi.json — 2 changes break callers.
+
+  GET /users/{userId}
+    ✖ `nickname` in the 200 response (application/json) is gone
+        a caller reading it gets nothing
+
+  GET /users/{userId}/orders/legacy
+    ✖ the operation is gone
+        every caller still holding it gets a 404
+```
+
+The classification is the same one the golden files make — see
+[Golden files](#golden-files) — so a project can take either or both: the task
+answers `./gradlew check` without a test suite, and the goldens answer per
+endpoint inside one. Pointing both at the same committed file is the tidiest
+arrangement, and is what `example` does.
+
+A compatible difference is printed and does not fail, so the task is also the
+short answer to "what does this release change for callers".
 
 ### Where the output goes, and what that changes
 
@@ -3041,6 +3086,68 @@ rename, and the contract test should.** `BookmarksContractTest` holds both, and
 `AllBackendsTest` pins the greetings URLs and then sends the pinned call, so
 three interpreters agreeing on how to *build* a request is backed by each one
 answering at the address itself.
+
+### Golden files
+
+A pin catches the rename it was written for, and somebody has to write one per
+endpoint. The change nobody writes a pin for is the one that costs most: a
+required field added to a request body passes every typed test in the suite,
+because the client that sends it is built from the same description the server
+reads it with.
+
+`pelican-test-golden` records what each endpoint publishes into a file, and
+compares the next run against that file as a contract:
+
+```kotlin
+private val golden = Golden()
+
+@Test fun `every endpoint publishes what it published`() {
+    golden.operations(ordersSpec())          // golden/operations/placeOrder.json, and one per endpoint
+}
+```
+
+The comparison is between two OpenAPI documents, classified from the caller's
+side of the wire. A deleted endpoint, a new required parameter or body field, a
+field that became required, a removed status, a response field that disappeared
+or became nullable, a renamed `operationId` and an added security requirement
+each fail the test and name the caller they break. A new endpoint, a new
+optional parameter, a new response field or a rewritten summary rewrites the
+golden and passes — a check that fails on changes nobody has to act on is one
+whose author learns to accept its output unread, which is how a real break gets
+waved through. `Golden(strict = true)` fails on every difference where that is
+wanted.
+
+An endpoint deleted is caught the same way: its golden is left with nothing to
+regenerate it, and a recording nothing produces is read as the deletion it is.
+
+The classification is `pelican-openapi`'s, over two documents, and is public on
+its own:
+
+```kotlin
+apiChanges(published, ordersSpec().openApi()).filter { it.compatibility == Compatibility.BREAKING }
+```
+
+A failure reads as the decision it is — the count first, then the operations,
+then what each change does to somebody:
+
+```
+placeOrder.json — 1 change breaks callers.
+
+  POST /users/{userId}/orders
+    ✖ `currency` in the request body (application/json) is new and required
+        every caller that is not sending it is refused
+```
+
+The wire recordings are the other half — `request` and `exchange` record the
+bytes a call puts on the wire, as text, where any difference fails:
+
+```kotlin
+golden.request("place-order", requestsOnly(JacksonCodecs).request(placeOrder, In3(7L, key, order)))
+```
+
+The whole of it — the table of what breaks, accepting a break you meant, and the
+`PELICAN_GOLDEN_UPDATE` switch — is in
+[docs/golden-testing.md](golden-testing.md).
 
 ### Asserting on an outcome
 

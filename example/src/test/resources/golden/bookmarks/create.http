@@ -1,0 +1,11 @@
+POST /bookmarks
+X-Api-Key: let-me-in
+
+{
+  "url": "https://pekko.apache.org",
+  "title": "Pekko",
+  "tags": [
+    "streams",
+    "jvm"
+  ]
+}

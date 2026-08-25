@@ -389,4 +389,16 @@ class ReflectionTest {
         failure.message.orEmpty() shouldContain "pelican-import"
         failure.message.orEmpty() shouldContain "takes no codec"
     }
+
+    @Test
+    fun `asks the comparison for a report and for how much of it breaks somebody`() {
+        val unchanged = Pelican.compatibility(loader, "same", "same", "openapi.json")
+        unchanged.first shouldBe "openapi.json — nothing changed."
+        unchanged.second shouldBe 0
+
+        val broken = Pelican.compatibility(loader, "before", "after", "openapi.json")
+        broken.second shouldBe 1
+        // Colour is a decision the caller makes, and a build log is not a terminal.
+        broken.first shouldContain "false"
+    }
 }

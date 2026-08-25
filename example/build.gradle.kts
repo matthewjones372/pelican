@@ -40,6 +40,9 @@ dependencies {
     // ask for the one they need. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
     testImplementation(project(":pelican-test-http4k"))
+    // Golden files for the document and for the request lines: the half of the
+    // contract a typed call is blind to. See GoldenContractTest.
+    testImplementation(project(":pelican-test-golden"))
 
     // Matchers, declared here rather than arriving through pelican-test. The
     // library ships assertions that throw AssertionError; which matcher
@@ -130,6 +133,12 @@ pelican {
             specClass.set("example.GenerateOpenApiKt")
             specFunction.set("ordersSpec")
             outputFile.set(layout.buildDirectory.file("openapi.json"))
+            // The document callers hold, committed. Naming it registers
+            // `checkOrdersDocument` and wires it into `check`: a change that
+            // would break somebody written against this file fails the build
+            // and prints what it would do to them. The same file is the
+            // golden `GoldenContractTest` records, so the two cannot disagree.
+            baseline.set(layout.projectDirectory.file("src/test/resources/golden/openapi.json"))
         }
         // The same document, written the other way. Two entries rather than a
         // format that flips, because a service that publishes both publishes

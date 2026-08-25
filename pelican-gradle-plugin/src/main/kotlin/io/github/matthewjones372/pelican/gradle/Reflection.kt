@@ -23,6 +23,7 @@ internal object Pelican {
     private const val CLIENT = "io.github.matthewjones372.pelican.codegen.KotlinClientKt"
     private const val OPEN_API = "io.github.matthewjones372.pelican.openapi.OpenApiKt"
     private const val YAML = "io.github.matthewjones372.pelican.openapi.YamlKt"
+    private const val REPORT = "io.github.matthewjones372.pelican.openapi.ReportKt"
     private const val IMPORT = "io.github.matthewjones372.pelican.importer.ImportKt"
     private const val CODEC_ANNOTATIONS = "io.github.matthewjones372.pelican.codegen.CodecAnnotations"
 
@@ -403,6 +404,33 @@ internal object Pelican {
         }
         val renderer = load(loader, className, "pelican-openapi")
         return renderer.getMethod(function, apiSpec).invokeUnwrapped(null, spec) as String
+    }
+
+    /**
+     * What changed for the people already calling the service, and how many of
+     * those changes break them.
+     *
+     * Two calls rather than one, because what crosses this boundary is a
+     * `String` and an `int` — the plugin cannot hold an `ApiChange`, and a
+     * shape invented to carry one over reflection would be a second API for
+     * the library to keep. The comparison runs twice over two small documents;
+     * that costs less than the type would.
+     */
+    fun compatibility(loader: ClassLoader, published: String, proposed: String, heading: String): Pair<String, Int> {
+        val report = load(loader, REPORT, "pelican-openapi")
+        val text = report
+            .getMethod(
+                "compatibilityReport",
+                String::class.java,
+                String::class.java,
+                String::class.java,
+                Boolean::class.java,
+            )
+            .invokeUnwrapped(null, published, proposed, heading, false) as String
+        val breaking = report
+            .getMethod("breakingChanges", String::class.java, String::class.java)
+            .invokeUnwrapped(null, published, proposed) as Int
+        return text to breaking
     }
 
     // ----------------------------------------------------------------------

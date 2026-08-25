@@ -204,6 +204,25 @@ class PelicanPlugin : Plugin<Project> {
                 }
             }
         }
+
+        val check = tasks.register("check${name}Document", CheckDocumentTask::class.java) { task ->
+            task.description =
+                "Fails when the descriptions have moved away from the committed ${document.name} document"
+            task.classpath.from(document.classpath)
+            task.specClass.set(document.specClass)
+            task.specFunction.set(document.specFunction)
+            task.baseline.set(document.baseline)
+            task.entryName.set(document.name)
+        }
+
+        // Only where there is a document to compare against. A `baseline`
+        // nobody set is an entry that only generates, and a check with nothing
+        // on the other side of it would fail for having been registered.
+        afterEvaluate {
+            if (document.baseline.isPresent) {
+                tasks.matching { task -> task.name == "check" }.configureEach { task -> task.dependsOn(check) }
+            }
+        }
     }
 
     private fun Project.defaultOutput(name: String) = layout.buildDirectory.dir("generated/pelican/$name")

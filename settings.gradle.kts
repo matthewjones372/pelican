@@ -28,6 +28,7 @@ include(
     "pelican-ktor",
     "pelican-ktor-docs",
     "pelican-test",
+    "pelican-test-golden",
     "pelican-test-pekko",
     "pelican-test-http4k",
     "example",

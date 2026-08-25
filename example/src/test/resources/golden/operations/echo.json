@@ -1,0 +1,41 @@
+{
+  "paths": {
+    "/echo": {
+      "post": {
+        "summary": "Echo the request body back as it arrives",
+        "operationId": "echo",
+        "tags": [
+          "diagnostics"
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Anything; it is never buffered",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A byte stream.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "contentMediaType": "application/octet-stream"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  }
+}
