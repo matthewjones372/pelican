@@ -5,12 +5,20 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
 import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.JsonArr
+import io.github.matthewjones372.pelican.JsonBool
+import io.github.matthewjones372.pelican.JsonNum
+import io.github.matthewjones372.pelican.JsonObj
+import io.github.matthewjones372.pelican.JsonStr
+import io.github.matthewjones372.pelican.JsonValue
+import io.github.matthewjones372.pelican.emptyJsonObj
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsoniter.JsoniterCodecs
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
+import io.kotest.matchers.shouldBe
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.junit.jupiter.api.DynamicTest
@@ -131,6 +139,34 @@ class SchemaAgreementTest {
         }
 
     /**
+     * The inverse claim, and the one the encode direction cannot make: a caller
+     * who sends exactly what the schema asks for and nothing more has to be
+     * read. What the schema calls optional is where the three libraries
+     * disagree, so the payload is built from the schema alone rather than from
+     * a value one of them wrote.
+     */
+    @TestFactory
+    fun `every codec reads the smallest payload its own published schema accepts`(): List<DynamicTest> =
+        sources.flatMap { (library, codecs) ->
+            shapes.map { shape ->
+                DynamicTest.dynamicTest("$library: ${shape.name}") {
+                    val document = StandaloneSchemas(codecs).schema(shape.type)
+                    val minimal = document.smallestPayload().render()
+
+                    withClue("$minimal is not a payload $library's own schema accepts, so this asserts nothing") {
+                        validate(document.render(), minimal).shouldBeEmpty()
+                    }
+
+                    val refusal = runCatching { codecs.codec<Any>(shape.type).decodeFromString(minimal) }
+                        .exceptionOrNull()
+                    withClue("$library published a schema that accepts $minimal, and refuses it: $refusal") {
+                        refusal shouldBe null
+                    }
+                }
+            }
+        }
+
+    /**
      * The harness, checked against a schema that is wrong on purpose.
      *
      * Every claim above passes today, so without this there is no evidence the
@@ -158,4 +194,52 @@ class SchemaAgreementTest {
             .validate(mapper.readTree(instance))
             .map { it.message }
     }
+}
+
+// ------------------------------------------------------------------ helpers
+
+/**
+ * The smallest payload this document's root accepts: the required properties
+ * and no others, each at the value the schema pins or an arbitrary one of the
+ * type it names.
+ *
+ * Written from the schema alone, which is the point — a property the schema
+ * calls optional is a property a caller following the document leaves out.
+ */
+private fun JsonObj.smallestPayload(): JsonValue = sampleOf(this)
+
+private fun JsonObj.sampleOf(schema: JsonObj): JsonValue =
+    schema["const"]
+        ?: (schema["\$ref"] as? JsonStr)?.let { sampleOf(definition(it.value)) }
+        ?: (schema["enum"] as? JsonArr)?.items?.firstOrNull()
+        // A `oneOf` is a union and an `anyOf` is how a nullable `$ref` is spelled;
+        // either way the first branch is a value the schema accepts.
+        ?: ((schema["oneOf"] ?: schema["anyOf"]) as? JsonArr)?.items?.firstOrNull()
+            ?.let { sampleOf(it as? JsonObj ?: emptyJsonObj) }
+        ?: byType(schema)
+
+private fun JsonObj.byType(schema: JsonObj): JsonValue = when (schema.typeName()) {
+    "object" -> requiredOf(schema)
+    "array" -> JsonArr(emptyList())
+    "integer", "number" -> JsonNum(1)
+    "boolean" -> JsonBool(true)
+    else -> JsonStr("x")
+}
+
+private fun JsonObj.requiredOf(schema: JsonObj): JsonObj {
+    val properties = (schema["properties"] as? JsonObj)?.fields.orEmpty()
+    val required = ((schema["required"] as? JsonArr)?.items.orEmpty()).mapNotNull { (it as? JsonStr)?.value }
+    return JsonObj(
+        required.mapNotNull { name -> (properties[name] as? JsonObj)?.let { name to sampleOf(it) } }.toMap(),
+    )
+}
+
+private fun JsonObj.definition(pointer: String): JsonObj =
+    (this["\$defs"] as? JsonObj)?.get(pointer.substringAfterLast('/')) as? JsonObj ?: emptyJsonObj
+
+/** What a schema calls itself, reading past the `"null"` a 3.1 type array adds. */
+private fun JsonObj.typeName(): String? = when (val type = this["type"]) {
+    is JsonStr -> type.value
+    is JsonArr -> type.items.filterIsInstance<JsonStr>().map { it.value }.firstOrNull { it != "null" }
+    else -> null
 }
