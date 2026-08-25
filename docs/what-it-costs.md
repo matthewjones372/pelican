@@ -90,11 +90,21 @@ adding endpoints over time.
 `./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"` — a class of its
 own, so the six-minute run above is unchanged.
 
-| endpoints | Pelican on http4k | http4k routes, by hand | Pelican on Pekko |
+| endpoints | Pelican on http4k | http4k routes, by hand | **Pelican on Pekko** |
 |---|---|---|---|
-| 1 | 1771 ± 265ns | 1646 ± 1472ns | 670 ± 187ns |
-| 50 | 37,827ns | 62,125ns | 20,567ns |
-| 200 | 147,907ns | 146,314ns | 149,511ns |
+| 1 | 1771 ± 265ns | 1646 ± 1472ns | **713 ± 23ns** |
+| 50 | 37,827ns | 62,125ns | **701 ± 122ns** |
+| 200 | 147,907ns | 146,314ns | **645 ± 28ns** |
+
+Pekko's column is flat because Pekko no longer scans: the descriptions go into a
+trie once and a request walks its own path instead of the endpoint list. Those
+are whole requests — a path parameter decoded, the handler run, the response
+encoded — not a dispatch microbenchmark. At two hundred endpoints it is **232
+times** what the same service cost before, and the row does not slope.
+
+http4k still scans, and its column is what that costs. Its interpreter is the
+next thing to move onto the index; it needs a `RoutingHttpHandler` that can
+report no-match, where Pekko already had `reject()`.
 
 At two hundred endpoints a request spends about 150µs being matched, against
 under two microseconds for the first. That is a real cost and a service with a
