@@ -1,6 +1,6 @@
 # Modules
 
-Linked from the [README](../README.md). What each of the twenty-four modules is
+Linked from the [README](../README.md). What each of the twenty-five modules is
 for, and what it depends on — the list to read when deciding which ones a
 build actually needs.
 
