@@ -155,7 +155,11 @@ class Api(
      */
     val cors: Cors? = null,
 
-    /** How long to wait for a strict (non-streaming) request body. */
+    /**
+     * How long to wait for a strict (non-streaming) request body. Past it the
+     * caller gets a 408 on Pekko and on Ktor; http4k reads on the calling
+     * thread and its server owns that timeout, so this does not reach it.
+     */
     val strictBodyTimeoutMillis: Long = 10_000,
 
     /**

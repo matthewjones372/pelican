@@ -385,7 +385,22 @@ private fun readStrictBody(
         .exceptionally { t ->
             // The backstop for a chunked request. Pekko signals it with an
             // EntityStreamException; core names the condition itself.
-            throw if (isSizeLimit(t)) PayloadTooLarge(api.maxBodyBytes) else t
+            throw when {
+                isSizeLimit(t) -> PayloadTooLarge(api.maxBodyBytes)
+
+                // `toStrict` gives up on a body that stops arriving, and the
+                // caller is the one who can act on that. Ktor already answers
+                // 408 here; this used to fall through as a 500, so the same
+                // `strictBodyTimeoutMillis` meant two different answers.
+                isReadTimeout(t) -> ApiException(
+                    REQUEST_TIMEOUT,
+                    "Timed out reading the request body",
+                    "The body did not arrive within the ${api.strictBodyTimeoutMillis}ms this service " +
+                        "waits for one. Send it faster, or raise Api(strictBodyTimeoutMillis = ...).",
+                )
+
+                else -> t
+            }
         }
         .thenApply { strict ->
             // Against the limit itself, not the ceiling the read was given.
@@ -455,6 +470,14 @@ private fun HttpResponse.withHeaders(params: Params): HttpResponse {
  * for other entity problems, so the message is matched too. Anything else keeps
  * its 500, and the Content-Length check catches the ordinary case first.
  */
+
+/** What `toStrict` throws when the body stops arriving, wrapped or not. */
+private fun isReadTimeout(t: Throwable): Boolean =
+    generateSequence(t) { it.cause }.any { it is java.util.concurrent.TimeoutException }
+
+/** RFC 9110's status for a caller who did not finish sending in time. */
+private const val REQUEST_TIMEOUT = 408
+
 private fun isSizeLimit(t: Throwable): Boolean =
     generateSequence(t) { it.cause }.any {
         it is org.apache.pekko.stream.StreamLimitReachedException ||
