@@ -1,0 +1,9 @@
+public final class io/github/matthewjones372/pelican/client/pekko/PekkoHttpTransport : io/github/matthewjones372/pelican/ClientTransport {
+	public static final field CONTENT_LENGTH Ljava/lang/String;
+	public static final field CONTENT_TYPE Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Lorg/apache/pekko/actor/ClassicActorSystemProvider;)V
+	public synthetic fun <init> (Lorg/apache/pekko/actor/ClassicActorSystemProvider;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
+}
+

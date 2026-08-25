@@ -1,0 +1,91 @@
+public final class io/github/matthewjones372/pelican/test/ApiCallFailed : java/lang/RuntimeException {
+	public fun <init> (Lio/github/matthewjones372/pelican/Endpoint;Lio/github/matthewjones372/pelican/test/RequestSpec;Lio/github/matthewjones372/pelican/test/ResponseSpec;)V
+	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
+	public final fun getRequest ()Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public final fun getResponse ()Lio/github/matthewjones372/pelican/test/ResponseSpec;
+}
+
+public final class io/github/matthewjones372/pelican/test/ApiClient : java/lang/AutoCloseable {
+	public fun <init> (Lio/github/matthewjones372/pelican/test/Transport;Lio/github/matthewjones372/pelican/Codecs;Ljava/lang/String;)V
+	public synthetic fun <init> (Lio/github/matthewjones372/pelican/test/Transport;Lio/github/matthewjones372/pelican/Codecs;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun call (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Ljava/lang/Object;
+	public final fun callFallible (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Ljava/lang/Object;
+	public fun close ()V
+	public final fun collect (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Ljava/util/List;
+	public final fun collectFallible (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Ljava/util/List;
+	public final fun getCodecs ()Lio/github/matthewjones372/pelican/Codecs;
+	public final fun getPrefers ()Ljava/lang/String;
+	public final fun getTransport ()Lio/github/matthewjones372/pelican/test/Transport;
+	public final fun outcome (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
+	public final fun request (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public final fun response (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+	public final fun sending (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ApiClient;
+}
+
+public final class io/github/matthewjones372/pelican/test/ApiClientKt {
+	public static final fun rawText (Ljava/lang/String;)Lio/github/matthewjones372/pelican/ByteStreamHandle;
+}
+
+public final class io/github/matthewjones372/pelican/test/AssertionsKt {
+	public static final fun errorBody (Lio/github/matthewjones372/pelican/test/ApiClient;Lio/github/matthewjones372/pelican/test/ResponseSpec;)Lio/github/matthewjones372/pelican/ApiError;
+	public static final fun shouldBeApiError (Lio/github/matthewjones372/pelican/test/ApiClient;Lio/github/matthewjones372/pelican/test/ResponseSpec;ILjava/lang/String;)Lio/github/matthewjones372/pelican/ApiError;
+	public static final fun shouldBeError (Lio/github/matthewjones372/pelican/Outcome;)Ljava/lang/Object;
+	public static final fun shouldBeError (Lio/github/matthewjones372/pelican/Outcome;Ljava/lang/Object;)Ljava/lang/Object;
+	public static final fun shouldBeFailure (Lio/github/matthewjones372/pelican/Outcome;Lio/github/matthewjones372/pelican/ErrorOutput;)Ljava/lang/Object;
+	public static final fun shouldBeOk (Lio/github/matthewjones372/pelican/Outcome;)Ljava/lang/Object;
+	public static final fun shouldBeResponse (Lio/github/matthewjones372/pelican/Outcome;Lio/github/matthewjones372/pelican/Output;)Ljava/lang/Object;
+	public static final fun shouldBeSuccessful (Lio/github/matthewjones372/pelican/test/ResponseSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+	public static final fun shouldBuild (Lio/github/matthewjones372/pelican/test/RequestSpec;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public static final fun shouldHaveContentType (Lio/github/matthewjones372/pelican/test/ResponseSpec;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+	public static final fun shouldHaveHeader (Lio/github/matthewjones372/pelican/test/ResponseSpec;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+	public static final fun shouldHaveNoBody (Lio/github/matthewjones372/pelican/test/ResponseSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+	public static final fun shouldHaveStatus (Lio/github/matthewjones372/pelican/test/ResponseSpec;I)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+}
+
+public final class io/github/matthewjones372/pelican/test/HttpClientTransport : io/github/matthewjones372/pelican/test/Transport {
+	public fun <init> (Ljava/lang/String;Ljava/net/http/HttpClient;Ljava/time/Duration;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/net/http/HttpClient;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun send (Lio/github/matthewjones372/pelican/test/RequestSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+}
+
+public final class io/github/matthewjones372/pelican/test/HttpClientTransportKt {
+	public static final fun apiClient (Ljava/lang/String;Lio/github/matthewjones372/pelican/Codecs;)Lio/github/matthewjones372/pelican/test/ApiClient;
+}
+
+public final class io/github/matthewjones372/pelican/test/RequestSpec {
+	public fun <init> (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)V
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getHeaders ()Ljava/util/List;
+	public final fun getMethod ()Lio/github/matthewjones372/pelican/Method;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getQuery ()Ljava/util/List;
+	public final fun getTarget ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+	public final fun withBody (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public final fun withHeader (Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public final fun withMethod (Lio/github/matthewjones372/pelican/Method;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public final fun withPath (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public final fun withoutHeader (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public final fun withoutQuery (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+}
+
+public final class io/github/matthewjones372/pelican/test/ResponseSpec {
+	public fun <init> (ILjava/util/List;Ljava/lang/String;)V
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getContentType ()Ljava/lang/String;
+	public final fun getHeaders ()Ljava/util/List;
+	public final fun getStatus ()I
+	public final fun header (Ljava/lang/String;)Ljava/lang/String;
+	public final fun isSuccess ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/test/TextBody : io/github/matthewjones372/pelican/ByteStreamHandle {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getText ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/test/Transport {
+	public abstract fun send (Lio/github/matthewjones372/pelican/test/RequestSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+}
+

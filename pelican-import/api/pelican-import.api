@@ -1,0 +1,42 @@
+public final class io/github/matthewjones372/pelican/importer/Backend : java/lang/Enum {
+	public static final field HTTP4K Lio/github/matthewjones372/pelican/importer/Backend;
+	public static final field KTOR Lio/github/matthewjones372/pelican/importer/Backend;
+	public static final field PEKKO Lio/github/matthewjones372/pelican/importer/Backend;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/importer/Backend;
+	public static fun values ()[Lio/github/matthewjones372/pelican/importer/Backend;
+}
+
+public final class io/github/matthewjones372/pelican/importer/Import {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/importer/Import;
+	public final fun kotlin (Ljava/io/File;Lio/github/matthewjones372/pelican/importer/ImportOptions;)Ljava/util/Map;
+	public final fun updateLock (Ljava/io/File;Lio/github/matthewjones372/pelican/importer/ImportOptions;Z)Ljava/util/List;
+	public final fun write (Ljava/io/File;Lio/github/matthewjones372/pelican/importer/ImportOptions;Ljava/io/File;)Ljava/util/List;
+}
+
+public final class io/github/matthewjones372/pelican/importer/ImportFailure : java/lang/RuntimeException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/matthewjones372/pelican/importer/ImportKt {
+	public static final fun importEndpoints (Ljava/io/File;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;)Ljava/util/List;
+	public static final fun importEndpoints (Ljava/io/File;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/lang/String;)Ljava/util/List;
+	public static final fun importEndpoints (Ljava/io/File;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)Ljava/util/List;
+	public static final fun importEndpoints (Ljava/io/File;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Set;Ljava/io/File;)Ljava/util/List;
+	public static final fun updateRemoteLock (Ljava/io/File;Ljava/io/File;Ljava/lang/String;Ljava/util/Set;Z)Ljava/util/List;
+}
+
+public final class io/github/matthewjones372/pelican/importer/ImportOptions {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/util/Set;Ljava/io/File;Lio/github/matthewjones372/pelican/codegen/CodecAnnotations;Lio/github/matthewjones372/pelican/importer/Backend;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/util/Set;Ljava/io/File;Lio/github/matthewjones372/pelican/codegen/CodecAnnotations;Lio/github/matthewjones372/pelican/importer/Backend;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAllowRemote ()Ljava/util/Set;
+	public final fun getCodec ()Lio/github/matthewjones372/pelican/codegen/CodecAnnotations;
+	public final fun getDiscriminators ()Ljava/util/Map;
+	public final fun getExclude ()Ljava/util/Set;
+	public final fun getHandlers ()Lio/github/matthewjones372/pelican/importer/Backend;
+	public final fun getLockfile ()Ljava/io/File;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPackageName ()Ljava/lang/String;
+}
+

@@ -1,0 +1,100 @@
+public final class io/github/matthewjones372/pelican/openapi/Ansi : io/github/matthewjones372/pelican/openapi/Style {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/openapi/Ansi;
+	public fun bold (Ljava/lang/String;)Ljava/lang/String;
+	public fun dim (Ljava/lang/String;)Ljava/lang/String;
+	public final fun getAvailable ()Z
+	public fun green (Ljava/lang/String;)Ljava/lang/String;
+	public fun red (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/ApiChange {
+	public fun <init> (Lio/github/matthewjones372/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lio/github/matthewjones372/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/matthewjones372/pelican/openapi/Compatibility;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Lio/github/matthewjones372/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/openapi/ApiChange;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/openapi/ApiChange;Lio/github/matthewjones372/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/openapi/ApiChange;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCompatibility ()Lio/github/matthewjones372/pelican/openapi/Compatibility;
+	public final fun getConsequence ()Ljava/lang/String;
+	public final fun getWhat ()Ljava/lang/String;
+	public final fun getWhere ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/Compatibility : java/lang/Enum {
+	public static final field BREAKING Lio/github/matthewjones372/pelican/openapi/Compatibility;
+	public static final field COMPATIBLE Lio/github/matthewjones372/pelican/openapi/Compatibility;
+	public static final field COSMETIC Lio/github/matthewjones372/pelican/openapi/Compatibility;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/openapi/Compatibility;
+	public static fun values ()[Lio/github/matthewjones372/pelican/openapi/Compatibility;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/CompatibilityKt {
+	public static final fun apiChanges (Lio/github/matthewjones372/pelican/JsonObj;Lio/github/matthewjones372/pelican/JsonObj;)Ljava/util/List;
+	public static final fun changesFrom (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/JsonObj;)Ljava/util/List;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/Docs {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/DocsOAuth;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/DocsOAuth;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDocsPath ()Ljava/lang/String;
+	public final fun getOauth ()Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
+	public final fun getOpenApiPath ()Ljava/lang/String;
+	public final fun getVersion ()Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/DocsOAuth {
+	public fun <init> (Ljava/lang/String;ZLjava/util/List;Ljava/lang/String;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;ZLjava/util/List;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAdditionalQueryStringParams ()Ljava/util/Map;
+	public final fun getAppName ()Ljava/lang/String;
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getScopes ()Ljava/util/List;
+	public final fun getUsePkce ()Z
+}
+
+public final class io/github/matthewjones372/pelican/openapi/OpenApiKt {
+	public static final fun openApi (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)Lio/github/matthewjones372/pelican/JsonObj;
+	public static synthetic fun openApi$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/JsonObj;
+	public static final fun openApiJson (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)Ljava/lang/String;
+	public static synthetic fun openApiJson$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/OpenApiVersion : java/lang/Enum {
+	public static final field V3_1_0 Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+	public static final field V3_2_0 Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getField ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+	public static fun values ()[Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/ReportKt {
+	public static final fun breakingChanges (Ljava/lang/String;Ljava/lang/String;)I
+	public static final fun compatibilityReport (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Ljava/lang/String;
+	public static synthetic fun compatibilityReport$default (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Ljava/lang/String;
+	public static final fun documentOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonObj;
+	public static final fun report (Ljava/util/List;Ljava/lang/String;Z)Ljava/lang/String;
+	public static synthetic fun report$default (Ljava/util/List;Ljava/lang/String;ZILjava/lang/Object;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/SwaggerUiKt {
+	public static final fun oauth2RedirectHtml ()Ljava/lang/String;
+	public static final fun oauth2RedirectPath (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun swaggerUiHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/DocsOAuth;Ljava/lang/String;)Ljava/lang/String;
+	public static synthetic fun swaggerUiHtml$default (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/DocsOAuth;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/YamlKt {
+	public static final fun openApiYaml (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)Ljava/lang/String;
+	public static synthetic fun openApiYaml$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Ljava/lang/String;
+	public static final fun renderYaml (Lio/github/matthewjones372/pelican/JsonValue;)Ljava/lang/String;
+}
+

@@ -1,0 +1,5 @@
+public final class io/github/matthewjones372/pelican/schema/StandaloneSchemas {
+	public fun <init> (Lio/github/matthewjones372/pelican/SchemaSource;)V
+	public final fun schema (Lkotlin/reflect/KType;)Lio/github/matthewjones372/pelican/JsonObj;
+}
+

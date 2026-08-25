@@ -17,6 +17,10 @@ plugins {
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
     // Renders the KDoc into the javadoc jar the published modules ship.
     id("org.jetbrains.dokka") version "2.1.0" apply false
+    // What each published module's binary surface is, as a file somebody reads
+    // in a diff. The golden-file argument, applied to the Kotlin API instead of
+    // to the HTTP one.
+    id("org.jetbrains.kotlinx.binary-compatibility-validator") version "0.18.1"
 }
 
 scmVersion {
@@ -91,6 +95,11 @@ val moduleDescriptions = mapOf(
 // The floor is deliberately below where the number sits now. It is a ratchet
 // against regression, not a target to code towards — a test written to move a
 // percentage is worth less than no test at all.
+apiValidation {
+    // Neither is published, so neither has a surface to keep.
+    ignoredProjects += listOf("example", "benchmarks")
+}
+
 kover {
     reports {
         total {
