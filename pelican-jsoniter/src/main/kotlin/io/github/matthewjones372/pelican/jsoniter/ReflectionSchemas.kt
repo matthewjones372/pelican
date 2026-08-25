@@ -78,6 +78,10 @@ internal class ReflectionSchemas(private val components: SchemaComponents) {
                 put("additionalProperties", elementAt(type, 1))
             }
 
+            // Described as what is inside it, because that is what travels:
+            // the wrapper is a Kotlin relation and the wire never sees it.
+            kclass.isValue -> schemaFor(kclass.valueProperty().returnType)
+
             kclass.isSealed -> named(kclass) { union(kclass) }
 
             // Refused rather than described as the object it is not. A `Page<T>`

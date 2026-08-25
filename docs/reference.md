@@ -273,6 +273,11 @@ own name, described as a `oneOf` with a full `mapping`, so it publishes the same
 shape as the other two modules — with no annotations to declare it, since there
 is no annotation this library reads.
 
+A value class travels as the value inside it, in both directions and in the
+document. The JVM erases the wrapper out of most signatures — a `Sku` property
+reflects as the `String` it wraps — so describing the wrapper would describe
+something no payload ever carries.
+
 jsoniter's own settings still apply to what the module writes: `indentionStep`
 indents an object the way jsoniter indents one, and `omitDefaultValue` leaves
 out what jsoniter's rule leaves out. The codegen modes are the exception — they

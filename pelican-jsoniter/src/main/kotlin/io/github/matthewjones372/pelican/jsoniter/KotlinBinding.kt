@@ -125,6 +125,7 @@ private fun decoderFor(type: Type, config: JsoniterConfig): Decoder? {
         !java.isKotlin -> null
         kclass.java.isEnum -> enumDecoder(kclass)
         kclass.objectInstance != null -> Decoder { iter -> iter.readAny(); kclass.objectInstance }
+        kclass.isValue -> valueDecoder(kclass)
         kclass.isSealed -> unionDecoder(kclass, config)
         kclass.primaryConstructor != null -> ObjectDecoder(kclass)
         else -> null
@@ -150,6 +151,8 @@ private class ObjectDecoder(private val kclass: KClass<*>) : Decoder {
 
     private val ctor = requireNotNull(kclass.primaryConstructor).also { it.isAccessible = true }
     private val byName = ctor.parameters.associateBy { it.name }
+    private val types = ctor.parameters.associateWith { it.type.toJsoniterType() }
+    private val wrappers = ctor.parameters.associateWith { it.wrapper() }
 
     override fun decode(iter: JsonIterator): Any? {
         if (iter.readNull()) return null
@@ -158,7 +161,16 @@ private class ObjectDecoder(private val kclass: KClass<*>) : Decoder {
         var field = iter.readObject()
         while (field != null) {
             val parameter = byName[field]
-            if (parameter == null) iter.skip() else arguments[parameter] = iter.read(parameter.type.toJsoniterType())
+            if (parameter == null) {
+                iter.skip()
+            } else {
+                val read = iter.read(types.getValue(parameter))
+                // `callBy` wants the wrapper where a parameter is a value
+                // class, and the type jsoniter was given is the one the JVM
+                // signature carries — which, for most of them, is what is
+                // inside the wrapper rather than the wrapper itself.
+                arguments[parameter] = wrappers.getValue(parameter)?.box(read) ?: read
+            }
             field = iter.readObject()
         }
 
@@ -172,6 +184,18 @@ private class ObjectDecoder(private val kclass: KClass<*>) : Decoder {
 
         return ctor.callBy(arguments)
     }
+}
+
+/**
+ * A value class, read as the value inside it and wrapped.
+ *
+ * The null is checked here rather than left to what is inside: a nullable
+ * value class over a primitive keeps its wrapper in the JVM signature, so this
+ * is the decoder a null arrives at, and `readInt` on one reports a parse error.
+ */
+private fun valueDecoder(kclass: KClass<*>): Decoder {
+    val underlying = kclass.underlying()
+    return Decoder { iter -> if (iter.readNull()) null else kclass.box(iter.read(underlying)) }
 }
 
 /** An enum, read by constant name, and told what the names were when it is not one. */
@@ -249,6 +273,7 @@ private fun encoderFor(type: Type, config: JsoniterConfig): Encoder? {
         !java.isKotlin -> null
         kclass.java.isEnum -> Encoder { value, stream -> stream.writeVal((value as Enum<*>).name) }
         kclass.objectInstance != null -> Encoder { _, stream -> stream.writeEmptyObject() }
+        kclass.isValue -> valueEncoder(kclass)
         kclass.isSealed -> unionEncoder(kclass, config)
         kclass.primaryConstructor != null -> ObjectEncoder(kclass, config)
         else -> null
@@ -320,20 +345,37 @@ private class ObjectEncoder(
 /**
  * How a property is read out of a value.
  *
- * The JVM getter where there is one: `KProperty.getter.call` goes through
- * kotlin-reflect for every value encoded, and a constructor property's getter
- * does the same work for the cost of `Method.invoke`. Not for a value class,
- * whose getter returns what is inside the wrapper the encoder was chosen for.
+ * The JVM getter where there is one, for two reasons. It is faster —
+ * `KProperty.getter.call` goes through kotlin-reflect for every value encoded.
+ * And it agrees with the type jsoniter was handed: both come from the JVM
+ * signature, so a value-class property yields what is inside the wrapper,
+ * which is what `KParameter.type.javaType` said the property was.
  */
 private fun readerOf(property: KProperty1<out Any, *>): (Any) -> Any? {
-    val wrapper = (property.returnType.classifier as? KClass<*>)?.isValue == true
-    val getter = property.javaGetter?.takeIf { !wrapper }
+    val getter = property.javaGetter
     if (getter == null) {
         property.isAccessible = true
         return { value -> property.getter.call(value) }
     }
     getter.isAccessible = true
     return { value -> getter.invoke(value) }
+}
+
+/**
+ * A value class, written as the value inside it.
+ *
+ * Reached only where the wrapper survives to the JVM — a nullable one over a
+ * primitive, or a payload that is a value class in its own right. Everywhere
+ * else the signature carries the value itself and jsoniter never asks about
+ * the wrapper at all.
+ */
+private fun valueEncoder(kclass: KClass<*>): Encoder {
+    val property = kclass.valueProperty()
+    val type = property.returnType.toJsoniterType()
+    val read = readerOf(property)
+    return Encoder { value, stream ->
+        if (value == null) stream.writeNull() else stream.writeVal(type, read(value))
+    }
 }
 
 /**
@@ -390,6 +432,29 @@ private fun generic(type: Type): String? {
  * and a binder that trusted that would read every string as an object.
  */
 private val Class<*>.isKotlin: Boolean get() = isAnnotationPresent(Metadata::class.java)
+
+/** The single property a value class wraps. */
+internal fun KClass<*>.valueProperty(): KProperty1<out Any, *> {
+    val name = requireNotNull(primaryConstructor).parameters.single().name
+    return memberProperties.first { it.name == name }
+}
+
+/** What is inside a value class, as jsoniter's type. */
+private fun KClass<*>.underlying(): Type = requireNotNull(primaryConstructor).parameters.single().type.toJsoniterType()
+
+/**
+ * [value] in this value class's wrapper.
+ *
+ * Already-wrapped is left alone: a nullable value class over a primitive keeps
+ * its wrapper in the JVM signature, so that one arrives wrapped already.
+ */
+private fun KClass<*>.box(value: Any?): Any? = when {
+    value == null || isInstance(value) -> value
+    else -> requireNotNull(primaryConstructor).also { it.isAccessible = true }.call(value)
+}
+
+/** The value class this parameter is declared as, or null where it is not one. */
+private fun KParameter.wrapper(): KClass<*>? = (type.classifier as? KClass<*>)?.takeIf { it.isValue }
 
 /** The branches of a sealed hierarchy, flattened — a sealed branch is not a branch. */
 internal fun KClass<*>.leaves(): List<KClass<*>> =

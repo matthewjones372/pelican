@@ -42,6 +42,12 @@ class JsoniterCodecsTest {
 
     data class Timestamps(val id: UUID, val placed: Instant, val due: LocalDate)
 
+    @JvmInline value class Sku(val value: String)
+
+    @JvmInline value class Pence(val amount: Int)
+
+    data class Priced(val sku: Sku, val pence: Pence, val discount: Pence?, val alternative: Sku?)
+
     sealed interface Payment {
         data class Card(val last4: String, val expiry: String) : Payment
         data class Transfer(val iban: String) : Payment
@@ -221,6 +227,31 @@ class JsoniterCodecsTest {
             .message shouldContain "KotlinxCodecs"
         shouldThrow<IllegalStateException> { JsoniterCodecs.schema(typeOf<Page<Line>>(), Components()) }
             .message shouldContain "Page"
+    }
+
+    @Test
+    fun `a value class travels as the value inside it`() {
+        // Which is also the only thing that could travel: the JVM erases the
+        // wrapper out of most signatures, so the document and the wire agree
+        // on the value or they agree on nothing.
+        val priced = Priced(Sku("sku-1"), Pence(250), null, Sku("sku-2"))
+        val text = """{"sku":"sku-1","pence":250,"discount":null,"alternative":"sku-2"}"""
+
+        codec<Priced>().encodeToString(priced) shouldBe text
+        codec<Priced>().decodeFromString(text) shouldBe priced
+
+        // And as a body in its own right, where the wrapper is all there is.
+        codec<Sku>().encodeToString(Sku("sku-1")) shouldBe """"sku-1""""
+        codec<Sku>().decodeFromString(""""sku-1"""") shouldBe Sku("sku-1")
+    }
+
+    @Test
+    fun `a value class is described as the value inside it`() {
+        val properties = schemaOf<Priced>()["properties"].asObj()
+
+        properties["sku"] shouldBe JsonObj(mapOf("type" to JsonStr("string")))
+        properties["pence"].asObj()["format"] shouldBe JsonStr("int32")
+        properties["discount"].asObj()["type"] shouldBe JsonArr(listOf(JsonStr("integer"), JsonStr("null")))
     }
 
     @Test

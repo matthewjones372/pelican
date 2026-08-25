@@ -31,6 +31,9 @@ class JsoniterAgreementTest {
 
     data class Line(val sku: String, val quantity: Int = 1, val note: String? = null)
 
+    /** A wrapper the JVM erases out of most signatures, and neither source may describe. */
+    @JvmInline value class Reference(val value: String)
+
     /**
      * The shapes the two sources have any reason to disagree about: defaults,
      * nullability at property level, and nullability one and two levels inside a
@@ -54,6 +57,8 @@ class JsoniterAgreementTest {
         val couriers: List<String>?,
         val labels: Map<String, String>,
         val weight: Double,
+        val reference: Reference,
+        val previousReference: Reference?,
         val gift: Boolean = false,
     )
 
@@ -129,7 +134,7 @@ class JsoniterAgreementTest {
             order["properties"].asObj().fields.keys.toList() shouldBe listOf(
                 "id", "status", "previousStatus", "history", "lines", "attempts",
                 "batches", "shipTo", "billTo", "depots", "couriers", "labels",
-                "weight", "gift",
+                "weight", "reference", "previousReference", "gift",
             )
             // `gift` has a default, so a payload may leave it out.
             order["required"].asStrings() shouldNotContain "gift"
