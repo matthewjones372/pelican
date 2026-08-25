@@ -1,0 +1,7 @@
+public final class io/github/matthewjones372/pelican/client/JavaHttpTransport : io/github/matthewjones372/pelican/ClientTransport {
+	public fun <init> ()V
+	public fun <init> (Ljava/net/http/HttpClient;)V
+	public synthetic fun <init> (Ljava/net/http/HttpClient;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
+}
+

@@ -1,0 +1,28 @@
+public final class io/github/matthewjones372/pelican/test/golden/Golden {
+	public fun <init> ()V
+	public fun <init> (Ljava/nio/file/Path;ZLjava/util/Set;Z)V
+	public synthetic fun <init> (Ljava/nio/file/Path;ZLjava/util/Set;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun contract (Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;)V
+	public final fun document (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/lang/String;)V
+	public static synthetic fun document$default (Lio/github/matthewjones372/pelican/test/golden/Golden;Lio/github/matthewjones372/pelican/ApiSpec;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun exchange (Ljava/lang/String;Lio/github/matthewjones372/pelican/test/ApiClient;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)V
+	public final fun exchange (Ljava/lang/String;Lio/github/matthewjones372/pelican/test/RequestSpec;Lio/github/matthewjones372/pelican/test/ResponseSpec;)V
+	public final fun operation (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;)V
+	public static synthetic fun operation$default (Lio/github/matthewjones372/pelican/test/golden/Golden;Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun operations (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/lang/String;)V
+	public static synthetic fun operations$default (Lio/github/matthewjones372/pelican/test/golden/Golden;Lio/github/matthewjones372/pelican/ApiSpec;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun request (Ljava/lang/String;Lio/github/matthewjones372/pelican/test/RequestSpec;)V
+	public final fun response (Ljava/lang/String;Lio/github/matthewjones372/pelican/test/ResponseSpec;)V
+	public final fun text (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+}
+
+public final class io/github/matthewjones372/pelican/test/golden/GoldenKt {
+	public static final field UPDATE_ENVIRONMENT Ljava/lang/String;
+	public static final field UPDATE_PROPERTY Ljava/lang/String;
+	public static final fun getVOLATILE_HEADERS ()Ljava/util/Set;
+	public static final fun requestsOnly (Lio/github/matthewjones372/pelican/Codecs;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public static final fun wireText (Lio/github/matthewjones372/pelican/test/RequestSpec;)Ljava/lang/String;
+	public static final fun wireText (Lio/github/matthewjones372/pelican/test/ResponseSpec;Ljava/util/Set;)Ljava/lang/String;
+	public static synthetic fun wireText$default (Lio/github/matthewjones372/pelican/test/ResponseSpec;Ljava/util/Set;ILjava/lang/Object;)Ljava/lang/String;
+}
+

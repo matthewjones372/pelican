@@ -1,0 +1,43 @@
+public final class io/github/matthewjones372/pelican/mcp/McpDispatch {
+	public final fun call (Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;)Ljava/util/concurrent/CompletionStage;
+	public static synthetic fun call$default (Lio/github/matthewjones372/pelican/mcp/McpDispatch;Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;ILjava/lang/Object;)Ljava/util/concurrent/CompletionStage;
+	public final fun getTools ()Ljava/util/List;
+}
+
+public final class io/github/matthewjones372/pelican/mcp/McpDispatchKt {
+	public static final fun mcpDispatch (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;)Lio/github/matthewjones372/pelican/mcp/McpDispatch;
+	public static synthetic fun mcpDispatch$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/mcp/McpDispatch;
+}
+
+public final class io/github/matthewjones372/pelican/mcp/McpOptions {
+	public fun <init> ()V
+	public fun <init> (Lkotlin/jvm/functions/Function1;Ljava/util/Map;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getHeaders ()Ljava/util/Map;
+	public final fun getInclude ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class io/github/matthewjones372/pelican/mcp/McpTool {
+	public fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getInputSchema ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getOutputSchema ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getTitle ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/mcp/McpToolsKt {
+	public static final fun mcpTools (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/mcp/McpOptions;)Ljava/util/List;
+	public static synthetic fun mcpTools$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/mcp/McpOptions;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun toJson (Lio/github/matthewjones372/pelican/mcp/McpTool;)Lio/github/matthewjones372/pelican/JsonObj;
+}
+
+public final class io/github/matthewjones372/pelican/mcp/ToolResult {
+	public fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/JsonObj;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getStructuredContent ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getText ()Ljava/lang/String;
+	public final fun isError ()Z
+}
+

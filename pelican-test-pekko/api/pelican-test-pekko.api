@@ -1,0 +1,17 @@
+public final class io/github/matthewjones372/pelican/test/pekko/InMemoryKt {
+	public static final fun client (Lio/github/matthewjones372/pelican/pekko/PelicanServer;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public static final fun inMemory (Lio/github/matthewjones372/pelican/Api;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public static final fun inMemory (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public static synthetic fun inMemory$default (Lio/github/matthewjones372/pelican/Api;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/test/ApiClient;
+}
+
+public final class io/github/matthewjones372/pelican/test/pekko/InMemoryTransport : io/github/matthewjones372/pelican/test/Transport, java/lang/AutoCloseable {
+	public fun <init> (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;Z)V
+	public fun close ()V
+	public final fun exchange (Lorg/apache/pekko/http/javadsl/model/HttpRequest;)Lorg/apache/pekko/http/javadsl/model/HttpResponse;
+	public final fun getShutdownTimeoutSeconds ()J
+	public final fun getSystem ()Lorg/apache/pekko/actor/typed/ActorSystem;
+	public fun send (Lio/github/matthewjones372/pelican/test/RequestSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+	public final fun setShutdownTimeoutSeconds (J)V
+}
+

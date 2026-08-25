@@ -1,0 +1,7 @@
+public final class io/github/matthewjones372/pelican/client/ktor/KtorHttpTransport : io/github/matthewjones372/pelican/ClientTransport {
+	public fun <init> ()V
+	public fun <init> (Lio/ktor/client/HttpClient;)V
+	public synthetic fun <init> (Lio/ktor/client/HttpClient;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
+}
+

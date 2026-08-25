@@ -1,0 +1,98 @@
+public final class io/github/matthewjones372/pelican/codegen/Branch {
+	public final fun getRef ()Ljava/lang/String;
+	public final fun getSchema ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getWire ()Ljava/lang/String;
+	public final fun name (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/CallStyle : java/lang/Enum {
+	public static final field BLOCKING Lio/github/matthewjones372/pelican/codegen/CallStyle;
+	public static final field SUSPENDING Lio/github/matthewjones372/pelican/codegen/CallStyle;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/codegen/CallStyle;
+	public static fun values ()[Lio/github/matthewjones372/pelican/codegen/CallStyle;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/CodecAnnotations : java/lang/Enum {
+	public static final field JACKSON Lio/github/matthewjones372/pelican/codegen/CodecAnnotations;
+	public static final field KOTLINX Lio/github/matthewjones372/pelican/codegen/CodecAnnotations;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/codegen/CodecAnnotations;
+	public static fun values ()[Lio/github/matthewjones372/pelican/codegen/CodecAnnotations;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/codegen/Composed {
+}
+
+public final class io/github/matthewjones372/pelican/codegen/Composed$Merged : io/github/matthewjones372/pelican/codegen/Composed {
+	public fun <init> (Lio/github/matthewjones372/pelican/JsonObj;)V
+	public final fun getSchema ()Lio/github/matthewjones372/pelican/JsonObj;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/Composed$Plain : io/github/matthewjones372/pelican/codegen/Composed {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/codegen/Composed$Plain;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/Composed$Undescribable : io/github/matthewjones372/pelican/codegen/Composed {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getKeyword ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/Composed$Union : io/github/matthewjones372/pelican/codegen/Composed {
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public final fun getBranches ()Ljava/util/List;
+	public final fun getDiscriminator ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/KotlinClientKt {
+	public static final fun defaultClientName (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun kotlinClient (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLio/github/matthewjones372/pelican/codegen/CodecAnnotations;Lio/github/matthewjones372/pelican/codegen/CallStyle;)Ljava/lang/String;
+	public static synthetic fun kotlinClient$default (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLio/github/matthewjones372/pelican/codegen/CodecAnnotations;Lio/github/matthewjones372/pelican/codegen/CallStyle;ILjava/lang/Object;)Ljava/lang/String;
+	public static final fun writeKotlinClient (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Ljava/io/File;
+	public static final fun writeKotlinClient (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLio/github/matthewjones372/pelican/codegen/CodecAnnotations;)Ljava/io/File;
+	public static final fun writeKotlinClient (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLio/github/matthewjones372/pelican/codegen/CodecAnnotations;Lio/github/matthewjones372/pelican/codegen/CallStyle;)Ljava/io/File;
+	public static final fun writeKotlinClient (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/nio/file/Path;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLio/github/matthewjones372/pelican/codegen/CodecAnnotations;Lio/github/matthewjones372/pelican/codegen/CallStyle;)Ljava/nio/file/Path;
+	public static synthetic fun writeKotlinClient$default (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Ljava/io/File;
+	public static synthetic fun writeKotlinClient$default (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLio/github/matthewjones372/pelican/codegen/CodecAnnotations;ILjava/lang/Object;)Ljava/io/File;
+	public static synthetic fun writeKotlinClient$default (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/io/File;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLio/github/matthewjones372/pelican/codegen/CodecAnnotations;Lio/github/matthewjones372/pelican/codegen/CallStyle;ILjava/lang/Object;)Ljava/io/File;
+	public static synthetic fun writeKotlinClient$default (Lio/github/matthewjones372/pelican/ApiSpec;Ljava/nio/file/Path;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLio/github/matthewjones372/pelican/codegen/CodecAnnotations;Lio/github/matthewjones372/pelican/codegen/CallStyle;ILjava/lang/Object;)Ljava/nio/file/Path;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/KotlinTypes {
+	public fun <init> ()V
+	public fun <init> (Lio/github/matthewjones372/pelican/codegen/CodecAnnotations;)V
+	public synthetic fun <init> (Lio/github/matthewjones372/pelican/codegen/CodecAnnotations;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun declarations ()Ljava/util/List;
+	public final fun declareAll (Lio/github/matthewjones372/pelican/JsonObj;)V
+	public final fun imports ()Ljava/util/Set;
+	public final fun kotlinName (Ljava/lang/String;)Ljava/lang/String;
+	public final fun type (Lio/github/matthewjones372/pelican/JsonValue;Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/NamesKt {
+	public static final fun asWritten (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun branchName (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static final fun indent (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static final fun isIdentifier (Ljava/lang/String;)Z
+	public static final fun isWritable (Ljava/lang/String;)Z
+	public static final fun kdoc (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static final fun kotlinString (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun memberName (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun typeName (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun unique (Ljava/lang/String;Ljava/util/Set;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/ResourcesKt {
+	public static final fun template (Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/String;
+	public static final fun template (Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/codegen/UnionsKt {
+	public static final fun composed (Lio/github/matthewjones372/pelican/JsonObj;Lio/github/matthewjones372/pelican/JsonObj;Ljava/lang/String;)Lio/github/matthewjones372/pelican/codegen/Composed;
+	public static synthetic fun composed$default (Lio/github/matthewjones372/pelican/JsonObj;Lio/github/matthewjones372/pelican/JsonObj;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/codegen/Composed;
+}
+

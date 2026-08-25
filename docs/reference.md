@@ -4528,17 +4528,6 @@ open  localhost:8080/api-docs                                 # Swagger UI
   nothing to add: a webhook you receive arrives at a path on your own service,
   so it is an ordinary `endpoint(...)` with a handler. `webhook(...)` is for the
   half you send.
-- **A Ktor client transport.** `ClientTransport` is core's, and
-  `pelican-client-java` and `pelican-client-pekko` are the adapters written —
-  see
-  [The transport a generated client sends with](#the-transport-a-generated-client-sends-with),
-  which says what the Ktor one would do. A service that wants it before it is
-- **A Pekko client transport.** `ClientTransport` is core's, and
-  `pelican-client-java` and `pelican-client-ktor` are the adapters written —
-  see
-  [The transport a generated client sends with](#the-transport-a-generated-client-sends-with),
-  which says what the Pekko one would do. A service that wants it before it is
-  written can implement the interface itself; it is one method.
 - **A fourth server backend.** `pelican-ktor` was the third, and cost what
   `pelican-http4k` cost: the binders above, a request-to-`Params` step and a
   response writer, in about 500 lines including the comments.
