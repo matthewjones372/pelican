@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.http4k
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -42,7 +43,7 @@ class RoutingScaleTest {
             endpoint(id) { get("resource$n" / id); text() } handledNow { _ -> "decoy" }
         }
         val target = endpoint(itemId) { get("items" / itemId); text() } handledNow { id -> "item-$id" }
-        return Api(endpoints = decoys + target, codecs = JacksonCodecs).toHttpHandler()
+        return api(endpoints = decoys + target, codecs = JacksonCodecs).toHttpHandler()
     }
 
     private val request = Request(Method.GET, "/items/7")

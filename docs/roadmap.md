@@ -93,7 +93,7 @@ twice — once in the route, once in the metric. Here the name already exists.
 
 **Touches** `pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Filter.kt`,
 the three interpreters, a new `pelican-metrics` module.
-**Done when** one line in an `Api(...)` produces a request counter and a latency
+**Done when** one line in an `api { }` block produces a request counter and a latency
 timer dimensioned by method, path template, operation and status; the example
 runs with it; and the module's dependency test asserts it pulls in core and a
 meter API and nothing else.
@@ -225,7 +225,7 @@ deciding how the handler learns which one was picked.
 
 ## 6. The cover check, at compile time
 
-`Api(covers = ...)` catches an endpoint that was described and never bound, but
+`api { covers = ... }` catches an endpoint that was described and never bound, but
 it catches it when the `Api` is constructed —
 [Api.kt:254](../pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Api.kt).
 That is a test away from useless and a KSP processor away from being a compile

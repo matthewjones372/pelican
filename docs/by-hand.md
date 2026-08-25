@@ -206,8 +206,11 @@ val routes = listOf(
 )
 
 fun main() {
-    Api(routes, codecs = JacksonCodecs, title = "Bookmarks", version = "1.0.0")
-        .startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
+    val api = api(routes, codecs = JacksonCodecs) {
+        title = "Bookmarks"
+        version = "1.0.0"
+    }
+    api.startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
 }
 ```
 

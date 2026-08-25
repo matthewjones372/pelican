@@ -20,6 +20,7 @@ package example.metrics
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
@@ -101,7 +102,7 @@ private val stock = listOf("kettle", "teapot").mapIndexed { index, item -> Order
  * `metrics(registry)` writes into it, and how it is exported is somebody
  * else's decision.
  */
-fun meteredOrders(registry: MeterRegistry): Api = Api(
+fun meteredOrders(registry: MeterRegistry): Api = api(
     endpoints = listOf(
         fetchOrder handledOrFail { id ->
             val found = stock.firstOrNull { it.id == id }
@@ -115,13 +116,14 @@ fun meteredOrders(registry: MeterRegistry): Api = Api(
         readMeters handledNow { meterTable(registry) },
     ),
     codecs = JacksonCodecs,
-    title = "Orders",
-    version = "1.0.0",
+) {
+    title = "Orders"
+    version = "1.0.0"
 
     // The whole of the instrumentation. Outermost, so that it also counts the
     // requests a filter listed after it refuses.
-    filters = listOf(metrics(registry)),
-)
+    filter(metrics(registry))
+}
 
 fun main() {
     val registry = SimpleMeterRegistry()

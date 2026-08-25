@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.test.http4k
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.Method
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
@@ -57,7 +58,7 @@ class InMemoryTransportTest {
         empty(204)
     }
 
-    private val app = Api(
+    private val app = api(
         endpoints = listOf(
             getWidget handledOrFail { id ->
                 if (id == 1L) {

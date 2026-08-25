@@ -34,7 +34,7 @@ class StartupChecksTest {
     @Test
     fun `two handlers on one route is a startup failure`() {
         val failure = shouldThrow<IllegalArgumentException> {
-            Api(endpoints = listOf(bind(getUser), bind(getUser)))
+            api(endpoints = listOf(bind(getUser), bind(getUser)))
         }
         failure.message shouldContain "can never be reached"
         failure.message shouldContain "GET /users/{userId}"
@@ -42,17 +42,16 @@ class StartupChecksTest {
 
     @Test
     fun `the same path under different methods is fine`() {
-        val api = Api(endpoints = listOf(bind(getUser), bind(deleteUser)))
+        val api = api(endpoints = listOf(bind(getUser), bind(deleteUser)))
         api.endpoints.size shouldBe 2
     }
 
     @Test
     fun `an endpoint declared but never bound is a startup failure`() {
         val failure = shouldThrow<IllegalArgumentException> {
-            Api(
-                endpoints = listOf(bind(getUser)),
-                covers = listOf(getUser, listUsers, deleteUser),
-            )
+            api(endpoints = listOf(bind(getUser))) {
+                covers = listOf(getUser, listUsers, deleteUser)
+            }
         }
         failure.message shouldContain "never bound"
         failure.message shouldContain "GET /users"
@@ -62,7 +61,9 @@ class StartupChecksTest {
     @Test
     fun `covering every declared endpoint passes`() {
         val all = listOf(getUser, listUsers, deleteUser)
-        val api = Api(endpoints = all.map(::bind), covers = all)
+        val api = api(endpoints = all.map(::bind)) {
+            covers = all
+        }
         api.endpoints.size shouldBe 3
     }
 
@@ -77,7 +78,9 @@ class StartupChecksTest {
             text()
         }
         shouldThrow<IllegalArgumentException> {
-            Api(endpoints = listOf(bind(getUser)), covers = listOf(twin))
+            api(endpoints = listOf(bind(getUser))) {
+                covers = listOf(twin)
+            }
         }
     }
 

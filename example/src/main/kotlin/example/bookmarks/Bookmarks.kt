@@ -164,17 +164,18 @@ val bookmarkRoutes: List<ServerEndpoint> = listOf(
     },
 )
 
-fun bookmarksApi(): Api = Api(
+fun bookmarksApi(): Api = api(
     endpoints = bookmarkRoutes,
     codecs = JacksonCodecs,       // the one argument that picks the JSON library
-    title = "Bookmarks",
-    version = "1.0.0",
+) {
+    title = "Bookmarks"
+    version = "1.0.0"
     // No `servers` entry on purpose. Swagger UI's "Try it out" calls the URLs
     // listed there, and a hardcoded one pins every call to that exact origin —
     // so opening the page on 127.0.0.1 while the spec says localhost makes each
     // call cross-origin, and the browser blocks it. Left empty, Swagger UI uses
     // the origin the page was loaded from, which is right either way.
-)
+}
 
 /** Docs are opt-in, so where they live is stated separately from the API. */
 val bookmarksDocs = Docs(docsPath = "/api-docs")

@@ -261,7 +261,7 @@ codec is resolved when the `Api` is assembled, which is why switching JSON
 libraries is one line in one file and touches no endpoint:
 
 ```kotlin
-Api(routes, codecs = JacksonCodecs)              // or KotlinxCodecs, or JsoniterCodecs
+api(routes, codecs = JacksonCodecs)              // or KotlinxCodecs, or JsoniterCodecs
 ApiSpec(endpoints, schemas = JacksonCodecs)      // docs need only the schema half
 ```
 
@@ -318,9 +318,9 @@ back — the document describes both spellings, and every codec here reads both.
 Pass your own mapper, `Json` or jsoniter config when the defaults do not fit:
 
 ```kotlin
-Api(routes, codecs = JacksonCodecs(myObjectMapper))
-Api(routes, codecs = KotlinxCodecs(myJson))
-Api(routes, codecs = JsoniterCodecs(jsoniterConfig { escapeUnicode(false) }))
+api(routes, codecs = JacksonCodecs(myObjectMapper))
+api(routes, codecs = KotlinxCodecs(myJson))
+api(routes, codecs = JsoniterCodecs(jsoniterConfig { escapeUnicode(false) }))
 ```
 
 Two things are refused rather than published as something they are not:
@@ -638,7 +638,7 @@ falling back to the origin the page was loaded from when there is none. A
 hardcoded entry is therefore a trap for a locally-run service:
 
 ```kotlin
-Api(routes, servers = listOf("http://localhost:8080"))   // "Try it out" always calls localhost
+api(routes) { servers = listOf("http://localhost:8080") }   // "Try it out" always calls localhost
 ```
 
 Open that page on `http://127.0.0.1:8080/api-docs` and every call is
@@ -828,7 +828,7 @@ val orderPlaced = webhook("orderPlaced") {
 }
 
 ApiSpec(endpoints = allEndpoints, schemas = JacksonCodecs, webhooks = listOf(orderPlaced))
-Api(endpoints = ordersRoutes, codecs = JacksonCodecs, webhooks = listOf(orderPlaced))
+api(endpoints = ordersRoutes, codecs = JacksonCodecs) { webhooks = listOf(orderPlaced) }
 ```
 
 An `Endpoint` was already a description rather than a route: a method, inputs,
@@ -860,7 +860,7 @@ whoever is sending it.
 not among them. The three interpreters build their routes from `endpoints`, so
 there is nothing for them to look at. Two more things hold the line:
 
-- A `Webhook`'s operation carries a `webhookName`, and `Api(...)` and
+- A `Webhook`'s operation carries a `webhookName`, and `api(...)` and
   `ApiSpec(...)` refuse one in the endpoints list. `Webhook.operation` is public
   because `pelican-openapi` and `pelican-codegen` are separate modules and have
   to read it — Kotlin's `internal` stops at the module boundary — so `webhook
@@ -2537,7 +2537,7 @@ per scope either way; the map form just puts a description beside each one.
 Set an API-wide requirement and let endpoints opt out of it:
 
 ```kotlin
-Api(routes, codecs = JacksonCodecs, security = listOf(oauth.requires("orders:read")))
+api(routes, codecs = JacksonCodecs) { security = listOf(oauth.requires("orders:read")) }
 
 val health = endpoint {
     get("health")
@@ -2654,7 +2654,10 @@ Something that runs around every handler: authentication, rate limiting, a
 request log, a timer.
 
 ```kotlin
-Api(routes, JacksonCodecs, filters = listOf(stamping, requireToken))
+api(routes, JacksonCodecs) {
+    filter(stamping)
+    filter(requireToken)
+}
 ```
 
 The first in the list is the outermost — it sees the request first and the
@@ -2783,7 +2786,7 @@ OAuth provider side by side.
 Micrometer.
 
 ```kotlin
-Api(routes, JacksonCodecs, filters = listOf(metrics(registry)))
+api(routes, JacksonCodecs) { filter(metrics(registry)) }
 ```
 
 That is the whole of the instrumentation. There is no per-route registration and
@@ -2849,7 +2852,7 @@ this way — a 200, a declared 404, a 201 and a deprecated endpoint, with
 carries traces as well as metrics:
 
 ```kotlin
-Api(routes, JacksonCodecs, filters = listOf(openTelemetry(sdk)))
+api(routes, JacksonCodecs) { filter(openTelemetry(sdk)) }
 ```
 
 That produces a `SERVER` span per request and records the
@@ -2914,7 +2917,7 @@ val pekkoHeaders = object : TextMapGetter<Params> {
         carrier?.request?.getHeader(key)?.map { it.value() }?.orElse(null)
 }
 
-Api(routes, JacksonCodecs, filters = listOf(openTelemetry(sdk, incomingHeaders = pekkoHeaders)))
+api(routes, JacksonCodecs) { filter(openTelemetry(sdk, incomingHeaders = pekkoHeaders)) }
 ```
 
 Six lines, written once per service, and they are the one thing this module
@@ -3032,11 +3035,10 @@ you described, because that is not a surprise.
 ## Limits and startup checks
 
 ```kotlin
-Api(
-    routes, JacksonCodecs,
-    maxBodyBytes = 2 * 1024 * 1024,
-    covers = allOrderEndpoints,
-)
+api(routes, JacksonCodecs) {
+    maxBodyBytes = 2 * 1024 * 1024
+    covers = allOrderEndpoints
+}
 ```
 
 `maxBodyBytes` defaults to 8 MiB. An unbounded request body is a way to run a
@@ -3070,7 +3072,7 @@ enforced rather than merely described — it is a rule about browsers, and a
 description a browser never sees would enforce nothing:
 
 ```kotlin
-Api(routes, JacksonCodecs, cors = cors("https://app.example.com", "http://localhost:5173"))
+api(routes, JacksonCodecs) { cors = cors("https://app.example.com", "http://localhost:5173") }
 ```
 
 What that origin may *do* is not configured a second time. It is read off the
@@ -3150,8 +3152,8 @@ wire.
 
 ## Everything is a value
 
-There is no registry and no builder. Descriptions are values, implementations
-are values, and an `Api` is a list of them plus some settings:
+There is no registry. Descriptions are values, implementations are values, and
+an `Api` is a list of them plus the settings they share:
 
 ```kotlin
 val routes = listOf(
@@ -3161,12 +3163,26 @@ val routes = listOf(
     echo         bytesNow    { body -> body.toSource() },
 )
 
-val api = Api(routes, codecs = JacksonCodecs, title = "Orders")
+val api = api(routes, codecs = JacksonCodecs) {
+    title = "Orders"
+    maxBodyBytes = 2 * 1024 * 1024
+    cors = cors("https://app.example.com")
+    filter(metrics(registry))                       // repeatable, outermost first
+    onError { reference, _, error -> log.error(reference, error) }
+}
 api.start(port = 8080)
 ```
 
 `routes` is an ordinary `List<ServerEndpoint>`, so it can be split across files,
 filtered by feature flag or concatenated — nothing has to happen inside a block.
+
+The endpoints and the codecs are arguments because a service cannot be served
+without them; everything else is a `var` in the block, which is where the
+settings documented in the sections above are written. `api(routes)` on its own
+is the whole call where none of them are. The `Api` it returns is frozen — a
+builder reference kept past the block writes into nothing — and its constructor
+is internal, so a setting added in a later release is a new `var` rather than a
+new parameter on a constructor every caller was compiled against.
 
 ## Typechecked endpoints
 
@@ -3709,7 +3725,7 @@ there, and the declaration is where that is written down.
   place where somebody is choosing to pay it.
 - **A part over its bound is a 413 naming the part** and the number its own
   declaration gave. Everything held in memory also shares one budget —
-  `Api(maxBodyBytes = ...)` — so six parts declaring a megabyte each cannot add
+  `api { maxBodyBytes = ... }` — so six parts declaring a megabyte each cannot add
   up to six megabytes of one request; where *that* is what ran out, the message
   names `maxBodyBytes` instead, because a caller told about what was left of a
   budget would go looking for a number nobody wrote down.
@@ -4780,7 +4796,7 @@ open  localhost:8080/api-docs                                 # Swagger UI
   only when no endpoint declares that method; when one does, that endpoint's
   path rejection swallows the method rejection and Pekko answers 404.
   `MethodMismatchTest` and `KtorInterpreterTest` hold all of this.
-- **A *compile-time* check that every declared endpoint is bound.** `Api(covers
+- **A *compile-time* check that every declared endpoint is bound.** `api { covers
   = ...)` closes this at startup — hand it the list the spec is built from and
   an unbound endpoint fails the constructor — but nothing in Kotlin's type
   system says a list covers a set of values, so it stays a runtime check. A KSP

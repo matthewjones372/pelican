@@ -33,12 +33,13 @@ class CorsPolicyTest {
         text()
     }
 
-    private fun api(cors: Cors): Api = Api(
+    private fun api(cors: Cors): Api = api(
         endpoints = listOf(getUser, updateUser, health).map { ep ->
             ServerEndpoint(ep) { CompletableFuture.completedStage(null) }
         },
-        cors = cors,
-    )
+    ) {
+        this.cors = cors
+    }
 
     private fun policy(cors: Cors): CorsPolicy = checkNotNull(api(cors).corsPolicy())
 
@@ -48,7 +49,9 @@ class CorsPolicyTest {
 
     @Test
     fun `an API with no cors has no policy at all`() {
-        Api(listOf(ServerEndpoint(health) { CompletableFuture.completedStage(null) })).corsPolicy().shouldBeNull()
+        api(
+            listOf(ServerEndpoint(health) { CompletableFuture.completedStage(null) }),
+        ).corsPolicy().shouldBeNull()
     }
 
     @Test
@@ -143,11 +146,12 @@ class CorsPolicyTest {
 
     @Test
     fun `an API-wide scheme reaches an endpoint that never mentions one`() {
-        val secured = Api(
+        val secured = api(
             endpoints = listOf(ServerEndpoint(getUser) { CompletableFuture.completedStage(null) }),
-            cors = cors(app),
-            security = listOf(token.requires()),
-        )
+        ) {
+            cors = cors(app)
+            security = listOf(token.requires())
+        }
         val allowed = checkNotNull(secured.corsPolicy())
             .preflight(app, "GET", "/users/7") as CorsPreflight.Allowed
 

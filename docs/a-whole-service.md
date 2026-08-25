@@ -105,7 +105,10 @@ val routes = listOf(
 // ---------------------------------------------------------------- 6. server
 
 fun main() {
-    val api = Api(routes, codecs = JacksonCodecs, title = "Bookmarks", version = "1.0.0")
+    val api = api(routes, codecs = JacksonCodecs) {
+        title = "Bookmarks"
+        version = "1.0.0"
+    }
     val server = api.startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
     println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
 }

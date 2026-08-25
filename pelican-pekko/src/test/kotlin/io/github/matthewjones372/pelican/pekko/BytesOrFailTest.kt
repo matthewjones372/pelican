@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.pekko
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
@@ -45,7 +46,7 @@ class BytesOrFailTest {
     // `beforeAll`, which runs after this instance is constructed.
     private val route: TestRoute by lazy {
         pekko.testRoute(
-            Api(
+            api(
                 endpoints = listOf(
                     fetchBlob bytesOrFail { id ->
                         if (id == 1L) ok(Source.single(ByteString.fromString("blobby")))

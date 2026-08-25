@@ -2,6 +2,7 @@ package example.backends
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
@@ -36,7 +37,7 @@ class MountedAlongsideTest {
 
     private val widget = endpoint { get("widget"); json<Widget>() }
 
-    private fun api(route: ServerEndpoint) = Api(endpoints = listOf(route), codecs = JacksonCodecs)
+    private fun api(route: ServerEndpoint) = api(endpoints = listOf(route), codecs = JacksonCodecs)
 
     private fun get(baseUrl: String, path: String): HttpResponse<String> =
         HttpClient.newHttpClient().send(

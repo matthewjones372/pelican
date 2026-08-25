@@ -9,6 +9,7 @@ package example.filters
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attribute
 import io.github.matthewjones372.pelican.before
 import io.github.matthewjones372.pelican.div
@@ -63,14 +64,16 @@ val getReport = endpoint(reportId, authorization) {
     json<Report>()
 }
 
-fun reports() = Api(
+fun reports() = api(
     endpoints = listOf(
         // `this[caller]` is what the filter worked out. There is no second
         // check here, and no way for this handler to have skipped the first.
         getReport handledNow { (id, _) -> Report(id, "Q3", visibleTo = this[caller].subject) },
     ),
     codecs = JacksonCodecs,
-    title = "Reports",
-    version = "1.0.0",
-    filters = listOf(requireToken, rateLimit),
-)
+) {
+    title = "Reports"
+    version = "1.0.0"
+    filter(requireToken)
+    filter(rateLimit)
+}

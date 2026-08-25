@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.ktor
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
@@ -142,7 +143,12 @@ class KtorInterpreterTest {
     @Test
     fun `an empty stream still renders an empty json array`() = testApplication {
         application {
-            pelican(Api(listOf(listItems streamedNow { _ -> emptyFlow<Item>() }), JacksonCodecs))
+            pelican(
+                api(
+                    listOf(listItems streamedNow { _ -> emptyFlow<Item>() }),
+                    JacksonCodecs,
+                ),
+            )
         }
         client.get("/items/list").bodyAsText() shouldBe "[]"
     }
@@ -233,7 +239,7 @@ class KtorInterpreterTest {
     fun `an api with no endpoints is refused rather than served empty`() {
         val failure = runCatching {
             testApplication {
-                application { pelican(Api(emptyList())) }
+                application { pelican(api(emptyList())) }
                 startApplication()
             }
         }

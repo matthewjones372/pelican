@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.In5
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.UploadedFile
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
@@ -384,12 +385,13 @@ class UndeclaredFailureTest {
     private fun apiThatReturnsAStrayFailure(
         exposeInternalErrors: Boolean = false,
         onServerError: ((String, io.github.matthewjones372.pelican.Endpoint<*, *>?, Throwable) -> Unit)? = null,
-    ) = Api(
+    ) = api(
         endpoints = listOf(fetchUser handledOrFail { strayFailure(ApiError(410, "nope")) }),
         codecs = JacksonCodecs,
-        exposeInternalErrors = exposeInternalErrors,
-        onServerError = onServerError,
-    )
+    ) {
+        this.exposeInternalErrors = exposeInternalErrors
+        onServerError?.let { onError(it) }
+    }
 
     @Test
     fun `returning a failure this endpoint never declared is a 500, not a 410`() {

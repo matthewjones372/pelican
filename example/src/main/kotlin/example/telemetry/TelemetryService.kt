@@ -32,6 +32,7 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.IntCodec
 import io.github.matthewjones372.pelican.Params
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.before
 import io.github.matthewjones372.pelican.between
 import io.github.matthewjones372.pelican.default
@@ -154,7 +155,7 @@ private fun searchDelayMillis(term: String?): Long = FLOOR_MILLIS + (term?.lengt
 private const val FLOOR_MILLIS = 4L
 private const val PER_CHARACTER_MILLIS = 6L
 
-fun telemetryService(registry: MeterRegistry, telemetry: OpenTelemetry, report: () -> String): Api = Api(
+fun telemetryService(registry: MeterRegistry, telemetry: OpenTelemetry, report: () -> String): Api = api(
     endpoints = listOf(
         fetchOrder handledOrFail { id ->
             stock.firstOrNull { it.id == id }?.let { ok(it) } ?: noSuchOrder(ApiError(404, "No order $id"))
@@ -185,12 +186,15 @@ fun telemetryService(registry: MeterRegistry, telemetry: OpenTelemetry, report: 
         readReport handledNow { report() },
     ),
     codecs = JacksonCodecs,
-    title = "Orders",
-    version = "1.0.0",
+) {
+    title = "Orders"
+    version = "1.0.0"
 
     // The whole of the instrumentation, and the gate they both have to see.
-    filters = listOf(metrics(registry), openTelemetry(telemetry, incomingHeaders = pekkoHeaders), gate),
-)
+    filter(metrics(registry))
+    filter(openTelemetry(telemetry, incomingHeaders = pekkoHeaders))
+    filter(gate)
+}
 
 /**
  * Reading `traceparent` off the request, which is the one thing a

@@ -303,19 +303,20 @@ fun shopRoutes(catalog: BookCatalog, desk: OrderDesk): List<ServerEndpoint> = li
 fun shopApi(
     catalog: BookCatalog = InMemoryCatalog(),
     desk: OrderDesk = InMemoryOrderDesk(catalog),
-): Api = Api(
+): Api = api(
     endpoints = shopRoutes(catalog, desk),
     codecs = JacksonCodecs,
-    title = "Rookery Books",
-    version = "1.0.0",
-    description = "An independent bookshop: a shelf, a till, and an order.",
+) {
+    title = "Rookery Books"
+    version = "1.0.0"
+    description = "An independent bookshop: a shelf, a till, and an order."
     // The list the document is built from, handed to the server as well. An
     // endpoint added to `allShopEndpoints` and forgotten in `shopRoutes` is a
     // startup failure naming it, rather than a route that documents itself and
     // answers 404.
-    covers = allShopEndpoints,
-    webhooks = allShopWebhooks,
-)
+    covers = allShopEndpoints
+    webhooks = allShopWebhooks
+}
 
 /** The same descriptions, no server and no handlers — what the docs task reads. */
 fun shopSpec(): ApiSpec = ApiSpec(

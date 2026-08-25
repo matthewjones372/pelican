@@ -432,7 +432,7 @@ class BufferedPartTest {
     @Test
     fun `the request's own budget bounds a part that declared more than the request may spend`() {
         // Two bounds, and the smaller applies: a part says what one field may
-        // cost, and `Api(maxBodyBytes = ...)` says what the whole request may.
+        // cost, and `api { maxBodyBytes = ... }` says what the whole request may.
         val failure = shouldThrow<PayloadTooLarge> {
             decode(
                 envelope(

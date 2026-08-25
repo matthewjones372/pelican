@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.http4k
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -11,7 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class StreamingTest {
 
-    private fun handlerCounting(produced: AtomicInteger) = Api(
+    private fun handlerCounting(produced: AtomicInteger) = api(
         endpoints = listOf(
             streamItems streamedNow { max ->
                 (1..max).asSequence().map { i ->

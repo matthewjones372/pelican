@@ -2,6 +2,7 @@ package example.backends
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
@@ -38,7 +39,7 @@ class ContentNegotiationTest {
     /** No representation at all, so there is nothing for a caller to refuse. */
     private val nothing = endpoint { get("nothing"); empty(status = 204) }
 
-    private fun api(routes: List<ServerEndpoint>) = Api(endpoints = routes, codecs = JacksonCodecs)
+    private fun api(routes: List<ServerEndpoint>) = api(endpoints = routes, codecs = JacksonCodecs)
 
     private val client: HttpClient = HttpClient.newHttpClient()
 

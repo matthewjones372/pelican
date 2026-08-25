@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.http4k
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
@@ -131,7 +132,10 @@ class Http4kInterpreterTest {
 
     @Test
     fun `an empty stream still renders an empty json array`() {
-        val empty = Api(listOf(listItems streamedNow { _ -> emptySequence<Item>() }), JacksonCodecs)
+        val empty = api(
+            listOf(listItems streamedNow { _ -> emptySequence<Item>() }),
+            JacksonCodecs,
+        )
             .toHttpHandler()
         empty(Request(Method.GET, "/items/list")).bodyString() shouldBe "[]"
     }

@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.ktor
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.matchers.shouldBe
 import io.ktor.client.request.header
@@ -19,7 +20,11 @@ class BodyLimitTest {
 
     private fun served(block: suspend (io.ktor.client.HttpClient) -> Unit) = testApplication {
         application {
-            pelican(Api(endpoints = testApi().endpoints, codecs = JacksonCodecs, maxBodyBytes = 64))
+            pelican(
+                api(endpoints = testApi().endpoints, codecs = JacksonCodecs) {
+                    maxBodyBytes = 64
+                },
+            )
         }
         block(client)
     }

@@ -338,24 +338,25 @@ val securedRoutes: List<ServerEndpoint> = listOf(
  */
 val apiWideSecurity = listOf(companyIdp.requires("reports:read"))
 
-fun securedApi(): Api = Api(
+fun securedApi(): Api = api(
     endpoints = securedRoutes,
     codecs = JacksonCodecs,
-    title = "Reports",
-    version = "1.0.0",
-    description = "Reports, behind an operator login and a company identity provider.",
-    security = apiWideSecurity,
+) {
+    title = "Reports"
+    version = "1.0.0"
+    description = "Reports, behind an operator login and a company identity provider."
+    security = apiWideSecurity
 
     // The one line that turns the padlocks above into a rule. Registered on the
     // Api rather than written into each handler, so an endpoint added later is
     // covered by default rather than by remembering.
-    filters = listOf(enforceDeclaredSecurity(apiWideSecurity)),
+    filter(enforceDeclaredSecurity(apiWideSecurity))
 
     // And the one line that says these six endpoints are all of them. Leaving
     // one out of `securedRoutes` is now a startup failure rather than a
     // documented endpoint that answers 404.
-    covers = allSecuredEndpoints,
-)
+    covers = allSecuredEndpoints
+}
 
 const val DOCS_PATH = "/api-docs"
 

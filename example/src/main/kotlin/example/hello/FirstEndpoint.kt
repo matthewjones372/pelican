@@ -23,12 +23,13 @@ val greet = endpoint(who) {
     json<Greeting>()
 }
 
-fun greetings() = Api(
+fun greetings() = api(
     endpoints = listOf(greet handledNow { name -> Greeting("Hello, $name!") }),
     codecs = JacksonCodecs,
-    title = "Greetings",
-    version = "1.0.0",
-)
+) {
+    title = "Greetings"
+    version = "1.0.0"
+}
 
 fun main() {
     val server = greetings().startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))

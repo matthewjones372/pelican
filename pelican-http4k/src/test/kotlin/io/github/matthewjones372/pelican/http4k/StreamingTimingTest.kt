@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.http4k
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeGreaterThan
@@ -30,7 +31,7 @@ class StreamingTimingTest {
     private val rows = 10
     private val gapMillis = 100L
 
-    private fun api() = Api(
+    private fun api() = api(
         endpoints = listOf(
             streamItems streamedNow { max ->
                 (1..max).asSequence().map { i ->

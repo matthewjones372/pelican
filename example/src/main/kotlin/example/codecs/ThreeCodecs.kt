@@ -84,13 +84,14 @@ val codecRoutes: List<ServerEndpoint> = listOf(
 // ============================================================ 4. the services
 
 /** The same endpoints and handlers, over whichever JSON library is passed. */
-fun notesApi(codecs: Codecs): Api = Api(
+fun notesApi(codecs: Codecs): Api = api(
     endpoints = codecRoutes,
     codecs = codecs,
-    title = "Notes",
-    version = "1.0.0",
-    description = "The same service, read and written by three JSON libraries.",
-)
+) {
+    title = "Notes"
+    version = "1.0.0"
+    description = "The same service, read and written by three JSON libraries."
+}
 
 /** Documentation needs only the schema half of a codec module. */
 fun notesSpec(schemas: SchemaSource): ApiSpec = ApiSpec(

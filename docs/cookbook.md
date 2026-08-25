@@ -39,12 +39,13 @@ val greet = endpoint(who) {
     json<Greeting>()
 }
 
-fun greetings() = Api(
+fun greetings() = api(
     endpoints = listOf(greet handledNow { name -> Greeting("Hello, $name!") }),
     codecs = JacksonCodecs,
-    title = "Greetings",
-    version = "1.0.0",
-)
+) {
+    title = "Greetings"
+    version = "1.0.0"
+}
 
 fun main() {
     val server = greetings().startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
@@ -324,7 +325,7 @@ val placeOrder = endpoint(userId, newOrder) {
 A default for the whole API, and an endpoint that opts out:
 
 ```kotlin
-Api(routes, codecs = JacksonCodecs, security = listOf(oauth.requires("orders:read")))
+api(routes, codecs = JacksonCodecs) { security = listOf(oauth.requires("orders:read")) }
 
 val health = endpoint {
     get("health")
@@ -356,7 +357,10 @@ val timing = Filter { params, next ->
     next(params).thenApply { it.also { metrics.record(params.endpoint, System.nanoTime() - started) } }
 }
 
-Api(routes, JacksonCodecs, filters = listOf(timing, requireToken))
+api(routes, JacksonCodecs) {
+    filter(timing)
+    filter(requireToken)
+}
 ```
 
 A handler reads what a filter put there by the same key:

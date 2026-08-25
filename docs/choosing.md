@@ -447,7 +447,7 @@ those all throw when the endpoint value or the `Api` is constructed. It does not
 catch two inputs of the same type being read in the wrong order, and it lets a
 handler destructure a prefix of its inputs and quietly ignore the rest. And
 nothing in Kotlin's type system can say that a list of bound handlers covers a
-set of declared endpoints, so `Api(covers = ...)` is a runtime check too.
+set of declared endpoints, so `api { covers = ... }` is a runtime check too.
 
 **Finally, the obvious one.** One author, one released version, and no issues
 open — which reads as "nothing is broken" and equally as "nobody has tried it

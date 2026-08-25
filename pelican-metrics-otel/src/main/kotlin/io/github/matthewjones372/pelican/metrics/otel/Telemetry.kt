@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.Attribute
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.Params
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attempt
 import io.github.matthewjones372.pelican.attribute
 import io.github.matthewjones372.pelican.statusFor
@@ -26,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
  * say.
  *
  * ```kotlin
- * Api(routes, JacksonCodecs, filters = listOf(openTelemetry(sdk)))
+ * api(routes, JacksonCodecs) { filter(openTelemetry(sdk)) }
  * ```
  *
  * That line is the whole of it, and it is the same line whichever interpreter

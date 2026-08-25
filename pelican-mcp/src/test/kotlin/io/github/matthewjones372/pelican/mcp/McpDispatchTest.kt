@@ -54,7 +54,7 @@ class McpDispatchTest {
     /** The credential the service requires, supplied by what serves the tools rather than by the model. */
     private val supplied = McpOptions(headers = mapOf("X-Api-Key" to "let-me-in"))
 
-    private fun api(seen: Seen = Seen(), options: McpOptions = supplied): McpDispatch = Api(
+    private fun api(seen: Seen = Seen(), options: McpOptions = supplied): McpDispatch = api(
         endpoints = listOf(
             ServerEndpoint(getOrders) { p ->
                 seen.userId = p[userId]

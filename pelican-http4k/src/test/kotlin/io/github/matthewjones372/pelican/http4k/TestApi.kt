@@ -96,7 +96,7 @@ val fetchBlob = endpoint(itemId) {
     bytes("application/octet-stream") orFail noSuchItem
 }
 
-fun testApi(extra: List<ServerEndpoint> = emptyList()): Api = Api(
+fun testApi(extra: List<ServerEndpoint> = emptyList()): Api = api(
     endpoints = listOf(
         getItem handledOrFail { id ->
             if (id == 1L) ok(Item(1, "widget")) else noSuchItem(ApiError(404, "No item $id"))
@@ -121,5 +121,6 @@ fun testApi(extra: List<ServerEndpoint> = emptyList()): Api = Api(
         },
     ) + extra,
     codecs = JacksonCodecs,
-    title = "Items",
-)
+) {
+    title = "Items"
+}

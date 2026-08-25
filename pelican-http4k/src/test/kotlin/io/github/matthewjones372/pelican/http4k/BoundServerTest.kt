@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.http4k
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -88,7 +89,7 @@ class BoundServerTest {
 
     @Test
     fun `an api with no endpoints is a startup failure, not a mystery 404`() {
-        val empty = Api(endpoints = emptyList(), codecs = JacksonCodecs)
+        val empty = api(endpoints = emptyList(), codecs = JacksonCodecs)
         val failure = runCatching { empty.toHttpHandler() }.exceptionOrNull()
         withClue("expected a startup failure, got $failure") { failure.shouldBeInstanceOf<IllegalArgumentException>() }
     }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.IntCodec
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.default
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
@@ -91,7 +92,7 @@ open class PekkoOverheadBenchmark {
         json<Item>()
     }
 
-    private val described: SealedRoute = Api(
+    private val described: SealedRoute = api(
         endpoints = listOf(getItem handledNow { (id, lim) -> Item(id, "item-$lim") }),
         codecs = JacksonCodecs,
     ).toRoute(system).function(system)
@@ -199,7 +200,7 @@ open class PekkoOverheadBenchmark {
         json<Item>(status = 201)
     }
 
-    private val describedPost: SealedRoute = Api(
+    private val describedPost: SealedRoute = api(
         endpoints = listOf(createItem handledNow { body -> Item(1, body.name) }),
         codecs = JacksonCodecs,
     ).toRoute(system).function(system)

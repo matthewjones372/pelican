@@ -447,11 +447,12 @@ class SwaggerUiOAuthTest {
     }
 
     private fun serve(docsOAuth: DocsOAuth?, block: (String) -> Unit) {
-        val server = Api(
+        val server = api(
             endpoints = listOf(secured handledNow { User(1, "Ada Lovelace", "ada@example.com") }),
             codecs = JacksonCodecs,
-            title = "Orders",
-        ).startWithDocs(
+        ) {
+            title = "Orders"
+        }.startWithDocs(
             port = 0,
             systemName = "swagger-oauth-test",
             docs = Docs(docsPath = "/api-docs", oauth = docsOAuth),
@@ -506,15 +507,16 @@ class SwaggerUiOAuthTest {
 class SwaggerUiTest {
 
     private fun serve(openApi: String?, docs: String?, block: (String) -> Unit) {
-        val server = Api(
+        val server = api(
             endpoints = listOf(
                 getUser handledOrFail { id ->
                     Store.user(id)?.let { ok(it) } ?: noSuchUser(ApiError(404, "No user $id"))
                 },
             ),
             codecs = JacksonCodecs,
-            title = "Orders",
-        ).startWithDocs(
+        ) {
+            title = "Orders"
+        }.startWithDocs(
             port = 0,
             systemName = "swagger-ui-test",
             docs = Docs(openApiPath = openApi, docsPath = docs),
@@ -565,11 +567,12 @@ class SwaggerUiTest {
             summary = "Closes the tag: </script><script>alert(1)</script>"
             json<User>()
         }
-        val server = Api(
+        val server = api(
             endpoints = listOf(hazard handledNow { User(1, "a", "b") }),
             codecs = JacksonCodecs,
-            title = "Hazard",
-        ).startWithDocs(
+        ) {
+            title = "Hazard"
+        }.startWithDocs(
             port = 0,
             systemName = "swagger-escape-test",
             docs = Docs(openApiPath = null, docsPath = "/api-docs"),
@@ -693,15 +696,16 @@ class WrapperCodecTest {
 
     @Test
     fun `a wrapper codec decodes to the wrapper type and documents as the underlying one`() {
-        val api = Api(
+        val api = api(
             // The handler receives AccountId, not Long. Swapping it for another
             // Long-backed id would not compile.
             endpoints = listOf(
                 getAccount handledNow { id: AccountId -> User(id.value, "acct-${id.value}", "a@b.c") },
             ),
             codecs = JacksonCodecs,
-            title = "Accounts",
-        )
+        ) {
+            title = "Accounts"
+        }
         val server = api.start(port = 0, systemName = "wrapper-test")
         try {
             val res = HttpClient.newHttpClient().send(

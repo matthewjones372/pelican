@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.http4k.docs
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Cors
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.cors
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
@@ -29,12 +30,13 @@ private val getWidget = endpoint(widgetId) {
     json<Widget>()
 }
 
-private fun api(cors: Cors? = null) = Api(
+private fun api(cors: Cors? = null) = api(
     endpoints = listOf(getWidget handledNow { id -> Widget(id, "widget-$id") }),
     codecs = JacksonCodecs,
-    title = "Widgets",
-    cors = cors,
-)
+) {
+    title = "Widgets"
+    this.cors = cors
+}
 
 class DocsTest {
 

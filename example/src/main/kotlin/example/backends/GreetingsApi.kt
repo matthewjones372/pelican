@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attribute
 import io.github.matthewjones372.pelican.before
 import io.github.matthewjones372.pelican.cors
@@ -37,28 +38,28 @@ fun greetingsApi(
      * throwing, so a filter listed after [gate] never hears about a 403.
      */
     outerFilters: List<Filter> = emptyList(),
-): Api = Api(
+): Api = api(
     endpoints = routes,
     codecs = JacksonCodecs,
-    title = "Greetings",
-    version = "1.0.0",
-    description = "One set of endpoint descriptions, served by three different HTTP libraries.",
+) {
+    title = "Greetings"
+    version = "1.0.0"
+    description = "One set of endpoint descriptions, served by three different HTTP libraries."
 
-    cors = cors("https://console.example.com"),
+    cors = cors("https://console.example.com")
 
-    filters = outerFilters + listOf(stamping, gate),
+    outerFilters.forEach { filter(it) }
+    filter(stamping)
+    filter(gate)
 
-    // Small enough to prove in a test without shipping a megabyte. The default
-    // is 8 MiB; a service that takes larger documents raises it, or takes the
-    // body as a `rawBody()` stream and never holds it whole.
-    maxBodyBytes = 4_096,
+    maxBodyBytes = SMALL_ENOUGH_TO_PROVE
 
     // Every description in `greetingEndpoints` must be bound above. Leaving one
     // out is a startup failure rather than a documented 404.
-    covers = covers,
+    this.covers = covers
 
-    webhooks = greetingWebhooks,
-)
+    webhooks = greetingWebhooks
+}
 
 /** What [stamping] worked out, for anything downstream that wants it. */
 val correlationId = attribute<String>("correlationId")
@@ -84,3 +85,10 @@ val gate: Filter = before { params ->
 }
 
 private const val HEX = 16
+
+/**
+ * Small enough to prove in a test without shipping a megabyte. The default is
+ * 8 MiB; a service that takes larger documents raises it, or takes the body as
+ * a `rawBody()` stream and never holds it whole.
+ */
+private const val SMALL_ENOUGH_TO_PROVE = 4_096L

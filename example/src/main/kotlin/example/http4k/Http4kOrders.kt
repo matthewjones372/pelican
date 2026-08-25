@@ -29,6 +29,7 @@ import example.watchOrders
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.http4k.bytesNow
 import io.github.matthewjones372.pelican.http4k.docs.Docs
 import io.github.matthewjones372.pelican.http4k.docs.startWithDocs
@@ -161,13 +162,14 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
  * The same `Api` value as the Pekko wiring builds, down to the codecs: only the
  * handler list differs, and only in the type its streaming handlers return.
  */
-fun ordersApi(): Api = Api(
+fun ordersApi(): Api = api(
     endpoints = ordersRoutes,
     codecs = JacksonCodecs,
-    title = "Orders",
-    version = "1.0.0",
-    description = "A Kotlin-first http4k service, described as values.",
-)
+) {
+    title = "Orders"
+    version = "1.0.0"
+    description = "A Kotlin-first http4k service, described as values."
+}
 
 /** `./gradlew :example:runHttp4k` — the same service, on the other backend. */
 fun main(args: Array<String>) {

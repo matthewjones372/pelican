@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.metrics
 
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attempt
 import io.github.matthewjones372.pelican.statusFor
 import io.micrometer.core.instrument.Counter
@@ -15,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
  * serves, dimensioned by what the descriptions already say.
  *
  * ```kotlin
- * Api(routes, JacksonCodecs, filters = listOf(metrics(registry)))
+ * api(routes, JacksonCodecs) { filter(metrics(registry)) }
  * ```
  *
  * That line is the whole of it. There is no per-route registration, no name to

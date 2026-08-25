@@ -185,12 +185,13 @@ val greet = endpoint(who) {
     json<Greeting>()
 }
 
-fun greetings() = Api(
+fun greetings() = api(
     endpoints = listOf(greet handledNow { name -> Greeting("Hello, $name!") }),
     codecs = JacksonCodecs,
-    title = "Greetings",
-    version = "1.0.0",
-)
+) {
+    title = "Greetings"
+    version = "1.0.0"
+}
 
 fun main() {
     greetings().startWithDocs(port = 8080, docs = Docs(docsPath = "/api-docs"))
@@ -548,7 +549,7 @@ val orderPlaced = webhook("orderPlaced") {
     empty(status = 204)
 }
 
-Api(endpoints = ordersRoutes, codecs = JacksonCodecs, webhooks = listOf(orderPlaced))
+api(endpoints = ordersRoutes, codecs = JacksonCodecs) { webhooks = listOf(orderPlaced) }
 ```
 
 There is no path, because the path belongs to whoever subscribed: `webhook(...)`
@@ -719,7 +720,10 @@ Register them once, outermost first — that ordering is why `rateLimit` can rea
 what `requireToken` established:
 
 ```kotlin
-Api(endpoints, JacksonCodecs, filters = listOf(requireToken, rateLimit))
+api(endpoints, JacksonCodecs) {
+    filter(requireToken)
+    filter(rateLimit)
+}
 ```
 
 And the handler reads the attribute off its receiver. There is no second check
@@ -744,7 +748,7 @@ A filter can read the endpoint, so a metric does not have to be hand-written per
 route either. `pelican-metrics` is one line:
 
 ```kotlin
-Api(endpoints, JacksonCodecs, filters = listOf(metrics(registry)))
+api(endpoints, JacksonCodecs) { filter(metrics(registry)) }
 ```
 
 That gives a Micrometer counter and timer for every endpoint, tagged with the
@@ -758,7 +762,7 @@ with the router, because all of it is already written down on the endpoint. See
 carries traces as well:
 
 ```kotlin
-Api(endpoints, JacksonCodecs, filters = listOf(openTelemetry(sdk)))
+api(endpoints, JacksonCodecs) { filter(openTelemetry(sdk)) }
 ```
 
 A `SERVER` span per request, named `GET /orders/{orderId}` from the endpoint
@@ -791,11 +795,10 @@ described still carries the payload you described.
 ### Size limits and startup checks
 
 ```kotlin
-Api(
-    routes, JacksonCodecs,
-    maxBodyBytes = 2 * 1024 * 1024,   // default 8 MiB; a bigger body is a 413
-    covers = allOrderEndpoints,       // every one of these must be bound
-)
+api(routes, JacksonCodecs) {
+    maxBodyBytes = 2 * 1024 * 1024   // default 8 MiB; a bigger body is a 413
+    covers = allOrderEndpoints       // every one of these must be bound
+}
 ```
 
 An unbounded request body is a way to run a service out of memory with one
@@ -812,7 +815,7 @@ all.
 ### CORS
 
 ```kotlin
-Api(routes, JacksonCodecs, cors = cors("https://app.example.com"))
+api(routes, JacksonCodecs) { cors = cors("https://app.example.com") }
 ```
 
 That is the whole configuration. The methods a preflight allows are the methods
@@ -836,10 +839,10 @@ network error.
 ### Choosing a JSON library
 
 ```kotlin
-Api(routes, codecs = JacksonCodecs)      // Jackson + swagger-core schemas
-Api(routes, codecs = KotlinxCodecs)      // kotlinx.serialization
-Api(routes, codecs = JsoniterCodecs)     // jsoniter
-Api(routes, codecs = JacksonCodecs(myObjectMapper))
+api(routes, codecs = JacksonCodecs)      // Jackson + swagger-core schemas
+api(routes, codecs = KotlinxCodecs)      // kotlinx.serialization
+api(routes, codecs = JsoniterCodecs)     // jsoniter
+api(routes, codecs = JacksonCodecs(myObjectMapper))
 ```
 
 Descriptions carry a `KType` and nothing else, no serializer and no mapper, so

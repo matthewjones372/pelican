@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.IntCodec
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.default
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
@@ -70,7 +71,7 @@ open class Http4kOverheadBenchmark {
         json<Item>()
     }
 
-    private val described: HttpHandler = Api(
+    private val described: HttpHandler = api(
         endpoints = listOf(getItem handledNow { (id, lim) -> Item(id, "item-$lim") }),
         codecs = JacksonCodecs,
     ).toHttpHandler()
@@ -123,7 +124,7 @@ open class Http4kOverheadBenchmark {
         text()
     }
 
-    private val describedPing: HttpHandler = Api(listOf(ping handledNow { "pong" })).toHttpHandler()
+    private val describedPing: HttpHandler = api(listOf(ping handledNow { "pong" })).toHttpHandler()
 
     private val handWrittenPing: HttpHandler = routes(
         "/ping" bind Method.GET to { _: Request -> Response(Status.OK).body("pong") },

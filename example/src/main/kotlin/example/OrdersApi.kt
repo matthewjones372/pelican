@@ -3,6 +3,7 @@ package example
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
@@ -123,25 +124,26 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     },
 )
 
-fun ordersApi(): Api = Api(
+fun ordersApi(): Api = api(
     endpoints = ordersRoutes,
     // The one argument that decides which JSON library serves this API. Swap it
     // for KotlinxCodecs and no endpoint description changes.
     codecs = JacksonCodecs,
-    title = "Orders",
-    version = "1.0.0",
-    description = "A Kotlin-first Pekko HTTP service, described as values.",
+) {
+    title = "Orders"
+    version = "1.0.0"
+    description = "A Kotlin-first Pekko HTTP service, described as values."
     // Declared on the served API as well as on the spec, because it is a fact
     // about the service rather than about the document: this is a call it
     // makes. Nothing here routes it — see `WebhooksTest` in pelican-core.
-    webhooks = allWebhooks,
+    webhooks = allWebhooks
 
     // No `servers` entry on purpose. Swagger UI's "Try it out" calls the URLs
     // listed there, and a hardcoded one pins every call to that exact origin —
     // so opening the page on 127.0.0.1 while the spec says localhost makes each
     // call cross-origin, and the browser blocks it. Left empty, Swagger UI uses
     // the origin the page was loaded from, which is right either way.
-)
+}
 
 /**
  * Where this service publishes itself. Separate from the `Api` on purpose:

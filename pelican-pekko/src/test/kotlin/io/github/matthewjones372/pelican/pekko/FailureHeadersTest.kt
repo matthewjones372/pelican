@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.pekko
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
@@ -57,7 +58,7 @@ class FailureHeadersTest {
     }
 
     /** Zero is the id that is being rate limited; anything else is served. */
-    private val api = Api(
+    private val api = api(
         endpoints = listOf(
             fetch handledOrFail { id ->
                 if (id == 0L) throttled(Problem("Slow down"), retryAfter of 30L) else ok(Widget(id))
@@ -67,7 +68,7 @@ class FailureHeadersTest {
     )
 
     /** The same endpoint bound by a handler that forgets the header it promised. */
-    private val forgetful = Api(
+    private val forgetful = api(
         endpoints = listOf(fetch handledOrFail { _ -> throttled(Problem("Slow down")) }),
         codecs = JacksonCodecs,
     )

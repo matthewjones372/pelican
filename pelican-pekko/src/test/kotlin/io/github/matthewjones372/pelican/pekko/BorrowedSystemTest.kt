@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.pekko
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.matchers.shouldBe
@@ -43,7 +44,7 @@ class BorrowedSystemTest {
         text()
     }
 
-    private val api = Api(
+    private val api = api(
         endpoints = listOf(hello handledNow { "hello" }),
         codecs = JacksonCodecs,
     )

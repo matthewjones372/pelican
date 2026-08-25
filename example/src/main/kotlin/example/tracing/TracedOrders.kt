@@ -30,6 +30,7 @@ package example.tracing
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.Params
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
@@ -151,7 +152,7 @@ private val stock = listOf("kettle", "teapot").mapIndexed { index, item -> Order
  * decision. `OpenTelemetry.noop()` is a perfectly good answer for a service
  * that has not decided yet.
  */
-fun tracedOrders(telemetry: OpenTelemetry, recorded: RecordedSpans): Api = Api(
+fun tracedOrders(telemetry: OpenTelemetry, recorded: RecordedSpans): Api = api(
     endpoints = listOf(
         fetchOrder handledOrFail { id ->
             val found = stock.firstOrNull { it.id == id }
@@ -167,13 +168,14 @@ fun tracedOrders(telemetry: OpenTelemetry, recorded: RecordedSpans): Api = Api(
         readSpans handledNow { spanTable(recorded) },
     ),
     codecs = JacksonCodecs,
-    title = "Orders",
-    version = "1.0.0",
+) {
+    title = "Orders"
+    version = "1.0.0"
 
     // The whole of the instrumentation. Outermost, so that it also spans the
     // requests a filter listed after it refuses.
-    filters = listOf(openTelemetry(telemetry, incomingHeaders = pekkoHeaders)),
-)
+    filter(openTelemetry(telemetry, incomingHeaders = pekkoHeaders))
+}
 
 /**
  * An SDK that keeps its spans in memory and understands `traceparent`.

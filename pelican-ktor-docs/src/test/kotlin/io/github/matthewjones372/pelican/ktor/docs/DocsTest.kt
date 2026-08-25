@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.ktor.docs
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -29,11 +30,12 @@ private val getWidget = endpoint(widgetId) {
     json<Widget>()
 }
 
-private fun api() = Api(
+private fun api() = api(
     endpoints = listOf(getWidget handledNow { id -> Widget(id, "widget-$id") }),
     codecs = JacksonCodecs,
-    title = "Widgets",
-)
+) {
+    title = "Widgets"
+}
 
 class DocsTest {
 

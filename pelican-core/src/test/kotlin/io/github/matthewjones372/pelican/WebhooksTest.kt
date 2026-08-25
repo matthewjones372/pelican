@@ -98,7 +98,7 @@ class WebhooksTest {
         val bound = ServerEndpoint(orderPlaced.operation) { CompletableFuture.completedFuture(null) }
 
         shouldThrow<IllegalArgumentException> {
-            Api(endpoints = listOf(bound))
+            api(endpoints = listOf(bound))
         }.message.orEmpty() shouldContain "a call this service sends rather than one it answers"
     }
 
@@ -137,7 +137,9 @@ class WebhooksTest {
     /** An `Api` hands its webhooks to the description half, since that is what publishes them. */
     @Test
     fun `the spec an api describes carries them`() {
-        val api = Api(endpoints = emptyList(), webhooks = listOf(orderPlaced))
+        val api = api(endpoints = emptyList()) {
+            webhooks = listOf(orderPlaced)
+        }
 
         api.spec().webhooks shouldBe listOf(orderPlaced)
     }

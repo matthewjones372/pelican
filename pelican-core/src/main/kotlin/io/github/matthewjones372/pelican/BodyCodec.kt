@@ -195,7 +195,7 @@ private fun Codecs.oneBodyCodec(input: BodyInput<*>): BodyCodec<Any?> = when (in
 /** The default when none is configured: fails with an actionable message. */
 object NoCodecs : Codecs {
     private fun fail(): Nothing = error(
-        "No codecs configured. Pass `codecs = JacksonCodecs` to Api(...) " +
+        "No codecs configured. Pass `codecs = JacksonCodecs` to api(...) " +
             "(pelican-jackson) or `codecs = KotlinxCodecs` (pelican-kotlinx).",
     )
 

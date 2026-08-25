@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.pekko
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.cors
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
@@ -64,13 +65,14 @@ class ConcatenatedRoutesTest {
         text()
     }
 
-    private val api = Api(
+    private val api = api(
         endpoints = listOf(
             hello handledNow { who -> "Hello, $who!" },
             note handledNow { carried -> "noted ${carried ?: "-"}" },
         ),
-        cors = cors(allowed),
-    )
+    ) {
+        cors = cors(allowed)
+    }
 
     private val ownRoutes: Route = Directives.concat(
         Directives.get { Directives.path("custom") { Directives.complete("mine") } },

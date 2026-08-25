@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.benchmarks
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -150,13 +151,13 @@ open class RoutingScaleBenchmark {
     fun setUp() {
         val descriptions = decoyDescriptions(endpoints - 1)
 
-        http4k = Api(
+        http4k = api(
             endpoints = descriptions.map { it handledOnHttp4k { _ -> "decoy" } } +
                 (target handledOnHttp4k { id -> "item-$id" }),
             codecs = JacksonCodecs,
         ).toHttp4kHandler()
 
-        pekko = Api(
+        pekko = api(
             endpoints = descriptions.map { it handledOnPekko { _ -> "decoy" } } +
                 (target handledOnPekko { id -> "item-$id" }),
             codecs = JacksonCodecs,

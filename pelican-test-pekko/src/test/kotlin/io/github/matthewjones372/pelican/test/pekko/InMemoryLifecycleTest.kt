@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.test.pekko
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.test.ApiClient
@@ -16,9 +17,7 @@ private val ping = endpoint {
     text()
 }
 
-private fun pingApi() = Api(
-    endpoints = listOf(ping handledNow { "pong" }),
-)
+private fun pingApi() = api(endpoints = listOf(ping handledNow { "pong" }))
 
 class InMemoryLifecycleTest {
 

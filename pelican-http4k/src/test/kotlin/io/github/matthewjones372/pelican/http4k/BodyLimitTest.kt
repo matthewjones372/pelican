@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.http4k
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -17,11 +18,12 @@ import org.junit.jupiter.api.Test
  */
 class BodyLimitTest {
 
-    private val small: HttpHandler = Api(
+    private val small: HttpHandler = api(
         endpoints = testApi().endpoints,
         codecs = JacksonCodecs,
-        maxBodyBytes = 64,
-    ).toHttpHandler()
+    ) {
+        maxBodyBytes = 64
+    }.toHttpHandler()
 
     private fun post(body: String) = small(
         Request(Method.POST, "/items").header("X-Api-Key", "let-me-in").body(body),

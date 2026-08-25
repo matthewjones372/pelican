@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.pekko
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsonBody
@@ -65,11 +66,12 @@ class ChunkedBodyLimitTest {
     }
 
     /** A deliberately tiny ceiling, so the test does not have to send megabytes. */
-    private val api = Api(
+    private val api = api(
         endpoints = listOf(echo handledNow { body -> "read ${body.text.length}" }),
         codecs = JacksonCodecs,
-        maxBodyBytes = 1024,
-    )
+    ) {
+        maxBodyBytes = 1024
+    }
 
     // Unbound by the testkit's shutdown, which runs the system's coordinated
     // shutdown, and that is what Pekko HTTP hooks its own unbind onto.

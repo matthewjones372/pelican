@@ -377,7 +377,7 @@ private fun readStrictBody(
                     REQUEST_TIMEOUT,
                     "Timed out reading the request body",
                     "The body did not arrive within the ${api.strictBodyTimeoutMillis}ms this service " +
-                        "waits for one. Send it faster, or raise Api(strictBodyTimeoutMillis = ...).",
+                        "waits for one. Send it faster, or raise strictBodyTimeoutMillis in api { }.",
                 )
 
                 else -> t

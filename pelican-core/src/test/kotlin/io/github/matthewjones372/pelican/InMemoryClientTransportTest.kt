@@ -100,7 +100,10 @@ class InMemoryClientTransportTest {
     private fun api(
         filters: List<Filter> = emptyList(),
         onServerError: ((String, Endpoint<*, *>?, Throwable) -> Unit)? = null,
-    ) = Api(handlers(), codecs = Strings, filters = filters, onServerError = onServerError)
+    ) = api(handlers(), codecs = Strings) {
+        filters.forEach { filter(it) }
+        onServerError?.let { onError(it) }
+    }
 
     private fun send(
         transport: ClientTransport,

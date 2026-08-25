@@ -123,7 +123,7 @@ private fun refuse(input: InputStream, part: String, bound: Long?, budget: Long,
     throw PayloadTooLarge(
         max,
         "The parts of this request read into memory come to more than the $max bytes it may hold, " +
-            "and '$part' is where that ran out. Raise Api(maxBodyBytes = ...), or send less.",
+            "and '$part' is where that ran out. Raise maxBodyBytes in api { }, or send less.",
     )
 }
 
