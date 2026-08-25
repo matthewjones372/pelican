@@ -27,6 +27,14 @@ one.
   value and never two segments and a different route.
 - **`?q` on http4k is a present, empty value**, as it already was on Pekko and
   Ktor, rather than indistinguishable from a parameter nobody sent.
+- **A kotlinx-backed server reads what its own document says it accepts.**
+  `defaultJson()` now sets `explicitNulls = false`. Without it, a nullable
+  property with no default was `required` to the decoder and optional in the
+  published schema, so a caller following the document got a 400 from
+  `KotlinxCodecs` and a 200 from the other two. The agreement harness gained the
+  decode direction that catches the whole class: for every shape it covers, the
+  smallest payload each codec's own schema accepts must decode through that
+  codec.
 
 ### Changed
 
@@ -35,6 +43,11 @@ one.
   and the trailing-slash rule are one answer on all three. Where a request lands
   is still Ktor's: a constant segment scores above the tailcard these routes
   install, so routes written by hand beside them keep the paths they describe.
+- **`KotlinxCodecs` leaves a null property out where the other two write it.**
+  The flag that lets kotlinx.serialization read an absent nullable property
+  governs writing too. Both spellings satisfy the published schema and all three
+  libraries read either; `ThreeCodecsTest` pins the difference and the
+  cross-reading. Pass your own `Json` to write the nulls back.
 
 ## [0.2.0]
 

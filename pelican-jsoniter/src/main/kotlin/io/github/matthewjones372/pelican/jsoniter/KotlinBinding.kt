@@ -284,8 +284,9 @@ private fun encoderFor(type: Type, config: JsoniterConfig): Encoder? {
  * unless the config asks for `omitDefaultValue` — jsoniter's own setting,
  * applied by jsoniter's own rule. Off, which is the default, an absent field
  * and a null one keep the different meanings a document that marks the field
- * nullable gives them, the same choice `defaultMapper()` and `defaultJson()`
- * make.
+ * nullable gives them, the same choice `defaultMapper()` makes. `defaultJson()`
+ * leaves a null out, because the flag that lets kotlinx.serialization *read*
+ * an absent nullable property governs writing too.
  */
 private class ObjectEncoder(
     kclass: KClass<*>,

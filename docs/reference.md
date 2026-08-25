@@ -300,6 +300,15 @@ result the same way; see [The publishing direction](#the-publishing-direction).
 and the document do not differ. `./gradlew :example:runCodecs` serves them side
 by side.
 
+One difference in the bytes is deliberate. `defaultJson()` sets
+`explicitNulls = false`, without which kotlinx.serialization refuses a payload
+that leaves out a nullable property with no default — a property its own schema
+marks optional, and one the other two read as null. The flag governs writing
+too, so `KotlinxCodecs` omits a null property where `JacksonCodecs` and
+`JsoniterCodecs` write `"author": null`. Both are payloads the published schema
+describes, and each library reads either, which is what `ThreeCodecsTest` pins.
+Pass your own `Json` to write the nulls back.
+
 Pass your own mapper, `Json` or jsoniter config when the defaults do not fit:
 
 ```kotlin
