@@ -69,12 +69,12 @@ in front of everyone who wanted only the schemas. Not recommended.
 
 ## Stack
 
-- [ ] **`spec-0002-mcp-tool-descriptions`** — `pelican-mcp`; `ApiSpec.mcpTools()`, names, input and output schemas over `StandaloneSchemas`.
-      Done when: the example Orders API yields one tool per endpoint, and `limit`'s `between(1, 100)` appears as `minimum`/`maximum`.
-- [ ] **`spec-0002-mcp-dispatch`** — arguments to `Params` to `handlerFor`; result to `ToolResult`; refusals; golden tool list.
-      Done when: valid arguments reach the handler, a declared failure returns an error result, a refinement rejects bad input before the handler, and changing a schema moves the golden.
-- [ ] **`spec-0002-mcp-docs`** — `docs/mcp.md`, README appendix line, `docs/modules.md` row and count, `docs/reference.md` section, roadmap entry.
-      Done when: the page carries the endpoint-to-tool mapping table, one worked example end to end, every refusal with its reason, why header params are excluded and how a credential reaches the service instead, and what MCP cannot carry — `Retry-After` on the 429, streamed responses.
+- [x] **`spec-0002-mcp-tool-descriptions`** — `pelican-mcp`; `ApiSpec.mcpTools()`, names, input and output schemas over `StandaloneSchemas`.
+      Done when: the example Orders API yields one tool per endpoint, and `limit`'s `between(1, 100)` appears as `minimum`/`maximum`. Landed in [#30](https://github.com/matthewjones372/pelican/pull/30).
+- [x] **`spec-0002-mcp-dispatch`** — arguments to `Params` to `handlerFor`; result to `ToolResult`; refusals; golden tool list.
+      Done when: valid arguments reach the handler, a declared failure returns an error result, a refinement rejects bad input before the handler, and changing a schema moves the golden. Landed in [#32](https://github.com/matthewjones372/pelican/pull/32).
+- [x] **`spec-0002-mcp-docs`** — `docs/mcp.md`, README appendix line, `docs/modules.md` row and count, `docs/reference.md` section, roadmap entry.
+      Done when: the page carries the endpoint-to-tool mapping table, one worked example end to end, every refusal with its reason, why header params are excluded and how a credential reaches the service instead, and what MCP cannot carry — `Retry-After` on the 429, streamed responses. Landed in [#33](https://github.com/matthewjones372/pelican/pull/33).
 
 ## Acceptance
 
@@ -95,3 +95,6 @@ in front of everyone who wanted only the schemas. Not recommended.
    is the half that must be right, and 0003 is small once it exists.
 5. Where does this sit now roadmap items 1–3 have landed? Recommend the next
    entry, not a jump ahead of what is queued.
+      Landed in [#30](https://github.com/matthewjones372/pelican/pull/30).
+      Landed in [#32](https://github.com/matthewjones372/pelican/pull/32).
+      Landed in [#33](https://github.com/matthewjones372/pelican/pull/33).

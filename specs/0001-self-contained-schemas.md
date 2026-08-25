@@ -67,12 +67,12 @@ the bug is in the derivation rather than in MCP.
 
 ## Stack
 
-- [ ] **`spec-0001-schema-module`** — `pelican-schema`; `StandaloneSchemas`, its `SchemaComponents`, the rebase pass.
-      Done when: every `$ref` in a derived schema resolves inside the returned document, for all three codecs.
-- [ ] **`spec-0001-schema-unions`** — the stamp pass; refusals for `OPEN` hierarchies and for a branch two hierarchies select differently.
-      Done when: a payload written to satisfy a branch schema decodes through that module's codec, asserted for all three, and each refusal names what to do instead.
-- [ ] **`spec-0001-schema-docs`** — `docs/schemas.md`, a `docs/modules.md` row and count, a `docs/reference.md` section.
-      Done when: the page shows one union before and after, says why the document keeps the old spelling, tabulates the three codecs' spellings, and lists what is refused.
+- [x] **`spec-0001-schema-module`** — `pelican-schema`; `StandaloneSchemas`, its `SchemaComponents`, the rebase pass.
+      Done when: every `$ref` in a derived schema resolves inside the returned document, for all three codecs. Landed in [#26](https://github.com/matthewjones372/pelican/pull/26).
+- [x] **`spec-0001-schema-unions`** — the stamp pass; refusals for `OPEN` hierarchies and for a branch two hierarchies select differently.
+      Done when: a payload written to satisfy a branch schema decodes through that module's codec, asserted for all three, and each refusal names what to do instead. Landed in [#27](https://github.com/matthewjones372/pelican/pull/27).
+- [x] **`spec-0001-schema-docs`** — `docs/schemas.md`, a `docs/modules.md` row and count, a `docs/reference.md` section.
+      Done when: the page shows one union before and after, says why the document keeps the old spelling, tabulates the three codecs' spellings, and lists what is refused. Landed in [#29](https://github.com/matthewjones372/pelican/pull/29).
 
 ## Acceptance
 
@@ -88,3 +88,6 @@ the bug is in the derivation rather than in MCP.
    Recommend `$ref`: one code path for named and anonymous types.
 3. `{"const": "card"}` or `{"enum": ["card"]}`? Recommend `const` — 2020-12's
    own spelling, and it reads better to a model.
+      Landed in [#26](https://github.com/matthewjones372/pelican/pull/26).
+      Landed in [#27](https://github.com/matthewjones372/pelican/pull/27).
+      Landed in [#29](https://github.com/matthewjones372/pelican/pull/29).
