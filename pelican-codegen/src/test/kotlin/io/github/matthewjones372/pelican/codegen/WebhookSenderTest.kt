@@ -68,7 +68,7 @@ class WebhookSenderTest {
     /** Appending anything to the URL a subscriber gave would invent a route on their host. */
     @Test
     fun `nothing is appended to the url it was given`() {
-        client shouldContain """request("POST", "", origin = url"""
+        client shouldContain """request(Method.POST, "", origin = url"""
     }
 
     @Test
@@ -93,7 +93,7 @@ class WebhookSenderTest {
         )
 
         withPayload shouldContain "fun orderRejected(url: String, body: OrderPlaced): Rejected {"
-        withPayload shouldContain "return rejectedCodec.decodeFromString(response.body())"
+        withPayload shouldContain "return rejectedCodec.decodeFromString(response.body)"
         withPayload shouldContain "The response below is the one the *receiver* sends"
     }
 
@@ -124,7 +124,7 @@ class WebhookSenderTest {
     /** A failed send names where it went, there being no path to name instead. */
     @Test
     fun `a send that failed reports the url rather than a path`() {
-        client shouldContain """failed("POST", url, response)"""
+        client shouldContain """failed(Method.POST, url, response)"""
     }
 
     @Test

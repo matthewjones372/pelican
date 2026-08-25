@@ -42,6 +42,12 @@ dependencies {
     // is worth very little; see OpenApiSpecQualityTest.
     testImplementation("io.swagger.parser.v3:swagger-parser:2.1.47")
 
+    // The generated client is compiled in this source set, and a generated
+    // client needs a transport. This is the adapter it finds by default; a
+    // consumer already running Ktor would take that adapter instead and pass
+    // the engine it has.
+    testImplementation(project(":pelican-client-java"))
+
     testImplementation(project(":pelican-test"))
     // The in-memory transports are per-backend, so the suites that run twice
     // ask for the one they need. `pelican-test` itself stays backend-agnostic.

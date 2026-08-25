@@ -13,6 +13,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-core` | **nothing** | endpoint descriptions, plain-value codecs, a minimal JSON tree. No HTTP library, no JSON library. |
 | `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
+| `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-kotlinx` | core, kotlinx.serialization | the alternative `Codecs` |
@@ -53,6 +54,9 @@ The layering is load-bearing, not decorative, and each edge is a test:
   and a `Filter`, neither of which knows which interpreter is serving it, and
   that is what lets one `metrics(registry)` line mean the same thing on all
   three backends.
+- `pelican-client-java` asserts the same shape on the caller's side: core, the
+  JDK, and no second HTTP stack. An adapter a caller adds in order to *choose*
+  a client library would be worth very little if it brought one along.
 - `pelican-import` depends on `pelican-codegen` rather than on core directly,
   and shares its schema-to-Kotlin generator outright. A client generated from a
   document and a client generated from endpoint values should not disagree
@@ -569,8 +573,8 @@ the same emitter that writes the endpoint methods:
 
 ```kotlin
 fun orderPlaced(url: String, body: Order, xSignature: String) {
-    val response = text(request("POST", "", origin = url, standingHeaders = emptyMap(), ...))
-    if (!response.succeeded()) failed("POST", url, response)
+    val response = text(request(Method.POST, "", origin = url, standingHeaders = emptyMap(), ...))
+    if (!response.succeeded()) failed(Method.POST, url, response)
 }
 ```
 
@@ -834,6 +838,117 @@ itself still can: `spec.openApiJson()`, `spec.openApiYaml()` and
 parameter, so that the signature the plugin looks up by name does not move
 under an older plugin. The plugin is those calls with the classpath, the
 up-to-date checks and the staleness gate already wired.
+
+## The transport a generated client sends with
+
+A generated client builds a request and reads a response. What carries it in
+between is a `ClientTransport`, which lives in `pelican-core`:
+
+```kotlin
+fun interface ClientTransport {
+    fun send(request: ClientRequest): CompletionStage<ClientResponse>
+}
+```
+
+`ClientRequest` is a method, an assembled and already-encoded URL, headers in
+the order the client wrote them, an optional per-request timeout, and a body
+that is `Empty`, `Text` or `Streaming`. `ClientResponse` is a status, headers,
+and a body that has not been read yet. Both are core's own types: no
+`java.net.http`, no Ktor, no Pekko, and nothing on core's runtime classpath but
+the Kotlin standard library, which is still the test it was.
+
+The reason there is an interface here at all is the reason there are three
+server backends. A service that already runs Ktor, and has already tuned one
+Ktor `HttpClient` engine, should not acquire a second HTTP stack because it
+generated a Pelican client. The server side settled that argument with one
+description and three interpreters; this is the same answer facing the other
+way.
+
+### Choosing one
+
+`pelican-client-java` is the adapter over the JDK's own `HttpClient`, and a
+generated client finds it without being told:
+
+```kotlin
+dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
+
+val client = OrdersClient("https://orders.internal", JacksonCodecs)
+```
+
+It is a `ServiceLoader` provider, so adding the module is the whole of choosing
+it — core cannot name an adapter it does not depend on. With none on the
+classpath the client says so when it is constructed, and with more than one it
+asks to be told which, since nothing there could pick for you.
+
+Handing one over is the other spelling, and the one to reach for when the
+process already has a client worth sharing:
+
+```kotlin
+val client = OrdersClient(
+    "https://orders.internal",
+    JacksonCodecs,
+    JavaHttpTransport(HttpClient.newBuilder().executor(pool).build()),
+)
+```
+
+Everything else about the client is unchanged: `timeout` is still a constructor
+parameter, and it reaches the transport on every `ClientRequest` rather than
+being configured into one engine, because a client's slow report and its cheap
+lookup share a connection pool.
+
+### Why a `CompletionStage`
+
+The generated code is written against the interface before anyone has chosen a
+transport, so the shape of `send` cannot vary per adapter without needing a
+generator per adapter. Given one shape it has to be the widest one, because the
+conversion only runs in one direction: an asynchronous transport serves a
+blocking caller with a `join`, while a blocking transport serves an
+asynchronous client by tying up a thread per call, which is most of what an
+asynchronous client is for. A `suspend` function could not live in core at all,
+since coroutines would be a third-party dependency.
+
+It is also the shape core already uses for exactly this job in the other
+direction: `ServerEndpoint.invoke` is a `(Params) -> CompletionStage<Any?>`.
+
+The generated methods still block, and are unchanged from what they were: they
+`join` the stage and unwrap the `CompletionException`, so what a caller catches
+is the `IOException` or the timeout the transport raised rather than a wrapper
+that the choice of transport put around it.
+
+### Streams cross both ways
+
+The seam would not be worth much if it could only carry a `String`. It carries
+what the descriptions already promise:
+
+- A multipart file part is a `ClientRequest.Body.Streaming`, which is a
+  function returning an `InputStream` rather than a stream, so a transport that
+  has to send the request twice — a redirect, a retry — has a way to ask for
+  the bytes again. Nothing buffers the upload.
+- `ndjson`, `sse`, `jsonArray` and `bytes()` responses arrive as an unread
+  `ClientResponse.body`, and `Streamed<T>` decodes off it as elements land,
+  exactly as before. A call that is not streaming reads the body whole, once,
+  into a `TextResponse` — a declared failure and the throw for an undeclared
+  status both need it, and only one of them can be the first reader of a
+  stream.
+- Response headers cross as a list of pairs and are read back without regard to
+  case, which is what a declared failure carrying a `Retry-After` needs.
+
+This is also the reason the SPI is not `pelican-test`'s `Transport`. That one is
+blocking and carries a `String` body on purpose, because a test asserts on a
+result it already has — which is exactly why the typed test client
+[cannot upload binary](#what-isnt-here). Right taste, wrong constraints.
+
+### Writing another one
+
+An adapter is small, and the two obvious ones are not written yet. A Ktor
+adapter would launch each `send` on its own scope, call `prepareRequest(...)`
+and `execute { }`, bridge the response's `ByteReadChannel` to an `InputStream`,
+and complete the stage with a `ClientResponse` over it, keeping the block open
+until that stream is closed — which is what makes a Ktor client's laziness
+survive the crossing. A Pekko adapter would map the request onto
+`Http().singleRequest(...)`, whose `CompletionStage<HttpResponse>` is already
+the right shape, and run the response entity's `Source[ByteString]` through
+`StreamConverters.asInputStream()`.
 
 ## Importing an OpenAPI document
 
@@ -3494,6 +3609,11 @@ open  localhost:8080/api-docs                                 # Swagger UI
   nothing to add: a webhook you receive arrives at a path on your own service,
   so it is an ordinary `endpoint(...)` with a handler. `webhook(...)` is for the
   half you send.
+- **A Ktor or Pekko client transport.** `ClientTransport` is core's, and
+  `pelican-client-java` is the one adapter written — see
+  [The transport a generated client sends with](#the-transport-a-generated-client-sends-with),
+  which says what each of the other two would do. A service that wants one
+  before they are written can implement the interface itself; it is one method.
 - **A fourth server backend.** `pelican-ktor` was the third, and cost what
   `pelican-http4k` cost: the binders above, a request-to-`Params` step and a
   response writer, in about 500 lines including the comments.

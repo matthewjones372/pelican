@@ -59,23 +59,23 @@ class SeveralResponsesClientTest {
     @Test
     fun `the call returns that type, and reads which one arrived off the status`() {
         client shouldContain "fun submitOrder(body: Order): Outcome<SubmitOrderFailure, SubmitOrderResult>"
-        client shouldContain "return when (response.statusCode()) {"
+        client shouldContain "return when (response.status) {"
         client shouldContain "201 -> Outcome.Ok(SubmitOrderResult.Created(" +
-            "orderCodec.decodeFromString(response.body()), response.header(\"Location\")))"
+            "orderCodec.decodeFromString(response.body), response.header(\"Location\")))"
         client shouldContain "202 -> Outcome.Ok(SubmitOrderResult.Accepted(queuedCodec.decodeFromString(" +
-            "response.body())))"
+            "response.body)))"
     }
 
     /** A 2xx the endpoint never declared is a response outside the contract. */
     @Test
     fun `an undeclared success fails the call rather than being read as the nearest one`() {
-        client shouldContain "else -> failed(\"POST\", \"/orders\", response)"
+        client shouldContain "else -> failed(Method.POST, \"/orders\", response)"
     }
 
     @Test
     fun `with no failures declared the sealed type is the return type itself`() {
         client shouldContain "fun rememberOrder(body: Order): RememberOrderResult"
-        client shouldContain "200 -> RememberOrderResult.Ok(orderCodec.decodeFromString(response.body()))"
+        client shouldContain "200 -> RememberOrderResult.Ok(orderCodec.decodeFromString(response.body))"
         client shouldNotContain "Outcome.Ok(RememberOrderResult"
     }
 
