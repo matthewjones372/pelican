@@ -124,6 +124,35 @@ class RouteIndexTest {
     }
 
     @Test
+    fun `a plus in a segment is a plus`() {
+        // A path is not a form. `URLDecoder` read this as two spaces, so the
+        // one language whose name is a pun was unroutable.
+        match(Method.GET, "/users/c++/posts").second[name] shouldBe "c++"
+    }
+
+    @Test
+    fun `and an encoded plus means the same thing`() {
+        match(Method.GET, "/users/c%2B%2B/posts").second[name] shouldBe "c++"
+    }
+
+    @Test
+    fun `an encoded slash stays inside the segment that carried it`() {
+        val (found, values) = match(Method.GET, "/users/a%2Fb/posts")
+        found shouldBe userPosts
+        values[name] shouldBe "a/b"
+    }
+
+    @Test
+    fun `a literal is matched decoded, so an escape spelling it still reaches it`() {
+        match(Method.GET, "/users/%61dmin").first shouldBe adminUser
+    }
+
+    @Test
+    fun `a malformed escape is a 400 rather than a 404 or a 500`() {
+        shouldThrow<ApiException> { match(Method.GET, "/users/%zz") }.status shouldBe 400
+    }
+
+    @Test
     fun `the root path is describable and reachable`() {
         match(Method.GET, "/").first shouldBe root
     }
