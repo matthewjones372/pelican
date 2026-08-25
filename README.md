@@ -944,10 +944,11 @@ Pass any other `ServerConfig` to `start(config = ...)`.
 
 ## Longer documents
 
-Six things that wanted a page rather than a section, and one benchmark:
+Seven things that wanted a page rather than a section, and one benchmark:
 
 | Page | What it answers |
 |---|---|
+| [Choosing between Pelican and the alternatives](docs/choosing.md) | Where http4k's contracts, Ktor's plugins, Spring, Micronaut, Quarkus, tapir or a hand-written document are the better answer — and the projects that should not use a 0.1 library at all. |
 | [A whole service, in one file](docs/a-whole-service.md) | What all of it looks like at once — models, inputs, endpoints, handlers, store, server, docs. Compiled every build as `ReadmeExample.kt`. |
 | [A generated Kotlin client](docs/generated-client.md) | What callers who cannot hold the descriptions get instead, and what the generator does with a union, a failure or a stream. |
 | [Importing an OpenAPI document](docs/importing.md) | A document somebody else wrote, read into descriptions: what comes out, what is refused, and how to get past a document you do not own. |
