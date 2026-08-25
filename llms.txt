@@ -42,6 +42,9 @@ Facts worth having before anything else:
   per-endpoint snapshots that fail when a change breaks an existing caller.
 - [Importing](https://github.com/matthewjones372/pelican/blob/main/docs/importing.md):
   an existing OpenAPI document, read back as endpoint descriptions.
+- [Tools a model can call](https://github.com/matthewjones372/pelican/blob/main/docs/mcp.md):
+  the endpoints as MCP tool descriptions and a dispatch that runs them, what
+  is refused, and what a tool result cannot carry. No transport yet.
 - [A schema that resolves on its own](https://github.com/matthewjones372/pelican/blob/main/docs/schemas.md):
   a derived JSON Schema for something that does not hold the OpenAPI document,
   and what a union's branches carry instead of a `discriminator`.

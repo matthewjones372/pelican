@@ -4,13 +4,16 @@ import io.github.matthewjones372.pelican.JsonArr
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.jsonArr
+import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.mcp.McpOptions
+import io.github.matthewjones372.pelican.mcp.mcpDispatch
 import io.github.matthewjones372.pelican.mcp.mcpTools
 import io.github.matthewjones372.pelican.mcp.toJson
 import io.github.matthewjones372.pelican.renderPretty
 import io.github.matthewjones372.pelican.test.golden.Golden
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
+import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -85,6 +88,29 @@ class McpToolsFromOrdersTest {
         withClue("X-Api-Key is a header, and a header is not a tool argument") {
             properties.fields.keys shouldContainExactly setOf("userId", "body")
         }
+    }
+
+    /**
+     * The whole path, on the service this repository runs: arguments in,
+     * decoded, through the bound handler, and a declared failure back as
+     * something a model can act on rather than as an exception.
+     */
+    @Test
+    fun `a declared failure comes back as the sentence the endpoint wrote for it`() {
+        val result = ordersApi().mcpDispatch(options)
+            .call(
+                "placeOrder",
+                jsonObj {
+                    "userId" to 999
+                    put("body", jsonObj { "item" to "a-widget" })
+                },
+            )
+            .toCompletableFuture()
+            .join()
+
+        result.isError.shouldBeTrue()
+        result.text shouldBe
+            "404 No user with that id: {\"status\":404,\"error\":\"No user 999\",\"detail\":null}"
     }
 
     /**
