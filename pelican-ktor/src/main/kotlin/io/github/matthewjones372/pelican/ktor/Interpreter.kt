@@ -29,6 +29,7 @@ import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.decode
 import io.github.matthewjones372.pelican.decodeList
 import io.github.matthewjones372.pelican.handlerFor
+import io.github.matthewjones372.pelican.readStrictBody
 import io.github.matthewjones372.pelican.requestBodyCodec
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -37,7 +38,6 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.path
 import io.ktor.server.request.receiveChannel
-import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
@@ -313,13 +313,22 @@ private suspend fun readBody(
         }
 
         is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
+            // A declared length is refused before a byte is transferred; a
+            // chunked body that declares none is counted as it is read. Both
+            // are bytes — `String.length` is UTF-16 code units, and a limit
+            // checked against it admits about three times as much CJK as it
+            // promises. `readStrictBody` blocks on the channel, so it goes to
+            // the IO dispatcher for the reason the multipart read does.
             refuseIfOversize(call.request.headers["Content-Length"]?.toLongOrNull(), api.maxBodyBytes)
             val text = try {
-                withTimeout(api.strictBodyTimeoutMillis) { call.receiveText() }
+                withTimeout(api.strictBodyTimeoutMillis) {
+                    withContext(Dispatchers.IO) {
+                        readStrictBody(call.receiveChannel().toInputStream(), api.maxBodyBytes)
+                    }
+                }
             } catch (t: TimeoutCancellationException) {
                 throw ApiException(408, "Timed out reading the request body", t.message, cause = t)
             }
-            refuseIfOversize(text.length.toLong(), api.maxBodyBytes)
             // Which codec, and what an undeclared media type means, are core's
             // answers — see `RequestBodyCodecs`. So is wrapping what it threw.
             values[body] = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
