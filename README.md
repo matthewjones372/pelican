@@ -7,7 +7,8 @@
 
 # Pelican
 
-**Type-safe HTTP for Kotlin.** Describe an endpoint once, as a value.
+**Type-safe HTTP for Kotlin.** Describe an endpoint once — get the server
+route, the OpenAPI document and a typed client from that one description.
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.matthewjones372/pelican-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core)
 [![build](https://github.com/matthewjones372/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
@@ -22,13 +23,23 @@
 
 ---
 
-You describe an endpoint once, as a value. Pelican turns that one description
-into the server route, the OpenAPI document, a test client, and a generated
-Kotlin client for your callers — there is no second source of truth, because
-there is no second description.
+Pelican is a Kotlin library for describing HTTP APIs. You write down what an
+endpoint is — its path, its inputs, the types it can return — as an ordinary
+Kotlin value. Pelican then derives the rest from that one value: the server
+route, the OpenAPI document, a test client, and a generated Kotlin client for
+your callers.
 
-Runs on Pekko HTTP, http4k or Ktor. Roughly what tapir is for Scala, scoped to
-what Kotlin's type system can express without implicits.
+That inverts the usual arrangement, where the route lives in code, the schema
+lives in annotations or a hand-written YAML file, and the two are kept in step
+by whoever remembers. Here there is no second source of truth, because there is
+no second description.
+
+It is a library rather than a framework: it does not own your `main`, and it
+serves through a web stack you already run — Pekko HTTP, http4k or Ktor. If you
+know tapir from Scala, this is that idea, scoped to what Kotlin's type system
+can express without implicits.
+
+A description, then the handler that answers it:
 
 ```kotlin
 val getBookmark = endpoint(bookmarkId) {
@@ -45,12 +56,6 @@ getBookmark handledOrFail { id ->                    // id: Long, already decode
 
 Change the path parameter's type, the response type or the declared error, and
 the handler stops compiling.
-
-Interpreting a description is not free, and what it costs is measured rather
-than argued about — 75ns a request against an http4k route someone tuned by
-hand, 131ns against a Pekko one, and cheaper than the idiomatic version of
-either. The numbers, the error bars they came with and the baselines they need
-are in [what it costs](docs/what-it-costs.md).
 
 ## Why you might want this
 
@@ -79,6 +84,12 @@ endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
 **Swapping backends does not touch your descriptions.** Only the type a
 streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
 `Flow` on Ktor.
+
+**And it is not slow.** Interpreting a description is not free, but what it
+costs is measured rather than argued about — 75ns a request against an http4k
+route someone tuned by hand, 131ns against a Pekko one, and cheaper than the
+idiomatic version of either. The numbers, the error bars they came with and the
+baselines they need are in [what it costs](docs/what-it-costs.md).
 
 ## Contents
 
