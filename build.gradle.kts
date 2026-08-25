@@ -95,6 +95,13 @@ val moduleDescriptions = mapOf(
 // The floor is deliberately below where the number sits now. It is a ratchet
 // against regression, not a target to code towards — a test written to move a
 // percentage is worth less than no test at all.
+//
+// It moved from 80 to 90 once the denominator stopped counting `main` functions
+// and the three places worth covering were covered: the security builders a
+// caller ran first, the classifier that decides whether a change is breaking,
+// and the in-memory transport nothing exercised. Ninety rather than the 91.9 it
+// actually sits at, so a release that legitimately adds a hard-to-reach branch
+// does not have to move this line in the same commit.
 apiValidation {
     // Neither is published, so neither has a surface to keep.
     ignoredProjects += listOf("example", "benchmarks")
@@ -105,7 +112,7 @@ kover {
         total {
             verify {
                 rule {
-                    minBound(80)
+                    minBound(90)
                 }
             }
             filters {
