@@ -458,6 +458,13 @@ private fun validate(ep: Endpoint<*, *>) {
     val duplicates = ep.pathSpec.captures.groupBy { it.name }.filterValues { it.size > 1 }.keys
     if (duplicates.isNotEmpty()) error("$ep uses the path parameter name(s) $duplicates more than once")
 
+    refuseRepeatedNames(ep, "query parameter", ep.queries, { it.name }, { it })
+    // RFC 9110 matches a field name without regard to case, so two spellings
+    // are one header on the wire.
+    refuseRepeatedNames(ep, "header", ep.headerParams, { it.name }, String::lowercase)
+    // RFC 6265 does not: `Session` and `session` are two cookies.
+    refuseRepeatedNames(ep, "cookie", ep.cookieParams, { it.name }, { it })
+
     val body = ep.bodyInput
     if (body is MultipartBody) {
         val partClashes = body.parts.groupBy { it.name }.filterValues { it.size > 1 }.keys
@@ -487,6 +494,30 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     validateResponseHeaders(ep)
+}
+
+/**
+ * Two declarations under one name are a pair nothing could tell apart: a
+ * request carries one value under a name, and OpenAPI keys a parameter by name
+ * and location. The same value listed twice is not that — `endpoint(size)` and
+ * a `query(size)` inside the block are one declaration written twice — so
+ * identity is what is counted, [compared] deciding when two names are one.
+ */
+private fun <P : Any> refuseRepeatedNames(
+    ep: Endpoint<*, *>,
+    noun: String,
+    declared: List<P>,
+    name: (P) -> String,
+    compared: (String) -> String,
+) {
+    val clashes = declared.distinct().groupBy { compared(name(it)) }.filterValues { it.size > 1 }
+    clashes.values.forEach { repeated ->
+        error(
+            "$ep declares more than one $noun named '${name(repeated.first())}'. A request carries one " +
+                "value under a name, so nothing could tell them apart, and the document would carry an " +
+                "entry for each. Declare it once, or give the other a name of its own.",
+        )
+    }
 }
 
 /**
