@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.importer.Import
 import io.github.matthewjones372.pelican.importer.ImportOptions
+import io.github.matthewjones372.pelican.importer.importOptions
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.openapi.openApi
 import io.kotest.assertions.withClue
@@ -38,7 +39,7 @@ class UnionImportTest {
         val document = File(directory, "openapi.json")
         document.writeText(spec.openApi().render())
 
-        val generated = Import.kotlin(document, ImportOptions("app", "payments")).values.single()
+        val generated = Import.kotlin(document, importOptions("app", "payments")).values.single()
 
         generated shouldContain "sealed interface Payment"
         generated shouldContain "data class Card("

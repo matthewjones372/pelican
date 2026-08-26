@@ -15,10 +15,10 @@ internal fun documentOf(vararg files: Pair<String, String>): File {
 }
 
 /** The endpoints file, which is the one every test here is about. */
-internal fun imported(document: File, options: ImportOptions = ImportOptions("test", "test")): String =
+internal fun imported(document: File, options: ImportOptions = importOptions("test", "test")): String =
     Import.kotlin(document, options).entries.first { it.key.endsWith(ENDPOINTS_FILE_SUFFIX) }.value
 
-internal fun imported(yaml: String, options: ImportOptions = ImportOptions("test", "test")): String =
+internal fun imported(yaml: String, options: ImportOptions = importOptions("test", "test")): String =
     imported(documentOf("openapi.yaml" to yaml), options)
 
 internal fun document(paths: String, components: String? = null): String =

@@ -8,7 +8,7 @@ import java.io.File
 
 class ImportTest {
 
-    private val bookmarks = imported(File("src/test/resources/bookmarks.yaml"), ImportOptions("app", "bookmarks"))
+    private val bookmarks = imported(File("src/test/resources/bookmarks.yaml"), importOptions("app", "bookmarks"))
 
     @Test
     fun `an input is declared once, as a value, and named after itself`() {
@@ -92,7 +92,7 @@ class ImportTest {
                         schema: { type: object, properties: { message: { type: string } } }
             """,
         )
-        val options = ImportOptions("app", "orders", handlers = Backend.KTOR)
+        val options = importOptions("app", "orders") { handlers = Backend.KTOR }
         val generated = Import.kotlin(documentOf("openapi.yaml" to yaml), options)
 
         val endpoints = generated.getValue("OrdersEndpoints.kt")
@@ -344,9 +344,9 @@ class ImportTest {
     @Test
     fun `handler stubs are generated only when a backend is named`() {
         val document = File("src/test/resources/bookmarks.yaml")
-        Import.kotlin(document, ImportOptions("app", "bookmarks")).keys shouldContain "BookmarksEndpoints.kt"
+        Import.kotlin(document, importOptions("app", "bookmarks")).keys shouldContain "BookmarksEndpoints.kt"
 
-        val withStubs = Import.kotlin(document, ImportOptions("app", "bookmarks", handlers = Backend.KTOR))
+        val withStubs = Import.kotlin(document, importOptions("app", "bookmarks") { handlers = Backend.KTOR })
         withStubs.keys shouldContain "BookmarksHandlers.kt"
         withStubs.getValue("BookmarksHandlers.kt") shouldContain "import io.github.matthewjones372.pelican.ktor.*"
         withStubs.getValue("BookmarksHandlers.kt") shouldContain

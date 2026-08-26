@@ -198,7 +198,7 @@ class RemoteReferencesTest {
     @Test
     fun `updating an entry that allows nothing says what to write first`(@TempDir dir: File) {
         val document = documentOf("openapi.yaml" to referring("https://schemas.test/common.yaml"))
-        val options = ImportOptions("test", "test", lockfile = lockfile(File(document.parent)))
+        val options = importOptions("test", "test") { lockfile = lockfile(File(document.parent)) }
 
         shouldThrow<ImportFailure> { Import.updateLock(document, options, acceptChanges = false) }
             .message.orEmpty() shouldContain "allowRemote(\"https://…\")"
@@ -239,12 +239,10 @@ class RemoteReferencesTest {
     @Test
     fun `a host the build file did not name is not fetched`(@TempDir dir: File) {
         val document = documentOf("openapi.yaml" to referring("https://elsewhere.test/common.yaml"))
-        val options = ImportOptions(
-            "test",
-            "test",
-            allowRemote = setOf("https://schemas.test"),
-            lockfile = lockfile(dir),
-        )
+        val options = importOptions("test", "test") {
+            allowRemote = setOf("https://schemas.test")
+            lockfile = lockfile(dir)
+        }
 
         val message = shouldThrow<ImportFailure> { imported(document, options) }.message.orEmpty()
         message shouldContain "does not allow that host"
@@ -255,12 +253,10 @@ class RemoteReferencesTest {
     @Test
     fun `plain HTTP to an allowed host has to be asked for by name`(@TempDir dir: File) {
         val document = documentOf("openapi.yaml" to referring("http://schemas.test/common.yaml"))
-        val options = ImportOptions(
-            "test",
-            "test",
-            allowRemote = setOf("schemas.test"),
-            lockfile = lockfile(dir),
-        )
+        val options = importOptions("test", "test") {
+            allowRemote = setOf("schemas.test")
+            lockfile = lockfile(dir)
+        }
 
         val message = shouldThrow<ImportFailure> { imported(document, options) }.message.orEmpty()
         message shouldContain "which is plain HTTP"
@@ -270,12 +266,10 @@ class RemoteReferencesTest {
     @Test
     fun `a scheme that is not HTTP at all is not fetched`(@TempDir dir: File) {
         val document = documentOf("openapi.yaml" to referring("ftp://schemas.test/common.yaml"))
-        val options = ImportOptions(
-            "test",
-            "test",
-            allowRemote = setOf("schemas.test"),
-            lockfile = lockfile(dir),
-        )
+        val options = importOptions("test", "test") {
+            allowRemote = setOf("schemas.test")
+            lockfile = lockfile(dir)
+        }
 
         shouldThrow<ImportFailure> { imported(document, options) }
             .message.orEmpty() shouldContain "is a `ftp:` URL"
@@ -284,12 +278,10 @@ class RemoteReferencesTest {
     @Test
     fun `a credential written into the URL is refused rather than committed`(@TempDir dir: File) {
         val document = documentOf("openapi.yaml" to referring("https://user:secret@schemas.test/common.yaml"))
-        val options = ImportOptions(
-            "test",
-            "test",
-            allowRemote = setOf("schemas.test"),
-            lockfile = lockfile(dir),
-        )
+        val options = importOptions("test", "test") {
+            allowRemote = setOf("schemas.test")
+            lockfile = lockfile(dir)
+        }
 
         val message = shouldThrow<ImportFailure> { imported(document, options) }.message.orEmpty()
         message shouldContain "carrying a credential in it"
@@ -360,7 +352,7 @@ class RemoteReferencesTest {
     @Test
     fun `allowing a host with no lockfile to record it in is refused`(@TempDir dir: File) {
         val document = documentOf("openapi.yaml" to referring("https://schemas.test/common.yaml"))
-        val options = ImportOptions("test", "test", allowRemote = setOf("schemas.test"))
+        val options = importOptions("test", "test") { allowRemote = setOf("schemas.test") }
 
         shouldThrow<ImportFailure> { imported(document, options) }
             .message.orEmpty() shouldContain "no lockfile was given"
@@ -374,12 +366,10 @@ class RemoteReferencesTest {
         shouldThrow<ImportFailure> {
             imported(
                 document,
-                ImportOptions(
-                    "test",
-                    "test",
-                    allowRemote = setOf("https://schemas.test/specs"),
-                    lockfile = lockfile(dir),
-                ),
+                importOptions("test", "test") {
+                    allowRemote = setOf("https://schemas.test/specs")
+                    lockfile = lockfile(dir)
+                },
             )
         }.message.orEmpty() shouldContain "names a URL. What is allowed is a host"
     }
@@ -387,7 +377,7 @@ class RemoteReferencesTest {
     // ------------------------------------------------------------
 
     private fun allowing(stub: Stub, dir: File) =
-        ImportOptions("test", "test", allowRemote = setOf(stub.origin), lockfile = lockfile(dir))
+        importOptions("test", "test") { allowRemote = setOf(stub.origin); lockfile = lockfile(dir) }
 
     private fun lockfile(dir: File) = File(dir, "test.refs.lock")
 

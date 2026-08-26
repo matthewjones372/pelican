@@ -25,7 +25,8 @@ one.
   `filters = listOf(a, b)` is `filter(a)` and `filter(b)`. Every call site is a
   compile error, not a silent change of meaning.
 - **The same for the other settings bundles**: `retryPolicy { }`, `docs { }`,
-  `docsOAuth(clientId) { }` and `mcpOptions { }` replace their constructors.
+  `docsOAuth(clientId) { }`, `mcpOptions { }` and
+  `importOptions(packageName, name) { }` replace their constructors.
   `ClientRequest` keeps a constructor — a client builds one per call — and
   gains `withTimeout(...)` and `withHeader(...)` for what is no longer a
   parameter.

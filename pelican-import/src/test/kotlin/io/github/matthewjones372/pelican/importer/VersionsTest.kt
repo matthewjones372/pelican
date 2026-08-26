@@ -7,7 +7,7 @@ import java.io.File
 
 class VersionsTest {
 
-    private val options = ImportOptions("app", "tiny")
+    private val options = importOptions("app", "tiny")
 
     private val fromV2 = imported(File("src/test/resources/tiny-2.0.json"), options)
     private val fromV3 = imported(File("src/test/resources/tiny-3.0.yaml"), options)

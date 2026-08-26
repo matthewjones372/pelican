@@ -233,7 +233,7 @@ class WebhooksTest {
                   responses:
                     "204": { description: ok }
             """,
-            ImportOptions("test", "test", exclude = setOf("orderPlaced")),
+            importOptions("test", "test") { exclude = setOf("orderPlaced") },
         )
 
         source shouldNotContain "webhook("

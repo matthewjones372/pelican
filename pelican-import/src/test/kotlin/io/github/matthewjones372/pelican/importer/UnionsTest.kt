@@ -494,7 +494,7 @@ class UnionsTest {
     fun `chosen for kotlinx, the payload types carry the annotations kotlinx needs`() {
         val generated = imported(
             union(),
-            ImportOptions("app", "test", codec = CodecAnnotations.KOTLINX),
+            importOptions("app", "test") { codec = CodecAnnotations.KOTLINX },
         )
 
         generated shouldContain "@Serializable"

@@ -414,7 +414,7 @@ class StrictnessTest {
                     content:
                       application/json: { schema: { type: object, properties: { id: { type: string } } } }
         """
-        val generated = imported(document(paths), ImportOptions("app", "test", exclude = setOf("a")))
+        val generated = imported(document(paths), importOptions("app", "test") { exclude = setOf("a") })
         generated shouldContain "val b = endpoint {"
         generated shouldNotContain "val a ="
     }
@@ -450,7 +450,7 @@ class StrictnessTest {
                       content:
                         application/json: { schema: { ${'$'}ref: '#/components/schemas/Kept' } }
             """,
-            ImportOptions("app", "test", exclude = setOf("a")),
+            importOptions("app", "test") { exclude = setOf("a") },
         )
         generated shouldContain "data class Kept("
         generated shouldNotContain "Dropped"

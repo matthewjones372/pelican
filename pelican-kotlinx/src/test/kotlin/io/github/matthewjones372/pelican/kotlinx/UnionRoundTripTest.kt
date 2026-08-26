@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo
 import io.github.matthewjones372.pelican.*
 import io.github.matthewjones372.pelican.importer.Import
 import io.github.matthewjones372.pelican.importer.ImportOptions
+import io.github.matthewjones372.pelican.importer.importOptions
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.openapi.openApi
 import io.kotest.assertions.withClue
@@ -337,7 +338,7 @@ class UnionRoundTripTest {
     private fun reimported(source: SchemaSource, payload: String, directory: File): String {
         val document = File(directory, "openapi.json")
         document.writeText(specFor(source, payload).openApi().render())
-        return Import.kotlin(document, ImportOptions("app", "payments")).values.single()
+        return Import.kotlin(document, importOptions("app", "payments")).values.single()
     }
 
     private fun JsonObj.mapping(): Map<String, JsonValue> = (this["mapping"] as JsonObj).fields

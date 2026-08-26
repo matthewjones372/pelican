@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test
 class HintsTest {
 
     private fun hinted(yaml: String, vararg hints: Pair<String, String>): String =
-        imported(yaml, ImportOptions("test", "test", discriminators = hints.toMap()))
+        imported(yaml, importOptions("test", "test") { discriminators = hints.toMap() })
 
     private fun refusing(yaml: String, vararg hints: Pair<String, String>): String =
         shouldThrow<ImportFailure> { hinted(yaml, *hints) }.message.orEmpty()
@@ -194,12 +194,10 @@ class HintsTest {
     fun `a hinted union is annotated for kotlinx when kotlinx is what will read it`() {
         val generated = imported(
             payments(),
-            ImportOptions(
-                "test",
-                "test",
-                discriminators = mapOf("Payment" to "kind"),
-                codec = CodecAnnotations.KOTLINX,
-            ),
+            importOptions("test", "test") {
+                discriminators = mapOf("Payment" to "kind")
+                codec = CodecAnnotations.KOTLINX
+            },
         )
 
         generated shouldContain """@JsonClassDiscriminator("kind")"""
@@ -350,12 +348,10 @@ class HintsTest {
         val message = shouldThrow<ImportFailure> {
             imported(
                 payments(),
-                ImportOptions(
-                    "test",
-                    "test",
-                    exclude = setOf("pay"),
-                    discriminators = mapOf("Payment" to "kind"),
-                ),
+                importOptions("test", "test") {
+                    exclude = setOf("pay")
+                    discriminators = mapOf("Payment" to "kind")
+                },
             )
         }.message.orEmpty()
 

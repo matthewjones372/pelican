@@ -59,27 +59,25 @@ fun importEndpoints(
     lockfile: File?,
 ): List<File> = Import.write(
     document,
-    ImportOptions(
-        packageName = packageName,
-        name = name,
-        exclude = exclude,
-        discriminators = discriminators,
-        allowRemote = allowRemote,
-        lockfile = lockfile,
-        codec = codec?.let { chosen ->
+    importOptions(packageName, name) {
+        this.exclude = exclude
+        this.discriminators = discriminators
+        this.allowRemote = allowRemote
+        this.lockfile = lockfile
+        this.codec = codec?.let { chosen ->
             CodecAnnotations.entries.firstOrNull { it.name.equals(chosen, ignoreCase = true) }
                 ?: throw ImportFailure(
                     "No codec called '$chosen'. It is one of " +
                         CodecAnnotations.entries.joinToString { it.name } + ".",
                 )
-        } ?: CodecAnnotations.JACKSON,
-        handlers = handlers?.let { backend ->
+        } ?: CodecAnnotations.JACKSON
+        this.handlers = handlers?.let { backend ->
             Backend.entries.firstOrNull { it.name.equals(backend, ignoreCase = true) }
                 ?: throw ImportFailure(
                     "No backend called '$backend'. It is one of ${Backend.entries.joinToString { it.name }}.",
                 )
-        },
-    ),
+        }
+    },
     sourceRoot,
 )
 
@@ -129,7 +127,7 @@ fun updateRemoteLock(
     acceptChanges: Boolean,
 ): List<String> = Import.updateLock(
     document,
-    ImportOptions(packageName = "unused", name = name, allowRemote = allowRemote, lockfile = lockfile),
+    importOptions("unused", name) { this.allowRemote = allowRemote; this.lockfile = lockfile },
     acceptChanges,
 )
 
@@ -145,9 +143,9 @@ fun importEndpoints(
 /**
  * What to generate.
  */
-class ImportOptions(
+class ImportOptions internal constructor(
     val packageName: String,
-    val name: String = "api",
+    val name: String = DEFAULT_IMPORT_NAME,
 
     /**
      * Operations to leave out, by `operationId` — the release valve on a strict
@@ -195,6 +193,42 @@ class ImportOptions(
     val handlers: Backend? = null,
 )
 
+/**
+ * What to generate, into [packageName] and under [name], with the defaults
+ * above for everything the block leaves alone.
+ *
+ * A factory over a builder rather than an eight-parameter constructor, for the
+ * reason in `api`: an option added later is a `var` here rather than a
+ * parameter every caller was compiled against.
+ */
+fun importOptions(
+    packageName: String,
+    name: String = DEFAULT_IMPORT_NAME,
+    configure: ImportOptionsBuilder.() -> Unit = {},
+): ImportOptions = ImportOptionsBuilder().apply(configure).build(packageName, name)
+
+/** What [importOptions]'s block writes into. Each option is documented on [ImportOptions]. */
+class ImportOptionsBuilder internal constructor() {
+
+    var exclude: Set<String> = emptySet()
+    var discriminators: Map<String, String> = emptyMap()
+    var allowRemote: Set<String> = emptySet()
+    var lockfile: File? = null
+    var codec: CodecAnnotations = CodecAnnotations.JACKSON
+    var handlers: Backend? = null
+
+    internal fun build(packageName: String, name: String): ImportOptions = ImportOptions(
+        packageName = packageName,
+        name = name,
+        exclude = exclude,
+        discriminators = discriminators,
+        allowRemote = allowRemote,
+        lockfile = lockfile,
+        codec = codec,
+        handlers = handlers,
+    )
+}
+
 /** Which server library the generated handler stubs bind against. */
 enum class Backend(internal val packageName: String) {
     PEKKO("io.github.matthewjones372.pelican.pekko"),
@@ -206,6 +240,9 @@ enum class Backend(internal val packageName: String) {
  * What a document that cannot be imported says, and why.
  */
 class ImportFailure(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+
+/** Written once and read twice: the constructor states it, and [importOptions] starts from it. */
+internal const val DEFAULT_IMPORT_NAME: String = "api"
 
 internal const val HANDLERS_FILE_SUFFIX = "Handlers.kt"
 internal const val ENDPOINTS_FILE_SUFFIX = "Endpoints.kt"

@@ -14,7 +14,7 @@ class WritingTest {
 
     @Test
     fun `files land under the package they declare`(@TempDir root: File) {
-        val written = Import.write(document, ImportOptions("com.example.marks", "bookmarks"), root)
+        val written = Import.write(document, importOptions("com.example.marks", "bookmarks"), root)
 
         written shouldBe listOf(File(root, "com/example/marks/BookmarksEndpoints.kt"))
         written.single().readText() shouldContain "package com.example.marks"
@@ -22,7 +22,7 @@ class WritingTest {
 
     @Test
     fun `the endpoints file is rewritten and the handlers are not`(@TempDir root: File) {
-        val options = ImportOptions("app", "bookmarks", handlers = Backend.HTTP4K)
+        val options = importOptions("app", "bookmarks") { handlers = Backend.HTTP4K }
         Import.write(document, options, root)
 
         val endpoints = File(root, "app/BookmarksEndpoints.kt")
@@ -47,7 +47,7 @@ class WritingTest {
     @Test
     fun `a missing document says which one`(@TempDir root: File) {
         shouldThrow<ImportFailure> {
-            Import.write(File(root, "nothing.yaml"), ImportOptions("app", "x"), root)
+            Import.write(File(root, "nothing.yaml"), importOptions("app", "x"), root)
         }.message.orEmpty() shouldContain "No such file"
     }
 
