@@ -243,13 +243,12 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
      * so where none is set it is reported by the reference in the body alone.
      */
     private fun errorResponse(raw: Throwable, endpoint: Endpoint<*, *>?): ClientResponse {
-        val rendered = renderError(raw, api.exposeInternalErrors)
+        val rendered = renderError(raw, api, endpoint)
         rendered.unexpected?.let { failure ->
             val reference = checkNotNull(rendered.reference) { "an unexpected failure with no reference" }
             api.onServerError?.invoke(reference, endpoint, failure)
         }
-        return body(rendered.error.status, "application/json", rendered.error.toJson().render())
-            .plus(rendered.headers)
+        return refusalBody(rendered.error.status, rendered.body).plus(rendered.headers)
     }
 }
 
@@ -299,6 +298,10 @@ private fun body(status: Int, contentType: String, text: String): ClientResponse
     listOf(CONTENT_TYPE to contentType),
     ByteArrayInputStream(text.toByteArray(StandardCharsets.UTF_8)),
 )
+
+/** A refusal as its renderer wrote it, byte for byte and under its own media type. */
+private fun refusalBody(status: Int, refusal: RefusalBody): ClientResponse =
+    ClientResponse(status, listOf(CONTENT_TYPE to refusal.mediaType), ByteArrayInputStream(refusal.bytes))
 
 private fun streamed(status: Int, contentType: String?, frames: Sequence<String>): ClientResponse =
     ClientResponse(status, listOfNotNull(contentType?.let { CONTENT_TYPE to it }), FrameStream(frames))

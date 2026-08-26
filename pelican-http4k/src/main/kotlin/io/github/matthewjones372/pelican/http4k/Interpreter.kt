@@ -72,13 +72,13 @@ fun Api.toHttpHandler(): RoutingHttpHandler {
     val index = endpoints.routeIndex()
     val dispatch = RoutingHttpHandler(
         listOf(
-            IndexedRouteMatcher(index, invoke = { se, req, values ->
+            IndexedRouteMatcher(index, this, invoke = { se, req, values ->
                 invoke(se, this, resolved.getValue(se), handlers.getValue(se), req, values).withCors(cors, req)
             }),
         ),
     )
 
-    val preflight = preflightRoutes(orderedEndpoints(), cors)
+    val preflight = preflightRoutes(orderedEndpoints(), cors, this)
     return if (preflight.isEmpty()) dispatch else routes(listOf(dispatch) + preflight)
 }
 
@@ -90,6 +90,7 @@ fun Api.toHttpHandler(): RoutingHttpHandler {
 private fun preflightRoutes(
     ordered: List<ServerEndpoint>,
     cors: CorsPolicy?,
+    api: Api,
 ): List<RoutingHttpHandler> {
     if (cors == null) return emptyList()
 
@@ -103,11 +104,11 @@ private fun preflightRoutes(
         .distinct()
         .filterNot { it in declaresOptions }
         .map { template ->
-            template bind Http4kMethod.OPTIONS to { req: Request -> preflightResponse(cors, req) }
+            template bind Http4kMethod.OPTIONS to { req: Request -> preflightResponse(cors, req, api) }
         }
 }
 
-private fun preflightResponse(cors: CorsPolicy, req: Request): Response =
+private fun preflightResponse(cors: CorsPolicy, req: Request, api: Api): Response =
     when (
         val decision = cors.preflight(
             origin = req.header(CorsHeaders.ORIGIN),
@@ -118,9 +119,9 @@ private fun preflightResponse(cors: CorsPolicy, req: Request): Response =
         // A bare OPTIONS, or one aimed at no described path: what the router
         // would have said before this route existed.
         is CorsPreflight.NotPreflight ->
-            errorResponse(ApiException(405, "Method not allowed", "OPTIONS ${req.uri.path}"), null)
+            errorResponse(ApiException(405, "Method not allowed", "OPTIONS ${req.uri.path}"), api)
 
-        is CorsPreflight.Refused -> errorResponse(ApiException(403, "Forbidden", decision.reason), null)
+        is CorsPreflight.Refused -> errorResponse(ApiException(403, "Forbidden", decision.reason), api)
 
         is CorsPreflight.Allowed ->
             decision.headers

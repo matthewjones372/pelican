@@ -153,9 +153,15 @@ class McpServer internal constructor(private val api: Api, private val dispatch:
      * protocol error instead, because a bug in a handler is not an answer to
      * give a model, and it carries the reference [Api.onServerError] was handed
      * so that one log line covers both halves of the service.
+     *
+     * The classification is taken; the body [renderError] wrote beside it is
+     * not. A tool call is answered in JSON-RPC, whose envelope MCP fixes and a
+     * service does not choose, so `refusals(...)` reaches the HTTP wire and
+     * stops there — putting a problem+json document inside a result's `text`
+     * would describe a response nobody sent.
      */
     private fun threw(id: JsonValue, tool: String, thrown: Throwable): String {
-        val rendered = renderError(thrown, api.exposeInternalErrors)
+        val rendered = renderError(thrown, api, endpointNamed(tool))
         val unexpected = rendered.unexpected
             ?: return reply(id, ToolResult(described(rendered.error), isError = true).toJson())
 

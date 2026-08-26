@@ -1,8 +1,10 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attribute
@@ -38,10 +40,15 @@ fun greetingsApi(
      * throwing, so a filter listed after [gate] never hears about a 403.
      */
     outerFilters: List<Filter> = emptyList(),
+
+    /** Which dialect this service refuses in. See [Backend.api]. */
+    refusals: RefusalRenderer = ApiErrorEnvelope,
 ): Api = api(
     endpoints = routes,
     codecs = JacksonCodecs,
 ) {
+    refusals(refusals)
+
     title = "Greetings"
     version = "1.0.0"
     description = "One set of endpoint descriptions, served by three different HTTP libraries."

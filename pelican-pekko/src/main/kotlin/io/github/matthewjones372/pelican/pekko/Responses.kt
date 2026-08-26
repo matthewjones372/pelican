@@ -197,24 +197,26 @@ private fun parseContentType(mediaType: String): ContentType {
 private val log: Logger = LoggerFactory.getLogger("io.github.matthewjones372.pelican.pekko")
 
 /**
- * Rendered through core's own JSON tree rather than the configured codec: a
- * codec that has just failed is not the thing to report that it failed.
+ * Rendered through core's own tree rather than the configured codec: a codec
+ * that has just failed is not the thing to report that it failed.
+ *
+ * [api] is not nullable, so a preflight refused before any route matched is
+ * still written in the dialect the service chose. That site passed null once.
  */
-internal fun errorResponse(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): HttpResponse {
-    val rendered = renderError(raw, api?.exposeInternalErrors ?: false)
+internal fun errorResponse(raw: Throwable, api: Api, endpoint: Endpoint<*, *>? = null): HttpResponse {
+    val rendered = renderError(raw, api, endpoint)
 
     rendered.unexpected?.let { failure ->
         // An unexpected failure always carries a reference; that is what
         // renderError produced it for.
         val reference = checkNotNull(rendered.reference) { "an unexpected failure with no reference" }
-        val hook = api?.onServerError
+        val hook = api.onServerError
         if (hook != null) hook(reference, endpoint, failure)
         else log.error("Unhandled failure in {} [ref {}]", endpoint ?: "?", rendered.reference, failure)
     }
 
-    val error = rendered.error
     return HttpResponse.create()
-        .withStatus(statusOf(error.status))
-        .withEntity(HttpEntities.create(ContentTypes.APPLICATION_JSON, error.toJson().render()))
+        .withStatus(statusOf(rendered.error.status))
+        .withEntity(HttpEntities.create(contentTypeOf(rendered.body.mediaType), rendered.body.bytes))
         .addHeaders(rendered.headers.map { (n, v) -> RawHeader.create(n, v) })
 }

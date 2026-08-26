@@ -4,8 +4,8 @@ import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.apiClient
-import io.github.matthewjones372.pelican.test.errorBody
-import io.github.matthewjones372.pelican.test.shouldBeApiError
+import io.github.matthewjones372.pelican.test.shouldHaveContentType
+import io.github.matthewjones372.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -21,18 +21,28 @@ import org.junit.jupiter.params.provider.MethodSource
  * `renderError` decides it in core, and each interpreter then builds the
  * response from what it hands back at a call site of its own — three of them,
  * none previously asserted against another. The answer is the one thing a
- * production team reads at three in the morning, so it is asked of all three.
+ * production team reads at three in the morning, so it is asked of all three,
+ * and of both shipped envelopes: choosing a dialect must not turn the 500 into
+ * a place a stack trace can appear.
  */
 class ThrowingHandlerTest {
 
     companion object {
-        private val running: Map<String, Running> = allBackends.associate { it.name to it.start(port = 0) }
+        private val running: Map<Pair<String, String>, Running> = allBackends.flatMap { backend ->
+            allDialects.map { dialect ->
+                (backend.name to dialect.name) to backend.start(port = 0, refusals = dialect.renderer)
+            }
+        }.toMap()
 
-        private val clients: Map<String, ApiClient> =
+        private val clients: Map<Pair<String, String>, ApiClient> =
             running.mapValues { (_, server) -> apiClient(server.baseUrl, JacksonCodecs) }
 
         @JvmStatic
-        fun backends(): List<Array<Any>> = allBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
+        fun backends(): List<Array<Any>> = allBackends.flatMap { backend ->
+            allDialects.map { dialect ->
+                arrayOf<Any>("${backend.name}/${dialect.name}", clients.getValue(backend.name to dialect.name), dialect)
+            }
+        }
 
         @JvmStatic
         @AfterAll
@@ -49,22 +59,37 @@ class ThrowingHandlerTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
-    fun `a handler that throws answers the ApiError shape, as JSON, with a 500`(name: String, client: ApiClient) {
-        withClue(name) { client.shouldBeApiError(broken(client), 500, "Internal server error") }
+    fun `a handler that throws answers a 500 in the configured envelope`(
+        name: String,
+        client: ApiClient,
+        dialect: Dialect,
+    ) {
+        val res = broken(client)
+
+        withClue(name) {
+            res shouldHaveStatus 500
+            res shouldHaveContentType dialect.mediaType
+            dialect.status(res) shouldBe 500
+            dialect.reason(res) shouldBe "Internal server error"
+        }
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
-    fun `and its detail is a reference to grep the log for`(name: String, client: ApiClient) {
-        val detail = client.errorBody(broken(client)).detail
+    fun `and its detail is a reference to grep the log for`(name: String, client: ApiClient, dialect: Dialect) {
+        val detail = dialect.detail(broken(client))
 
         withClue(name) { detail.shouldNotBeNull() shouldMatch REFERENCE }
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
-    fun `a new reference each time, so two failures are two lines in the log`(name: String, client: ApiClient) {
-        val references = List(2) { client.errorBody(broken(client)).detail }
+    fun `a new reference each time, so two failures are two lines in the log`(
+        name: String,
+        client: ApiClient,
+        dialect: Dialect,
+    ) {
+        val references = List(2) { dialect.detail(broken(client)) }
 
         withClue("$name: $references") { references.toSet().size shouldBe 2 }
     }

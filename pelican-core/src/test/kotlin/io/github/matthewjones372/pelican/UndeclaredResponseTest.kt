@@ -67,7 +67,7 @@ class UndeclaredResponseTest {
 
     @Test
     fun `the caller gets a reference and the log gets the reason`() {
-        val rendered = renderError(UndeclaredResponse("error:410 was returned but this declares error:404"))
+        val rendered = renderError(UndeclaredResponse("error:410 was returned but this declares error:404"), api = null)
 
         rendered.error.status shouldBe 500
         rendered.error.error shouldBe "Internal server error"

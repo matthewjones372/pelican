@@ -1,7 +1,9 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.http4k.bytesNow
 import io.github.matthewjones372.pelican.http4k.handledNow
@@ -69,16 +71,19 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
     echoRaw bytesNow { body -> body.toStream() },
 )
 
-fun http4kApi(outerFilters: List<Filter> = emptyList()): Api =
-    greetingsApi(http4kRoutes, outerFilters = outerFilters)
+fun http4kApi(
+    outerFilters: List<Filter> = emptyList(),
+    refusals: RefusalRenderer = ApiErrorEnvelope,
+): Api = greetingsApi(http4kRoutes, outerFilters = outerFilters, refusals = refusals)
 
 object OnHttp4k : Backend {
     override val name = "http4k"
 
-    override fun api(outerFilters: List<Filter>): Api = http4kApi(outerFilters)
+    override fun api(outerFilters: List<Filter>, refusals: RefusalRenderer): Api =
+        http4kApi(outerFilters, refusals)
 
-    override fun start(port: Int, outerFilters: List<Filter>): Running {
-        val server = api(outerFilters).start(port = port)
+    override fun start(port: Int, outerFilters: List<Filter>, refusals: RefusalRenderer): Running {
+        val server = api(outerFilters, refusals).start(port = port)
         return object : Running {
             override val baseUrl = server.baseUrl
             override fun stop() = server.stop()

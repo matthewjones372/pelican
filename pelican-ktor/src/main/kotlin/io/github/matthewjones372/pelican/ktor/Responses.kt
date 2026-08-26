@@ -24,6 +24,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondBytesWriter
 import io.ktor.server.response.respondText
 import io.ktor.utils.io.ByteReadChannel
@@ -242,22 +243,29 @@ private fun statusOf(code: Int): HttpStatusCode = HttpStatusCode.fromValue(code)
 private val log: Logger = LoggerFactory.getLogger("io.github.matthewjones372.pelican.ktor")
 
 /**
- * Rendered through core's own JSON tree rather than the configured codec: a
- * codec that has just failed is not the thing to report that it failed.
+ * Rendered through core's own tree rather than the configured codec: a codec
+ * that has just failed is not the thing to report that it failed.
  *
- * [renderError] decides which throwable becomes which response. What is local
- * is the logging — Pelican catches the throwable, so Ktor never sees it.
+ * [renderError] decides which throwable becomes which response and writes the
+ * body in the dialect the service configured. What is local is the logging —
+ * Pelican catches the throwable, so Ktor never sees it.
+ *
+ * [api] is not nullable, so a preflight refused before any route matched is
+ * still written in that dialect. That site passed null once.
  */
-internal suspend fun ApplicationCall.respondError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null) {
-    val rendered = renderError(raw, api?.exposeInternalErrors ?: false)
+internal suspend fun ApplicationCall.respondError(raw: Throwable, api: Api, endpoint: Endpoint<*, *>? = null) {
+    val rendered = renderError(raw, api, endpoint)
 
     rendered.unexpected?.let { failure ->
-        val hook = api?.onServerError
+        val hook = api.onServerError
         if (hook != null) hook(checkNotNull(rendered.reference), endpoint, failure)
         else log.error("Unhandled failure in {} [ref {}]", endpoint ?: "?", rendered.reference, failure)
     }
 
     rendered.headers.forEach { (name, value) -> response.headers.append(name, value) }
-    val error = rendered.error
-    respondText(error.toJson().render(), ContentType.Application.Json, statusOf(error.status))
+    respondBytes(
+        rendered.body.bytes,
+        ContentType.parse(rendered.body.mediaType),
+        statusOf(rendered.error.status),
+    )
 }

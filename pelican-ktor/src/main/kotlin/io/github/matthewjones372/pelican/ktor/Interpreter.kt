@@ -136,13 +136,13 @@ private suspend fun ApplicationCall.dispatch(
             invoke(matched, api, codecs.getValue(matched), handlers.getValue(matched), this, values)
         }
 
-        method == Method.OPTIONS && cors != null -> respondPreflight(cors)
+        method == Method.OPTIONS && cors != null -> respondPreflight(cors, api)
 
         else -> respond(HttpStatusCode.NotFound)
     }
 }
 
-private suspend fun ApplicationCall.respondPreflight(cors: CorsPolicy) {
+private suspend fun ApplicationCall.respondPreflight(cors: CorsPolicy, api: Api) {
     when (
         val decision = cors.preflight(
             origin = request.headers[CorsHeaders.ORIGIN],
@@ -152,9 +152,9 @@ private suspend fun ApplicationCall.respondPreflight(cors: CorsPolicy) {
     ) {
         // A bare OPTIONS, or one aimed at no described path: the same 404
         // Ktor's own router gives. See `MethodMismatchTest`.
-        is CorsPreflight.NotPreflight -> respondError(ApiException(404, "Not found"), null)
+        is CorsPreflight.NotPreflight -> respondError(ApiException(404, "Not found"), api)
 
-        is CorsPreflight.Refused -> respondError(ApiException(403, "Forbidden", decision.reason), null)
+        is CorsPreflight.Refused -> respondError(ApiException(403, "Forbidden", decision.reason), api)
 
         is CorsPreflight.Allowed -> {
             decision.headers.forEach { (name, value) -> response.headers.append(name, value) }

@@ -1,7 +1,9 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.RefusalRenderer
 
 /**
  * A backend, reduced to what anything outside it needs: bind the shared
@@ -27,11 +29,22 @@ interface Backend {
      * here rather than in each suite's own wiring so that a test which needs to
      * watch every request — `MetricsAcrossBackendsTest` does — can still ask
      * all three backends the same question through this one seam.
+     *
+     * [refusals] is the second thing a suite varies rather than a second
+     * wiring: `RefusalsAcrossBackendsTest` runs the whole suite once per shipped
+     * renderer, which is the same claim as running it once per backend.
      */
-    fun api(outerFilters: List<Filter> = emptyList()): Api
+    fun api(
+        outerFilters: List<Filter> = emptyList(),
+        refusals: RefusalRenderer = ApiErrorEnvelope,
+    ): Api
 
     /** Binds [api] on [port]; pass 0 to let the OS choose, which is what tests do. */
-    fun start(port: Int = 0, outerFilters: List<Filter> = emptyList()): Running
+    fun start(
+        port: Int = 0,
+        outerFilters: List<Filter> = emptyList(),
+        refusals: RefusalRenderer = ApiErrorEnvelope,
+    ): Running
 }
 
 /** A started server, and the two things a caller needs from one. */

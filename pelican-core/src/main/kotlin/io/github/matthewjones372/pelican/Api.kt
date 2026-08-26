@@ -33,6 +33,9 @@ class ApiSpec(
      * The calls this service sends — OpenAPI 3.1's `webhooks`.
      */
     val webhooks: List<Webhook> = emptyList(),
+
+    /** [Api.refusals], so a document says what the wire says. */
+    val refusals: RefusalRenderer = ApiErrorEnvelope,
 ) {
     init {
         refuseWebhooksAmong(endpoints)
@@ -194,6 +197,13 @@ class Api internal constructor(
 
     /** The calls this service sends. Documented and generated, never routed. */
     val webhooks: List<Webhook> = emptyList(),
+
+    /**
+     * What a refusal — a 400 nothing could decode, a 406, a 413, a 500 nobody
+     * described — looks like on the wire. Declared failures are untouched:
+     * `errorJson<E>` already carries whatever type the endpoint promised.
+     */
+    val refusals: RefusalRenderer = ApiErrorEnvelope,
 ) {
     init {
         val bound = endpoints.map { it.endpoint }
@@ -227,6 +237,7 @@ class Api internal constructor(
         servers = servers,
         security = security,
         webhooks = webhooks,
+        refusals = refusals,
     )
 }
 

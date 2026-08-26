@@ -16,6 +16,15 @@ one.
 
 ### Changed — read this one
 
+- **`spi.renderError` takes the `Api`, not a boolean.**
+  `renderError(t, api.exposeInternalErrors)` becomes
+  `renderError(t, api, endpoint)`, and the `RenderedError` it returns carries
+  the body already written, under `body.bytes` and `body.mediaType`. There is
+  no default for `api`: a call site that forgot one would answer in an envelope
+  nobody configured, silently, and only for the refusals that reach it — which
+  is how three of them came to bypass the setting during this change. An
+  interpreter should write `rendered.body` and take only the status from
+  `rendered.error`; encoding `error` itself is a fourth dialect.
 - **The interpreter SPI lives in `io.github.matthewjones372.pelican.spi`.**
   `handlerFor`, `routeIndex`/`RouteIndex`, `renderError`/`RenderedError`,
   `readStrictBody`, `requestBodyCodec`/`RequestBodyCodecs`, `successNamedBy`,
@@ -107,6 +116,20 @@ one.
 
 ### Added
 
+- **Refusals in the caller's dialect.** `refusals(ProblemDetails)` inside
+  `api { }` writes the built-in refusals — a 400 nothing could decode, a 406, a
+  413, a 500 nobody described — as RFC 9457 `application/problem+json` instead
+  of `{"status":…,"error":…,"detail":…}`. The default, `ApiErrorEnvelope`, is
+  the envelope that was always there, byte for byte. A `RefusalRenderer` sees
+  the *classified* refusal — status, sentence, detail, reference, and the path
+  template where a route matched — and never the request or the throwable, so
+  the 500 path cannot leak internals by construction and `instance` cannot echo
+  anything a caller sent. One renderer serves all three backends and the
+  in-memory transport; `RefusalsAcrossBackendsTest` and `ThrowingHandlerTest`
+  run once per backend and once per shipped renderer. Declared failures are
+  untouched — `errorJson<E>` already carries whatever type was promised — and
+  an MCP tool call is unaffected, because JSON-RPC's envelope is the protocol's
+  and not the service's.
 - **An event stream that says where a caller left off.**
   `sse<T>(id = { it.sequence.toString() }, retry = 15.seconds)` puts an `id:`
   on every frame and opens the stream with a `retry:` directive of its own —

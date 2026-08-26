@@ -1,12 +1,16 @@
 package io.github.matthewjones372.pelican.mcp.server
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.JsonArr
 import io.github.matthewjones372.pelican.JsonBool
 import io.github.matthewjones372.pelican.JsonNum
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
+import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.Outcome
+import io.github.matthewjones372.pelican.ProblemDetails
+import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
@@ -56,7 +60,7 @@ class ProtocolTest {
     /** References the hook was handed, so a test can say the log and the answer name the same failure. */
     private val logged = ArrayDeque<String>()
 
-    private fun service(): Api = api(
+    private fun service(refusals: RefusalRenderer = ApiErrorEnvelope): Api = api(
         endpoints = listOf(
             ServerEndpoint(getOrder) { p ->
                 val outcome =
@@ -72,6 +76,7 @@ class ProtocolTest {
     ) {
         title = "Orders"
         version = "2.0.0"
+        refusals(refusals)
         onError { reference, _, _ -> logged += reference }
     }
 
@@ -175,6 +180,31 @@ class ProtocolTest {
         withClue("the message a handler threw may name a table, a host or a query") {
             (error["message"] as JsonStr).value shouldNotContain "on fire"
         }
+    }
+
+    /**
+     * `refusals(...)` chooses the envelope an HTTP caller reads. MCP answers in
+     * JSON-RPC, whose shape the protocol fixes and a service does not pick, so a
+     * problem+json document has no place inside a tool result's `text`.
+     */
+    @Test
+    fun `the envelope an HTTP caller reads does not reach a tool result`() {
+        fun answers(renderer: RefusalRenderer): Pair<JsonValue?, JsonValue?> {
+            val server = service(renderer).mcpServer()
+            val declared = server
+                .answering(request(8, "tools/call", """{"name":"getOrder","arguments":{"userId":0}}"""))
+                .result()
+            val undeclared = server
+                .answering(request(9, "tools/call", """{"name":"reindex","arguments":{}}"""))
+                .failure()
+            return ((declared["content"] as JsonArr).items.single() as JsonObj)["text"] to undeclared["code"]
+        }
+
+        val (problemText, problemCode) = answers(ProblemDetails)
+        val (envelopeText, envelopeCode) = answers(ApiErrorEnvelope)
+
+        problemText shouldBe envelopeText
+        problemCode shouldBe envelopeCode
     }
 
     @Test

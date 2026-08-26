@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican.http4k
 
+import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.ServerEndpoint
@@ -31,6 +32,8 @@ import org.http4k.routing.RoutingMatch
  */
 internal class IndexedRouteMatcher(
     private val index: RouteIndex,
+    /** Carried for the 400 below: a refusal is written in the dialect this service chose. */
+    private val api: Api,
     private val invoke: (ServerEndpoint, Request, MutableMap<ParamKey<*>, Any?>) -> Response,
     private val filter: Filter = Filter { it },
     private val prefix: String = "",
@@ -48,7 +51,7 @@ internal class IndexedRouteMatcher(
         } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
             // A capture that will not decode is this endpoint's 400 rather than
             // somebody else's route, so it counts as matched and answers.
-            return RoutingMatch(MATCHED, description) { errorResponse(t, null) }
+            return RoutingMatch(MATCHED, description) { errorResponse(t, api) }
         }
 
         return when {
@@ -69,10 +72,10 @@ internal class IndexedRouteMatcher(
         RoutingMatch(UNMATCHED, description) { Response(Status.NOT_FOUND) }
 
     override fun withBasePath(prefix: String): RouteMatcher<Response, Filter> =
-        IndexedRouteMatcher(index, invoke, filter, prefix + this.prefix)
+        IndexedRouteMatcher(index, api, invoke, filter, prefix + this.prefix)
 
     override fun withFilter(new: Filter): RouteMatcher<Response, Filter> =
-        IndexedRouteMatcher(index, invoke, new.then(filter), prefix)
+        IndexedRouteMatcher(index, api, invoke, new.then(filter), prefix)
 
     /**
      * Narrowing by a predicate is not expressible here: the answer comes from

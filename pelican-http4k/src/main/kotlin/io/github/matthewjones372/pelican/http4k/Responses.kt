@@ -27,6 +27,7 @@ import org.http4k.core.Status
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.InputStream
+import java.nio.ByteBuffer
 import kotlin.reflect.KClass
 
 internal const val CONTENT_TYPE = "Content-Type"
@@ -172,21 +173,28 @@ private fun statusOf(code: Int): Status = Status.fromCode(code) ?: Status(code, 
 private val log: Logger = LoggerFactory.getLogger("io.github.matthewjones372.pelican.http4k")
 
 /**
- * Rendered through core's own JSON tree rather than the configured codec: a
- * codec that has just failed is not the thing to report that it failed.
+ * Rendered through core's own tree rather than the configured codec: a codec
+ * that has just failed is not the thing to report that it failed.
+ *
+ * [api] is not nullable, so a refusal raised where no route matched — a
+ * preflight, a capture that will not decode — is still written in the dialect
+ * the service chose. Every one of those sites passed null once.
  */
-internal fun errorResponse(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): Response {
-    val rendered = renderError(raw, api?.exposeInternalErrors ?: false)
+internal fun errorResponse(raw: Throwable, api: Api, endpoint: Endpoint<*, *>? = null): Response {
+    val rendered = renderError(raw, api, endpoint)
 
     rendered.unexpected?.let { failure ->
         // Always present: renderError produces one for exactly this.
         val reference = checkNotNull(rendered.reference) { "an unexpected failure with no reference" }
-        val hook = api?.onServerError
+        val hook = api.onServerError
         if (hook != null) hook(reference, endpoint, failure)
         else log.error("Unhandled failure in {} [ref {}]", endpoint ?: "?", rendered.reference, failure)
     }
 
-    val error = rendered.error
-    val headers = if (rendered.headers.isEmpty()) JSON_HEADERS else JSON_HEADERS + rendered.headers
-    return MemoryResponse(statusOf(error.status), headers, MemoryBody(error.toJson().render()))
+    val contentType = listOf(CONTENT_TYPE to rendered.body.mediaType)
+    return MemoryResponse(
+        statusOf(rendered.error.status),
+        contentType + rendered.headers,
+        MemoryBody(ByteBuffer.wrap(rendered.body.bytes)),
+    )
 }

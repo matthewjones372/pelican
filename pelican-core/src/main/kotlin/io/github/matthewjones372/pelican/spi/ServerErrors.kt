@@ -13,6 +13,12 @@ class RenderedError(
     val unexpected: Throwable?,
     /** The id printed in the response body, to grep the log for. */
     val reference: String?,
+    /**
+     * The body, already written by the [Api]'s [RefusalRenderer]. An interpreter
+     * that encoded [error] itself would be a fourth dialect nobody configured,
+     * so the bytes come from here and the status from [error].
+     */
+    val body: RefusalBody,
 )
 
 /**
@@ -38,11 +44,19 @@ private fun described(t: Throwable): ApiError? = when (t) {
 }
 
 /**
- * Decides the response for a throwable. [exposeInternalDetail] puts an
- * unexpected message back in the body — for a local run, not production.
+ * Decides the response for a throwable, and writes it in the dialect [api] was
+ * configured with.
+ *
+ * [api] is the whole settings value rather than the two fields this reads, and
+ * it has no default, because a call site that forgot one would answer in an
+ * envelope nobody chose — silently, and only for the refusals that reach it.
+ * Null is for the caller with no service in scope at all; every interpreter has
+ * one.
  */
-fun renderError(raw: Throwable, exposeInternalDetail: Boolean = false): RenderedError {
+fun renderError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): RenderedError {
     val t = unwrapCompletion(raw)
+    val renderer = api?.refusals ?: ApiErrorEnvelope
+    val template = endpoint?.pathSpec?.template
 
     val described = described(t)
     if (described != null) {
@@ -53,21 +67,28 @@ fun renderError(raw: Throwable, exposeInternalDetail: Boolean = false): Rendered
             if (t is ApiException) t.headers else emptyList(),
             unexpected = null,
             reference = null,
+            body = renderer.render(described.refusal(reference = null, pathTemplate = template)),
         )
     }
 
     val reference = newReference()
+    val error = ApiError(
+        INTERNAL_SERVER_ERROR,
+        "Internal server error",
+        if (api?.exposeInternalErrors == true) t.toString() else "Reference: $reference",
+    )
     return RenderedError(
-        ApiError(
-            INTERNAL_SERVER_ERROR,
-            "Internal server error",
-            if (exposeInternalDetail) t.toString() else "Reference: $reference",
-        ),
+        error,
         emptyList(),
         unexpected = t,
         reference = reference,
+        body = renderer.render(error.refusal(reference, template)),
     )
 }
+
+/** The classification, and only the classification, as a renderer is allowed to see it. */
+private fun ApiError.refusal(reference: String?, pathTemplate: String?): Refusal =
+    Refusal(status, error, detail, reference, pathTemplate)
 
 /**
  * The status a throwable becomes, without building the body that would go with

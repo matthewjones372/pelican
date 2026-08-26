@@ -78,7 +78,7 @@ class ResponseStatusTest {
             PayloadTooLarge(limit = 10L),
             IllegalStateException("something nobody described"),
         ).forEach { failure ->
-            plain.statusFor(result = null, error = failure) shouldBe renderError(failure).error.status
+            plain.statusFor(result = null, error = failure) shouldBe renderError(failure, api = null).error.status
         }
     }
 

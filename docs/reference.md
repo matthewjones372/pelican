@@ -3119,6 +3119,7 @@ Which throwable becomes which response is decided in `pelican-core`
 | `ApiException` (`notFound`, `forbidden`, …) | its own status, message and detail |
 | `DecodeFailure` | 400, naming the parameter and the constraint |
 | `BodyDecodeFailure` | 400, "Malformed request body" |
+| `NotAcceptable` | 406, naming what the endpoint does produce |
 | `PayloadTooLarge` | 413 |
 | anything else | 500, a reference, and nothing else |
 
@@ -3153,6 +3154,55 @@ Declared failures are untouched: a 404 you described still carries the payload
 you described, as `application/json`, because that is not a surprise. Every row
 above is JSON too — `renderError` writes one shape, so a caller parsing a 400
 and a 500 parses the same thing.
+
+### Which envelope a refusal is written in
+
+Every row above is a *refusal*: a response the endpoint never declared, so
+nothing in the description says what it carries. Core decides that, and one
+setting chooses between the two envelopes it ships:
+
+```kotlin
+api(routes, JacksonCodecs) {
+    refusals(ProblemDetails)        // or the default, ApiErrorEnvelope
+}
+```
+
+| Renderer | Media type | Body |
+|---|---|---|
+| `ApiErrorEnvelope` (default) | `application/json` | `{"status":…,"error":…,"detail":…}` |
+| `ProblemDetails` | `application/problem+json` | RFC 9457: `type`, `title`, `status`, `detail`, `instance` |
+
+```
+406 application/problem+json
+{"type":"about:blank","title":"Not acceptable","status":406,
+ "detail":"This endpoint produces application/json, and the request's Accept header takes none of them",
+ "instance":"/greetings/{who}"}
+```
+
+`type` is `about:blank`, which RFC 9457 defines as "no semantics beyond the
+status code" — the honest reading of a refusal raised before any handler ran. A
+service that wants its own type URIs writes a `RefusalRenderer` of its own;
+core is not the place to invent a URI namespace.
+
+`instance` is the *path template* of the route that refused, and is absent where
+nothing matched. A `RefusalRenderer` is handed the classified refusal — status,
+sentence, detail, reference, template — and never the request or the throwable,
+so a 500 cannot leak an exception message and a renderer cannot echo a header a
+caller sent.
+
+One renderer serves all three backends and the in-memory transport, including
+the refusals raised before a route was chosen: a CORS preflight refused with a
+403, a path capture that will not decode. `RefusalsAcrossBackendsTest` and
+`ThrowingHandlerTest` each run their whole suite once per backend *and* once per
+shipped renderer, which is six answers to every question they ask.
+
+It reaches the HTTP wire and stops there. An MCP tool call is answered in
+JSON-RPC, whose envelope the protocol fixes and a service does not choose, so
+`refusals(...)` changes nothing a model reads — the classification is shared,
+the rendering is not.
+
+Declared failures are not refusals and are unaffected: `errorJson<E>` already
+carries whatever type the endpoint promised.
 
 ## Limits and startup checks
 

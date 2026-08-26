@@ -61,7 +61,7 @@ fun Api.toRoute(system: ClassicActorSystemProvider): Route {
         .map { it.endpoint.method }
         .distinct()
         .map { method -> methodRoute(method, this, index, codecs, handlers, cors, system) } +
-        listOfNotNull(cors?.let(::preflightRoute))
+        listOfNotNull(cors?.let { preflightRoute(it, this) })
 
     return routes.reduce { left, right -> Directives.concat(left, right) }
 }
@@ -117,7 +117,7 @@ private fun methodRoute(
  * declaring `OPTIONS` itself is tried first and a path nobody described is
  * still a 404.
  */
-private fun preflightRoute(cors: CorsPolicy): Route =
+private fun preflightRoute(cors: CorsPolicy, api: Api): Route =
     Directives.method(HttpMethods.OPTIONS) {
         Directives.extractRequest { req ->
             val decision = cors.preflight(
@@ -129,7 +129,7 @@ private fun preflightRoute(cors: CorsPolicy): Route =
                 is CorsPreflight.NotPreflight -> Directives.reject()
 
                 is CorsPreflight.Refused ->
-                    Directives.complete(errorResponse(ApiException(403, "Forbidden", decision.reason), null))
+                    Directives.complete(errorResponse(ApiException(403, "Forbidden", decision.reason), api))
 
                 is CorsPreflight.Allowed -> Directives.complete(
                     HttpResponse.create()
