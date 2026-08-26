@@ -119,7 +119,8 @@ numbers, the error bars they came with and the baselines they need are in
 [Testing](#testing) · [Backends](#backends)
 
 **[Appendix](#appendix)** — [Longer documents](#longer-documents) ·
-[Running the examples](#running-the-examples) · [Versions](#versions)
+[Running the examples](#running-the-examples) · [Stability](#stability) ·
+[Versions](#versions)
 
 The reference manual, with the reasoning behind each design decision, is
 [docs/reference.md](docs/reference.md).
@@ -1014,7 +1015,7 @@ Nine things that wanted a page rather than a section, and one benchmark:
 | Page | What it answers |
 |---|---|
 | [Cookbook](docs/cookbook.md) | Complete recipes in the order people need them — typed inputs, declared failures, forms, uploads, streaming, security, filters, testing — each one whole rather than a fragment to assemble. |
-| [Choosing between Pelican and the alternatives](docs/choosing.md) | Where http4k's contracts, Ktor's plugins, Spring, Micronaut, Quarkus, tapir or a hand-written document are the better answer — and the projects that should not use a 0.1 library at all. |
+| [Choosing between Pelican and the alternatives](docs/choosing.md) | Where http4k's contracts, Ktor's plugins, Spring, Micronaut, Quarkus, tapir or a hand-written document are the better answer — and the projects that should not use a first-release library at all. |
 | [A whole service, in one file](docs/a-whole-service.md) | What all of it looks like at once — models, inputs, endpoints, handlers, store, server, docs. Compiled every build as `ReadmeExample.kt`. |
 | [A generated Kotlin client](docs/generated-client.md) | What callers who cannot hold the descriptions get instead, and what the generator does with a union, a failure or a stream. |
 | [Importing an OpenAPI document](docs/importing.md) | A document somebody else wrote, read into descriptions: what comes out, what is refused, and how to get past a document you do not own. |
@@ -1049,6 +1050,27 @@ Nine things that wanted a page rather than a section, and one benchmark:
 `--args=8081`. The two generator tasks come from the repository's own Gradle
 plugin, and they start nothing: `pelican-openapi` and `pelican-codegen` depend
 on core alone, so neither needs an HTTP library present.
+
+## Stability
+
+From 1.0, the public API of the shipped modules is stable, and a breaking change
+waits for a major release.
+
+Two things in the repository say what that covers, and both fail the build
+rather than being promised in prose. The `.api` dump beside each module is the
+binary contract — if a signature is in the dump, it is promised, and `apiCheck`
+fails when one changes. `StillCompilesTest` is the contract for the reified
+inline half of the DSL, which a bytecode dump cannot see: `json<T>()`,
+`pathParam<T>()`, `errorJson<T>()` and the rest are compiled against as source,
+so the suite compiles pinned call sites against the published modules.
+
+Outside it: anything `internal`, the emitted document's byte-for-byte shape —
+[golden files](docs/golden-testing.md) are how you pin what your own callers
+hold — and the modules on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch, which are not covered until they return to `main`. The full statement is
+in the reference manual at [Stability](docs/reference.md#stability), and every
+break is recorded in [the changelog](CHANGELOG.md).
 
 ## Versions
 

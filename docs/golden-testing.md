@@ -116,9 +116,9 @@ field does not.
 
 ### When a break is deliberate
 
-Breaking changes are allowed — but they are announced. A failing golden test
-means this break is so far announced to nobody. When the break is
-intentional, accept it the same way you accept any change:
+Breaking changes to *your* contract are allowed — but they are announced. A
+failing golden test means this break is so far announced to nobody. When the
+break is intentional, accept it the same way you accept any change:
 
 ```bash
 mv src/test/resources/golden/operations/placeOrder_changed.json \

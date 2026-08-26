@@ -3,7 +3,7 @@
 Linked from the [README](../README.md). The page for deciding *against* Pelican
 quickly, and for a reason that is actually true.
 
-Pelican is at 0.1.0. The README explains what it does and the reference manual
+Pelican is at 1.0. The README explains what it does and the reference manual
 explains how, but neither answers the question a reader arrives with, which is
 whether the thing they already have is worse. Usually it is not. This page is
 the honest version of that comparison: for each neighbour, what it does better
@@ -25,7 +25,7 @@ either left out or stated as the weaker thing that could be supported.
 - [tapir](#tapir)
 - [Writing OpenAPI by hand and generating from it](#writing-openapi-by-hand-and-generating-from-it)
 - [When Pelican is the wrong choice](#when-pelican-is-the-wrong-choice)
-- [The API will break before 1.0](#the-api-will-break-before-10)
+- [What the API promises from 1.0](#what-the-api-promises-from-10)
 
 ---
 
@@ -370,12 +370,12 @@ necessarily a document this toolchain reads well.
 Separately from any comparison, there are projects that should not use this
 library at all.
 
-**It is 0.1.0 and the API moves.** There is one released version. The
-description DSL, the binder names and the module layout are all still being
-shaped by what the examples turn out to need, and there is no deprecation cycle
-because there is nothing yet to deprecate against. A service that will be
-maintained for years by people who did not choose this is taking on a risk that
-a Spring or Ktor service is not.
+**It is a first release, whatever the promise says.** The API is frozen and
+guarded — the dumps and `StillCompilesTest` are the contract, and a break waits
+for a major — but a promise made on the day of a first release has no track
+record behind it, and 1.0 is the version with the fewest people having tried it
+rather than the most. A service that will be maintained for years by people who
+did not choose this is taking on a risk that a Spring or Ktor service is not.
 
 **One backend at 1.0.** Pekko HTTP, and nothing else on main. If you are on
 Vert.x, Helidon, Armeria, Netty directly, Jakarta REST, Javalin or Spring MVC,
@@ -462,33 +462,37 @@ handler destructure a prefix of its inputs and quietly ignore the rest. And
 nothing in Kotlin's type system can say that a list of bound handlers covers a
 set of declared endpoints, so `api { covers = ... }` is a runtime check too.
 
-**Finally, the obvious one.** One author, one released version, and no issues
+**Finally, the obvious one.** One author, a first stable release, and no issues
 open — which reads as "nothing is broken" and equally as "nobody has tried it
 yet". Weigh it accordingly.
 
 ---
 
-## The API will break before 1.0
+## What the API promises from 1.0
 
-Plainly: the public API will change in breaking ways between minor versions
-until 1.0. Not only in new modules or at the edges — the endpoint DSL, the
-binder names, the codec interfaces and the module boundaries are all in scope,
-and a `0.2.0` may require edits to code that compiled against `0.1.0` with no
-deprecation period in between.
+Plainly: the public API of the shipped modules is stable, and a breaking change
+waits for a major release. The endpoint DSL, the binder names, the codec
+interfaces and the module boundaries are all inside that, not at its edge.
 
-So pin an exact version, and upgrade deliberately:
+Two artefacts in the repository are the contract, and both are checked on every
+build rather than asserted here. The `.api` dump beside each module is the
+binary one: `apiCheck` fails when a published signature changes, so a break
+cannot reach a release without the dump changing in the same commit.
+`StillCompilesTest` is the other, for the half a dump cannot see — `json<T>()`,
+`jsonBody<T>()`, `pathParam<T>()`, `sse<T>()` and `errorJson<T>()` are reified
+inline functions, so what you compile against is source, and the suite compiles
+pinned call sites against the published modules.
 
-```kotlin
-dependencies {
-    implementation("io.github.matthewjones372:pelican-core:0.1.0")
-}
-```
+What is outside it: anything `internal`, the emitted document's byte-for-byte
+shape, and the http4k, Ktor, jsoniter and kotlinx modules on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch, which are not covered until they return to `main`.
 
-Not a range, not a `+`, and not a version resolved by a plugin you do not
-control. If you use the Gradle plugin, pin that too, at the same version as the
-libraries — `id("io.github.matthewjones372.pelican") version "0.1.0"` — since
-its generators and the runtime read the same descriptions and are not tested
-against each other across versions.
+Pin an exact version anyway, and upgrade deliberately — not a range, not a `+`,
+and not a version resolved by a plugin you do not control. If you use the Gradle
+plugin, pin that too, at the same version as the libraries, since its generators
+and the runtime read the same descriptions and are not tested against each other
+across versions.
 
 The other half of that advice costs nothing and is worth taking whatever you
 decide about Pelican: pin the wire contract your callers hold, in a test, so

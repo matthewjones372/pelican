@@ -11,8 +11,11 @@ Facts worth having before anything else:
 
 - Kotlin 2.4, JVM. Apache 2.0. On Maven Central as
   `io.github.matthewjones372:pelican-core` and sibling modules.
-- Version 0.1.x. Breaking changes are expected between minor versions. Pin an
-  exact version.
+- Version 1.0. The public API of the shipped modules is stable and a breaking
+  change waits for a major release. The `.api` dump beside each module is the
+  binary contract, checked by `apiCheck`; `StillCompilesTest` is the contract
+  for the reified inline DSL, which a dump cannot see. `internal`, the emitted
+  document's exact bytes, and the `multi-backend` branch are outside it.
 - `pelican-core` depends on nothing but the Kotlin standard library, and a test
   enforces it. Every JSON library, server library and HTTP client lives in a
   separate module.

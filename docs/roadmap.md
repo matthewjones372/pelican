@@ -109,15 +109,16 @@ meter API and nothing else.
 
 ## 2. A page that says when not to use Pelican
 
-At 0.1.0 with no issues open, the thing standing between a reader and a
-decision is not a missing feature. It is that nobody can tell in five minutes
+On a first release with no issues open, the thing standing between a reader and
+a decision is not a missing feature. It is that nobody can tell in five minutes
 how this differs from http4k's own contracts, from the Ktor OpenAPI plugins,
 from springdoc-style annotations, or from tapir — which the README names but
 does not compare against.
 
 The page worth writing is the unflattering one: what each of those does better,
-which projects should use them instead, and what you give up by taking a 0.1
-library. Paired with a plain statement that the API will break before 1.0.
+which projects should use them instead, and what you give up by taking a
+library on its first stable release. Paired with a plain statement of what the
+API promises and what it does not.
 
 This costs no code and is second only because the first item is nearly free.
 
@@ -366,6 +367,15 @@ un-prove it, and it is not an argument for a fourth.
 
 ## Stability
 
-Until 1.0, expect breaking changes between minor versions. The golden-file
-tests in `pelican-test-golden` exist so that a break in *your* API is loud;
-they say nothing about breaks in Pelican's own. Pin an exact version.
+From 1.0, the public API of the shipped modules is stable and a breaking change
+waits for a major release. Two artefacts say what that covers, and both are
+checked on every build: the `.api` dump beside each module is the binary
+contract, and `StillCompilesTest` is the contract for the reified inline half of
+the DSL — `json<T>()`, `pathParam<T>()`, `errorJson<T>()` — which a bytecode
+dump cannot see.
+
+Outside it: anything `internal`, the emitted document's byte-for-byte shape, and
+the modules on the `multi-backend` branch, which are not covered until they
+return to `main`. The golden-file tests in `pelican-test-golden` exist so that a
+break in *your* API is loud; they still say nothing about breaks in Pelican's
+own, which are recorded in the changelog.

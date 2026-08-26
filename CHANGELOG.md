@@ -3,16 +3,32 @@
 Notable changes, newest first, in the format of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-**Before 1.0, expect breaking changes between minor versions.** Pin an exact
-version. The golden-file tests in `pelican-test-golden` make a break in *your*
-contract loud; they say nothing about breaks in Pelican's own, and this file is
-the only place those are recorded.
+**From 1.0, the public API of the shipped modules is stable, and a breaking
+change waits for a major release.** Two artefacts in this repository say what
+that covers, and they are checked on every build rather than promised here:
 
-A version is cut by tagging — `git tag v0.2.0 && git push --tags`. The build
+- **The `.api` dump beside each module** is the binary contract. `apiCheck`
+  fails when a published signature changes, so a break cannot reach a release
+  without someone editing the dump in the same commit and saying why.
+- **`StillCompilesTest`** is the contract for the half of the DSL a dump cannot
+  see. `json<T>()`, `pathParam<T>()`, `errorJson<T>()` and the rest are reified
+  inline functions, so a caller compiles against source; the suite compiles
+  pinned call sites against the published modules and fails when one stops
+  compiling.
+
+What is *not* covered: anything `internal`, the emitted OpenAPI document's
+byte-for-byte shape (`pelican-test-golden` is how you pin the part your callers
+hold), and the modules on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch, which are outside the promise until they return to `main`.
+
+Breaks are still recorded here, and this file is the only place they are.
+
+A version is cut by tagging — `git tag v1.0.0 && git push --tags`. The build
 reads the nearest `v` tag, so an untagged commit is a `-SNAPSHOT` of the next
 one.
 
-## [Unreleased]
+## [1.0.0] — Unreleased
 
 ### Removed — read this one first
 
@@ -38,8 +54,23 @@ one.
   live socket. The entries below that describe an http4k or Ktor module still
   describe it accurately — on that branch.
 
+- **Three static fields nothing was meant to read.**
+  `PekkoHttpTransport.CONTENT_TYPE`, `PekkoHttpTransport.CONTENT_LENGTH` and
+  `RouteIndex.INITIAL_CAPTURES` are gone from the dumps. A `const val` in a
+  *private* companion is still a public static field on the class, so two
+  header spellings and a list-sizing hint were about to be frozen as contract.
+  No Kotlin caller could have named them.
+
 ### Changed — read this one
 
+- **`FallibleOutput` is `DeclaredResponses`.** The type names what an endpoint
+  declared, and `Fallible` named only the half of it that can go wrong. The
+  file holding it is `Outcomes.kt`, so the top-level `ok`, `of`, `or` and
+  `orFail` move from `FallibleKt` to `OutcomesKt` for a Java caller;
+  `pelican-test`'s two `@JvmName`s follow, `callFallible` and `collectFallible`
+  becoming `callOutcome` and `collectOutcome`. `Outcome`, `or`, `orFail` and
+  `errorJson` keep the names they had, so Kotlin source that names none of the
+  three moved names is unaffected.
 - **`spi.renderError` takes the `Api`, not a boolean.**
   `renderError(t, api.exposeInternalErrors)` becomes
   `renderError(t, api, endpoint)`, and the `RenderedError` it returns carries
@@ -101,6 +132,36 @@ one.
   and the interfaces that had them already emitted real JVM default methods.
   Kotlin callers see no difference; a Java class that implemented `JsonValue`,
   `PlainCodec` or `SecurityScheme` by calling `DefaultImpls` is the one break.
+- **Ktor dispatches through `RouteIndex`**, as the other two backends already
+  did, rather than installing one Ktor route per endpoint. Decoding, precedence
+  and the trailing-slash rule are one answer on all three. Where a request lands
+  is still Ktor's: a constant segment scores above the tailcard these routes
+  install, so routes written by hand beside them keep the paths they describe.
+- **All three codecs now leave a null property out.** The flag that lets
+  kotlinx.serialization read an absent nullable property governs writing too, so
+  `defaultMapper()` moved to Jackson's `NON_NULL` and jsoniter's encoder skips a
+  null property, rather than one library writing `"detail": null` and another
+  omitting it. The schema already marks a nullable property optional and all
+  three read an absent one back as null, so this is one spelling of a fact that
+  had two. A null *inside* a list or a map is unaffected — it is a value there,
+  and all three still write it. A response body carrying nullable fields is
+  shorter and no longer carries their names; pass your own mapper or `Json` to
+  write them back.
+- **A streamed call no longer inherits the client's deadline.** `ndjson`, `sse`,
+  `jsonArray` and `bytes` calls are built with no timeout, because the three
+  transports do not bound the same thing: Ktor's request timeout ends the whole
+  exchange and the other two are done when the response head arrives, so one
+  client's SSE subscription died at 30 seconds on one transport and ran on the
+  other two. Everything read whole is bounded as before. Regenerate to pick it
+  up. `docs/generated-client.md` now has the per-transport table, and the
+  bearer-token recipe that was missing beside it.
+- **A generated client refuses a body it cannot read, naming the call.** A
+  declared status arriving with something the codec cannot decode — a proxy's
+  HTML 404, a gateway's plain-text 502 — used to let a bare Jackson or kotlinx
+  exception escape with no status, path or body attached. It is now an
+  `ApiCallFailed` like any undeclared status, carrying the status, the method,
+  the path template, the body capped at 8 KiB with a marker where it was cut,
+  and the codec's failure as its `cause`. Regenerate to pick it up.
 
 ### Fixed
 
@@ -377,39 +438,6 @@ one.
   streamed response that is not a `Sequence` are refused by name, because the
   values behind those belong to a backend rather than to core.
 
-### Changed
-
-- **Ktor dispatches through `RouteIndex`**, as the other two backends already
-  did, rather than installing one Ktor route per endpoint. Decoding, precedence
-  and the trailing-slash rule are one answer on all three. Where a request lands
-  is still Ktor's: a constant segment scores above the tailcard these routes
-  install, so routes written by hand beside them keep the paths they describe.
-- **All three codecs now leave a null property out.** The flag that lets
-  kotlinx.serialization read an absent nullable property governs writing too, so
-  `defaultMapper()` moved to Jackson's `NON_NULL` and jsoniter's encoder skips a
-  null property, rather than one library writing `"detail": null` and another
-  omitting it. The schema already marks a nullable property optional and all
-  three read an absent one back as null, so this is one spelling of a fact that
-  had two. A null *inside* a list or a map is unaffected — it is a value there,
-  and all three still write it. A response body carrying nullable fields is
-  shorter and no longer carries their names; pass your own mapper or `Json` to
-  write them back.
-- **A streamed call no longer inherits the client's deadline.** `ndjson`, `sse`,
-  `jsonArray` and `bytes` calls are built with no timeout, because the three
-  transports do not bound the same thing: Ktor's request timeout ends the whole
-  exchange and the other two are done when the response head arrives, so one
-  client's SSE subscription died at 30 seconds on one transport and ran on the
-  other two. Everything read whole is bounded as before. Regenerate to pick it
-  up. `docs/generated-client.md` now has the per-transport table, and the
-  bearer-token recipe that was missing beside it.
-- **A generated client refuses a body it cannot read, naming the call.** A
-  declared status arriving with something the codec cannot decode — a proxy's
-  HTML 404, a gateway's plain-text 502 — used to let a bare Jackson or kotlinx
-  exception escape with no status, path or body attached. It is now an
-  `ApiCallFailed` like any undeclared status, carrying the status, the method,
-  the path template, the body capped at 8 KiB with a marker where it was cut,
-  and the codec's failure as its `cause`. Regenerate to pick it up.
-
 ## [0.2.0]
 
 Ninety-seven commits since 0.1.0. One breaking change, named below.
@@ -510,5 +538,6 @@ First published release, on Maven Central.
 - **`pelican-test`** — the descriptions interpreted a third way, as a typed
   client, with `shouldBuild` for pinning the URL a caller holds.
 
-[Unreleased]: https://github.com/matthewjones372/pelican/compare/v0.1.0...HEAD
+[1.0.0]: https://github.com/matthewjones372/pelican/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/matthewjones372/pelican/releases/tag/v0.2.0
 [0.1.0]: https://github.com/matthewjones372/pelican/releases/tag/v0.1.0
