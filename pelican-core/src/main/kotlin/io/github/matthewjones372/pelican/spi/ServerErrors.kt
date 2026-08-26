@@ -67,7 +67,7 @@ fun renderError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): Re
             if (t is ApiException) t.headers else emptyList(),
             unexpected = null,
             reference = null,
-            body = renderer.render(described.refusal(reference = null, pathTemplate = template)),
+            body = renderer.bodyFor(described.refusal(reference = null, pathTemplate = template)),
         )
     }
 
@@ -82,13 +82,19 @@ fun renderError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): Re
         emptyList(),
         unexpected = t,
         reference = reference,
-        body = renderer.render(error.refusal(reference, template)),
+        body = renderer.bodyFor(error.refusal(reference, template)),
     )
 }
 
 /** The classification, and only the classification, as a renderer is allowed to see it. */
 private fun ApiError.refusal(reference: String?, pathTemplate: String?): Refusal =
     Refusal(status, error, detail, reference, pathTemplate)
+
+/**
+ * The bytes under the media type the same renderer publishes, so a response
+ * cannot be labelled with one thing and documented as another.
+ */
+private fun RefusalRenderer.bodyFor(refusal: Refusal): RefusalBody = RefusalBody(mediaType, render(refusal))
 
 /**
  * The status a throwable becomes, without building the body that would go with

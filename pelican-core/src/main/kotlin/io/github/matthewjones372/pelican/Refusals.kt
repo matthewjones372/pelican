@@ -32,9 +32,31 @@ class RefusalBody(val mediaType: String, val bytes: ByteArray)
  * One of these per service rather than one per backend: the three interpreters
  * render every refusal through the configured value, which is what stops them
  * answering the same condition three ways.
+ *
+ * A renderer describes itself as well as writing bytes, and the document reads
+ * [mediaType] and [schema] from the same value the wire is written by. Two
+ * members rather than one, because a renderer whose document had to be written
+ * separately is a renderer whose document goes stale.
  */
-fun interface RefusalRenderer {
-    fun render(refusal: Refusal): RefusalBody
+interface RefusalRenderer {
+    /** What a refusal this writes is labelled with, on the wire and in the document. */
+    val mediaType: String
+
+    /**
+     * What the document calls the schema below.
+     *
+     * A component rather than a schema inlined per operation, because every
+     * operation refuses in the same envelope and a document repeating it is a
+     * document a reader — or an importer — turns into one type per operation.
+     * The name is the envelope's own: a service already describing that type
+     * keeps its description, since it is the same shape being described twice.
+     */
+    val componentName: String
+
+    /** The schema of the body it writes, as a document publishes it. */
+    val schema: JsonObj
+
+    fun render(refusal: Refusal): ByteArray
 }
 
 /**
@@ -42,10 +64,24 @@ fun interface RefusalRenderer {
  * was a choice, and what it still refuses with unless a service says otherwise.
  */
 object ApiErrorEnvelope : RefusalRenderer {
-    override fun render(refusal: Refusal): RefusalBody = RefusalBody(
-        "application/json",
-        ApiError(refusal.status, refusal.reason, refusal.detail).toJson().render().utf8(),
+    override val mediaType: String = "application/json"
+
+    /** [ApiError] itself — the type a service already writes as `errorJson<ApiError>`. */
+    override val componentName: String = "ApiError"
+
+    // `required` is alphabetical because that is the order a codec describing
+    // the class itself writes, and a service declaring `errorJson<ApiError>`
+    // publishes that description under this same component name.
+    // `RefusalEnvelopeSchemaTest` holds the two together.
+    override val schema: JsonObj = objectSchema(
+        required = listOf("error", "status"),
+        "status" to integer,
+        "error" to string,
+        "detail" to nullableString,
     )
+
+    override fun render(refusal: Refusal): ByteArray =
+        ApiError(refusal.status, refusal.reason, refusal.detail).toJson().render().utf8()
 }
 
 /**
@@ -60,16 +96,46 @@ object ApiErrorEnvelope : RefusalRenderer {
  * sees the request, so what it can say is which route refused.
  */
 object ProblemDetails : RefusalRenderer {
-    override fun render(refusal: Refusal): RefusalBody = RefusalBody(
-        "application/problem+json",
-        jsonObj {
-            "type" to "about:blank"
-            "title" to refusal.reason
-            "status" to refusal.status
-            putIfNotNull("detail", refusal.detail)
-            putIfNotNull("instance", refusal.pathTemplate)
-        }.render().utf8(),
+    override val mediaType: String = "application/problem+json"
+
+    override val componentName: String = "ProblemDetails"
+
+    override val schema: JsonObj = objectSchema(
+        required = listOf("type", "title", "status"),
+        "type" to jsonObj {
+            "type" to "string"
+            "format" to "uri-reference"
+        },
+        "title" to string,
+        "status" to integer,
+        "detail" to string,
+        "instance" to jsonObj {
+            "type" to "string"
+            "format" to "uri-reference"
+        },
     )
+
+    override fun render(refusal: Refusal): ByteArray = jsonObj {
+        "type" to "about:blank"
+        "title" to refusal.reason
+        "status" to refusal.status
+        putIfNotNull("detail", refusal.detail)
+        putIfNotNull("instance", refusal.pathTemplate)
+    }.render().utf8()
 }
 
 private fun String.utf8(): ByteArray = toByteArray(StandardCharsets.UTF_8)
+
+private val string = jsonObj { "type" to "string" }
+private val nullableString = jsonObj { put("type", jsonStrings(listOf("string", "null"))) }
+private val integer = jsonObj {
+    "type" to "integer"
+    "format" to "int32"
+}
+
+/** Written once so the two envelopes below cannot spell an object schema two ways. */
+private fun objectSchema(required: List<String>, vararg properties: Pair<String, JsonObj>): JsonObj = jsonObj {
+    "type" to "object"
+    put("properties", jsonObj { properties.forEach { (name, schema) -> put(name, schema) } })
+    put("required", jsonStrings(required))
+}

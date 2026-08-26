@@ -3204,6 +3204,32 @@ the rendering is not.
 Declared failures are not refusals and are unaffected: `errorJson<E>` already
 carries whatever type the endpoint promised.
 
+#### And what the document says about it
+
+Every operation publishes a `default` response carrying the configured
+envelope. `default` is OpenAPI's word for the answer to the statuses not
+enumerated, which is exactly what a refusal is:
+
+```json
+"default": {
+  "description": "A refusal: this request was not answered by the operation above.",
+  "content": {
+    "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+  }
+}
+```
+
+A `$ref` to one component rather than a schema written out per operation:
+`pelican-import` reads a repeated schema back as one type per operation, and a
+document is read by people too. The component takes the envelope's own name —
+`ApiError` for the default, `ProblemDetails` for RFC 9457 — and a service that
+already describes that type from the type itself keeps its description, because
+the two are the same shape. `RefusalEnvelopeSchemaTest` holds them to that.
+
+An endpoint that declares its own `defaultJson<E>(...)` keeps it: a description
+beats a derivation. Nothing else in the document changes — a declared failure is
+still `application/json` under the status it was declared with.
+
 ## Limits and startup checks
 
 ```kotlin

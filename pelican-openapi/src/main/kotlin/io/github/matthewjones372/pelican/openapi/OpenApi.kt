@@ -43,7 +43,7 @@ fun ApiSpec.openApi(version: OpenApiVersion = OpenApiVersion.V3_1_0): JsonObj {
 
     for (ep in documented) {
         val byMethod = paths.getOrPut(ep.pathSpec.template) { LinkedHashMap() }
-        byMethod[ep.method.name.lowercase()] = operation(ep, version, schemas, components)
+        byMethod[ep.method.name.lowercase()] = operation(ep, version, schemas, components, refusals)
     }
 
     // A webhook says hidden the same way an endpoint does.
@@ -69,7 +69,7 @@ fun ApiSpec.openApi(version: OpenApiVersion = OpenApiVersion.V3_1_0): JsonObj {
         put("paths", JsonObj(paths.mapValues { (_, ops) -> JsonObj(ops.toMap()) }))
         // The order the specification lists the fields in; a document is read
         // by people too.
-        if (sent.isNotEmpty()) put("webhooks", webhookItems(sent, version, schemas, components))
+        if (sent.isNotEmpty()) put("webhooks", webhookItems(sent, version, schemas, components, refusals))
         if (security.isNotEmpty()) put("security", requirements(security))
         put("components", jsonObj {
             put("schemas", components.all())
@@ -116,11 +116,12 @@ private fun webhookItems(
     version: OpenApiVersion,
     schemas: SchemaSource,
     components: SchemaComponents,
+    refusals: RefusalRenderer,
 ): JsonObj {
     val items = LinkedHashMap<String, MutableMap<String, JsonValue>>()
     webhooks.forEach { hook ->
         items.getOrPut(hook.name) { LinkedHashMap() }[hook.operation.method.name.lowercase()] =
-            operation(hook.operation, version, schemas, components)
+            operation(hook.operation, version, schemas, components, refusals)
     }
     return JsonObj(items.mapValues { (_, ops) -> JsonObj(ops.toMap()) })
 }
@@ -206,14 +207,24 @@ private fun requestBody(ep: Endpoint<*, *>, schemas: SchemaSource, components: S
     }
 
 /**
- * One entry per successful response the output describes, and one per declared
- * failure — each with its own schema and media type.
+ * One entry per successful response the output describes, one per declared
+ * failure — each with its own schema and media type — and, where the endpoint
+ * declares no `default` of its own, one for the refusals nothing declares.
+ *
+ * The refusal entry goes under `default` because that is what `default` means:
+ * the answer for the statuses not enumerated above. A refusal is exactly that —
+ * a 400 nothing could decode, a 406, a 413, a 500 — and the envelope it arrives
+ * in is [Api.refusals] rather than anything on the endpoint, so it is written
+ * once here from the same value the interpreters write the bytes from. An
+ * endpoint that declares its own `default` keeps it: a description beats a
+ * derivation.
  */
 private fun responses(
     ep: Endpoint<*, *>,
     version: OpenApiVersion,
     schemas: SchemaSource,
     components: SchemaComponents,
+    refusals: RefusalRenderer,
 ): JsonObj = jsonObj {
     successesOf(ep.output).forEach { out ->
         put(out.status.toString(), jsonObj {
@@ -238,6 +249,29 @@ private fun responses(
                     put("application/json", jsonObj { put("schema", schema) })
                 })
             }
+        })
+    }
+    if (ep.errors.none { it.status == null }) put("default", refusalResponse(refusals, components))
+}
+
+/**
+ * What a request this endpoint refuses comes back as.
+ *
+ * A `$ref` to one component and not a schema repeated per operation: every
+ * operation refuses in the same envelope, and a document that spells it out a
+ * dozen times is a document `pelican-import` reads back as a dozen types. The
+ * component keeps whatever definition it already has — under the default
+ * envelope that is `ApiError`, which a service describing `errorJson<ApiError>`
+ * has already published from the type itself.
+ */
+private fun refusalResponse(refusals: RefusalRenderer, components: SchemaComponents): JsonObj {
+    if (!components.isRegistered(refusals.componentName)) {
+        components.register(refusals.componentName, refusals.schema)
+    }
+    return jsonObj {
+        "description" to "A refusal: this request was not answered by the operation above."
+        put("content", jsonObj {
+            put(refusals.mediaType, jsonObj { put("schema", components.ref(refusals.componentName)) })
         })
     }
 }
@@ -363,6 +397,7 @@ private fun operation(
     version: OpenApiVersion,
     schemas: SchemaSource,
     components: SchemaComponents,
+    refusals: RefusalRenderer,
 ): JsonObj = jsonObj {
     putIfNotNull("summary", ep.summary)
     putIfNotNull("description", ep.description)
@@ -383,7 +418,7 @@ private fun operation(
 
     requestBody(ep, schemas, components)?.let { put("requestBody", it) }
 
-    put("responses", responses(ep, version, schemas, components))
+    put("responses", responses(ep, version, schemas, components, refusals))
 }
 
 /**

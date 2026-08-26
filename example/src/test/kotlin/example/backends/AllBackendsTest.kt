@@ -536,7 +536,9 @@ class AllBackendsTest {
             .jsonObject["paths"]!!.jsonObject["/greetings/{name}"]!!
             .jsonObject["put"]!!.jsonObject["responses"]!!.jsonObject
 
-        responses.keys shouldBe setOf("201", "200")
+        // `default` is the refusal envelope, which every operation answers with
+        // and none declares. See `RefusalDocumentTest`.
+        responses.keys shouldBe setOf("201", "200", "default")
         responses["201"]!!.jsonObject["headers"]!!.jsonObject.keys shouldBe setOf("X-Request-Id", "Location")
         responses["200"]!!.jsonObject["headers"]!!.jsonObject.keys shouldBe setOf("X-Request-Id")
         responses["200"]!!.jsonObject["content"]!!.jsonObject.keys shouldBe setOf("application/json")

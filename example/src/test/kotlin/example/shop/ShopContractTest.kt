@@ -185,7 +185,9 @@ class ShopContractTest {
             .jsonObject["paths"]!!.jsonObject["/orders"]!!
             .jsonObject["post"]!!.jsonObject["responses"]!!.jsonObject
 
-        responses.keys shouldContainExactly setOf("201", "400", "404", "422")
+        // `default` is not a fourth failure: it is the refusal envelope, which
+        // this operation answers with and does not declare.
+        responses.keys shouldContainExactly setOf("201", "400", "404", "422", "default")
 
         // Three statuses is only half of it: they carry different payloads too,
         // so a caller can read which book was missing or which address was

@@ -130,6 +130,13 @@ one.
   untouched — `errorJson<E>` already carries whatever type was promised — and
   an MCP tool call is unaffected, because JSON-RPC's envelope is the protocol's
   and not the service's.
+- **The document says what a refusal comes back as.** Every operation now
+  publishes a `default` response — OpenAPI's word for the statuses not
+  enumerated, which is what a refusal is — pointing at one component carrying
+  the configured envelope's schema. New emission: the document said nothing
+  about refusals before, so every golden gains one response per operation and
+  one `ApiError` component. An endpoint declaring its own `defaultJson<E>(...)`
+  keeps it.
 - **An event stream that says where a caller left off.**
   `sse<T>(id = { it.sequence.toString() }, retry = 15.seconds)` puts an `id:`
   on every frame and opens the stream with a `retry:` directive of its own —

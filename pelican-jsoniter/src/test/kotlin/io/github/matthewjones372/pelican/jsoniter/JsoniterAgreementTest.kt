@@ -119,7 +119,10 @@ class JsoniterAgreementTest {
         listOf(JacksonCodecs, JsoniterCodecs).forEach { source ->
             val schemas = documentWith(source)["components"].asObj()["schemas"].asObj()
             withClue("$source did not describe the expected models") {
-                schemas.fields.keys shouldBe setOf("Order", "Line", "Address", "Category", "CreateOrder", "Failure")
+                // `ApiError` is the refusal envelope, published by core rather than by either
+                // source — which is why both documents carry it and neither describes it.
+                schemas.fields.keys shouldBe
+                    setOf("Order", "Line", "Address", "Category", "CreateOrder", "Failure", "ApiError")
             }
             val order = schemas["Order"].asObj()
             order["properties"].asObj().fields.keys.toList() shouldBe listOf(

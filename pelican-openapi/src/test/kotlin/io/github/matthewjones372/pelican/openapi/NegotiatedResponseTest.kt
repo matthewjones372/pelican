@@ -37,7 +37,7 @@ class NegotiatedResponseTest {
 
     @Test
     fun `one status, with one entry per rendering in declaration order`() {
-        responses.keys().toList() shouldBe listOf("200", "404")
+        responses.keys().toList() shouldBe listOf("200", "404", "default")
         (responses / "200" / "content").keys().toList() shouldBe listOf("application/json", "text/csv")
     }
 

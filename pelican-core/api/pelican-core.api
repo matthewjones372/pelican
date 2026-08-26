@@ -70,7 +70,10 @@ public final class io/github/matthewjones372/pelican/ApiError {
 
 public final class io/github/matthewjones372/pelican/ApiErrorEnvelope : io/github/matthewjones372/pelican/RefusalRenderer {
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/ApiErrorEnvelope;
-	public fun render (Lio/github/matthewjones372/pelican/Refusal;)Lio/github/matthewjones372/pelican/RefusalBody;
+	public fun getComponentName ()Ljava/lang/String;
+	public fun getMediaType ()Ljava/lang/String;
+	public fun getSchema ()Lio/github/matthewjones372/pelican/JsonObj;
+	public fun render (Lio/github/matthewjones372/pelican/Refusal;)[B
 }
 
 public final class io/github/matthewjones372/pelican/ApiException : java/lang/RuntimeException {
@@ -1159,7 +1162,10 @@ public abstract interface class io/github/matthewjones372/pelican/PlainCodec {
 
 public final class io/github/matthewjones372/pelican/ProblemDetails : io/github/matthewjones372/pelican/RefusalRenderer {
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/ProblemDetails;
-	public fun render (Lio/github/matthewjones372/pelican/Refusal;)Lio/github/matthewjones372/pelican/RefusalBody;
+	public fun getComponentName ()Ljava/lang/String;
+	public fun getMediaType ()Ljava/lang/String;
+	public fun getSchema ()Lio/github/matthewjones372/pelican/JsonObj;
+	public fun render (Lio/github/matthewjones372/pelican/Refusal;)[B
 }
 
 public final class io/github/matthewjones372/pelican/QueryParam : io/github/matthewjones372/pelican/ParamKey {
@@ -1217,7 +1223,10 @@ public final class io/github/matthewjones372/pelican/RefusalBody {
 }
 
 public abstract interface class io/github/matthewjones372/pelican/RefusalRenderer {
-	public abstract fun render (Lio/github/matthewjones372/pelican/Refusal;)Lio/github/matthewjones372/pelican/RefusalBody;
+	public abstract fun getComponentName ()Ljava/lang/String;
+	public abstract fun getMediaType ()Ljava/lang/String;
+	public abstract fun getSchema ()Lio/github/matthewjones372/pelican/JsonObj;
+	public abstract fun render (Lio/github/matthewjones372/pelican/Refusal;)[B
 }
 
 public final class io/github/matthewjones372/pelican/ResponseHeader {

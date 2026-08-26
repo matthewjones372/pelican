@@ -62,7 +62,8 @@ class SeveralResponsesTest {
 
     @Test
     fun `both successes are published, in the order they were declared`() {
-        submitted.keys().toList() shouldBe listOf("201", "202", "401")
+        // `default` last: the refusals nothing declares, after everything that is.
+        submitted.keys().toList() shouldBe listOf("201", "202", "401", "default")
     }
 
     @Test
