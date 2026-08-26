@@ -29,6 +29,7 @@ public final class io/github/matthewjones372/pelican/http4k/PelicanServer : java
 	public final fun getPort ()I
 	public final fun getServer ()Lorg/http4k/server/Http4kServer;
 	public final fun stop ()V
+	public final fun stopAsync ()Ljava/util/concurrent/CompletionStage;
 }
 
 public final class io/github/matthewjones372/pelican/http4k/ServerKt {

@@ -25,6 +25,7 @@ public final class io/github/matthewjones372/pelican/ktor/PelicanServer : java/l
 	public final fun getPort ()I
 	public final fun getServer ()Lio/ktor/server/engine/EmbeddedServer;
 	public final fun stop ()V
+	public final fun stopAsync ()Ljava/util/concurrent/CompletionStage;
 }
 
 public final class io/github/matthewjones372/pelican/ktor/ServerKt {

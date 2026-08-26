@@ -185,8 +185,8 @@ fun main(args: Array<String>) {
     val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT
     val server = bookmarksApi().startWithDocs(port = port, docs = bookmarksDocs)
     println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
-    Runtime.getRuntime().addShutdownHook(Thread { server.stop().toCompletableFuture().join() })
-    Thread.currentThread().join()
+    Runtime.getRuntime().addShutdownHook(Thread { server.stop() })
+    server.block()
 }
 
 // ======================================================= 6. the docs, alone

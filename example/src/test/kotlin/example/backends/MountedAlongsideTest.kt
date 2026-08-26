@@ -68,7 +68,7 @@ class MountedAlongsideTest {
         try {
             bothAnswer(server.baseUrl)
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 

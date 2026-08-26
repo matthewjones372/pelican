@@ -42,7 +42,7 @@ class BareOkTest {
         try {
             asking(server.baseUrl).shouldBeRefused()
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 

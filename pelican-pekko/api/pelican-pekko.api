@@ -20,7 +20,9 @@ public final class io/github/matthewjones372/pelican/pekko/InterpreterKt {
 	public static final fun toRoute (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/ClassicActorSystemProvider;)Lorg/apache/pekko/http/javadsl/server/Route;
 }
 
-public final class io/github/matthewjones372/pelican/pekko/PelicanServer {
+public final class io/github/matthewjones372/pelican/pekko/PelicanServer : java/lang/AutoCloseable {
+	public final fun block ()V
+	public fun close ()V
 	public final fun getApi ()Lio/github/matthewjones372/pelican/Api;
 	public final fun getBaseUrl ()Ljava/lang/String;
 	public final fun getBinding ()Lorg/apache/pekko/http/javadsl/ServerBinding;
@@ -28,7 +30,8 @@ public final class io/github/matthewjones372/pelican/pekko/PelicanServer {
 	public final fun getOwnsSystem ()Z
 	public final fun getPort ()I
 	public final fun getSystem ()Lorg/apache/pekko/actor/typed/ActorSystem;
-	public final fun stop ()Ljava/util/concurrent/CompletionStage;
+	public final fun stop ()V
+	public final fun stopAsync ()Ljava/util/concurrent/CompletionStage;
 }
 
 public final class io/github/matthewjones372/pelican/pekko/ServerKt {

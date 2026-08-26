@@ -315,6 +315,6 @@ class OverHttpBookmarksTest : BookmarksContractTest() {
 
     override fun shutDown() {
         app.close()
-        server.stop().toCompletableFuture().join()
+        server.stop()
     }
 }

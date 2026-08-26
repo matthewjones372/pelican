@@ -630,9 +630,14 @@ mapping.
 ## Running a server
 
 ```kotlin
-ordersApi().start(port = 8080)                                  // endpoints only
+ordersApi().start(port = 8080)                                  // endpoints only, on 127.0.0.1
+ordersApi().start(port = 8080, host = "0.0.0.0")                // every interface, said out loud
 ordersApi().startWithDocs(port = 8080, docs = ordersDocs)       // plus /openapi.json and /docs
 ```
+
+The same call on all three backends, loopback by default on all three, and the
+handle it returns is `AutoCloseable` with `block()`, `stop()` and `stopAsync()`
+wherever you are.
 
 Both create an `ActorSystem` and shut it down again on `stop()`. A service that
 already has one — for its cluster, its persistence, its streams — hands it over

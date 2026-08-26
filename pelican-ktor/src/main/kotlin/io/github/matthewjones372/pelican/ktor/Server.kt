@@ -9,6 +9,8 @@ import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 
 /** A bound server, and the handle to shut it down again. */
 class PelicanServer internal constructor(
@@ -30,6 +32,9 @@ class PelicanServer internal constructor(
     fun stop() {
         server.stop(gracePeriodMillis = 0, timeoutMillis = 1_000)
     }
+
+    /** [stop] off the calling thread: the shape Pekko needs, spelled the same here. */
+    fun stopAsync(): CompletionStage<Unit> = CompletableFuture.supplyAsync { stop() }
 
     /** Parks the calling thread until the server is stopped — what a `main` wants. */
     fun block() {

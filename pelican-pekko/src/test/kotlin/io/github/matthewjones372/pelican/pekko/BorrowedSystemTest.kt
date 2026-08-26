@@ -67,14 +67,14 @@ class BorrowedSystemTest {
             server.ownsSystem shouldBe false
             get("${server.baseUrl}/hello").body() shouldBe "hello"
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 
     @Test
     fun `stopping a server does not terminate a system it borrowed`() {
         val server = api.start(system, port = 0)
-        server.stop().toCompletableFuture().join()
+        server.stop()
 
         // `stop` has completed, so if it were going to take the system with it
         // the system would be down by now rather than on its way.
@@ -85,7 +85,7 @@ class BorrowedSystemTest {
         try {
             get("${second.baseUrl}/hello").body() shouldBe "hello"
         } finally {
-            second.stop().toCompletableFuture().join()
+            second.stop()
         }
     }
 
@@ -93,7 +93,7 @@ class BorrowedSystemTest {
     fun `the port is unbound even though the system lives on`() {
         val server = api.start(system, port = 0)
         val url = "${server.baseUrl}/hello"
-        server.stop().toCompletableFuture().join()
+        server.stop()
 
         val refused = runCatching { get(url) }.exceptionOrNull()
 
@@ -109,7 +109,7 @@ class BorrowedSystemTest {
         val its = server.system
 
         server.ownsSystem shouldBe true
-        server.stop().toCompletableFuture().join()
+        server.stop()
 
         its.whenTerminated.toCompletableFuture().isDone shouldBe true
     }

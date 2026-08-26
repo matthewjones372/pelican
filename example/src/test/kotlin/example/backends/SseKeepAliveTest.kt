@@ -86,7 +86,7 @@ class SseKeepAliveTest {
         try {
             body(server.baseUrl).shouldCarryKeepAlives()
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 

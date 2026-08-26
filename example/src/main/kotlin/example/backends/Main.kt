@@ -69,10 +69,10 @@ fun main(args: Array<String>) {
         Thread {
             ktor.stop()
             http4k.stop()
-            pekko.stop().toCompletableFuture().join()
+            pekko.stop()
         },
     )
-    Thread.currentThread().join()
+    pekko.block()
 }
 
 /** What every example binds to unless told otherwise; `--args=8081` moves it. */

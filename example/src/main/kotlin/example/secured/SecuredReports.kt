@@ -407,8 +407,8 @@ fun main(args: Array<String>) {
         |Ctrl-C to stop.
         """.trimMargin(),
     )
-    Runtime.getRuntime().addShutdownHook(Thread { server.stop().toCompletableFuture().join() })
-    Thread.currentThread().join()
+    Runtime.getRuntime().addShutdownHook(Thread { server.stop() })
+    server.block()
 }
 
 // ======================================================== 8. the docs, alone

@@ -11,9 +11,10 @@ import io.github.matthewjones372.pelican.Filter
  * This is the seam that makes one test suite run against three interpreters.
  * The descriptions in `Greetings.kt` are already backend-agnostic; what is not
  * agnostic is the *binding* — `Source` on Pekko, `Sequence` on http4k, `Flow`
- * on Ktor — and the shape of a server handle: Pekko's `stop()` returns a
- * `CompletionStage`, the other two return nothing. Both differences live behind
- * this interface, and nowhere else in the example.
+ * on Ktor — and that difference lives behind this interface and nowhere else in
+ * the example. The server handle is no longer one of them: all three are
+ * `AutoCloseable` with the same `block`, `stop` and `stopAsync`, which
+ * `ServerShapeParityTest` holds.
  */
 interface Backend {
     /** What the parameterised tests print, and what `Main` labels a server with. */

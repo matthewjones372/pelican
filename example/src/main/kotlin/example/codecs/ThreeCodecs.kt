@@ -145,12 +145,12 @@ fun main(args: Array<String>) {
 
     Runtime.getRuntime().addShutdownHook(
         Thread {
-            jsoniter.stop().toCompletableFuture().join()
-            kotlinx.stop().toCompletableFuture().join()
-            jackson.stop().toCompletableFuture().join()
+            jsoniter.stop()
+            kotlinx.stop()
+            jackson.stop()
         },
     )
-    Thread.currentThread().join()
+    jackson.block()
 }
 
 /** What every example binds to unless told otherwise; `--args=8081` moves it. */

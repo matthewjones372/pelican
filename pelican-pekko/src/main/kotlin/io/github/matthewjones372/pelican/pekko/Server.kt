@@ -8,6 +8,7 @@ import org.apache.pekko.http.javadsl.ServerBinding
 import org.apache.pekko.http.javadsl.server.Route
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.CountDownLatch
 
 /** A bound server, and the handle to shut it down again. */
 class PelicanServer internal constructor(
@@ -22,16 +23,23 @@ class PelicanServer internal constructor(
      * a system this server created is a system this server may terminate.
      */
     val ownsSystem: Boolean = true,
-) {
+) : AutoCloseable {
+    private val stopped = CountDownLatch(1)
+
     val port: Int get() = binding.localAddress().port
     val baseUrl: String get() = "http://127.0.0.1:$port"
+
+    /** [stopAsync], waited on: the blocking spelling all three backends share. */
+    fun stop() {
+        stopAsync().toCompletableFuture().join()
+    }
 
     /**
      * Unbinds the port, and terminates the actor system if this server started
      * it. The stage completes once the system has actually terminated, so a
      * test joining on it does not return with threads still up.
      */
-    fun stop(): CompletionStage<Void> =
+    fun stopAsync(): CompletionStage<Unit> =
         binding.unbind()
             .thenCompose {
                 if (!ownsSystem) {
@@ -41,7 +49,18 @@ class PelicanServer internal constructor(
                     system.getWhenTerminated()
                 }
             }
-            .thenApply { null }
+            .thenApply { stopped.countDown() }
+
+    /**
+     * Parks the calling thread until [stop] — what a `main` wants. A latch
+     * rather than `getWhenTerminated`, because a server on a borrowed system
+     * never terminates one and would park for the life of the process.
+     */
+    fun block() {
+        stopped.await()
+    }
+
+    override fun close() = stop()
 }
 
 /**

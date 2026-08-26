@@ -22,8 +22,8 @@ fun main(args: Array<String>) {
         |Ctrl-C to stop.
         """.trimMargin(),
     )
-    Runtime.getRuntime().addShutdownHook(Thread { server.stop().toCompletableFuture().join() })
-    Thread.currentThread().join()
+    Runtime.getRuntime().addShutdownHook(Thread { server.stop() })
+    server.block()
 }
 
 /** What every example binds to unless told otherwise; `--args=8081` moves it. */

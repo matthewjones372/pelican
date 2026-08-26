@@ -68,7 +68,7 @@ class RetryingClientTest {
 
     @AfterAll
     fun tearDown() {
-        server.stop().toCompletableFuture().join()
+        server.stop()
     }
 
     private fun clientWith(policy: RetryPolicy) = OrdersClient(server.baseUrl, codecs, counting.retrying(policy))

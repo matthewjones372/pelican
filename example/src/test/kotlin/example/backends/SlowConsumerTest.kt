@@ -89,7 +89,7 @@ class SlowConsumerTest {
             readOneFrameThenVanish(server.baseUrl)
             closed.shouldFireWithinTheTimeout("the source")
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 

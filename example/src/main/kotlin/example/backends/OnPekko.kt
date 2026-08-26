@@ -82,7 +82,7 @@ object OnPekko : Backend {
         return object : Running {
             override val baseUrl = server.baseUrl
             override fun stop() {
-                server.stop().toCompletableFuture().join()
+                server.stop()
             }
         }
     }

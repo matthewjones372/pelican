@@ -153,23 +153,24 @@ every wiring generates the same OpenAPI document, byte for byte.
 
 The three bindings sit behind a deliberately thin `Backend` interface — `api()`,
 `start(port)`, `stop()` — which is what lets one parameterised suite run against
-all of them. It hides exactly two things: the stream type each binder demands,
-and the shape of a server handle (Pekko's `stop()` returns a `CompletionStage`,
-the other two return nothing). Anything more would start hiding the differences
-the example exists to show, which is why `MethodMismatchTest` still reaches for
-each backend's own module directly.
+all of them. It hides exactly one thing: the stream type each binder demands.
+Anything more would start hiding the differences the example exists to show,
+which is why `MethodMismatchTest` still reaches for each backend's own module
+directly.
 
 At scale, `example/OrdersApi.kt` and `example/http4k/Http4kOrders.kt` bind the
 same endpoint list on either backend, and `ClientContractTest` — written entirely
 against descriptions — runs against both, so any divergence is a failing test.
 
-### Starting one
+### Starting and stopping one
 
-`start` reads the same way on all three:
+`start` reads the same way on all three, and so does the handle it returns:
 
 ```kotlin
 val server = ordersApi().start(port = 8080)                    // binds 127.0.0.1
 val server = ordersApi().start(port = 8080, host = "0.0.0.0")  // every interface, said out loud
+
+server.use { it.block() }        // AutoCloseable everywhere; block() returns when stop() does
 ```
 
 **Loopback is the default everywhere.** Reaching the network is a deployment
@@ -182,6 +183,28 @@ than a service. `host` is the second parameter, after `port`, on `start` and on
 *asked for*: the socket belongs to the `ServerConfig`, and a `config` of your
 own binds where it says. `StartParityTest` pins both the parameter order and
 the default.
+
+The handle is the same five members on every backend:
+
+| | what it does |
+|---|---|
+| `port`, `baseUrl`, `host` | where it is answering |
+| `stop()` | stops, and returns when it has |
+| `stopAsync()` | the same as a `CompletionStage<Unit>` |
+| `block()` | parks the calling thread until `stop()` — what a `main` wants |
+| `close()` | `stop()`, so `use { }` works |
+
+`stop()` used to return a `CompletionStage` on Pekko and nothing on the other
+two, so a shutdown written against one backend did not compile against the
+next. It returns nothing everywhere now; `stopAsync()` is the stage, and on
+Pekko it is still the one that completes only once the actor system has
+actually terminated.
+
+`block()` means the same thing on all three: released by `stop()`, not by the
+process ending. On Pekko and http4k that is a latch — Pekko's system may be a
+borrowed one that never terminates, and http4k's own `Http4kServer.block()` is
+`Thread.currentThread().join()`, which stopping the server does not release.
+`ServerShapeParityTest` runs the same `use { }` block against all three.
 
 ### What the request line says
 

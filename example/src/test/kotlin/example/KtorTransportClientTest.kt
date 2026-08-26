@@ -59,7 +59,7 @@ class KtorTransportClientTest {
     @AfterAll
     fun tearDown() {
         http.close()
-        server.stop().toCompletableFuture().join()
+        server.stop()
     }
 
     @Test

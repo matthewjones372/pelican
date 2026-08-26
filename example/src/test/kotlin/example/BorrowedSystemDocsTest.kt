@@ -55,7 +55,7 @@ class BorrowedSystemDocsTest {
 
             get("${server.baseUrl}/api-docs").statusCode() shouldBe 200
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
 
         system.whenTerminated.toCompletableFuture().isDone shouldBe false

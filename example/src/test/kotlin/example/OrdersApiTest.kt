@@ -55,7 +55,7 @@ class OrdersApiTest {
         @AfterAll
         @JvmStatic
         fun shutdown() {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 
@@ -462,7 +462,7 @@ class SwaggerUiOAuthTest {
         try {
             block(server.baseUrl)
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 
@@ -526,7 +526,7 @@ class SwaggerUiTest {
         try {
             block(server.baseUrl)
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 
@@ -585,7 +585,7 @@ class SwaggerUiTest {
             body shouldNotContain "</script><script>alert"
             withClue(body.substringAfter("spec: ").take(400)) { body shouldContain "<\\/script>" }
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 }
@@ -615,7 +615,7 @@ class RouteSpecificityTest {
             )
             del.statusCode() shouldBe 204
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 }
@@ -633,7 +633,7 @@ class TypedInputsTest {
             res.statusCode() shouldBe 200
             res.body().trim().lines().size shouldBe 3
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 
@@ -717,7 +717,7 @@ class WrapperCodecTest {
             res.statusCode() shouldBe 200
             Json.parseToJsonElement(res.body()).jsonObject["id"]!!.jsonPrimitive.int shouldBe 77
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
 
         val schema = Json.parseToJsonElement(

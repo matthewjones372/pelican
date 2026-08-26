@@ -47,7 +47,7 @@ class SecuredReportsTest {
         @AfterAll
         @JvmStatic
         fun shutdown() {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 

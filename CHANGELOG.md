@@ -46,6 +46,14 @@ one.
   http4k, which had no host parameter and bound every interface through the
   JDK's server, changes the same way. `PelicanServer.host` reports what was
   bound.
+- **One server handle on all three backends.** Pekko's `PelicanServer` gains
+  `AutoCloseable`, `block()` and a `stop()` returning nothing; the
+  `CompletionStage` it used to return is now `stopAsync()`, which http4k and
+  Ktor gain too. `server.stop().toCompletableFuture().join()` becomes
+  `server.stop()`. `block()` means the same thing everywhere — parked until
+  `stop()` — which on http4k is a change: `Http4kServer.block()` is
+  `Thread.currentThread().join()`, released by nothing, and Pelican no longer
+  delegates to it.
 - **`Ansi` is internal**, and the `DefaultImpls` classes are gone from the
   published surface: the modules compile with `-jvm-default=no-compatibility`,
   and the interfaces that had them already emitted real JVM default methods.

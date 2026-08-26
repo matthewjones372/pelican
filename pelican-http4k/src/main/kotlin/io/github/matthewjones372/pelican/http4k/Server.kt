@@ -5,6 +5,9 @@ import org.http4k.core.HttpHandler
 import org.http4k.server.Http4kServer
 import org.http4k.server.ServerConfig
 import org.http4k.server.asServer
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.CountDownLatch
 
 /** A bound server, and the handle to shut it down again. */
 class PelicanServer internal constructor(
@@ -19,6 +22,8 @@ class PelicanServer internal constructor(
      */
     val host: String,
 ) : AutoCloseable {
+    private val stopped = CountDownLatch(1)
+
     /** The port actually bound, which is the one to use after asking for port 0. */
     val port: Int get() = server.port()
 
@@ -26,10 +31,20 @@ class PelicanServer internal constructor(
 
     fun stop() {
         server.stop()
+        stopped.countDown()
     }
 
-    /** Parks the calling thread until the process is stopped — what a `main` wants. */
-    fun block(): Unit = server.block()
+    /** [stop] off the calling thread: the shape Pekko needs, spelled the same here. */
+    fun stopAsync(): CompletionStage<Unit> = CompletableFuture.supplyAsync { stop() }
+
+    /**
+     * Parks the calling thread until [stop] — what a `main` wants. Not
+     * `Http4kServer.block()`, which is `Thread.currentThread().join()` and so
+     * is released by stopping the server no more than by anything else.
+     */
+    fun block() {
+        stopped.await()
+    }
 
     override fun close() = stop()
 }

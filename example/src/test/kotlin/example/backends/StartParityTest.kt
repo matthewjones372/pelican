@@ -92,7 +92,7 @@ class StartParityTest {
                     }
                 }
         } finally {
-            pekko.stop().toCompletableFuture().join()
+            pekko.stop()
             http4k.stop()
             ktor.stop()
         }

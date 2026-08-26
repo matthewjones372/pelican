@@ -66,7 +66,7 @@ class SuspendingClientTest {
 
     @AfterAll
     fun tearDown() {
-        server.stop().toCompletableFuture().join()
+        server.stop()
     }
 
     @Test

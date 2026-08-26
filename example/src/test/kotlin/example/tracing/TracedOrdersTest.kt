@@ -54,7 +54,7 @@ class TracedOrdersTest {
         @JvmStatic
         @AfterAll
         fun stop() {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 

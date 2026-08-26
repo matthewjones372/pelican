@@ -93,7 +93,7 @@ class ContentNegotiationTest {
         try {
             probe(server.baseUrl)
         } finally {
-            server.stop().toCompletableFuture().join()
+            server.stop()
         }
     }
 
