@@ -110,7 +110,17 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
                 is CookieParam<*> -> cookieParams += key
 
-                is BodyInput<*> -> bodyInput = key
+                // One body slot, and a stream occupies it exactly as a payload
+                // does. Two declarations would leave the second silently
+                // winning and the first documented nowhere.
+                is BodyInput<*> -> {
+                    require(bodyInput == null) {
+                        "An endpoint reads one request body, and this one declares $bodyInput as well as " +
+                            "$key. Declare one — or, where they are two encodings of the same value, " +
+                            "join them with `or` so the caller's Content-Type picks between them."
+                    }
+                    bodyInput = key
+                }
 
                 // The envelope holding them is assembled below, once they are
                 // all known.

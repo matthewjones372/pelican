@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.pekko
 
 import io.github.matthewjones372.pelican.*
 import io.github.matthewjones372.pelican.spi.*
+import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ClassicActorSystemProvider
 import org.apache.pekko.http.javadsl.model.*
 import org.apache.pekko.http.javadsl.model.headers.RawHeader
@@ -10,6 +11,7 @@ import org.apache.pekko.http.javadsl.server.Route
 import org.apache.pekko.stream.javadsl.Source
 import org.apache.pekko.stream.javadsl.StreamConverters
 import org.apache.pekko.util.ByteString
+import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
@@ -300,6 +302,32 @@ private fun readBody(
         is RawBody -> {
             // Handed over unconsumed: no buffering, full back-pressure.
             values[body] = PekkoByteStream(req.entity().dataBytes as Source<ByteString, Any>)
+            CompletableFuture.completedStage(Unit)
+        }
+
+        // Framed by core as the bytes arrive, so nothing is held but the frame
+        // being read. `statefulMap` rather than `statefulMapConcat` because the
+        // reader has a tail: a producer need not end its last document with a
+        // newline, and only the completion hook can hand that frame over.
+        is NdjsonBody<*> -> {
+            val frames = api.ndjsonFrames(ep, codecs.body, req.entity().contentType.toString())
+            values[body] = PekkoFrames<Any?>(
+                req.entity()
+                    .dataBytes
+                    .statefulMap(
+                        { frames },
+                        // Pekko's own `Pair`, spelled out: imported, it would
+                        // shadow `kotlin.Pair`, which this file's header
+                        // handling is written in.
+                        { reader, chunk ->
+                            org.apache.pekko.japi.Pair.create(reader, reader.push(chunk.toArray()))
+                        },
+                        { reader -> Optional.of(reader.end()) },
+                    )
+                    .mapConcat { it }
+                    .mapMaterializedValue { NotUsed.getInstance() },
+                system,
+            )
             CompletableFuture.completedStage(Unit)
         }
 

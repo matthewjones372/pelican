@@ -170,6 +170,12 @@ class Api internal constructor(
     val maxBodyBytes: Long = DEFAULT_MAX_BODY_BYTES,
 
     /**
+     * The largest frame of a streamed request body; null takes [maxBodyBytes].
+     * Read through the property of the same name below.
+     */
+    maxFrameBytes: Long? = null,
+
+    /**
      * Runs around every handler, outermost first, composed once at route-build
      * time. A check written here also covers the endpoint added next week,
      * which a check copied into each handler does not.
@@ -211,6 +217,18 @@ class Api internal constructor(
      */
     val onRefusal: RefusalObserver? = null,
 ) {
+    /**
+     * The largest single frame of a streamed request body, over which the frame
+     * is a 413 naming it.
+     *
+     * A limit of its own rather than [maxBodyBytes], because a stream has no
+     * total length to bound — bounding it would be refusing to stream — and one
+     * frame that never ends is the way to run a service out of memory with one
+     * upload. Unset it takes [maxBodyBytes], which is the same number for the
+     * same reason: it is how much of a request this service will hold at once.
+     */
+    val maxFrameBytes: Long = maxFrameBytes ?: maxBodyBytes
+
     init {
         val bound = endpoints.map { it.endpoint }
         refuseWebhooksAmong(bound)

@@ -31,6 +31,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.util.Collections
+import java.util.Enumeration
 import java.util.UUID
 import java.util.concurrent.CompletionException
 import kotlin.reflect.typeOf
@@ -157,6 +158,31 @@ class Streamed<T> internal constructor(
 /** Newline-delimited JSON: one document per line. */
 internal fun ndjsonFrames(reader: BufferedReader): Sequence<String> =
     reader.lineSequence().filter { it.isNotBlank() }
+
+/**
+ * A sequence of values as a newline-delimited request body.
+ *
+ * One stream per frame, chained lazily, so a value is encoded when the
+ * transport asks for it rather than when the call is made — the upload is
+ * pulled at the speed the socket drains it, and nothing holds the whole of it.
+ *
+ * The sequence is iterated inside `open()`, so a transport that has to send the
+ * request again asks the sequence for its elements again. One that cannot
+ * supply them twice — a sequence over a live cursor — is a body that must not
+ * be retried, which is the caller's own knowledge to act on.
+ */
+internal fun <T> ndjsonBody(values: Sequence<T>, encode: (T) -> String): ClientRequest.Body =
+    ClientRequest.Body.Streaming {
+        val frames = values.iterator()
+        SequenceInputStream(
+            object : Enumeration<InputStream> {
+                override fun hasMoreElements(): Boolean = frames.hasNext()
+
+                override fun nextElement(): InputStream =
+                    ByteArrayInputStream((encode(frames.next()) + "\n").toByteArray(StandardCharsets.UTF_8))
+            },
+        )
+    }
 
 /**
  * Where a stream that sends ids has reached. Written by the frame reader and
@@ -734,8 +760,8 @@ class OrdersClient(
             404 -> return Outcome.Err(StreamOrdersFailure.NotFound(apiErrorCodec.decoded(drain(response), Method.GET, "/users/{userId}/orders", response.status)))
         }
         if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders", response)
-        val body = response.body
-        return Outcome.Ok(Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decoded(it, Method.GET, "/users/{userId}/orders", response.status) }))
+        val stream = response.body
+        return Outcome.Ok(Streamed(stream, ndjsonFrames(stream.bufferedReader()).map { orderCodec.decoded(it, Method.GET, "/users/{userId}/orders", response.status) }))
     }
 
     /**
@@ -746,8 +772,8 @@ class OrdersClient(
     fun watchOrders(userId: Long, limit: Int? = null, lastEventId: String? = null): Streamed<Tick> {
         val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/watch", query = listOf("limit" to limit), headerParams = listOf("Last-Event-ID" to lastEventId), deadline = null))
         if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders/watch", response)
-        val body = response.body
-        return sseStreamed(body) { tickCodec.decoded(it, Method.GET, "/users/{userId}/orders/watch", response.status) }
+        val stream = response.body
+        return sseStreamed(stream) { tickCodec.decoded(it, Method.GET, "/users/{userId}/orders/watch", response.status) }
     }
 
     /**
@@ -760,8 +786,8 @@ class OrdersClient(
     fun listOrders(userId: Long, limit: Int? = null): Streamed<Order> {
         val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/list", query = listOf("limit" to limit), deadline = null))
         if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders/list", response)
-        val body = response.body
-        return Streamed(body, jsonArrayFrames(body.reader()).map { orderCodec.decoded(it, Method.GET, "/users/{userId}/orders/list", response.status) })
+        val stream = response.body
+        return Streamed(stream, jsonArrayFrames(stream.reader()).map { orderCodec.decoded(it, Method.GET, "/users/{userId}/orders/list", response.status) })
     }
 
     /**
@@ -864,8 +890,8 @@ class OrdersClient(
     fun searchOrders(limit: Int? = null, status: OrderStatus? = null, item: List<String>? = null, tag: List<String>? = null, sort: List<String>? = null, fields: List<String>? = null, xTraceId: String? = null, xFeature: List<String>? = null, seen: List<Long>? = null): Streamed<Order> {
         val response = stream(request(Method.GET, "/search", query = listOf("limit" to limit, "status" to status, "item" to joined("item", item, ","), "tag" to tag, "sort" to joined("sort", sort, "|"), "fields" to joined("fields", fields, " ")), headerParams = listOf("X-Trace-Id" to xTraceId, "X-Feature" to joined("X-Feature", xFeature, ",")), cookies = listOf("seen" to seen), deadline = null))
         if (!response.succeeded()) failedStream(Method.GET, "/search", response)
-        val body = response.body
-        return Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decoded(it, Method.GET, "/search", response.status) })
+        val stream = response.body
+        return Streamed(stream, ndjsonFrames(stream.bufferedReader()).map { orderCodec.decoded(it, Method.GET, "/search", response.status) })
     }
 
     // ----------------------------------------------------------- webhooks sent

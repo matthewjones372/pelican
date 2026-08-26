@@ -88,6 +88,12 @@ class InMemoryClientTransportTest {
         empty(status = 202)
     }
 
+    private val takeFrames = endpoint(ndjsonIn<String>()) {
+        post("frames")
+        operationId = "takeFrames"
+        empty(status = 202)
+    }
+
     /** The same value, offered two ways: `Accept` picks, here as on a socket. */
     private val exportTag = endpoint(tag) {
         get("tags" / tag / "export")
@@ -119,6 +125,7 @@ class InMemoryClientTransportTest {
         },
         ServerEndpoint(breakThing) { _ -> throw IllegalStateException("the database is on fire") },
         ServerEndpoint(takeBytes) { _ -> CompletableFuture.completedStage(Unit as Any?) },
+        ServerEndpoint(takeFrames) { _ -> CompletableFuture.completedStage(Unit as Any?) },
         ServerEndpoint(exportTag) { p -> CompletableFuture.completedStage("tag ${p[tag]}" as Any?) },
     )
 
@@ -330,5 +337,24 @@ class InMemoryClientTransportTest {
         }
 
         withClue(failure.message) { failure.message shouldContain "bytes(" }
+    }
+
+    /**
+     * The same reason, one step further along: the frames a handler reads are
+     * that backend's own stream, and core cannot build a `Source` or a `Flow`
+     * to hand it.
+     */
+    @Test
+    fun `a streamed body is refused by name too`() {
+        val failure = shouldThrow<UnsupportedInMemoryCall> {
+            send(
+                InMemoryClientTransport(api()),
+                Method.POST,
+                "http://things.test/frames",
+                body = ClientRequest.Body.Text("one\ntwo\n"),
+            )
+        }
+
+        withClue(failure.message) { failure.message shouldContain "ndjsonIn(" }
     }
 }

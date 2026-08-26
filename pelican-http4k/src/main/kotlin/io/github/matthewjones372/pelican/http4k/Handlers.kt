@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.StreamIn
 import io.github.matthewjones372.pelican.StreamOf
 import org.http4k.core.Body
 import org.http4k.core.Request
@@ -134,6 +135,15 @@ internal class Http4kByteStream(val body: Body) : ByteStreamHandle
 
 /** The request body as a stream, unread until the handler reads it. */
 fun ByteStreamHandle.toStream(): InputStream = (this as Http4kByteStream).body.stream
+
+internal class Http4kFrames<T>(val values: Sequence<T>) : StreamIn<T>
+
+/**
+ * The frames of an `ndjsonIn` body as a lazy sequence: a chunk of the request
+ * is read, and a frame decoded, when the handler asks for the next value.
+ */
+@Suppress("UNCHECKED_CAST")
+fun <T> StreamIn<T>.toSequence(): Sequence<T> = (this as Http4kFrames<T>).values
 
 /** Escape hatch: the raw http4k request behind this call. */
 val Params.request: Request

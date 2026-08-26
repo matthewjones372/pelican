@@ -16,6 +16,7 @@ import io.github.matthewjones372.pelican.JsonOutput
 import io.github.matthewjones372.pelican.ListStyle
 import io.github.matthewjones372.pelican.MediaOutput
 import io.github.matthewjones372.pelican.MultipartBody
+import io.github.matthewjones372.pelican.NdjsonBody
 import io.github.matthewjones372.pelican.NdjsonOutput
 import io.github.matthewjones372.pelican.NegotiatedBody
 import io.github.matthewjones372.pelican.NegotiatedOutput
@@ -234,6 +235,7 @@ private class KotlinClientEmitter(
         (endpoints + webhooks.map { it.operation }).forEach { ep ->
             when (val body = ep.bodyInput) {
                 is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> schema(checkNotNull(body.payloadType))
+                is NdjsonBody<*> -> schema(body.type)
                 else -> null
             }
             declaredSuccesses(ep).forEach { out -> out.payloadType?.let { schema(it) } }
@@ -496,12 +498,16 @@ private class KotlinClientEmitter(
 
         val produced = when {
             isStream(out) -> {
-                appendLine("val body = response.body")
+                // `stream` rather than `body`, which is what the parameter
+                // carrying a streamed *request* is called: an endpoint that
+                // streams both ways declares both, and the second would shadow
+                // the first halfway through the method.
+                appendLine("val stream = response.body")
                 val decode = decodeExpression(elementType(out), "it", at)
                 // An event stream hands back the id it reached as well as the
                 // values, so a caller that stops can say where to start again.
-                if (out is SseOutput<*>) "sseStreamed(body) { $decode }"
-                else "Streamed(body, ${frames(out)}.map { $decode })"
+                if (out is SseOutput<*>) "sseStreamed(stream) { $decode }"
+                else "Streamed(stream, ${frames(out)}.map { $decode })"
             }
 
             out is ByteStreamOutput -> "response.body"
@@ -716,6 +722,19 @@ private class KotlinClientEmitter(
                     "contentType = \"application/octet-stream\""
             }
 
+            // A `Sequence` in both call shapes, as a streamed *response* comes
+            // back as one in both: `Body.Streaming` hands the transport a
+            // `java.io.InputStream`, which is pulled rather than pushed, and a
+            // `Flow` bridged to it would either buffer the upload — the thing
+            // streaming it exists to avoid — or park a thread per call, which
+            // is what the suspending surface exists to avoid.
+            is NdjsonBody<*> -> {
+                val type = typeFor(input.type)
+                required += "$bodyName: Sequence<$type>"
+                "body = ndjsonBody($bodyName) { ${codecName(type)}.encodeToString(it) }, " +
+                    "contentType = \"application/x-ndjson\""
+            }
+
             null -> null
         }
 
@@ -828,9 +847,9 @@ private class KotlinClientEmitter(
     }
 
     private fun frames(out: Output<*>): String = when (out) {
-        is NdjsonOutput<*> -> "ndjsonFrames(body.bufferedReader())"
-        is SseOutput<*> -> "sseFrames(body.bufferedReader())"
-        else -> "jsonArrayFrames(body.reader())"
+        is NdjsonOutput<*> -> "ndjsonFrames(stream.bufferedReader())"
+        is SseOutput<*> -> "sseFrames(stream.bufferedReader())"
+        else -> "jsonArrayFrames(stream.reader())"
     }
 
     private fun successType(out: Output<*>): String = when (out) {
@@ -1129,6 +1148,7 @@ private val IMPORTS = """
     import java.nio.charset.StandardCharsets
     import java.time.Duration
     import java.util.Collections
+    import java.util.Enumeration
     import java.util.UUID
     import java.util.concurrent.CompletionException
     import kotlin.reflect.typeOf

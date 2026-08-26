@@ -12,6 +12,7 @@ import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.MultipartBody
+import io.github.matthewjones372.pelican.NdjsonBody
 import io.github.matthewjones372.pelican.NegotiatedBody
 import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
@@ -30,6 +31,7 @@ import io.github.matthewjones372.pelican.spi.RouteIndex
 import io.github.matthewjones372.pelican.spi.acceptable
 import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.handlerFor
+import io.github.matthewjones372.pelican.spi.ndjsonFrames
 import io.github.matthewjones372.pelican.spi.readStrictBody
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.responseCodecs
@@ -45,13 +47,18 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.utils.io.jvm.javaio.toInputStream
+import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.CompletionStage
+
+/** As much of the channel as is taken at once, the same four kilobytes core reads a body in. */
+private const val READ_BUFFER_BYTES = 4096
 
 /**
  * Interprets an [Api] as Ktor routes: one route per method the descriptions
@@ -321,6 +328,26 @@ private suspend fun readBody(
 
         // Handed over unconsumed: no buffering, full back-pressure.
         is RawBody -> values[body] = KtorByteStream(call.receiveChannel())
+
+        // Framed by core, off the channel Ktor already back-pressures. A cold
+        // flow, so the request is read when the handler collects it and not
+        // before — and the read suspends rather than parking a thread, which
+        // is why this one does not go to the IO dispatcher as the two below do.
+        is NdjsonBody<*> -> {
+            val frames = api.ndjsonFrames(ep, codecs.body, call.request.headers[HttpHeaders.ContentType])
+            val channel = call.receiveChannel()
+            values[body] = KtorFrames(
+                flow {
+                    val buffer = ByteArray(READ_BUFFER_BYTES)
+                    while (true) {
+                        val read = channel.readAvailable(buffer)
+                        if (read < 0) break
+                        frames.push(buffer, 0, read).forEach { emit(it) }
+                    }
+                    frames.end().forEach { emit(it) }
+                },
+            )
+        }
 
         // The one blocking read on this backend. Core parses the envelope
         // from a `java.io.InputStream`, so it moves to the IO dispatcher

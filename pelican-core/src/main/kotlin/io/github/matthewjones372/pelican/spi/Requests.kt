@@ -91,7 +91,11 @@ class RequestBodyCodecs internal constructor(private val byMediaType: Map<String
  * rather than about a server, so it is here and not in each interpreter.
  */
 fun Codecs.requestBodyCodec(input: BodyInput<*>?): RequestBodyCodecs? = when (input) {
-    is JsonBody<*>, is FormBody<*> -> RequestBodyCodecs(mapOf(input.mediaType to oneBodyCodec(input)))
+    // A streamed body is here because a frame of it is read exactly as a strict
+    // body is — one document, one codec, wrapped the same way when it will not
+    // decode. What differs is how many times, which is `NdjsonFrames`' business.
+    is JsonBody<*>, is FormBody<*>, is NdjsonBody<*> ->
+        RequestBodyCodecs(mapOf(input.mediaType to oneBodyCodec(input)))
 
     // Resolved here rather than on the request that picks one, so an unreadable
     // encoding is a startup failure and not a 500 for whoever chose it.
@@ -101,6 +105,17 @@ fun Codecs.requestBodyCodec(input: BodyInput<*>?): RequestBodyCodecs? = when (in
 
     null, is RawBody, is MultipartBody -> null
 }
+
+/**
+ * The frame reader for a streamed request body, or null where the body is not
+ * framed. One per request, because it holds the frame a chunk stopped inside.
+ */
+fun Api.ndjsonFrames(endpoint: Endpoint<*, *>, codecs: RequestBodyCodecs?, contentType: String?): NdjsonFrames =
+    NdjsonFrames(
+        checkNotNull(codecs) { "No codec was resolved for the body of $endpoint" },
+        contentType,
+        maxFrameBytes,
+    )
 
 /**
  * A writer per response an endpoint may answer with, keyed by identity: every
@@ -133,6 +148,7 @@ private fun Output<*>.writtenAs(): String =
 /** What reads a body of one media type. Every alternative is one of these. */
 private fun Codecs.oneBodyCodec(input: BodyInput<*>): BodyCodec<Any?> = when (input) {
     is JsonBody<*> -> codec(input.type)
+    is NdjsonBody<*> -> codec(input.type)
     is FormBody<*> -> formCodec(input.type)
     else -> error("$input is not a body a codec reads")
 }

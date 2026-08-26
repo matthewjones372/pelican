@@ -122,6 +122,31 @@ internal fun ndjsonFrames(reader: BufferedReader): Sequence<String> =
     reader.lineSequence().filter { it.isNotBlank() }
 
 /**
+ * A sequence of values as a newline-delimited request body.
+ *
+ * One stream per frame, chained lazily, so a value is encoded when the
+ * transport asks for it rather than when the call is made — the upload is
+ * pulled at the speed the socket drains it, and nothing holds the whole of it.
+ *
+ * The sequence is iterated inside `open()`, so a transport that has to send the
+ * request again asks the sequence for its elements again. One that cannot
+ * supply them twice — a sequence over a live cursor — is a body that must not
+ * be retried, which is the caller's own knowledge to act on.
+ */
+internal fun <T> ndjsonBody(values: Sequence<T>, encode: (T) -> String): ClientRequest.Body =
+    ClientRequest.Body.Streaming {
+        val frames = values.iterator()
+        SequenceInputStream(
+            object : Enumeration<InputStream> {
+                override fun hasMoreElements(): Boolean = frames.hasNext()
+
+                override fun nextElement(): InputStream =
+                    ByteArrayInputStream((encode(frames.next()) + "\n").toByteArray(StandardCharsets.UTF_8))
+            },
+        )
+    }
+
+/**
  * Where a stream that sends ids has reached. Written by the frame reader and
  * read through [Streamed.lastEventId]; separate from both so the sequence can
  * report progress to a response it is being read out of.

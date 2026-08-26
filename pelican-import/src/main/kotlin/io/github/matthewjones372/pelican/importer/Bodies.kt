@@ -23,7 +23,20 @@ internal class Bodies(private val reader: Reader, private val operation: Operati
         val (mediaType, node) = single(content, path / "content", "request body")
         val schema = (node as? JsonObj)?.get("schema")
 
+        // 3.2 puts a sequential media type's frame under `itemSchema`, a field
+        // it added because `schema` means the whole stream read as an array.
+        // Both spellings are read, as `Responses` reads both for a streamed
+        // answer: the document may have been written against either revision,
+        // and the frame is what `ndjsonIn<T>` needs either way.
+        val item = (node as? JsonObj)?.get("itemSchema")
+
         return when {
+            mediaType == "application/x-ndjson" -> IrBody.Ndjson(
+                (item ?: schema)?.let(::normaliseSchema)
+                    ?: unsupported(path, "The NDJSON request body declares no schema."),
+                description,
+            )
+
             mediaType.isJson() -> IrBody.Json(
                 schema?.let(::normaliseSchema) ?: unsupported(path, "The JSON request body declares no schema."),
                 description,

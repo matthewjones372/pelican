@@ -13,6 +13,7 @@ public final class io/github/matthewjones372/pelican/http4k/HandlersKt {
 	public static final fun streamedByOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun streamedNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun streamedOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun toSequence (Lio/github/matthewjones372/pelican/StreamIn;)Lkotlin/sequences/Sequence;
 	public static final fun toStream (Lio/github/matthewjones372/pelican/ByteStreamHandle;)Ljava/io/InputStream;
 }
 

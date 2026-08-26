@@ -135,6 +135,13 @@ class KotlinClientTest {
         bytes()
     }
 
+    /** Streamed both ways, which is what makes `body` and `stream` collide. */
+    private val ingestWidgets = endpoint(ndjsonIn<Widget>()) {
+        post("widgets" / "ingest")
+        operationId = "ingestWidgets"
+        ndjson<Widget>()
+    }
+
     private val signInWidget = endpoint(widgetForm) {
         post("widgets" / "form")
         operationId = "signInWidget"
@@ -188,7 +195,8 @@ class KotlinClientTest {
     private fun spec() = ApiSpec(
         endpoints = listOf(
             getWidget, streamWidgets, listWidgets, watchWidgets, createWidget, deleteWidget,
-            uploadWidget, signInWidget, importWidgets, postWidgetEitherWay, themed, searchWidgets,
+            uploadWidget, ingestWidgets, signInWidget, importWidgets, postWidgetEitherWay, themed,
+            searchWidgets,
             rebuild, unnamed, pokeWidget,
         ),
         schemas = WidgetSchemas,
@@ -321,12 +329,29 @@ class KotlinClientTest {
 
     @Test
     fun `each streaming shape gets the reader that frames it`() {
-        client shouldContain "ndjsonFrames(body.bufferedReader())"
+        // `stream` rather than `body`, which is the name a streamed *request*
+        // body's parameter takes: an endpoint streaming both ways has both.
+        client shouldContain "ndjsonFrames(stream.bufferedReader())"
         // An event stream is read through `sseStreamed`, which makes the reader
         // and the id it fills in together.
-        client shouldContain "sseStreamed(body) {"
-        client shouldContain "jsonArrayFrames(body.reader())"
+        client shouldContain "sseStreamed(stream) {"
+        client shouldContain "jsonArrayFrames(stream.reader())"
         client shouldContain "fun listWidgets(page: Int? = null): Streamed<Widget> {"
+    }
+
+    /**
+     * The other direction: the frames go up over the re-openable streaming body
+     * seam, encoded one at a time as the transport drains them.
+     */
+    @Test
+    fun `a streamed request body is a Sequence sent as ndjson`() {
+        client shouldContain "fun ingestWidgets(body: Sequence<Widget>): Streamed<Widget> {"
+        client shouldContain "body = ndjsonBody(body) { widgetCodec.encodeToString(it) }"
+        client shouldContain """contentType = "application/x-ndjson""""
+        withClue("the response's own local must not shadow the upload's parameter") {
+            client shouldContain "val stream = response.body"
+            client shouldNotContain "val body = response.body"
+        }
     }
 
     @Test

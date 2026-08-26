@@ -21,9 +21,10 @@ import io.github.matthewjones372.pelican.*
  *   cookie pairs with `"; "` and passes values through unescaped, which is
  *   what that style means and is not what the `form` both revisions assume at
  *   this location means. See [serialisation].
- * - **NDJSON and SSE responses** put their schema under `itemSchema` under
- *   3.2, which is the field 3.2 added for exactly this and describes one frame
- *   rather than the whole stream. See [successBody].
+ * - **NDJSON and SSE bodies**, sent or received, put their schema under
+ *   `itemSchema` under 3.2 — the field 3.2 added for exactly this, describing
+ *   one frame rather than the whole stream. See [successBody] and
+ *   [requestBody].
  *
  * 3.0 is not on the list and will not be. Nullability is spelled inside a
  * schema rather than around it, so writing it would need either an OpenAPI
@@ -143,7 +144,12 @@ private fun parameters(ep: Endpoint<*, *>, version: OpenApiVersion): List<JsonVa
 }
 
 /** The request body, or null where the endpoint declares none. */
-private fun requestBody(ep: Endpoint<*, *>, schemas: SchemaSource, components: SchemaComponents): JsonObj? =
+private fun requestBody(
+    ep: Endpoint<*, *>,
+    version: OpenApiVersion,
+    schemas: SchemaSource,
+    components: SchemaComponents,
+): JsonObj? =
     when (val body = ep.bodyInput) {
         is JsonBody<*> -> jsonObj {
             "required" to true
@@ -185,6 +191,22 @@ private fun requestBody(ep: Endpoint<*, *>, schemas: SchemaSource, components: S
             put("content", jsonObj {
                 put("application/octet-stream", jsonObj {
                     put("schema", binarySchema("application/octet-stream"))
+                })
+            })
+        }
+
+        // A sequential media type in the other direction, described the way a
+        // sequential *response* is: `itemSchema` under 3.2, which is the field
+        // that means one frame, and `schema` under 3.1, which has no other. The
+        // rule is [successBody]'s and applies here for the same reason — the
+        // frame is the thing a description knows about.
+        is NdjsonBody<*> -> jsonObj {
+            "required" to true
+            putIfNotNull("description", body.description)
+            val field = if (version == OpenApiVersion.V3_2_0) "itemSchema" else "schema"
+            put("content", jsonObj {
+                put("application/x-ndjson", jsonObj {
+                    put(field, schemas.schema(body.type, components))
                 })
             })
         }
@@ -416,7 +438,7 @@ private fun operation(
     val params = parameters(ep, version)
     if (params.isNotEmpty()) put("parameters", jsonArr(params))
 
-    requestBody(ep, schemas, components)?.let { put("requestBody", it) }
+    requestBody(ep, version, schemas, components)?.let { put("requestBody", it) }
 
     put("responses", responses(ep, version, schemas, components, refusals))
 }

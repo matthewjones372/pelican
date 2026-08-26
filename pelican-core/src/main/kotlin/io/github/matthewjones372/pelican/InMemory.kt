@@ -22,11 +22,13 @@ import java.util.concurrent.CompletionStage
  * val client = OrdersClient(transport = InMemoryClientTransport(api))
  * ```
  *
- * Two things a backend owns cannot cross, because core has no name for them,
- * and both are refused by name rather than by class cast: a `bytes(...)`
- * request body, whose handle is the backend's own type, and a streamed response
- * a handler produced as something other than a `Sequence` — Pekko's `Source`,
- * Ktor's `Flow`. An http4k-bound API streams as a `Sequence` and crosses whole.
+ * What a backend owns cannot cross, because core has no name for it, and each
+ * is refused by name rather than by class cast: a `bytes(...)` request body,
+ * whose handle is the backend's own type; an `ndjsonIn(...)` body, whose frames
+ * arrive as that backend's own stream; and a streamed response a handler
+ * produced as something other than a `Sequence` — Pekko's `Source`, Ktor's
+ * `Flow`. An http4k-bound API streams its *responses* as a `Sequence` and those
+ * cross whole.
  */
 class InMemoryClientTransport(private val api: Api) : ClientTransport {
 
@@ -95,6 +97,13 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
                     "against a bound server.",
             )
         }
+        if (endpoint.bodyInput is NdjsonBody<*>) {
+            throw UnsupportedInMemoryCall(
+                "$endpoint takes an ndjsonIn( ) request body, and a handler reads the frames as its " +
+                    "backend's own stream — a Source, a Sequence, a Flow — which core cannot build. " +
+                    "Call this one against a bound server.",
+            )
+        }
     }
 
     private fun negotiate(endpoint: Endpoint<*, *>, request: ClientRequest) {
@@ -151,7 +160,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
             null -> Unit
 
             // Refused above, before the handler was reached.
-            is RawBody -> Unit
+            is RawBody, is NdjsonBody<*> -> Unit
 
             is MultipartBody -> body.decode(
                 contentType = request.header("Content-Type"),

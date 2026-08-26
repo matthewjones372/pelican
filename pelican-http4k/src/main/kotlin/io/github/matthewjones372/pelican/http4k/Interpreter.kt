@@ -11,6 +11,7 @@ import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.MultipartBody
+import io.github.matthewjones372.pelican.NdjsonBody
 import io.github.matthewjones372.pelican.NegotiatedBody
 import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
@@ -30,6 +31,7 @@ import io.github.matthewjones372.pelican.spi.acceptable
 import io.github.matthewjones372.pelican.spi.declaredInputCount
 import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.handlerFor
+import io.github.matthewjones372.pelican.spi.ndjsonFrames
 import io.github.matthewjones372.pelican.spi.readStrictBody
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.responseCodecs
@@ -298,6 +300,14 @@ private fun readBody(
         // http4k's own body is lazy, so a handler that never reads it never
         // pulls the request into memory.
         is RawBody -> values[body] = Http4kByteStream(req.body)
+
+        // Framed by core as the bytes arrive. A `Sequence` is the honest
+        // equivalent of a `Source` here for the reason it is on the answering
+        // side: http4k reads on the calling thread, so laziness rather than
+        // back-pressure signalling is what keeps the upload out of memory.
+        is NdjsonBody<*> -> values[body] = Http4kFrames(
+            api.ndjsonFrames(ep, codecs.body, req.header("Content-Type")).readFrom(req.body.stream),
+        )
 
         // Exempt from the size limit as a raw body is: the streamed part is
         // never held whole, and the limit bounds the parts that are.

@@ -62,6 +62,41 @@ class OpenApi32Test {
         source shouldContain "ndjson<Order>()"
     }
 
+    /**
+     * The same field in the other direction. Nothing about a streamed upload
+     * fails to travel: `maxFrameBytes` is a setting on the service that reads
+     * it rather than anything a document says, exactly as `maxBodyBytes` is for
+     * a strict body.
+     */
+    @Test
+    fun `a streamed request body reads its frame from itemSchema too`() {
+        val source = imported(
+            document32(
+                """
+                /orders/ingest:
+                  post:
+                    operationId: ingestOrders
+                    requestBody:
+                      description: One order per line
+                      content:
+                        application/x-ndjson:
+                          itemSchema:
+                            ${'$'}ref: '#/components/schemas/Order'
+                    responses:
+                      "202":
+                        description: Taken
+                        content:
+                          application/json:
+                            schema:
+                              ${'$'}ref: '#/components/schemas/Order'
+                """,
+                order,
+            ),
+        )
+
+        source shouldContain "ndjsonIn<Order>(\"One order per line\")"
+    }
+
     @Test
     fun `an event stream reads its payload out of the event's data field`() {
         val source = imported(

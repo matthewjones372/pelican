@@ -603,6 +603,12 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
             is IrBody.Raw -> "rawBody(${describedBy(body.description)})"
 
+            // The frame's type, which is all a description holds. How large one
+            // frame may be is `maxFrameBytes` on the service that reads it,
+            // and a document has no field that says so — the same reason a
+            // strict body's `maxBodyBytes` does not come back either.
+            is IrBody.Ndjson -> "ndjsonIn<${typeFor(body.schema, context)}>(${describedBy(body.description)})"
+
             is IrBody.Multipart -> error("A multipart body is declared by its parts")
 
             // One payload, one type, and one `or` per further encoding — the

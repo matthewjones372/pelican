@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.StreamIn
 import io.github.matthewjones372.pelican.StreamOf
 import io.ktor.server.application.ApplicationCall
 import io.ktor.utils.io.ByteReadChannel
@@ -98,6 +99,15 @@ internal class KtorByteStream(val channel: ByteReadChannel) : ByteStreamHandle
  * a handler that never reads it never pulls the request into memory.
  */
 fun ByteStreamHandle.toChannel(): ByteReadChannel = (this as KtorByteStream).channel
+
+internal class KtorFrames<T>(val values: Flow<T>) : StreamIn<T>
+
+/**
+ * The frames of an `ndjsonIn` body as a cold flow: the request is read when the
+ * handler collects it, a chunk at a time, and never before.
+ */
+@Suppress("UNCHECKED_CAST")
+fun <T> StreamIn<T>.toFlow(): Flow<T> = (this as KtorFrames<T>).values
 
 /** Escape hatch: the raw Ktor call behind this request. */
 val Params.call: ApplicationCall

@@ -67,13 +67,20 @@ class BodiesAndCookiesTest {
         json<Widget>()
     }
 
+    private val streamed = endpoint(ndjsonIn<Widget>(description = "One widget per line")) {
+        post("widgets" / "bulk")
+        operationId = "bulkWidgets"
+        json<Widget>(status = 202)
+    }
+
     private val document =
-        ApiSpec(listOf(read, form, upload, negotiated), Schemas, title = "Widgets").openApi()
+        ApiSpec(listOf(read, form, upload, negotiated, streamed), Schemas, title = "Widgets").openApi()
 
     private val preferences = document / "paths" / "/preferences" / "get"
     private val signIn = document / "paths" / "/sign-in" / "post"
     private val uploaded = document / "paths" / "/upload" / "post"
     private val eitherWayOperation = document / "paths" / "/sign-in-either-way" / "post"
+    private val bulk = document / "paths" / "/widgets/bulk" / "post"
 
     // ------------------------------------------------------------- cookies
 
@@ -171,5 +178,19 @@ class BodiesAndCookiesTest {
     @Test
     fun `a multipart body has no parameters section, since its parts are not parameters`() {
         (uploaded / "parameters").shouldBeNull()
+    }
+
+    // ------------------------------------------------------------- a streamed body
+
+    @Test
+    fun `a streamed body publishes one frame's schema under the ndjson media type`() {
+        val content = bulk / "requestBody" / "content"
+
+        content.keys() shouldBe setOf("application/x-ndjson")
+        // 3.1 has only `schema`; `OpenApi32Test` is where it moves to
+        // `itemSchema`, which is the field that means one frame.
+        (content / "application/x-ndjson" / "schema" / "\$ref").str() shouldBe "#/components/schemas/Widget"
+        (bulk / "requestBody" / "description").str() shouldBe "One widget per line"
+        (bulk / "requestBody" / "required").bool() shouldBe true
     }
 }

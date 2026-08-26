@@ -65,7 +65,13 @@ class OpenApi32Test {
         jsonArray<Order>()
     }
 
-    private fun spec() = ApiSpec(listOf(stream, watch, unnamed, resumable, batch), Schemas, title = "Orders")
+    private val ingest = endpoint(ndjsonIn<Order>(description = "One order per line")) {
+        post("orders" / "ingest")
+        json<Order>(status = 202)
+    }
+
+    private fun spec() =
+        ApiSpec(listOf(stream, watch, unnamed, resumable, batch, ingest), Schemas, title = "Orders")
 
     private fun doc(version: OpenApiVersion) = spec().openApi(version)
 
@@ -106,6 +112,25 @@ class OpenApi32Test {
         val v32 = content(OpenApiVersion.V3_2_0, "/orders", "application/x-ndjson")
         (v32 / "itemSchema" / "\$ref").str() shouldBe "#/components/schemas/Order"
         withClue("`schema` would claim the whole stream is one Order") {
+            (v32 / "schema").shouldBeNull()
+        }
+    }
+
+    /** The same rule in the other direction: an upload's frame is an item too. */
+    @Test
+    fun `a streamed request body's frame moves to itemSchema under 3_2 as well`() {
+        val body = { version: OpenApiVersion ->
+            doc(version) / "paths" / "/orders/ingest" / "post" / "requestBody" /
+                "content" / "application/x-ndjson"
+        }
+
+        val v31 = body(OpenApiVersion.V3_1_0)
+        (v31 / "schema" / "\$ref").str() shouldBe "#/components/schemas/Order"
+        (v31 / "itemSchema").shouldBeNull()
+
+        val v32 = body(OpenApiVersion.V3_2_0)
+        (v32 / "itemSchema" / "\$ref").str() shouldBe "#/components/schemas/Order"
+        withClue("`schema` would claim the whole upload is one Order") {
             (v32 / "schema").shouldBeNull()
         }
     }
@@ -226,6 +251,9 @@ class OpenApi32Test {
             "/paths//orders/get/parameters/2/style",
             "/paths//orders/get/responses/200/content/application/x-ndjson/itemSchema",
             "/paths//orders/get/responses/200/content/application/x-ndjson/schema",
+            // The upload's frame moves for the same reason the answer's does.
+            "/paths//orders/ingest/post/requestBody/content/application/x-ndjson/itemSchema",
+            "/paths//orders/ingest/post/requestBody/content/application/x-ndjson/schema",
             "/paths//orders/pulse/get/responses/200/content/text/event-stream/itemSchema",
             "/paths//orders/pulse/get/responses/200/content/text/event-stream/schema",
             "/paths//orders/resumable/get/responses/200/content/text/event-stream/itemSchema",

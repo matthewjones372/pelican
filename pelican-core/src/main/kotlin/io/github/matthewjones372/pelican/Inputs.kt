@@ -110,6 +110,31 @@ class RawBody @PublishedApi internal constructor(
 }
 
 /**
+ * The request body as a stream of [T]; the backend decides the concrete type,
+ * and a handler asks for it in that backend's own terms — `toSource()` on
+ * Pekko, `toSequence()` on http4k, `toFlow()` on Ktor.
+ *
+ * An interface where [StreamOf] on the answering side is a phantom, and for a
+ * reason that only applies in this direction: a streamed input is one slot of
+ * the handler's argument tuple, beside the path and query parameters it
+ * composes with, and no binder can retype one slot of a tuple. So the marker
+ * has to be a value the request carries — which is what [ByteStreamHandle]
+ * already is for the untyped case.
+ */
+interface StreamIn<T>
+
+/**
+ * Newline-delimited JSON arriving as the request body: one document per line,
+ * decoded and handed over as it arrives rather than after it has all arrived.
+ */
+class NdjsonBody<T> @PublishedApi internal constructor(
+    val type: KType,
+    override val description: String?,
+) : BodyInput<StreamIn<T>>() {
+    override fun toString() = "body:ndjson"
+}
+
+/**
  * One named field of a `multipart/form-data` body. A [ParamKey] so that parts
  * are ordinary inputs: list them on `endpoint(...)` and the handler receives
  * them typed. The [MultipartBody] holding them is assembled for you.
@@ -203,16 +228,22 @@ val BodyInput<*>.mediaType: String
         is FormBody<*> -> "application/x-www-form-urlencoded"
         is MultipartBody -> "multipart/form-data"
         is RawBody -> "application/octet-stream"
+        is NdjsonBody<*> -> "application/x-ndjson"
         is NegotiatedBody<*> -> error("$this is several media types; ask its alternatives")
     }
 
-/** The payload type a codec reads this body into, or null where no codec reads it. */
+/**
+ * The payload type a codec reads this body into, or null where no codec reads
+ * the body as one value. A streamed body is the second case even though a codec
+ * reads every frame of it: the value it names is [NdjsonBody.type], and one
+ * request carries however many of those the caller sends.
+ */
 val BodyInput<*>.payloadType: KType?
     get() = when (this) {
         is JsonBody<*> -> type
         is FormBody<*> -> type
         is NegotiatedBody<*> -> alternatives.first().payloadType
-        is MultipartBody, is RawBody -> null
+        is MultipartBody, is RawBody, is NdjsonBody<*> -> null
     }
 
 // ---------------------------------------------------------------- factories
@@ -353,6 +384,13 @@ private fun <T> BodyInput<T>.asAlternatives(): List<BodyInput<T>> =
     if (this is NegotiatedBody<T>) alternatives else listOf(this)
 
 fun rawBody(description: String? = null): RawBody = RawBody(description)
+
+/**
+ * A streamed request body: one JSON document per line, decoded as it arrives.
+ * Nothing is held but the frame being read, which `Api.maxFrameBytes` bounds.
+ */
+inline fun <reified T> ndjsonIn(description: String? = null): NdjsonBody<T> =
+    NdjsonBody(typeOf<T>(), description)
 
 /**
  * A named text field of a multipart body: one string on the wire, so it takes

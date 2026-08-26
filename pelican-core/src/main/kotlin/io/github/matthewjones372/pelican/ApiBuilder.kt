@@ -33,6 +33,9 @@ class ApiBuilder internal constructor() {
     var cors: Cors? = null
     var strictBodyTimeoutMillis: Long = DEFAULT_STRICT_BODY_TIMEOUT_MILLIS
     var maxBodyBytes: Long = DEFAULT_MAX_BODY_BYTES
+
+    /** Null derives it from [maxBodyBytes]; see [Api.maxFrameBytes]. */
+    var maxFrameBytes: Long? = null
     var exposeInternalErrors: Boolean = false
     var covers: List<Endpoint<*, *>> = emptyList()
     var webhooks: List<Webhook> = emptyList()
@@ -73,6 +76,7 @@ class ApiBuilder internal constructor() {
         cors = cors,
         strictBodyTimeoutMillis = strictBodyTimeoutMillis,
         maxBodyBytes = maxBodyBytes,
+        maxFrameBytes = maxFrameBytes,
         filters = filters.toList(),
         exposeInternalErrors = exposeInternalErrors,
         onServerError = onServerError,

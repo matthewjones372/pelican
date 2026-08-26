@@ -2,9 +2,11 @@ package io.github.matthewjones372.pelican.pekko
 
 import io.github.matthewjones372.pelican.*
 import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ClassicActorSystemProvider
 import org.apache.pekko.http.javadsl.model.HttpMethod
 import org.apache.pekko.http.javadsl.model.HttpMethods
 import org.apache.pekko.http.javadsl.model.HttpRequest
+import org.apache.pekko.stream.javadsl.Sink
 import org.apache.pekko.stream.javadsl.Source
 import org.apache.pekko.util.ByteString
 import java.util.concurrent.CompletableFuture
@@ -117,6 +119,34 @@ internal class PekkoByteStream(val source: Source<ByteString, Any>) : ByteStream
 /** The request body as a Pekko source. Nothing has been read from it yet. */
 fun ByteStreamHandle.toSource(): Source<ByteString, Any> =
     (this as PekkoByteStream).source
+
+internal class PekkoFrames<T>(
+    val source: Source<T, NotUsed>,
+    /** The system the request arrived on, which is the one [runWith] runs the upload on. */
+    val system: ClassicActorSystemProvider,
+) : StreamIn<T>
+
+/**
+ * The frames of an `ndjsonIn` body as a Pekko source, unread and unbuffered:
+ * a frame is decoded when the stage downstream of it pulls, so the upload is
+ * consumed at the speed the handler consumes it.
+ */
+@Suppress("UNCHECKED_CAST")
+fun <T> StreamIn<T>.toSource(): Source<T, NotUsed> = (this as PekkoFrames<T>).source
+
+/**
+ * Runs the upload into [sink] on the system this request arrived on.
+ *
+ * Here because a handler that answers with a *value* has to consume the upload
+ * itself, and consuming a `Source` needs a materializer that nothing else in a
+ * handler's reach carries. Answering with a stream needs none: the response is
+ * the upload's own graph, and the interpreter materialises it.
+ */
+@Suppress("UNCHECKED_CAST")
+fun <T, M> StreamIn<T>.runWith(sink: Sink<T, M>): M {
+    val frames = this as PekkoFrames<T>
+    return frames.source.runWith(sink, frames.system)
+}
 
 /** Escape hatch: the raw Pekko request behind this call. */
 val Params.request: HttpRequest

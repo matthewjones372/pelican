@@ -123,6 +123,23 @@ class ApiClient(
                         "or drive `transport` directly for anything a String cannot hold.",
                 )
             }
+
+            // Framed here and sent whole. This client's job is to make the
+            // contract easy to assert on, and a test that has already written
+            // its rows down as a list is not testing that they leave one at a
+            // time — `PekkoTransportClientTest` and the backends' own timing
+            // tests are where that claim is made, over a socket.
+            is NdjsonBody<*> -> when (val frames = values[input]) {
+                is BufferedFrames<*> -> Payload(
+                    frames.values.joinToString("") { codecs.codec<Any?>(input.type).encodeToString(it) + "\n" },
+                    "application/x-ndjson",
+                )
+
+                else -> error(
+                    "$endpoint takes an ndjsonIn body. Pass frames(...) as its input, or drive " +
+                        "`transport` directly for an upload that has to arrive a frame at a time.",
+                )
+            }
         }
 
     /**
@@ -371,6 +388,14 @@ class TextBody(val text: String) : ByteStreamHandle
 
 /** Supplies a [RawBody] input for a client call. */
 fun rawText(text: String): ByteStreamHandle = TextBody(text)
+
+/** A streamed request body a test can actually construct: the frames, already in hand. */
+class BufferedFrames<T>(val values: List<T>) : StreamIn<T>
+
+/** Supplies an [NdjsonBody] input for a client call. */
+fun <T> frames(values: List<T>): StreamIn<T> = BufferedFrames(values)
+
+fun <T> frames(vararg values: T): StreamIn<T> = BufferedFrames(values.toList())
 
 /**
  * The occurrences one input puts on the wire: none for an absent optional, one

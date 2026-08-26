@@ -77,6 +77,9 @@ internal sealed class IrBody {
     class Multipart(val parts: List<IrPart>, override val description: String?) : IrBody()
     class Raw(override val description: String?) : IrBody()
 
+    /** [schema] is one frame's, which is what `ndjsonIn<T>` names. */
+    class Ndjson(val schema: JsonObj, override val description: String?) : IrBody()
+
     /**
      * One payload, offered under several media types. [encodings] are in the
      * document's own order, since that is what decides which one a generated
@@ -252,6 +255,7 @@ internal fun IrEndpoint.schemas(): List<JsonObj> = buildList {
     when (val declared = body) {
         is IrBody.Json -> add(declared.schema)
         is IrBody.Form -> add(declared.schema)
+        is IrBody.Ndjson -> add(declared.schema)
         is IrBody.Negotiated -> add(declared.schema)
         is IrBody.Multipart -> declared.parts.filterIsInstance<IrPart.Text>().forEach { add(it.schema) }
         is IrBody.Raw, null -> Unit

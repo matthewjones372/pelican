@@ -7,6 +7,7 @@ public final class io/github/matthewjones372/pelican/Api {
 	public final fun getExposeInternalErrors ()Z
 	public final fun getFilters ()Ljava/util/List;
 	public final fun getMaxBodyBytes ()J
+	public final fun getMaxFrameBytes ()J
 	public final fun getOnRefusal ()Lio/github/matthewjones372/pelican/RefusalObserver;
 	public final fun getOnServerError ()Lkotlin/jvm/functions/Function3;
 	public final fun getRefusals ()Lio/github/matthewjones372/pelican/RefusalRenderer;
@@ -26,6 +27,7 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getExposeInternalErrors ()Z
 	public final fun getMaxBodyBytes ()J
+	public final fun getMaxFrameBytes ()Ljava/lang/Long;
 	public final fun getSecurity ()Ljava/util/List;
 	public final fun getServers ()Ljava/util/List;
 	public final fun getStrictBodyTimeoutMillis ()J
@@ -40,6 +42,7 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun setDescription (Ljava/lang/String;)V
 	public final fun setExposeInternalErrors (Z)V
 	public final fun setMaxBodyBytes (J)V
+	public final fun setMaxFrameBytes (Ljava/lang/Long;)V
 	public final fun setSecurity (Ljava/util/List;)V
 	public final fun setServers (Ljava/util/List;)V
 	public final fun setStrictBodyTimeoutMillis (J)V
@@ -899,6 +902,13 @@ public abstract class io/github/matthewjones372/pelican/MultipartPart : io/githu
 	public abstract fun getName ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/NdjsonBody : io/github/matthewjones372/pelican/BodyInput {
+	public fun <init> (Lkotlin/reflect/KType;Ljava/lang/String;)V
+	public fun getDescription ()Ljava/lang/String;
+	public final fun getType ()Lkotlin/reflect/KType;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/matthewjones372/pelican/NdjsonOutput : io/github/matthewjones372/pelican/Output {
 	public fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;)V
 	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -1423,6 +1433,9 @@ public final class io/github/matthewjones372/pelican/SseOutput : io/github/matth
 public final class io/github/matthewjones372/pelican/SseOutput$Companion {
 }
 
+public abstract interface class io/github/matthewjones372/pelican/StreamIn {
+}
+
 public final class io/github/matthewjones372/pelican/StreamOf {
 }
 
@@ -1539,6 +1552,14 @@ public final class io/github/matthewjones372/pelican/spi/HandlersKt {
 	public static final fun successNamedBy (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/Outcome$Ok;)Lio/github/matthewjones372/pelican/Output;
 }
 
+public final class io/github/matthewjones372/pelican/spi/NdjsonFrames {
+	public fun <init> (Lio/github/matthewjones372/pelican/spi/RequestBodyCodecs;Ljava/lang/String;J)V
+	public final fun end ()Ljava/util/List;
+	public final fun push ([BII)Ljava/util/List;
+	public static synthetic fun push$default (Lio/github/matthewjones372/pelican/spi/NdjsonFrames;[BIIILjava/lang/Object;)Ljava/util/List;
+	public final fun readFrom (Ljava/io/InputStream;)Lkotlin/sequences/Sequence;
+}
+
 public final class io/github/matthewjones372/pelican/spi/RenderedError {
 	public fun <init> (Lio/github/matthewjones372/pelican/ApiError;Ljava/util/List;Ljava/lang/Throwable;Ljava/lang/String;Lio/github/matthewjones372/pelican/RefusalBody;)V
 	public final fun getBody ()Lio/github/matthewjones372/pelican/RefusalBody;
@@ -1557,6 +1578,7 @@ public final class io/github/matthewjones372/pelican/spi/RequestsKt {
 	public static final fun decodeList (Lio/github/matthewjones372/pelican/CookieParam;Ljava/util/List;)Ljava/lang/Object;
 	public static final fun decodeList (Lio/github/matthewjones372/pelican/HeaderParam;Ljava/util/List;)Ljava/lang/Object;
 	public static final fun decodeList (Lio/github/matthewjones372/pelican/QueryParam;Ljava/util/List;)Ljava/lang/Object;
+	public static final fun ndjsonFrames (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/Endpoint;Lio/github/matthewjones372/pelican/spi/RequestBodyCodecs;Ljava/lang/String;)Lio/github/matthewjones372/pelican/spi/NdjsonFrames;
 	public static final fun readStrictBody (Ljava/io/InputStream;J)Ljava/lang/String;
 	public static final fun requestBodyCodec (Lio/github/matthewjones372/pelican/Codecs;Lio/github/matthewjones372/pelican/BodyInput;)Lio/github/matthewjones372/pelican/spi/RequestBodyCodecs;
 	public static final fun responseCodecs (Lio/github/matthewjones372/pelican/Codecs;Lio/github/matthewjones372/pelican/Output;)Ljava/util/Map;

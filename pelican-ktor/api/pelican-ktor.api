@@ -9,6 +9,7 @@ public final class io/github/matthewjones372/pelican/ktor/HandlersKt {
 	public static final fun streamedNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function3;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun streamedOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function3;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun toChannel (Lio/github/matthewjones372/pelican/ByteStreamHandle;)Lio/ktor/utils/io/ByteReadChannel;
+	public static final fun toFlow (Lio/github/matthewjones372/pelican/StreamIn;)Lkotlinx/coroutines/flow/Flow;
 }
 
 public final class io/github/matthewjones372/pelican/ktor/InterpreterKt {

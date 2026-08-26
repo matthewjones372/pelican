@@ -25,6 +25,8 @@ public final class io/github/matthewjones372/pelican/test/ApiClient : java/lang/
 }
 
 public final class io/github/matthewjones372/pelican/test/ApiClientKt {
+	public static final fun frames (Ljava/util/List;)Lio/github/matthewjones372/pelican/StreamIn;
+	public static final fun frames ([Ljava/lang/Object;)Lio/github/matthewjones372/pelican/StreamIn;
 	public static final fun rawText (Ljava/lang/String;)Lio/github/matthewjones372/pelican/ByteStreamHandle;
 }
 
@@ -42,6 +44,11 @@ public final class io/github/matthewjones372/pelican/test/AssertionsKt {
 	public static final fun shouldHaveHeader (Lio/github/matthewjones372/pelican/test/ResponseSpec;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
 	public static final fun shouldHaveNoBody (Lio/github/matthewjones372/pelican/test/ResponseSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
 	public static final fun shouldHaveStatus (Lio/github/matthewjones372/pelican/test/ResponseSpec;I)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+}
+
+public final class io/github/matthewjones372/pelican/test/BufferedFrames : io/github/matthewjones372/pelican/StreamIn {
+	public fun <init> (Ljava/util/List;)V
+	public final fun getValues ()Ljava/util/List;
 }
 
 public final class io/github/matthewjones372/pelican/test/HttpClientTransport : io/github/matthewjones372/pelican/test/Transport {
