@@ -18,7 +18,8 @@ Facts worth having before anything else:
   separate module.
 - Server backends: `pelican-pekko`, `pelican-http4k`, `pelican-ktor`. JSON:
   `pelican-jackson`, `pelican-kotlinx`, `pelican-jsoniter`. Client transports:
-  `pelican-client-java`, `pelican-client-pekko`.
+  `pelican-client-java`, `pelican-client-pekko`, `pelican-client-ktor`,
+  `pelican-client-okhttp` — the last being the one that runs on Android.
 - Errors a caller was promised are values in the return type — `orFail`,
   `handledOrFail` — not exceptions.
 - OpenAPI 3.1.0 and 3.2.0.

@@ -107,6 +107,24 @@ one.
 
 ### Added
 
+- **`pelican-client-okhttp`, the fourth transport — and the one Android can
+  run.** There is no `java.net.http` on Android, so a generated client could
+  only get there through `KtorHttpTransport(HttpClient(OkHttp))`, which drags
+  the Ktor client machinery into an app that already ships an HTTP stack.
+  `OkHttpTransport(okHttpClient)` takes the client the application already
+  built, with its interceptors, its cache and its connection pool. The module
+  is plain JVM — core and `okhttp`, no Android plugin and no AndroidX — and
+  `DependenciesTest` asserts that list rather than promising it: running on
+  Android is a consequence of depending on nothing that does not.
+  **OkHttp 4.x is the floor**; Gradle resolves upwards, so a build on OkHttp 5
+  keeps it, and a fleet pinned to OkHttp 3 keeps the Ktor-engine route, which
+  stays documented. The per-request deadline bounds the arrival of the response
+  head, as it does on the JDK and Pekko adapters — deliberately *not* OkHttp's
+  `callTimeout`, which is the whole exchange and would end every `sse` response
+  that outlived the deadline its client was built with. It raises the
+  `InterruptedIOException` OkHttp itself raises on a call timeout, so a caller
+  catching a timeout by type catches it either way, and `RetryPolicy` treats it
+  as the `IOException` it is.
 - **Four claims the parity suite made and never asked.** A handler that throws
   answers the same `ApiError` on all three backends — a 500 whose detail is a
   reference to grep the log for, nothing of the throwable, and the header a

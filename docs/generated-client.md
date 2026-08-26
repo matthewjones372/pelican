@@ -139,6 +139,34 @@ one to make a call. The suspending client behind the `CompletionStage`, and
 what a per-request timeout does and does not bound there, are in
 [docs/reference.md](reference.md#on-ktor).
 
+`pelican-client-okhttp` is the fourth, over OkHttp's `Call`, and it takes the
+`OkHttpClient` an application has already built — its interceptors, its cache
+and its connection pool included:
+
+```kotlin
+val client = OrdersClient("https://orders.internal", JacksonCodecs, OkHttpTransport(okHttpClient))
+```
+
+### On the JVM it is a choice; on Android it is the answer
+
+The module is plain JVM — core and `okhttp`, no Android plugin and no AndroidX,
+which `DependenciesTest` asserts rather than promises. On a server it is one
+adapter among four, worth taking when OkHttp is already the stack in the
+process. On Android it is the only one of the four that runs at all: there is
+no `java.net.http` on the platform, Pekko and Ktor-CIO are a second networking
+stack in an app that already ships one, and OkHttp is what the platform uses
+underneath anyway.
+
+OkHttp **4.x is the floor**. Gradle resolves upwards, so a build already on
+OkHttp 5 keeps it. A fleet pinned to OkHttp 3 has no adapter here and keeps the
+escape hatch that predates this module — Ktor's client over an OkHttp engine,
+which brings the Ktor machinery but leaves the socket work with the OkHttp 3
+already in the build:
+
+```kotlin
+val client = OrdersClient("https://orders.internal", JacksonCodecs, KtorHttpTransport(HttpClient(OkHttp)))
+```
+
 More generally, a service that already runs an HTTP client passes that one as
 the third argument and gets its pooling, its metrics and its tuning rather than
 a second stack:
@@ -147,7 +175,7 @@ a second stack:
 val client = OrdersClient("https://orders.internal", JacksonCodecs, ourOwnTransport)
 ```
 
-Naming it is also what a classpath carrying *both* adapters has to do:
+Naming it is also what a classpath carrying *more than one* adapter has to do:
 `ServiceLoader` finds two and the client refuses to guess between them, saying
 so where it is constructed.
 
@@ -186,7 +214,7 @@ so. The lambda is for what every call carries.
 
 `OrdersClient(..., timeout = Duration.ofSeconds(30))` is the deadline every
 call is built with, and it reaches the transport as `ClientRequest.timeout`.
-What that bounds is the transport's answer, and the three do not agree, so it
+What that bounds is the transport's answer, and the four do not agree, so it
 is worth knowing which you have:
 
 | Transport | What the deadline bounds | Where it comes from |
@@ -195,6 +223,7 @@ is worth knowing which you have:
 | `pelican-client-pekko` | the response head, likewise | the adapter, on the stage: Pekko's own timeouts are pool settings |
 | `pelican-client-ktor`, with `HttpTimeout` installed | the whole exchange, the reading of the body included | `requestTimeoutMillis` |
 | `pelican-client-ktor`, without it | the response head — the adapter imposes it, since Ktor would drop it | the adapter's own deadline |
+| `pelican-client-okhttp` | the response head, likewise | the adapter, on the stage: OkHttp's `callTimeout` is the whole exchange, so it is not used |
 | `InMemoryClientTransport` | nothing; there is no clock in a function call | — |
 
 A streamed call — `ndjson`, `sse`, `jsonArray` or `bytes` — carries no deadline

@@ -19,6 +19,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
 | `pelican-client-pekko` | core, pekko-http | the same seam over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-client-ktor` | core, ktor-client-cio | the same seam over Ktor's `HttpClient`, for a service that already runs one. Not `pelican-ktor`: calling is not interpreting |
+| `pelican-client-okhttp` | core, okhttp | the same seam over OkHttp's `Call`, for an application that already runs one — and the only one of the four that runs on Android, where there is no `java.net.http`. Plain JVM: no Android plugin, no AndroidX |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-kotlinx` | core, kotlinx.serialization | the alternative `Codecs` |
@@ -80,6 +81,11 @@ The layering is load-bearing, not decorative, and each edge is a test:
   about. It also asserts that `pelican-ktor` is absent, which is the edge worth
   having: the interpreter and the transport are both Ktor, and a caller who
   only makes calls should not compile a route builder in to do it.
+- `pelican-client-okhttp` asserts core, OkHttp and okio, and nothing else —
+  no second HTTP stack, no interpreter, and no AndroidX. The last one is the
+  point of the module rather than a detail of it: it runs on Android because
+  every jar on that list is one an Android app already ships, and an AndroidX
+  artifact arriving here would make that a coincidence instead of a claim.
 - `pelican-import` depends on `pelican-codegen` rather than on core directly,
   and shares its schema-to-Kotlin generator outright. A client generated from a
   document and a client generated from endpoint values should not disagree
@@ -1296,11 +1302,13 @@ way.
 
 ### Choosing one
 
-Two adapters are written. `pelican-client-java` is the one over the JDK's own
-`HttpClient`; `pelican-client-pekko` is the one over Pekko HTTP's client and
-`pelican-client-ktor` the one over Ktor's, for a service that already runs one
-of those and would rather not start a second HTTP stack to call out of. A
-generated client finds whichever is there without being told:
+Four adapters are written. `pelican-client-java` is the one over the JDK's own
+`HttpClient`; `pelican-client-pekko` is the one over Pekko HTTP's client,
+`pelican-client-ktor` the one over Ktor's and `pelican-client-okhttp` the one
+over OkHttp's `Call`, for a service that already runs one of those and would
+rather not start a second HTTP stack to call out of. On Android the choice is
+made for you: `java.net.http` is not there, and OkHttp is. A generated client
+finds whichever is present without being told:
 
 ```kotlin
 dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
