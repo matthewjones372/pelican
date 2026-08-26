@@ -55,7 +55,9 @@ class SeveralResponsesTest {
         json<Order>(status = 200) or empty(status = 202)
     }
 
-    private val document = ApiSpec(listOf(submit, accept), Schemas, title = "Orders").openApi()
+    private val document = apiSpec(listOf(submit, accept), Schemas) {
+        title = "Orders"
+    }.openApi()
 
     private val submitted = document / "paths" / "/orders" / "post" / "responses"
     private val accepted = document / "paths" / "/intake" / "post" / "responses"

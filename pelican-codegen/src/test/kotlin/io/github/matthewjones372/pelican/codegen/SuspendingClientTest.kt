@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.codegen
 
 import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.apiSpec
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -68,12 +69,10 @@ class SuspendingClientTest {
         empty(status = 204)
     }
 
-    private val spec = ApiSpec(
-        endpoints = listOf(getOrder, placeOrder, streamOrders, cancelOrder),
-        schemas = Schemas,
-        title = "Orders",
-        servers = listOf("https://orders.internal"),
-    )
+    private val spec = apiSpec(listOf(getOrder, placeOrder, streamOrders, cancelOrder), Schemas) {
+        title = "Orders"
+        servers = listOf("https://orders.internal")
+    }
 
     private val blocking = spec.kotlinClient("com.example.orders")
     private val suspending = spec.kotlinClient("com.example.orders", callStyle = CallStyle.SUSPENDING)

@@ -289,7 +289,7 @@ libraries is one line in one file and touches no endpoint:
 
 ```kotlin
 api(routes, codecs = JacksonCodecs)              // the codec module 1.0 ships
-ApiSpec(endpoints, schemas = JacksonCodecs)      // docs need only the schema half
+apiSpec(endpoints, schemas = JacksonCodecs)      // docs need only the schema half
 ```
 
 Three interfaces carry it, all in `core/BodyCodec.kt`:
@@ -403,11 +403,9 @@ function off the module's own classpath and writes what it returns. See
 `pelican-openapi`:
 
 ```kotlin
-val spec = ApiSpec(
-    endpoints = listOf(getUser, streamOrders, placeOrder),
-    schemas = JacksonCodecs,
-    title = "Orders",
-)
+val spec = apiSpec(listOf(getUser, streamOrders, placeOrder), schemas = JacksonCodecs) {
+    title = "Orders"
+}
 spec.openApiJson()      // String
 spec.openApiYaml()      // the same document, written as YAML
 spec.openApi()          // JsonObj — core's own tree, if you want to post-process it
@@ -860,7 +858,7 @@ val orderPlaced = webhook("orderPlaced") {
     empty(status = 204)
 }
 
-ApiSpec(endpoints = allEndpoints, schemas = JacksonCodecs, webhooks = listOf(orderPlaced))
+apiSpec(allEndpoints, schemas = JacksonCodecs) { webhooks = listOf(orderPlaced) }
 api(endpoints = ordersRoutes, codecs = JacksonCodecs) { webhooks = listOf(orderPlaced) }
 ```
 
@@ -894,7 +892,7 @@ not among them. An interpreter builds its routes from `endpoints`, so there is
 nothing for it to look at. Two more things hold the line:
 
 - A `Webhook`'s operation carries a `webhookName`, and `api(...)` and
-  `ApiSpec(...)` refuse one in the endpoints list. `Webhook.operation` is public
+  `apiSpec(...)` refuse one in the endpoints list. `Webhook.operation` is public
   because `pelican-openapi` and `pelican-codegen` are separate modules and have
   to read it — Kotlin's `internal` stops at the module boundary — so `webhook
   handledNow { ... }` will compile. It fails at construction, naming the

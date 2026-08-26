@@ -64,12 +64,10 @@ class DecouplingTest {
         jsonArray<Widget>()
     }
 
-    private fun spec() = ApiSpec(
-        endpoints = listOf(getWidget, streamWidgets, listWidgets),
-        schemas = WidgetSchemas,
-        title = "Widgets",
-        version = "2.0.0",
-    )
+    private fun spec() = apiSpec(listOf(getWidget, streamWidgets, listWidgets), WidgetSchemas) {
+        title = "Widgets"
+        version = "2.0.0"
+    }
 
     @Test
     fun `a spec can be generated with no server library present`() {

@@ -320,14 +320,12 @@ fun shopApi(
 }
 
 /** The same descriptions, no server and no handlers — what the docs task reads. */
-fun shopSpec(): ApiSpec = ApiSpec(
-    endpoints = allShopEndpoints,
-    schemas = JacksonCodecs,
-    title = "Rookery Books",
-    version = "1.0.0",
-    description = "An independent bookshop: a shelf, a till, and an order.",
-    webhooks = allShopWebhooks,
-)
+fun shopSpec(): ApiSpec = apiSpec(allShopEndpoints, schemas = JacksonCodecs) {
+    title = "Rookery Books"
+    version = "1.0.0"
+    description = "An independent bookshop: a shelf, a till, and an order."
+    webhooks = allShopWebhooks
+}
 
 fun main(args: Array<String>) {
     val port = args.firstOrNull()?.toInt() ?: DEFAULT_PORT

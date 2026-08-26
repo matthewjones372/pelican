@@ -15,7 +15,7 @@ data class ApiError(val status: Int, val error: String, val detail: String? = nu
  * Descriptions only. All the OpenAPI interpreter needs, which is why docs can
  * be generated in a build task with no HTTP library on the classpath.
  */
-class ApiSpec(
+class ApiSpec internal constructor(
     val endpoints: List<Endpoint<*, *>>,
     /** Describes payload types. Documentation needs this; a server does not. */
     val schemas: SchemaSource,

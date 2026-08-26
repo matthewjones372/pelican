@@ -721,7 +721,7 @@ class WrapperCodecTest {
         }
 
         val schema = Json.parseToJsonElement(
-            ApiSpec(listOf(getAccount), JacksonCodecs).openApiJson(),
+            apiSpec(listOf(getAccount), JacksonCodecs).openApiJson(),
         ).jsonObject["paths"]!!.jsonObject["/accounts/{accountId}"]!!.jsonObject["get"]!!
             .jsonObject["parameters"]!!.jsonArray.first().jsonObject["schema"]!!.jsonObject
 

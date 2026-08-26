@@ -5,6 +5,7 @@ import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.Webhook
+import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.openapi.ApiChange
 import io.github.matthewjones372.pelican.openapi.Compatibility
 import io.github.matthewjones372.pelican.openapi.apiChanges
@@ -457,17 +458,15 @@ class Golden(
  * to it shows up.
  */
 private fun sliceOf(api: ApiSpec, endpoint: Endpoint<*, *>? = null, webhook: Webhook? = null): JsonObj {
-    val alone = ApiSpec(
-        endpoints = listOfNotNull(endpoint),
-        schemas = api.schemas,
-        title = api.title,
-        version = api.version,
+    val alone = apiSpec(listOfNotNull(endpoint), api.schemas) {
+        title = api.title
+        version = api.version
         // Kept, unlike the rest of the preamble: what an endpoint requires when
         // it declares nothing is what the API requires, and a caller reading
         // this file is reading the credential it has to send.
-        security = api.security,
-        webhooks = listOfNotNull(webhook),
-    )
+        security = api.security
+        webhooks = listOfNotNull(webhook)
+    }
 
     return JsonObj(alone.openApi().fields - PREAMBLE)
 }

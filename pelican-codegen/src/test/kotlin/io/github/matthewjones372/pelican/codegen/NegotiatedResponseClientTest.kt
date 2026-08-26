@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.codegen
 
 import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.apiSpec
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
@@ -50,7 +51,9 @@ class NegotiatedResponseClientTest {
         negotiated(json<Report>(), media<Report>("text/csv")) orFail errorJson<Problem>(404, "No such year")
     }
 
-    private val client = ApiSpec(listOf(export, guarded), Schemas, title = "Reports").kotlinClient("com.example")
+    private val client = apiSpec(listOf(export, guarded), Schemas) {
+        title = "Reports"
+    }.kotlinClient("com.example")
 
     @Test
     fun `one method per rendering, named after the subtype`() {

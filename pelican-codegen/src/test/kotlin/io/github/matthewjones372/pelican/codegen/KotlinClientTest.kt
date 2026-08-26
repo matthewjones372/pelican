@@ -6,6 +6,7 @@
 package io.github.matthewjones372.pelican.codegen
 
 import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.apiSpec
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
@@ -192,18 +193,16 @@ class KotlinClientTest {
         json<Widget>()
     }
 
-    private fun spec() = ApiSpec(
-        endpoints = listOf(
-            getWidget, streamWidgets, listWidgets, watchWidgets, createWidget, deleteWidget,
-            uploadWidget, ingestWidgets, signInWidget, importWidgets, postWidgetEitherWay, themed,
-            searchWidgets,
-            rebuild, unnamed, pokeWidget,
-        ),
-        schemas = WidgetSchemas,
-        title = "Widget Shop",
-        version = "2.0.0",
-        servers = listOf("https://widgets.example.com"),
-    )
+    private fun spec() = apiSpec(listOf(
+        getWidget, streamWidgets, listWidgets, watchWidgets, createWidget, deleteWidget,
+        uploadWidget, ingestWidgets, signInWidget, importWidgets, postWidgetEitherWay, themed,
+        searchWidgets,
+        rebuild, unnamed, pokeWidget,
+    ), WidgetSchemas) {
+        title = "Widget Shop"
+        version = "2.0.0"
+        servers = listOf("https://widgets.example.com")
+    }
 
     private val client = spec().kotlinClient("com.example.widgets")
 
@@ -499,7 +498,9 @@ class KotlinClientTest {
             json<Widget>()
         }
 
-        ApiSpec(listOf(getJob), jobs, title = "Jobs").kotlinClient("com.example.jobs") shouldContain
+        apiSpec(listOf(getJob), jobs) {
+            title = "Jobs"
+        }.kotlinClient("com.example.jobs") shouldContain
             "enum class JobState { queued, `in-progress` }"
     }
 
@@ -582,19 +583,17 @@ class KotlinClientTest {
 
     data class Payment(val kind: String)
 
-    private val paymentSpec = ApiSpec(
-        endpoints = listOf(
-            endpoint(jsonBody<Payment>()) {
-                post("payments")
-                operationId = "pay"
-                empty(status = 204)
-            },
-        ),
-        schemas = PaymentSchemas,
-        title = "Payments",
-        version = "1.0.0",
-        servers = listOf("https://payments.example.com"),
-    )
+    private val paymentSpec = apiSpec(listOf(
+        endpoint(jsonBody<Payment>()) {
+            post("payments")
+            operationId = "pay"
+            empty(status = 204)
+        },
+    ), PaymentSchemas) {
+        title = "Payments"
+        version = "1.0.0"
+        servers = listOf("https://payments.example.com")
+    }
 
     private val paymentClient = paymentSpec.kotlinClient("com.example.payments")
 

@@ -32,7 +32,9 @@ class NegotiatedResponseTest {
         negotiated(json<Report>(), media<Report>("text/csv")) orFail errorJson<Problem>(404, "No such year")
     }
 
-    private val document = ApiSpec(listOf(export), Schemas, title = "Reports").openApi()
+    private val document = apiSpec(listOf(export), Schemas) {
+        title = "Reports"
+    }.openApi()
     private val responses = document / "paths" / "/reports" / "get" / "responses"
 
     @Test
@@ -52,7 +54,9 @@ class NegotiatedResponseTest {
     /** The 3.2 rendering moves a *sequential* media type's schema, and this is not one. */
     @Test
     fun `and says the same thing under 3_2`() {
-        val v32 = ApiSpec(listOf(export), Schemas, title = "Reports").openApi(OpenApiVersion.V3_2_0)
+        val v32 = apiSpec(listOf(export), Schemas) {
+            title = "Reports"
+        }.openApi(OpenApiVersion.V3_2_0)
         val content = v32 / "paths" / "/reports" / "get" / "responses" / "200" / "content"
 
         content.keys().toList() shouldBe listOf("application/json", "text/csv")

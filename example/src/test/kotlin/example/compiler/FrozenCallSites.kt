@@ -279,13 +279,11 @@ internal val frozenCallSites: Map<String, String> = mapOf(
             onRefusal { reason, status, template -> println("${'$'}reason ${'$'}status ${'$'}template") }
         }
 
-        val spec = ApiSpec(
-            endpoints = listOf(getOrder),
-            schemas = JacksonCodecs,
-            title = "Orders",
-            webhooks = listOf(orderPlaced),
-            refusals = ApiErrorEnvelope,
-        )
+        val spec = apiSpec(listOf(getOrder), schemas = JacksonCodecs) {
+            title = "Orders"
+            webhooks = listOf(orderPlaced)
+            refusals(ApiErrorEnvelope)
+        }
 
         val document = spec.openApi(OpenApiVersion.V3_2_0)
         val documentJson = spec.openApiJson()
@@ -514,7 +512,7 @@ internal val frozenCallSites: Map<String, String> = mapOf(
             maxFrameBytes = 64 * 1024
         }
 
-        val spec = ApiSpec(listOf(getOrder, findOrder, streamOrders, bulk), JacksonCodecs)
+        val spec = apiSpec(listOf(getOrder, findOrder, streamOrders, bulk), JacksonCodecs)
 
         fun overHttp(): ApiClient = apiClient("http://localhost:8080", JacksonCodecs)
         fun inProcess(): ApiClient = service.inMemory()

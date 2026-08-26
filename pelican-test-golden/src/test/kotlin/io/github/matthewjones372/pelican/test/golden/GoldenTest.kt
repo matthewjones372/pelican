@@ -154,7 +154,9 @@ class GoldenTest {
 
     @Test
     fun `the whole document is one file, preamble and all`(@TempDir dir: Path) {
-        val api = ApiSpec(endpoints = listOf(getOrder), schemas = JacksonCodecs, title = "Orders")
+        val api = apiSpec(listOf(getOrder), JacksonCodecs) {
+            title = "Orders"
+        }
 
         message { Golden(directory = dir, update = false).document(api) }
 
@@ -167,7 +169,9 @@ class GoldenTest {
 
     private fun spec(
         orders: List<Endpoint<*, *>> = listOf(getOrder, countOrders, secretOrders),
-    ) = ApiSpec(endpoints = orders, schemas = JacksonCodecs, title = "Orders")
+    ) = apiSpec(orders, JacksonCodecs) {
+        title = "Orders"
+    }
 
     @Test
     fun `every endpoint is recorded without a line of test code per endpoint`(@TempDir dir: Path) {
@@ -244,7 +248,10 @@ class GoldenTest {
             body(jsonBody<Order>())
             empty(status = 204)
         }
-        val announced = ApiSpec(listOf(getOrder), JacksonCodecs, title = "Orders", webhooks = listOf(sent))
+        val announced = apiSpec(listOf(getOrder), JacksonCodecs) {
+            title = "Orders"
+            webhooks = listOf(sent)
+        }
         Golden(directory = dir, update = true).operations(announced)
 
         val failure = message { Golden(directory = dir, update = false).operations(spec(listOf(getOrder))) }

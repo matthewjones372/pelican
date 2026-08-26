@@ -194,13 +194,12 @@ fun main(args: Array<String>) {
 // Same descriptions, no server, no handlers. This is what the
 // `generateOpenApi` Gradle task runs.
 
-fun bookmarksSpec(): ApiSpec = ApiSpec(
-    endpoints = allBookmarkEndpoints,
-    schemas = JacksonCodecs,      // documentation needs only the schema half
-    title = "Bookmarks",
-    version = "1.0.0",
-    servers = listOf("http://localhost:8080"),
-)
+// Documentation needs only the schema half of a codec module.
+fun bookmarksSpec(): ApiSpec = apiSpec(allBookmarkEndpoints, schemas = JacksonCodecs) {
+    title = "Bookmarks"
+    version = "1.0.0"
+    servers = listOf("http://localhost:8080")
+}
 
 fun writeSpec() = println(bookmarksSpec().openApiJson())
 

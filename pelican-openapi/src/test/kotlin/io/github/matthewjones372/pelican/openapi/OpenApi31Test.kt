@@ -59,7 +59,9 @@ class OpenApi31Test {
     }
 
     private fun doc(): JsonObj =
-        ApiSpec(listOf(listParts, uploadPart), PartSchemas, title = "Parts").openApi()
+        apiSpec(listOf(listParts, uploadPart), PartSchemas) {
+            title = "Parts"
+        }.openApi()
 
     @Test
     fun `the document declares OpenAPI 3_1_0`() {

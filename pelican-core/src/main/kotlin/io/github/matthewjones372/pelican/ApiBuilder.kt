@@ -86,3 +86,48 @@ class ApiBuilder internal constructor() {
         onRefusal = onRefusal,
     )
 }
+
+/**
+ * The endpoints a document describes, the schema source that describes their
+ * payloads, and the document-level settings — [api]'s shape, for the build
+ * that never starts a server.
+ *
+ * A factory over a builder for [api]'s reason: a document will want more
+ * settings after 1.0 — a contact, a license — and a constructor with defaults
+ * freezes twice over.
+ */
+fun apiSpec(
+    endpoints: List<Endpoint<*, *>>,
+    schemas: SchemaSource,
+    configure: ApiSpecBuilder.() -> Unit = {},
+): ApiSpec = ApiSpecBuilder().apply(configure).build(endpoints, schemas)
+
+/** What [apiSpec]'s block writes into. Each setting is documented on the [ApiSpec] property it becomes. */
+class ApiSpecBuilder internal constructor() {
+
+    var title: String = DEFAULT_TITLE
+    var version: String = DEFAULT_VERSION
+    var description: String? = null
+    var servers: List<String> = emptyList()
+    var security: List<SecurityRequirement> = emptyList()
+    var webhooks: List<Webhook> = emptyList()
+
+    private var refusals: RefusalRenderer = ApiErrorEnvelope
+
+    /** [ApiSpec.refusals] — the same spelling [api]'s block uses. */
+    fun refusals(renderer: RefusalRenderer) {
+        refusals = renderer
+    }
+
+    internal fun build(endpoints: List<Endpoint<*, *>>, schemas: SchemaSource): ApiSpec = ApiSpec(
+        endpoints = endpoints,
+        schemas = schemas,
+        title = title,
+        version = version,
+        description = description,
+        servers = servers,
+        security = security,
+        webhooks = webhooks,
+        refusals = refusals,
+    )
+}

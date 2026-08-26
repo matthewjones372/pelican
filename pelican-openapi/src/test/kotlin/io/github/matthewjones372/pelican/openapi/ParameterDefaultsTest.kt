@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.IntCodec
 import io.github.matthewjones372.pelican.LongCodec
 import io.github.matthewjones372.pelican.NoCodecs
+import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.between
 import io.github.matthewjones372.pelican.commaSeparated
 import io.github.matthewjones372.pelican.cookieParam
@@ -35,7 +36,7 @@ class ParameterDefaultsTest {
         text()
     }
 
-    private val params = (ApiSpec(listOf(ep), NoCodecs).openApi() / "paths" / "/search" / "get" / "parameters")
+    private val params = (apiSpec(listOf(ep), NoCodecs).openApi() / "paths" / "/search" / "get" / "parameters")
         .arr()
         .associateBy { (it / "name").str() }
 

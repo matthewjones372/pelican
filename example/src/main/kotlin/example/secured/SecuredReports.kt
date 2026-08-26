@@ -468,14 +468,12 @@ fun main(args: Array<String>) {
 // Same descriptions, no server and no handler — the security schemes reach the
 // document without anything being started.
 
-fun securedSpec(): ApiSpec = ApiSpec(
-    endpoints = allSecuredEndpoints,
-    schemas = JacksonCodecs,
-    title = "Reports",
-    version = "1.0.0",
-    description = "Reports, behind an operator login and a company identity provider.",
-    security = listOf(companyIdp.requires("reports:read")),
-)
+fun securedSpec(): ApiSpec = apiSpec(allSecuredEndpoints, schemas = JacksonCodecs) {
+    title = "Reports"
+    version = "1.0.0"
+    description = "Reports, behind an operator login and a company identity provider."
+    security = listOf(companyIdp.requires("reports:read"))
+}
 
 fun writeSecuredSpec() = println(securedSpec().openApiJson())
 

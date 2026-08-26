@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.codegen
 
 import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.apiSpec
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
@@ -49,13 +50,11 @@ class WebhookSenderTest {
     private fun clientFor(
         vararg webhooks: Webhook,
         endpoints: List<Endpoint<*, *>> = listOf(listOrders),
-    ): String = ApiSpec(
-        endpoints,
-        Schemas,
-        title = "Orders",
-        servers = listOf("https://orders.example.com"),
-        webhooks = webhooks.toList(),
-    ).kotlinClient("com.example.orders")
+    ): String = apiSpec(endpoints, Schemas) {
+        title = "Orders"
+        servers = listOf("https://orders.example.com")
+        this.webhooks = webhooks.toList()
+    }.kotlinClient("com.example.orders")
 
     private val client = clientFor(orderPlaced)
 
@@ -107,14 +106,12 @@ class WebhookSenderTest {
     @Test
     fun `a webhook does not inherit the document's security requirement`() {
         val key = apiKeyHeader("X-Api-Key", name = "apiKey")
-        val secured = ApiSpec(
-            listOf(listOrders),
-            Schemas,
-            title = "Orders",
-            servers = listOf("https://orders.example.com"),
-            security = listOf(key.requires()),
-            webhooks = listOf(orderPlaced),
-        ).kotlinClient("com.example.orders")
+        val secured = apiSpec(listOf(listOrders), Schemas) {
+            title = "Orders"
+            servers = listOf("https://orders.example.com")
+            security = listOf(key.requires())
+            webhooks = listOf(orderPlaced)
+        }.kotlinClient("com.example.orders")
 
         // A method's KDoc is what precedes it, so each is read up to its own
         // signature: the endpoint's inherits, and the sender's says nothing.
@@ -130,7 +127,10 @@ class WebhookSenderTest {
 
     @Test
     fun `a spec that is only webhooks needs no base url`() {
-        val sendersOnly = ApiSpec(emptyList(), Schemas, title = "Orders", webhooks = listOf(orderPlaced))
+        val sendersOnly = apiSpec(emptyList(), Schemas) {
+            title = "Orders"
+            webhooks = listOf(orderPlaced)
+        }
             .kotlinClient("com.example.orders")
 
         sendersOnly shouldNotContain "This client has no base URL"

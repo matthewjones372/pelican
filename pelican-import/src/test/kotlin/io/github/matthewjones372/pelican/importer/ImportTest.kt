@@ -203,7 +203,7 @@ class ImportTest {
         )
 
         elsewhere shouldContain """servers("https://uploads.eu.example.com")"""
-        elsewhere shouldContain """servers = listOf("https://orders.example.com"),"""
+        elsewhere shouldContain """servers = listOf("https://orders.example.com")"""
     }
 
     @Test
@@ -218,7 +218,8 @@ class ImportTest {
         bookmarks shouldContain """\"names\":{\"Bookmark\":\"Bookmark\""""
         // And the no-argument spec is what a Gradle task can call.
         bookmarks shouldContain "fun bookmarksSpec(): ApiSpec = bookmarksSpec(BookmarksSchemas)"
-        bookmarks shouldContain "fun bookmarksSpec(schemas: SchemaSource): ApiSpec = ApiSpec("
+        bookmarks shouldContain
+            "fun bookmarksSpec(schemas: SchemaSource): ApiSpec = apiSpec(bookmarksEndpoints, schemas) {"
     }
 
     @Test

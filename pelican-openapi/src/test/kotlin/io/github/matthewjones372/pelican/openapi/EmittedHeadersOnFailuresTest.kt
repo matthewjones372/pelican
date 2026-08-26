@@ -5,6 +5,7 @@ import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.SchemaComponents
 import io.github.matthewjones372.pelican.SchemaSource
+import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jsonObj
@@ -42,7 +43,7 @@ class EmittedHeadersOnFailuresTest {
         json<String>() orFail throttled
     }
 
-    private val doc = ApiSpec(listOf(ep), Schemas).openApi()
+    private val doc = apiSpec(listOf(ep), Schemas).openApi()
     private val responses = doc / "paths" / "/widgets" / "get" / "responses"
 
     @Test

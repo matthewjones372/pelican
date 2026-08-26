@@ -73,7 +73,11 @@ class CompatibilityTest {
         shapes: Map<String, JsonObj> = emptyMap(),
         security: List<SecurityRequirement> = emptyList(),
         webhooks: List<Webhook> = emptyList(),
-    ) = ApiSpec(endpoints, Shapes(shapes), title = "Orders", security = security, webhooks = webhooks)
+    ) = apiSpec(endpoints, Shapes(shapes)) {
+        title = "Orders"
+        this.security = security
+        this.webhooks = webhooks
+    }
 
     private fun changes(before: ApiSpec, after: ApiSpec) = apiChanges(before.openApi(), after.openApi())
 

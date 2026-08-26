@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.codegen
 
 import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.apiSpec
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
@@ -47,7 +48,10 @@ class OperationServersClientTest {
     }
 
     private fun clientFor(vararg endpoints: Endpoint<*, *>, servers: List<String> = emptyList()): String =
-        ApiSpec(endpoints.toList(), Schemas, title = "Orders", servers = servers)
+        apiSpec(endpoints.toList(), Schemas) {
+            title = "Orders"
+            this.servers = servers
+        }
             .kotlinClient("com.example.orders")
 
     private val client = clientFor(listOrders, importOrders, servers = listOf("https://orders.example.com"))

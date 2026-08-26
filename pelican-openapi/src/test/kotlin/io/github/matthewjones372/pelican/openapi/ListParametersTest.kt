@@ -43,7 +43,9 @@ class ListParametersTest {
         json<Widget>()
     }
 
-    private val document = ApiSpec(listOf(search), Schemas, title = "Widgets").openApi()
+    private val document = apiSpec(listOf(search), Schemas) {
+        title = "Widgets"
+    }.openApi()
 
     private val parameters = (document / "paths" / "/widgets" / "get" / "parameters")
         .arr()

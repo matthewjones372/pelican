@@ -1,6 +1,7 @@
 package example
 
 import io.github.matthewjones372.pelican.ApiSpec
+import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 
 /**
@@ -14,16 +15,14 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
  * is no `main` here to keep in step with the build file. The hidden endpoint is
  * absent from both for the same reason: it is not published.
  */
-fun ordersSpec(): ApiSpec = ApiSpec(
-    endpoints = allEndpoints,
-    // Documentation needs only a SchemaSource, never a codec that can encode.
-    schemas = JacksonCodecs,
-    title = "Orders",
-    version = "1.0.0",
-    description = "A Kotlin-first Pekko HTTP service, described as values.",
-    servers = listOf("http://localhost:8080"),
+// Documentation needs only a SchemaSource, never a codec that can encode.
+fun ordersSpec(): ApiSpec = apiSpec(allEndpoints, schemas = JacksonCodecs) {
+    title = "Orders"
+    version = "1.0.0"
+    description = "A Kotlin-first Pekko HTTP service, described as values."
+    servers = listOf("http://localhost:8080")
     // The calls the service sends. They are published under `webhooks` and
     // generated as senders on the client, and no interpreter ever sees them —
-    // which is what `webhooks = ` being a field of its own is for.
-    webhooks = allWebhooks,
-)
+    // which is what `webhooks = ` being a setting of its own is for.
+    webhooks = allWebhooks
+}

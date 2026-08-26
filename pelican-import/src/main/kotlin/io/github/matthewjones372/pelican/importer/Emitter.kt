@@ -170,22 +170,23 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         )
         appendLine("fun ${memberName(options.name)}Spec(): ApiSpec = ${memberName(options.name)}Spec($schemasName)")
         appendLine()
-        appendLine("fun ${memberName(options.name)}Spec(schemas: SchemaSource): ApiSpec = ApiSpec(")
-        appendLine("    endpoints = ${memberName(options.name)}Endpoints,")
-        appendLine("    schemas = schemas,")
-        appendLine("    title = ${kotlinString(api.title)},")
-        appendLine("    version = ${kotlinString(api.version)},")
-        api.description?.let { appendLine("    description = ${kotlinString(it)},") }
+        appendLine(
+            "fun ${memberName(options.name)}Spec(schemas: SchemaSource): ApiSpec = " +
+                "apiSpec(${memberName(options.name)}Endpoints, schemas) {",
+        )
+        appendLine("    title = ${kotlinString(api.title)}")
+        appendLine("    version = ${kotlinString(api.version)}")
+        api.description?.let { appendLine("    description = ${kotlinString(it)}") }
         if (api.servers.isNotEmpty()) {
-            appendLine("    servers = listOf(${api.servers.joinToString { kotlinString(it) }}),")
+            appendLine("    servers = listOf(${api.servers.joinToString { kotlinString(it) }})")
         }
         if (api.security.isNotEmpty()) {
-            appendLine("    security = listOf(${api.security.joinToString { requirement(it) }}),")
+            appendLine("    security = listOf(${api.security.joinToString { requirement(it) }})")
         }
         if (api.webhooks.isNotEmpty()) {
-            appendLine("    webhooks = ${memberName(options.name)}Webhooks,")
+            appendLine("    webhooks = ${memberName(options.name)}Webhooks")
         }
-        append(")")
+        append("}")
     }
 
     /**

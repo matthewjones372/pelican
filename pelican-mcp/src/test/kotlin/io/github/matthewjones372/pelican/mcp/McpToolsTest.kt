@@ -59,7 +59,7 @@ class McpToolsTest {
     private val options = mcpOptions { headers = mapOf("X-Api-Key" to "let-me-in") }
 
     private fun toolsFor(vararg endpoints: Endpoint<*, *>): List<McpTool> =
-        ApiSpec(endpoints.toList(), JacksonCodecs).mcpTools(options)
+        apiSpec(endpoints.toList(), JacksonCodecs).mcpTools(options)
 
     @Test
     fun `one tool per endpoint, named as the document and the generated client name it`() {

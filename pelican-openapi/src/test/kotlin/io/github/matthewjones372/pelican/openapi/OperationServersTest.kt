@@ -45,12 +45,10 @@ class OperationServersTest {
         json<ImportResult>(status = 201)
     }
 
-    private val document = ApiSpec(
-        listOf(listOrders, importOrders),
-        Schemas,
-        title = "Orders",
-        servers = listOf("https://orders.example.com"),
-    ).openApi()
+    private val document = apiSpec(listOf(listOrders, importOrders), Schemas) {
+        title = "Orders"
+        servers = listOf("https://orders.example.com")
+    }.openApi()
 
     @Test
     fun `the operation carries its own servers list`() {

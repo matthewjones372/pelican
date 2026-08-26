@@ -21,9 +21,9 @@ dependencies {
 ```
 
 A recipe that needs a module beyond these says so in a comment on its first
-line. Each recipe carries its own imports so it can be pasted whole;
-`import ...pelican.*` is deliberate — core's vocabulary is the point, and the
-wildcard rule is turned off for it in `.editorconfig` and detekt alike.
+line. Each recipe carries its own imports so it can be pasted whole, and every
+import is written out in full — one line per name, so the import block is an
+inventory of what the recipe uses and where each piece lives.
 
 ---
 
@@ -34,12 +34,14 @@ The smallest service that runs. This is
 verbatim, and it is compiled and tested on every build so it cannot rot.
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pekko.*
-import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.pekko.handledNow
 
 data class Greeting(val message: String)
 
@@ -101,7 +103,14 @@ Declare the inputs on `endpoint(...)` and the handler's signature is fixed by
 them. No separate `query(...)` call — listing them did that.
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.default
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.headerParam
+import io.github.matthewjones372.pelican.optional
+import io.github.matthewjones372.pelican.pathParam
+import io.github.matthewjones372.pelican.pekko.handledNow
+import io.github.matthewjones372.pelican.queryParam
 
 val userId = pathParam<Long>("userId")
 val limit  = queryParam<Int>("limit").default(25)
@@ -142,7 +151,10 @@ Refining a codec narrows what is accepted *and* writes the constraint into the
 schema. Both halves, or it is a lie in the contract:
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.IntCodec
+import io.github.matthewjones372.pelican.between
+import io.github.matthewjones372.pelican.default
+import io.github.matthewjones372.pelican.queryParam
 
 val limit = queryParam("limit", IntCodec.between(1, 100), description = "How many to return").default(20)
 ```
@@ -158,7 +170,13 @@ Declare the failure as a value, list it on the output, and it joins the
 endpoint's type. The handler then has to *produce* it rather than throw it.
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.errorJson
+import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.pelican.orFail
+import io.github.matthewjones372.pelican.pekko.handledOrFail
 
 val noSuchUser = errorJson<ApiError>(404, "No user with that id")
 val badApiKey  = errorJson<ApiError>(401, "Missing or bad API key")
@@ -202,7 +220,15 @@ exists to show the shape that goes wrong.
 ## More than one success
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.json
+import io.github.matthewjones372.pelican.of
+import io.github.matthewjones372.pelican.or
+import io.github.matthewjones372.pelican.orFail
+import io.github.matthewjones372.pelican.pekko.handledOneOf
+import io.github.matthewjones372.pelican.responseHeader
 
 val orderAt = responseHeader<String>("Location", "Where the placed order lives")
 
@@ -233,7 +259,10 @@ submitOrder handledOneOf { (id, key, req) ->
 Declared on the endpoint, set from the handler, published in the document:
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.optional
+import io.github.matthewjones372.pelican.pekko.handledNow
+import io.github.matthewjones372.pelican.responseHeader
 
 val location   = responseHeader<String>("Location", "Where the new order lives")
 val rateLeft   = responseHeader<Int>("X-RateLimit-Remaining")
@@ -259,7 +288,9 @@ placeOrder handledNow { req ->
 ## A form body
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.formBody
+import io.github.matthewjones372.pelican.pekko.handledNow
 
 data class SignIn(val user: String, val remember: Boolean, val visits: Int)
 
@@ -285,7 +316,13 @@ app.call(signIn, SignIn("ada", remember = true, visits = 3))
 ## A file upload
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.StringCodec
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.filePart
+import io.github.matthewjones372.pelican.nonEmpty
+import io.github.matthewjones372.pelican.pekko.handledNow
+import io.github.matthewjones372.pelican.textPart
 
 val caption = textPart("caption", StringCodec.nonEmpty(), description = "What to call it")
 val upload  = filePart("file", contentType = "text/csv", description = "One order per line")
@@ -316,7 +353,8 @@ The description is backend-agnostic; the *binder* is the backend's own stream
 type, so nothing in core knows what a `Source` is:
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
 
 val streamOrders = endpoint(userId, limit) {
     get("users" / userId / "orders" / "stream")
@@ -326,7 +364,7 @@ val streamOrders = endpoint(userId, limit) {
 
 ```kotlin
 // pelican-pekko — Source<T, NotUsed>
-import io.github.matthewjones372.pelican.pekko.*
+import io.github.matthewjones372.pelican.pekko.streamedNow
 import org.apache.pekko.stream.javadsl.Source
 
 streamOrders streamedNow { (id, max) -> Source.from(Store.orders(id, max)) }
@@ -343,7 +381,9 @@ test with `app.collect(...)`.
 ## Security schemes
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.oauth2AuthorizationCode
 
 val oauth = oauth2AuthorizationCode(
     authorizationUrl = "https://id.example.com/oauth2/authorize",
@@ -385,8 +425,12 @@ Composable, outermost-first, narrowable with `onlyWhen`, and able to reject by
 throwing:
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.attribute
+import io.github.matthewjones372.pelican.before
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.unauthorized
 
 val caller = attribute<Caller>("caller")
 
@@ -418,7 +462,9 @@ fileReport handledNow { req -> Reports.file(this[caller].subject, req) }
 
 ```kotlin
 // build.gradle.kts: testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC1")
-import io.github.matthewjones372.pelican.*             // In2, In3, In4
+import io.github.matthewjones372.pelican.In2
+import io.github.matthewjones372.pelican.In3
+import io.github.matthewjones372.pelican.In4
 import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.test.pekko.client
 import io.github.matthewjones372.pelican.test.pekko.inMemory

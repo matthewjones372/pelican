@@ -74,7 +74,9 @@ class BodiesAndCookiesTest {
     }
 
     private val document =
-        ApiSpec(listOf(read, form, upload, negotiated, streamed), Schemas, title = "Widgets").openApi()
+        apiSpec(listOf(read, form, upload, negotiated, streamed), Schemas) {
+            title = "Widgets"
+        }.openApi()
 
     private val preferences = document / "paths" / "/preferences" / "get"
     private val signIn = document / "paths" / "/sign-in" / "post"

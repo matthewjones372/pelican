@@ -67,7 +67,9 @@ class SecurityTest {
     }
 
     private fun spec(vararg eps: Endpoint<*, *>, default: List<SecurityRequirement> = emptyList()) =
-        ApiSpec(endpoints = eps.toList(), schemas = Schemas, security = default)
+        apiSpec(eps.toList(), Schemas) {
+            security = default
+        }
 
     @Test
     fun `a hidden endpoint is left out of the document`() {

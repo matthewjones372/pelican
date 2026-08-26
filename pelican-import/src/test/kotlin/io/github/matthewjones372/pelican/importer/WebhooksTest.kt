@@ -77,7 +77,7 @@ class WebhooksTest {
     fun `webhooks land in their own list, and not among the endpoints`() {
         generated shouldContain "val testWebhooks: List<Webhook> = listOf(\n    orderPlaced,\n)"
         generated shouldContain "val testEndpoints: List<Endpoint<*, *>> = listOf(\n)"
-        generated shouldContain "webhooks = testWebhooks,"
+        generated shouldContain "webhooks = testWebhooks"
     }
 
     /** A method other than POST is said, because `webhook(...)` assumes the common one. */

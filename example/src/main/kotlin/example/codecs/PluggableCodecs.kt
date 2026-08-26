@@ -84,12 +84,10 @@ fun notesApi(codecs: Codecs): Api = api(
 }
 
 /** Documentation needs only the schema half of a codec module. */
-fun notesSpec(schemas: SchemaSource): ApiSpec = ApiSpec(
-    endpoints = codecEndpoints,
-    schemas = schemas,
-    title = "Notes",
-    version = "1.0.0",
-)
+fun notesSpec(schemas: SchemaSource): ApiSpec = apiSpec(codecEndpoints, schemas) {
+    title = "Notes"
+    version = "1.0.0"
+}
 
 /** `./gradlew :example:runCodecs` — the notes service on :8080, over Jackson. */
 fun main(args: Array<String>) {

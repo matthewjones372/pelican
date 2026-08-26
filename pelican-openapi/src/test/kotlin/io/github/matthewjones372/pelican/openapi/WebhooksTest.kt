@@ -45,14 +45,15 @@ class WebhooksTest {
         empty(status = 204)
     }
 
-    private fun documentOf(vararg webhooks: Webhook, security: List<SecurityRequirement> = emptyList()) = ApiSpec(
-        listOf(listOrders),
-        Schemas,
-        title = "Orders",
-        servers = listOf("https://orders.example.com"),
-        security = security,
-        webhooks = webhooks.toList(),
-    ).openApi()
+    private fun documentOf(
+        vararg webhooks: Webhook,
+        security: List<SecurityRequirement> = emptyList(),
+    ) = apiSpec(listOf(listOrders), Schemas) {
+        title = "Orders"
+        servers = listOf("https://orders.example.com")
+        this.security = security
+        this.webhooks = webhooks.toList()
+    }.openApi()
 
     private val document = documentOf(orderPlaced)
 

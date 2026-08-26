@@ -52,7 +52,9 @@ class DefaultResponseTest {
         json<Widget>()
     }
 
-    private val document = ApiSpec(listOf(getWidget, listWidgets), Schemas, title = "Widgets").openApi()
+    private val document = apiSpec(listOf(getWidget, listWidgets), Schemas) {
+        title = "Widgets"
+    }.openApi()
 
     private val one = document / "paths" / "/widgets/{widgetId}" / "get" / "responses"
     private val all = document / "paths" / "/widgets" / "get" / "responses"

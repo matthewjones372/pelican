@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.codegen
 
 import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.apiSpec
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
@@ -47,7 +48,9 @@ class SeveralResponsesClientTest {
         json<Order>(status = 200) or json<Order>(status = 201) or empty(status = 204)
     }
 
-    private val client = ApiSpec(listOf(submit, remember), Schemas, title = "Orders").kotlinClient("com.example")
+    private val client = apiSpec(listOf(submit, remember), Schemas) {
+        title = "Orders"
+    }.kotlinClient("com.example")
 
     @Test
     fun `several successes become a sealed type, one member per status`() {

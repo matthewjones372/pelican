@@ -100,6 +100,13 @@ one.
   against Pelican compiles as it was; a backend or transport written against
   core adds one import per file. The fence goes up before 1.0 because after it
   the same move would break every backend at once.
+- **An `ApiSpec` is built by `apiSpec(endpoints, schemas) { }`**, and its
+  constructor is internal, for the same reason as `Api` below: a document will
+  want more settings after 1.0 — a contact, a license — and a nine-parameter
+  constructor with defaults freezes twice over. Settings that were named
+  arguments are assignments inside the block; `refusals = r` is `refusals(r)`,
+  the spelling `api { }` already uses. `pelican-import` generates the builder
+  form, so regenerate imported sources when picking this up.
 - **An `Api` is built by `api(routes, codecs = ...) { }`**, and its constructor
   is internal. A fifteen-parameter constructor with defaults freezes twice over
   — the descriptor and the synthetic constructor carrying the defaults both

@@ -14,12 +14,31 @@ so it compiles on every build. Run it with `./gradlew :example:runReadmeExample`
 //   implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")     // JacksonCodecs
 //   implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")  // startWithDocs and Swagger UI
 
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.IntCodec
+import io.github.matthewjones372.pelican.StringCodec
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.between
+import io.github.matthewjones372.pelican.default
+import io.github.matthewjones372.pelican.describedAs
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.errorJson
+import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jsonBody
+import io.github.matthewjones372.pelican.map
+import io.github.matthewjones372.pelican.matching
+import io.github.matthewjones372.pelican.nonEmpty
+import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pekko.*
-import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.optional
+import io.github.matthewjones372.pelican.orFail
+import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.pekko.handledOrFail
+import io.github.matthewjones372.pelican.pekko.streamedNow
+import io.github.matthewjones372.pelican.queryParam
 import org.apache.pekko.stream.javadsl.Source
 
 // ---------------------------------------------------------------- 1. models

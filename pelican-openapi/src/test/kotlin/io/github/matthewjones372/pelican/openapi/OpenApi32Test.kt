@@ -71,7 +71,9 @@ class OpenApi32Test {
     }
 
     private fun spec() =
-        ApiSpec(listOf(stream, watch, unnamed, resumable, batch, ingest), Schemas, title = "Orders")
+        apiSpec(listOf(stream, watch, unnamed, resumable, batch, ingest), Schemas) {
+            title = "Orders"
+        }
 
     private fun doc(version: OpenApiVersion) = spec().openApi(version)
 

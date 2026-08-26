@@ -10,6 +10,7 @@ import io.github.matthewjones372.pelican.ProblemDetails
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.SchemaComponents
 import io.github.matthewjones372.pelican.SchemaSource
+import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jsonObj
@@ -51,7 +52,10 @@ class RefusalDocumentTest {
     }
 
     private fun document(refusals: RefusalRenderer, vararg endpoints: Endpoint<*, *>): JsonObj =
-        ApiSpec(endpoints.toList(), Schemas, title = "Reports", refusals = refusals).openApi()
+        apiSpec(endpoints.toList(), Schemas) {
+            title = "Reports"
+            refusals(refusals)
+        }.openApi()
 
     private fun refusalIn(document: JsonObj, path: String): JsonValue? =
         document / "paths" / path / "get" / "responses" / "default"

@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.SchemaComponents
 import io.github.matthewjones372.pelican.SchemaSource
+import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.jsonObj
@@ -41,7 +42,7 @@ class SuccessDescriptionsTest {
     }
 
     private fun responsesOf(path: String, method: String) =
-        ApiSpec(listOf(remember, plain), Schemas).openApi() / "paths" / path / method / "responses"
+        apiSpec(listOf(remember, plain), Schemas).openApi() / "paths" / path / method / "responses"
 
     @Test
     fun `each declared success carries the description it was given`() {

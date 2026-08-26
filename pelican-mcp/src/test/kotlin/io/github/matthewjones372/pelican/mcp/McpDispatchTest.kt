@@ -166,7 +166,7 @@ class McpDispatchTest {
 
     private fun refusalFor(vararg endpoints: Endpoint<*, *>, options: McpOptions = mcpOptions()): String =
         shouldThrow<IllegalArgumentException> {
-            ApiSpec(endpoints.toList(), JacksonCodecs).mcpTools(options)
+            apiSpec(endpoints.toList(), JacksonCodecs).mcpTools(options)
         }.message.orEmpty()
 
     @Test
@@ -211,7 +211,7 @@ class McpDispatchTest {
         message shouldContain "X-Api-Key"
         message shouldContain "headers"
 
-        ApiSpec(listOf(placeOrder), JacksonCodecs)
+        apiSpec(listOf(placeOrder), JacksonCodecs)
             .mcpTools(mcpOptions { headers = mapOf("X-Api-Key" to "let-me-in") })
             .single().name shouldBe "placeOrder"
     }
