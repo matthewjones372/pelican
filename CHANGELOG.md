@@ -116,6 +116,18 @@ one.
 
 ### Added
 
+- **The names the `.api` dumps cannot see are pinned by compiling them.**
+  `StillCompilesTest` compiles nine fixtures of ordinary call-site source —
+  endpoints, inputs, outputs, failures, construction, binders, clients, the
+  test DSL and the codecs — against the published modules, and fails naming
+  the fixture and the compiler's own error when one stops compiling. Binary
+  compatibility validation reads bytecode, and the most-typed half of this DSL
+  never reaches it: `json<T>()`, `jsonBody<T>()`, `pathParam<T>()`, `sse<T>()`,
+  `errorJson<T>()` and the rest are reified inline functions, so what a caller
+  compiles against is source and the only thing left in the jar is a synthetic
+  copy no dump lists. Renaming `json` across this repository leaves every `.api`
+  file byte-identical and every other test and gate green.
+
 - **The refusals a request metric cannot see, reported.** `onRefusal(...)`
   inside `api { }` takes a `RefusalObserver`, told about each request refused
   before the filter chain was entered: a parameter or body that would not

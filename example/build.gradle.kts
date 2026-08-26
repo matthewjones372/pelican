@@ -57,6 +57,12 @@ dependencies {
     // can be a test rather than a sentence in a document that goes stale.
     testImplementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.10")
 
+    // The importer's own DSL — `importOptions(...) { }` — is part of the frozen
+    // surface, so StillCompilesTest compiles a call site for it. Test scope
+    // only: `pelicanImport` below is still what the import *task* runs against,
+    // and nothing this module ships or serves sees it.
+    testImplementation(project(":pelican-import"))
+
     // The generated client is compiled in this source set, and a generated
     // client needs a transport. Both adapters are here so the suite runs the
     // same client over each of them — which is also what makes this the one
@@ -339,5 +345,11 @@ tasks.named("compileTestKotlin") {
         "generateOrdersSuspendingClient",
     )
 }
+
+// Two suites here run the Kotlin compiler inside the test JVM, and
+// StillCompilesTest hands it nine fixtures against this module's whole
+// classpath at once. Gradle's default 512m turns twelve seconds of that into a
+// garbage-collection stall long enough to trip the build's 60s test timeout.
+tasks.withType<Test>().configureEach { maxHeapSize = "2g" }
 
 // The benchmarks are a JMH harness in `:benchmarks`: `./gradlew :benchmarks:jmh`.
