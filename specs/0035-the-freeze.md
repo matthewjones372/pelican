@@ -44,11 +44,11 @@ discover after.
 
 - [x] **`spec-0035-source-compat`** — the pinned-DSL compilation suite.
       Done when: renaming `json` locally fails the suite and nothing else does.
-- [ ] **`spec-0035-freeze-audit`** — dumps regenerated and committed; the
+- [x] **`spec-0035-freeze-audit`** — dumps regenerated and committed; the
       checklist run with findings fixed or recorded; `FallibleOutput`
       decision applied if the maintainer renames.
       Done when: `apiCheck` is green and the audit's findings list is in the PR body.
-- [ ] **`spec-0035-the-promise`** — stability docs and the `1.0.0`
+- [x] **`spec-0035-the-promise`** — stability docs and the `1.0.0`
       CHANGELOG section.
       Done when: no doc says "expect breaking changes" about the shipped surface.
 
