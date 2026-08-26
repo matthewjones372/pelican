@@ -102,7 +102,11 @@ one.
   the `finally` of a `Sequence` whose walking thread is interrupted. It fails
   against a `StreamingSunHttp` that does not close the body it was writing,
   which is the leak it exists to stop.
-
+- **A definition for `handledNow`**, which had none: handled in place, on the
+  request, where *in place* is a thread on Pekko and http4k and a coroutine on
+  Ktor. No code changes — `docs/reference.md` states it, and
+  `BinderNameParityTest` names the binders each backend publishes so the
+  difference stays documented rather than discovered.
 - **Three refusals where something was published as what it is not.** Two types
   wanting one component name are refused where the schema is built, naming both
   — all three sources named a component after the simple name and let the second

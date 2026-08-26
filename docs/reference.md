@@ -130,13 +130,26 @@ envelope was parsed, the parsing is core's, and so the stream is core's too —
 which is why an upload is read the same way on all three. See
 [Multipart uploads](#multipart-uploads).
 
+**`handledNow` means handled in place, on the request** — and *in place* is a
+thread on Pekko and http4k, a coroutine on Ktor. `-Now` is a claim about
+*when*, not about what the answer is carried on: the handler produces the value
+during the call rather than handing back something that completes later, which
+is `handledBy` and its `…By` family. The name is the same on all three because
+the description is: `getUser handledNow { id -> Store.user(id) }` is one line
+whichever server ends up running it. Renaming Ktor's binder `handledSuspending`
+would buy naming purity by making the first example a reader meets differ per
+backend, which is the wrong trade for a library whose pitch is "same
+description, any backend".
+
 Ktor is the only one of the three whose handlers suspend, because that is Ktor's
 own calling convention: a handler runs inside the call's coroutine and may await
 anything. A lambda that suspends nowhere still satisfies a `suspend` parameter,
 so there is one set of binders rather than a blocking set and a suspending one —
 and, for the same reason, no `handledBy`/`streamedBy` taking a
 `CompletionStage`, which on the other two backends exist to reach concurrency
-this style already has.
+this style already has. `BinderNameParityTest` names the binders each backend
+publishes: the eight in-place ones everywhere, the five `…By` ones on Pekko and
+http4k only.
 
 Core's handler type is `(Params) -> CompletionStage<Any?>`, being the most it
 can say without picking a concurrency library, so `pelican-ktor` bridges the gap
