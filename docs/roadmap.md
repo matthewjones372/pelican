@@ -337,6 +337,18 @@ decided which of its endpoints a model gets.
 one line in `pelican-ktor`, where a bound handler needed a request to run on.
 Nothing in `pelican-core`.
 
+## Coming back after 1.0
+
+The 1.0 release narrows the shipped surface to one backend and one codec —
+Pekko and Jackson — so the stability promise covers the pair a first release
+can actually stand behind. The http4k and Ktor interpreters, the Ktor client
+transport, and the jsoniter and kotlinx codec modules are not abandoned: they
+live, complete and green, on the `multi-backend` branch, built by the same
+specs and passing the same parity suites. Re-adding each after 1.0 is a
+restore, not a rewrite — the parity harness and the codec agreement matrix
+keep their shape on `main` with a single entry precisely so a returning
+module plugs back into a live socket.
+
 ## Not on this list
 
 Things that look like gaps and are not, with the reasoning in
