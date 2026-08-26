@@ -30,18 +30,17 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.err
 import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
 import io.github.matthewjones372.pelican.metrics.otel.refusalCounter
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
+import io.github.matthewjones372.pelican.pekko.request
 import io.github.matthewjones372.pelican.unauthorized
 import io.opentelemetry.api.OpenTelemetry
 import org.slf4j.Logger
@@ -100,15 +99,17 @@ fun accessLog(): Filter = afterStatus { params, status, error ->
     val operation = endpoint?.operationId ?: "unnamed"
 
     when {
-        // Nobody described this one: the reference in the message is the same
-        // one the caller was given, so a support ticket quoting it finds this line.
-        error != null -> log.error("{} {} -> {}", route, operation, status, error)
+        // The status decides the level, not whether a throwable is in hand: a
+        // filter refuses by throwing, so a 401 arrives here with one and is
+        // still a fact about the caller rather than a fault of the service.
+        status >= SERVER_ERROR ->
+            // Only here is the throwable worth a stack trace, and the reference
+            // in it is the one the caller was given.
+            if (error != null) log.error("{} {} -> {}", route, operation, status, error)
+            else log.error("{} {} -> {}", route, operation, status)
 
-        // A 5xx the service chose to answer with is still the service's problem.
-        status >= SERVER_ERROR -> log.warn("{} {} -> {}", route, operation, status)
-
-        // A refused request is a fact about the caller, not a fault: `info`, so
-        // it survives a production level that drops `debug`.
+        // Refused, and described: `info`, so it survives a production level
+        // that drops `debug`.
         status >= CLIENT_ERROR -> log.info("{} {} -> {}", route, operation, status)
 
         else -> log.debug("{} {} -> {}", route, operation, status)
@@ -132,8 +133,6 @@ fun refusalLog(): RefusalObserver = RefusalObserver { reason, status, template -
 
 /** The scheme the descriptions declare, and what draws the padlock in Swagger UI. */
 val token = bearerAuth(name = "token", description = "A bearer token")
-
-private val authorization = headerParam<String>("Authorization").optional()
 
 private val caller = attribute<String>("caller")
 
@@ -160,7 +159,13 @@ private val requireToken = before { p ->
     val required = p.endpoint?.security.orEmpty()
     if (required.isEmpty()) return@before
 
-    val presented = p[authorization]?.removePrefix("Bearer ")
+    // `p.request` is the backend's own request, which is how a filter reads a
+    // header no endpoint declared. Declaring `Authorization` as an input
+    // instead would put the credential in the document as a parameter and make
+    // every handler take it — see `:example:runSecured`.
+    val presented = p.request.getHeader("Authorization").orElse(null)
+        ?.value()
+        ?.removePrefix("Bearer ")
     p[caller] = presented?.takeIf { it == "let-me-in" }
         ?: unauthorized("Present a bearer token")
 }
