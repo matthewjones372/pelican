@@ -107,6 +107,40 @@ one.
 
 ### Added
 
+- **An event stream that says where a caller left off.**
+  `sse<T>(id = { it.sequence.toString() }, retry = 15.seconds)` puts an `id:`
+  on every frame and opens the stream with a `retry:` directive of its own —
+  once, ahead of the first event, because a frame carrying no `data:`
+  dispatches nothing. `id` is a projection of the event rather than a counter
+  the interpreter keeps, so there is one source of truth for the resume point.
+  Both are optional and additive: an `sse<T>()` that declares neither writes
+  the frames it always wrote, byte for byte, on all three backends. Under
+  OpenAPI 3.2 the described event gains an `id` property, required exactly when
+  the output sends one; `retry` is said in the response's description, being a
+  directive about the stream rather than a field of any event. Neither travels
+  through the OpenAPI importer — an id extractor is a function of the event
+  value and no document holds a function — so an imported event stream declares
+  its payload and the service adds the frame fields back.
+- **`lastEventId()` on `Params`**, the `Last-Event-ID` a reconnecting caller
+  sent, and null on a fresh connect. An extension rather than a declared input:
+  resume is optional by nature and reading it does not change an endpoint's
+  input arity, so a handler that ignores it is unchanged. The header is read
+  only where the output declares an event stream (`Endpoint.resumable`, decided
+  in core), and the value rides on `Params` rather than through an attribute
+  nothing stops a filter forging. What is done with it stays the service's:
+  Pelican frames and delivers, and retention is not its business. Under
+  OpenAPI 3.2 the described event's `id` carries the contract in words.
+- **Clients that can pick a stream up again.** A generated method answering
+  `text/event-stream` takes a trailing `lastEventId: String? = null` and sends
+  it as the header, and the `Streamed<T>` it returns reports `lastEventId` —
+  the id of the last event handed over, so it is read after the sequence rather
+  than off the response. `pelican-test`'s `collect(...)` takes the same
+  argument. The parameter is generated for every event stream rather than only
+  those declaring an extractor, so a client generated from a description and
+  one generated from the document it publishes stay identical. Reconnecting
+  itself is deliberately not done for you: no loop, no backoff, no decision
+  about how much of a gap is worth replaying — that is a policy, like retrying,
+  and what is here is the seam for writing it.
 - **One response, several renderings**, chosen by the caller's `Accept`:
   `negotiated(json<Report>(200), media<Report>("text/csv", 200))` is one
   declared response written two ways. The handler goes on returning a `Report`;

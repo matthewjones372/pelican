@@ -6,9 +6,11 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * What moves when the same descriptions are written against 3.2 instead of 3.1.
@@ -53,12 +55,17 @@ class OpenApi32Test {
         sse<Tick>()
     }
 
+    private val resumable = endpoint {
+        get("orders" / "resumable")
+        sse<Tick>(eventName = "order", id = { it.at.toString() }, retry = 15.seconds)
+    }
+
     private val batch = endpoint {
         get("orders" / "all")
         jsonArray<Order>()
     }
 
-    private fun spec() = ApiSpec(listOf(stream, watch, unnamed, batch), Schemas, title = "Orders")
+    private fun spec() = ApiSpec(listOf(stream, watch, unnamed, resumable, batch), Schemas, title = "Orders")
 
     private fun doc(version: OpenApiVersion) = spec().openApi(version)
 
@@ -135,6 +142,36 @@ class OpenApi32Test {
     }
 
     @Test
+    fun `a stream that sends ids describes them, and says every frame carries one`() {
+        val item = content(OpenApiVersion.V3_2_0, "/orders/resumable", "text/event-stream") / "itemSchema"
+
+        (item / "properties" / "id" / "type").str() shouldBe "string"
+        (item / "required").strings() shouldBe listOf("event", "id", "data")
+    }
+
+    @Test
+    fun `and says what sending one back does, since a string field cannot say it`() {
+        val item = content(OpenApiVersion.V3_2_0, "/orders/resumable", "text/event-stream") / "itemSchema"
+
+        (item / "properties" / "id" / "description").str() shouldContain "Last-Event-ID"
+    }
+
+    /**
+     * `retry` is a directive about the stream, and the parse of an event stream
+     * never yields it as a field of an event, so the schema has nowhere honest
+     * to put it.
+     */
+    @Test
+    fun `the reconnection time is said in the response's description and not in the event`() {
+        val item = content(OpenApiVersion.V3_2_0, "/orders/resumable", "text/event-stream") / "itemSchema"
+        (item / "properties" / "retry").shouldBeNull()
+
+        val response = doc(OpenApiVersion.V3_2_0) / "paths" / "/orders/resumable" / "get" / "responses" / "200"
+        (response / "description").str() shouldBe
+            "A server-sent event stream. Clients are asked to wait 15000ms before reconnecting."
+    }
+
+    @Test
     fun `a 3_1 event stream can only name the payload`() {
         val body = content(OpenApiVersion.V3_1_0, "/orders/watch", "text/event-stream")
 
@@ -191,6 +228,8 @@ class OpenApi32Test {
             "/paths//orders/get/responses/200/content/application/x-ndjson/schema",
             "/paths//orders/pulse/get/responses/200/content/text/event-stream/itemSchema",
             "/paths//orders/pulse/get/responses/200/content/text/event-stream/schema",
+            "/paths//orders/resumable/get/responses/200/content/text/event-stream/itemSchema",
+            "/paths//orders/resumable/get/responses/200/content/text/event-stream/schema",
             "/paths//orders/watch/get/responses/200/content/text/event-stream/itemSchema",
             "/paths//orders/watch/get/responses/200/content/text/event-stream/schema",
         )

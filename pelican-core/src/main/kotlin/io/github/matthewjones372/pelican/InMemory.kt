@@ -56,7 +56,12 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
         val endpoint = matched.endpoint
         refuseWhatCannotCross(endpoint)
 
-        val params = Params(values, request, endpoint)
+        val params = Params(
+            values,
+            request,
+            endpoint,
+            resumeFrom = if (endpoint.resumable) request.header(SseOutput.LAST_EVENT_ID) else null,
+        )
         val resolved = codecs.getValue(matched)
 
         return try {
@@ -214,7 +219,9 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
             is SseOutput<*> -> {
                 val o = out as SseOutput<Any?>
                 val codec = payload()
-                streamed(out.status, out.mediaType, elements(value, out).map { o.frame(codec, it) })
+                val frames = elements(value, out).map { o.frame(codec, it) }
+                val prelude = o.prelude()
+                streamed(out.status, out.mediaType, if (prelude == null) frames else sequenceOf(prelude) + frames)
             }
 
             is JsonArrayOutput<*> ->

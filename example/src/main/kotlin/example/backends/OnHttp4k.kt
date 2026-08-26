@@ -11,6 +11,7 @@ import io.github.matthewjones372.pelican.http4k.handledWith
 import io.github.matthewjones372.pelican.http4k.start
 import io.github.matthewjones372.pelican.http4k.streamedNow
 import io.github.matthewjones372.pelican.http4k.toStream
+import io.github.matthewjones372.pelican.lastEventId
 
 /**
  * The http4k binding of the same [greetingEndpoints].
@@ -60,6 +61,7 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
     peek handledWith { _ -> },
 
     ticker streamedNow { ticks().asSequence() },
+    replay streamedNow { ticksSince(lastEventId()).asSequence() },
     everyone streamedNow { greetingsOf().asSequence() },
 
     logo bytesNow { java.io.ByteArrayInputStream(LOGO_BYTES) },

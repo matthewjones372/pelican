@@ -49,7 +49,10 @@ positional; query parameters, headers and cookies are named parameters with
 defaults, and leaving one out leaves it off the request rather than sending it
 empty. A streaming endpoint hands back a `Streamed<T>`, a `Sequence` over the
 open connection decoded as elements land, and a file part is streamed into the
-request so a large upload is never held in memory. Declared failures become a
+request so a large upload is never held in memory. An event stream also takes a
+`lastEventId` and reports the one it reached, so a caller can pick it up where
+it stopped; the reconnect itself is the caller's, since how much of a gap is
+worth replaying is not something a generated client can know. Declared failures become a
 sealed type per endpoint: add a failure, regenerate, and the calls that do not
 handle it stop compiling. A failure that declares response headers carries them
 as properties, typed from the schema the document publishes — nullable, because

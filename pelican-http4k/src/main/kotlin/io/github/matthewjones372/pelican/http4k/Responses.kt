@@ -91,7 +91,7 @@ internal fun buildResponse(
             val c = payload()
             response
                 .header(CONTENT_TYPE, "text/event-stream")
-                .streaming(elements(value).map { o.frame(c, it) }.withKeepAlive(o.keepAlive))
+                .streaming(elements(value).map { o.frame(c, it) }.after(o.prelude()).withKeepAlive(o.keepAlive))
         }
 
         is JsonArrayOutput<*> ->

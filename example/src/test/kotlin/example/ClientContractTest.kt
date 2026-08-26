@@ -135,6 +135,16 @@ abstract class ClientContractTest {
         app.response(watchOrders, In2(1L, 3)).contentType shouldBe "text/event-stream"
     }
 
+    @Test
+    fun `resumes an event stream from the id the caller last saw`() {
+        // Each frame carries its sequence as the `id:`, and the service starts
+        // after the one the caller says it already has.
+        app.response(watchOrders, In2(1L, 3)).body shouldContain "id: 1"
+
+        val resumed: List<Tick> = app.collect(watchOrders, In2(1L, 3), lastEventId = "4")
+        resumed.map { it.seq } shouldBe listOf(5, 6, 7)
+    }
+
     // ------------------------------------------------------------ bodies
 
     @Test

@@ -179,6 +179,47 @@ class AllBackendsTest {
         }
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a stream that declares ids writes them, identically, on all three`(name: String, client: ApiClient) {
+        val res = client.response(replay, Unit)
+
+        withClue(name) {
+            res shouldHaveStatus 200
+            res shouldHaveContentType "text/event-stream"
+            // `retry:` once ahead of the events, since it is a directive about
+            // the stream and a frame with no `data:` dispatches nothing; then
+            // `event:`, `id:`, `data:` per frame, in the order core writes them.
+            res.body shouldBe
+                "retry: 15000\n\n" +
+                "event: tick\nid: 1\ndata: {\"seq\":1,\"at\":\"one\"}\n\n" +
+                "event: tick\nid: 2\ndata: {\"seq\":2,\"at\":\"two\"}\n\n"
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a reconnect carries the last id it saw to the handler`(name: String, client: ApiClient) {
+        // What a browser sends when the connection it was reading drops: the
+        // id of the last event it managed to parse.
+        val res = client.transport.send(client.request(replay, Unit).withHeader("Last-Event-ID", "1"))
+
+        withClue(name) {
+            res shouldHaveStatus 200
+            // The handler read `lastEventId()` and started after it, so the
+            // event already delivered is not delivered twice.
+            res.body shouldBe
+                "retry: 15000\n\n" +
+                "event: tick\nid: 2\ndata: {\"seq\":2,\"at\":\"two\"}\n\n"
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `and a handler on a stream nobody resumed reads no id at all`(name: String, client: ApiClient) {
+        withClue(name) { client.response(replay, Unit).body shouldContain "id: 1" }
+    }
+
     // ------------------------------------------------------------- a simple GET
 
     @ParameterizedTest(name = "{0}")

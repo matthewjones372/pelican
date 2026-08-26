@@ -604,9 +604,16 @@ text/event-stream:
     required: [event, data]
 ```
 
-`id` and `retry` are absent because `sse(...)` never sends them, on the same
-principle that stops a response header being documented and not sent. `event`
-is absent too where the output does not name one.
+Every field is there exactly when the frame writer writes it, on the same
+principle that stops a response header being documented and not sent: `event`
+is absent where the output names no event, and `id` is absent where it declares
+no id extractor.
+
+`retry` is never a property here. It is a directive about the stream rather
+than a field of a dispatched event — the stream opens with it once, and a frame
+carrying no `data` dispatches nothing — so the response's description is where
+it is said: *"A server-sent event stream. Clients are asked to wait 15000ms
+before reconnecting."*
 
 A streamed JSON array is *not* sequential under either revision — it is one
 document with brackets round it that happens to arrive in pieces — so
@@ -4550,6 +4557,95 @@ stream type is nothing core has ever heard of.
 Core also owns the framing — `NdjsonOutput.frame(codec, value)` renders one
 element — so the backend only supplies wire mechanics. Nothing about NDJSON or
 SSE format is duplicated per backend.
+
+## An event stream a caller can pick up again
+
+```kotlin
+sse<OrderEvent>(eventName = "order", id = { it.sequence.toString() }, retry = 15.seconds)
+```
+
+`id` is a projection of the event, not a counter the interpreter keeps: one
+source of truth for where a reconnecting caller left off, and nothing to get out
+of step with the payload. Declared, every frame carries an `id:` line; left out,
+the frames are byte for byte what they were before the option existed, which is
+what keeps `AllBackendsTest`'s existing pin green.
+
+`retry` is per-endpoint rather than per-`Api`, because it is part of what the
+endpoint promises a caller rather than something a deployment tunes. It is a
+*stream* directive, so it goes out once, ahead of the first event, as a frame of
+its own:
+
+```
+retry: 15000
+
+event: tick
+id: 1
+data: {"seq":1}
+
+```
+
+A frame carrying no `data:` dispatches no event, which is why that is the honest
+place for it: attaching it to the first event would leave a stream that has yet
+to produce one having said nothing, and repeating it on every frame would say
+the same thing over and over.
+
+All three backends prepend the same directive to the same frames — `AllBackendsTest`
+pins the bytes with ids as it already pinned them without.
+
+### Reading where the caller left off
+
+```kotlin
+replay streamedNow { ticksSince(lastEventId()) }
+```
+
+`lastEventId()` is the `Last-Event-ID` the reconnecting caller sent, and null on
+a fresh connect. It is an extension on `Params` rather than a declared input:
+resume is optional by nature, so putting it in `endpoint(...)` would change the
+arity of every SSE handler for the sake of something most of them ignore. A
+handler that never calls it streams from now, as it always did.
+
+The header is read only where the endpoint's output declares an event stream —
+`Endpoint.resumable`, decided in core so three interpreters cannot each read it
+for a different set of endpoints — and the value is carried on `Params` rather
+than through an attribute, so nothing running before the handler can forge one.
+
+What to do with it is the service's. Pelican frames and delivers; retention,
+replay storage and fan-out stay where they were. Under 3.2 the described event's
+`id` says so in as many words, because a caller cannot infer from a string field
+that sending it back is how the stream is picked up again.
+
+### And on the calling side
+
+A generated method answering with an event stream takes a trailing
+`lastEventId: String? = null` and sends it as the header, and the `Streamed<T>`
+it hands back reports the id it reached:
+
+```kotlin
+val ticks = client.watchOrders(1L, limit = 2)
+ticks.map { it.seq }.toList()   // [1, 2]
+ticks.lastEventId               // "2"
+
+client.watchOrders(1L, limit = 2, lastEventId = ticks.lastEventId)  // 3, 4
+```
+
+`lastEventId` is the id of the last event *handed over*, so it is read after
+the sequence rather than off the response; a frame carrying no `id:` leaves the
+previous one standing, which is what the SSE specification says the last event
+id does. The parameter is generated for every endpoint answering
+`text/event-stream`, not only those whose description declares an extractor: a
+document cannot say whether a service assigns ids, so gating on it would make a
+client generated from the description differ from one generated from the
+document it publishes.
+
+`pelican-test`'s typed client takes the same argument —
+`app.collect(watchOrders, In2(1L, 3), lastEventId = "4")` — and `RequestSpec`
+already had `withHeader` for a hand-built one.
+
+**Reconnecting itself is not done for you.** No generated client loops,
+backs off, or decides how much of a gap is worth replaying: that is a policy,
+like retrying, and one whose right answer depends on what the stream carries.
+What is here is the seam — an id out, an id back in — so a caller can write the
+loop that suits them.
 
 `jsonArray<T>()` is the deliberate exception. Pekko already frames a stream of
 JSON documents as an array via `EntityStreamingSupport.json()`, and

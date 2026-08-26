@@ -35,6 +35,7 @@ import io.github.matthewjones372.pelican.repeated
 import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.textPart
 import io.github.matthewjones372.pelican.webhook
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * One description, three servers.
@@ -377,11 +378,26 @@ val ticker = endpoint {
     sse<Tick>(eventName = "tick")
 }
 
+/**
+ * The same events with the two fields a dropped connection needs: an `id:` per
+ * frame and the `retry:` the stream opens with. A description of its own rather
+ * than a change to [ticker], so the frames of a stream that sends neither stay
+ * pinned as they were.
+ */
+val replay = endpoint {
+    get("replay")
+    summary = "A short run of events a caller can pick up again"
+    operationId = "replay"
+    tag("greetings")
+    emits(requestId)
+    sse<Tick>(eventName = "tick", id = { it.seq.toString() }, retry = 15.seconds)
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
-        roundtrip, motd, forget, peek, everyone, logo, echoRaw, ticker,
+        roundtrip, motd, forget, peek, everyone, logo, echoRaw, ticker, replay,
     )
 
 /**
@@ -415,6 +431,16 @@ val LOGO_BYTES: ByteArray = "PELICAN".toByteArray(Charsets.US_ASCII)
 
 /** A short, fixed run of events, so three backends can be compared frame for frame. */
 fun ticks(): List<Tick> = listOf(Tick(1, "one"), Tick(2, "two"))
+
+/**
+ * The events after the one a reconnecting caller says it already saw. What
+ * Pelican supplies is the resume point; deciding what is still worth sending
+ * is the service's, and here that is a filter over a fixed list.
+ */
+fun ticksSince(lastEventId: String?): List<Tick> {
+    val seen = lastEventId?.toIntOrNull() ?: 0
+    return ticks().filter { it.seq > seen }
+}
 
 /** A short, fixed list, so three backends can be compared byte for byte. */
 fun greetingsOf(): List<Greeting> = listOf(Greeting("Hello", "en"), Greeting("Bonjour", "fr"))

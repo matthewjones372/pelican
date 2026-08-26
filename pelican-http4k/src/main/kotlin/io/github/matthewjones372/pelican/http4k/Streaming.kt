@@ -51,6 +51,10 @@ internal class FrameInputStream(frames: Sequence<String>) : InputStream() {
     }
 }
 
+/** Puts an SSE stream's opening directive in front of its first event. */
+internal fun Sequence<String>.after(prelude: String?): Sequence<String> =
+    if (prelude == null) this else sequenceOf(prelude) + this
+
 /**
  * Injects an SSE comment down a stream that has gone quiet. Idle rather than
  * periodic, matching `Source.keepAlive` — a busy stream sends nothing extra.

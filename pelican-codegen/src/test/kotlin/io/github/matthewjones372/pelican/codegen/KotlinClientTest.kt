@@ -322,9 +322,20 @@ class KotlinClientTest {
     @Test
     fun `each streaming shape gets the reader that frames it`() {
         client shouldContain "ndjsonFrames(body.bufferedReader())"
-        client shouldContain "sseFrames(body.bufferedReader())"
+        // An event stream is read through `sseStreamed`, which makes the reader
+        // and the id it fills in together.
+        client shouldContain "sseStreamed(body) {"
         client shouldContain "jsonArrayFrames(body.reader())"
         client shouldContain "fun listWidgets(page: Int? = null): Streamed<Widget> {"
+    }
+
+    @Test
+    fun `only an event stream takes an id to resume from`() {
+        client shouldContain "fun watchWidgets(lastEventId: String? = null): Streamed<Widget> {"
+        client shouldContain """headerParams = listOf("Last-Event-ID" to lastEventId)"""
+        withClue("a JSON array cannot be resumed, so nothing offers to") {
+            client shouldContain "fun listWidgets(page: Int? = null): Streamed<Widget> {"
+        }
     }
 
     @Test
@@ -389,7 +400,9 @@ class KotlinClientTest {
      */
     @Test
     fun `a streamed call sends no deadline, and every other call sends the client's`() {
-        client shouldContain """stream(request(Method.GET, "/widgets/watch", deadline = null))"""
+        client shouldContain
+            """stream(request(Method.GET, "/widgets/watch", """ +
+            """headerParams = listOf("Last-Event-ID" to lastEventId), deadline = null))"""
         client shouldContain """contentType = "application/octet-stream", deadline = null))"""
 
         withClue("a call read whole is bounded, as it always was") {

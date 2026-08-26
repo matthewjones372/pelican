@@ -11,6 +11,12 @@ class Params(
     val underlying: Any?,
     /** The description this request matched. Null only for a hand-built [Params]. */
     val endpoint: Endpoint<*, *>? = null,
+    /**
+     * What a caller reconnecting to an event stream said it had already seen.
+     * Read by [lastEventId]; a request that is not one carries null, and so
+     * does a fresh connect.
+     */
+    internal val resumeFrom: String? = null,
 ) {
     @Suppress("UNCHECKED_CAST")
     operator fun <T> get(key: ParamKey<T>): T {
@@ -111,6 +117,18 @@ class Params(
     fun missingRequiredHeaders(): List<ResponseHeader<*>> =
         endpoint?.responseHeaders.orEmpty().filter { it.required && it.name !in outgoing.orEmpty() }
 }
+
+/**
+ * Where a caller reconnecting to an event stream left off — the `Last-Event-ID`
+ * it sent back — or null on a fresh connect.
+ *
+ * An extension rather than a declared input because resume is optional by
+ * nature: a stream is answerable without it, and putting it in the endpoint's
+ * signature would change the arity of every handler for the sake of something
+ * most of them ignore. What to do with the value is the service's — Pelican
+ * frames and delivers, and retention is not its business.
+ */
+fun Params.lastEventId(): String? = resumeFrom
 
 /**
  * Thrown from a handler to produce a specific error status. Anything else that

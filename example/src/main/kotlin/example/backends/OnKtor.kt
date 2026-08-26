@@ -11,6 +11,7 @@ import io.github.matthewjones372.pelican.ktor.handledWith
 import io.github.matthewjones372.pelican.ktor.start
 import io.github.matthewjones372.pelican.ktor.streamedNow
 import io.github.matthewjones372.pelican.ktor.toChannel
+import io.github.matthewjones372.pelican.lastEventId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.flow
@@ -63,6 +64,7 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
     peek handledWith { _ -> },
 
     ticker streamedNow { ticks().asFlow() },
+    replay streamedNow { ticksSince(lastEventId()).asFlow() },
     everyone streamedNow { greetingsOf().asFlow() },
 
     logo bytesNow { io.ktor.utils.io.ByteReadChannel(LOGO_BYTES) },

@@ -70,6 +70,12 @@ class InMemoryClientTransportTest {
         ndjson<String>()
     }
 
+    private val watchThings = endpoint {
+        get("watch")
+        operationId = "watchThings"
+        sse<String>(id = { it.substringAfter('-') })
+    }
+
     private val breakThing = endpoint {
         get("boom")
         operationId = "breakThing"
@@ -106,6 +112,10 @@ class InMemoryClientTransportTest {
                 .take(5)
                 .map { "tick-$it".also { _ -> produced.incrementAndGet() } }
             CompletableFuture.completedStage(ticks as Any?)
+        },
+        ServerEndpoint(watchThings) { p ->
+            val from = p.lastEventId()?.toInt() ?: 0
+            CompletableFuture.completedStage(sequenceOf(1, 2, 3).filter { it > from }.map { "tick-$it" } as Any?)
         },
         ServerEndpoint(breakThing) { _ -> throw IllegalStateException("the database is on fire") },
         ServerEndpoint(takeBytes) { _ -> CompletableFuture.completedStage(Unit as Any?) },
@@ -184,6 +194,21 @@ class InMemoryClientTransportTest {
         val response = send(InMemoryClientTransport(api()), Method.GET, "http://things.test/things/7")
 
         response.text() shouldBe "thing-7/false/null/null"
+    }
+
+    @Test
+    fun `a reconnect crosses as the resume point the handler reads`() {
+        val transport = InMemoryClientTransport(api())
+
+        send(transport, Method.GET, "http://things.test/watch").text() shouldBe
+            "id: 1\ndata: tick-1\n\nid: 2\ndata: tick-2\n\nid: 3\ndata: tick-3\n\n"
+
+        send(
+            transport,
+            Method.GET,
+            "http://things.test/watch",
+            headers = listOf("Last-Event-ID" to "2"),
+        ).text() shouldBe "id: 3\ndata: tick-3\n\n"
     }
 
     @Test

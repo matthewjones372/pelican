@@ -20,6 +20,7 @@ import io.github.matthewjones372.pelican.PathSegment
 import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.decode
 import io.github.matthewjones372.pelican.spi.CorsHeaders
@@ -193,6 +194,13 @@ private fun negotiate(ep: Endpoint<*, *>, req: Request) {
 /** Every `Accept` field line: RFC 9110 reads two lines as one field. */
 private fun Request.acceptLines(): List<String> = headerValues("Accept").filterNotNull()
 
+/**
+ * The `Last-Event-ID` of a reconnect, read only where the endpoint answers with
+ * a stream that could be resumed — which is core's answer, not this file's.
+ */
+private fun Request.resumePoint(ep: Endpoint<*, *>): String? =
+    if (ep.resumable) header(SseOutput.LAST_EVENT_ID) else null
+
 private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap<ParamKey<*>, Any?>) = with(into) {
     // A loop rather than `filterIsInstance`, which allocates a list per
     // request to hold what is walked once.
@@ -328,7 +336,7 @@ private fun invoke(
 
     // Built before decoding, so a filter or a failing decode can still put a
     // header on the way out.
-    val params = Params(values, req, ep)
+    val params = Params(values, req, ep, resumeFrom = req.resumePoint(ep))
 
     // ---- what the caller will take, then the inputs -----------------------
     //

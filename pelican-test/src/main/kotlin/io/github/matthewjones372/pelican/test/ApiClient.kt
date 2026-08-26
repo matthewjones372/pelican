@@ -292,10 +292,13 @@ class ApiClient(
      * Sends a streaming call and collects every element — the right default for
      * asserting on content, and the wrong tool for asserting elements arrive as
      * produced. See `InMemoryTransport.exchange` for that.
+     *
+     * [lastEventId] is what a reconnecting caller would send; it means something
+     * only to an event stream, which is the only kind that can be resumed.
      */
     @Suppress("UNCHECKED_CAST")
-    fun <I, T> collect(endpoint: Endpoint<I, StreamOf<T>>, input: I): List<T> {
-        val req = request(endpoint, input)
+    fun <I, T> collect(endpoint: Endpoint<I, StreamOf<T>>, input: I, lastEventId: String? = null): List<T> {
+        val req = request(endpoint, input).resuming(lastEventId)
         val res = transport.send(req)
         if (!res.isSuccess) throw ApiCallFailed(endpoint, req, res)
         return decodeStream(endpoint, endpoint.output, res) as List<T>
@@ -307,13 +310,21 @@ class ApiClient(
      */
     @JvmName("collectFallible")
     @Suppress("UNCHECKED_CAST")
-    fun <I, E, T> collect(endpoint: Endpoint<I, Outcome<E, StreamOf<T>>>, input: I): List<T> {
-        val req = request(endpoint, input)
+    fun <I, E, T> collect(
+        endpoint: Endpoint<I, Outcome<E, StreamOf<T>>>,
+        input: I,
+        lastEventId: String? = null,
+    ): List<T> {
+        val req = request(endpoint, input).resuming(lastEventId)
         val res = transport.send(req)
         if (!res.isSuccess) throw ApiCallFailed(endpoint, req, res)
         val out = endpoint.output as FallibleOutput<E, StreamOf<T>>
         return decodeStream(endpoint, out.success, res) as List<T>
     }
+
+    /** The same request, saying where a reconnecting caller left off. */
+    private fun RequestSpec.resuming(lastEventId: String?): RequestSpec =
+        if (lastEventId == null) this else withHeader(SseOutput.LAST_EVENT_ID, lastEventId)
 
     private fun decodeStream(endpoint: Endpoint<*, *>, output: Output<*>, res: ResponseSpec): List<Any?> {
         return when (val out = output) {

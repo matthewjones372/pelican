@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.importer
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
 /**
@@ -92,6 +93,50 @@ class OpenApi32Test {
         )
 
         source shouldContain "sse<Order>()"
+    }
+
+    /**
+     * `sse(id = ...)` is a function of the event value, and no document holds a
+     * function; `retry` is a number the server opens the stream with. Both are
+     * how a service writes the stream rather than what the stream carries, so
+     * the import reads the payload and leaves them behind — a declaration
+     * claiming to send ids that nothing could compute would be worse.
+     */
+    @Test
+    fun `the frame fields a server decides for itself do not come back`() {
+        val source = imported(
+            document32(
+                """
+                /orders/watch:
+                  get:
+                    operationId: watchOrders
+                    responses:
+                      "200":
+                        description: An event stream. Clients are asked to wait 15000ms before reconnecting.
+                        content:
+                          text/event-stream:
+                            itemSchema:
+                              type: object
+                              properties:
+                                event:
+                                  type: string
+                                  const: order
+                                id:
+                                  type: string
+                                data:
+                                  type: string
+                                  contentMediaType: application/json
+                                  contentSchema:
+                                    ${'$'}ref: '#/components/schemas/Order'
+                              required: [event, id, data]
+                """,
+                order,
+            ),
+        )
+
+        source shouldContain "sse<Order>()"
+        source shouldNotContain "id ="
+        source shouldNotContain "retry ="
     }
 
     @Test
