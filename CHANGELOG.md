@@ -134,6 +134,15 @@ one.
   `ignoreUnknownKeys`, `encodeDefaults` and `explicitNulls` are what it reads.
   And a success carrying a payload its response never declared is now an
   `UndeclaredResponse` naming both types, the check a failure already had.
+- **Every compiler line the manual quotes is now a fixture.** `DoesNotCompileTest`
+  compiles the wrong input type, the wrong stream element, a value where a
+  stream was declared, a bare value where a failure was declared, a failure from
+  outside the declared type, and a seventh input with no overload to land on —
+  asserting the compiler's line, not a paraphrase of it. Two more fixtures pin
+  the holes the manual admits *open*, so a page describing a trade-off fails if
+  the trade-off quietly closes: a failure of the same payload type compiles
+  whichever endpoint declared it, and a lens handler reading a key nothing
+  declared compiles and throws on the request instead.
 - **Three truths the manual left unwritten.** A declared failure is always JSON —
   `errorJson` is the only spelling, on all three backends and in the document.
   A client that disconnects cancels a Ktor handler and does not cancel a Pekko
