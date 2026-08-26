@@ -1,10 +1,10 @@
 # Modules
 
-Linked from the [README](../README.md). What each of the twenty-six modules is
+Linked from the [README](../README.md). What each of the thirty modules is
 for, and what it depends on — the list to read when deciding which ones a
 build actually needs.
 
-Twenty-five modules and a Gradle plugin; you take four or five. The layering is enforced by tests
+Twenty-nine modules and a Gradle plugin; you take four or five. The layering is enforced by tests
 rather than convention.
 
 | Module | Depends on | Contains |
@@ -13,11 +13,13 @@ rather than convention.
 | `pelican-jackson` / `-kotlinx` / `-jsoniter` | core + one JSON library | your `Codecs` |
 | `pelican-pekko` / `-http4k` / `-ktor` | core + one server library | descriptions → that server's routes |
 | `pelican-*-docs` | its backend, openapi | serves the document and Swagger UI |
+| `pelican-*-mcp` | its backend, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
 | `pelican-schema` | core | one type → a JSON Schema 2020-12 document that resolves on its own |
-| `pelican-mcp` | core + schema | descriptions → MCP tool descriptions, and a dispatch that runs them. Descriptions half only: **serving is roadmap** — no SDK, no transport, nothing that speaks the protocol |
+| `pelican-mcp` | core + schema | descriptions → MCP tool descriptions, and a dispatch that runs them. Values only, so deriving a tool list needs no server |
+| `pelican-mcp-server` | core + mcp | those tools **served**: JSON-RPC 2.0 over stdio, and the request/response half of Streamable HTTP. No MCP SDK |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | core | where a generated client's requests go, over the JDK's `HttpClient` |
 | `pelican-client-pekko` | core + pekko-http | the same, over Pekko HTTP's client |
@@ -37,7 +39,11 @@ absent, `pelican-metrics` asserts it is core plus a meter API and no server
 library, `pelican-schema` asserts it carries no document generator and no
 codec — the three codecs are test-scoped, which is where the claim that spans
 them is made, `pelican-mcp` asserts it is core plus that schema pass and no MCP
-SDK, deriving tools being a separate job from serving them, `pelican-metrics-otel` asserts the mirror image — core plus the
+SDK, deriving tools being a separate job from serving them, and
+`pelican-mcp-server` asserts the same of the half that does serve them — the
+protocol is JSON-RPC over lines of text, and taking the official Kotlin SDK for
+it would put a Ktor server behind `mcpServe` on a service running Pekko,
+`pelican-metrics-otel` asserts the mirror image — core plus the
 OpenTelemetry API, and neither Micrometer nor a server library — which is the
 whole reason the two telemetry vendors are two modules, `pelican-client-java`
 asserts it carries no HTTP library beyond the JDK's, `pelican-client-pekko`,

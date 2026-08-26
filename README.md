@@ -129,7 +129,7 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-All twenty-five modules are on Maven Central under `io.github.matthewjones372`,
+All twenty-nine modules are on Maven Central under `io.github.matthewjones372`,
 with sources and an empty javadoc jar.
 
 ```kotlin
@@ -622,9 +622,19 @@ exception:
 
 Header parameters are deliberately not arguments: a model asked for an
 `Authorization` value invents one. The credential is supplied where the tools
-are served. See [Tools a model can call](docs/mcp.md) for what is refused and
-why — a streamed response, a cookie, a multipart body — and for the whole
-mapping.
+are served, which is one line:
+
+```kotlin
+mcpServe(ordersApi())                                 // stdio, for a client that launches a process
+routes(api.mcpRoutes() + api.toHttpHandler())         // or /mcp beside the endpoints, per backend
+```
+
+`pelican-mcp-server` speaks the protocol — JSON-RPC 2.0, revision `2025-11-25`
+— with no MCP SDK on the classpath, and `pelican-pekko-mcp`,
+`pelican-http4k-mcp` and `pelican-ktor-mcp` mount it exactly as the `-docs`
+modules mount the document. See [Tools a model can call](docs/mcp.md) for what
+is refused and why — a streamed response, a cookie, a multipart body — and for
+the whole mapping.
 
 ---
 
@@ -1042,7 +1052,7 @@ Nine things that wanted a page rather than a section, and one benchmark:
 | [Golden files](docs/golden-testing.md) | A test that fails when a change would break the callers you already have — a new required field, a deleted endpoint — and stays quiet when it would not. |
 | [Tools a model can call](docs/mcp.md) | The same endpoints as MCP tool descriptions and a dispatch that runs them — what becomes what, what is refused, where a credential comes from, and what a tool result cannot carry. |
 | [A schema that resolves on its own](docs/schemas.md) | A derived JSON Schema handed to something that does not hold your OpenAPI document — where the pointers go, what a union's branches carry instead of a `discriminator`, and what is refused. |
-| [Modules](docs/modules.md) | What each of the twenty-five modules is for and what it depends on, for deciding which ones your build needs. |
+| [Modules](docs/modules.md) | What each of the twenty-nine modules is for and what it depends on, for deciding which ones your build needs. |
 | [What it costs](docs/what-it-costs.md) | The interpreter measured by JMH against the hand-written routes it replaces, with the baselines that comparison needs and the error bars it came with. |
 | [Roadmap](docs/roadmap.md) | What is not built yet and the order it is worth building in — a different list from the deliberate refusals, and the argument for the order written down so it can be disagreed with. |
 
@@ -1060,6 +1070,7 @@ Nine things that wanted a page rather than a section, and one benchmark:
 ./gradlew :example:runMetrics            # Micrometer meters tagged from the descriptions, at /admin/meters
 ./gradlew :example:runTracing            # OpenTelemetry spans from the same descriptions, at /admin/traces
 ./gradlew :example:runShop               # a bookshop: three domain failures, three declared responses
+./gradlew :example:runMcp                # the orders API with its tools served on /mcp
 ./gradlew :example:generateOrdersDocument  # the spec, with no server started
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ```

@@ -15,7 +15,8 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 or 3.2.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-schema` | **core** | one type → a self-contained JSON Schema 2020-12 document: pointers under `$defs`, a union's branches carrying the property that picks them. No document generator, no codec |
-| `pelican-mcp` | core, schema | descriptions → MCP tool descriptions, and a dispatch that decodes a tool call into the handler the route already has. The descriptions half only: no MCP SDK, no transport, and **serving them is roadmap** |
+| `pelican-mcp` | core, schema | descriptions → MCP tool descriptions, and a dispatch that decodes a tool call into the handler the route already has. Values only: no MCP SDK and no transport, so a tool list can be derived with no server on the classpath |
+| `pelican-mcp-server` | core, mcp | those tools served: JSON-RPC 2.0 — `initialize`, `tools/list`, `tools/call`, `ping` — over stdio with `mcpServe(api)`, and the request/response half of Streamable HTTP for a backend to mount. Protocol revision `2025-11-25`. Still no MCP SDK |
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
 | `pelican-client-pekko` | core, pekko-http | the same seam over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-client-ktor` | core, ktor-client-cio | the same seam over Ktor's `HttpClient`, for a service that already runs one. Not `pelican-ktor`: calling is not interpreting |
@@ -26,10 +27,13 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-jsoniter` | core, jsoniter, kotlin-reflect | a third `Codecs`, bound and described through the primary constructor |
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and Swagger UI over HTTP |
+| `pelican-pekko-mcp` | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
 | `pelican-http4k` | core, http4k-core | descriptions → an http4k `HttpHandler`, plus a server that streams |
 | `pelican-http4k-docs` | http4k, openapi | the same two pages, on http4k |
+| `pelican-http4k-mcp` | http4k, mcp-server | the same endpoint, on http4k |
 | `pelican-ktor` | core, ktor-server-core, ktor-server-cio | descriptions → Ktor routes, with `suspend` handlers and `Flow` streams |
 | `pelican-ktor-docs` | ktor, openapi | the same two pages, on Ktor |
+| `pelican-ktor-mcp` | ktor, mcp-server | the same endpoint, on Ktor |
 | `pelican-metrics` | core, micrometer-core | descriptions → Micrometer meters, tagged from what the descriptions already say |
 | `pelican-metrics-otel` | core, opentelemetry-api | descriptions → OpenTelemetry server spans and the specified duration histogram |
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
@@ -870,8 +874,43 @@ model can act on. What nobody declared still throws.
 
 `pelican-mcp` carries no MCP SDK and no transport: `McpTool` and `ToolResult`
 are its own values, so a tool list can be derived, asserted and recorded as a
-golden with no server on the classpath. Serving them over stdio and Streamable
-HTTP is separate, and not built yet.
+golden with no server on the classpath. Serving them is the module next to it.
+
+### Serving them
+
+`pelican-mcp-server` speaks the protocol — JSON-RPC 2.0, revision `2025-11-25`:
+`initialize`, `notifications/initialized`, `tools/list`, `tools/call`, `ping`:
+
+```kotlin
+mcpServe(api, options)                                // stdio: a message per line, until EOF
+routes(api.mcpRoutes(options) + api.toHttpHandler())  // Streamable HTTP on /mcp, here on http4k
+```
+
+The stdio loop is what a desktop client launches as a subprocess; stdout is the
+transport, so a handler that prints goes to stderr or the client tries to parse
+it. The HTTP endpoint is mounted by `pelican-pekko-mcp`, `pelican-http4k-mcp`
+or `pelican-ktor-mcp` — the same split, and for the same reason, as the
+`-docs` modules: a service that serves endpoints alone never compiles the
+protocol in. Both drive the same `McpDispatch`, so a tool call over either is
+the execution path an HTTP request takes.
+
+**No MCP SDK.** The official Kotlin SDK resolves and is current, and its server
+half is Ktor's — `Route.mcp`, `mcpStreamableHttp`, an SSE transport over
+`ApplicationCall`, and `kotlin-sdk-server` compiling against `ktor-server-core`
+even for stdio. Adopting it would put a Ktor server, a Ktor client,
+kotlinx.serialization and a logging facade behind `mcpServe` on a service that
+runs Pekko, and would leave the HTTP half mountable on one backend of the
+three. What is spoken here is JSON-RPC over lines of text, and core already has
+the JSON tree to speak it with. The revision is pinned to that SDK's
+`LATEST_PROTOCOL_VERSION` rather than to whatever is newest, so the number in
+the handshake is one a client library on the other end supports.
+
+**What is not served.** No resources, prompts, sampling or elicitation: the
+endpoint model describes tools and does not describe those. No
+server-initiated event stream and no session id — a GET to the endpoint is
+answered `405`, which is what the specification names for a server with no
+stream to open. A tools-only server has nothing to push anyway, which is the
+same reason a streamed endpoint is not a tool.
 
 What a tool call cannot carry is refused where the tools are derived rather
 than at the call: a streamed answer, a multipart or raw body, a cookie
@@ -4709,7 +4748,7 @@ sources. It is a ratchet, not a ban: sixteen files accumulate into a mutable
 collection and hand back something immutable, which is what a builder is, and
 each is listed with why. What it stops is the next file quietly starting.
 
-A test that reads files has to say which ones. The eighteen library modules it
+A test that reads files has to say which ones. The nineteen library modules it
 judges are listed in `pelican-core/build.gradle.kts`, which declares their
 `src/main/kotlin` directories as inputs of `:pelican-core:test` and hands the
 same list to the test as a system property — one list, snapshotted by Gradle

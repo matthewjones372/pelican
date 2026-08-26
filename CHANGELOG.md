@@ -107,6 +107,31 @@ one.
 
 ### Added
 
+- **`pelican-mcp-server`, and the tools served.** `pelican-mcp` derived the
+  tools and ran a call; nothing carried either to a client, and the docs said
+  so. This module speaks the protocol — JSON-RPC 2.0, revision `2025-11-25`:
+  `initialize`, `notifications/initialized`, `tools/list`, `tools/call`,
+  `ping` — over stdio with `mcpServe(api)`, and `pelican-pekko-mcp`,
+  `pelican-http4k-mcp` and `pelican-ktor-mcp` mount the request/response half
+  of Streamable HTTP on `/mcp` beside the endpoints, exactly as the `-docs`
+  modules mount the document. Both drive the same `McpDispatch`, so a tool call
+  is the execution path an HTTP request takes: the same codecs, refinements,
+  filters and refusals, into the handler the route already has.
+  **No MCP SDK**, and the dependency test says so: the official Kotlin SDK's
+  server half is Ktor's — its transports are `Route` extensions, and
+  `kotlin-sdk-server` compiles against `ktor-server-core` even for stdio — so
+  adopting it would put a Ktor server behind `mcpServe` on a service running
+  Pekko, and leave the HTTP half mountable on one backend of three. The
+  revision is pinned to that SDK's `LATEST_PROTOCOL_VERSION`. Deferred and said
+  out loud: the server-initiated event stream and the session id that goes with
+  it — a GET is answered `405` — and resources, prompts and sampling.
+  `example.mcp` is the Orders service with both halves on one port.
+- **A Ktor-bound handler runs when it is invoked without a request.** Ktor's
+  binders launch the handler as a child coroutine of the call, so anything
+  invoking a binding without one — `mcpDispatch` running the same
+  `ServerEndpoint` as a tool — cast `null` to an `ApplicationCall` and answered
+  an internal error. Where there is no call it runs on the default dispatcher
+  instead; nothing is cancelling that work and no socket is waiting on it.
 - **`pelican-client-okhttp`, the fourth transport — and the one Android can
   run.** There is no `java.net.http` on Android, so a generated client could
   only get there through `KtorHttpTransport(HttpClient(OkHttp))`, which drags

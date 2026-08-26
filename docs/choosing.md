@@ -65,7 +65,7 @@ It is enormously broader. The 6.58.0.0 API documentation publishes 221 modules.
 Beyond API description there is chaos engineering, Servirtium service
 virtualisation, approval testing, WebDriver and Playwright drivers, serverless
 adapters for five clouds, an AWS surface where most services ship with a
-matching fake, and a large MCP and LLM section. Pelican is seventeen modules
+matching fake, and a large MCP and LLM section. Pelican is twenty-nine modules
 that describe HTTP endpoints and does nothing else on purpose, which is a
 smaller promise, not a better one.
 

@@ -20,21 +20,26 @@ shapes it answers with.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-mcp:0.1.0")
+    implementation("io.github.matthewjones372:pelican-mcp:0.1.0")         // the tools as values
+    implementation("io.github.matthewjones372:pelican-mcp-server:0.1.0")  // and spoken
+    implementation("io.github.matthewjones372:pelican-pekko-mcp:0.1.0")   // over HTTP, on your backend
 }
 ```
 
-Core and [`pelican-schema`](schemas.md). No MCP SDK: a tool list is a value.
+Core and [`pelican-schema`](schemas.md) for the first, and no MCP SDK for
+either: a tool list is a value, and the protocol is JSON-RPC over lines of text.
 
 ```kotlin
 val tools = ordersSpec().mcpTools(options)              // descriptions only
 val dispatch = ordersApi().mcpDispatch(options)         // descriptions, and callable
 dispatch.call("placeOrder", arguments)                  // CompletionStage<ToolResult>
+
+mcpServe(ordersApi(), options)                          // and the same, spoken to a client
 ```
 
-**Nothing here serves them yet.** Carrying tools over stdio and Streamable HTTP
-is the next piece of work; this is the half that has to be right first, and it
-is testable in memory without a server or a port.
+The values come first because they are the half that has to be right: a tool
+list is testable in memory, with no server and no port. [Serving
+them](#serving-them) is at the end.
 
 ## What becomes what
 
@@ -182,3 +187,67 @@ knowing which before pointing a model at a service.
 
 None of these is a reason not to publish tools. They are the reasons to keep
 the HTTP API the thing callers with real requirements use, which it is.
+
+## Serving them
+
+`pelican-mcp-server` is the half that speaks: JSON-RPC 2.0, protocol revision
+`2025-11-25` — `initialize`, `notifications/initialized`, `tools/list`,
+`tools/call` and `ping`, and nothing else.
+
+**Over stdio**, which is what a desktop client launches as a subprocess:
+
+```kotlin
+fun main() = mcpServe(ordersApi(), toolOptions)
+```
+
+One JSON message per line in, one per line out, until the input ends. stdout is
+the transport, so anything a handler prints goes to stderr — a `println` is a
+line the client tries to parse as a message.
+
+**Over HTTP**, on the port the endpoints are already served from:
+
+```kotlin
+// Pekko
+api.routeWithMcp(system, toolOptions)
+
+// http4k
+routes(api.mcpRoutes(toolOptions) + api.toHttpHandler())
+
+// Ktor
+routing {
+    pelicanMcp(api, toolOptions)
+    pelican(api)
+}
+```
+
+`pelican-pekko-mcp`, `pelican-http4k-mcp` and `pelican-ktor-mcp` are the same
+split the `-docs` modules make, for the same reason: a service that serves
+endpoints alone never compiles the protocol in. `example.mcp` is the Orders
+service with both on one port — `./gradlew :example:runMcp`, then:
+
+```
+curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+### No SDK, and what is not served
+
+The official MCP Kotlin SDK resolves and is current, and its server half is
+Ktor's: `Route.mcp`, `mcpStreamableHttp`, an SSE transport over
+`ApplicationCall`, and `kotlin-sdk-server` compiling against `ktor-server-core`
+even for stdio. Taking it would put a Ktor server, a Ktor client,
+kotlinx.serialization and a logging facade behind `mcpServe` on a service that
+runs Pekko, and would leave the HTTP half mountable on one backend of three.
+The protocol here is JSON-RPC over lines of text, and core already has the JSON
+tree to speak it with. The revision is pinned to that SDK's
+`LATEST_PROTOCOL_VERSION`, so the number in the handshake is one a client
+library on the other end supports.
+
+- **No resources, prompts, sampling or elicitation.** An endpoint description
+  says what a tool is; it does not say what any of those are.
+- **No server-initiated event stream and no session.** A GET to the endpoint is
+  answered `405`, which is what the specification names for a server with no
+  stream to open. A tools-only server has nothing to push — a tool call has one
+  result, which is the same reason a streamed endpoint is not a tool.
+- **No auth of its own.** The endpoint is mounted alongside the API and
+  inherits whatever the service already does; the credential the *tools* send
+  is `mcpOptions { headers = ... }`, above.

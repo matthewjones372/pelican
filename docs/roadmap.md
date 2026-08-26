@@ -293,8 +293,8 @@ different argument from this one.
 
 ## 9. A model that can call the service
 
-The descriptions half of this has landed, and the page says so here rather than
-being quietly rewritten, for the reason items 1, 3 and 8 do.
+This has landed, both halves, and the page says so here rather than being
+quietly rewritten, for the reason items 1, 3 and 8 do.
 
 `pelican-mcp` derives MCP tool descriptions from the endpoints — name, input
 schema, output schema — and `mcpDispatch` runs a tool call through the same
@@ -304,10 +304,19 @@ resolves only inside an OpenAPI document is no use to a model, and a union
 branch missing the property that picks it is a schema a validator passes and
 the codec then refuses. Both are described in [Tools a model can call](mcp.md).
 
-What is not built is the serving half: stdio and Streamable HTTP, an SDK
-mapping, and the initialise handshake. That is a small piece of work now the
-tool list exists, and it is the piece that needs an MCP SDK and a server — so it
-belongs in a module of its own, exactly as serving the OpenAPI document does.
+`pelican-mcp-server` carries them: JSON-RPC 2.0 over stdio with
+`mcpServe(api)`, and the request/response half of Streamable HTTP mounted by
+`pelican-pekko-mcp`, `pelican-http4k-mcp` and `pelican-ktor-mcp` — a module of
+its own per backend, exactly as serving the OpenAPI document is. It turned out
+not to need an MCP SDK at all: the official Kotlin one's server half is Ktor's,
+so taking it would have put a Ktor server behind `mcpServe` on a service
+running Pekko. The revision spoken is `2025-11-25`, pinned to that SDK's
+`LATEST_PROTOCOL_VERSION`.
+
+What is still not built is the server-initiated event stream, the session id
+that goes with it, and resources, prompts and sampling. The first two are state
+a tools-only server has no use for — a tool call has one result — and the last
+three are things an endpoint description does not describe.
 
 This sits here rather than higher because the argument for it is the same
 argument the rest of the library makes, and the same objection applies: an
@@ -316,10 +325,9 @@ pretending otherwise would describe a call the service cannot honour. Those are
 refused rather than half-served, which means a service publishing tools has
 decided which of its endpoints a model gets.
 
-**Touches** a new module carrying the SDK and the transports; nothing in
-`pelican-core`.
-**Done when** a model client can list and call the example service's tools over
-stdio, and the tool list it sees is the committed golden.
+**Touched** four new modules — the protocol and one mounting per backend — and
+one line in `pelican-ktor`, where a bound handler needed a request to run on.
+Nothing in `pelican-core`.
 
 ## Not on this list
 
