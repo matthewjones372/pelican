@@ -8,15 +8,20 @@ Every snippet here is drawn from the compiled example or from
 [the reference manual](reference.md), which is where the reasoning lives. This
 page is the short answer; the reference is the long one.
 
-The imports are the same in nearly every recipe, so they are written once here
-and elided after:
+The recipes share one set of Gradle dependencies, written once here:
 
 ```kotlin
-import io.github.matthewjones372.pelican.*
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.pekko.*
+// build.gradle.kts
+dependencies {
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")       // brings pelican-core, and Pekko itself, transitively
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")     // JacksonCodecs
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")  // startWithDocs and Swagger UI
+    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC1")    // the typed test client
+}
 ```
 
+A recipe that needs a module beyond these says so in a comment on its first
+line. Each recipe carries its own imports so it can be pasted whole;
 `import ...pelican.*` is deliberate — core's vocabulary is the point, and the
 wildcard rule is turned off for it in `.editorconfig` and detekt alike.
 
@@ -29,6 +34,13 @@ The smallest service that runs. This is
 verbatim, and it is compiled and tested on every build so it cannot rot.
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.docs
+import io.github.matthewjones372.pelican.pekko.*
+import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
+
 data class Greeting(val message: String)
 
 val who = pathParam<String>("who", description = "Who to greet")
@@ -56,6 +68,12 @@ fun main() {
 And its test, in full:
 
 ```kotlin
+// build.gradle.kts: testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC1")
+import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.shouldBuild
+import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.Test
+
 class FirstEndpointTest {
     private val app = greetings().inMemory("first-endpoint")
 
@@ -83,6 +101,8 @@ Declare the inputs on `endpoint(...)` and the handler's signature is fixed by
 them. No separate `query(...)` call — listing them did that.
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+
 val userId = pathParam<Long>("userId")
 val limit  = queryParam<Int>("limit").default(25)
 val status = queryParam<OrderStatus>("status").optional()
@@ -122,6 +142,8 @@ Refining a codec narrows what is accepted *and* writes the constraint into the
 schema. Both halves, or it is a lie in the contract:
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+
 val limit = queryParam("limit", IntCodec.between(1, 100), description = "How many to return").default(20)
 ```
 
@@ -136,6 +158,8 @@ Declare the failure as a value, list it on the output, and it joins the
 endpoint's type. The handler then has to *produce* it rather than throw it.
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+
 val noSuchUser = errorJson<ApiError>(404, "No user with that id")
 val badApiKey  = errorJson<ApiError>(401, "Missing or bad API key")
 
@@ -178,6 +202,8 @@ exists to show the shape that goes wrong.
 ## More than one success
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+
 val orderAt = responseHeader<String>("Location", "Where the placed order lives")
 
 val orderPlaced = json<Order>(status = 201, orderAt)
@@ -207,6 +233,8 @@ submitOrder handledOneOf { (id, key, req) ->
 Declared on the endpoint, set from the handler, published in the document:
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+
 val location   = responseHeader<String>("Location", "Where the new order lives")
 val rateLeft   = responseHeader<Int>("X-RateLimit-Remaining")
 val retryAfter = responseHeader<Long>("Retry-After").optional()
@@ -231,6 +259,8 @@ placeOrder handledNow { req ->
 ## A form body
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+
 data class SignIn(val user: String, val remember: Boolean, val visits: Int)
 
 val credentials = formBody<SignIn>(description = "The sign-in form")
@@ -255,6 +285,8 @@ app.call(signIn, SignIn("ada", remember = true, visits = 3))
 ## A file upload
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+
 val caption = textPart("caption", StringCodec.nonEmpty(), description = "What to call it")
 val upload  = filePart("file", contentType = "text/csv", description = "One order per line")
 
@@ -284,6 +316,8 @@ The description is backend-agnostic; the *binder* is the backend's own stream
 type, so nothing in core knows what a `Source` is:
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+
 val streamOrders = endpoint(userId, limit) {
     get("users" / userId / "orders" / "stream")
     ndjson<Order>()
@@ -292,6 +326,9 @@ val streamOrders = endpoint(userId, limit) {
 
 ```kotlin
 // pelican-pekko — Source<T, NotUsed>
+import io.github.matthewjones372.pelican.pekko.*
+import org.apache.pekko.stream.javadsl.Source
+
 streamOrders streamedNow { (id, max) -> Source.from(Store.orders(id, max)) }
 ```
 
@@ -306,6 +343,8 @@ test with `app.collect(...)`.
 ## Security schemes
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+
 val oauth = oauth2AuthorizationCode(
     authorizationUrl = "https://id.example.com/oauth2/authorize",
     tokenUrl = "https://id.example.com/oauth2/token",
@@ -346,6 +385,9 @@ Composable, outermost-first, narrowable with `onlyWhen`, and able to reject by
 throwing:
 
 ```kotlin
+import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+
 val caller = attribute<Caller>("caller")
 
 val requireToken = before { p ->
@@ -375,6 +417,14 @@ fileReport handledNow { req -> Reports.file(this[caller].subject, req) }
 ## Testing, in three layers
 
 ```kotlin
+// build.gradle.kts: testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC1")
+import io.github.matthewjones372.pelican.*             // In2, In3, In4
+import io.github.matthewjones372.pelican.pekko.start
+import io.github.matthewjones372.pelican.test.pekko.client
+import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.shouldBuild
+import io.kotest.matchers.shouldBe
+
 val app = ordersApi().inMemory()          // pelican-test-pekko
 
 // 1. behaviour — typed in, typed out, no path strings

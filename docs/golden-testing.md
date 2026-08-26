@@ -26,7 +26,7 @@ calling us?"
 
 ```kotlin
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-golden:0.2.0")
+    testImplementation("io.github.matthewjones372:pelican-test-golden:1.0.0-RC1")
 }
 ```
 

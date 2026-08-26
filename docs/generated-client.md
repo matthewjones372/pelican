@@ -8,7 +8,7 @@ or on another release cycle, get a file generated from them instead. It is a
 Gradle task: no `main` to write, no `JavaExec` to wire.
 
 ```kotlin
-plugins { id("io.github.matthewjones372.pelican") version "0.2.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC1" }
 
 pelican {
     clients {
@@ -30,6 +30,13 @@ document from the same function; see
 [docs/reference.md](reference.md#the-gradle-plugin).
 
 ```kotlin
+// build.gradle.kts:
+//   implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")       // JacksonCodecs; brings pelican-core
+//   implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")  // the transport the client sends with
+import com.example.orders.*                              // the generated file: OrdersClient and its sealed failures
+import io.github.matthewjones372.pelican.Outcome
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 
 val orders = client.listOrders(1L, limit = 3)          // Streamed<Order>, as they arrive
@@ -57,7 +64,9 @@ sealed type per endpoint: add a failure, regenerate, and the calls that do not
 handle it stop compiling. A failure that declares response headers carries them
 as properties, typed from the schema the document publishes — nullable, because
 this is the reading end and a client that threw over a header would have thrown
-away the failure it was handed.
+away the failure it was handed. An Arrow codebase converts a call's `Outcome`
+at the edge with `toEither()` from `pelican-arrow`, and works in `Either` from
+there.
 
 Anything the endpoint did not describe is an `ApiCallFailed`, carrying the
 status, the method, the path template and the body that arrived — capped at
@@ -111,45 +120,30 @@ fun interface ClientTransport {
 }
 ```
 
-`pelican-client-java` is the adapter over the JDK's own `HttpClient`: add the
-module and a client finds it through `ServiceLoader`, with no line to write.
+`pelican-client-pekko` is the shipped adapter, over Pekko HTTP's client: add
+the module and a client finds it through `ServiceLoader`, with no line to
+write.
 
 ```kotlin
-dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.2.0") }
+dependencies { implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1") }
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 ```
 
-`pelican-client-pekko` is the second one, over Pekko HTTP's client, and the one
-a service already running Pekko wants — it takes the `ActorSystem` that service
-already has, so the calls go out on its dispatchers and under its
-configuration:
+A service already running Pekko hands over the `ActorSystem` it already has, so
+the calls go out on its dispatchers and under its configuration; a caller that
+does not run Pekko passes nothing and the adapter keeps a daemonic system of
+its own:
 
 ```kotlin
 val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTransport(system))
 ```
 
-`pelican-client-okhttp` is the third, over OkHttp's `Call`, and it takes the
-`OkHttpClient` an application has already built — its interceptors, its cache
-and its connection pool included:
-
-```kotlin
-val client = OrdersClient("https://orders.internal", JacksonCodecs, OkHttpTransport(okHttpClient))
-```
-
-### On the JVM it is a choice; on Android it is the answer
-
-The module is plain JVM — core and `okhttp`, no Android plugin and no AndroidX,
-which `DependenciesTest` asserts rather than promises. On a server it is one
-adapter among three, worth taking when OkHttp is already the stack in the
-process. On Android it is the only one of the three that runs at all: there is
-no `java.net.http` on the platform, Pekko is a second networking stack in an app
-that already ships one, and OkHttp is what the platform uses underneath anyway.
-
-OkHttp **4.x is the floor**. Gradle resolves upwards, so a build already on
-OkHttp 5 keeps it. A fleet pinned to OkHttp 3 has no adapter here and has to
-hand `OrdersClient` a `ClientTransport` of its own over the OkHttp 3 already in
-the build.
+The JDK adapter (`pelican-client-java`), the OkHttp adapter
+(`pelican-client-okhttp`) — the one that runs on Android — and the Ktor one
+(`pelican-client-ktor`) are written and green on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch, and return after 1.0.
 
 More generally, a service that already runs an HTTP client passes that one as
 the third argument and gets its pooling, its metrics and its tuning rather than
@@ -198,14 +192,11 @@ so. The lambda is for what every call carries.
 
 `OrdersClient(..., timeout = Duration.ofSeconds(30))` is the deadline every
 call is built with, and it reaches the transport as `ClientRequest.timeout`.
-What that bounds is the transport's answer, and the adapters do not agree, so
-it is worth knowing which you have:
+What that bounds is the transport's answer:
 
 | Transport | What the deadline bounds | Where it comes from |
 |---|---|---|
-| `pelican-client-java` | the response head; the body streams on after it | `HttpRequest.timeout` |
-| `pelican-client-pekko` | the response head, likewise | the adapter, on the stage: Pekko's own timeouts are pool settings |
-| `pelican-client-okhttp` | the response head, likewise | the adapter, on the stage: OkHttp's `callTimeout` is the whole exchange, so it is not used |
+| `pelican-client-pekko` | the response head; the body streams on after it | the adapter, on the stage: Pekko's own timeouts are pool settings |
 | `InMemoryClientTransport` | nothing; there is no clock in a function call | — |
 
 A streamed call — `ndjson`, `sse`, `jsonArray` or `bytes` — carries no deadline
@@ -295,7 +286,9 @@ val client = OrdersClient(
 `retryPolicy()` sends three times at most, waits 100ms and then 200ms with half
 of each wait randomised, and retries only 408, 429, 502, 503 and 504, only on
 the methods HTTP calls idempotent, and only for an `IOException`. It is not
-retrying a 500, a POST, or a body it cannot ask for twice. A `Retry-After` is
+retrying a 500, a POST, or a body it cannot ask for twice. Connection failures
+— a refused connection, a reset, a dead node — surface from the shipped
+transport as `IOException`, so the default fires for them. A `Retry-After` is
 honoured where it is longer than the computed wait, and where it asks for more
 than ten seconds the policy stops retrying rather than waiting that long. Every
 one of those is a constructor argument. The defence of each default is in

@@ -122,21 +122,27 @@ The reference manual, with the reasoning behind each design decision, is
 ## Install
 
 The current release is **0.2.0**, on Maven Central under
-`io.github.matthewjones372`:
+`io.github.matthewjones372`; the release candidate, **1.0.0-RC1**, is what this
+page describes. Until its tag lands, `./gradlew publishToMavenLocal` builds it
+from source.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-core:0.2.0")
-    implementation("io.github.matthewjones372:pelican-pekko:0.2.0")
-    implementation("io.github.matthewjones372:pelican-jackson:0.2.0")
-    testImplementation("io.github.matthewjones372:pelican-test:0.2.0")
+    // The interpreter. Brings pelican-core and Pekko HTTP itself transitively.
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+    // The codec module: Jackson, and the schemas the document derives.
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+    // /openapi.json and Swagger UI beside the endpoints — startWithDocs lives here.
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+    // The typed test client.
+    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC1")
 }
 ```
 
-[Modules](docs/modules.md) lists all of them and what each depends on. Three —
-`pelican-mcp-server`, `pelican-pekko-mcp` and `pelican-client-okhttp` — are new
-since 0.2.0 and ship with 1.0; until it is tagged,
-`./gradlew publishToMavenLocal` builds them from source.
+Those four lines are the whole canonical stack — everything on this page
+compiles against them. [Modules](docs/modules.md) lists all eighteen and what
+each depends on. New since 0.2.0: `pelican-mcp-server`, `pelican-pekko-mcp`
+and `pelican-arrow`.
 
 The Gradle plugin is `io.github.matthewjones372.pelican`. It publishes to Maven
 Central rather than the Gradle Plugin Portal, so the build needs telling once:
@@ -153,14 +159,14 @@ pluginManagement {
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "0.2.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC1" }
 ```
 
 To build against unreleased changes, `./gradlew publishToMavenLocal` installs
 the modules and `./gradlew -p pelican-gradle-plugin publishToMavenLocal` the
-plugin. The version between tags comes from the nearest tag — `0.2.0-SNAPSHOT`
-on an untagged commit after `v0.2.0` — rather than from a number written down
-anywhere.
+plugin. The version between tags comes from the nearest tag — a `-SNAPSHOT` of
+the next version on an untagged commit — rather than from a number written
+down anywhere.
 
 ## Your first endpoint
 
@@ -170,6 +176,14 @@ compiled — it is
 the example module, so the front page cannot drift from what runs.
 
 ```kotlin
+// Needs pelican-pekko, pelican-jackson and pelican-pekko-docs — the Install
+// block above, minus the test line.
+import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.docs
+import io.github.matthewjones372.pelican.pekko.*
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
+
 data class Greeting(val message: String)
 
 val who = pathParam<String>("who", description = "Who to greet")
@@ -299,7 +313,12 @@ placeOrder handledOrFail { (id, key, req) ->
 The status comes from the declaration rather than the payload's type, so two
 failures can share a payload. Give the failures a sealed supertype and the
 `when` is exhaustive. A failure can carry response headers — a `Retry-After` on
-a 429 — declared on that one failure and supplied where it is produced. See
+a 429 — declared on that one failure and supplied where it is produced.
+
+An endpoint declaring a single failure can skip the naming: `err(value)` is
+`ok`'s other half and means that one declared failure. An Arrow codebase
+converts at the edge instead — `service.find(id).toOutcome()`, from
+`pelican-arrow`, reads a `Right` as `ok` and a `Left` as `err`. See
 [Declared failures](docs/reference.md#declared-failures).
 
 ## More than one successful response

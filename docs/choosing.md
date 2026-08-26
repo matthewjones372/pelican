@@ -3,7 +3,7 @@
 Linked from the [README](../README.md). The page for deciding *against* Pelican
 quickly, and for a reason that is actually true.
 
-Pelican's current release is 0.2.0, with 1.0 at release-candidate stage. The
+Pelican's current release is 1.0.0-RC1, the candidate for 1.0. The
 README explains what it does and the reference manual explains how, but
 neither answers the question a reader arrives with, which is whether the thing
 they already have is worse. Usually it is not. This page is the honest version
@@ -67,7 +67,7 @@ It is enormously broader. The 6.58.0.0 API documentation publishes 221 modules.
 Beyond API description there is chaos engineering, Servirtium service
 virtualisation, approval testing, WebDriver and Playwright drivers, serverless
 adapters for five clouds, an AWS surface where most services ship with a
-matching fake, and a large MCP and LLM section. Pelican is nineteen modules
+matching fake, and a large MCP and LLM section. Pelican is eighteen modules
 that describe HTTP endpoints and does nothing else on purpose, which is a
 smaller promise, not a better one.
 
@@ -435,14 +435,13 @@ generates a real Kotlin client from the descriptions: one method per operation,
 sealed failure types, streamed responses, a per-request timeout, and a
 `ClientTransport` it sends through rather than an HTTP library it is welded to.
 That is more than a toy. But there is no published client artifact — the file is
-generated into your build, and you own it. Four transports are written:
-`pelican-client-java` over the JDK's own `HttpClient`, `pelican-client-pekko`
-over Pekko HTTP's client, which takes the `ActorSystem` a Pekko service already
-has, `pelican-client-okhttp` over OkHttp's `Call`, which takes the
-`OkHttpClient` an application already built and is the one that runs on Android,
-and `pelican-client-ktor` over Ktor's, which is on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch with the Ktor server and not published at 1.0. A build carrying more
-than one has to name the
+generated into your build, and you own it. One transport ships:
+`pelican-client-pekko` over Pekko HTTP's client, which takes the `ActorSystem`
+a Pekko service already has. The JDK, OkHttp and Ktor adapters —
+`pelican-client-java`, `pelican-client-okhttp` (the one that runs on Android)
+and `pelican-client-ktor` — are written and green on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch and not published at 1.0. A build carrying more
+than one transport has to name the
 transport at each client it constructs, since nothing can choose between two
 providers on one classpath. The generated methods block by default, joining the
 stage the transport answers with; a `suspend` surface is generated instead when

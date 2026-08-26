@@ -120,12 +120,17 @@ interpreter half-covers it), raw Netty.
 ## Clients
 
 `ClientTransport` has landed, with the `suspend` surface and the retry policy.
+All four adapters were written; 1.0 ships one of them, `pelican-client-pekko`
+— the client a Pekko stack already runs — and the rest wait on the
+`multi-backend` branch.
 
-- [x] **`pelican-client-java`** over the JDK's own `HttpClient`, and
-      **`pelican-client-pekko`** beside it.
+- [x] **`pelican-client-pekko`**, the transport 1.0 ships.
+- [x] **`pelican-client-java`** over the JDK's own `HttpClient`. Written; on
+      the `multi-backend` branch until it returns after 1.0.
 - [x] **`pelican-client-okhttp`.** `java.net.http` does not exist on Android,
-      so OkHttp is what reaches every Android caller. Landed for 1.0; on
-      Central from the 1.0 release.
+      so OkHttp is what reaches every Android caller. Written; on the
+      `multi-backend` branch until it returns after 1.0 — the largest reach
+      gain among the waiting restores.
 - [ ] **`pelican-client-ktor`.** Written, on the `multi-backend` branch with
       the Ktor server stack; returns after 1.0. Also the route to Kotlin
       Multiplatform, and so to iOS and JS callers.

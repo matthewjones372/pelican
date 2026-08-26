@@ -44,12 +44,13 @@ worth keeping next to the result of following it.
   interpreter to fix.
 - **Item 2** shipped as [Choosing between Pelican and the alternatives](choosing.md).
 - **Item 3** is done. It shipped in three parts:
-  - `ClientTransport` lives in core, and there is an adapter for each client a
-    Pelican service is likely to be running already: `pelican-client-java` over
-    the JDK's own `HttpClient`, `pelican-client-pekko` over Pekko HTTP's,
-    `pelican-client-okhttp` over OkHttp's, and `pelican-client-ktor` over
-    Ktor's — that last one on the `multi-backend` branch, with the Ktor server.
-    The second of them made the classpath question real rather than
+  - `ClientTransport` lives in core, with `pelican-client-pekko` over Pekko
+    HTTP's client as the adapter that ships — the client a Pekko service is
+    running already. The others written are `pelican-client-java` over the
+    JDK's own `HttpClient`, `pelican-client-okhttp` over OkHttp's, and
+    `pelican-client-ktor` over Ktor's — all three on the `multi-backend`
+    branch with the http4k and Ktor stacks, returning after 1.0.
+    Writing the second of them made the classpath question real rather than
     hypothetical: `ClientTransport.default()` refuses to choose between two
     providers, so a build carrying more than one names the transport at each
     client it constructs.
@@ -101,7 +102,7 @@ changes what Pelican is for. Every competitor makes you name the operation
 twice — once in the route, once in the metric. Here the name already exists.
 
 **Touches** `pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Filter.kt`,
-the three interpreters, a new `pelican-metrics` module.
+the interpreters, a new `pelican-metrics` module.
 **Done when** one line in an `api { }` block produces a request counter and a latency
 timer dimensioned by method, path template, operation and status; the example
 runs with it; and the module's dependency test asserts it pulls in core and a
@@ -151,9 +152,9 @@ runtime preamble the generator emits, not a swapped field.
 
 - **`ClientTransport` lives in core.** An interface and two holders, no library
   types, which keeps `NoThirdPartyDependenciesTest` true. Adapters —
-  `pelican-client-java`, `pelican-client-pekko`, `pelican-client-okhttp`, and
-  `pelican-client-ktor` on the `multi-backend` branch — carry their own
-  dependencies, exactly as a server module does.
+  `pelican-client-pekko` on main; `pelican-client-java`,
+  `pelican-client-okhttp` and `pelican-client-ktor` on the `multi-backend`
+  branch — carry their own dependencies, exactly as a server module does.
 - **Not `pelican-test`'s `Transport`.** That one is blocking and carries a
   `String` body deliberately, which is precisely why the test client cannot
   upload binary. A real client needs a streamed request body for a file part

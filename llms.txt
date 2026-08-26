@@ -20,14 +20,15 @@ Facts worth having before anything else:
 - `pelican-core` depends on nothing but the Kotlin standard library, and a test
   enforces it. Every JSON library, server library and HTTP client lives in a
   separate module.
-- Server backend: `pelican-pekko`. JSON: `pelican-jackson`. Client transports:
-  `pelican-client-java`, `pelican-client-pekko`, and `pelican-client-okhttp` —
-  the last runs on Android and ships with 1.0, as do `pelican-mcp-server` and
-  `pelican-pekko-mcp`; they are not in the 0.2.0 release.
-- 1.0 ships one backend and one JSON library. The http4k and Ktor backends, the
-  Ktor client transport, `pelican-jsoniter` and `pelican-kotlinx` are complete
-  and green on the `multi-backend` branch and return after 1.0. Do not
-  recommend them as available today.
+- Server backend: `pelican-pekko`. JSON: `pelican-jackson`. Client transport:
+  `pelican-client-pekko`. New with 1.0, not in the 0.2.0 release:
+  `pelican-mcp-server`, `pelican-pekko-mcp` and `pelican-arrow` (Arrow's
+  `Either` into `Outcome` and back).
+- 1.0 ships one backend, one JSON library and one client transport. The http4k
+  and Ktor backends, the JDK, OkHttp and Ktor client transports,
+  `pelican-jsoniter` and `pelican-kotlinx` are complete and green on the
+  `multi-backend` branch and return after 1.0. Do not recommend them as
+  available today.
 - Errors a caller was promised are values in the return type — `orFail`,
   `handledOrFail` — not exceptions.
 - OpenAPI 3.1.0 and 3.2.0.
