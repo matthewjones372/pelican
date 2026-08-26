@@ -20,6 +20,7 @@ import io.github.matthewjones372.pelican.formBody
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.jsonBody
+import io.github.matthewjones372.pelican.ndjsonIn
 import io.github.matthewjones372.pelican.nonEmpty
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
@@ -52,6 +53,8 @@ data class Greeting(val greeting: String, val language: String)
 data class Tick(val seq: Int, val at: String)
 
 data class Note(val text: String)
+
+data class Tally(val notes: Int)
 
 data class Echoed(val text: String, val trace: String?)
 
@@ -355,6 +358,28 @@ val logo = endpoint {
     bytes("image/png")
 }
 
+/**
+ * A stream in the other direction, which is where the backends visibly differ
+ * a second time: the frames arrive as a `Source` on Pekko, a `Sequence` on
+ * http4k and a `Flow` on Ktor, and the framing at both ends is core's.
+ *
+ * The answer is a value rather than a second stream, which is what makes the
+ * two refusals below reachable: a response that has already begun cannot change
+ * its status, so a frame that will not decode is a 400 only for an endpoint
+ * that reads the upload before it answers. `UploadTimingTest` is where the
+ * other shape — a stream each way, answered as it arrives — is exercised.
+ */
+val tally = endpoint(ndjsonIn<Note>(description = "One note per line, read as it arrives")) {
+    post("tally")
+    summary = "Count the notes in a streamed upload"
+    operationId = "tally"
+    tag("greetings")
+    emits(requestId)
+    errorResponse(400, "A frame that would not decode, named by the line it was on")
+    errorResponse(413, "A frame longer than this service will hold")
+    json<Tally>()
+}
+
 val echoRaw = endpoint(rawBody(description = "Whatever was sent, unread")) {
     post("echo-raw")
     summary = "Hand the body straight back without reading it"
@@ -397,7 +422,7 @@ val replay = endpoint {
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
-        roundtrip, motd, forget, peek, everyone, logo, echoRaw, ticker, replay,
+        roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay,
     )
 
 /**

@@ -14,9 +14,11 @@ import io.github.matthewjones372.pelican.ktor.handledWith
 import io.github.matthewjones372.pelican.ktor.start
 import io.github.matthewjones372.pelican.ktor.streamedNow
 import io.github.matthewjones372.pelican.ktor.toChannel
+import io.github.matthewjones372.pelican.ktor.toFlow
 import io.github.matthewjones372.pelican.lastEventId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.count
 import kotlinx.coroutines.flow.flow
 
 /**
@@ -73,6 +75,10 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
     logo bytesNow { io.ktor.utils.io.ByteReadChannel(LOGO_BYTES) },
 
     echoRaw bytesNow { body -> body.toChannel() },
+
+    // The same count, off a cold `Flow`: collecting it reads the channel a
+    // chunk at a time, so the upload is never held whole.
+    tally handledNow { rows -> Tally(rows.toFlow().count()) },
 )
 
 fun ktorApi(

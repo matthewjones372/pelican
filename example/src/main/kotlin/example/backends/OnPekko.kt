@@ -8,14 +8,17 @@ import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.lastEventId
 import io.github.matthewjones372.pelican.pekko.bytesNow
+import io.github.matthewjones372.pelican.pekko.handledBy
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOneOf
 import io.github.matthewjones372.pelican.pekko.handledOrFail
 import io.github.matthewjones372.pelican.pekko.handledWith
+import io.github.matthewjones372.pelican.pekko.runWith
 import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.github.matthewjones372.pelican.pekko.toSource
 import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.javadsl.Sink
 import org.apache.pekko.stream.javadsl.Source
 import org.apache.pekko.util.ByteString
 import java.time.Duration
@@ -71,6 +74,13 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
     // `toSource` hands back the request's own materialised value; the binder
     // wants `NotUsed`, and nothing here needs what it discards.
     echoRaw bytesNow { body -> body.toSource().mapMaterializedValue { NotUsed.getInstance() } },
+
+    // The upload's frames as a `Source`, run to a count. `runWith` because the
+    // answer is a value: the upload has to be consumed before there is one, and
+    // consuming a `Source` needs the system the request arrived on.
+    tally handledBy { rows ->
+        rows.runWith(Sink.fold(0) { n: Int, _ -> n + 1 }).thenApply { Tally(it) }
+    },
 )
 
 fun pekkoApi(

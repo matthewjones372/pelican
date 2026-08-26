@@ -13,6 +13,7 @@ import io.github.matthewjones372.pelican.http4k.handledOrFail
 import io.github.matthewjones372.pelican.http4k.handledWith
 import io.github.matthewjones372.pelican.http4k.start
 import io.github.matthewjones372.pelican.http4k.streamedNow
+import io.github.matthewjones372.pelican.http4k.toSequence
 import io.github.matthewjones372.pelican.http4k.toStream
 import io.github.matthewjones372.pelican.lastEventId
 
@@ -70,6 +71,10 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
     logo bytesNow { java.io.ByteArrayInputStream(LOGO_BYTES) },
 
     echoRaw bytesNow { body -> body.toStream() },
+
+    // The same count, off a lazy `Sequence`: `count()` walks it, so a chunk of
+    // the request is read at a time and the upload is never held whole.
+    tally handledNow { rows -> Tally(rows.toSequence().count()) },
 )
 
 fun http4kApi(

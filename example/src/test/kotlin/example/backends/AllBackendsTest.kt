@@ -10,6 +10,7 @@ import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.RequestSpec
 import io.github.matthewjones372.pelican.test.apiClient
+import io.github.matthewjones372.pelican.test.frames
 import io.github.matthewjones372.pelican.test.rawText
 import io.github.matthewjones372.pelican.test.shouldBeFailure
 import io.github.matthewjones372.pelican.test.shouldBeResponse
@@ -160,6 +161,53 @@ class AllBackendsTest {
             res.body shouldBe sent
         }
     }
+
+    // ------------------------------------------------- a stream in the other direction
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a streamed upload reaches the handler as the frames it was written as`(
+        name: String,
+        client: ApiClient,
+    ) {
+        val sent = listOf(Note("Hello"), Note("Bonjour"), Note("Hola"))
+
+        withClue(name) { client.call(tally, frames(sent)) shouldBe Tally(3) }
+    }
+
+    /**
+     * The frame number is what makes this refusal worth anything: a caller
+     * uploading a file is told which line to go and look at, and all three
+     * backends name the same line because core is what counted it.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a frame that will not decode is a 400 naming the line it was on`(name: String, client: ApiClient) {
+        val res = client.transport.send(
+            client.request(tally, frames(Note("fine")))
+                .replacingBody("""{"text":"fine"}""" + "\nnot json at all\n"),
+        )
+
+        withClue("$name: ${res.body}") {
+            res shouldHaveStatus 400
+            res.body shouldContain "Frame 2"
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a frame larger than the service will hold is a 413`(name: String, client: ApiClient) {
+        val res = client.transport.send(
+            client.request(tally, frames(Note("fine")))
+                .replacingBody("""{"text":"""" + "x".repeat(TOO_LONG_A_FRAME) + "\"}\n"),
+        )
+
+        withClue("$name: ${res.body}") { res shouldHaveStatus 413 }
+    }
+
+    /** The upload as bytes, for the two tests that are about a body no typed client would build. */
+    private fun RequestSpec.replacingBody(body: String): RequestSpec =
+        RequestSpec(method, path, query, headers, body)
 
     // ------------------------------------------------------------ server-sent events
 
@@ -618,3 +666,6 @@ class AllBackendsTest {
         withClue("documents disagreed between backends") { documents.values.toSet().size shouldBe 1 }
     }
 }
+
+/** Over the 4 KiB this service holds, which is `maxBodyBytes` and so also `maxFrameBytes`. */
+private const val TOO_LONG_A_FRAME = 5_000
