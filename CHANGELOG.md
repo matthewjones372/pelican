@@ -30,6 +30,12 @@ one.
 
 ## [1.0.0] — Unreleased
 
+**`1.0.0-RC1` is the first candidate cut from this section.** The surface below
+is what it ships, and the stability promise above takes effect at `1.0.0`
+rather than here: a candidate exists so that the things only real use finds
+can still change. Breaks between a candidate and `1.0.0` are recorded here
+like any other.
+
 ### Removed — read this one first
 
 - **1.0 ships one backend, one codec module and one client transport: Pekko
