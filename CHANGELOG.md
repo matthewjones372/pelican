@@ -72,6 +72,12 @@ one.
   (Pekko 404, http4k 405, Ktor 404). A chunked body over the limit is refused
   on http4k and Ktor, as it already was on Pekko. And a list header split over
   two field lines decodes as two values, not one.
+- **A consumer that reads one frame and hangs up closes the handler's stream**,
+  on all three backends, within a bounded time — asserted through each one's
+  own signal: `watchTermination` on a `Source`, `onCompletion` on a `Flow`, and
+  the `finally` of a `Sequence` whose walking thread is interrupted. It fails
+  against a `StreamingSunHttp` that does not close the body it was writing,
+  which is the leak it exists to stop.
 
 - **Three refusals where something was published as what it is not.** Two types
   wanting one component name are refused where the schema is built, naming both
