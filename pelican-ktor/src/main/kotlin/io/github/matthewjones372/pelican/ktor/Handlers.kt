@@ -11,6 +11,8 @@ import io.github.matthewjones372.pelican.StreamOf
 import io.ktor.server.application.ApplicationCall
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.util.concurrent.CompletableFuture
@@ -108,7 +110,7 @@ val Params.call: ApplicationCall
 @Suppress("TooGenericExceptionCaught") // Catching everything is the contract; see the KDoc above.
 private fun Params.launch(f: suspend () -> Any?): CompletionStage<Any?> {
     val stage = CompletableFuture<Any?>()
-    call.launch {
+    scope().launch {
         try {
             stage.complete(f())
         } catch (cancelled: CancellationException) {
@@ -120,6 +122,15 @@ private fun Params.launch(f: suspend () -> Any?): CompletionStage<Any?> {
     }
     return stage
 }
+
+/**
+ * The call, where the handler was reached by a request. A handler called
+ * without one — `mcpDispatch` running the same binding as a tool — has no call
+ * to be a child of, and casting `null` to one is the NPE that says so. Nothing
+ * cancels that work and no socket is waiting on it, so it runs on the default
+ * dispatcher instead: a bound handler is a handler, whatever asked for it.
+ */
+private fun Params.scope(): CoroutineScope = underlying as? ApplicationCall ?: CoroutineScope(Dispatchers.Default)
 
 internal fun Method.toKtor(): KtorMethod = when (this) {
     Method.GET -> KtorMethod.Get

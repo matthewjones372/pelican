@@ -18,6 +18,10 @@ dependencies {
     implementation(project(":pelican-pekko"))
     // Serving the docs is opt-in: this is the module that adds them to a server.
     implementation(project(":pelican-pekko-docs"))
+    // And serving the tools is opt-in in exactly the same way: `example.mcp` is
+    // what that looks like. `pelican-mcp` and `pelican-mcp-server` arrive
+    // through it, which is why neither is declared here.
+    implementation(project(":pelican-pekko-mcp"))
     // The second and third backends, wired to the same endpoint descriptions.
     implementation(project(":pelican-http4k"))
     implementation(project(":pelican-http4k-docs"))
@@ -59,11 +63,6 @@ dependencies {
     // classpath in the repository where `ClientTransport.default()` finds two
     // providers and refuses to choose. Every client built here therefore names
     // the transport it wants; see GeneratedKotlinClientTest.
-    // Tool descriptions for the same endpoints, asserted here because this is
-    // where the service that has streams, uploads and a raw body lives. Not an
-    // `implementation`: nothing in the example serves them yet.
-    testImplementation(project(":pelican-mcp"))
-
     testImplementation(project(":pelican-client-java"))
     testImplementation(project(":pelican-client-pekko"))
     testImplementation(project(":pelican-client-ktor"))
@@ -162,6 +161,14 @@ tasks.register<JavaExec>("runCodecs") {
     description = "Runs the notes example on Jackson, kotlinx.serialization and jsoniter side by side"
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("example.codecs.ThreeCodecsKt")
+}
+
+/** The same service with its tools beside its endpoints: `curl` `/mcp` with a JSON-RPC message. */
+tasks.register<JavaExec>("runMcp") {
+    group = "application"
+    description = "Runs the Orders example with its MCP tools served on /mcp"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.mcp.MainKt")
 }
 
 /** The metered service: `curl` it, then read `/admin/meters` to see what that recorded. */

@@ -1,3 +1,15 @@
+public final class io/github/matthewjones372/pelican/mcp/server/HttpKt {
+	public static final field MCP_PATH Ljava/lang/String;
+	public static final fun mcpMethodNotAllowed ()Lio/github/matthewjones372/pelican/mcp/server/McpHttpResponse;
+	public static final fun post (Lio/github/matthewjones372/pelican/mcp/server/McpServer;Ljava/lang/String;)Ljava/util/concurrent/CompletionStage;
+}
+
+public final class io/github/matthewjones372/pelican/mcp/server/McpHttpResponse {
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getContentType ()Ljava/lang/String;
+	public final fun getStatus ()I
+}
+
 public final class io/github/matthewjones372/pelican/mcp/server/McpServer {
 	public final fun handle (Ljava/lang/String;)Ljava/util/concurrent/CompletionStage;
 }

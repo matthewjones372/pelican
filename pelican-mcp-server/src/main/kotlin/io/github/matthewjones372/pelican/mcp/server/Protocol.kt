@@ -207,7 +207,8 @@ private fun reply(id: JsonValue, result: JsonObj): String = jsonObj {
     put("result", result)
 }.render()
 
-private fun failure(id: JsonValue, code: Int, message: String): String = jsonObj {
+/** A JSON-RPC error message. Internal because the HTTP half answers a 405 with one. */
+internal fun failure(id: JsonValue, code: Int, message: String): String = jsonObj {
     "jsonrpc" to JSONRPC_VERSION
     put("id", id)
     put(
