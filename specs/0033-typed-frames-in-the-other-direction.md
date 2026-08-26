@@ -49,13 +49,13 @@ one does.
 
 ## Stack
 
-- [ ] **`spec-0033-stream-in-core`** — `StreamIn<T>`, `ndjsonIn`, frame
+- [x] **`spec-0033-stream-in-core`** — `StreamIn<T>`, `ndjsonIn`, frame
       splitter/decoder, refusal semantics, document emission.
       Done when: core tests pin split, decode, refusal-with-index, and the emitted request body.
-- [ ] **`spec-0033-binders`** — the three backends' binders and interpreter
+- [x] **`spec-0033-binders`** — the three backends' binders and interpreter
       paths, unbuffered.
       Done when: a first-frame-processed-before-last-sent timing test passes per backend.
-- [ ] **`spec-0033-clients`** — generated client accepts a streamed body
+- [x] **`spec-0033-clients`** — generated client accepts a streamed body
       (`Sequence<T>`/`Flow<T>` per call style) over the existing re-openable
       body seam.
       Done when: the round trip streams both directions in one call against the example service.
