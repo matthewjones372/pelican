@@ -14,6 +14,27 @@ one.
 
 ## [Unreleased]
 
+### Changed — read this one
+
+- **An `Api` is built by `api(routes, codecs = ...) { }`**, and its constructor
+  is internal. A fifteen-parameter constructor with defaults freezes twice over
+  — the descriptor and the synthetic constructor carrying the defaults both
+  change when a parameter is added — so after 1.0 every new server setting
+  would break every caller compiled against the last release. Settings that
+  were named arguments are assignments inside the block, and
+  `filters = listOf(a, b)` is `filter(a)` and `filter(b)`. Every call site is a
+  compile error, not a silent change of meaning.
+- **The same for the other settings bundles**: `retryPolicy { }`, `docs { }`,
+  `docsOAuth(clientId) { }` and `mcpOptions { }` replace their constructors.
+  `ClientRequest` keeps a constructor — a client builds one per call — and
+  gains `withTimeout(...)` and `withHeader(...)` for what is no longer a
+  parameter.
+- **`Ansi` is internal**, and the `DefaultImpls` classes are gone from the
+  published surface: the modules compile with `-jvm-default=no-compatibility`,
+  and the interfaces that had them already emitted real JVM default methods.
+  Kotlin callers see no difference; a Java class that implemented `JsonValue`,
+  `PlainCodec` or `SecurityScheme` by calling `DefaultImpls` is the one break.
+
 ### Fixed
 
 - **A path segment is decoded as a path, not as a form.** A `+` in a captured
