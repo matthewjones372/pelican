@@ -45,10 +45,10 @@ and still leaves the names squatting in the user package.
 
 ## Stack
 
-- [ ] **`spec-0021-spi-move-core`** — the package move in pelican-core, old
+- [x] **`spec-0021-spi-move-core`** — the package move in pelican-core, old
       names gone, dumps regenerated.
       Done when: `pelican-core.api` shows the SPI only under `.spi` and the DSL surface is unchanged.
-- [ ] **`spec-0021-spi-move-backends`** — import updates in pelican-pekko,
+- [x] **`spec-0021-spi-move-backends`** — import updates in pelican-pekko,
       pelican-http4k, pelican-ktor, pelican-mcp, the docs modules, and
       `docs/modules.md`.
       Done when: `./gradlew build` is green with no other source change.
