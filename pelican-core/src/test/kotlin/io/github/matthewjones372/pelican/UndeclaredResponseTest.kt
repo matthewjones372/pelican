@@ -1,13 +1,14 @@
 package io.github.matthewjones372.pelican
 
-import io.github.matthewjones372.pelican.spi.*
+import io.github.matthewjones372.pelican.spi.failureNamedBy
+import io.github.matthewjones372.pelican.spi.renderError
+import io.github.matthewjones372.pelican.spi.successNamedBy
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
-
 /**
  * `orFail` widens `E` to the common supertype of the failures it is given, and
  * `Outcome` is covariant in it — so a handler may name a failure that belongs to

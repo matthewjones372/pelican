@@ -1,11 +1,20 @@
 package io.github.matthewjones372.pelican.test.golden
 
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.apiSpec
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.empty
+import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.json
+import io.github.matthewjones372.pelican.jsonBody
+import io.github.matthewjones372.pelican.optional
+import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.RequestSpec
 import io.github.matthewjones372.pelican.test.ResponseSpec
 import io.github.matthewjones372.pelican.test.Transport
+import io.github.matthewjones372.pelican.webhook
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe

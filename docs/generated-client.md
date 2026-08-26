@@ -30,9 +30,14 @@ document from the same function; see
 [docs/reference.md](reference.md#the-gradle-plugin).
 
 ```kotlin
-// build.gradle.kts:
-//   implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")       // JacksonCodecs; brings pelican-core
-//   implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")  // the transport the client sends with
+// build.gradle.kts
+dependencies {
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
+}
+```
+
+```kotlin
 import com.example.orders.CreateOrder                    // the generated file: the client,
 import com.example.orders.OrdersClient                   //   its request types
 import com.example.orders.PlaceOrderFailure              //   and its sealed failures

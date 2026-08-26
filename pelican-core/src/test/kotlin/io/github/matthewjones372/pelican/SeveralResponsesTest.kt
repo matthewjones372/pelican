@@ -1,6 +1,6 @@
 package io.github.matthewjones372.pelican
 
-import io.github.matthewjones372.pelican.spi.*
+import io.github.matthewjones372.pelican.spi.successNamedBy
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -9,7 +9,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import org.junit.jupiter.api.Test
-
 class SeveralResponsesTest {
 
     data class Order(val id: Long)

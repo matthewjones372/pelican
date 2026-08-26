@@ -1,14 +1,24 @@
 package io.github.matthewjones372.pelican
 
-import io.github.matthewjones372.pelican.spi.*
+import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
+import io.github.matthewjones372.pelican.spi.acceptable
 import io.github.matthewjones372.pelican.spi.decode
+import io.github.matthewjones372.pelican.spi.decodeList
+import io.github.matthewjones372.pelican.spi.failureNamedBy
+import io.github.matthewjones372.pelican.spi.handlerFor
+import io.github.matthewjones372.pelican.spi.readStrictBody
+import io.github.matthewjones372.pelican.spi.renderError
+import io.github.matthewjones372.pelican.spi.requestBodyCodec
+import io.github.matthewjones372.pelican.spi.responseCodecs
+import io.github.matthewjones372.pelican.spi.routeIndex
+import io.github.matthewjones372.pelican.spi.selectedFor
+import io.github.matthewjones372.pelican.spi.successNamedBy
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
-
 /**
  * The API a generated client calls, called in memory: no socket, no port, no
  * bind.

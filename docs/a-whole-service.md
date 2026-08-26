@@ -9,11 +9,15 @@ This block lives in the repository as
 so it compiles on every build. Run it with `./gradlew :example:runReadmeExample`.
 
 ```kotlin
-// build.gradle.kts:
-//   implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")       // brings pelican-core, and Pekko itself, transitively
-//   implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")     // JacksonCodecs
-//   implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")  // startWithDocs and Swagger UI
+// build.gradle.kts
+dependencies {
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+}
+```
 
+```kotlin
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.IntCodec
 import io.github.matthewjones372.pelican.StringCodec

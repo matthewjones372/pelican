@@ -176,8 +176,15 @@ compiled — it is
 the example module, so the front page cannot drift from what runs.
 
 ```kotlin
-// Needs pelican-pekko, pelican-jackson and pelican-pekko-docs — the Install
-// block above, minus the test line.
+// build.gradle.kts
+dependencies {
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+}
+```
+
+```kotlin
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint

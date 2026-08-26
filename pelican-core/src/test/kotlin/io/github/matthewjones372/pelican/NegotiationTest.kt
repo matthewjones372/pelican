@@ -1,10 +1,9 @@
 package io.github.matthewjones372.pelican
 
-import io.github.matthewjones372.pelican.spi.*
+import io.github.matthewjones372.pelican.spi.acceptable
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-
 class NegotiationTest {
 
     private val json = setOf("application/json")

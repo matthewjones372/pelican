@@ -1,12 +1,11 @@
 package io.github.matthewjones372.pelican
 
-import io.github.matthewjones372.pelican.spi.*
+import io.github.matthewjones372.pelican.spi.renderError
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
-
 /**
  * What a filter is told the status is, asked of the description alone.
  *

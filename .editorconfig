@@ -33,10 +33,14 @@ max_line_length = 120
 ij_kotlin_allow_trailing_comma = true
 ij_kotlin_allow_trailing_comma_on_call_site = true
 
-# `import io.github.matthewjones372.pelican.*` is deliberate: the point of pelican-core is that an
-# endpoint description is written with a vocabulary of top-level values, and
-# the example sources are meant to read that way.
-ktlint_standard_no-wildcard-imports = disabled
+# No wildcard imports, anywhere — a project principle (maintainer, 2026-08-26).
+# An explicit import list is the one place a reader sees where every name in
+# the file comes from, and it is what keeps the documentation's examples
+# honest: each one names exactly what it needs. Generated sources are the
+# exception, and they are excluded from formatting rather than from the rule.
+# IntelliJ is told the same thing, so an optimize-imports never puts one back.
+ij_kotlin_name_count_to_use_star_import = 2147483647
+ij_kotlin_name_count_to_use_star_import_for_members = 2147483647
 
 # Assignment and trailing-comment alignment is used on purpose — see the input
 # declarations in example/src/main/kotlin/example/readme/ReadmeExample.kt,

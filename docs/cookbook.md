@@ -20,10 +20,11 @@ dependencies {
 }
 ```
 
-A recipe that needs a module beyond these says so in a comment on its first
-line. Each recipe carries its own imports so it can be pasted whole, and every
+A recipe needing a module beyond these carries its own `dependencies` block.
+Each recipe carries its own imports so it can be pasted whole, and every
 import is written out in full — one line per name, so the import block is an
-inventory of what the recipe uses and where each piece lives.
+inventory of what the recipe uses and where each piece lives. No wildcard
+imports anywhere, in this page or in the library: the build refuses them.
 
 ---
 
@@ -70,7 +71,13 @@ fun main() {
 And its test, in full:
 
 ```kotlin
-// build.gradle.kts: testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC1")
+// build.gradle.kts
+dependencies {
+    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC1")
+}
+```
+
+```kotlin
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
@@ -461,7 +468,13 @@ fileReport handledNow { req -> Reports.file(this[caller].subject, req) }
 ## Testing, in three layers
 
 ```kotlin
-// build.gradle.kts: testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC1")
+// build.gradle.kts
+dependencies {
+    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC1")
+}
+```
+
+```kotlin
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.In3
 import io.github.matthewjones372.pelican.In4

@@ -14,6 +14,7 @@ import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jsonObj
+import io.github.matthewjones372.pelican.openapi.div
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

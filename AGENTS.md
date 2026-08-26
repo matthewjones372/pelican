@@ -119,6 +119,17 @@ private fun statusOf(code: Int): StatusCode = ...
 Same rules in test sources. A test name should carry the claim; the KDoc above
 it should not repeat the name in longer words.
 
+## Imports
+
+**No wildcard imports, anywhere.** One line per name, so an import block is an
+inventory of what a file uses and where each piece lives — and so a reader of
+the documentation's examples can see exactly what to import. detekt's
+`WildcardImport` fails the build on one, and `.editorconfig` tells ktlint and
+the IDE the same thing, so an optimize-imports cannot put one back.
+
+The same holds in the docs: every complete example carries its imports written
+out, and the `dependencies { }` block naming the modules it needs.
+
 ## Layout
 
 `pelican-core` depends on the Kotlin standard library and nothing else.

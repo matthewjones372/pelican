@@ -9,8 +9,10 @@ import io.github.matthewjones372.pelican.between
 import io.github.matthewjones372.pelican.commaSeparated
 import io.github.matthewjones372.pelican.cookieParam
 import io.github.matthewjones372.pelican.default
+import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.headerParam
+import io.github.matthewjones372.pelican.openapi.div
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.queryParam
 import io.kotest.matchers.shouldBe

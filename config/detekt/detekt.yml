@@ -67,9 +67,12 @@ style:
     # a lint rule.
     active: false
   WildcardImport:
-    # See .editorconfig: `import io.github.matthewjones372.pelican.*` is the point of the core
-    # module's vocabulary, and the example sources are written to read that way.
-    active: false
+    # A project principle: an explicit import list is the one place a reader
+    # sees where every name in a file comes from, and it is what keeps the
+    # documentation's examples honest — each one names exactly what it needs.
+    # `.editorconfig` tells ktlint and the IDE the same thing, so an
+    # optimize-imports cannot put one back.
+    active: true
   MagicNumber:
     # A status code in a test is the assertion, not a number needing a name.
     excludes: ['**/test/**']

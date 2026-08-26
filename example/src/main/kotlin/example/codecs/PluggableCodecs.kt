@@ -2,9 +2,21 @@ package example.codecs
 
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ApiSpec
+import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.SchemaSource
+import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.apiSpec
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.json
+import io.github.matthewjones372.pelican.jsonBody
+import io.github.matthewjones372.pelican.mcp.server.post
 import io.github.matthewjones372.pelican.openapi.docs
+import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.github.matthewjones372.pelican.pekko.handledNow
 

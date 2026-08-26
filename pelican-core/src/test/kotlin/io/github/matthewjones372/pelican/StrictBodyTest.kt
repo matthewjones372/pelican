@@ -1,12 +1,11 @@
 package io.github.matthewjones372.pelican
 
-import io.github.matthewjones372.pelican.spi.*
+import io.github.matthewjones372.pelican.spi.readStrictBody
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
-
 /**
  * The limit is a number of bytes, and the reason it cannot be a number of
  * characters is that a caller chooses the characters.

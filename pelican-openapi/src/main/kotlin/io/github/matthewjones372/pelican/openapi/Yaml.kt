@@ -1,7 +1,13 @@
 package io.github.matthewjones372.pelican.openapi
 
-import io.github.matthewjones372.pelican.*
-
+import io.github.matthewjones372.pelican.ApiSpec
+import io.github.matthewjones372.pelican.JsonArr
+import io.github.matthewjones372.pelican.JsonBool
+import io.github.matthewjones372.pelican.JsonNull
+import io.github.matthewjones372.pelican.JsonNum
+import io.github.matthewjones372.pelican.JsonObj
+import io.github.matthewjones372.pelican.JsonStr
+import io.github.matthewjones372.pelican.JsonValue
 /**
  * The same document, written as YAML — a second rendering of core's
  * [JsonValue], not a second document, so the two cannot disagree. No YAML

@@ -1,7 +1,11 @@
 package io.github.matthewjones372.pelican.openapi
 
-import io.github.matthewjones372.pelican.*
-
+import io.github.matthewjones372.pelican.JsonArr
+import io.github.matthewjones372.pelican.JsonBool
+import io.github.matthewjones372.pelican.JsonNum
+import io.github.matthewjones372.pelican.JsonObj
+import io.github.matthewjones372.pelican.JsonStr
+import io.github.matthewjones372.pelican.JsonValue
 fun JsonValue?.obj(): JsonObj = this as? JsonObj ?: error("not an object: $this")
 fun JsonValue?.arr(): List<JsonValue> = (this as? JsonArr)?.items ?: error("not an array: $this")
 fun JsonValue?.str(): String = (this as? JsonStr)?.value ?: error("not a string: $this")
