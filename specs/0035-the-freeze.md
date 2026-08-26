@@ -42,7 +42,7 @@ discover after.
 
 ## Stack
 
-- [ ] **`spec-0035-source-compat`** — the pinned-DSL compilation suite.
+- [x] **`spec-0035-source-compat`** — the pinned-DSL compilation suite.
       Done when: renaming `json` locally fails the suite and nothing else does.
 - [ ] **`spec-0035-freeze-audit`** — dumps regenerated and committed; the
       checklist run with findings fixed or recorded; `FallibleOutput`
