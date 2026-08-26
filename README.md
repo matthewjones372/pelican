@@ -439,15 +439,27 @@ emits every second has nothing to gain from it.
 
 ## Content negotiation
 
-An endpoint declares one media type per response, so `Accept` has one question
-to answer: will this caller read what this endpoint sends? If not, it gets a
-406 naming what was on offer, before the handler runs.
+`Accept` has one question to answer for most endpoints: will this caller read
+what this endpoint sends? If not, it gets a 406 naming what was on offer,
+before the handler runs.
 
 ```
 GET /orders   Accept: application/json   ->  200
 GET /orders   Accept: */*                ->  200
 GET /orders   Accept: text/csv           ->  406
 ```
+
+A response that offers a choice answers the other question too — which of them
+to send:
+
+```kotlin
+negotiated(json<Report>(), media<Report>("text/csv")) orFail reportMissing
+```
+
+One declared response, one status, two wire shapes. The handler returns a
+`Report`; `Accept` picks the rendering, and no `Accept` at all takes the first
+one declared. The encoder for the second is one line on your `Codecs` — a JSON
+library has none for `text/csv`.
 
 Wildcards match, quality values are honoured including `q=0`, and a more
 specific range beats a less specific one — so a header meaning "anything except

@@ -274,6 +274,80 @@ class SecuredReportsTest {
         header["schema"]!!.jsonObject["type"]!!.jsonPrimitive.content shouldBe "integer"
     }
 
+    // ------------------------------------------ one response, two renderings
+
+    /**
+     * A report of this test's own. The store is shared with the tests above,
+     * which file and withdraw in whatever order JUnit runs them.
+     */
+    private fun fileOne(): String {
+        val res = send(
+            "POST", "/reports",
+            """{"title":"Cold start","body":"90s, mostly class loading"}""",
+            bearer("demo-writer"),
+        )
+        res.statusCode() shouldBe 201
+        return Json.parseToJsonElement(res.body()).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
+    @Test
+    fun `the export answers as JSON or as CSV, and the handler returns a Report either way`() {
+        val id = fileOne()
+
+        val asJson = send("GET", "/reports/$id/export", null, bearer("demo-reader"), "Accept" to "application/json")
+        asJson.statusCode() shouldBe 200
+        Json.parseToJsonElement(asJson.body()).jsonObject["title"]!!.jsonPrimitive.content shouldBe "Cold start"
+
+        val asCsv = send("GET", "/reports/$id/export", null, bearer("demo-reader"), "Accept" to "text/csv")
+        asCsv.statusCode() shouldBe 200
+        // The bytes, because that is what a second representation promises —
+        // the quoting included, since the body has a comma in it.
+        asCsv.body() shouldBe
+            "id,title,author,body\n$id,Cold start,grace@example.com,\"90s, mostly class loading\"\n"
+        asCsv.headers().firstValue("Content-Type").orElse("") shouldContain "text/csv"
+    }
+
+    @Test
+    fun `a caller that names neither gets the first rendering declared`() {
+        val silent = send("GET", "/reports/${fileOne()}/export", null, bearer("demo-reader"))
+
+        silent.statusCode() shouldBe 200
+        silent.headers().firstValue("Content-Type").orElse("") shouldContain "application/json"
+    }
+
+    /** Negotiation is not a way past the filter: the credential is checked first. */
+    @Test
+    fun `an unauthenticated caller asking for CSV is still a 401`() {
+        send("GET", "/reports/1/export", null, "Accept" to "text/csv").statusCode() shouldBe 401
+    }
+
+    @Test
+    fun `a caller that takes neither rendering is refused with a 406 naming both`() {
+        val refused = send(
+            "GET", "/reports/${fileOne()}/export", null,
+            bearer("demo-reader"), "Accept" to "application/xml",
+        )
+
+        refused.statusCode() shouldBe 406
+        refused.body() shouldContain "text/csv"
+        refused.body() shouldContain "application/json"
+    }
+
+    @Test
+    fun `and the declared failure is unchanged by any of it`() {
+        send("GET", "/reports/9999/export", null, bearer("demo-reader"), "Accept" to "text/csv")
+            .statusCode() shouldBe 404
+    }
+
+    @Test
+    fun `the document says one status with one entry per rendering`() {
+        val content = operation("/reports/{reportId}/export", "get")["responses"]!!
+            .jsonObject["200"]!!.jsonObject["content"]!!.jsonObject
+
+        content.keys.toList() shouldBe listOf("application/json", "text/csv")
+        content.values.map { it.jsonObject["schema"]!! }.distinct().size shouldBe 1
+    }
+
     @Test
     fun `every documented endpoint is bound, and the Api says so at startup`() {
         // `securedApi()` passes `covers = allSecuredEndpoints`. If a handler

@@ -24,6 +24,13 @@ class InMemoryClientTransportTest {
             override fun decodeFromString(text: String) = text
         } as BodyCodec<T>
 
+        /**
+         * The same identity, whatever the media type. Overridden because the
+         * default refuses everything but JSON, which is what makes a response
+         * declared as `text/csv` with nothing to write it a startup failure.
+         */
+        override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> = codec(type)
+
         override fun schema(type: KType, components: SchemaComponents): JsonObj =
             jsonObj { "type" to "string" }
     }
@@ -75,6 +82,13 @@ class InMemoryClientTransportTest {
         empty(status = 202)
     }
 
+    /** The same value, offered two ways: `Accept` picks, here as on a socket. */
+    private val exportTag = endpoint(tag) {
+        get("tags" / tag / "export")
+        operationId = "exportTag"
+        negotiated(json<String>(), media<String>("text/csv"))
+    }
+
     /** How many elements the stream has produced, so laziness can be asserted. */
     private val produced = java.util.concurrent.atomic.AtomicInteger()
 
@@ -95,6 +109,7 @@ class InMemoryClientTransportTest {
         },
         ServerEndpoint(breakThing) { _ -> throw IllegalStateException("the database is on fire") },
         ServerEndpoint(takeBytes) { _ -> CompletableFuture.completedStage(Unit as Any?) },
+        ServerEndpoint(exportTag) { p -> CompletableFuture.completedStage("tag ${p[tag]}" as Any?) },
     )
 
     private fun api(
@@ -127,6 +142,41 @@ class InMemoryClientTransportTest {
         response.status shouldBe 200
         response.header("Content-Type") shouldBe "application/json"
         response.text() shouldBe "thing-7/true/t-1/dark"
+    }
+
+    @Test
+    fun `the rendering the caller asked for is the one that crosses`() {
+        val transport = InMemoryClientTransport(api())
+
+        val asCsv = send(
+            transport, Method.GET, "http://things.test/tags/kotlin/export",
+            headers = listOf("Accept" to "text/csv"),
+        )
+        asCsv.header("Content-Type") shouldBe "text/csv"
+        asCsv.text() shouldBe "tag kotlin"
+
+        val asJson = send(
+            transport, Method.GET, "http://things.test/tags/kotlin/export",
+            headers = listOf("Accept" to "application/json"),
+        )
+        asJson.header("Content-Type") shouldBe "application/json"
+    }
+
+    @Test
+    fun `and a caller that names none takes the first declared, as a bound server answers it`() {
+        val silent = send(InMemoryClientTransport(api()), Method.GET, "http://things.test/tags/kotlin/export")
+
+        silent.header("Content-Type") shouldBe "application/json"
+    }
+
+    @Test
+    fun `a caller that will take neither is refused here too`() {
+        val refused = send(
+            InMemoryClientTransport(api()), Method.GET, "http://things.test/tags/kotlin/export",
+            headers = listOf("Accept" to "application/xml"),
+        )
+
+        refused.status shouldBe 406
     }
 
     @Test

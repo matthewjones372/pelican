@@ -12,6 +12,7 @@ import io.github.matthewjones372.pelican.pekko.docs.Docs
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import org.apache.pekko.stream.javadsl.Source
 import java.util.Base64
+import kotlin.reflect.KType
 
 /**
  * An API behind two credentials at once, and a Swagger UI page that can obtain
@@ -144,6 +145,21 @@ val getReport = endpoint(reportId) {
     json<Report>() orFail reportMissing
 }
 
+/**
+ * The same report, as JSON or as the CSV a spreadsheet opens: one response
+ * written two ways, with `Accept` choosing. The handler returns a `Report`
+ * either way — which representation goes out is not its business.
+ */
+val exportReport = endpoint(reportId) {
+    get("reports" / reportId / "export")
+    summary = "Fetch one report, as JSON or as CSV"
+    operationId = "exportReport"
+    tag("reports")
+    security(companyIdp, "reports:read")
+    rejectsBadCredentials()
+    negotiated(json<Report>(), media<Report>("text/csv")) orFail reportMissing
+}
+
 val fileReport = endpoint(lensInputs) {
     post("reports")
     summary = "File a report"
@@ -184,7 +200,7 @@ val usage = endpoint {
 }
 
 val allSecuredEndpoints: List<Endpoint<*, *>> =
-    listOf(health, listReports, getReport, fileReport, withdrawReport, usage)
+    listOf(health, listReports, getReport, exportReport, fileReport, withdrawReport, usage)
 
 // =============================================== 5. the store and the "IdP"
 
@@ -322,6 +338,10 @@ val securedRoutes: List<ServerEndpoint> = listOf(
         Reports.find(id)?.let { ok(it) } ?: reportMissing(NoSuchReport(id, "No report $id"))
     },
 
+    exportReport handledOrFail { id ->
+        Reports.find(id)?.let { ok(it) } ?: reportMissing(NoSuchReport(id, "No report $id"))
+    },
+
     fileReport handledNow { p ->
         val filed = Reports.file(p[caller].subject, p[newReport])
         setHeader(reportLocation, "/reports/${filed.id}")
@@ -340,9 +360,41 @@ val securedRoutes: List<ServerEndpoint> = listOf(
  */
 val apiWideSecurity = listOf(companyIdp.requires("reports:read"))
 
+/**
+ * Jackson, and the one thing a JSON library has nothing to say about: a
+ * `Report` written as CSV. A second representation is an encoder the service
+ * supplies — the description names the media type, and this says what it
+ * means. The document needs none of it: a schema describes the value, not the
+ * encoding, which is why `securedSpec()` below is still handed `JacksonCodecs`.
+ */
+private const val REPORT_COLUMNS = 4
+
+object ReportCodecs : Codecs by JacksonCodecs {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
+        if (mediaType != "text/csv") JacksonCodecs.codec(type, mediaType)
+        else object : BodyCodec<Report> {
+            override fun encodeToString(value: Report): String =
+                "id,title,author,body\n" + listOf(
+                    value.id.toString(),
+                    value.title,
+                    value.author,
+                    value.body,
+                ).joinToString(",") { field -> if (',' in field) "\"$field\"" else field } + "\n"
+
+            /** The other half of the interface: a server writes, and a client reading one back reads. */
+            override fun decodeFromString(text: String): Report {
+                val (id, title, author, body) = text.lines()[1]
+                    .removeSurrounding("\"")
+                    .split(",", limit = REPORT_COLUMNS)
+                return Report(id.toLong(), title, author, body.removeSuffix("\n"))
+            }
+        } as BodyCodec<T>
+}
+
 fun securedApi(): Api = api(
     endpoints = securedRoutes,
-    codecs = JacksonCodecs,
+    codecs = ReportCodecs,
 ) {
     title = "Reports"
     version = "1.0.0"
@@ -354,7 +406,7 @@ fun securedApi(): Api = api(
     // covered by default rather than by remembering.
     filter(enforceDeclaredSecurity(apiWideSecurity))
 
-    // And the one line that says these six endpoints are all of them. Leaving
+    // And the one line that says these seven endpoints are all of them. Leaving
     // one out of `securedRoutes` is now a startup failure rather than a
     // documented endpoint that answers 404.
     covers = allSecuredEndpoints

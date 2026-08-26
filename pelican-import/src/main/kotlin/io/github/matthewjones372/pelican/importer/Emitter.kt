@@ -440,6 +440,15 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
                 val status = status(success.status, 200)
                 "bytes(${listOf(mediaType, status).filter { it.isNotEmpty() }.joinToString()})"
             }
+
+            is IrSuccess.Negotiated -> {
+                val type = typeFor(success.schema, context)
+                val renderings = success.mediaTypes.joinToString { mediaType ->
+                    if (mediaType == JSON) "json<$type>(${success.status})"
+                    else "media<$type>(${kotlinString(mediaType)}, ${success.status})"
+                }
+                "negotiated($renderings)"
+            }
         }
     }
 
@@ -834,6 +843,8 @@ private val bareType = Regex("[A-Z][A-Za-z0-9_]*")
 private const val CHUNK = 8_000
 
 private const val OCTET_STREAM = "application/octet-stream"
+
+private const val JSON = "application/json"
 
 private const val TUPLE_LIMIT = 6
 private const val RULE_WIDTH = 68

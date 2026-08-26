@@ -20,7 +20,7 @@ rewriting — and what the caller gets.
 
 ## What has since landed
 
-Four of the items below are done or partly done, and the page says so here
+Five of the items below are done or partly done, and the page says so here
 rather than being quietly rewritten, because the argument for the order is
 worth keeping next to the result of following it.
 
@@ -60,6 +60,14 @@ worth keeping next to the result of following it.
   - The retry policy is `ClientTransport.default().retrying(policy)`: a
     decorator in core, no line of it generated, and no retries at all unless
     somebody wrapped a transport in one.
+- **Item 5** is done. `negotiated(json<Report>(200), media<Report>("text/csv", 200))`
+  is one declared response written several ways, and the question the item said
+  had to be answered first — how the handler learns which rendering was picked
+  — was answered by deciding it never does: the handler returns the value, and
+  the interpreter picks the rendering from `Accept` with the scoring the 406
+  already used. What a service does have to supply is the encoder, on its
+  `Codecs`, since a JSON library has none for `text/csv`. See
+  [One response, several renderings](reference.md#one-response-several-renderings).
 - **Item 8** shipped: `pelican-openapi` writes 3.2.0 as well as 3.1.0, and the
   survey that item asked for came back with more than a number. Two things
   Pelican describes every day — cookie parameters and streamed responses —

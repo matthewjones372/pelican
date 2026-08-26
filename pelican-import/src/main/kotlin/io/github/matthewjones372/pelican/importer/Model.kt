@@ -151,6 +151,19 @@ internal sealed class IrSuccess {
         override val status: Int,
         override val headers: List<IrResponseHeader> = emptyList(),
     ) : IrSuccess()
+
+    /**
+     * One response documented under several media types: the same schema in
+     * each, which is the only reading of a multi-entry content map an endpoint
+     * description can hold — one value, written each of those ways.
+     */
+    class Negotiated(
+        override val status: Int,
+        val schema: JsonObj,
+        /** In document order. The first is what a caller naming no preference gets. */
+        val mediaTypes: List<String>,
+        override val headers: List<IrResponseHeader> = emptyList(),
+    ) : IrSuccess()
 }
 
 /** Whether producing this response means handing over a stream rather than a value. */
@@ -169,6 +182,7 @@ internal fun IrSuccess.with(headers: List<IrResponseHeader>): IrSuccess = when (
     is IrSuccess.Text -> IrSuccess.Text(status, headers)
     is IrSuccess.Bytes -> IrSuccess.Bytes(status, mediaType, headers)
     is IrSuccess.Empty -> IrSuccess.Empty(status, headers)
+    is IrSuccess.Negotiated -> IrSuccess.Negotiated(status, schema, mediaTypes, headers)
 }
 
 /** A documented non-2xx. One with a JSON body becomes a typed failure; one without is documented only. */

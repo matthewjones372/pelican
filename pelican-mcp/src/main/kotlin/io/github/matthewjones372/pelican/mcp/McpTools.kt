@@ -9,7 +9,9 @@ import io.github.matthewjones372.pelican.FallibleOutput
 import io.github.matthewjones372.pelican.JsonArrayOutput
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonOutput
+import io.github.matthewjones372.pelican.MediaOutput
 import io.github.matthewjones372.pelican.NdjsonOutput
+import io.github.matthewjones372.pelican.NegotiatedOutput
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.PlainCodec
 import io.github.matthewjones372.pelican.QueryParam
@@ -177,6 +179,11 @@ private fun Endpoint<*, *>.refuseWhatMcpCannotCarry(options: McpOptions) {
             "a stream of rows or events has nowhere to go. Leave it out with " +
             "mcpOptions { include = { ... } }, and let a caller that can stream have it over HTTP."
     }
+    require(output.isJsonAnswer()) {
+        "$operationName answers as $output, and a tool result is JSON — there is nothing for a " +
+            "rendering of another media type to travel in. Offer a JSON rendering beside it with " +
+            "negotiated(json<T>(200), ...), or leave it out with mcpOptions { include = { ... } }."
+    }
     require(bodyInput.isReadable()) {
         "$operationName takes $bodyInput, which is bytes rather than a payload a model could write. " +
             "Leave it out with mcpOptions { include = { ... } }."
@@ -197,9 +204,26 @@ private fun Endpoint<*, *>.refuseWhatMcpCannotCarry(options: McpOptions) {
 
 /** One result, and one thing to put in it. */
 private fun Output<*>.isOneAnswer(): Boolean = when (this) {
-    is JsonOutput<*>, is TextOutput, is EmptyOutput -> true
+    is JsonOutput<*>, is TextOutput, is EmptyOutput, is MediaOutput<*>, is NegotiatedOutput<*> -> true
     is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*>, is ByteStreamOutput -> false
     is FallibleOutput<*, *> -> successes.all { it.isOneAnswer() }
+}
+
+/**
+ * Whether that one answer is one a tool result can carry. MCP moves JSON, so a
+ * response rendered as something else has nothing to travel in — and a
+ * negotiated one travels as the JSON rendering it offers.
+ */
+private fun Output<*>.isJsonAnswer(): Boolean = when (this) {
+    is MediaOutput<*> -> false
+
+    is NegotiatedOutput<*> -> alternatives.any { it is JsonOutput<*> }
+
+    is FallibleOutput<*, *> -> successes.all { it.isJsonAnswer() }
+
+    is JsonOutput<*>, is TextOutput, is EmptyOutput,
+    is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*>, is ByteStreamOutput,
+    -> true
 }
 
 /** A body a codec reads is one a model could write; an envelope or a raw stream is not. */
@@ -214,7 +238,17 @@ private fun BodyInput<*>?.isReadable(): Boolean = this == null || payloadType !=
  */
 private fun Endpoint<*, *>.successType(): KType? = when (val out: Output<*> = output) {
     is JsonOutput<*> -> out.type
-    is FallibleOutput<*, *> -> (out.successes.singleOrNull() as? JsonOutput<*>)?.type
+
+    // The JSON rendering is the one a tool result carries, so its schema is
+    // the one that binds.
+    is NegotiatedOutput<*> -> (out.alternatives.firstOrNull { it is JsonOutput<*> } as? JsonOutput<*>)?.type
+
+    is FallibleOutput<*, *> -> when (val only = out.successes.singleOrNull()) {
+        is JsonOutput<*> -> only.type
+        is NegotiatedOutput<*> -> (only.alternatives.firstOrNull { it is JsonOutput<*> } as? JsonOutput<*>)?.type
+        else -> null
+    }
+
     else -> null
 }
 

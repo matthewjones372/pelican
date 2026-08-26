@@ -254,6 +254,17 @@ class ApiClient(
 
             is TextOutput -> res.body
 
+            // Read back by the same media type it was written as, which is the
+            // one thing a `Codecs` answering that type has to be able to do
+            // for a test to assert on the value rather than on the bytes.
+            is MediaOutput<*> -> codecs.codec<Any?>(out.type, out.mediaType).decodeFromString(res.body)
+
+            // This client names no `Accept`, so the server sends the first
+            // rendering. Which one it sent is on the response, and that is what
+            // is read: assuming would decode the wrong one the day that stops
+            // being true.
+            is NegotiatedOutput<*> -> decodeSuccess(endpoint, out.renderedAs(res.header("Content-Type")), res)
+
             is EmptyOutput -> Unit
 
             is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*> ->
@@ -265,6 +276,17 @@ class ApiClient(
             is FallibleOutput<*, *> ->
                 error("$endpoint declares its failures; use outcome(...) rather than call(...)")
         }
+
+    /**
+     * Which rendering of a negotiated response came back, by the media type it
+     * arrived under. Anything else is the first declared, which is what a
+     * server answers a caller that named no preference.
+     */
+    private fun NegotiatedOutput<*>.renderedAs(contentType: String?): Output<*> {
+        val media = contentType?.substringBefore(';')?.trim()
+        return alternatives.firstOrNull { it.mediaType.equals(media, ignoreCase = true) }
+            ?: alternatives.first()
+    }
 
     /**
      * Sends a streaming call and collects every element — the right default for

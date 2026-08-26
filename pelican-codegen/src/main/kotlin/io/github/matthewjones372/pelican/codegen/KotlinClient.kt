@@ -14,9 +14,11 @@ import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonOutput
 import io.github.matthewjones372.pelican.ListStyle
+import io.github.matthewjones372.pelican.MediaOutput
 import io.github.matthewjones372.pelican.MultipartBody
 import io.github.matthewjones372.pelican.NdjsonOutput
 import io.github.matthewjones372.pelican.NegotiatedBody
+import io.github.matthewjones372.pelican.NegotiatedOutput
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.PathParam
 import io.github.matthewjones372.pelican.PathSegment
@@ -239,8 +241,8 @@ private class KotlinClientEmitter(
         }
         types.declareAll(components.all())
 
-        val methods = endpoints.joinToString("\n\n") { method(it) }
-        val senders = webhooks.joinToString("\n\n") { method(it.operation) }
+        val methods = endpoints.joinToString("\n\n") { methods(it) }
+        val senders = webhooks.joinToString("\n\n") { methods(it.operation) }
         // Before the imports: an annotation the payload types needed is an
         // import the file has to declare.
         val declarations = types.declarations()
@@ -413,17 +415,31 @@ private class KotlinClientEmitter(
 
     // ------------------------------------------------------------ one endpoint
 
-    private fun method(ep: Endpoint<*, *>): String {
-        val call = call(ep)
-        val name = memberName(ep.operationName)
-        val successes = declaredSuccesses(ep)
+    /**
+     * One method per endpoint, except where the endpoint answers one value
+     * several ways: then it is one per rendering, and picking the method is
+     * how a caller picks the representation. The alternative — a media type
+     * parameter — would type the result as whatever the two renderings have
+     * in common, which is nothing a caller could use.
+     */
+    private fun methods(ep: Endpoint<*, *>): String {
+        val negotiated = declaredSuccesses(ep).singleOrNull() as? NegotiatedOutput<*>
+            ?: return method(ep, rendering = null)
+
+        return negotiated.alternatives.joinToString("\n\n") { method(ep, rendering = it) }
+    }
+
+    private fun method(ep: Endpoint<*, *>, rendering: Output<*>?): String {
+        val call = call(ep, rendering)
+        val name = memberName(ep.operationName) + renderingSuffix(rendering)
+        val successes = declaredSuccesses(ep).map { if (it is NegotiatedOutput<*>) it.alternatives.first() else it }
         val failures = declaredFailures(ep)
 
         // Several successes become a sealed type of their own, so a caller has
         // to say which one it is looking at. One success is what it always
         // was — the value itself, with no wrapper to unpick.
         val produces =
-            if (successes.size > 1) resultType(ep, successes) else successType(successes.single())
+            if (successes.size > 1) resultType(ep, successes) else successType(rendering ?: successes.single())
 
         // The `Outcome` is the *failure* side's doing. An endpoint that answers
         // two ways and declares no failure hands back the sealed type directly,
@@ -433,11 +449,22 @@ private class KotlinClientEmitter(
         val signature = "    $keyword $name(${call.parameters})" + if (returns == "Unit") " {" else ": $returns {"
 
         return buildString {
-            appendLine(doc(ep))
+            appendLine(doc(ep, rendering))
             appendLine(signature)
-            appendLine(indent(body(ep, call, successes), "        "))
+            appendLine(indent(body(ep, call, if (rendering == null) successes else listOf(rendering)), "        "))
             append("    }")
         }
+    }
+
+    /**
+     * What the method asking for one rendering is called: the operation's name
+     * and the subtype — `exportReportAsCsv`. The subtype rather than the whole
+     * media type, because it is the half a caller would say out loud.
+     */
+    private fun renderingSuffix(rendering: Output<*>?): String {
+        if (rendering == null) return ""
+        val subtype = checkNotNull(rendering.mediaType).substringAfter('/').substringAfterLast('+')
+        return "As" + typeName(subtype)
     }
 
     private fun body(
@@ -475,7 +502,7 @@ private class KotlinClientEmitter(
 
             out is ByteStreamOutput -> "response.body"
 
-            out is TextOutput -> "response.body"
+            out is TextOutput || out is MediaOutput<*> -> "response.body"
 
             out is EmptyOutput -> null
 
@@ -559,7 +586,8 @@ private class KotlinClientEmitter(
     /** What this response's body decodes to, or null where it carries none. */
     private fun bodyExpression(out: Output<*>, at: CallSite): String? = when (out) {
         is JsonOutput<*> -> decodeExpression(out.type, "response.body", at)
-        is TextOutput -> "response.body"
+        is TextOutput, is MediaOutput<*> -> "response.body"
+        is NegotiatedOutput<*> -> bodyExpression(out.alternatives.first(), at)
         else -> null
     }
 
@@ -586,7 +614,7 @@ private class KotlinClientEmitter(
     // passing this function's naming state along with them, which is a worse
     // shape than the length.
     @Suppress("CyclomaticComplexMethod")
-    private fun call(ep: Endpoint<*, *>): Call {
+    private fun call(ep: Endpoint<*, *>, rendering: Output<*>?): Call {
         val taken = mutableSetOf<String>()
         val pathNames = LinkedHashMap<PathParam<*>, String>()
         ep.pathSpec.captures.forEach { pathNames[it] = unique(memberName(it.name), taken) }
@@ -689,6 +717,10 @@ private class KotlinClientEmitter(
 
         ep.queries.forEach { parameter(it.name, it.codec, it.required, it.listStyle, queryPairs) }
         ep.headerParams.forEach { parameter(it.name, it.codec, it.required, it.listStyle, headerPairs) }
+        // The method is the choice, so the header says what the method asked
+        // for. Sent rather than left off: a caller that says nothing gets the
+        // first rendering, which is not the one this method decodes.
+        rendering?.let { headerPairs += "\"Accept\" to ${kotlinString(checkNotNull(it.mediaType))}" }
         ep.cookieParams.forEach { parameter(it.name, it.codec, it.required, it.listStyle, cookiePairs) }
 
         val arguments = buildList {
@@ -791,6 +823,15 @@ private class KotlinClientEmitter(
 
         is TextOutput -> "String"
 
+        // The text as it arrived. A client generated from a document has the
+        // schema of the value, and no reader for the encoding it asked for —
+        // that is the service's own, and belongs to whoever wanted the format.
+        is MediaOutput<*> -> "String"
+
+        // Only where the group is one of several successes; a caller who wants
+        // the other rendering calls the method that asks for it.
+        is NegotiatedOutput<*> -> successType(out.alternatives.first())
+
         is EmptyOutput -> "Unit"
 
         // Opaque bytes stay opaque: the caller reads the stream, and closes it.
@@ -846,7 +887,8 @@ private class KotlinClientEmitter(
     /** What this response carries, as a property, or null where it carries no body. */
     private fun bodyProperty(out: Output<*>): String? = when (out) {
         is JsonOutput<*> -> "val body: ${typeFor(out.type)}"
-        is TextOutput -> "val body: String"
+        is TextOutput, is MediaOutput<*> -> "val body: String"
+        is NegotiatedOutput<*> -> bodyProperty(out.alternatives.first())
         else -> null
     }
 
@@ -914,7 +956,7 @@ private class KotlinClientEmitter(
     private fun formCodecName(type: String): String =
         formCodecs.getOrPut(type) { memberName(type) + "FormCodec" }
 
-    private fun doc(ep: Endpoint<*, *>): String {
+    private fun doc(ep: Endpoint<*, *>, rendering: Output<*>? = null): String {
         val lines = buildList {
             ep.summary?.let { add(it) }
             ep.description?.takeIf { it != ep.summary }?.let { add(""); add(it) }
@@ -944,6 +986,10 @@ private class KotlinClientEmitter(
                         "this description nobody publishing it controls.",
                     ),
                 )
+            }
+            rendering?.let {
+                add("")
+                add("Asks for the `${it.mediaType}` rendering of the response, and reads it back as one.")
             }
             requirements(ep)?.let { add(it) }
             if (ep.deprecated) { add(""); add("@deprecated") }

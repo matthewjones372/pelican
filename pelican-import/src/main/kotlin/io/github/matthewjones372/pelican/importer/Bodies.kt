@@ -150,8 +150,10 @@ internal const val DEFAULT_BUFFERED_PART_BYTES: Long = 1024L * 1024L
 
 /**
  * The one entry of a `content` map, or a refusal naming what else was there.
- * A request body reaches this only with a single entry; the response half is
- * where the refusal stands, a handler producing one value rendered one way.
+ * The two callers that can reach it with several are the ones where several is
+ * undescribable: a request body picks its encoding by `Content-Type`, and a
+ * declared failure carries a JSON payload or none. A *success* offered several
+ * ways is read as a negotiated response instead.
  */
 internal fun single(content: JsonObj, path: JsonPath, what: String): Pair<String, JsonValue> {
     val entries = content.entries()
@@ -162,9 +164,10 @@ internal fun single(content: JsonObj, path: JsonPath, what: String): Pair<String
 
         else -> unsupported(
             path,
-            "The $what is offered as ${entries.joinToString { it.first }}. A response carries one " +
-                "payload rendered one way, and nothing here reads `Accept` to choose between two " +
-                "renderings of it; pick one in the document, or exclude the operation.",
+            "The $what is offered as ${entries.joinToString { it.first }}, and nothing here could pick " +
+                "between them: a request body is chosen by the `Content-Type` the caller sends, and a " +
+                "declared failure carries a JSON payload or none at all. Pick one in the document, or " +
+                "exclude the operation.",
         )
     }
 }

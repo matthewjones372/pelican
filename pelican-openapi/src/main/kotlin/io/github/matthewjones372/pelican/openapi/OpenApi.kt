@@ -272,6 +272,20 @@ private fun successBody(
     components: SchemaComponents,
 ): JsonObj? {
     if (out is FallibleOutput<*, *>) return successBody(out.success, version, schemas, components)
+
+    // One entry per rendering, all the same schema — one value written several
+    // ways, as a negotiated *request* body is one value read several ways.
+    // Published once and shared, since entries that could drift apart would
+    // describe two responses rather than one.
+    if (out is NegotiatedOutput<*>) {
+        val schema = schemaOf(out.alternatives.first(), version, schemas, components) ?: return null
+        return jsonObj {
+            out.alternatives.forEach { alternative ->
+                put(checkNotNull(alternative.mediaType), jsonObj { put("schema", schema) })
+            }
+        }
+    }
+
     val media = out.mediaType ?: return null
     val schema = schemaOf(out, version, schemas, components) ?: return null
     val field = if (version == OpenApiVersion.V3_2_0 && out.isSequential()) "itemSchema" else "schema"
@@ -384,10 +398,18 @@ private fun schemaOf(
 
     is TextOutput -> jsonObj { "type" to "string" }
 
+    // The media type is the encoding, and the schema is the value it encodes:
+    // the same one the JSON rendering beside it publishes.
+    is MediaOutput<*> -> schemas.schema(out.type, components)
+
     is EmptyOutput -> null
 
     // Failures are documented from ep.errors, so this is the success schema.
     is FallibleOutput<*, *> -> schemaOf(out.success, version, schemas, components)
+
+    // Every rendering carries one value; `successBody` puts that schema under
+    // each of the media types.
+    is NegotiatedOutput<*> -> schemaOf(out.alternatives.first(), version, schemas, components)
 }
 
 /**

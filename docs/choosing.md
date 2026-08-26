@@ -413,8 +413,10 @@ waiting on a release:
   gives up most of what you came for. Six is fewer than http4k's ten path
   segments with uncapped queries and headers, and much fewer than tapir's
   twenty-one.
-- **One media type per response.** Nothing reads `Accept` to choose between two
-  renderings of the same response.
+- **No encoder for a second representation.** `negotiated(...)` says a response
+  is written several ways and `Accept` picks between them, but the writer for
+  anything that is not JSON is one you supply on your `Codecs`. There is no CSV
+  or XML module here.
 - **CORS is one policy on the `Api`**, not per endpoint.
 
 **There is no production client story yet, only most of one.** `pelican-codegen`

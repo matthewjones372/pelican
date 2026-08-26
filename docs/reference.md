@@ -4372,10 +4372,11 @@ is gone.
   thing separating two responses on the wire — it is what a test client, a
   generated client and a browser all match on — so a second 200 is a response no
   reader could pick out. Refused where the output is declared, naming the status.
-  Several *renderings* of one response are a different thing and this refusal
-  already reads that way: they would be one declared response carrying two media
-  types, which is what [response negotiation](#what-isnt-here) would add and is
-  why adding it needs nothing here loosened.
+  Several *renderings* of one response are a different thing, and the refusal
+  reads that way: they are one declared response carrying two media types, which
+  is [`negotiated(...)`](#one-response-several-renderings) — and adding it
+  loosened nothing here, because a negotiated group arrives at this check as the
+  one response it is.
 - **A streamed alternative among several.** `ndjson<Order>() or empty(202)` is
   refused: naming a response is what produces it, and producing a stream means
   handing over the backend's own type — a `Source`, a `Flow`, a `Sequence` —
@@ -4397,6 +4398,100 @@ text(status = 202)` publishes `application/json` under 200 and `text/plain`
 under 202, which is one content map per status and exactly what the format is
 for. What could not be told apart is two responses under one status, and that is
 the refusal above.
+
+## One response, several renderings
+
+An endpoint that offers the same value as JSON and as CSV declares one
+response, not two:
+
+```kotlin
+val exportReport = endpoint(reportId) {
+    get("reports" / reportId / "export")
+    negotiated(json<Report>(), media<Report>("text/csv")) orFail reportMissing
+}
+```
+
+The handler returns a `Report` and says nothing about media types:
+
+```kotlin
+exportReport handledOrFail { id ->
+    Reports.find(id)?.let { ok(it) } ?: reportMissing(NoSuchReport(id, "No report $id"))
+}
+```
+
+Which rendering goes out is the interpreter's decision, from the request's
+`Accept` and the same RFC 9110 scoring that already answered the 406: each
+rendering is scored by the most specific range matching it — exact beats
+`text/*` beats `*/*` — and the highest score goes out, ties falling to
+declaration order. `q=0` is *not this one*, not a weak yes. All three backends
+read it through one function in core, so they cannot differ about it.
+
+- `Accept: text/csv` gets the CSV.
+- `Accept: application/json;q=0.2, text/csv;q=0.9` gets the CSV as well.
+- No `Accept` at all, or `*/*`, gets **the first alternative in declaration
+  order** — the same rule as the first of several `servers`.
+- `Accept: application/xml` is the 406 it always was, before the handler runs.
+
+### The encoder is yours
+
+A description holds a type and a media type; it never holds a function. What
+writes a `Report` as `text/csv` is a `Codecs`, which is where the JSON library
+already lives:
+
+```kotlin
+object ReportCodecs : Codecs by JacksonCodecs {
+    override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
+        if (mediaType != "text/csv") JacksonCodecs.codec(type, mediaType)
+        else csvWriter as BodyCodec<T>
+}
+```
+
+`codec(type, mediaType)` defaults to `codec(type)` for `application/json` and
+refuses anything else by name, so a media type nothing can write is a startup
+failure rather than a 500 for whoever asked for it. The whole of one is in
+`example/secured/SecuredReports.kt`.
+
+### What it publishes, and what a client does with it
+
+The document says one status with one entry per rendering, all carrying the
+schema of the value — the shape a negotiated *request* body already emits:
+
+```json
+"200": {
+  "description": "Success.",
+  "content": {
+    "application/json": { "schema": { "$ref": "#/components/schemas/Report" } },
+    "text/csv":         { "schema": { "$ref": "#/components/schemas/Report" } }
+  }
+}
+```
+
+The generated client gets one method per rendering — `exportReportAsJson`
+returning `Report`, `exportReportAsCsv` returning `String` — and each sends the
+`Accept` that asks for the one it decodes. Picking the method is how a caller
+picks the representation: a media type *parameter* would have to type its
+result as whatever a payload and its CSV have in common, which is nothing.
+The importer reads that content map back as the same `negotiated(...)` it was
+written from — and refuses one whose entries describe *different* schemas,
+which is two responses under one status rather than one written twice; see
+[What comes out](#what-comes-out).
+
+### What is refused
+
+All of it where the response is declared, so none of it can reach a request:
+
+- **Alternatives under different statuses.** `Accept` picks how a value is
+  written and never what happened, so these are two responses.
+- **Alternatives carrying different payload types.** One value, written several
+  ways. Two payloads under one status is the clash the previous section
+  refuses, and it is refused here too.
+- **A stream as an alternative.** Producing one hands over the backend's own
+  type rather than writing a value, so a stream is the one response or none.
+- **A rendering with its own response headers.** A header belongs to the
+  response; one declared on a rendering would stop being sent to a caller who
+  asked for the other. Declare it with `emits(...)`.
+- **One alternative.** `negotiated(json<Report>())` offers no choice; declare
+  the response on its own.
 
 ## A whole list, or a stream of one
 
@@ -4887,12 +4982,12 @@ open  localhost:8080/api-docs                                 # Swagger UI
 - **A Ktor wiring of the *orders* example.** The small `example/backends/`
   service runs on all three; the larger orders service is bound on Pekko and
   http4k only, and `ClientContractTest` runs against those two.
-- **Response negotiation** — one media type per response. An endpoint may answer
-  two statuses two ways, but nothing reads `Accept` to choose between two
-  renderings of the *same* response. The request direction is not the same
-  gap: a body declares its encodings and `Content-Type` picks one, because the
-  caller says which it sent rather than which it would prefer back. See
-  [One body, several encodings](#one-body-several-encodings).
+- **A codec for a second representation.** `negotiated(...)` says a response is
+  written several ways and `media<T>("text/csv")` names one of them; what turns
+  a `T` into those bytes is a writer the service supplies on its `Codecs`.
+  There is no CSV or XML module here, and the encoders the JSON libraries bring
+  answer `application/json` and nothing else. See
+  [One response, several renderings](#one-response-several-renderings).
 - **A streamed response among several.** An endpoint declaring more than one 2xx
   names the one it is producing, and producing a stream means handing over the
   backend's own type, which core cannot name. A stream is still a success; it is

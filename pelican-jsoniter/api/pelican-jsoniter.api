@@ -7,6 +7,7 @@ public final class io/github/matthewjones372/pelican/jsoniter/JsoniterCodecs : i
 
 public final class io/github/matthewjones372/pelican/jsoniter/JsoniterCodecs$Default : io/github/matthewjones372/pelican/Codecs {
 	public fun codec (Lkotlin/reflect/KType;)Lio/github/matthewjones372/pelican/BodyCodec;
+	public fun codec (Lkotlin/reflect/KType;Ljava/lang/String;)Lio/github/matthewjones372/pelican/BodyCodec;
 	public fun schema (Lkotlin/reflect/KType;Lio/github/matthewjones372/pelican/SchemaComponents;)Lio/github/matthewjones372/pelican/JsonObj;
 }
 

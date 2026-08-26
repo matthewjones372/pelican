@@ -82,6 +82,7 @@ internal class Responses(private val reader: Reader, private val operation: Oper
     private fun success(status: Int, response: JsonObj, path: JsonPath): IrSuccess {
         val content = response.obj("content")
         if (content == null || content.fields.isEmpty()) return IrSuccess.Empty(status)
+        if (content.entries().size > 1) return negotiated(status, content, path / "content")
 
         val (mediaType, node) = single(content, path / "content", "$status response")
         val media = node as? JsonObj
@@ -129,6 +130,49 @@ internal class Responses(private val reader: Reader, private val operation: Oper
             )
         }
     }
+
+    /**
+     * A response documented under several media types: one value written each
+     * of those ways, which is what `negotiated(...)` describes.
+     *
+     * Every entry has to say the same thing about the payload. A content map
+     * whose entries disagree describes two responses under one status, and an
+     * endpoint answers a negotiated one by writing the value it returned — so
+     * there would be no one value to write.
+     */
+    private fun negotiated(status: Int, content: JsonObj, at: JsonPath): IrSuccess {
+        val renderings = content.entries().map { (mediaType, node) ->
+            val schema = (node as? JsonObj)?.get("schema")?.let(::normaliseSchema)
+                ?: unsupported(at, "The $status response is offered as $mediaType and declares no schema.")
+
+            if (mediaType.isBinary() || schema.isBinary() || mediaType in streamed) {
+                unsupported(
+                    at,
+                    "The $status response is offered as $mediaType among ${content.entries().size} " +
+                        "renderings, and $mediaType is bytes or a stream rather than a value written a " +
+                        "second way. Document it as the one media type of a response of its own, or " +
+                        "exclude the operation.",
+                )
+            }
+            mediaType to schema
+        }
+
+        val schemas = renderings.map { it.second }.distinct()
+        if (schemas.size > 1) {
+            unsupported(
+                at,
+                "The $status response describes a different schema under each of " +
+                    "${renderings.joinToString { it.first }}. `Accept` picks how one value is written and " +
+                    "never what it is, so these are two responses: give them different statuses, or " +
+                    "document one of them.",
+            )
+        }
+
+        return IrSuccess.Negotiated(status, schemas.single(), renderings.map { it.first })
+    }
+
+    /** Media types that repeat a frame, which a rendering of one value is not. */
+    private val streamed = setOf("application/x-ndjson", "text/event-stream")
 
     /**
      * The payload inside a 3.2 event stream's `itemSchema`.

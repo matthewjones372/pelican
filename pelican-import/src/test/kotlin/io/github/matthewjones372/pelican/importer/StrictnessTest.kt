@@ -374,7 +374,7 @@ class StrictnessTest {
                     description: ok
                     content:
                       application/json: { schema: { type: object } }
-                      application/xml: { schema: { type: object } }
+                      application/xml: { schema: { type: string } }
             /b:
               get:
                 operationId: b
@@ -383,7 +383,7 @@ class StrictnessTest {
                     description: ok
                     content:
                       application/json: { schema: { type: object } }
-                      application/xml: { schema: { type: object } }
+                      application/xml: { schema: { type: string } }
             """,
         )
         message shouldContain "2 operations cannot be described"
@@ -404,7 +404,7 @@ class StrictnessTest {
                     description: ok
                     content:
                       application/json: { schema: { type: object } }
-                      application/xml: { schema: { type: object } }
+                      application/xml: { schema: { type: string } }
             /b:
               get:
                 operationId: b

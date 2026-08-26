@@ -107,6 +107,24 @@ one.
 
 ### Added
 
+- **One response, several renderings**, chosen by the caller's `Accept`:
+  `negotiated(json<Report>(200), media<Report>("text/csv", 200))` is one
+  declared response written two ways. The handler goes on returning a `Report`;
+  which rendering goes out is the interpreter's, from the RFC 9110 scoring the
+  406 already used, and all three backends read it through one function in
+  core. No `Accept`, or `*/*`, takes the first alternative in declaration
+  order. Nothing acceptable is the 406 it always was. The document says one
+  status with one entry per media type — the shape a negotiated request body
+  already published — the importer reads that shape back as the same
+  `negotiated(...)`, and the generated client grows one method per rendering
+  (`exportReportAsJson`, `exportReportAsCsv`), each sending the `Accept` that
+  asks for the one it decodes.
+- **`media<T>("text/csv")`**, a response written as a media type that is not
+  JSON, and **`CodecFactory.codec(type, mediaType)`**, which is where the
+  writer for it comes from. The default answers `application/json` with the
+  codec it already had and refuses anything else by name, so a media type
+  nothing can write is a startup failure rather than a 500. Implementing it is
+  one override on the `Codecs` an `Api` is given; `example/secured` has one.
 - **`pelican-mcp-server`, and the tools served.** `pelican-mcp` derived the
   tools and ran a call; nothing carried either to a client, and the docs said
   so. This module speaks the protocol — JSON-RPC 2.0, revision `2025-11-25`:

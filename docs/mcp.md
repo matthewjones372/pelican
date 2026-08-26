@@ -141,6 +141,7 @@ refusal names the endpoint and the way past.
 | Refused | Why | What to do |
 |---|---|---|
 | a streamed answer — `ndjson`, `sse`, `jsonArray`, `bytes` | one tool call has one result, and a stream of rows or events has nowhere to go in it | leave it out with `include`, and let callers that can stream have it over HTTP |
+| an answer with no JSON rendering — `media<T>("text/csv")`, or a `negotiated(...)` offering none | a tool result is JSON, and there is nothing for another rendering to travel in | offer a JSON rendering beside it — `negotiated(json<T>(200), media<T>("text/csv", 200))` — or leave it out with `include` |
 | a multipart body, or a raw body | bytes rather than a payload a model could write | leave it out with `include` |
 | a cookie parameter | a tool call has no browser behind it | leave it out, or read the value from somewhere a caller without cookies can supply |
 | a required header parameter with no value behind it | a model asked for a credential invents one | supply it with `mcpOptions { headers = ... }`, or leave the endpoint out |
