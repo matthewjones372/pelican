@@ -47,10 +47,10 @@ makes Pelican look like a guest on Android rather than a resident.
 
 ## Stack
 
-- [ ] **`spec-0030-okhttp-transport`** — the module, the adapter, the
+- [x] **`spec-0030-okhttp-transport`** — the module, the adapter, the
       ServiceLoader file, the transport test suite run against it.
       Done when: the shared transport tests (streaming, cancellation, timeout, retry) pass on OkHttp.
-- [ ] **`spec-0030-docs`** — `docs/modules.md`, the generated-client docs'
+- [x] **`spec-0030-docs`** — `docs/modules.md`, the generated-client docs'
       transport table, CHANGELOG.
       Done when: the dependency claims in `docs/modules.md` are tests, as for the other three.
 
