@@ -27,10 +27,13 @@ snapshot branch and return after 1.0 as restores.
 Removed from main: `pelican-http4k`, `pelican-http4k-docs`,
 `pelican-http4k-mcp`, `pelican-test-http4k`, `pelican-ktor`,
 `pelican-ktor-docs`, `pelican-ktor-mcp`, `pelican-client-ktor`,
-`pelican-jsoniter`, `pelican-kotlinx`.
+`pelican-jsoniter`, `pelican-kotlinx` — and, decided after the freeze
+landed, `pelican-client-java`: on a Pekko stack the Pekko client is the
+natural default, and OkHttp covers the rest; the JDK transport returns with
+the branch.
 
 Kept: core, schema, openapi, import, codegen, gradle-plugin, jackson, mcp,
-mcp-server, pekko + pekko-docs + pekko-mcp, client-java, client-pekko, client-okhttp,
+mcp-server, pekko + pekko-docs + pekko-mcp, client-pekko, client-okhttp,
 test, test-golden, test-pekko, metrics, metrics-otel, benchmarks, example.
 
 Example keeps the `Backend`/`Running` seam and every parity test, running
