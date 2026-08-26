@@ -2,8 +2,8 @@
     private val codecs: Codecs,
     /**
      * Where a built request goes. The default is whichever `ClientTransport`
-     * the classpath supplies — `pelican-client-java`, over the JDK's own
-     * `HttpClient`, unless the build says otherwise — so a service that already
+     * the classpath supplies — `pelican-client-pekko`, over Pekko HTTP's
+     * client, unless the build says otherwise — so a service that already
      * runs and tunes an HTTP client can hand that one over rather than acquire
      * a second HTTP stack because it generated a client.
      */

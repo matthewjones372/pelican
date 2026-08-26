@@ -24,7 +24,7 @@ import kotlin.test.assertFailsWith
  * The decisions are asserted here against no server at all, because they are
  * arithmetic and a set membership; that a retry actually reaches a socket, and
  * that a body drained by the first attempt is sent whole by the second, is
- * asserted in `pelican-client-java` against a server that fails and then
+ * asserted in `pelican-client-pekko` against a server that fails and then
  * succeeds.
  */
 class RetryTest {

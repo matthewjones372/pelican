@@ -8,7 +8,7 @@ package example.compiler
  * two of them may declare the same `Order`.
  *
  * Only the modules main ships appear below: core, schema, openapi, import,
- * jackson, mcp, the Pekko trio, `pelican-client-java` and the test modules.
+ * jackson, mcp, the Pekko trio, `pelican-client-pekko` and the test modules.
  * The surfaces on the `multi-backend` branch are frozen there, in this file's
  * counterpart, and return with the modules.
  *
@@ -424,7 +424,7 @@ internal val frozenCallSites: Map<String, String> = mapOf(
 
     "clients" to """
         import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.client.JavaHttpTransport
+        import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
         import io.github.matthewjones372.pelican.jackson.JacksonCodecs
         import io.github.matthewjones372.pelican.pekko.handledNow
         import java.io.ByteArrayInputStream
@@ -466,8 +466,8 @@ internal val frozenCallSites: Map<String, String> = mapOf(
         val nothing: ClientRequest.Body = ClientRequest.Body.Empty
 
         val discovered: ClientTransport = ClientTransport.default()
-        val retrying: ClientTransport = JavaHttpTransport().retrying(retryPolicy { maxAttempts = 2 })
-        val wrapped: ClientTransport = RetryingTransport(JavaHttpTransport(), retryPolicy())
+        val retrying: ClientTransport = PekkoHttpTransport().retrying(retryPolicy { maxAttempts = 2 })
+        val wrapped: ClientTransport = RetryingTransport(PekkoHttpTransport(), retryPolicy())
 
         // No socket at all: the same client shape, answered by the routes.
         val inProcess: ClientTransport = InMemoryClientTransport(service)

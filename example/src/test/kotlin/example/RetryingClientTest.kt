@@ -9,7 +9,7 @@ import example.generated.PlaceOrderFailure
 import io.github.matthewjones372.pelican.ClientTransport
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.RetryPolicy
-import io.github.matthewjones372.pelican.client.JavaHttpTransport
+import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * the retries are spent, and that the policy's own refusals reach a real call.
  *
  * The retrying of a server that fails and then succeeds is asserted in
- * `pelican-client-java`, where a server can be made to do exactly that.
+ * `pelican-client-pekko`, where a server can be made to do exactly that.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RetryingClientTest {
@@ -52,10 +52,12 @@ class RetryingClientTest {
 
     private lateinit var server: PelicanServer
 
+    private val sending = PekkoHttpTransport()
+
     /** Counts what actually leaves, so "retried" and "not retried" are countable. */
     private val counting = ClientTransport { request ->
         attempts.incrementAndGet()
-        JavaHttpTransport().send(request)
+        sending.send(request)
     }
 
     @BeforeAll

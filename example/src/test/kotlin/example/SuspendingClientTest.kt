@@ -10,7 +10,7 @@ import example.generated.suspending.PlaceOrderFailure
 import example.generated.suspending.User
 import io.github.matthewjones372.pelican.ClientResponse
 import io.github.matthewjones372.pelican.ClientTransport
-import io.github.matthewjones372.pelican.client.JavaHttpTransport
+import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -58,10 +58,7 @@ class SuspendingClientTest {
     @BeforeAll
     fun setUp() {
         server = ordersApi().start(port = 0, systemName = "orders-suspending-client")
-        // Named rather than defaulted: this module carries both the JDK and the
-        // Pekko adapters, so `ClientTransport.default()` has two providers to
-        // choose between and rightly refuses to.
-        client = OrdersClient(server.baseUrl, codecs, JavaHttpTransport())
+        client = OrdersClient(server.baseUrl, codecs, PekkoHttpTransport())
     }
 
     @AfterAll
@@ -130,9 +127,9 @@ class SuspendingClientTest {
      * A coroutine that gives up takes the call with it.
      *
      * The transport here answers nothing at all, which is the only reliable way
-     * to still be waiting when the cancellation arrives; that a cancelled stage
-     * then stops a real exchange is `pelican-client-java`'s own test, against a
-     * real `HttpClient`. What this asserts is the half the generated file is
+     * to still be waiting when the cancellation arrives; that a cancelled call
+     * then has its late-arriving response discarded is `pelican-client-pekko`'s
+     * own test. What this asserts is the half the generated file is
      * responsible for — that the cancellation reaches the stage rather than
      * being lost between the coroutine and the transport.
      */

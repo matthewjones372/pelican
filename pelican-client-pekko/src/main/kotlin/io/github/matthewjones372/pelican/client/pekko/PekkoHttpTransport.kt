@@ -18,9 +18,11 @@ import org.apache.pekko.http.javadsl.model.HttpMethods
 import org.apache.pekko.http.javadsl.model.HttpRequest
 import org.apache.pekko.http.javadsl.model.HttpResponse
 import org.apache.pekko.http.javadsl.model.RequestEntity
+import org.apache.pekko.stream.StreamTcpException
 import org.apache.pekko.stream.javadsl.Source
 import org.apache.pekko.stream.javadsl.StreamConverters
 import org.apache.pekko.util.ByteString
+import java.io.IOException
 import java.io.InputStream
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
@@ -66,8 +68,38 @@ class PekkoHttpTransport @JvmOverloads constructor(
 
     override fun send(request: ClientRequest): CompletionStage<ClientResponse> {
         val exchange = http.singleRequest(pekkoRequest(request))
+            .exceptionally { failed -> throw asIo(failed) }
         val head = request.timeout?.let { deadline(request, exchange, it) } ?: exchange
-        return head.thenApply { response -> clientResponse(response) }
+
+        // A future of this stage's own rather than `thenApply`, so that a
+        // caller's `cancel` is seen here: a response arriving after the caller
+        // gave up is discarded at once, not left holding its connection until
+        // the pool's subscription timeout salvages it.
+        val answer = CompletableFuture<ClientResponse>()
+        head.whenComplete { response, failure ->
+            when {
+                failure != null -> answer.completeExceptionally(failure)
+
+                answer.isDone -> response.discardEntityBytes(running)
+
+                else -> {
+                    val crossed = clientResponse(response)
+                    if (!answer.complete(crossed)) crossed.body.close()
+                }
+            }
+        }
+        return answer
+    }
+
+    /**
+     * Pekko raises a connection refused or reset as `StreamTcpException`, a
+     * `RuntimeException` — so it would not read as the `IOException` the other
+     * transports raise and `RetryPolicy` retries by default. It crosses here as
+     * one, with Pekko's own as its cause.
+     */
+    private fun asIo(failed: Throwable): Throwable {
+        val cause = if (failed is CompletionException) failed.cause ?: failed else failed
+        return if (cause is StreamTcpException) IOException(cause.message, cause) else cause
     }
 
     /**

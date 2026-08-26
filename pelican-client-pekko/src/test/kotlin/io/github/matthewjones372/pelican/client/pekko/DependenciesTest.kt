@@ -61,8 +61,7 @@ class DependenciesTest {
     /**
      * What makes adding the module the whole of choosing it — as long as it is
      * the only adapter present. `ClientTransport.default()` refuses to pick
-     * between two, which is why this module stays off `pelican-client-java`'s
-     * test classpath and that one stays off this.
+     * between two, so a second adapter never joins this test classpath.
      */
     @Test
     fun `core finds this adapter as the default transport`() {

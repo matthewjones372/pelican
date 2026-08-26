@@ -96,6 +96,8 @@ class PekkoHttpTransportTest {
         seen["encoding"] = exchange.requestHeaders.getFirst("Transfer-Encoding").orEmpty()
         seen["agent"] = exchange.requestHeaders.getFirst("User-Agent").orEmpty()
         contentTypes["sent"] = exchange.requestHeaders["Content-Type"].orEmpty().toList()
+        contentTypes["lengths"] = exchange.requestHeaders["Content-Length"].orEmpty().toList()
+        contentTypes["multi"] = exchange.requestHeaders["X-Multi"].orEmpty().toList()
         seen["body"] = exchange.requestBody.readBytes().toString(Charsets.UTF_8)
         exchange.responseHeaders.add("X-Answer", "42")
         respond(exchange, "ok")
@@ -161,17 +163,31 @@ class PekkoHttpTransportTest {
     }
 
     @Test
-    fun `a streaming body is sent from the stream it was given`() {
+    fun `a streaming body is sent from the stream it was given, chunked, and the stream is closed`() {
+        val closed = CountDownLatch(1)
+        val tracked = object : ByteArrayInputStream("streamed".toByteArray()) {
+            override fun close() {
+                closed.countDown()
+                super.close()
+            }
+        }
+
         val response = send(
             ClientRequest(
                 method = Method.POST,
                 url = "$base/echo",
-                body = ClientRequest.Body.Streaming { ByteArrayInputStream("streamed".toByteArray()) },
+                body = ClientRequest.Body.Streaming { tracked },
             ),
         )
 
         response.status shouldBe 200
         seen["body"] shouldBe "streamed"
+        withClue("a body with no declared length goes out chunked, not buffered for a Content-Length") {
+            seen["encoding"] shouldBe "chunked"
+        }
+        withClue("the transport opened the stream, so the transport closes it") {
+            closed.await(GATE_SECONDS, TimeUnit.SECONDS) shouldBe true
+        }
     }
 
     @Test
@@ -188,6 +204,22 @@ class PekkoHttpTransportTest {
         seen["length"] shouldBe "8"
         seen["encoding"] shouldBe ""
         seen["body"] shouldBe "measured"
+        withClue("the caller's Content-Length reaches the wire once, not as a header and again from the entity") {
+            contentTypes["lengths"] shouldContainExactly listOf("8")
+        }
+    }
+
+    @Test
+    fun `a header the caller wrote twice arrives twice`() {
+        send(
+            ClientRequest(
+                method = Method.GET,
+                url = "$base/echo",
+                headers = listOf("X-Multi" to "one", "X-Multi" to "two"),
+            ),
+        )
+
+        contentTypes["multi"] shouldContainExactly listOf("one", "two")
     }
 
     @Test
@@ -277,6 +309,51 @@ class PekkoHttpTransportTest {
         send(ClientRequest(Method.GET, "$base/bulk?bytes=$BULK")).body.close()
 
         send(ClientRequest(Method.GET, "$base/echo")).text() shouldBe "ok"
+    }
+
+    /**
+     * The deadline bounds the arrival of the response head, not the reading of
+     * the body — an `sse` response that outlives its deadline is the endpoint
+     * working. The server holds the second chunk until well past the deadline,
+     * so a deadline that governed the body would fail this read.
+     */
+    @Test
+    fun `the deadline lets a body it raced keep streaming`() {
+        val response = send(
+            ClientRequest(Method.GET, "$base/drip").withTimeout(Duration.ofMillis(TIMEOUT_MILLIS)),
+        )
+
+        response.body.use { body ->
+            body.readNBytes(3).toString(Charsets.UTF_8) shouldBe "one"
+            Thread.sleep(TIMEOUT_MILLIS * 2)
+            drip.countDown()
+            body.readBytes().toString(Charsets.UTF_8) shouldBe "two"
+        }
+    }
+
+    @Test
+    fun `a call cancelled before the head arrives leaves the transport usable`() {
+        val abandoned = transport.send(ClientRequest(Method.GET, "$base/slow")).toCompletableFuture()
+
+        abandoned.cancel(true) shouldBe true
+
+        send(ClientRequest(Method.GET, "$base/echo")).text() shouldBe "ok"
+    }
+
+    /**
+     * `ClientTransport.default()` instantiates every provider it finds in order
+     * to count them, so a transport constructed and never sent on must not have
+     * started an actor system — the claim `running`'s own KDoc makes.
+     */
+    @Test
+    fun `a transport nobody sends on starts nothing`() {
+        val counted = PekkoHttpTransport()
+
+        val delegate = PekkoHttpTransport::class.java.getDeclaredField("running\$delegate")
+            .apply { isAccessible = true }
+            .get(counted)
+
+        (delegate as Lazy<*>).isInitialized() shouldBe false
     }
 
     /**

@@ -1,7 +1,8 @@
-package io.github.matthewjones372.pelican.client
+package io.github.matthewjones372.pelican.client.pekko
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.pelican.ClientRequest
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.RetryPolicy
@@ -9,6 +10,8 @@ import io.github.matthewjones372.pelican.retryPolicy
 import io.github.matthewjones372.pelican.retrying
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.javadsl.Behaviors
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -50,7 +53,21 @@ class RetryingTransportTest {
     /** No jitter and no waiting: the pause is asserted in core, not here. */
     private val impatient = retryPolicy { jitter = 0.0; initialBackoff = Duration.ZERO; retryStreamedBodies = true }
 
-    private val transport = JavaHttpTransport().retrying(impatient)
+    private val transport = PekkoHttpTransport().retrying(impatient)
+
+    private val fastFailing: ActorSystem<Void> = ActorSystem.create(
+        Behaviors.empty(),
+        "fast-failing",
+        ConfigFactory
+            .parseString(
+                """
+                pekko.http.host-connection-pool.max-retries = 0
+                pekko.http.host-connection-pool.base-connection-backoff = 0ms
+                pekko.http.host-connection-pool.max-connection-backoff = 0ms
+                """.trimIndent(),
+            )
+            .withFallback(ConfigFactory.load()),
+    )
 
     @BeforeEach
     fun reset() {
@@ -60,7 +77,10 @@ class RetryingTransportTest {
     }
 
     @AfterAll
-    fun tearDown() = server.stop(0)
+    fun tearDown() {
+        server.stop(0)
+        fastFailing.terminate()
+    }
 
     private fun flaky(exchange: HttpExchange) {
         bodies += exchange.requestBody.readBytes().toString(Charsets.UTF_8)
@@ -145,11 +165,13 @@ class RetryingTransportTest {
     @Test
     fun `a connection that cannot be made is retried and then given up on`() {
         // Nothing is listening on this port, so every attempt fails the way a
-        // dead node does: an IOException before any status exists.
+        // dead node does: an IOException before any status exists. The pool is
+        // told not to add retries and backoff of its own, or three attempts at
+        // a dead node sit out minutes of connection backoff before giving up.
         val nowhere = ClientRequest(Method.GET, "http://localhost:1/flaky")
 
         val failed = assertFailsWith<CompletionException> {
-            transport.send(nowhere).toCompletableFuture().join()
+            PekkoHttpTransport(fastFailing).retrying(impatient).send(nowhere).toCompletableFuture().join()
         }
 
         failed.cause.shouldBeInstanceOf<IOException>()

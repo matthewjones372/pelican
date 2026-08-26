@@ -14,7 +14,7 @@ import example.generated.StreamOrdersFailure
 import example.generated.SubmitOrderFailure
 import example.generated.SubmitOrderResult
 import io.github.matthewjones372.pelican.UploadedFile
-import io.github.matthewjones372.pelican.client.JavaHttpTransport
+import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
 import io.github.matthewjones372.pelican.codegen.kotlinClient
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
@@ -51,10 +51,11 @@ class GeneratedKotlinClientTest {
     )
 
     /**
-     * The service on a socket, over the JDK adapter: the exhaustive suite, and
-     * the transport a generated client picks when nobody names one.
-     * `PekkoTransportClientTest` runs the calls a change of adapter can break
-     * over `pelican-client-pekko` instead.
+     * The service on a socket, over `pelican-client-pekko` — the transport a
+     * generated client picks when nobody names one, now that it is the one
+     * adapter shipped. `PekkoTransportClientTest` keeps the calls that need a
+     * backend stream type — `bytes`, `ndjsonIn` — and the handed-over-system
+     * case.
      *
      * Bound rather than in memory because half the endpoints below answer with
      * a stream, and a Pekko `Source` is the backend's own type: `InMemory`
@@ -66,7 +67,7 @@ class GeneratedKotlinClientTest {
     @BeforeAll
     fun setUp() {
         server = ordersApi().start(port = 0, systemName = "orders-generated-client")
-        client = OrdersClient(server.baseUrl, codecs, JavaHttpTransport())
+        client = OrdersClient(server.baseUrl, codecs, PekkoHttpTransport())
     }
 
     @AfterAll

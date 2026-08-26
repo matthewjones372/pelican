@@ -54,7 +54,7 @@ import kotlin.reflect.KType
  * The generated file needs `pelican-core`, a `Codecs`, and a `ClientTransport`
  * on its classpath, and nothing else. The transport is an interface core owns
  * rather than an HTTP library, so a caller already running one supplies it;
- * `pelican-client-java` is the adapter over the JDK's own `HttpClient` and the
+ * `pelican-client-pekko` is the adapter over Pekko HTTP's client and the
  * one a client finds unless the build names another. Payload types come from
  * the [ApiSpec]'s own `SchemaSource`, so the client's types and the document's
  * schemas are the same schemas.
@@ -361,7 +361,7 @@ private class KotlinClientEmitter(
             // and the document publishes.
             //
             // Needs pelican-core on the classpath, a Codecs to read bodies with, and
-            // a ClientTransport to send with — pelican-client-java, unless you have
+            // a ClientTransport to send with — pelican-client-pekko, unless you have
             // an HTTP client of your own to hand over.
             """.trimIndent()
 

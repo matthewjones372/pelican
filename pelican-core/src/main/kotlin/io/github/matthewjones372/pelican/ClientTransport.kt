@@ -141,7 +141,7 @@ fun interface ClientTransport {
          * Core cannot depend on an adapter — its runtime classpath is the
          * Kotlin standard library and nothing else, which is a test — so the
          * default cannot be a name written down here. Adding
-         * `pelican-client-java` is what makes it the JDK's own `HttpClient`.
+         * `pelican-client-pekko` is what makes it Pekko HTTP's client.
          *
          * Loaded through core's own class loader rather than the thread's,
          * whose context is whatever the framework running the call last set it
@@ -156,8 +156,8 @@ fun interface ClientTransport {
                 1 -> found.single()
 
                 0 -> error(
-                    "No ClientTransport is on the classpath. Add pelican-client-java to send with the JDK's " +
-                        "own HttpClient, or pass a transport of your own.",
+                    "No ClientTransport is on the classpath. Add pelican-client-pekko to send with Pekko " +
+                        "HTTP's client, or pass a transport of your own.",
                 )
 
                 else -> error(
