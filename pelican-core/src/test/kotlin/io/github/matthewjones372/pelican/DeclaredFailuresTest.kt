@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican
 
+import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -113,7 +114,7 @@ class DeclaredFailuresTest {
         val (declared, error) = missing(Problem("gone")) as Outcome.Err
         declared shouldBeSameInstanceAs missing
         error shouldBe Problem("gone")
-        (forbidden(Problem("gone")) as Outcome.Err).declared.status shouldBe 403
+        (forbidden(Problem("gone")) as Outcome.Err).declared?.status shouldBe 403
     }
 
     sealed interface Trouble {
@@ -138,6 +139,64 @@ class DeclaredFailuresTest {
 
         val answer: Outcome<Trouble, Widget> = gone(Trouble.Missing(7))
         (answer as Outcome.Err).error shouldBe Trouble.Missing(7)
+    }
+
+    // ---------------------------------------------------- err, the bare form
+
+    @Test
+    fun `err means the single declared failure, as ok means the first success`() {
+        val ep = endpoint(widgetId) {
+            get("widgets" / widgetId)
+            json<Widget>() orFail missing
+        }
+
+        val out = ep.output as DeclaredResponses<*, *>
+        out.failureNamedBy(Outcome.Err(null, Problem("gone"))).shouldBeSameInstanceAs(missing)
+        ep.statusFor(err(Problem("gone")), error = null) shouldBe 404
+    }
+
+    @Test
+    fun `err with several declared failures is refused, naming them`() {
+        val ep = endpoint(widgetId) {
+            get("widgets" / widgetId)
+            json<Widget>().orFail(missing, forbidden)
+        }
+
+        val out = ep.output as DeclaredResponses<*, *>
+        shouldThrow<UndeclaredResponse> {
+            out.failureNamedBy(Outcome.Err(null, Problem("gone")))
+        }.message.orEmpty() shouldContain "names no failure"
+
+        // The filter-facing reader cannot throw; the response it mirrors is the 500.
+        ep.statusFor(err(Problem("gone")), error = null) shouldBe 500
+    }
+
+    @Test
+    fun `err cannot stand in for a failure that promised a header`() {
+        val retryAfter = responseHeader<Long>("Retry-After", "Seconds to wait")
+        val throttled = errorJson<Problem>(429, "Too many requests", retryAfter)
+        val ep = endpoint(widgetId) {
+            get("widgets" / widgetId)
+            json<Widget>() orFail throttled
+        }
+
+        val out = ep.output as DeclaredResponses<*, *>
+        shouldThrow<IllegalStateException> {
+            out.failureNamedBy(Outcome.Err(null, Problem("slow")))
+        }.message.orEmpty() shouldContain "Retry-After"
+    }
+
+    @Test
+    fun `err still refuses a payload the single failure does not carry`() {
+        val ep = endpoint(widgetId) {
+            get("widgets" / widgetId)
+            json<Widget>() orFail missing
+        }
+
+        val out = ep.output as DeclaredResponses<*, *>
+        shouldThrow<UndeclaredResponse> {
+            out.failureNamedBy(Outcome.Err(null, Widget(1)))
+        }.message.orEmpty() shouldContain "carries"
     }
 
     private fun typeOfProblem() = kotlin.reflect.typeOf<Problem>()

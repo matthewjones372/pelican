@@ -13,6 +13,7 @@ val styledModules = listOf(
     "pelican-core", "pelican-openapi", "pelican-schema", "pelican-mcp", "pelican-mcp-server",
     "pelican-codegen",
     "pelican-jackson",
+    "pelican-arrow",
     "pelican-pekko",
     "pelican-metrics",
     "pelican-metrics-otel",
@@ -29,7 +30,7 @@ val styledModules = listOf(
 val styledSources = styledModules.map { rootDir.resolve("$it/src/main/kotlin") }
 
 /**
- * A gate in this module's tests that judges thirteen modules is a wart, kept because
+ * A gate in this module's tests that judges fourteen modules is a wart, kept because
  * the regex and its exemptions are compiled with the code they describe, run
  * from an IDE, and report through the test report. Nothing orders it:
  * `src/main/kotlin` is checked in rather than generated, so there is no

@@ -70,6 +70,7 @@ val moduleDescriptions = mapOf(
     "pelican-codegen" to "Endpoint descriptions to a Kotlin client, as source.",
     "pelican-import" to "An OpenAPI document to endpoint descriptions, as source.",
     "pelican-jackson" to "Jackson codecs and swagger-core schemas for Pelican.",
+    "pelican-arrow" to "Arrow's Either into Pelican's Outcome and back.",
     "pelican-pekko" to "Endpoint descriptions to a Pekko HTTP route.",
     "pelican-pekko-docs" to "Serves the OpenAPI document and Swagger UI on Pekko HTTP.",
     "pelican-pekko-mcp" to "Serves the MCP tools over Streamable HTTP on Pekko HTTP.",

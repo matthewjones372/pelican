@@ -1030,6 +1030,7 @@ public final class io/github/matthewjones372/pelican/Outcome$Ok : io/github/matt
 }
 
 public final class io/github/matthewjones372/pelican/OutcomesKt {
+	public static final fun err (Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
 	public static final fun of (Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/HeaderValue;
 	public static final fun ok (Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
 	public static final fun or (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/DeclaredResponses;

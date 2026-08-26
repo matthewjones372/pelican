@@ -26,6 +26,7 @@ import io.github.matthewjones372.pelican.parseJson
 import io.github.matthewjones372.pelican.payloadType
 import io.github.matthewjones372.pelican.schema.StandaloneSchemas
 import io.github.matthewjones372.pelican.spi.decodeList
+import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.successNamedBy
 import java.util.concurrent.CompletableFuture
@@ -146,7 +147,7 @@ internal class BoundTool(
     fun resultOf(value: Any?): ToolResult = when (val out: Output<*> = endpoint.output) {
         is DeclaredResponses<*, *> -> when (val outcome = value as Outcome<*, *>) {
             is Outcome.Ok<*> -> success(out.successNamedBy(outcome), outcome.value)
-            is Outcome.Err<*> -> failure(outcome.declared, outcome.error)
+            is Outcome.Err<*> -> failure(out.failureNamedBy(outcome), outcome.error)
         }
 
         else -> success(out, value)

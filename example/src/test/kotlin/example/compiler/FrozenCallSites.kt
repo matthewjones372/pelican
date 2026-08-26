@@ -223,6 +223,7 @@ internal val frozenCallSites: Map<String, String> = mapOf(
         }
 
         fun succeed(): Outcome<Problem, Order> = ok(Order(1))
+        fun bareFailure(): Outcome<Problem, Order> = err(Problem("no"))
         fun named(): Outcome<Problem, Order> = json<Order>(200)(Order(1))
         fun fail(): Outcome<Problem, Order> = missing(Problem("no"))
         fun withHeader(): Outcome<Problem, Order> = throttled(Problem("later"), retryAfter of 30L)

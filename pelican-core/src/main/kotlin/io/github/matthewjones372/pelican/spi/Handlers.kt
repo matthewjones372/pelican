@@ -84,7 +84,12 @@ private fun Output<*>.doesNotCarry(value: Any?): Boolean {
  * three chances to send an undescribed response.
  */
 fun DeclaredResponses<*, *>.failureNamedBy(err: Outcome.Err<*>): ErrorOutput<*> {
-    val declared = err.declared
+    val declared = err.declared ?: failures.singleOrNull() ?: throw UndeclaredResponse(
+        "`err(...)` names no failure, and $this declares " +
+            "${if (failures.isEmpty()) "none" else failures.joinToString()}. The declaration is what " +
+            "fixes the status, so with several to choose from the handler names the one it means — " +
+            "the declaration is callable.",
+    )
     if (failures.none { it === declared }) {
         throw UndeclaredResponse(
             "$declared was returned by a handler but $this never declared it. It declares " +
@@ -98,6 +103,19 @@ fun DeclaredResponses<*, *>.failureNamedBy(err: Outcome.Err<*>): ErrorOutput<*> 
         throw UndeclaredResponse(
             "$declared carries ${declared.type} but the handler returned ${err.error?.let { it::class }}",
         )
+    }
+
+    // As in `successNamedBy`: `err(...)` names no failure, so it carries no
+    // headers, and a required one cannot be conjured here.
+    val promised = declared.headers.filter { header ->
+        header.required && err.headers.none { (name, _) -> name.equals(header.name, ignoreCase = true) }
+    }
+    check(promised.isEmpty()) {
+        "$declared declares ${promised.joinToString { it.name }} and this response carries no value for " +
+            "${if (promised.size == 1) "it" else "them"}. `err(...)` names no failure, so it carries no " +
+            "headers either: call the declaration with what it promised — " +
+            "$declared(value, ${promised.first().name} of ...). Or declare the header as " +
+            "responseHeader(...).optional() if it is only sometimes sent."
     }
     return declared
 }

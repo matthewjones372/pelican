@@ -38,8 +38,13 @@ fun Endpoint<*, *>.statusFor(result: Any?, error: Throwable?): Int {
     val out = output
     return when {
         // The declaration supplies the status, not the payload's type: two
-        // failures carrying the same type stay distinct.
-        result is Outcome.Err<*> -> result.declared.status
+        // failures carrying the same type stay distinct. A bare `err(...)`
+        // means the single declared failure; one with several to mean is
+        // refused when the response is written, so a 500 is what goes out.
+        result is Outcome.Err<*> ->
+            result.declared?.status
+                ?: (out as? DeclaredResponses<*, *>)?.failures?.singleOrNull()?.status
+                ?: UNDECLARED
 
         result is Outcome.Ok<*> && out is DeclaredResponses<*, *> -> out.chosenSuccess(result).status
 
@@ -47,3 +52,6 @@ fun Endpoint<*, *>.statusFor(result: Any?, error: Throwable?): Int {
         else -> out.status
     }
 }
+
+/** What an `UndeclaredResponse` is answered with, and so what this reports for one. */
+private const val UNDECLARED = 500

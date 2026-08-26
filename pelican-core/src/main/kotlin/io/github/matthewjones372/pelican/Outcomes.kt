@@ -22,9 +22,13 @@ sealed interface Outcome<out E, out T> {
         operator fun <H : Any> get(header: ResponseHeader<H>): H? = headerValue(headers, header)
     }
 
-    /** [declared] is the failure the endpoint listed; it supplies the status. */
+    /**
+     * [declared] is the failure the endpoint listed; it supplies the status.
+     * Null is what [err] produces: the endpoint's single declared failure,
+     * resolved where the response is written.
+     */
     data class Err<E>(
-        val declared: ErrorOutput<E>,
+        val declared: ErrorOutput<E>?,
         val error: E,
         /**
          * The headers [declared] carries, encoded, in declaration order. One
@@ -60,6 +64,18 @@ private fun <T : Any> headerValue(headers: List<Pair<String, String>>, header: R
 
 /** The first declared success, carrying [value]. */
 fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)
+
+/**
+ * The single declared failure, carrying [value] — [ok]'s other half, for the
+ * endpoint that declares one failure and would rather not name it every time.
+ * An endpoint declaring several has to name the one it means, because the
+ * declaration is what fixes the status; `err` on one of those is an
+ * `UndeclaredResponse` where the response is written.
+ *
+ * Not `error`: that name is the standard library's throw, and taking it would
+ * silently turn every `error("message")` in a handler into an unused value.
+ */
+fun <E> err(value: E): Outcome<E, Nothing> = Outcome.Err(null, value)
 
 /**
  * Which declared success an [Outcome.Ok] names, and nothing else: a bare

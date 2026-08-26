@@ -22,6 +22,7 @@ include(
     "pelican-codegen",
     "pelican-import",
     "pelican-jackson",
+    "pelican-arrow",
     "pelican-pekko",
     "pelican-pekko-docs",
     "pelican-pekko-mcp",

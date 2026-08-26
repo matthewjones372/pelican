@@ -1,0 +1,6 @@
+public final class io/github/matthewjones372/pelican/arrow/EitherOutcomeKt {
+	public static final fun toEither (Lio/github/matthewjones372/pelican/Outcome;)Larrow/core/Either;
+	public static final fun toOutcome (Larrow/core/Either;)Lio/github/matthewjones372/pelican/Outcome;
+	public static final fun toOutcome (Larrow/core/Either;Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/Outcome;
+}
+

@@ -76,7 +76,7 @@ fun <E, T> Outcome<E, T>.shouldBeOk(): T = when (this) {
 
     is Outcome.Err -> fail(
         "Expected a successful outcome but the endpoint returned its declared " +
-            "${declared.status} failure: $error",
+            "${declared?.status ?: "(unnamed)"} failure: $error",
     )
 }
 
@@ -120,7 +120,7 @@ infix fun <E, T> Outcome<E, T>.shouldBeFailure(expected: ErrorOutput<out E>): E 
 infix fun <E, T> Outcome<E, T>.shouldBeResponse(expected: Output<*>): T = when (this) {
     is Outcome.Err -> fail(
         "Expected the response declared as $expected but the endpoint returned its declared " +
-            "${declared.status} failure: $error",
+            "${declared?.status ?: "(unnamed)"} failure: $error",
     )
 
     is Outcome.Ok ->
