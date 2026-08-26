@@ -160,6 +160,51 @@ as an unread stream that `Streamed<T>` decodes off as elements land. The
 reasoning is in
 [docs/reference.md](reference.md#the-transport-a-generated-client-sends-with).
 
+## Presenting a credential
+
+The fifth constructor argument is called once per request, which is what a
+token that expires needs — a `Map` read at construction would be the token the
+process started with:
+
+```kotlin
+val client = OrdersClient(
+    "https://orders.internal",
+    JacksonCodecs,
+    headers = { mapOf("Authorization" to "Bearer ${tokens.current()}") },
+)
+```
+
+Those headers go on every call this client makes, and on no webhook it sends:
+a webhook goes to a subscriber's URL, and a subscriber is not the API. What a
+receiver expects is declared on the webhook and arrives as a typed parameter.
+
+A credential the *document* declares — `apiKeyHeader("X-Api-Key")` — is a
+parameter on the methods that require it instead, because the description says
+so. The lambda is for what every call carries.
+
+## How long a call may take
+
+`OrdersClient(..., timeout = Duration.ofSeconds(30))` is the deadline every
+call is built with, and it reaches the transport as `ClientRequest.timeout`.
+What that bounds is the transport's answer, and the three do not agree, so it
+is worth knowing which you have:
+
+| Transport | What the deadline bounds | Where it comes from |
+|---|---|---|
+| `pelican-client-java` | the response head; the body streams on after it | `HttpRequest.timeout` |
+| `pelican-client-pekko` | the response head, likewise | the adapter, on the stage: Pekko's own timeouts are pool settings |
+| `pelican-client-ktor`, with `HttpTimeout` installed | the whole exchange, the reading of the body included | `requestTimeoutMillis` |
+| `pelican-client-ktor`, without it | the response head — the adapter imposes it, since Ktor would drop it | the adapter's own deadline |
+| `InMemoryClientTransport` | nothing; there is no clock in a function call | — |
+
+A streamed call — `ndjson`, `sse`, `jsonArray` or `bytes` — carries no deadline
+at all. A deadline is for a call that ends, and an SSE subscription is meant to
+stay open: inheriting the client's would have ended it mid-body on Ktor and
+left it running on the other two, which is a difference no description
+mentions. Bound a stream by taking what you need from it and closing it —
+`use { it.take(100).toList() }` — or by the idle timeout on the engine you
+handed over.
+
 ## Calling it without a socket
 
 `InMemoryClientTransport` is a `ClientTransport` over an `Api` value, so a

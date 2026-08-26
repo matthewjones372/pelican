@@ -74,6 +74,14 @@ one.
   and all three still write it. A response body carrying nullable fields is
   shorter and no longer carries their names; pass your own mapper or `Json` to
   write them back.
+- **A streamed call no longer inherits the client's deadline.** `ndjson`, `sse`,
+  `jsonArray` and `bytes` calls are built with no timeout, because the three
+  transports do not bound the same thing: Ktor's request timeout ends the whole
+  exchange and the other two are done when the response head arrives, so one
+  client's SSE subscription died at 30 seconds on one transport and ran on the
+  other two. Everything read whole is bounded as before. Regenerate to pick it
+  up. `docs/generated-client.md` now has the per-transport table, and the
+  bearer-token recipe that was missing beside it.
 - **A generated client refuses a body it cannot read, naming the call.** A
   declared status arriving with something the codec cannot decode — a proxy's
   HTML 404, a gateway's plain-text 502 — used to let a bare Jackson or kotlinx

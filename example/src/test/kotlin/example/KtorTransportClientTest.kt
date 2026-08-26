@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayInputStream
+import java.time.Duration
 
 /**
  * The generated client over `pelican-client-ktor`, against the orders service
@@ -112,5 +113,26 @@ class KtorTransportClientTest {
 
         first.map { it.seq } shouldBe listOf(1, 2)
         withClue("two of ten events took ${elapsedMs}ms — that looks buffered") { elapsedMs shouldBeLessThan 700 }
+    }
+
+    /**
+     * The transport where this had teeth. Ktor's `requestTimeoutMillis` bounds
+     * the whole exchange, body included, so a client's deadline used to end a
+     * stream that outlived it — while the same client on the JDK and Pekko
+     * adapters, which bound the response head, streamed on.
+     */
+    @Test
+    fun `a streamed call outlives the deadline the client was built with`() {
+        val impatient = OrdersClient(
+            server.baseUrl,
+            codecs,
+            KtorHttpTransport(http),
+            timeout = Duration.ofMillis(300),
+        )
+
+        // Ten events, 100ms apart: a second of stream under a 300ms deadline.
+        val ticks = impatient.watchOrders(1L, limit = 10).use { it.toList() }
+
+        ticks.map { it.seq } shouldBe (1..10).toList()
     }
 }

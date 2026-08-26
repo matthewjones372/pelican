@@ -8,6 +8,7 @@ package io.github.matthewjones372.pelican.codegen
 import io.github.matthewjones372.pelican.*
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
+import io.kotest.inspectors.forAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -378,6 +379,22 @@ class KotlinClientTest {
             "429 -> return Outcome.Err(PokeWidgetFailure.TooManyRequests(" +
             "problemCodec.decoded(response.body, Method.POST, \"/widgets/{widgetId}/poke\", response.status), " +
             """response.header("Retry-After")?.toLongOrNull()))"""
+    }
+
+    /**
+     * A deadline is for a call that ends. A stream is meant to stay open, and
+     * one transport of the three bounds the whole exchange rather than the
+     * response head — so inheriting the client's deadline killed a stream
+     * there and nowhere else.
+     */
+    @Test
+    fun `a streamed call sends no deadline, and every other call sends the client's`() {
+        client shouldContain """stream(request(Method.GET, "/widgets/watch", deadline = null))"""
+        client shouldContain """contentType = "application/octet-stream", deadline = null))"""
+
+        withClue("a call read whole is bounded, as it always was") {
+            client.lines().filter { it.contains("text(request(") }.forAll { it shouldNotContain "deadline" }
+        }
     }
 
     @Test

@@ -9,7 +9,7 @@ rather than convention.
 
 | Module | Depends on | Contains |
 |---|---|---|
-| `pelican-core` | **nothing** | endpoint descriptions, plain codecs, a minimal JSON tree |
+| `pelican-core` | **nothing** | endpoint descriptions, plain codecs, a minimal JSON tree, the client SPI and its in-memory implementation |
 | `pelican-jackson` / `-kotlinx` / `-jsoniter` | core + one JSON library | your `Codecs` |
 | `pelican-pekko` / `-http4k` / `-ktor` | core + one server library | descriptions → that server's routes |
 | `pelican-*-docs` | its backend, openapi | serves the document and Swagger UI |
@@ -26,7 +26,7 @@ rather than convention.
 | `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-golden` | test + openapi | per-endpoint goldens; fails on a breaking change |
-| `pelican-test-pekko` / `-http4k` | test + that backend | the in-memory transport |
+| `pelican-test-pekko` / `-http4k` | test + that backend | the typed test client's in-memory transport |
 
 Every one of those dependency claims is a test. `pelican-core` asserts its
 runtime classpath holds nothing but the Kotlin standard library, `pelican-openapi`

@@ -1400,6 +1400,32 @@ blocking and carries a `String` body on purpose, because a test asserts on a
 result it already has — which is exactly why the typed test client
 [cannot upload binary](#what-isnt-here). Right taste, wrong constraints.
 
+### What a deadline bounds, and what carries none
+
+`timeout` on a generated client's constructor is put on every `ClientRequest`
+it builds, and each adapter maps it onto what its library has. Two of the three
+bound the arrival of the response head and leave the body to the connection's
+own idle timeout; Ktor's `HttpTimeout` plugin bounds the whole exchange, the
+reading of the body included. The table in
+[docs/generated-client.md](generated-client.md#how-long-a-call-may-take) is the
+short form.
+
+That difference has no consequence for a call read whole, and one consequence
+for a call that is not: an `sse` subscription inheriting a 30-second deadline
+died at 30 seconds on Ktor and ran on for hours on the other two — the same
+description, the same client, two behaviours, and nothing in either to say so.
+
+So a generated streamed call sends no deadline. `ndjson`, `sse`, `jsonArray`
+and `bytes` build their request with `deadline = null` and everything else
+takes the client's; the generated `request(...)` helper carries the parameter
+and the reasoning. It is not that streams should be unbounded — it is that a
+whole-exchange deadline is the wrong instrument for one, and an idle timeout on
+the engine you handed over is the right one. A caller who wants a bound takes
+what they need and closes: `use { it.take(100).toList() }`.
+
+A per-call override is a further parameter on the generated methods, and can be
+added without breaking a caller, so it is not here yet.
+
 ### Without a socket
 
 The fourth implementation of the interface carries nothing anywhere.

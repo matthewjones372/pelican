@@ -14,6 +14,13 @@
  * [standingHeaders] defaults to the ones this client sends with everything —
  * and a webhook passes none, because those are the credential the client
  * presents to the API and a subscriber's endpoint is not the API.
+ *
+ * [deadline] is this client's own, except for a call that streams: those pass
+ * null. A deadline is for a call that ends, and the three transports do not
+ * bound the same thing — Ktor's request timeout ends the whole exchange, the
+ * reading of the body included, while the JDK's and Pekko's are done once the
+ * response head arrives. A stream inheriting it therefore died at the deadline
+ * on one transport and ran on the other two.
  */
 private fun request(
     method: Method,
@@ -26,6 +33,7 @@ private fun request(
     multipart: MultipartContent? = null,
     origin: String = base,
     standingHeaders: Map<String, String> = headers(),
+    deadline: Duration? = timeout,
 ): ClientRequest {
     val search = query
         .flatMap { (name, value) -> occurrences(name, value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
@@ -47,7 +55,7 @@ private fun request(
         url = origin + path + if (search.isEmpty()) "" else "?$search",
         headers = sent,
         body = multipart?.body ?: body,
-        timeout = timeout,
+        timeout = deadline,
     )
 }
 

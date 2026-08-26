@@ -452,7 +452,7 @@ private class KotlinClientEmitter(
         val template = call.target ?: kotlinString(ep.pathSpec.template)
         val at = CallSite(method, template)
         val out = successes.first()
-        val streamed = isStream(out) || out is ByteStreamOutput
+        val streamed = streams(ep)
         val failures = declaredFailures(ep)
 
         appendLine("val response = ${if (streamed) "stream" else "text"}(${call.request})")
@@ -718,6 +718,9 @@ private class KotlinClientEmitter(
             if (headerPairs.isNotEmpty()) add("headerParams = listOf(${headerPairs.joinToString(", ")})")
             if (cookiePairs.isNotEmpty()) add("cookies = listOf(${cookiePairs.joinToString(", ")})")
             bodyArgument?.let { add(it) }
+            // A stream is meant to stay open, and the client's deadline bounds
+            // the whole exchange on one of the three transports.
+            if (streams(ep)) add("deadline = null")
         }
 
         return Call(
@@ -765,6 +768,10 @@ private class KotlinClientEmitter(
 
     private fun isStream(out: Output<*>): Boolean =
         out is NdjsonOutput<*> || out is SseOutput<*> || out is JsonArrayOutput<*>
+
+    /** Whether the response is read as it arrives rather than after it has all arrived. */
+    private fun streams(ep: Endpoint<*, *>): Boolean =
+        declaredSuccesses(ep).first().let { isStream(it) || it is ByteStreamOutput }
 
     private fun elementType(out: Output<*>): KType = when (out) {
         is NdjsonOutput<*> -> out.type

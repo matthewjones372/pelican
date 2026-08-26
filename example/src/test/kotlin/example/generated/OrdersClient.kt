@@ -560,6 +560,13 @@ class OrdersClient(
      * [standingHeaders] defaults to the ones this client sends with everything —
      * and a webhook passes none, because those are the credential the client
      * presents to the API and a subscriber's endpoint is not the API.
+     *
+     * [deadline] is this client's own, except for a call that streams: those pass
+     * null. A deadline is for a call that ends, and the three transports do not
+     * bound the same thing — Ktor's request timeout ends the whole exchange, the
+     * reading of the body included, while the JDK's and Pekko's are done once the
+     * response head arrives. A stream inheriting it therefore died at the deadline
+     * on one transport and ran on the other two.
      */
     private fun request(
         method: Method,
@@ -572,6 +579,7 @@ class OrdersClient(
         multipart: MultipartContent? = null,
         origin: String = base,
         standingHeaders: Map<String, String> = headers(),
+        deadline: Duration? = timeout,
     ): ClientRequest {
         val search = query
             .flatMap { (name, value) -> occurrences(name, value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
@@ -593,7 +601,7 @@ class OrdersClient(
             url = origin + path + if (search.isEmpty()) "" else "?$search",
             headers = sent,
             body = multipart?.body ?: body,
-            timeout = timeout,
+            timeout = deadline,
         )
     }
 
@@ -683,7 +691,7 @@ class OrdersClient(
      * `GET /users/{userId}/orders`
      */
     fun streamOrders(userId: Long, limit: Int? = null, status: OrderStatus? = null, xTraceId: String? = null): Outcome<StreamOrdersFailure, Streamed<Order>> {
-        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders", query = listOf("limit" to limit, "status" to status), headerParams = listOf("X-Trace-Id" to xTraceId)))
+        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders", query = listOf("limit" to limit, "status" to status), headerParams = listOf("X-Trace-Id" to xTraceId), deadline = null))
         when (response.status) {
             404 -> return Outcome.Err(StreamOrdersFailure.NotFound(apiErrorCodec.decoded(drain(response), Method.GET, "/users/{userId}/orders", response.status)))
         }
@@ -698,7 +706,7 @@ class OrdersClient(
      * `GET /users/{userId}/orders/watch`
      */
     fun watchOrders(userId: Long, limit: Int? = null): Streamed<Tick> {
-        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/watch", query = listOf("limit" to limit)))
+        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/watch", query = listOf("limit" to limit), deadline = null))
         if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders/watch", response)
         val body = response.body
         return Streamed(body, sseFrames(body.bufferedReader()).map { tickCodec.decoded(it, Method.GET, "/users/{userId}/orders/watch", response.status) })
@@ -712,7 +720,7 @@ class OrdersClient(
      * `GET /users/{userId}/orders/list`
      */
     fun listOrders(userId: Long, limit: Int? = null): Streamed<Order> {
-        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/list", query = listOf("limit" to limit)))
+        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/list", query = listOf("limit" to limit), deadline = null))
         if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders/list", response)
         val body = response.body
         return Streamed(body, jsonArrayFrames(body.reader()).map { orderCodec.decoded(it, Method.GET, "/users/{userId}/orders/list", response.status) })
@@ -805,7 +813,7 @@ class OrdersClient(
      * `POST /echo`
      */
     fun echo(body: InputStream): InputStream {
-        val response = stream(request(Method.POST, "/echo", body = ClientRequest.Body.Streaming { body }, contentType = "application/octet-stream"))
+        val response = stream(request(Method.POST, "/echo", body = ClientRequest.Body.Streaming { body }, contentType = "application/octet-stream", deadline = null))
         if (!response.succeeded()) failedStream(Method.POST, "/echo", response)
         return response.body
     }
@@ -816,7 +824,7 @@ class OrdersClient(
      * `GET /search`
      */
     fun searchOrders(limit: Int? = null, status: OrderStatus? = null, item: List<String>? = null, tag: List<String>? = null, sort: List<String>? = null, fields: List<String>? = null, xTraceId: String? = null, xFeature: List<String>? = null, seen: List<Long>? = null): Streamed<Order> {
-        val response = stream(request(Method.GET, "/search", query = listOf("limit" to limit, "status" to status, "item" to joined("item", item, ","), "tag" to tag, "sort" to joined("sort", sort, "|"), "fields" to joined("fields", fields, " ")), headerParams = listOf("X-Trace-Id" to xTraceId, "X-Feature" to joined("X-Feature", xFeature, ",")), cookies = listOf("seen" to seen)))
+        val response = stream(request(Method.GET, "/search", query = listOf("limit" to limit, "status" to status, "item" to joined("item", item, ","), "tag" to tag, "sort" to joined("sort", sort, "|"), "fields" to joined("fields", fields, " ")), headerParams = listOf("X-Trace-Id" to xTraceId, "X-Feature" to joined("X-Feature", xFeature, ",")), cookies = listOf("seen" to seen), deadline = null))
         if (!response.succeeded()) failedStream(Method.GET, "/search", response)
         val body = response.body
         return Streamed(body, ndjsonFrames(body.bufferedReader()).map { orderCodec.decoded(it, Method.GET, "/search", response.status) })
