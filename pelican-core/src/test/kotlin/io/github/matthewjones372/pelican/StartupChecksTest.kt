@@ -31,6 +31,23 @@ class StartupChecksTest {
     private fun bind(ep: Endpoint<*, *>) =
         ServerEndpoint(ep) { CompletableFuture.completedStage("ok" as Any?) }
 
+    /**
+     * `get("/users/{id}")` is the spelling every annotation framework taught,
+     * and nothing here reads braces: it would route the literal text
+     * `%7Bid%7D`. Refused where it is written, naming the spelling that works.
+     */
+    @Test
+    fun `a brace in a path literal is refused, naming the DSL's own spelling`() {
+        val failure = shouldThrow<IllegalArgumentException> {
+            endpoint(userId) {
+                get("users/{userId}")
+                text()
+            }
+        }
+        failure.message shouldContain "{userId}"
+        failure.message shouldContain "pathParam"
+    }
+
     @Test
     fun `two handlers on one route is a startup failure`() {
         val failure = shouldThrow<IllegalArgumentException> {

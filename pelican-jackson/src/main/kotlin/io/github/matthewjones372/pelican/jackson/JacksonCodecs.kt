@@ -79,6 +79,12 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
         return json.withNullabilityOf(type)
     }
 
+    /**
+     * One instance for the whole process, so two threads describing schemas
+     * concurrently through it share resolver state: generate documents once at
+     * startup — what the `-docs` modules do — or construct a `JacksonCodecs`
+     * per thread for concurrent `schema()` calls.
+     */
     companion object Default : Codecs by JacksonCodecs(defaultMapper())
 }
 

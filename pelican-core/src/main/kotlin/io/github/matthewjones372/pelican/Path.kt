@@ -2,7 +2,18 @@ package io.github.matthewjones372.pelican
 
 /** One element of a route's path: either a fixed word or a typed capture. */
 sealed interface PathSegment {
-    data class Literal(val value: String) : PathSegment
+    data class Literal(val value: String) : PathSegment {
+        init {
+            // The spelling every annotation framework taught. Nothing here
+            // reads braces, so this would route the literal text `%7Bid%7D`.
+            require('{' !in value && '}' !in value) {
+                "A path literal cannot capture: '$value' would match those characters literally. " +
+                    "Declare the parameter — val id = pathParam<Long>(\"id\") — and put the value " +
+                    "in the path: \"users\" / id."
+            }
+        }
+    }
+
     data class Capture(val param: PathParam<*>) : PathSegment
 }
 

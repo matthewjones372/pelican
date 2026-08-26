@@ -318,6 +318,7 @@ fun <T : Any> QueryParam<T>.pipeSeparated(): QueryParam<List<T>> = listed(ListSt
 
 private fun <T : Any> QueryParam<T>.listed(style: ListStyle): QueryParam<List<T>> {
     require(listStyle == null) { "$this already carries a list of values" }
+    requireNoScalarDefault(this, default)
     return QueryParam(name, codec, required, default, description, style)
 }
 
@@ -328,6 +329,7 @@ private fun <T : Any> QueryParam<T>.listed(style: ListStyle): QueryParam<List<T>
  */
 fun <T : Any> HeaderParam<T>.commaSeparated(): HeaderParam<List<T>> {
     require(listStyle == null) { "$this already carries a list of values" }
+    requireNoScalarDefault(this, default)
     return HeaderParam(name, codec, required, default, description, ListStyle.COMMA)
 }
 
@@ -337,7 +339,19 @@ fun <T : Any> HeaderParam<T>.commaSeparated(): HeaderParam<List<T>> {
  */
 fun <T : Any> CookieParam<T>.repeated(): CookieParam<List<T>> {
     require(listStyle == null) { "$this already carries a list of values" }
+    requireNoScalarDefault(this, default)
     return CookieParam(name, codec, required, default, description, ListStyle.REPEATED)
+}
+
+/**
+ * A scalar default carried into a list-typed parameter would meet the handler
+ * as a ClassCastException far from the declaration, so the order is refused.
+ */
+private fun requireNoScalarDefault(param: Any, default: Any?) {
+    require(default == null) {
+        "$param declares a default and then a list of values, which would leave a single $default " +
+            "where the handler reads a list. Spread first, then default(listOf(...))."
+    }
 }
 
 inline fun <reified T> jsonBody(description: String? = null): JsonBody<T> =

@@ -29,6 +29,45 @@ class OutputDeclarationTest {
     }
 
     @Test
+    fun `a documentation-only error is held to the same status range`() {
+        shouldThrow<IllegalArgumentException> {
+            endpoint {
+                get("widgets")
+                errorResponse(4004, "Not found, twice over")
+                json<Widget>()
+            }
+        }.message.orEmpty() shouldContain "run from 100 to 599"
+    }
+
+    /**
+     * The responses map keys on the status, so a documentation-only error under
+     * a declared success would silently replace it in the document while the
+     * server kept answering with the success.
+     */
+    @Test
+    fun `a documentation-only error cannot shadow a declared response`() {
+        shouldThrow<IllegalStateException> {
+            endpoint {
+                get("widgets")
+                errorResponse(200, "An error that is also the success")
+                json<Widget>()
+            }
+        }.message.orEmpty() shouldContain "200"
+    }
+
+    @Test
+    fun `two documentation-only errors cannot share a status`() {
+        shouldThrow<IllegalStateException> {
+            endpoint {
+                get("widgets")
+                errorResponse(404, "No widget")
+                errorResponse(404, "Still no widget")
+                json<Widget>()
+            }
+        }.message.orEmpty() shouldContain "404"
+    }
+
+    @Test
     fun `a payload cannot be declared under a status that carries no body`() {
         shouldThrow<IllegalArgumentException> { json<Widget>(status = 204) }
             .message.orEmpty() shouldContain "cannot carry a body"

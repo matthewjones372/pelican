@@ -17,7 +17,7 @@ interface BodyCodec<T> {
  */
 class BodyDecodeFailure(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
-/** Resolves a codec for a type. Implemented by `pelican-jackson` and `pelican-kotlinx`. */
+/** Resolves a codec for a type. Implemented by `pelican-jackson`. */
 interface CodecFactory {
     fun <T> codec(type: KType): BodyCodec<T>
 
@@ -103,8 +103,7 @@ interface Codecs : CodecFactory, SchemaSource
 /** The default when none is configured: fails with an actionable message. */
 object NoCodecs : Codecs {
     private fun fail(): Nothing = error(
-        "No codecs configured. Pass `codecs = JacksonCodecs` to api(...) " +
-            "(pelican-jackson) or `codecs = KotlinxCodecs` (pelican-kotlinx).",
+        "No codecs configured. Pass `codecs = JacksonCodecs` to api(...), from pelican-jackson.",
     )
 
     override fun <T> codec(type: KType): BodyCodec<T> = fail()

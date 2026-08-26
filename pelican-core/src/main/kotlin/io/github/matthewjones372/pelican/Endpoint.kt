@@ -12,7 +12,11 @@ class ErrorSpec @PublishedApi internal constructor(
     val type: KType?,
     /** Headers this failure carries — `Retry-After` on a 429, chiefly. */
     val headers: List<ResponseHeader<*>> = emptyList(),
-)
+) {
+    init {
+        if (status != null) checkStatus("error:$status", status, carriesBody = type != null)
+    }
+}
 
 /**
  * A description of one HTTP endpoint. A plain value: no handler, no server
@@ -523,6 +527,24 @@ private fun validate(ep: Endpoint<*, *>) {
             "$ep declares more than one default response, and a document has room for one: " +
                 "`default` is the single entry meaning \"and anything else\". Say it once, or give the " +
                 "others the statuses they really are.",
+        )
+    }
+
+    // The numbered statuses are one key each in the same map, so an error
+    // sharing a status — with a success, or with another error — would
+    // silently replace it in the document while the server kept answering.
+    val successStatuses = when (val out = ep.output) {
+        is DeclaredResponses<*, *> -> out.successes.map { it.status }
+        else -> listOf(out.status)
+    }
+    val errorStatuses = ep.errors.mapNotNull { it.status }
+    val statusClashes = errorStatuses.groupingBy { it }.eachCount().filterValues { it > 1 }.keys +
+        errorStatuses.filter { it in successStatuses }
+    if (statusClashes.isNotEmpty()) {
+        error(
+            "$ep declares more than one response under status ${statusClashes.toSortedSet().joinToString()}, " +
+                "and the document has room for one per status: the second declaration would silently " +
+                "replace the first. Give them different statuses, or declare one.",
         )
     }
 

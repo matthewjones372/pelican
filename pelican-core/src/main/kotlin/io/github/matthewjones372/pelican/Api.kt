@@ -132,8 +132,8 @@ class Api internal constructor(
     val endpoints: List<ServerEndpoint>,
 
     /**
-     * How bodies are encoded, decoded and described — `JacksonCodecs`,
-     * `KotlinxCodecs`. The only thing that changes when you switch libraries.
+     * How bodies are encoded, decoded and described — `JacksonCodecs`. The
+     * only thing that changes when you switch libraries.
      */
     val codecs: Codecs = NoCodecs,
 

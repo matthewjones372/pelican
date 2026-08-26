@@ -161,4 +161,24 @@ class MultiValuedInputsTest {
         shouldThrow<IllegalArgumentException> { queryParam<String>("tag").repeated().commaSeparated() }
             .message shouldContain "already carries a list"
     }
+
+    /**
+     * `default(v)` then `repeated()` would carry a scalar default in a slot the
+     * type now says is a list, and the handler would meet it as a
+     * ClassCastException far from the declaration. The working order is
+     * `repeated().default(listOf(...))`.
+     */
+    @Test
+    fun `a scalar default cannot be spread into a list`() {
+        shouldThrow<IllegalArgumentException> { queryParam<String>("tag").default("none").repeated() }
+            .message shouldContain "default(listOf("
+
+        shouldThrow<IllegalArgumentException> { queryParam<String>("tag").default("none").commaSeparated() }
+
+        shouldThrow<IllegalArgumentException> { headerParam<String>("X-Tags").default("none").commaSeparated() }
+            .message shouldContain "default(listOf("
+
+        shouldThrow<IllegalArgumentException> { cookieParam<String>("tag").default("none").repeated() }
+            .message shouldContain "default(listOf("
+    }
 }
