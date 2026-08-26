@@ -965,7 +965,7 @@ The document and the client are both readings of the same values, and both are
 build tasks:
 
 ```kotlin
-plugins { id("io.github.matthewjones372.pelican") version "0.1.0" }
+plugins { id("io.github.matthewjones372.pelican") version "0.2.0" }
 
 pelican {
     documents {
@@ -1062,7 +1062,7 @@ importer:
 
 ```kotlin
 val pelicanImport: Configuration by configurations.creating
-dependencies { pelicanImport("io.github.matthewjones372:pelican-import:0.1.0") }
+dependencies { pelicanImport("io.github.matthewjones372:pelican-import:0.2.0") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
@@ -1263,7 +1263,7 @@ and OkHttp is. A generated client finds whichever is present without being
 told:
 
 ```kotlin
-dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
+dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.2.0") }
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 ```
@@ -2673,7 +2673,7 @@ val caller = attribute<Caller>("caller")
 
 val requireToken = before { p -> p[caller] = check(p) ?: unauthorized() }
 
-fileReport handledNow { req -> Reports.file(p[caller].subject, req) }
+fileReport handledNow { req -> Reports.file(this[caller].subject, req) }   // `this` is Params
 ```
 
 Reading an attribute nothing set throws and says so: a handler that reads one is

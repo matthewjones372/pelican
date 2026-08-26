@@ -82,7 +82,8 @@ javadoc.io from the Dokka javadoc jar, which needs no site.
 
 ## Servers
 
-Three interpreters exist. The roadmap is right that a fourth proves nothing
+Three interpreters exist — Pekko on `main`, http4k and Ktor on the
+`multi-backend` branch. The roadmap is right that a fourth proves nothing
 further about the abstraction; this list is about audience, which is a separate
 argument.
 
@@ -108,26 +109,24 @@ interpreter half-covers it), raw Netty.
 
 - [ ] **Hoist the shared pipeline into core before backend four.**
       `decodePlainInputs`, `refuseIfOversize`, `orderedEndpoints`,
-      `EndpointCodecs` and the CORS folding are private in all three
-      interpreters. A decode fix already has to land three times. Hoisting is
+      `EndpointCodecs` and the CORS folding are private per interpreter, so on
+      the `multi-backend` branch a decode fix lands three times. Hoisting is
       core-side only and turns each new backend into roughly 300 lines of
       genuinely backend-specific work: route registration, body reading,
       response writing, streaming, async model.
 
 ## Clients
 
-`ClientTransport` has landed, with `pelican-client-java` over the JDK's own
-`HttpClient` and `pelican-client-pekko` beside it, plus the `suspend` surface
-and the retry policy. Two adapters are left, and one of them carries most of
-the remaining audience:
+`ClientTransport` has landed, with the `suspend` surface and the retry policy.
 
-- [ ] **`pelican-client-okhttp`.** `java.net.http` does not exist on Android, so
-      every Android caller of a Pelican-described API is excluded today. OkHttp
-      is Android's default, and the adapter is small now the SPI exists. This
-      is the largest single audience gap on the client side.
-- [ ] **`pelican-client-ktor`.** A service already tuning one Ktor engine should
-      not acquire a second HTTP stack to call a generated client. Also the
-      route to Kotlin Multiplatform, and so to iOS and JS callers.
+- [x] **`pelican-client-java`** over the JDK's own `HttpClient`, and
+      **`pelican-client-pekko`** beside it.
+- [x] **`pelican-client-okhttp`.** `java.net.http` does not exist on Android,
+      so OkHttp is what reaches every Android caller. Landed for 1.0; on
+      Central from the 1.0 release.
+- [ ] **`pelican-client-ktor`.** Written, on the `multi-backend` branch with
+      the Ktor server stack; returns after 1.0. Also the route to Kotlin
+      Multiplatform, and so to iOS and JS callers.
 
 A server interpreter wins a backend team. A client adapter wins an
 organisation: the backend describes the API and mobile consumes the same

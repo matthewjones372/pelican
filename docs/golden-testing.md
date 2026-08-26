@@ -26,7 +26,7 @@ calling us?"
 
 ```kotlin
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-golden:0.1.0")
+    testImplementation("io.github.matthewjones372:pelican-test-golden:0.2.0")
 }
 ```
 
@@ -35,7 +35,7 @@ server library, no matcher library, no test framework. The assertions throw
 plain `AssertionError`, so JUnit, kotest and `kotlin.test` all report them.
 
 You only need an in-memory transport if you record a response;
-`pelican-test-pekko` and its siblings stay optional.
+`pelican-test-pekko` stays optional.
 
 ## One line covers every endpoint
 

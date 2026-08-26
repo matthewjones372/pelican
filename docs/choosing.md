@@ -3,11 +3,12 @@
 Linked from the [README](../README.md). The page for deciding *against* Pelican
 quickly, and for a reason that is actually true.
 
-Pelican is at 1.0. The README explains what it does and the reference manual
-explains how, but neither answers the question a reader arrives with, which is
-whether the thing they already have is worse. Usually it is not. This page is
-the honest version of that comparison: for each neighbour, what it does better
-than Pelican does, and which projects should take it instead.
+Pelican's current release is 0.2.0, with 1.0 at release-candidate stage. The
+README explains what it does and the reference manual explains how, but
+neither answers the question a reader arrives with, which is whether the thing
+they already have is worse. Usually it is not. This page is the honest version
+of that comparison: for each neighbour, what it does better than Pelican does,
+and which projects should take it instead.
 
 Every claim about another project below was checked against that project's own
 current documentation in August 2026, and the version checked is named, because
@@ -131,7 +132,7 @@ the same class the server routed on.
 **Take Ktor's own plugins instead when** you are on Ktor and want typed routing
 without a new dependency, when Resources' URL-level type safety is the amount
 you actually needed, or when you would rather have a first-party feature from
-JetBrains than a 0.1 library from one person.
+JetBrains than a first-release library from one person.
 
 Three things are worth knowing before you decide, all from Ktor's own
 documentation. The generation feature is opt-in: `enabled` defaults to `false`.
@@ -256,9 +257,11 @@ you bind with.
 
 It is mature and it is much larger. Roughly a dozen server interpreters are
 documented — among them http4s, Netty in four variants, Pekko HTTP, Play,
-Vert.x, Armeria, ZIO HTTP, Helidon Níma and AWS Lambda — against Pelican's
-three, and four client interpreters against Pelican's one generated file. Eight
-JSON libraries are supported where Pelican has three.
+Vert.x, Armeria, ZIO HTTP, Helidon Níma and AWS Lambda — against the one
+backend Pelican ships at 1.0 (three are written; two sit on the
+`multi-backend` branch), and four client interpreters against Pelican's one
+generated file. Eight JSON libraries are supported where Pelican ships one,
+with two more on that branch.
 
 It describes more. Besides OpenAPI it generates AsyncAPI, through
 `tapir-asyncapi-docs` against the AsyncAPI 2.0.0 specification, and standalone
@@ -462,7 +465,7 @@ handler destructure a prefix of its inputs and quietly ignore the rest. And
 nothing in Kotlin's type system can say that a list of bound handlers covers a
 set of declared endpoints, so `api { covers = ... }` is a runtime check too.
 
-**Finally, the obvious one.** One author, a first stable release, and no issues
+**Finally, the obvious one.** One author, a first release, and no issues
 open — which reads as "nothing is broken" and equally as "nobody has tried it
 yet". Weigh it accordingly.
 

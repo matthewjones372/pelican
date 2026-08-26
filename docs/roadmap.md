@@ -210,8 +210,8 @@ emits, three new adapter modules, `docs/generated-client.md`.
 one test, blocking and `suspend` call shapes both generate, a retry policy is a
 constructor argument defaulting to no retries, and each adapter module's
 dependency test asserts it drags in core and one HTTP library and nothing else.
-Two of those four are done; what is left is the two adapters and the test that
-runs one client against all three.
+All four are done: the adapters shipped — see "What has since landed" — and
+`example`'s suite runs the generated client over each transport it compiles.
 
 ## 4. A filter that can change the response
 
