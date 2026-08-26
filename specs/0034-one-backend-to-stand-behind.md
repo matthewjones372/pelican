@@ -48,13 +48,13 @@ infrastructure the moment a second backend returns.
 
 ## Stack
 
-- [ ] **`multi-backend`** — the snapshot branch, cut from main after spec
+- [x] **`multi-backend`** — the snapshot branch, cut from main after spec
       0033 merges. Not a PR; a branch push. Done when: the branch builds green.
-- [ ] **`spec-0034-remove-modules`** — module directories, settings.gradle.kts,
+- [x] **`spec-0034-remove-modules`** — module directories, settings.gradle.kts,
       version catalog entries, cross-module test references; example rewired
       to Pekko-only with harness shapes kept.
       Done when: `./gradlew build` is green with the kept module set only.
-- [ ] **`spec-0034-docs-truth`** — README, docs/reference.md, choosing.md,
+- [x] **`spec-0034-docs-truth`** — README, docs/reference.md, choosing.md,
       modules.md, golden-testing.md, llms.txt, roadmap coherence (the
       "fourth backend" and "three is enough" sentences), CHANGELOG breaking
       note naming the branch.
