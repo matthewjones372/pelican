@@ -1,7 +1,10 @@
 public final class io/github/matthewjones372/pelican/metrics/otel/TelemetryKt {
 	public static final field INSTRUMENTATION_SCOPE Ljava/lang/String;
+	public static final field UNMATCHED Ljava/lang/String;
 	public static final fun getOtelContext ()Lio/github/matthewjones372/pelican/Attribute;
 	public static final fun openTelemetry (Lio/opentelemetry/api/OpenTelemetry;Lio/opentelemetry/context/propagation/TextMapGetter;Ljava/lang/String;)Lio/github/matthewjones372/pelican/Filter;
 	public static synthetic fun openTelemetry$default (Lio/opentelemetry/api/OpenTelemetry;Lio/opentelemetry/context/propagation/TextMapGetter;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/Filter;
+	public static final fun refusalCounter (Lio/opentelemetry/api/OpenTelemetry;Ljava/lang/String;)Lio/github/matthewjones372/pelican/RefusalObserver;
+	public static synthetic fun refusalCounter$default (Lio/opentelemetry/api/OpenTelemetry;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/RefusalObserver;
 }
 

@@ -2,6 +2,8 @@ package io.github.matthewjones372.pelican.metrics
 
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.RefusalObserver
+import io.github.matthewjones372.pelican.RefusalReason
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attempt
 import io.github.matthewjones372.pelican.statusFor
@@ -66,6 +68,10 @@ import java.util.concurrent.ConcurrentHashMap
  * The status is resolved by core, in the one place that decides it, so what is
  * counted here is what the caller was sent. See `Endpoint.statusFor` for how,
  * and for the single case it cannot see.
+ *
+ * What no filter can see at all is a request refused before the chain was
+ * entered — a 413, a 406, a body nothing could decode. [refusalCounter] counts
+ * those, under a name of its own so that nothing here changes meaning.
  */
 fun metrics(registry: MeterRegistry, prefix: String = DEFAULT_PREFIX): Filter {
     require(prefix.isNotBlank()) {
@@ -95,8 +101,54 @@ fun metrics(registry: MeterRegistry, prefix: String = DEFAULT_PREFIX): Filter {
     }
 }
 
+/**
+ * The requests [metrics] is structurally unable to count: those refused before
+ * the filter chain was entered.
+ *
+ * ```kotlin
+ * api(routes, JacksonCodecs) {
+ *     filter(metrics(registry))
+ *     onRefusal(refusalCounter(registry))
+ * }
+ * ```
+ *
+ * Two lines rather than one because they are two different places. A filter is
+ * inside the request; a 413 is decided several layers outside the outermost
+ * one, where no filter exists to be called. The consequence is that
+ * `http.server.requests` under-counts exactly during an attack or a
+ * broken-client rollout — the moments an operator reads the dashboard — and an
+ * incident review that trusts it concludes the flood never happened.
+ *
+ * It records `http.server.refusals`, a counter, and touches nothing else: no
+ * existing series changes meaning, so no existing dashboard does either. Its
+ * three tags:
+ *
+ * | Tag | Where it comes from |
+ * |---|---|
+ * | `reason` | [RefusalReason.label] — `unmatched`, `decode`, `body_limit`, `content_type`, `accept` |
+ * | `status` | the status the caller was sent |
+ * | `path` | the refusing route's template, or [UNMATCHED] where nothing matched |
+ *
+ * All three are bounded by the service's own shape. That is the whole reason
+ * the observer is handed a template rather than a URL: an unmatched request is
+ * a caller's arbitrary path, and a meter tagged with it would grow a series per
+ * probe — which is to say the metric would become the attack surface.
+ */
+fun refusalCounter(registry: MeterRegistry, prefix: String = DEFAULT_PREFIX): RefusalObserver {
+    require(prefix.isNotBlank()) {
+        "The meter prefix is what the counter's name is built from, so it has to be one: " +
+            "refusalCounter(registry, prefix = \"orders.http\"). Leave it out for `$DEFAULT_PREFIX`."
+    }
+
+    val meters = RefusalMeters(registry, prefix)
+    return RefusalObserver { reason, status, pathTemplate -> meters.record(reason, status, pathTemplate) }
+}
+
 /** The names below are `http.server.requests` and `http.server.request.duration`. */
 const val DEFAULT_PREFIX: String = "http.server"
+
+/** What the `path` tag says where the request matched no route at all. */
+const val UNMATCHED: String = "_unmatched"
 
 /** What an endpoint that never named itself is tagged with. */
 private const val UNNAMED = "unnamed"
@@ -160,6 +212,40 @@ private class RequestMeters(private val registry: MeterRegistry, prefix: String)
         "deprecated", endpoint.deprecated.toString(),
     )
 }
+
+/**
+ * The refusal counter, and the tag list arrived at once per distinct refusal
+ * rather than once per refused request.
+ *
+ * Bounded like [RequestMeters] and for a stronger reason: [RefusalReason] is a
+ * closed set, a status comes from core's own table, and a path is a template or
+ * the one constant. Nothing a caller sends can add a key.
+ */
+private class RefusalMeters(private val registry: MeterRegistry, prefix: String) {
+
+    private val name = "$prefix.refusals"
+
+    private val meters = ConcurrentHashMap<Refused, Counter>()
+
+    fun record(reason: RefusalReason, status: Int, pathTemplate: String?) {
+        meters.computeIfAbsent(Refused(reason, status, pathTemplate ?: UNMATCHED), ::build).increment()
+    }
+
+    private fun build(refused: Refused): Counter = Counter.builder(name)
+        .description("Requests refused before the filter chain, by reason and route")
+        .baseUnit("requests")
+        .tags(
+            Tags.of(
+                "reason", refused.reason.label,
+                "status", refused.status.toString(),
+                "path", refused.path,
+            ),
+        )
+        .register(registry)
+}
+
+/** One reason, one status and one route: the key the counter hangs off. */
+private data class Refused(val reason: RefusalReason, val status: Int, val path: String)
 
 /** One endpoint and one status it answered with: the key both meters hang off. */
 private data class Answered(val endpoint: Endpoint<*, *>, val status: Int)

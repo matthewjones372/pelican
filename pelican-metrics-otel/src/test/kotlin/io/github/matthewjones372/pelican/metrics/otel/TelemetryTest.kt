@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.Params
+import io.github.matthewjones372.pelican.RefusalReason
 import io.github.matthewjones372.pelican.before
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
@@ -353,5 +354,48 @@ class TelemetryTest {
         val failure = shouldThrow<IllegalArgumentException> { openTelemetry(sdk, scopeName = " ") }
 
         failure.message.shouldNotBeNull()
+    }
+
+    // ------------------------------------------------ the traffic no filter sees
+
+    @Test
+    fun `a refusal is counted by reason, status and the route that refused`() {
+        refusalCounter(sdk).refused(RefusalReason.BODY_LIMIT, 413, "/orders/{orderId}")
+
+        val metric = measurements.collectAllMetrics().single()
+        metric.name shouldBe "http.server.refusals"
+        metric.unit shouldBe "{request}"
+
+        val point = metric.longSumData.points.single()
+        point.value shouldBe 1L
+        point.attributes.asMap().entries.associate { it.key.key to it.value } shouldBe mapOf(
+            "pelican.refusal_reason" to "body_limit",
+            "http.response.status_code" to 413L,
+            "http.route" to "/orders/{orderId}",
+        )
+    }
+
+    /**
+     * The attribute that decides whether this instrument is safe to publish. An
+     * unmatched request carries whatever path a caller chose, so recording that
+     * would be one series per probe.
+     */
+    @Test
+    fun `a refusal with no route is attributed with one constant, not with the path`() {
+        val counter = refusalCounter(sdk)
+        counter.refused(RefusalReason.UNMATCHED, 404, null)
+        counter.refused(RefusalReason.UNMATCHED, 404, null)
+
+        val point = measurements.collectAllMetrics().single().longSumData.points.single()
+        point.value shouldBe 2L
+        point.attributes.asMap().entries
+            .single { it.key.key == "http.route" }
+            .value shouldBe "_unmatched"
+    }
+
+    @Test
+    fun `a blank scope name is refused for the counter as well`() {
+        shouldThrow<IllegalArgumentException> { refusalCounter(sdk, scopeName = " ") }
+            .message.shouldNotBeNull()
     }
 }

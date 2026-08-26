@@ -2954,12 +2954,78 @@ Two things to know before drawing conclusions from the numbers:
   listed after an authentication filter never hears about the requests that
   filter refuses. Outermost is where anything measuring the whole request
   belongs.
-- **Requests that never reach a filter are not counted.** A path parameter that
-  will not decode, a body over `maxBodyBytes`, a `Content-Type` nothing
+- **Requests that never reach a filter are not counted here.** A path parameter
+  that will not decode, a body over `maxBodyBytes`, a `Content-Type` nothing
   declared: these are answered before the chain is entered, so no filter sees
-  them and neither do the meters. The 4xx rate here is therefore the rate of
-  *handled* 4xx. Closing that gap means metering inside each interpreter, which
-  is three implementations of what is currently one, and it has not been done.
+  them. The 4xx rate on `http.server.requests` is therefore the rate of
+  *handled* 4xx, and it always will be. Those requests are counted under a name
+  of their own instead — see below.
+
+### Refusals, which no filter can see
+
+Outermost is not outside enough. A 413 is decided while the body is being read,
+several layers outside the outermost filter, so there is no filter there to be
+called; the same is true of a 406, a 415, and a parameter that will not decode.
+The effect is that `http.server.requests` goes quiet about exactly the traffic
+an operator most wants to see — an attack, a broken-client rollout — and an
+incident review that trusts it concludes the flood never happened.
+
+`onRefusal(...)` is where that traffic is reported, and `refusalCounter` turns
+it into a meter:
+
+```kotlin
+api(routes, JacksonCodecs) {
+    filter(metrics(registry))
+    onRefusal(refusalCounter(registry))
+}
+```
+
+Two lines because they are two different places. It records one more meter,
+`http.server.refusals`, a counter, and changes nothing about the two above — so
+no existing dashboard changes meaning. Its tags:
+
+| Tag | Where it comes from |
+|---|---|
+| `reason` | `unmatched`, `decode`, `body_limit`, `content_type`, `accept` |
+| `status` | the status the caller was sent |
+| `path` | the refusing route's template, or `_unmatched` where nothing matched |
+
+The `path` tag is why the observer is handed a *template* and not a URL. An
+unmatched request carries whatever path a caller chose, and a counter tagged
+with it grows one series per probe — which is to say the metric becomes the
+attack surface. `reason` is a closed set for the same reason: a `RefusalReason`
+is an enum, so the number of series is a property of the library rather than of
+the traffic.
+
+The hook is called from `spi.renderError`, the one function that turns a refusal
+into a response, so a refusal cannot be answered and left uncounted, and all
+three backends and the in-memory transport report identically because they
+report through one implementation rather than three of their own.
+`RefusalObserver` is an interface on the `Api` rather than a `Filter` precisely
+because a filter is the thing these requests never reach.
+
+Three things it does not count, each on purpose:
+
+- **A 404 or 405 for a path nothing describes**, when a bound server answered
+  it. Pelican hands an unmatched request back to the server library's own
+  router — an http4k `UNMATCHED`, a Pekko rejection, Ktor's own 404 — which is
+  what lets a Pelican route be mounted beside routes written by hand. Nothing
+  renders that response, so nothing observes it. The `unmatched` reason is
+  reported by `InMemoryClientTransport`, which has no router underneath to
+  decline to, and by the CORS preflight aimed at a path nobody described.
+- **A required parameter nobody sent.** It is an `ApiException(400)` raised in
+  each interpreter, indistinguishable from a 400 a filter throws, and counting
+  it would mean counting requests `http.server.requests` already has. A
+  parameter that arrived and would not *decode* is counted, under `decode`.
+- **A 500 nobody described, and any status a filter or a handler chose.** Those
+  reached the chain, so the request counter has them. The two counters are
+  disjoint by construction, which is what makes adding their 4xx rates
+  meaningful.
+
+An MCP tool call is not counted either. It is answered in JSON-RPC over a 200,
+so the status a refusal would report never reached a caller; `spi.classifyError`
+gives the protocol its classification without the render — and so without the
+observation.
 
 `example/src/main/kotlin/example/metrics/MeteredOrders.kt` is a service wired
 this way — a 200, a declared 404, a 201 and a deprecated endpoint, with
@@ -3071,15 +3137,28 @@ What was deliberately **not** done:
   decides. A handler that wants to nest a span reads `params[otelContext]` and
   passes it to `setParent`, which is one line and is reliable.
 
-#### The same two blind spots
+#### Refusals, and the blind spot that remains
 
-Nothing about OpenTelemetry closes the gaps described above for the meters, and
-the new documentation should not read as though it did:
+`refusalCounter(sdk)` is the OpenTelemetry half of the counter above, under the
+same name so that a service moving between the two vendors keeps its dashboard:
 
-- **Requests answered before the chain is entered are invisible.** A path
-  parameter that will not decode, a body over `maxBodyBytes`, a `Content-Type`
-  nothing declared: no filter is asked, so there is no span and no measurement.
-  The 4xx rate here is the rate of *handled* 4xx, on both instruments.
+```kotlin
+api(routes, JacksonCodecs) {
+    filter(openTelemetry(sdk))
+    onRefusal(refusalCounter(sdk))
+}
+```
+
+It records `http.server.refusals`, a monotonic counter of `{request}`,
+attributed with `pelican.refusal_reason`, `http.response.status_code` and
+`http.route` — the template, or `_unmatched`. No span: a refusal is answered
+before any handler runs and has no work to describe, and a span per rejected
+probe would cost a trace backend a great deal to say what the counter says.
+Everything the Micrometer counter does not count, this one does not count
+either, and for the same reasons.
+
+One blind spot is not closed by either:
+
 - **A response that fails while it is being written** becomes a 500 after the
   chain has unwound, so the span carries the status the handler asked for rather
   than the one the caller received.

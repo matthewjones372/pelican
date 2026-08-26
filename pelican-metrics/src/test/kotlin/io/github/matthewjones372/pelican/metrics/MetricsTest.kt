@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.Params
+import io.github.matthewjones372.pelican.RefusalReason
 import io.github.matthewjones372.pelican.before
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
@@ -224,5 +225,49 @@ class MetricsTest {
         val failure = shouldThrow<IllegalArgumentException> { metrics(registry, prefix = " ") }
 
         failure.message.shouldNotBeNull()
+    }
+
+    // ------------------------------------------------ the traffic no filter sees
+
+    @Test
+    fun `a refusal is counted by reason, status and the route that refused`() {
+        refusalCounter(registry).refused(RefusalReason.BODY_LIMIT, 413, "/orders/{orderId}")
+
+        tagsOf("http.server.refusals") shouldBe mapOf(
+            "reason" to "body_limit",
+            "status" to "413",
+            "path" to "/orders/{orderId}",
+        )
+    }
+
+    /**
+     * The tag that decides whether this meter is safe to publish. An unmatched
+     * request carries whatever path a caller chose, so counting under it would
+     * be one series per probe — the metric as attack surface.
+     */
+    @Test
+    fun `a refusal with no route is counted under one constant, not under the path`() {
+        val counter = refusalCounter(registry)
+        counter.refused(RefusalReason.UNMATCHED, 404, null)
+        counter.refused(RefusalReason.UNMATCHED, 404, null)
+
+        tagsOf("http.server.refusals")["path"] shouldBe "_unmatched"
+        registry.find("http.server.refusals").counter().shouldNotBeNull().count() shouldBe 2.0
+    }
+
+    @Test
+    fun `the request meters are untouched by a refusal, so no dashboard changes meaning`() {
+        refusalCounter(registry).refused(RefusalReason.ACCEPT, 406, "/orders/{orderId}")
+
+        meterNames() shouldBe setOf("http.server.refusals")
+    }
+
+    @Test
+    fun `the prefix moves the refusal counter too`() {
+        refusalCounter(registry, prefix = "orders.http").refused(RefusalReason.DECODE, 400, null)
+
+        meterNames() shouldBe setOf("orders.http.refusals")
+        shouldThrow<IllegalArgumentException> { refusalCounter(registry, prefix = " ") }
+            .message.shouldNotBeNull()
     }
 }

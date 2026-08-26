@@ -1,11 +1,14 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.In2
+import io.github.matthewjones372.pelican.In3
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.metrics.metrics
+import io.github.matthewjones372.pelican.metrics.refusalCounter
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.apiClient
 import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -29,11 +32,11 @@ import org.junit.jupiter.params.provider.MethodSource
  * The four cases are the four ways a request ends that a filter can see: a
  * plain success, a success the handler *named* out of several declared, a
  * declared failure returned as a value, and a refusal thrown by a filter
- * further in. What is deliberately not here is a request that never reached the
- * chain at all — a path parameter that would not decode, a body over the limit
- * — because those are answered before a filter is asked, and no filter-based
- * metric can see them. `docs/reference.md` says so where it describes the
- * module rather than leaving it to be discovered from a flat line on a graph.
+ * further in. A request that never reached the chain at all — a body over the
+ * limit, an `Accept` nothing satisfies — is the second suite below: no filter
+ * is asked about those, so they are counted by `onRefusal` under a name of
+ * their own, and the two counters staying disjoint is as much the claim as
+ * either of them being right.
  */
 class MetricsAcrossBackendsTest {
 
@@ -46,6 +49,9 @@ class MetricsAcrossBackendsTest {
                 port = 0,
                 // Outermost, so that the 403 raised by `gate` is counted too.
                 outerFilters = listOf(metrics(registries.getValue(backend.name))),
+                // Outermost is still not outside enough for a refusal, which is
+                // answered before any filter runs. This is where those go.
+                onRefusal = refusalCounter(registries.getValue(backend.name)),
             )
         }
 
@@ -97,6 +103,51 @@ class MetricsAcrossBackendsTest {
 
         withClue("the meters disagree with the responses on $name") {
             recorded(name) shouldBe answered.map { (path, status) -> path to status.toString() }.toSet()
+        }
+    }
+
+    /** The (reason, status, path) triples the refusal counter is holding. */
+    private fun refused(name: String): Set<Triple<String?, String?, String?>> =
+        registries.getValue(name).meters
+            .filter { it.id.name == "http.server.refusals" }
+            .map { Triple(it.id.getTag("reason"), it.id.getTag("status"), it.id.getTag("path")) }
+            .toSet()
+
+    /**
+     * The other half of the same claim, for the requests a filter is never
+     * asked about. Three refusals, none of which reaches the chain, so none of
+     * which appears above — and all three of which appear here.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a request refused before the chain is counted under its own name`(name: String, client: ApiClient) {
+        val answered = listOf(
+            // 400: a body no codec can read.
+            client.transport.send(client.request(echo, In2(null, Note("x"))).withBody("{ nope")).status,
+            // 406: an Accept taking nothing this endpoint sends.
+            client.transport.send(
+                client.request(strict, In3("kotlin", "ada", "crumbs")).withHeader("Accept", "text/csv"),
+            ).status,
+            // 413: a body past `maxBodyBytes`.
+            client.transport.send(
+                client.request(echo, In2(null, Note("x"))).withBody("""{"text":"${"x".repeat(8_192)}"}"""),
+            ).status,
+        )
+
+        withClue("the statuses on the wire are not the ones this test is written about") {
+            answered shouldBe listOf(400, 406, 413)
+        }
+
+        withClue("the refusal counter on $name") {
+            refused(name) shouldBe setOf(
+                Triple("decode", "400", "/echo"),
+                Triple("accept", "406", "/strict"),
+                Triple("body_limit", "413", "/echo"),
+            )
+        }
+
+        withClue("a refusal reached no filter, so the request counter must be untouched") {
+            recorded(name).map { it.second } shouldNotContain "406"
         }
     }
 

@@ -4,6 +4,8 @@ import io.github.matthewjones372.pelican.Attribute
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.Params
+import io.github.matthewjones372.pelican.RefusalObserver
+import io.github.matthewjones372.pelican.RefusalReason
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attempt
 import io.github.matthewjones372.pelican.attribute
@@ -108,13 +110,14 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * ### What it cannot see
  *
- * The same two blind spots the Micrometer module has, for the same reasons, and
- * they are worth knowing before an error rate is read off any of this:
+ * The same blind spots the Micrometer module has, for the same reasons, and they
+ * are worth knowing before an error rate is read off any of this:
  *
  * - A request answered before the chain is entered — a path parameter that will
  *   not decode, a body over `Api.maxBodyBytes`, a `Content-Type` nothing
- *   declared — reaches no filter, so it produces no span and no measurement.
- *   The 4xx rate here is the rate of *handled* 4xx.
+ *   declared — reaches no filter, so it produces no span and no measurement
+ *   here. The 4xx rate on this histogram is the rate of *handled* 4xx.
+ *   [refusalCounter] is where those requests are counted instead.
  * - A response that fails while it is being written becomes a 500 after the
  *   chain has already unwound, so the span carries the status the handler asked
  *   for rather than the one the caller received. See `Endpoint.statusFor`,
@@ -183,6 +186,61 @@ fun openTelemetry(
 }
 
 /**
+ * The requests [openTelemetry] is structurally unable to see: those refused
+ * before the filter chain was entered.
+ *
+ * ```kotlin
+ * api(routes, JacksonCodecs) {
+ *     filter(openTelemetry(sdk))
+ *     onRefusal(refusalCounter(sdk))
+ * }
+ * ```
+ *
+ * The same counter `pelican-metrics` publishes to Micrometer, under the same
+ * name, so a service moving between the two keeps its dashboards:
+ * `http.server.refusals`, attributed by [RefusalReason.label], the status the
+ * caller was sent, and `http.route` — the refusing route's template, or
+ * [UNMATCHED] where nothing matched.
+ *
+ * No span. A refusal is answered before any handler runs and has no work to
+ * describe; a span per rejected probe would cost a trace backend a great deal
+ * to say the same thing this counter says. It is also why the attributes stop
+ * at three: an unmatched request carries a caller's arbitrary path, and
+ * recording that would grow one series per probe.
+ */
+fun refusalCounter(telemetry: OpenTelemetry, scopeName: String = INSTRUMENTATION_SCOPE): RefusalObserver {
+    require(scopeName.isNotBlank()) {
+        "The scope name is what a backend attributes this counter to, so it has to be one: " +
+            "refusalCounter(sdk, scopeName = \"orders\"). Leave it out for `$INSTRUMENTATION_SCOPE`."
+    }
+
+    val refusals = telemetry.getMeter(scopeName)
+        .counterBuilder(REFUSALS_METRIC)
+        .setDescription("Requests refused before the filter chain, by reason and route.")
+        .setUnit("{request}")
+        .build()
+
+    // One attribute set per distinct refusal rather than one per refused
+    // request, as the span attributes are cached per endpoint. Bounded by the
+    // closed set of reasons, core's own status table and the described routes.
+    val attributes = ConcurrentHashMap<Refused, Attributes>()
+
+    return RefusalObserver { reason, status, pathTemplate ->
+        val key = Refused(reason, status, pathTemplate ?: UNMATCHED)
+        refusals.add(1, attributes.computeIfAbsent(key, ::attributesFor))
+    }
+}
+
+/** One reason, one status and one route: the key the attribute set hangs off. */
+private data class Refused(val reason: RefusalReason, val status: Int, val route: String)
+
+private fun attributesFor(refused: Refused): Attributes = Attributes.builder()
+    .put(PELICAN_REFUSAL_REASON, refused.reason.label)
+    .put(HTTP_RESPONSE_STATUS_CODE, refused.status.toLong())
+    .put(HTTP_ROUTE, refused.route)
+    .build()
+
+/**
  * The context this request's span sits in, for a handler or a later filter that
  * wants to nest work under it.
  *
@@ -201,6 +259,9 @@ const val INSTRUMENTATION_SCOPE: String = "io.github.matthewjones372.pelican"
 
 /** What an endpoint that never named itself is attributed with. */
 private const val UNNAMED = "unnamed"
+
+/** What `http.route` says on a refusal where the request matched no route at all. */
+const val UNMATCHED: String = "_unmatched"
 
 /** The status from which the conventions call a server span's outcome an error. */
 private const val LOWEST_SERVER_ERROR = 500
@@ -228,12 +289,16 @@ private val HTTP_ROUTE = AttributeKey.stringKey("http.route")
 private val HTTP_RESPONSE_STATUS_CODE = AttributeKey.longKey("http.response.status_code")
 private val ERROR_TYPE = AttributeKey.stringKey("error.type")
 
-/** Pelican's own two, in a namespace of their own because the conventions have no key for either. */
+/** Pelican's own three, in a namespace of their own because the conventions have no key for any. */
 private val PELICAN_OPERATION_ID = AttributeKey.stringKey("pelican.operation_id")
 private val PELICAN_DEPRECATED = AttributeKey.booleanKey("pelican.deprecated")
+private val PELICAN_REFUSAL_REASON = AttributeKey.stringKey("pelican.refusal_reason")
 
 /** The name the conventions give the instrument, and the buckets they recommend for it. */
 private const val DURATION_METRIC = "http.server.request.duration"
+
+/** Not a name the conventions have. It is `pelican-metrics`'s, so the two publish one series. */
+private const val REFUSALS_METRIC = "http.server.refusals"
 
 private val DURATION_BUCKETS =
     listOf(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0)

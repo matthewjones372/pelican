@@ -1,6 +1,9 @@
 public final class io/github/matthewjones372/pelican/metrics/MetricsKt {
 	public static final field DEFAULT_PREFIX Ljava/lang/String;
+	public static final field UNMATCHED Ljava/lang/String;
 	public static final fun metrics (Lio/micrometer/core/instrument/MeterRegistry;Ljava/lang/String;)Lio/github/matthewjones372/pelican/Filter;
 	public static synthetic fun metrics$default (Lio/micrometer/core/instrument/MeterRegistry;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/Filter;
+	public static final fun refusalCounter (Lio/micrometer/core/instrument/MeterRegistry;Ljava/lang/String;)Lio/github/matthewjones372/pelican/RefusalObserver;
+	public static synthetic fun refusalCounter$default (Lio/micrometer/core/instrument/MeterRegistry;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/RefusalObserver;
 }
 

@@ -130,6 +130,17 @@ one.
   It is handed a `RefusalReason`, the status, and the *path template* of the
   route that refused; never the request, the throwable or the detail, so it has
   nothing high-cardinality to be tagged with.
+- **`http.server.refusals`**, a counter, in `pelican-metrics` and
+  `pelican-metrics-otel` under the same name. `onRefusal(refusalCounter(registry))`
+  beside `filter(metrics(registry))`, or `refusalCounter(sdk)` beside
+  `openTelemetry(sdk)`. Tagged `reason` (`unmatched`, `decode`, `body_limit`,
+  `content_type`, `accept`), `status`, and `path` — the refusing route's
+  template, or `_unmatched` where nothing matched; the OpenTelemetry attributes
+  are `pelican.refusal_reason`, `http.response.status_code` and `http.route`.
+  Every existing meter, timer, span and histogram is untouched, so no dashboard
+  changes meaning, and the two counters are disjoint: this one counts only what
+  the request counter structurally cannot. `docs/reference.md` lists the three
+  things it deliberately does not count.
 - **`Unrouted` and `UnsupportedMediaType`**, the two refusals Pelican used to
   raise as an `ApiException`. Same status, same sentence, same body: what
   changes is that a 404 the router raised can now be told from one a handler
