@@ -195,6 +195,9 @@ class SseOutput<T> @PublishedApi internal constructor(
     companion object {
         /** An SSE comment: a colon line, which every conformant client discards. */
         const val KEEP_ALIVE_FRAME: String = ":\n\n"
+
+        /** The header a reconnecting client sends its resume point back in. */
+        const val LAST_EVENT_ID: String = "Last-Event-ID"
     }
 }
 

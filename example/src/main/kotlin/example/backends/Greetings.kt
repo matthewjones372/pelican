@@ -432,6 +432,16 @@ val LOGO_BYTES: ByteArray = "PELICAN".toByteArray(Charsets.US_ASCII)
 /** A short, fixed run of events, so three backends can be compared frame for frame. */
 fun ticks(): List<Tick> = listOf(Tick(1, "one"), Tick(2, "two"))
 
+/**
+ * The events after the one a reconnecting caller says it already saw. What
+ * Pelican supplies is the resume point; deciding what is still worth sending
+ * is the service's, and here that is a filter over a fixed list.
+ */
+fun ticksSince(lastEventId: String?): List<Tick> {
+    val seen = lastEventId?.toIntOrNull() ?: 0
+    return ticks().filter { it.seq > seen }
+}
+
 /** A short, fixed list, so three backends can be compared byte for byte. */
 fun greetingsOf(): List<Greeting> = listOf(Greeting("Hello", "en"), Greeting("Bonjour", "fr"))
 

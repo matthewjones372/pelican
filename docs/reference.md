@@ -4592,6 +4592,28 @@ the same thing over and over.
 All three backends prepend the same directive to the same frames — `AllBackendsTest`
 pins the bytes with ids as it already pinned them without.
 
+### Reading where the caller left off
+
+```kotlin
+replay streamedNow { ticksSince(lastEventId()) }
+```
+
+`lastEventId()` is the `Last-Event-ID` the reconnecting caller sent, and null on
+a fresh connect. It is an extension on `Params` rather than a declared input:
+resume is optional by nature, so putting it in `endpoint(...)` would change the
+arity of every SSE handler for the sake of something most of them ignore. A
+handler that never calls it streams from now, as it always did.
+
+The header is read only where the endpoint's output declares an event stream —
+`Endpoint.resumable`, decided in core so three interpreters cannot each read it
+for a different set of endpoints — and the value is carried on `Params` rather
+than through an attribute, so nothing running before the handler can forge one.
+
+What to do with it is the service's. Pelican frames and delivers; retention,
+replay storage and fan-out stay where they were. Under 3.2 the described event's
+`id` says so in as many words, because a caller cannot infer from a string field
+that sending it back is how the stream is picked up again.
+
 `jsonArray<T>()` is the deliberate exception. Pekko already frames a stream of
 JSON documents as an array via `EntityStreamingSupport.json()`, and
 reimplementing brace-and-comma handling in core would be strictly worse than

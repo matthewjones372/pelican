@@ -296,6 +296,14 @@ private fun successBody(
 private fun Output<*>.isSequential(): Boolean = this is NdjsonOutput<*> || this is SseOutput<*>
 
 /**
+ * What an id is *for*, said in the document, because a caller cannot infer from
+ * a string field that sending it back is how the stream is picked up again.
+ */
+private const val RESUME_CONTRACT: String =
+    "The event's id. Send the last one received as `Last-Event-ID` to resume the stream from " +
+        "that point; a connection that sends none starts from now."
+
+/**
  * One event of a `text/event-stream`, as 3.2 asks for it to be described.
  *
  * An item of an event stream is not the payload. 3.2 requires implementations
@@ -329,7 +337,12 @@ private fun sseEventSchema(
                 "const" to name
             })
         }
-        if (out.id != null) put("id", jsonObj { "type" to "string" })
+        if (out.id != null) {
+            put("id", jsonObj {
+                "type" to "string"
+                "description" to RESUME_CONTRACT
+            })
+        }
         put("data", jsonObj {
             "type" to "string"
             "contentMediaType" to "application/json"

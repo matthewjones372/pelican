@@ -3,6 +3,7 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.lastEventId
 import io.github.matthewjones372.pelican.pekko.bytesNow
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOneOf
@@ -59,7 +60,7 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
     peek handledWith { _ -> },
 
     ticker streamedNow { Source.from(ticks()) },
-    replay streamedNow { Source.from(ticks()) },
+    replay streamedNow { Source.from(ticksSince(lastEventId())) },
     everyone streamedNow { Source.from(greetingsOf()) },
 
     logo bytesNow { Source.single(ByteString.fromArray(LOGO_BYTES)) },

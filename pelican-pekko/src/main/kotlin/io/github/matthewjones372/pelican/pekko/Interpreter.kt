@@ -194,6 +194,13 @@ private fun negotiate(ep: Endpoint<*, *>, req: HttpRequest) {
 /** Every `Accept` field line: RFC 9110 reads two lines as one field. */
 private fun HttpRequest.acceptLines(): List<String> = headerValues("Accept")
 
+/**
+ * The `Last-Event-ID` of a reconnect, read only where the endpoint answers with
+ * a stream that could be resumed — which is core's answer, not this file's.
+ */
+private fun HttpRequest.resumePoint(ep: Endpoint<*, *>): String? =
+    if (ep.resumable) getHeader(SseOutput.LAST_EVENT_ID).orElse(null)?.value() else null
+
 private fun originOf(req: HttpRequest): String? =
     req.getHeader(CorsHeaders.ORIGIN).orElse(null)?.value()
 
@@ -408,7 +415,7 @@ private fun invoke(
 
     // Built before decoding, so a filter or a failing decode can still put a
     // header on the way out.
-    val params = Params(values, req, ep)
+    val params = Params(values, req, ep, resumeFrom = req.resumePoint(ep))
 
     // ---- what the caller will take ----------------------------------------
     //

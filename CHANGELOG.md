@@ -121,6 +121,15 @@ one.
   through the OpenAPI importer — an id extractor is a function of the event
   value and no document holds a function — so an imported event stream declares
   its payload and the service adds the frame fields back.
+- **`lastEventId()` on `Params`**, the `Last-Event-ID` a reconnecting caller
+  sent, and null on a fresh connect. An extension rather than a declared input:
+  resume is optional by nature and reading it does not change an endpoint's
+  input arity, so a handler that ignores it is unchanged. The header is read
+  only where the output declares an event stream (`Endpoint.resumable`, decided
+  in core), and the value rides on `Params` rather than through an attribute
+  nothing stops a filter forging. What is done with it stays the service's:
+  Pelican frames and delivers, and retention is not its business. Under
+  OpenAPI 3.2 the described event's `id` carries the contract in words.
 - **One response, several renderings**, chosen by the caller's `Accept`:
   `negotiated(json<Report>(200), media<Report>("text/csv", 200))` is one
   declared response written two ways. The handler goes on returning a `Report`;

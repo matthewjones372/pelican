@@ -20,6 +20,7 @@ import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.decode
 import io.github.matthewjones372.pelican.spi.CorsHeaders
@@ -221,6 +222,13 @@ private fun negotiate(ep: Endpoint<*, *>, call: ApplicationCall) {
 /** Every `Accept` field line: RFC 9110 reads two lines as one field. */
 private fun ApplicationCall.acceptLines(): List<String> = request.headers.getAll("Accept").orEmpty()
 
+/**
+ * The `Last-Event-ID` of a reconnect, read only where the endpoint answers with
+ * a stream that could be resumed — which is core's answer, not this file's.
+ */
+private fun ApplicationCall.resumePoint(ep: Endpoint<*, *>): String? =
+    if (ep.resumable) request.headers[SseOutput.LAST_EVENT_ID] else null
+
 private fun decodePlainInputs(
     ep: Endpoint<*, *>,
     call: ApplicationCall,
@@ -364,7 +372,7 @@ private suspend fun invoke(
 
     // Built before decoding, so a filter or a failing decode can still put a
     // header on the way out.
-    val params = Params(values, call, ep)
+    val params = Params(values, call, ep, resumeFrom = call.resumePoint(ep))
 
     // ---- what the caller will take, then the inputs -----------------------
     //

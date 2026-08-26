@@ -6,6 +6,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -146,6 +147,13 @@ class OpenApi32Test {
 
         (item / "properties" / "id" / "type").str() shouldBe "string"
         (item / "required").strings() shouldBe listOf("event", "id", "data")
+    }
+
+    @Test
+    fun `and says what sending one back does, since a string field cannot say it`() {
+        val item = content(OpenApiVersion.V3_2_0, "/orders/resumable", "text/event-stream") / "itemSchema"
+
+        (item / "properties" / "id" / "description").str() shouldContain "Last-Event-ID"
     }
 
     /**

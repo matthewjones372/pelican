@@ -56,6 +56,16 @@ class Endpoint<I, R> internal constructor(
      */
     val webhookName: String? = null,
 ) {
+    /**
+     * Whether a request here can carry a resume point. Only an event stream is
+     * something to pick up again, and it is decided once and here so that three
+     * interpreters cannot read `Last-Event-ID` for three different sets of
+     * endpoints.
+     */
+    val resumable: Boolean by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        output.representations().any { it is SseOutput<*> }
+    }
+
     override fun toString() =
         if (webhookName == null) "$method ${pathSpec.template}" else "webhook $webhookName ($method)"
 }

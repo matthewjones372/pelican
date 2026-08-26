@@ -197,6 +197,29 @@ class AllBackendsTest {
         }
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a reconnect carries the last id it saw to the handler`(name: String, client: ApiClient) {
+        // What a browser sends when the connection it was reading drops: the
+        // id of the last event it managed to parse.
+        val res = client.transport.send(client.request(replay, Unit).withHeader("Last-Event-ID", "1"))
+
+        withClue(name) {
+            res shouldHaveStatus 200
+            // The handler read `lastEventId()` and started after it, so the
+            // event already delivered is not delivered twice.
+            res.body shouldBe
+                "retry: 15000\n\n" +
+                "event: tick\nid: 2\ndata: {\"seq\":2,\"at\":\"two\"}\n\n"
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `and a handler on a stream nobody resumed reads no id at all`(name: String, client: ApiClient) {
+        withClue(name) { client.response(replay, Unit).body shouldContain "id: 1" }
+    }
+
     // ------------------------------------------------------------- a simple GET
 
     @ParameterizedTest(name = "{0}")
