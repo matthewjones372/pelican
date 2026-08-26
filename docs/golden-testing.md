@@ -1,23 +1,26 @@
 # Golden files
 
-Linked from the [README](../README.md). A test that fails when a change to the
-descriptions would break the people already calling the service — a new required
-field, a deleted endpoint, a response that stopped carrying something — and
-stays quiet when it would not.
+Linked from the [README](../README.md). A golden test fails when a change to
+your endpoint descriptions would break the people already calling your
+service — a new required field, a deleted endpoint, a response that no longer
+carries something they read. When a change costs callers nothing, the test
+stays quiet.
 
 ---
 
 ## What it is for
 
-A developer adds a required field to a request body, runs the suite, and every
-test passes. They are all typed tests: the client builds its request from the
-same description the server routes on, so the new field is supplied on both
-sides and nothing notices. The first thing that notices is the caller who
-deployed last month and starts getting a 400.
+Here is the problem. A developer adds a required field to a request body and
+runs the test suite. Every test passes — and that is exactly the trap. The
+tests are typed: the test client builds its requests from the same
+descriptions the server routes on, so both sides already agree about the new
+field and nothing notices. The first thing that notices is a caller who
+deployed last month and suddenly starts getting a 400.
 
-That is the failure this catches. Not "the document changed" — documents change
-constantly and most of it is harmless — but "this change costs somebody who is
-already calling us".
+That is the failure golden tests catch. The question is never "did the
+document change?" — documents change constantly, and most changes are
+harmless. The question is "does this change cost somebody who is already
+calling us?"
 
 ## Install
 
@@ -27,17 +30,17 @@ dependencies {
 }
 ```
 
-It brings `pelican-test` and `pelican-openapi` with it, and nothing else — no
+This brings in `pelican-test` and `pelican-openapi`, and nothing else — no
 server library, no matcher library, no test framework. The assertions throw
 plain `AssertionError`, so JUnit, kotest and `kotlin.test` all report them.
 
-Nothing here needs an in-memory transport unless you record a response;
+You only need an in-memory transport if you record a response;
 `pelican-test-pekko` and `pelican-test-http4k` stay optional.
 
 ## One line covers every endpoint
 
-The endpoints are a list of values, so the tests are derived from the spec
-rather than written out one per endpoint:
+Your endpoints are a list of values, so the tests can be derived from the
+spec instead of written out one per endpoint:
 
 ```kotlin
 class OrdersGoldenTest {
@@ -51,8 +54,9 @@ class OrdersGoldenTest {
 }
 ```
 
-That records one file per operation under `src/test/resources/golden/operations/`,
-named by `operationId` — or by method and path where an endpoint has none:
+This records one file per operation under
+`src/test/resources/golden/operations/`. Files are named by `operationId`, or
+by method and path when an endpoint has no `operationId`:
 
 ```
 operations/getUser.json
@@ -62,21 +66,22 @@ operations/webhook-orderPlaced.json
 ```
 
 Each file holds what that endpoint publishes: its path, its parameters, the
-statuses it declares, the schemas they carry. Commit them. They are not a
-formality — the committed file is *the contract callers were given*, and it is
-the thing the next change is measured against.
+statuses it declares, and the schemas they carry. Commit these files. They
+are not a formality — the committed file *is* the contract your callers were
+given, and it is what the next change gets measured against.
 
-An endpoint added tomorrow is recorded by the same line, with no test to write.
-An endpoint deleted is caught by the same line, because its golden is left with
-nothing to regenerate it.
+Add an endpoint tomorrow and the same one line records it; there is no new
+test to write. Delete an endpoint and the same line catches it, because the
+endpoint's golden file is left behind with nothing to regenerate it.
 
 ## What fails, and what does not
 
-The next run compares two OpenAPI documents as documents, not as text, and
-classifies every difference from the caller's side of the wire.
+On the next run, the test compares two OpenAPI documents as structured
+documents, not as text. It classifies every difference by one rule: what does
+this do to a caller on the other side of the wire?
 
-**Fails the test.** A caller written against the recorded contract stops
-working:
+**These fail the test**, because a caller written against the recorded
+contract stops working:
 
 | Change | What it does to them |
 |---|---|
@@ -91,47 +96,48 @@ working:
 | security requirement added | 401 for everyone not sending the credential |
 | request constraint tightened (`minLength`, `maximum`, `pattern`, enum narrowed) | payloads that were accepted are refused |
 
-**Updates the golden and passes.** Nobody has to do anything:
+**These update the golden file and pass**, because nobody has to do
+anything: a new endpoint, a new optional parameter or field, a field that
+became optional, a new declared status, a new response field, a request type
+widened or a constraint loosened, a new media type, a deprecation, or a
+rewritten summary, description or tag.
 
-new endpoint · new optional parameter or field · a field that became optional ·
-a new declared status · a new response field · a request type widened or
-constraint loosened · a new media type · deprecation · a rewritten summary,
-description or tag.
+Rewriting the golden file on a harmless change is deliberate, not a shortcut.
+The file's job is to be the contract the *next* change is measured against.
+A check that goes red for changes nobody must act on trains its owner to
+accept its output without reading it — and that reflex is exactly how a real
+break gets waved through. The rewritten file still appears in your git diff,
+so nothing changes silently.
 
-The passing case rewrites the golden in place, and that is the design rather
-than a shortcut. The file's job is to be the contract the *next* change is
-measured against; a check that goes red for things nobody must act on is one
-whose author learns to accept its output without reading, and that reflex is
-exactly how a real break gets waved through. The rewritten file still shows up
-in the diff.
-
-A webhook is the same rules with the arrows reversed. Its request is what this
-service *sends*, so the subscriber is the one reading it: a field removed from a
-webhook body breaks them, and a required field added does not.
+Webhooks follow the same rules with the direction reversed. A webhook's
+request is what this service *sends*, so the subscriber is the one reading
+it: removing a field from a webhook body breaks them, while adding a required
+field does not.
 
 ### When a break is deliberate
 
-Breaks are allowed — they are announced. The test is telling you that this one
-is announced to nobody yet. When it is intentional, accept it the way you accept
-any other:
+Breaking changes are allowed — but they are announced. A failing golden test
+means this break is so far announced to nobody. When the break is
+intentional, accept it the same way you accept any change:
 
 ```bash
 mv src/test/resources/golden/operations/placeOrder_changed.json \
    src/test/resources/golden/operations/placeOrder.json
 ```
 
-or, for a batch:
+or, to accept a whole batch:
 
 ```bash
 PELICAN_GOLDEN_UPDATE=true ./gradlew test
 ```
 
-which also deletes the goldens of endpoints that are gone. The commit that
-carries the new golden is the record that somebody decided.
+The batch form also deletes the golden files of endpoints that are gone. The
+commit that carries the new golden file is the record that somebody decided
+this break was acceptable.
 
-An environment variable because a test JVM inherits the environment and Gradle
-does not hand its own `-D` flags to one. The system property `pelican.golden.update`
-is read as well, for a build that passes it on:
+Why an environment variable? A test JVM inherits the environment, but Gradle
+does not pass its own `-D` flags through to test JVMs. The system property
+`pelican.golden.update` is also read, for builds that forward it explicitly:
 
 ```kotlin
 tasks.test {
@@ -139,11 +145,12 @@ tasks.test {
 }
 ```
 
-### The failure
+### Reading a failure
 
-The count first, because that is the decision; then the operations; then what
-each change does to somebody. The changes nobody has to act on are counted at
-the end rather than listed, so one break cannot hide under nine harmless ones:
+The report puts the count first, because the count is the decision. Then it
+lists the affected operations, and under each one, what the change does to a
+caller. Harmless changes are counted at the end but not listed, so one real
+break cannot hide under nine harmless entries:
 
 ```
 Orders 1.0.0 — 2 changes break callers.
@@ -164,18 +171,20 @@ Orders 1.0.0 — 2 changes break callers.
   If the changes are meant, `mv` each over its golden, or rerun with PELICAN_GOLDEN_UPDATE=true.
 ```
 
-`operations` compares every endpoint before it throws, so one run names every
-endpoint that broke rather than the first of them.
+`operations` compares every endpoint before it throws, so one run names
+every endpoint that broke — not just the first one it found.
 
-Colour is used where something has said it can be read — an interactive
-console, or `FORCE_COLOR` in a CI that renders escapes — and never when
-`NO_COLOR` is set. A Gradle test report gets the same text without the escapes,
-which is why the layout carries the meaning and colour only underlines it.
+Colour appears only where something has said it can be rendered: an
+interactive console, or `FORCE_COLOR` in a CI system that renders escape
+codes. It never appears when `NO_COLOR` is set. A Gradle test report gets the
+same text without the escapes — the layout carries the meaning, and colour
+only underlines it.
 
 ## The whole document
 
-`document` is the other reading: one file, the artifact a consumer generates
-their client from, compared by the same rules.
+`document` is the other view: one file holding the whole OpenAPI document —
+the artifact a consumer generates their client from — compared by the same
+rules.
 
 ```kotlin
 @Test
@@ -184,12 +193,13 @@ fun `the published document is the one that was reviewed`() {
 }
 ```
 
-Take it when the document is published somewhere in its own right — a portal, a
-repository another team reads. Take `operations` when the question is which
-endpoint changed. Both is reasonable and costs one more file.
+Use `document` when the document is published somewhere in its own right — a
+portal, a repository another team reads. Use `operations` when the question
+is *which endpoint* changed. Using both is reasonable and costs one more
+file.
 
-`strict = true` turns off the classification for a `Golden` and fails on every
-difference, for a document where the reviewed artifact is the file itself:
+For a document where the reviewed artifact is the file itself, `strict =
+true` turns the classification off and fails on every difference:
 
 ```kotlin
 private val golden = Golden(strict = true)
@@ -197,9 +207,10 @@ private val golden = Golden(strict = true)
 
 ## The call itself
 
-The document says what a caller should send. The other half is what the client
-actually puts on the wire, and there the recording is text: those bytes *are*
-the contract, and there is no safe change to the address somebody has to type.
+The document says what a caller *should* send. The other half of the
+contract is what the client actually puts on the wire. That recording is
+plain text, because those bytes *are* the contract — there is no safe way to
+change an address somebody has to type.
 
 ```kotlin
 private val calls = requestsOnly(JacksonCodecs)      // builds calls; never sends one
@@ -227,13 +238,15 @@ X-Api-Key: let-me-in
 }
 ```
 
-`requestsOnly` builds and never sends, so a suite of these costs no server and
-no port; sending through it fails, naming the transports that do. JSON bodies
-are re-rendered one field per line, so a codec that starts spelling a field
-differently is one changed line. A form body, a rendered page or a stream is
-recorded exactly as it travelled.
+`requestsOnly` builds requests and never sends them, so a suite of these
+needs no server and no port. Trying to send through it fails with an error
+naming the transports that do send. JSON bodies are re-rendered one field per
+line, so when a codec starts spelling a field differently, the diff is one
+changed line. A form body, a rendered page or a stream is recorded exactly as
+it travelled.
 
-With a server running, `exchange` records both halves in one file:
+With a server running, `exchange` records both halves of the conversation in
+one file:
 
 ```kotlin
 private val app = ordersApi().inMemory()
@@ -244,9 +257,10 @@ fun `fetching a user answers what it answered`() {
 }
 ```
 
-Response headers that differ between two runs of the same test would fail it for
-saying so, so `Date`, `Server`, `Connection` and `Keep-Alive` are left out. A
-service whose responses carry a request id of its own passes its own set:
+Some response headers differ between two runs of the same test, and
+recording them would fail the test for saying so. `Date`, `Server`,
+`Connection` and `Keep-Alive` are therefore left out. If your service stamps
+its own volatile header — a request id, say — pass your own set:
 
 ```kotlin
 Golden(ignoringHeaders = VOLATILE_HEADERS + "X-Request-Id")
@@ -254,23 +268,24 @@ Golden(ignoringHeaders = VOLATILE_HEADERS + "X-Request-Id")
 
 ## The first run
 
-There is nothing to compare against, so the run writes `<name>_new.<ext>` and
-**fails**. A snapshot accepted by the run that produced it is not a review: read
-it, rename it, commit it.
+On the first run there is nothing to compare against, so the test writes
+`<name>_new.<ext>` and **fails**. This is on purpose: a snapshot accepted by
+the same run that produced it has not been reviewed by anyone. Read the file,
+rename it, commit it.
 
 ```bash
 mv src/test/resources/golden/openapi_new.json src/test/resources/golden/openapi.json
 ```
 
-`PELICAN_GOLDEN_UPDATE=true` on the first run does the renaming for you, which is
-the reasonable thing to do for an API that already exists and a suite you are
-adding today.
+`PELICAN_GOLDEN_UPDATE=true` on the first run does the renaming for you.
+That is a reasonable shortcut when the API already exists and you are adding
+the suite today.
 
 ## From Gradle, without a test
 
-The same check runs as a build task. Give a `documents` entry a `baseline` — the
-document your callers hold, committed — and the plugin registers
-`check<Name>Document` and wires it into `check`:
+The same check can run as a build task. Give a `documents` entry a
+`baseline` — the committed document your callers hold — and the plugin
+registers `check<Name>Document` and wires it into `check`:
 
 ```kotlin
 pelican {
@@ -297,18 +312,18 @@ openapi.json — 2 changes break callers.
         every caller still holding it gets a 404
 ```
 
-Nothing breaking prints `openapi.json — 4 changes, none of them breaking.` and
-the build carries on, which also makes the task the short answer to "what does
-this release change for callers".
+When nothing breaks, the task prints `openapi.json — 4 changes, none of them
+breaking.` and the build carries on. That also makes the task the short
+answer to "what does this release change for callers?"
 
-Pointing the task and `golden.document(...)` at the same committed file is the
-tidiest arrangement: one contract, checked by the suite and by `./gradlew check`
-without a suite. That is what `example` does.
+The tidiest arrangement is to point the task and `golden.document(...)` at
+the same committed file: one contract, checked both by the test suite and by
+`./gradlew check` without one. That is what `example` does.
 
 ## The comparison on its own
 
-The classification is not part of the test module. It is
-`pelican-openapi`, over two documents:
+The classification logic is not locked inside the test module. It lives in
+`pelican-openapi` and works on any two documents:
 
 ```kotlin
 val published = parseJson(File("openapi.json").readText()) as JsonObj
@@ -318,15 +333,16 @@ apiChanges(published, ordersSpec().openApi())
     .forEach { println(it) }                 // POST /orders — `currency` … is new and required
 ```
 
-That is the same call the golden files make, exposed for a CI step that compares
-against the document a deployed service is serving, or a release note that lists
-what changed for callers.
+This is the same call the golden files make, exposed directly. Use it in a
+CI step that compares against the document a deployed service is actually
+serving, or to build a release note listing what changed for callers.
 
 ## Where the files live
 
-`Golden()` writes to `src/test/resources/golden`, resolved against the module
-directory — a test's working directory under Gradle and under Maven. Point it
-elsewhere if you would rather not ship them in the jar's resources:
+`Golden()` writes to `src/test/resources/golden`, resolved against the
+module directory — which is a test's working directory under both Gradle and
+Maven. If you would rather not ship the files in the jar's resources, point
+it elsewhere:
 
 ```kotlin
 Golden(directory = Paths.get("src", "test", "golden"))
@@ -334,15 +350,16 @@ Golden(directory = Paths.get("src", "test", "golden"))
 
 ## What this does not do
 
-It does not generate sample payloads. A recorded request is one you wrote the
-input for, because a synthesised `CreateOrder` would pin the generator's
-imagination rather than your contract; `operations` needs no input at all, which
-is why it is the one that scales to a whole API.
+**It does not generate sample payloads.** A recorded request is one you
+wrote the input for. A synthesised `CreateOrder` would pin down the
+generator's imagination rather than your contract. This is also why
+`operations` is the variant that scales to a whole API: it needs no input at
+all.
 
-It does not know about your versioning. A break is reported as a break whether
-or not it is going out under a new major version — accepting it is how you say
-which it is.
+**It does not know about your versioning.** A break is reported as a break
+whether or not it ships under a new major version. Accepting the golden is
+how you say which one it is.
 
-It does not replace the typed tests. Behaviour tests should *not* break on a
-rename, and these should. `BookmarksContractTest` exercises what the service
-does; the goldens beside it record what it promises.
+**It does not replace the typed tests.** Behaviour tests should *not* break
+on a rename; golden tests should. `BookmarksContractTest` exercises what the
+service does. The goldens beside it record what the service promises.
