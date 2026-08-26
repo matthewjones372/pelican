@@ -57,13 +57,13 @@ only honest alternative to implementing translation.
 
 ## Stack
 
-- [ ] **`spec-0024-explicit-nulls`** — the `defaultJson()` change plus the
+- [x] **`spec-0024-explicit-nulls`** — the `defaultJson()` change plus the
       decode direction in `SchemaAgreementTest` across all three codecs.
       Done when: the minimal-payload cell fails without the fix and passes with it.
-- [ ] **`spec-0024-form-type-arrays`** — `FormShape` reads 3.1 type arrays;
+- [x] **`spec-0024-form-type-arrays`** — `FormShape` reads 3.1 type arrays;
       a nullable scalar case lands in `FormBodyTest`.
       Done when: a nullable Int form field round-trips as an integer on all codecs.
-- [ ] **`spec-0024-loud-refusals`** — collision refusal in all three schema
+- [x] **`spec-0024-loud-refusals`** — collision refusal in all three schema
       sources; unsupported-`Json`-settings refusal; `successNamedBy` payload
       check.
       Done when: each refusal has a test naming the message.
