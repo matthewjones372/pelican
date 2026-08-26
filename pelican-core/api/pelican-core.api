@@ -76,7 +76,6 @@ public final class io/github/matthewjones372/pelican/ApiException : java/lang/Ru
 }
 
 public final class io/github/matthewjones372/pelican/ApiKeyScheme : io/github/matthewjones372/pelican/SecurityScheme {
-	public fun getDeclaredScopes ()Ljava/util/Set;
 	public fun getDescription ()Ljava/lang/String;
 	public final fun getLocation ()Ljava/lang/String;
 	public fun getName ()Ljava/lang/String;
@@ -130,14 +129,7 @@ public final class io/github/matthewjones372/pelican/BooleanCodec : io/github/ma
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/BooleanCodec;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Boolean;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun encode (Z)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
-	public fun getExample ()Ljava/lang/String;
-	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/ByteStream {
@@ -328,14 +320,8 @@ public final class io/github/matthewjones372/pelican/DoubleCodec : io/github/mat
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/DoubleCodec;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Double;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
-	public fun encode (D)Ljava/lang/String;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
-	public fun getExample ()Ljava/lang/String;
 	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/EmptyOutput : io/github/matthewjones372/pelican/Output {
@@ -434,12 +420,8 @@ public final class io/github/matthewjones372/pelican/EnumCodec : io/github/matth
 	public fun <init> ([Ljava/lang/Object;Lkotlin/jvm/functions/Function1;)V
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
 	public fun getEnumValues ()Ljava/util/List;
-	public fun getExample ()Ljava/lang/String;
-	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/ErrorOutput {
@@ -543,7 +525,6 @@ public final class io/github/matthewjones372/pelican/HeaderValue {
 
 public final class io/github/matthewjones372/pelican/HttpScheme : io/github/matthewjones372/pelican/SecurityScheme {
 	public final fun getBearerFormat ()Ljava/lang/String;
-	public fun getDeclaredScopes ()Ljava/util/Set;
 	public fun getDescription ()Ljava/lang/String;
 	public fun getName ()Ljava/lang/String;
 	public final fun getScheme ()Ljava/lang/String;
@@ -687,28 +668,17 @@ public final class io/github/matthewjones372/pelican/InstantCodec : io/github/ma
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/InstantCodec;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/time/Instant;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun encode (Ljava/time/Instant;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
 	public fun getExample ()Ljava/lang/String;
 	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/IntCodec : io/github/matthewjones372/pelican/PlainCodec {
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/IntCodec;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Integer;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
-	public fun encode (I)Ljava/lang/String;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
-	public fun getExample ()Ljava/lang/String;
 	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/JsonArr : io/github/matthewjones372/pelican/JsonValue {
@@ -720,7 +690,6 @@ public final class io/github/matthewjones372/pelican/JsonArr : io/github/matthew
 	public final fun getItems ()Ljava/util/List;
 	public fun hashCode ()I
 	public final fun isEmpty ()Z
-	public fun render ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 	public fun write (Ljava/lang/StringBuilder;)V
 }
@@ -750,7 +719,6 @@ public final class io/github/matthewjones372/pelican/JsonBool : io/github/matthe
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getValue ()Z
 	public fun hashCode ()I
-	public fun render ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 	public fun write (Ljava/lang/StringBuilder;)V
 }
@@ -759,7 +727,6 @@ public final class io/github/matthewjones372/pelican/JsonNull : io/github/matthe
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/JsonNull;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
-	public fun render ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 	public fun write (Ljava/lang/StringBuilder;)V
 }
@@ -772,7 +739,6 @@ public final class io/github/matthewjones372/pelican/JsonNum : io/github/matthew
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getValue ()Ljava/lang/Number;
 	public fun hashCode ()I
-	public fun render ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 	public fun write (Ljava/lang/StringBuilder;)V
 }
@@ -788,7 +754,6 @@ public final class io/github/matthewjones372/pelican/JsonObj : io/github/matthew
 	public fun hashCode ()I
 	public final fun isEmpty ()Z
 	public final fun plus (Lio/github/matthewjones372/pelican/JsonObj;)Lio/github/matthewjones372/pelican/JsonObj;
-	public fun render ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 	public fun write (Ljava/lang/StringBuilder;)V
 }
@@ -821,7 +786,6 @@ public final class io/github/matthewjones372/pelican/JsonStr : io/github/matthew
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getValue ()Ljava/lang/String;
 	public fun hashCode ()I
-	public fun render ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 	public fun write (Ljava/lang/StringBuilder;)V
 }
@@ -829,10 +793,6 @@ public final class io/github/matthewjones372/pelican/JsonStr : io/github/matthew
 public abstract interface class io/github/matthewjones372/pelican/JsonValue {
 	public fun render ()Ljava/lang/String;
 	public abstract fun write (Ljava/lang/StringBuilder;)V
-}
-
-public final class io/github/matthewjones372/pelican/JsonValue$DefaultImpls {
-	public static fun render (Lio/github/matthewjones372/pelican/JsonValue;)Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/JsonValueKt {
@@ -862,42 +822,26 @@ public final class io/github/matthewjones372/pelican/LocalDateCodec : io/github/
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/LocalDateCodec;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/time/LocalDate;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun encode (Ljava/time/LocalDate;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
 	public fun getExample ()Ljava/lang/String;
 	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/LocalDateTimeCodec : io/github/matthewjones372/pelican/PlainCodec {
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/LocalDateTimeCodec;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/time/LocalDateTime;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun encode (Ljava/time/LocalDateTime;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
 	public fun getExample ()Ljava/lang/String;
 	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/LongCodec : io/github/matthewjones372/pelican/PlainCodec {
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/LongCodec;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Long;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
-	public fun encode (J)Ljava/lang/String;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
-	public fun getExample ()Ljava/lang/String;
 	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/Method : java/lang/Enum {
@@ -1029,7 +973,6 @@ public final class io/github/matthewjones372/pelican/OAuthFlow$Password : io/git
 }
 
 public final class io/github/matthewjones372/pelican/OpenIdConnectScheme : io/github/matthewjones372/pelican/SecurityScheme {
-	public fun getDeclaredScopes ()Ljava/util/Set;
 	public fun getDescription ()Ljava/lang/String;
 	public fun getName ()Ljava/lang/String;
 	public final fun getOpenIdConnectUrl ()Ljava/lang/String;
@@ -1198,15 +1141,6 @@ public abstract interface class io/github/matthewjones372/pelican/PlainCodec {
 	public fun getOpenApiFormat ()Ljava/lang/String;
 	public abstract fun getOpenApiType ()Ljava/lang/String;
 	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
-}
-
-public final class io/github/matthewjones372/pelican/PlainCodec$DefaultImpls {
-	public static fun encode (Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/Object;)Ljava/lang/String;
-	public static fun getDescription (Lio/github/matthewjones372/pelican/PlainCodec;)Ljava/lang/String;
-	public static fun getEnumValues (Lio/github/matthewjones372/pelican/PlainCodec;)Ljava/util/List;
-	public static fun getExample (Lio/github/matthewjones372/pelican/PlainCodec;)Ljava/lang/String;
-	public static fun getOpenApiFormat (Lio/github/matthewjones372/pelican/PlainCodec;)Ljava/lang/String;
-	public static fun getSchemaFacets (Lio/github/matthewjones372/pelican/PlainCodec;)Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/QueryParam : io/github/matthewjones372/pelican/ParamKey {
@@ -1418,10 +1352,6 @@ public abstract interface class io/github/matthewjones372/pelican/SecurityScheme
 	public abstract fun getName ()Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/SecurityScheme$DefaultImpls {
-	public static fun getDeclaredScopes (Lio/github/matthewjones372/pelican/SecurityScheme;)Ljava/util/Set;
-}
-
 public final class io/github/matthewjones372/pelican/ServerEndpoint {
 	public fun <init> (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function1;)V
 	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
@@ -1458,14 +1388,7 @@ public final class io/github/matthewjones372/pelican/StringCodec : io/github/mat
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/StringCodec;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun encode (Ljava/lang/String;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
-	public fun getExample ()Ljava/lang/String;
-	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/TextOutput : io/github/matthewjones372/pelican/Output {
@@ -1515,28 +1438,17 @@ public final class io/github/matthewjones372/pelican/UriCodec : io/github/matthe
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/UriCodec;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/net/URI;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun encode (Ljava/net/URI;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
 	public fun getExample ()Ljava/lang/String;
 	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/UuidCodec : io/github/matthewjones372/pelican/PlainCodec {
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/UuidCodec;
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/util/UUID;
-	public synthetic fun encode (Ljava/lang/Object;)Ljava/lang/String;
-	public fun encode (Ljava/util/UUID;)Ljava/lang/String;
-	public fun getDescription ()Ljava/lang/String;
-	public fun getEnumValues ()Ljava/util/List;
-	public fun getExample ()Ljava/lang/String;
 	public fun getOpenApiFormat ()Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
-	public fun getSchemaFacets ()Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/Webhook {

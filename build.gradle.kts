@@ -171,6 +171,17 @@ subprojects {
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
         jvmToolchain(21)
+
+        compilerOptions {
+            // Without this, every interface with a method body also gets a
+            // `DefaultImpls` class holding a copy of it, and both are published
+            // surface the BCV gate then has to keep. The interfaces here
+            // already emit real JVM default methods, so the copies are the ABI
+            // of a compatibility mode with nothing behind it: Kotlin callers
+            // never reach them, and the Java caller they exist for would have
+            // had to write `JsonValue.DefaultImpls.x(this)` by hand.
+            jvmDefault.set(org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode.NO_COMPATIBILITY)
+        }
     }
 
     dependencies {

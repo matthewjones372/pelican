@@ -129,13 +129,16 @@ private object Plain : Style {
 /**
  * The escapes, and the question of whether to use them.
  *
+ * Internal because it implements a private interface: published, it would have
+ * been a public type whose supertype nobody outside this file can name.
+ *
  * `NO_COLOR` wins outright — it is the one convention every tool agrees on.
  * Otherwise colour is used where something has said it can be read: an
  * attached console, or a `FORCE_COLOR` from a CI that renders escapes in its
  * log viewer. A test JVM under Gradle has neither, and gets plain text, which
  * is the right answer for a message that ends up inside an XML report.
  */
-object Ansi : Style {
+internal object Ansi : Style {
 
     val available: Boolean =
         System.getenv("NO_COLOR") == null &&
