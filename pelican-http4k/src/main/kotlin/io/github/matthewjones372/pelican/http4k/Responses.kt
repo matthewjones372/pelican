@@ -9,13 +9,16 @@ import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FallibleOutput
 import io.github.matthewjones372.pelican.JsonArrayOutput
 import io.github.matthewjones372.pelican.JsonOutput
+import io.github.matthewjones372.pelican.MediaOutput
 import io.github.matthewjones372.pelican.NdjsonOutput
+import io.github.matthewjones372.pelican.NegotiatedOutput
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.TextOutput
 import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.renderError
+import io.github.matthewjones372.pelican.spi.selectedFor
 import io.github.matthewjones372.pelican.spi.successNamedBy
 import org.http4k.core.MemoryBody
 import org.http4k.core.MemoryResponse
@@ -32,7 +35,12 @@ internal const val CONTENT_TYPE = "Content-Type"
  * Turns a described [Output] plus a handler's result into an http4k response.
  */
 @Suppress("UNCHECKED_CAST")
-internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs): Response {
+internal fun buildResponse(
+    out: Output<*>,
+    value: Any?,
+    codecs: EndpointCodecs,
+    accept: List<String>,
+): Response {
     // Resolved when the handler was built, so a null is a bug in that
     // resolution rather than anything a request can provoke.
     fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
@@ -41,9 +49,15 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
     // and the type the body is written as.
     if (out is FallibleOutput<*, *>) {
         return when (val outcome = value as Outcome<*, *>) {
-            is Outcome.Ok<*> -> successResponse(out, outcome, codecs)
+            is Outcome.Ok<*> -> successResponse(out, outcome, codecs, accept)
             is Outcome.Err<*> -> failureResponse(out, outcome, codecs)
         }
+    }
+
+    // Which rendering of one value goes out is core's answer, from the same
+    // scoring the 406 above was decided with.
+    if (out is NegotiatedOutput<*>) {
+        return buildResponse(out.selectedFor(accept), value, codecs, accept)
     }
 
     val response = Response(statusOf(out.status))
@@ -55,6 +69,12 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
         is JsonOutput<*> -> jsonResponse(out.status, payload().encodeToString(value))
 
         is TextOutput -> MemoryResponse(statusOf(out.status), TEXT_HEADERS, MemoryBody(value as String))
+
+        is MediaOutput<*> -> MemoryResponse(
+            statusOf(out.status),
+            listOf(CONTENT_TYPE to out.mediaType),
+            MemoryBody(payload().encodeToString(value)),
+        )
 
         is EmptyOutput -> response
 
@@ -85,8 +105,8 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
                 .header(CONTENT_TYPE, out.mediaType)
                 .body(value as InputStream, null)
 
-        // Unreachable: handled above, before any payload is touched.
-        is FallibleOutput<*, *> -> error("Unreachable")
+        // Unreachable: both are handled above, before any payload is touched.
+        is FallibleOutput<*, *>, is NegotiatedOutput<*> -> error("Unreachable")
     }
 }
 
@@ -107,9 +127,10 @@ private fun successResponse(
     out: FallibleOutput<*, *>,
     ok: Outcome.Ok<*>,
     codecs: EndpointCodecs,
+    accept: List<String>,
 ): Response {
     val chosen = out.successNamedBy(ok)
-    val response = buildResponse(chosen, ok.value, codecs)
+    val response = buildResponse(chosen, ok.value, codecs, accept)
     // Encoded and checked when the handler produced the response.
     return ok.headers.fold(response) { res, (name, value) -> res.header(name, value) }
 }

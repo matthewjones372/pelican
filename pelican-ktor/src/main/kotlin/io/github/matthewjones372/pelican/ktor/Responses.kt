@@ -9,13 +9,16 @@ import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FallibleOutput
 import io.github.matthewjones372.pelican.JsonArrayOutput
 import io.github.matthewjones372.pelican.JsonOutput
+import io.github.matthewjones372.pelican.MediaOutput
 import io.github.matthewjones372.pelican.NdjsonOutput
+import io.github.matthewjones372.pelican.NegotiatedOutput
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.TextOutput
 import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.renderError
+import io.github.matthewjones372.pelican.spi.selectedFor
 import io.github.matthewjones372.pelican.spi.successNamedBy
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -48,6 +51,7 @@ internal suspend fun respond(
     out: Output<*>,
     value: Any?,
     codecs: EndpointCodecs,
+    accept: List<String>,
 ) {
     // Resolved at route-build time, so a null is a bug in that resolution
     // rather than anything a request can provoke.
@@ -57,9 +61,15 @@ internal suspend fun respond(
     // and the type the body is written as.
     if (out is FallibleOutput<*, *>) {
         return when (val outcome = value as Outcome<*, *>) {
-            is Outcome.Ok<*> -> respondSuccess(call, out, outcome, codecs)
+            is Outcome.Ok<*> -> respondSuccess(call, out, outcome, codecs, accept)
             is Outcome.Err<*> -> respondFailure(call, out, outcome, codecs)
         }
+    }
+
+    // Which rendering of one value goes out is core's answer, from the same
+    // scoring the 406 above was decided with.
+    if (out is NegotiatedOutput<*>) {
+        return respond(call, out.selectedFor(accept), value, codecs, accept)
     }
 
     val status = statusOf(out.status)
@@ -70,6 +80,9 @@ internal suspend fun respond(
 
         is TextOutput ->
             call.respondText(value as String, ContentType.Text.Plain, status)
+
+        is MediaOutput<*> ->
+            call.respondText(payload().encodeToString(value), ContentType.parse(out.mediaType), status)
 
         is EmptyOutput -> call.respond(status)
 
@@ -95,8 +108,8 @@ internal suspend fun respond(
             (value as ByteReadChannel).copyTo(this)
         }
 
-        // Unreachable: handled above, before any payload is touched.
-        is FallibleOutput<*, *> -> error("Unreachable")
+        // Unreachable: both are handled above, before any payload is touched.
+        is FallibleOutput<*, *>, is NegotiatedOutput<*> -> error("Unreachable")
     }
 }
 
@@ -181,12 +194,13 @@ private suspend fun respondSuccess(
     out: FallibleOutput<*, *>,
     ok: Outcome.Ok<*>,
     codecs: EndpointCodecs,
+    accept: List<String>,
 ) {
     val chosen = out.successNamedBy(ok)
     // Encoded and checked when the handler produced the response. Appended
     // before the body, because writing the body commits the response.
     ok.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
-    respond(call, chosen, ok.value, codecs)
+    respond(call, chosen, ok.value, codecs, accept)
 }
 
 /**

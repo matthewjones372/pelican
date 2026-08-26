@@ -1,17 +1,22 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.BodyCodec
+import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import kotlin.reflect.KType
 import io.github.matthewjones372.pelican.http4k.handledNow as handledNowOnHttp4k
 import io.github.matthewjones372.pelican.http4k.start as startOnHttp4k
 import io.github.matthewjones372.pelican.ktor.handledNow as handledNowOnKtor
@@ -39,7 +44,29 @@ class ContentNegotiationTest {
     /** No representation at all, so there is nothing for a caller to refuse. */
     private val nothing = endpoint { get("nothing"); empty(status = 204) }
 
-    private fun api(routes: List<ServerEndpoint>) = api(endpoints = routes, codecs = JacksonCodecs)
+    /** One widget, two wire shapes: the same value under one status. */
+    private val export = endpoint {
+        get("export")
+        negotiated(json<Widget>(status = 200), media<Widget>("text/csv", status = 200))
+    }
+
+    /**
+     * Jackson, plus the one thing no JSON library answers: a `Widget` written
+     * as CSV. A second representation is an encoder the service supplies, and
+     * this is the whole of what supplying one looks like — the description
+     * names `text/csv`, and the `Codecs` says what that means.
+     */
+    private object WidgetCodecs : Codecs by JacksonCodecs {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
+            if (mediaType != "text/csv") JacksonCodecs.codec(type, mediaType)
+            else object : BodyCodec<Widget> {
+                override fun encodeToString(value: Widget): String = "id\n${value.id}\n"
+                override fun decodeFromString(text: String): Widget = Widget(text.lines()[1].toLong())
+            } as BodyCodec<T>
+    }
+
+    private fun api(routes: List<ServerEndpoint>) = api(endpoints = routes, codecs = WidgetCodecs)
 
     private val client: HttpClient = HttpClient.newHttpClient()
 
@@ -78,7 +105,54 @@ class ContentNegotiationTest {
         withClue("a legal status nobody registered is the status that goes out") {
             get(baseUrl, "/odd", accept = null).statusCode() shouldBe 419
         }
+
+        probeNegotiation(baseUrl)
     }
+
+    /**
+     * The same handler, the same value, and two wire shapes — pinned as bytes,
+     * because what a negotiated response promises is exactly what goes out.
+     */
+    private fun probeNegotiation(baseUrl: String) {
+        val asJson = get(baseUrl, "/export", accept = "application/json")
+        withClue("a caller asking for JSON gets the JSON rendering") {
+            asJson.statusCode() shouldBe 200
+            asJson.body() shouldBe """{"id":7}"""
+            contentTypeOf(asJson) shouldStartWith "application/json"
+        }
+
+        val asCsv = get(baseUrl, "/export", accept = "text/csv")
+        withClue("and the same value goes out as CSV for the caller that asked for that") {
+            asCsv.statusCode() shouldBe 200
+            asCsv.body() shouldBe "id\n7\n"
+            contentTypeOf(asCsv) shouldStartWith "text/csv"
+        }
+
+        withClue("no Accept at all takes the first alternative in declaration order") {
+            val silent = get(baseUrl, "/export", accept = null)
+            silent.body() shouldBe """{"id":7}"""
+            contentTypeOf(silent) shouldStartWith "application/json"
+        }
+
+        withClue("a q value is a preference, and the preferred rendering is the one that goes out") {
+            get(baseUrl, "/export", accept = "application/json;q=0.2, text/csv;q=0.9").body() shouldBe "id\n7\n"
+            get(baseUrl, "/export", accept = "application/json;q=0.9, text/csv;q=0.2")
+                .body() shouldBe """{"id":7}"""
+        }
+
+        withClue("a named type beats the wildcard beside it, whatever order they were written in") {
+            get(baseUrl, "/export", accept = "*/*;q=0.1, text/csv").body() shouldBe "id\n7\n"
+        }
+
+        val refused = get(baseUrl, "/export", accept = "application/xml")
+        withClue("and a caller that will take neither is refused before the handler runs") {
+            refused.statusCode() shouldBe 406
+            refused.body() shouldContain "text/csv"
+        }
+    }
+
+    private fun contentTypeOf(response: HttpResponse<String>): String =
+        response.headers().firstValue("Content-Type").orElse("")
 
     @Test
     fun `pekko negotiates, and sends an unregistered status`() {
@@ -87,6 +161,7 @@ class ContentNegotiationTest {
                 widget handledNowOnPekko { Widget(1) },
                 odd handledNowOnPekko { Widget(2) },
                 nothing handledNowOnPekko { },
+                export handledNowOnPekko { Widget(7) },
             ),
         ).startOnPekko(port = 0, systemName = "negotiation")
 
@@ -104,6 +179,7 @@ class ContentNegotiationTest {
                 widget handledNowOnHttp4k { Widget(1) },
                 odd handledNowOnHttp4k { Widget(2) },
                 nothing handledNowOnHttp4k { },
+                export handledNowOnHttp4k { Widget(7) },
             ),
         ).startOnHttp4k(port = 0)
 
@@ -121,6 +197,7 @@ class ContentNegotiationTest {
                 widget handledNowOnKtor { Widget(1) },
                 odd handledNowOnKtor { Widget(2) },
                 nothing handledNowOnKtor { },
+                export handledNowOnKtor { Widget(7) },
             ),
         ).startOnKtor(port = 0)
 

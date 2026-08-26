@@ -164,12 +164,7 @@ internal class EndpointCodecs(
 private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = EndpointCodecs(
     body = codecs.requestBodyCodec(bodyInput),
     payload = output.payloadType?.let { codecs.codec(it) },
-    alternatives = (output as? FallibleOutput<*, *>)?.let { declared ->
-        (
-            declared.successes.mapNotNull { s -> s.payloadType?.let { s as Any to codecs.codec<Any?>(it) } } +
-                declared.failures.map { f -> f as Any to codecs.codec<Any?>(f.type) }
-            ).associateTo(java.util.IdentityHashMap<Any, BodyCodec<Any?>>()) { it }
-    }.orEmpty(),
+    alternatives = codecs.responseCodecs(output),
 )
 
 /**
@@ -191,10 +186,13 @@ internal fun Api.orderedEndpoints(): List<ServerEndpoint> =
 private fun negotiate(ep: Endpoint<*, *>, req: HttpRequest) {
     val produced = ep.output.produces
     if (produced.isEmpty()) return
-    val accept = req.headerValues("Accept")
+    val accept = req.acceptLines()
     if (accept.isEmpty()) return
     if (!acceptable(accept, produced)) throw NotAcceptable(produced)
 }
+
+/** Every `Accept` field line: RFC 9110 reads two lines as one field. */
+private fun HttpRequest.acceptLines(): List<String> = headerValues("Accept")
 
 private fun originOf(req: HttpRequest): String? =
     req.getHeader(CorsHeaders.ORIGIN).orElse(null)?.value()
@@ -434,7 +432,7 @@ private fun invoke(
 
     return bodyReady
         .thenCompose { handler(params) }
-        .thenApply { result -> buildResponse(ep.output, result, codecs) }
+        .thenApply { result -> buildResponse(ep.output, result, codecs, req.acceptLines()) }
         .exceptionally { t -> errorResponse(t, api, ep) }
         .thenApply { res -> res.withHeaders(params) }
 }

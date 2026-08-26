@@ -8,7 +8,6 @@ import io.github.matthewjones372.pelican.Cookies
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.CorsPreflight
 import io.github.matthewjones372.pelican.Endpoint
-import io.github.matthewjones372.pelican.FallibleOutput
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.Method
@@ -31,6 +30,7 @@ import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.readStrictBody
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
+import io.github.matthewjones372.pelican.spi.responseCodecs
 import io.github.matthewjones372.pelican.spi.routeIndex
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -49,7 +49,6 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import java.util.IdentityHashMap
 import java.util.concurrent.CompletionStage
 
 /**
@@ -197,12 +196,7 @@ internal class EndpointCodecs(
 private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = EndpointCodecs(
     body = codecs.requestBodyCodec(bodyInput),
     payload = output.payloadType?.let { codecs.codec(it) },
-    alternatives = (output as? FallibleOutput<*, *>)?.let { declared ->
-        (
-            declared.successes.mapNotNull { s -> s.payloadType?.let { s as Any to codecs.codec<Any?>(it) } } +
-                declared.failures.map { f -> f as Any to codecs.codec<Any?>(f.type) }
-            ).associateTo(IdentityHashMap<Any, BodyCodec<Any?>>()) { it }
-    }.orEmpty(),
+    alternatives = codecs.responseCodecs(output),
 )
 
 /**
@@ -219,10 +213,13 @@ private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = Endpo
 private fun negotiate(ep: Endpoint<*, *>, call: ApplicationCall) {
     val produced = ep.output.produces
     if (produced.isEmpty()) return
-    val accept = call.request.headers.getAll("Accept").orEmpty()
+    val accept = call.acceptLines()
     if (accept.isEmpty()) return
     if (!acceptable(accept, produced)) throw NotAcceptable(produced)
 }
+
+/** Every `Accept` field line: RFC 9110 reads two lines as one field. */
+private fun ApplicationCall.acceptLines(): List<String> = request.headers.getAll("Accept").orEmpty()
 
 private fun decodePlainInputs(
     ep: Endpoint<*, *>,
@@ -406,7 +403,7 @@ private suspend fun invoke(
     call.applyHeaders(params)
 
     try {
-        respond(call, ep.output, result, codecs)
+        respond(call, ep.output, result, codecs, call.acceptLines())
     } catch (t: Throwable) {
         // A stream failing after its first element has already committed a 200
         // and some bytes. Let it out, so the client sees a truncated response

@@ -31,7 +31,12 @@ internal val EVENT_STREAM: ContentType.NonBinary = MediaTypes.TEXT_EVENT_STREAM.
  * frames a stream of JSON documents as an array already.
  */
 @Suppress("UNCHECKED_CAST")
-internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs): HttpResponse {
+internal fun buildResponse(
+    out: Output<*>,
+    value: Any?,
+    codecs: EndpointCodecs,
+    accept: List<String>,
+): HttpResponse {
     // Resolved at route-build time, so a null is a bug in that resolution
     // rather than anything a request can provoke.
     fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
@@ -40,9 +45,15 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
     // and the type the body is written as.
     if (out is FallibleOutput<*, *>) {
         return when (val outcome = value as Outcome<*, *>) {
-            is Outcome.Ok<*> -> successResponse(out, outcome, codecs)
+            is Outcome.Ok<*> -> successResponse(out, outcome, codecs, accept)
             is Outcome.Err<*> -> failureResponse(out, outcome, codecs)
         }
+    }
+
+    // Which rendering of one value goes out is core's answer, from the same
+    // scoring the 406 above was decided with.
+    if (out is NegotiatedOutput<*>) {
+        return buildResponse(out.selectedFor(accept), value, codecs, accept)
     }
 
     val entity: ResponseEntity = when (out) {
@@ -52,6 +63,11 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
         )
 
         is TextOutput -> HttpEntities.create(ContentTypes.TEXT_PLAIN_UTF8, value as String)
+
+        is MediaOutput<*> -> HttpEntities.create(
+            contentTypeOf(out.mediaType),
+            ByteString.fromString(payload().encodeToString(value)),
+        )
 
         is EmptyOutput -> HttpEntities.EMPTY
 
@@ -82,8 +98,8 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
             value as Source<ByteString, NotUsed>,
         )
 
-        // Unreachable: handled above, before any payload is touched.
-        is FallibleOutput<*, *> -> error("Unreachable")
+        // Unreachable: both are handled above, before any payload is touched.
+        is FallibleOutput<*, *>, is NegotiatedOutput<*> -> error("Unreachable")
     }
 
     return HttpResponse.create().withStatus(statusOf(out.status)).withEntity(entity)
@@ -99,9 +115,10 @@ private fun successResponse(
     out: FallibleOutput<*, *>,
     ok: Outcome.Ok<*>,
     codecs: EndpointCodecs,
+    accept: List<String>,
 ): HttpResponse {
     val chosen = out.successNamedBy(ok)
-    val response = buildResponse(chosen, ok.value, codecs)
+    val response = buildResponse(chosen, ok.value, codecs, accept)
     // Encoded and checked against the declaration when the handler produced
     // the response, so there is nothing left to decide here.
     return if (ok.headers.isEmpty()) response

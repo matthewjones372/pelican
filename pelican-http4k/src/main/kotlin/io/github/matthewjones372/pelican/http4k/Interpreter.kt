@@ -8,7 +8,6 @@ import io.github.matthewjones372.pelican.Cookies
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.CorsPreflight
 import io.github.matthewjones372.pelican.Endpoint
-import io.github.matthewjones372.pelican.FallibleOutput
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.MultipartBody
@@ -31,6 +30,7 @@ import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.readStrictBody
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
+import io.github.matthewjones372.pelican.spi.responseCodecs
 import io.github.matthewjones372.pelican.spi.routeIndex
 import org.http4k.core.HttpHandler
 import org.http4k.core.Request
@@ -40,7 +40,6 @@ import org.http4k.routing.RoutingHttpHandler
 import org.http4k.routing.bind
 import org.http4k.routing.path
 import org.http4k.routing.routes
-import java.util.IdentityHashMap
 import io.github.matthewjones372.pelican.Method as PelicanMethod
 import org.http4k.core.Method as Http4kMethod
 
@@ -147,12 +146,7 @@ internal class EndpointCodecs(
 private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = EndpointCodecs(
     body = codecs.requestBodyCodec(bodyInput),
     payload = output.payloadType?.let { codecs.codec(it) },
-    alternatives = (output as? FallibleOutput<*, *>)?.let { declared ->
-        (
-            declared.successes.mapNotNull { s -> s.payloadType?.let { s as Any to codecs.codec<Any?>(it) } } +
-                declared.failures.map { f -> f as Any to codecs.codec<Any?>(f.type) }
-            ).associateTo(IdentityHashMap<Any, BodyCodec<Any?>>()) { it }
-    }.orEmpty(),
+    alternatives = codecs.responseCodecs(output),
 )
 
 /**
@@ -191,10 +185,13 @@ private fun Response.withCors(cors: CorsPolicy?, req: Request): Response {
 private fun negotiate(ep: Endpoint<*, *>, req: Request) {
     val produced = ep.output.produces
     if (produced.isEmpty()) return
-    val accept = req.headerValues("Accept").filterNotNull()
+    val accept = req.acceptLines()
     if (accept.isEmpty()) return
     if (!acceptable(accept, produced)) throw NotAcceptable(produced)
 }
+
+/** Every `Accept` field line: RFC 9110 reads two lines as one field. */
+private fun Request.acceptLines(): List<String> = headerValues("Accept").filterNotNull()
 
 private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap<ParamKey<*>, Any?>) = with(into) {
     // A loop rather than `filterIsInstance`, which allocates a list per
@@ -354,7 +351,7 @@ private fun invoke(
     // blocking read the server's own timeout governs.
     return try {
         val result = bound(params).toCompletableFuture().join()
-        buildResponse(ep.output, result, codecs)
+        buildResponse(ep.output, result, codecs, req.acceptLines())
     } catch (t: Throwable) {
         errorResponse(t, api, ep)
     }.withHeaders(params)
