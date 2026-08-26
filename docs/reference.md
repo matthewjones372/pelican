@@ -16,11 +16,10 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-schema` | **core** | one type → a self-contained JSON Schema 2020-12 document: pointers under `$defs`, a union's branches carrying the property that picks them. No document generator, no codec |
 | `pelican-mcp` | core, schema | descriptions → MCP tool descriptions, and a dispatch that decodes a tool call into the handler the route already has. Values only: no MCP SDK and no transport, so a tool list can be derived with no server on the classpath |
 | `pelican-mcp-server` | core, mcp | those tools served: JSON-RPC 2.0 — `initialize`, `tools/list`, `tools/call`, `ping` — over stdio with `mcpServe(api)`, and the request/response half of Streamable HTTP for a backend to mount. Protocol revision `2025-11-25`. Still no MCP SDK |
-| `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
-| `pelican-client-pekko` | core, pekko-http | the same seam over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
-| `pelican-client-okhttp` | core, okhttp | the same seam over OkHttp's `Call`, for an application that already runs one — and the only one of the three that runs on Android, where there is no `java.net.http`. Plain JVM: no Android plugin, no AndroidX |
+| `pelican-client-pekko` | core, pekko-http | where a generated client's requests go: `ClientTransport` over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the `Codecs`: Jackson reads bodies, swagger-core describes types |
+| `pelican-arrow` | core, arrow-core | Arrow's `Either` into Pelican's `Outcome` and back: `toOutcome()`, its naming overload, and `toEither()` |
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and Swagger UI over HTTP |
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
@@ -33,9 +32,11 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `example` | core, openapi, jackson, pekko | the orders, bookmarks, greetings and secured services |
 | `benchmarks` | core, jackson, pekko, JMH | the interpreter measured against hand-written Pekko routes. Not published, not run by `build`. |
 
-1.0 ships one backend and one codec module. The http4k and Ktor interpreters
-and their `-docs` and `-mcp` modules, the http4k in-memory transport, the Ktor
-client transport, `pelican-jsoniter` and `pelican-kotlinx` are complete and
+1.0 ships one backend, one codec module and one client transport. The http4k
+and Ktor interpreters and their `-docs` and `-mcp` modules, the http4k
+in-memory transport, the JDK, OkHttp and Ktor client transports
+(`pelican-client-java`, `pelican-client-okhttp`, `pelican-client-ktor`),
+`pelican-jsoniter` and `pelican-kotlinx` are complete and
 green on the
 [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
 branch, and return after 1.0. Where the reasoning below is easier to read with
@@ -64,19 +65,15 @@ The layering is load-bearing, not decorative, and each edge is a test:
   OpenTelemetry in the same breath. The two vendors' APIs are the same size as
   each other and neither audience asked for the other's, so a service that
   wanted meters does not ship a tracer to get them.
-- `pelican-client-java` asserts the same shape on the caller's side: core, the
-  JDK, and no second HTTP stack. An adapter a caller adds in order to *choose*
-  a client library would be worth very little if it brought one along.
-- `pelican-client-pekko` asserts the same claim with Pekko in the place of the
-  JDK: core, Pekko HTTP's own closure, and nothing else. It also asserts that
-  `pelican-pekko` is absent, which is the edge worth having — the interpreter
-  and the transport are both Pekko, and a caller who only makes calls should
-  not compile a route builder in to do it.
-- `pelican-client-okhttp` asserts core, OkHttp and okio, and nothing else —
-  no second HTTP stack, no interpreter, and no AndroidX. The last one is the
-  point of the module rather than a detail of it: it runs on Android because
-  every jar on that list is one an Android app already ships, and an AndroidX
-  artifact arriving here would make that a coincidence instead of a claim.
+- `pelican-client-pekko` asserts the same shape on the caller's side: core,
+  Pekko HTTP's own closure, and nothing else — an adapter a caller adds in
+  order to *choose* a client library would be worth very little if it brought a
+  second one along. It also asserts that `pelican-pekko` is absent, which is
+  the edge worth having — the interpreter and the transport are both Pekko,
+  and a caller who only makes calls should not compile a route builder in to
+  do it.
+- `pelican-arrow` asserts it is core plus `arrow-core` and nothing else —
+  `NoOtherDependenciesTest`, the same claim every other edge here makes.
 - `pelican-import` depends on `pelican-codegen` rather than on core directly,
   and shares its schema-to-Kotlin generator outright. A client generated from a
   document and a client generated from endpoint values should not disagree
@@ -358,6 +355,23 @@ One thing is refused rather than published as something it is not:
 jsoniter's story — binding and describing a Kotlin data class through its
 primary constructor, for a library that has no serialization metadata to read —
 is on the branch with `pelican-jsoniter`.
+
+One more edge-of-the-service module lives beside the codecs. `pelican-arrow` —
+core plus `arrow-core` and nothing else, which `NoOtherDependenciesTest`
+asserts — turns Arrow's `Either` into Pelican's `Outcome` and back, in
+`io.github.matthewjones372.pelican.arrow`:
+
+```kotlin
+getUser handledOrFail { id -> service.find(id).toOutcome() }             // Right → ok, Left → the single declared failure
+placeOrder handledOrFail { req -> desk.place(req).toOutcome(badOrder) }  // several failures: name the declaration
+val placed: Either<PlaceOrderFailure, Order> = client.placeOrder(order).toEither()  // and back, on the calling side
+```
+
+A bare `toOutcome()` is `err` for the `Left`, so it means the endpoint's single
+declared failure; an endpoint declaring several uses the overload that names
+one, for the same reason a bare `err` is refused there — the declaration is
+what fixes the status. `toEither()` is the way back, for a caller who wants
+their domain type on the outside of a generated client's call.
 
 ## Getting the OpenAPI docs
 
@@ -965,7 +979,7 @@ The document and the client are both readings of the same values, and both are
 build tasks:
 
 ```kotlin
-plugins { id("io.github.matthewjones372.pelican") version "0.2.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC1" }
 
 pelican {
     documents {
@@ -1062,7 +1076,7 @@ importer:
 
 ```kotlin
 val pelicanImport: Configuration by configurations.creating
-dependencies { pelicanImport("io.github.matthewjones372:pelican-import:0.2.0") }
+dependencies { pelicanImport("io.github.matthewjones372:pelican-import:1.0.0-RC1") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
@@ -1253,17 +1267,16 @@ an interpreter it does not name; this is the same answer facing the other way.
 
 ### Choosing one
 
-Three adapters are written. `pelican-client-java` is the one over the JDK's own
-`HttpClient`; `pelican-client-pekko` is the one over Pekko HTTP's client and
-`pelican-client-okhttp` the one over OkHttp's `Call`, for a service that
-already runs one of those and would rather not start a second HTTP stack to
-call out of. A fourth, over Ktor's `HttpClient`, is on the `multi-backend`
-branch. On Android the choice is made for you: `java.net.http` is not there,
-and OkHttp is. A generated client finds whichever is present without being
-told:
+One adapter ships: `pelican-client-pekko`, over Pekko HTTP's client, for the
+service that already runs Pekko and would rather not start a second HTTP stack
+to call out of. The JDK, OkHttp and Ktor adapters — `pelican-client-java`,
+`pelican-client-okhttp` and `pelican-client-ktor` — are on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch and return after 1.0. A generated client finds the adapter on the
+classpath without being told:
 
 ```kotlin
-dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.2.0") }
+dependencies { implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1") }
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 ```
@@ -1274,20 +1287,18 @@ classpath the client says so when it is constructed, and with more than one it
 asks to be told which, since nothing there could pick for you.
 
 Which is the one case finding-by-classpath cannot serve, and it is worth
-knowing what it looks like before you meet it. Put both adapters on one
-classpath and every client built without a named transport fails where it is
-constructed:
+knowing what it looks like before you meet it. Put a second provider on the
+classpath — one of your own, or a branch adapter beside the shipped one — and
+every client built without a named transport fails where it is constructed:
 
 ```
-Several transports are on the classpath — [..JavaHttpTransport, ..PekkoHttpTransport]
+Several transports are on the classpath — [..PekkoHttpTransport, ..OurOwnTransport]
 — and nothing here can say which one this client should use. Pass one.
 ```
 
-The way through is to name the transport at each construction site. That is
-what `example`'s own suite does: it compiles both adapters in order to run the
-generated client over each, so every `OrdersClient` there is built with the one
-it means. Nothing is lost but the defaulted argument, and the failure is loud
-and immediate rather than a client that quietly sends on the wrong stack.
+The way through is to name the transport at each construction site. Nothing is
+lost but the defaulted argument, and the failure is loud and immediate rather
+than a client that quietly sends on the wrong stack.
 
 Handing one over is the other spelling, and the one to reach for when the
 process already has a client worth sharing:
@@ -1296,7 +1307,7 @@ process already has a client worth sharing:
 val client = OrdersClient(
     "https://orders.internal",
     JacksonCodecs,
-    JavaHttpTransport(HttpClient.newBuilder().executor(pool).build()),
+    PekkoHttpTransport(system),   // the ActorSystem the service already runs
 )
 ```
 
@@ -1387,10 +1398,10 @@ generated file says so in its own header.
 with the `CompletionException` a stage wraps around it — the same unwrapping
 the blocking form does by hand — and a coroutine cancelled while it is waiting
 cancels the `CompletableFuture` underneath it. An adapter has to carry that the
-rest of the way: `JavaHttpTransport` cancels the exchange the response was
-derived from, because cancellation travels down a chain of stages and not back
-up it, and a stage cancelled without that would leave the request running with
-nobody left to read it.
+rest of the way, because cancellation travels down a chain of stages and not
+back up it: `PekkoHttpTransport` answers with a future of its own so that a
+caller's `cancel` is seen, and a response arriving after the caller gave up is
+discarded at once rather than left holding its connection.
 
 **What still blocks.** Reading a body is a socket read wherever it happens. The
 generated suspending client reads a whole body inside `withContext(
@@ -1429,11 +1440,10 @@ result it already has — which is exactly why the typed test client
 ### What a deadline bounds, and what carries none
 
 `timeout` on a generated client's constructor is put on every `ClientRequest`
-it builds, and each adapter maps it onto what its library has. All three bound
-the arrival of the response head and leave the body to the connection's own
-idle timeout — two of them by imposing the deadline on the stage, because the
-library's own setting is either a pool setting or a bound on the whole
-exchange. The table in
+it builds. The shipped adapter bounds the arrival of the response head and
+leaves the body to the connection's own idle timeout — the deadline is imposed
+on the stage, because Pekko's own timeout settings are pool settings rather
+than per-request ones. The table in
 [docs/generated-client.md](generated-client.md#how-long-a-call-may-take) is the
 short form.
 
@@ -1555,6 +1565,12 @@ working rather than failing. What is raised on expiry is a
 `HttpTimeoutException`, so a caller catching a timeout by type catches the one
 its own transport raises.
 
+Connection failures cross as `IOException`. Pekko raises a refused connection
+or a reset as `StreamTcpException`, a `RuntimeException`, which the default
+`RetryPolicy` would not touch; the adapter rethrows it as an `IOException`
+with Pekko's own exception as the cause, so a wrapped transport's default
+policy retries a dead node here exactly as it would anywhere else.
+
 ### Retrying, and what is safe to retry
 
 Nothing retries unless somebody wrapped a transport in something that does:
@@ -1623,14 +1639,13 @@ description behaves the same way whichever transport carries it.
 
 ### Writing another one
 
-An adapter is small: the three here run to between 100 and 280 lines including
-the comments, and in every one of them nearly all of what took thought was the
-stream bridge and the cancellation rather than the mapping. Another — Apache,
-something a house already runs — starts by reading whichever of the three is
-closest in shape. `pelican-client-java` is the plainest, since the JDK's
-`sendAsync` is already the shape `send` wants; `pelican-client-pekko` and
-`pelican-client-okhttp` are the ones to read for how a streaming client's
-laziness survives the crossing into an `InputStream`.
+An adapter is small — a few hundred lines including the comments — and nearly
+all of what takes thought is the stream bridge and the cancellation rather
+than the mapping. Another — Apache, something a house already runs — starts by
+reading `PekkoHttpTransport` for how a streaming client's laziness survives
+the crossing into an `InputStream`, or the branch's `pelican-client-java`,
+the plainest of them, since the JDK's `sendAsync` is already the shape `send`
+wants.
 
 ## Importing an OpenAPI document
 
@@ -3919,6 +3934,17 @@ can carry the same type, as `placeOrder`'s 401 and 404 do. The body is written
 by the configured codec, as the declared type: the response is the one the
 document promised.
 
+`err(value)` is the shorthand, top-level in `io.github.matthewjones372.pelican`
+beside `ok`: the endpoint's *single* declared failure, for the handler that
+would rather not name it every time — `noSuchUser(ApiError(...))` above could be
+`err(ApiError(...))`. Which declaration it means is resolved where the response
+is written, so on an endpoint declaring several failures a bare `err` is an
+`UndeclaredResponse` naming the choices, and a failure that promised a required
+response header is refused the same way a bare `ok` is — the declaration has to
+be invoked to supply what it promised. It is named `err` rather than `error`
+because `error` is the standard library's throw, and taking that name would
+silently turn every `error("message")` in a handler into an unused value.
+
 What the compiler catches:
 
 ```
@@ -5256,10 +5282,31 @@ place they are recorded.
 
 ## Versions
 
-Kotlin 2.4.10 · Pekko 1.7.0 · Pekko HTTP 1.4.0 · Jackson 2.22.2 ·
+Kotlin 2.4.10 · Pekko 1.2.1 · Pekko HTTP 1.3.0 · Jackson 2.22.2 ·
 swagger-core 2.2.54 · slf4j-api 2.0.18 · snakeyaml-engine 2.10 ·
-Micrometer 1.17.1 · OpenTelemetry 1.65.0 · OkHttp 4.12.0 · JDK 21 ·
+Micrometer 1.17.1 · OpenTelemetry 1.65.0 · arrow-core 2.1.2 · JDK 21 ·
 Gradle 9.7.1
+
+These are floors, not pins — Gradle resolves upwards, so a service already on
+a newer Pekko keeps its own. The Pekko floor is deliberately old: a library
+that pinned the newest Pekko would upgrade every app that adds it, and Pekko
+refuses to run mixed versions in one JVM. The whole build and every suite run
+at the floor, so what is tested is what the floor promises.
+
+### If the service refuses to start naming two Pekko versions
+
+```
+IllegalStateException: You are using version X of Apache Pekko, but it appears
+you (perhaps indirectly) also depend on older versions of related artifacts.
+```
+
+That is Pekko's own mixed-version check, not Pelican's: some Pekko artifacts
+on the classpath resolved to one version and some to another — usually a
+version pinned in one build file while another dependency brings a different
+one. The fix is the one the message names: align every `org.apache.pekko`
+artifact to one version, most simply by depending on `pekko-bom` at the
+version your app wants. Anything at or above the floor above works with
+Pelican.
 
 This is the only copy of that list. The README carried a second one until the
 two disagreed about half of it, and now points here instead.

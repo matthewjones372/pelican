@@ -32,15 +32,17 @@ one.
 
 ### Removed — read this one first
 
-- **1.0 ships one backend and one codec module: Pekko HTTP and Jackson.** Ten
-  modules leave `main`: `pelican-http4k`, `pelican-http4k-docs`,
-  `pelican-http4k-mcp`, `pelican-test-http4k`, `pelican-ktor`,
-  `pelican-ktor-docs`, `pelican-ktor-mcp`, `pelican-client-ktor`,
-  `pelican-jsoniter` and `pelican-kotlinx`. A build depending on any of them
-  has no artifact to resolve at the next release.
+- **1.0 ships one backend, one codec module and one client transport: Pekko
+  HTTP, Jackson and `pelican-client-pekko`.** Twelve modules leave `main`:
+  `pelican-http4k`, `pelican-http4k-docs`, `pelican-http4k-mcp`,
+  `pelican-test-http4k`, `pelican-ktor`, `pelican-ktor-docs`,
+  `pelican-ktor-mcp`, `pelican-client-ktor`, `pelican-jsoniter`,
+  `pelican-kotlinx`, `pelican-client-java` and `pelican-client-okhttp`. A
+  build depending on any of them has no artifact to resolve at the next
+  release.
 
-  They are not abandoned and they are not deleted. All ten live, complete and
-  green, on the
+  They are not abandoned and they are not deleted. All twelve live, complete
+  and green, on the
   [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
   branch — cut from `main` immediately before this change, built by the same
   specs and passing the same parity suites — and each returns after 1.0 as a
@@ -51,8 +53,9 @@ one.
 
   `allBackends`, the parity suites and the codec agreement matrix keep their
   shapes on `main` with a single entry each, so a returning module plugs into a
-  live socket. The entries below that describe an http4k or Ktor module still
-  describe it accurately — on that branch.
+  live socket. The entries below that describe an http4k, Ktor, JDK-transport
+  or OkHttp module — or say "all three backends" — still describe the branch
+  accurately; on `main`, read them as describing the Pekko stack.
 
 - **Three static fields nothing was meant to read.**
   `PekkoHttpTransport.CONTENT_TYPE`, `PekkoHttpTransport.CONTENT_LENGTH` and
@@ -173,6 +176,38 @@ one.
 
 ### Fixed
 
+- **Pelican no longer force-upgrades an app's Pekko.** The modules built
+  against Pekko 1.7.0, so adding Pelican to an app holding any Pekko artifact
+  at an older version ended at startup with Pekko's own mixed-version
+  refusal — "You are using version 1.7.0 of Apache Pekko, but it appears you
+  (perhaps indirectly) also depend on older versions of related artifacts."
+  The build now pins the floor it actually needs — **Pekko 1.2.1 and Pekko
+  HTTP 1.3.0** — and every suite runs at that floor, so an app anywhere at or
+  above it keeps the Pekko it has and Gradle resolves upwards where it wants
+  newer. The reference manual's Versions section carries the mixed-version
+  error and its fix.
+- **A dead node is retried on the shipped transport.** Pekko raises a
+  connection refused or reset as `StreamTcpException`, a `RuntimeException`,
+  so `RetryPolicy`'s default — retry an `IOException` — never fired for a
+  connection failure through `PekkoHttpTransport`. It now crosses as an
+  `IOException` with Pekko's own as its cause, so a policy that retries a
+  dead node on one transport retries it on this one.
+- **A cancelled call no longer parks a connection.** Cancelling the stage a
+  `PekkoHttpTransport` call returned left the late-arriving response holding
+  its connection until the pool's subscription timeout salvaged it. The
+  response is discarded the moment it arrives cancelled, and the transport
+  stays usable.
+- **Three declarations that silently misrouted or miscast are refused where
+  they are written.** `default(v)` followed by `repeated()` or
+  `commaSeparated()` carried a scalar default into a slot typed `List<T>` — a
+  `ClassCastException` in the handler, far from the declaration; the working
+  order is `repeated().default(listOf(...))`, and the refusal says so. A brace
+  in a path literal — `get("users/{id}")`, the spelling every annotation
+  framework taught — routed the literal text `%7Bid%7D`; refused naming
+  `pathParam` and the `/` spelling. And `errorResponse` skipped the status
+  check every other response gets, while a documentation-only error declared
+  under a live status silently replaced that response in the published
+  document; both are construction failures now.
 - **A path segment is decoded as a path, not as a form.** A `+` in a captured
   segment arrived as a space, because captures were decoded with `URLDecoder`;
   `/tags/c++` now reaches a handler as `c++`. Literals are matched decoded too,
@@ -205,10 +240,25 @@ one.
   Pekko `Source` built from a Java constant arrives with platform-type marks.
   Every quoted line is now the compiler's own, asserted verbatim. The Kover
   floor reads 90 in `AGENTS.md`, as the build has, and `FunctionalStyleTest`
-  judges eighteen modules rather than the eleven the reference claimed.
+  judges fourteen modules rather than the eleven the reference claimed.
 
 ### Added
 
+- **`err(value)`, the failure-side `ok`.** The single declared failure,
+  carrying `value`, for the endpoint that declares one failure and would
+  rather not name it on every return. With several declared failures a bare
+  `err` is an `UndeclaredResponse` where the response is written, naming the
+  choices — the declaration is what fixes the status — and a failure that
+  promised a required header is refused the way a bare `ok` already was.
+  `Outcome.Err.declared` becomes nullable to carry the unnamed form; source
+  and binaries built against the old shape are unaffected. Deliberately not
+  `error`: that is the standard library's throw, and taking the name would
+  silently turn every `error("message")` in a handler into an unused value.
+- **`pelican-arrow`.** Arrow's `Either` into Pelican's `Outcome` and back:
+  `either.toOutcome()` reads a `Right` as `ok` and a `Left` as `err`,
+  `toOutcome(failure)` names the declaration for an endpoint declaring
+  several, and `outcome.toEither()` is the way back on the client side. Core
+  plus `arrow-core` and nothing else, asserted by the usual dependency test.
 - **The names the `.api` dumps cannot see are pinned by compiling them.**
   `StillCompilesTest` compiles nine fixtures of ordinary call-site source —
   endpoints, inputs, outputs, failures, construction, binders, clients, the
@@ -379,7 +429,9 @@ one.
   an internal error. Where there is no call it runs on the default dispatcher
   instead; nothing is cancelling that work and no socket is waiting on it.
 - **`pelican-client-okhttp`, the fourth transport — and the one Android can
-  run.** There is no `java.net.http` on Android, so a generated client could
+  run.** Landed here, then moved to the `multi-backend` branch when 1.0
+  narrowed to one client transport; it returns with the branch, as described
+  below. There is no `java.net.http` on Android, so a generated client could
   only get there through `KtorHttpTransport(HttpClient(OkHttp))`, which drags
   the Ktor client machinery into an app that already ships an HTTP stack.
   `OkHttpTransport(okHttpClient)` takes the client the application already
