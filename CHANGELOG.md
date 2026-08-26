@@ -63,6 +63,14 @@ one.
 
 ### Changed — read this one
 
+- **The importer refuses to write handler stubs for a backend 1.0 does not
+  ship.** `handlers.set("ktor")` and `handlers.set("http4k")` used to emit a
+  file whose first import named `…pelican.ktor.*`, which nothing on the
+  classpath provides — generated source that cannot compile. Both now fail the
+  generation task by name, saying the interpreter is on the `multi-backend`
+  branch and to generate for `pekko` or restore the module. `Backend.HTTP4K`
+  and `Backend.KTOR` keep their places in the enum: those interpreters return
+  after 1.0, and deleting an enum value is the larger break.
 - **`FallibleOutput` is `DeclaredResponses`.** The type names what an endpoint
   declared, and `Fallible` named only the half of it that can go wrong. The
   file holding it is `Outcomes.kt`, so the top-level `ok`, `of`, `or` and

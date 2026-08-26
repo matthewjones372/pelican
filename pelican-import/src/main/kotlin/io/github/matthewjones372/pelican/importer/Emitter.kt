@@ -189,16 +189,36 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
     }
 
     /**
+     * The two backends this release does not ship keep their [Backend] entries,
+     * because their interpreters return from the multi-backend branch and
+     * deleting an enum value is the larger break. What they do not keep is the
+     * right to be generated for: the stub's first import would name a package
+     * nothing on the classpath provides, and refusing beats handing someone a
+     * file that cannot compile.
+     */
+    private fun shippedPackage(backend: Backend): String = when (backend) {
+        Backend.PEKKO -> backend.packageName
+
+        Backend.HTTP4K, Backend.KTOR -> throw ImportFailure(
+            "Handler stubs for $backend would import ${backend.packageName}.*, which this release " +
+                "does not ship: the $backend interpreter lives on the multi-backend branch. Generate " +
+                "for PEKKO, or restore the module and generate from that branch.",
+        )
+    }
+
+    /**
      * The handlers, once, as a starting point: every one a `TODO()`, so the
      * service compiles and routes and throws where nothing is written yet.
      * Written once and never overwritten — see [Import.write].
      */
     private fun handlersFile(backend: Backend): String = buildString {
+        val backendPackage = shippedPackage(backend)
+
         appendLine(stubBanner)
         appendLine("package ${options.packageName}")
         appendLine()
         appendLine("import io.github.matthewjones372.pelican.*")
-        appendLine("import ${backend.packageName}.*")
+        appendLine("import $backendPackage.*")
         appendLine()
         appendLine("val ${memberName(options.name)}Handlers: List<ServerEndpoint> = listOf(")
         api.endpoints.forEach { ep ->

@@ -1,9 +1,12 @@
 package io.github.matthewjones372.pelican.importer
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import java.io.File
 
 class ImportTest {
@@ -92,7 +95,7 @@ class ImportTest {
                         schema: { type: object, properties: { message: { type: string } } }
             """,
         )
-        val options = importOptions("app", "orders") { handlers = Backend.KTOR }
+        val options = importOptions("app", "orders") { handlers = Backend.PEKKO }
         val generated = Import.kotlin(documentOf("openapi.yaml" to yaml), options)
 
         val endpoints = generated.getValue("OrdersEndpoints.kt")
@@ -346,10 +349,25 @@ class ImportTest {
         val document = File("src/test/resources/bookmarks.yaml")
         Import.kotlin(document, importOptions("app", "bookmarks")).keys shouldContain "BookmarksEndpoints.kt"
 
-        val withStubs = Import.kotlin(document, importOptions("app", "bookmarks") { handlers = Backend.KTOR })
+        val withStubs = Import.kotlin(document, importOptions("app", "bookmarks") { handlers = Backend.PEKKO })
         withStubs.keys shouldContain "BookmarksHandlers.kt"
-        withStubs.getValue("BookmarksHandlers.kt") shouldContain "import io.github.matthewjones372.pelican.ktor.*"
+        withStubs.getValue("BookmarksHandlers.kt") shouldContain "import io.github.matthewjones372.pelican.pekko.*"
         withStubs.getValue("BookmarksHandlers.kt") shouldContain
             """getBookmark handledOrFail { bookmarkId -> TODO("getBookmark") }"""
+    }
+
+    @ParameterizedTest
+    @EnumSource(Backend::class, names = ["HTTP4K", "KTOR"])
+    fun `a backend this release does not ship is refused rather than generated for`(backend: Backend) {
+        val document = File("src/test/resources/bookmarks.yaml")
+
+        val refusal = shouldThrow<ImportFailure> {
+            Import.kotlin(document, importOptions("app", "bookmarks") { handlers = backend })
+        }.message.orEmpty()
+
+        refusal shouldContain "Handler stubs for $backend"
+        refusal shouldContain "which this release does not ship"
+        refusal shouldContain "lives on the multi-backend branch"
+        refusal shouldContain "Generate for PEKKO"
     }
 }

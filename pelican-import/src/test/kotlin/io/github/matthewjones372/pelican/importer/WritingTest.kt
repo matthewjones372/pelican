@@ -22,7 +22,7 @@ class WritingTest {
 
     @Test
     fun `the endpoints file is rewritten and the handlers are not`(@TempDir root: File) {
-        val options = importOptions("app", "bookmarks") { handlers = Backend.HTTP4K }
+        val options = importOptions("app", "bookmarks") { handlers = Backend.PEKKO }
         Import.write(document, options, root)
 
         val endpoints = File(root, "app/BookmarksEndpoints.kt")

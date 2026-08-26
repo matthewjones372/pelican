@@ -1049,7 +1049,7 @@ and Gradle's are not the same Jackson.
 | `packageName` | endpoints | — required |
 | `exclude` | endpoints | empty: `operationId`s to leave out. See below |
 | `discriminator` | endpoints | none: `discriminator("Payment", property = "kind")` states which property tells an undiscriminated `oneOf`'s branches apart. See below |
-| `handlers` | endpoints | unset: `pekko`, `http4k` or `ktor` writes stubs bound against that interpreter. Only `pekko` names a module 1.0 ships |
+| `handlers` | endpoints | unset: `pekko` writes stubs bound against that interpreter. `http4k` and `ktor` name modules 1.0 does not ship and are refused — see [Handler stubs](#handler-stubs) |
 | `codec` | endpoints | unset: `jackson`. The same setting a client entry takes. See below |
 | `outputDir` | endpoints | `build/generated/pelican/<name>` |
 
@@ -2361,11 +2361,13 @@ stream, `handledWith` where there is no body. It compiles immediately and
 throws the moment a request reaches something unwritten, which is the honest
 state of a service nobody has written yet.
 
-`http4k` and `ktor` are accepted too, and write the same stubs importing that
-interpreter's binders instead. The generated file is source a consumer's build
-compiles, so the setting is about what *they* have on their classpath — and the
-two interpreters it names are on the `multi-backend` branch, so a stub asking
-for one needs that branch published.
+`http4k` and `ktor` are still named by the setting and are **refused** rather
+than generated for: their interpreters are on the `multi-backend` branch, so the
+stub's first import would name a package this release does not ship, and a file
+that cannot compile is worse than a build that stops. The two values stay in the
+enum because those interpreters return after 1.0 and deleting them would be the
+larger break. Restore the module and generate from that branch, or generate for
+`pekko`.
 
 It is written once and never overwritten. After the first run it is not
 generated code any more. Inside `build/` the whole directory belongs to the
