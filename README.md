@@ -88,10 +88,14 @@ starting to 404. The client and the server agree by construction, though, which
 is why the wire contract your callers hold is pinned separately, in one line per
 endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
 
-**Swapping backends does not touch your descriptions.** Only the type a
-streaming handler returns changes — `Source` on Pekko. 1.0 ships one backend;
-the interpreters that prove the point sit on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch and
-return after it.
+**Your descriptions do not belong to the backend.** 1.0 starts deliberately
+small: Pekko HTTP and Jackson, one backend and one codec a first release can
+fully stand behind. The http4k and Ktor interpreters and the kotlinx and
+jsoniter codecs already exist, pass the same parity suites, and sit on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch — they come back as demand shows up, and your descriptions will not
+change when they do. Only the type a streaming handler returns is the
+backend's own — `Source`, on Pekko.
 
 **And it is not slow.** Interpreting a description is not free, but what it
 costs is measured rather than argued about — 131ns a request against a Pekko
@@ -661,9 +665,9 @@ ordersApi().start(port = 8080, host = "0.0.0.0")                // every interfa
 ordersApi().startWithDocs(port = 8080, docs = ordersDocs)       // plus /openapi.json and /docs
 ```
 
-The same call on all three backends, loopback by default on all three, and the
-handle it returns is `AutoCloseable` with `block()`, `stop()` and `stopAsync()`
-wherever you are.
+Loopback by default — listening on the network is a choice you write down. The
+handle it returns is `AutoCloseable` with `block()`, `stop()` and
+`stopAsync()`.
 
 Both create an `ActorSystem` and shut it down again on `stop()`. A service that
 already has one — for its cluster, its persistence, its streams — hands it over
@@ -813,8 +817,8 @@ api(routes, JacksonCodecs) {
 
 An unbounded request body is a way to run a service out of memory with one
 request, so the limit has a default. Oversized bodies are refused before any
-codec sees them, on all three backends; a `rawBody()` stream is exempt because
-nothing holds it whole.
+codec sees them; a `rawBody()` stream is exempt because nothing holds it
+whole.
 
 `covers` closes the gap a list leaves open. Hand it the same endpoint list the
 spec is built from and forgetting to bind one is a startup failure rather than a
