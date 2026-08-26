@@ -163,6 +163,26 @@ At scale, `example/OrdersApi.kt` and `example/http4k/Http4kOrders.kt` bind the
 same endpoint list on either backend, and `ClientContractTest` — written entirely
 against descriptions — runs against both, so any divergence is a failing test.
 
+### Starting one
+
+`start` reads the same way on all three:
+
+```kotlin
+val server = ordersApi().start(port = 8080)                    // binds 127.0.0.1
+val server = ordersApi().start(port = 8080, host = "0.0.0.0")  // every interface, said out loud
+```
+
+**Loopback is the default everywhere.** Reaching the network is a deployment
+decision, and a `start()` that took it silently is one an engine chose rather
+than a service. `host` is the second parameter, after `port`, on `start` and on
+`startWithDocs`, and everything after it is the backend's own: `systemName` and
+`route` on Pekko, `config` on http4k, `factory` and `module` on Ktor.
+
+`PelicanServer.host` reports what was bound. On http4k it reports what was
+*asked for*: the socket belongs to the `ServerConfig`, and a `config` of your
+own binds where it says. `StartParityTest` pins both the parameter order and
+the default.
+
 ### What the request line says
 
 All three hand the path, as it arrived, to the same router. `RouteIndex` splits

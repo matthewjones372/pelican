@@ -15,6 +15,8 @@ class PelicanServer internal constructor(
     val api: Api,
     val system: ActorSystem<Void>,
     val binding: ServerBinding,
+    /** The interface this server was bound to, which defaults to loopback. */
+    val host: String,
     /**
      * Whether [system] was created by [start] rather than handed to it. Only
      * a system this server created is a system this server may terminate.
@@ -48,8 +50,8 @@ class PelicanServer internal constructor(
  * service with routes of its own — adds to it.
  */
 fun Api.start(
-    host: String = "127.0.0.1",
     port: Int = 8080,
+    host: String = "127.0.0.1",
     systemName: String = "pelican",
     route: Api.(ActorSystem<Void>) -> Route = { toRoute(it) },
 ): PelicanServer {
@@ -68,8 +70,8 @@ fun Api.start(
  */
 fun Api.start(
     system: ActorSystem<Void>,
-    host: String = "127.0.0.1",
     port: Int = 8080,
+    host: String = "127.0.0.1",
     route: Api.(ActorSystem<Void>) -> Route = { toRoute(it) },
 ): PelicanServer = bind(system, host, port, ownsSystem = false, route = route)
 
@@ -85,5 +87,5 @@ private fun Api.bind(
         .bind(route(system))
         .toCompletableFuture()
         .join()
-    return PelicanServer(this, system, binding, ownsSystem)
+    return PelicanServer(this, system, binding, host, ownsSystem)
 }

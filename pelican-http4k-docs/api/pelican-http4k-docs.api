@@ -3,7 +3,7 @@ public final class io/github/matthewjones372/pelican/http4k/docs/DocsKt {
 	public static synthetic fun docsRoutes$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Ljava/util/List;
 	public static final fun handlerWithDocs (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;)Lorg/http4k/routing/RoutingHttpHandler;
 	public static synthetic fun handlerWithDocs$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lorg/http4k/routing/RoutingHttpHandler;
-	public static final fun startWithDocs (Lio/github/matthewjones372/pelican/Api;ILorg/http4k/server/ServerConfig;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/http4k/PelicanServer;
-	public static synthetic fun startWithDocs$default (Lio/github/matthewjones372/pelican/Api;ILorg/http4k/server/ServerConfig;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/http4k/PelicanServer;
+	public static final fun startWithDocs (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lorg/http4k/server/ServerConfig;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/http4k/PelicanServer;
+	public static synthetic fun startWithDocs$default (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lorg/http4k/server/ServerConfig;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/http4k/PelicanServer;
 }
 

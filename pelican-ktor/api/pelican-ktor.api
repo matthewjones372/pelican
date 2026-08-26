@@ -21,6 +21,7 @@ public final class io/github/matthewjones372/pelican/ktor/PelicanServer : java/l
 	public fun close ()V
 	public final fun getApi ()Lio/github/matthewjones372/pelican/Api;
 	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getHost ()Ljava/lang/String;
 	public final fun getPort ()I
 	public final fun getServer ()Lio/ktor/server/engine/EmbeddedServer;
 	public final fun stop ()V

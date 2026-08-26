@@ -15,6 +15,8 @@ class PelicanServer internal constructor(
     /** The API this server is serving. A test client needs its codecs. */
     val api: Api,
     val server: EmbeddedServer<*, *>,
+    /** The interface this server was bound to, which defaults to loopback. */
+    val host: String,
 ) : AutoCloseable {
     /**
      * The port actually bound, for when port 0 was asked for. Ktor reports its
@@ -38,20 +40,20 @@ class PelicanServer internal constructor(
 }
 
 /**
- * Binds this API on [port]; port 0 lets the OS choose. [factory] defaults to
- * `CIO`, which ships with this module, so a Pelican service on Ktor needs no
- * further dependency.
+ * Binds this API on [host]:[port]; port 0 lets the OS choose. [factory]
+ * defaults to `CIO`, which ships with this module, so a Pelican service on Ktor
+ * needs no further dependency.
  *
  * [module] is how a module knowing more than this one — one serving an OpenAPI
  * document, or a service with routes of its own — configures the application.
  */
 fun Api.start(
     port: Int = 8080,
-    host: String = "0.0.0.0",
+    host: String = "127.0.0.1",
     factory: ApplicationEngineFactory<out ApplicationEngine, *> = CIO,
     module: Application.(Api) -> Unit = { pelican(it) },
 ): PelicanServer {
     val api = this
     val server = embeddedServer(factory, port = port, host = host) { module(api) }
-    return PelicanServer(api, server.start(wait = false))
+    return PelicanServer(api, server.start(wait = false), host)
 }

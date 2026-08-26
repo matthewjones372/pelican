@@ -11,6 +11,13 @@ class PelicanServer internal constructor(
     /** The API this server is serving. A test client needs its codecs. */
     val api: Api,
     val server: Http4kServer,
+    /**
+     * The interface [start] was asked for, which defaults to loopback. A
+     * `ServerConfig` of your own owns its socket and may bind elsewhere;
+     * http4k's `Http4kServer` reports only a port, so this is what was asked
+     * rather than what the engine did with it.
+     */
+    val host: String,
 ) : AutoCloseable {
     /** The port actually bound, which is the one to use after asking for port 0. */
     val port: Int get() = server.port()
@@ -28,8 +35,8 @@ class PelicanServer internal constructor(
 }
 
 /**
- * Binds this API on [port]; port 0 lets the OS choose. [config] defaults to
- * [StreamingSunHttp], the JDK's own server, which needs no dependency beyond
+ * Binds this API on [host]:[port]; port 0 lets the OS choose. [config] defaults
+ * to [StreamingSunHttp], the JDK's own server, which needs no dependency beyond
  * this module and flushes each frame where http4k's stock `SunHttp` holds it
  * in a 4KB buffer.
  *
@@ -38,6 +45,7 @@ class PelicanServer internal constructor(
  */
 fun Api.start(
     port: Int = 8080,
-    config: ServerConfig = StreamingSunHttp(port),
+    host: String = "127.0.0.1",
+    config: ServerConfig = StreamingSunHttp(port, host),
     handler: Api.() -> HttpHandler = { toHttpHandler() },
-): PelicanServer = PelicanServer(this, handler().asServer(config).start())
+): PelicanServer = PelicanServer(this, handler().asServer(config).start(), host)

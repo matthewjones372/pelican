@@ -3,9 +3,9 @@ public final class io/github/matthewjones372/pelican/pekko/docs/DocsKt {
 	public static synthetic fun docsRoutes$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Ljava/util/List;
 	public static final fun routeWithDocs (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/ClassicActorSystemProvider;Lio/github/matthewjones372/pelican/openapi/Docs;)Lorg/apache/pekko/http/javadsl/server/Route;
 	public static synthetic fun routeWithDocs$default (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/ClassicActorSystemProvider;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lorg/apache/pekko/http/javadsl/server/Route;
-	public static final fun startWithDocs (Lio/github/matthewjones372/pelican/Api;Ljava/lang/String;ILjava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
-	public static final fun startWithDocs (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;Ljava/lang/String;ILio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
-	public static synthetic fun startWithDocs$default (Lio/github/matthewjones372/pelican/Api;Ljava/lang/String;ILjava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
-	public static synthetic fun startWithDocs$default (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;Ljava/lang/String;ILio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static final fun startWithDocs (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static final fun startWithDocs (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;ILjava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static synthetic fun startWithDocs$default (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static synthetic fun startWithDocs$default (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;ILjava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
 }
 

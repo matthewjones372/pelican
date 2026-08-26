@@ -78,11 +78,11 @@ fun Api.routeWithDocs(system: ClassicActorSystemProvider, docs: Docs = docs()): 
 
 /** [start], with the document and the Swagger UI page served alongside. */
 fun Api.startWithDocs(
-    host: String = "127.0.0.1",
     port: Int = 8080,
+    host: String = "127.0.0.1",
     systemName: String = "pelican",
     docs: Docs = docs(),
-): PelicanServer = start(host, port, systemName) { system: ActorSystem<Void> ->
+): PelicanServer = start(port, host, systemName) { system: ActorSystem<Void> ->
     routeWithDocs(system, docs)
 }
 
@@ -93,10 +93,10 @@ fun Api.startWithDocs(
  */
 fun Api.startWithDocs(
     system: ActorSystem<Void>,
-    host: String = "127.0.0.1",
     port: Int = 8080,
+    host: String = "127.0.0.1",
     docs: Docs = docs(),
-): PelicanServer = start(system, host, port) { on: ActorSystem<Void> ->
+): PelicanServer = start(system, port, host) { on: ActorSystem<Void> ->
     routeWithDocs(on, docs)
 }
 

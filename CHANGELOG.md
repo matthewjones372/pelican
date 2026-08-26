@@ -30,6 +30,22 @@ one.
   `ClientRequest` keeps a constructor — a client builds one per call — and
   gains `withTimeout(...)` and `withHeader(...)` for what is no longer a
   parameter.
+- **`start` is `start(port, host = "127.0.0.1", ...)` on all three backends.**
+  Pekko read `start(host, port)` and Ktor read `start(port, host)`, so the same
+  two positional arguments meant opposite things; http4k had no host at all.
+  Port is first everywhere now, `host` is second on `start` and
+  `startWithDocs`, and http4k's `config` moves one place right —
+  `StreamingSunHttp(port, host, ...)` likewise. A call using named arguments is
+  unaffected; a positional `start("0.0.0.0", 8080)` on Pekko no longer
+  compiles.
+- **Ktor binds loopback by default, where it bound every interface.** A bare
+  `start()` was `0.0.0.0` on Ktor and `127.0.0.1` on Pekko, which is a
+  deployment decision inherited from an engine rather than made by a service.
+  This one is silent — nothing fails to compile — so a Ktor service that
+  *meant* to be reachable off the machine now says `start(port, "0.0.0.0")`.
+  http4k, which had no host parameter and bound every interface through the
+  JDK's server, changes the same way. `PelicanServer.host` reports what was
+  bound.
 - **`Ansi` is internal**, and the `DefaultImpls` classes are gone from the
   published surface: the modules compile with `-jvm-default=no-compatibility`,
   and the interfaces that had them already emitted real JVM default methods.

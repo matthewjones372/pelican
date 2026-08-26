@@ -33,12 +33,13 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
  */
 class StreamingSunHttp(
     private val port: Int = 8000,
+    private val host: String = "127.0.0.1",
     override val stopMode: StopMode = StopMode.Immediate,
     private val executor: ExecutorService = Executors.newCachedThreadPool(),
 ) : ServerConfig {
 
     override fun toServer(http: HttpHandler): Http4kServer = object : Http4kServer {
-        private val server: HttpServer = HttpServer.create(InetSocketAddress(port), 1000)
+        private val server: HttpServer = HttpServer.create(InetSocketAddress(host, port), 1000)
 
         override fun port(): Int = if (port > 0) port else server.address.port
 

@@ -82,9 +82,10 @@ fun Api.handlerWithDocs(docs: Docs = docs()): RoutingHttpHandler =
 /** [start], with the document and the Swagger UI page served alongside. */
 fun Api.startWithDocs(
     port: Int = 8080,
-    config: ServerConfig = StreamingSunHttp(port),
+    host: String = "127.0.0.1",
+    config: ServerConfig = StreamingSunHttp(port, host),
     docs: Docs = docs(),
-): PelicanServer = start(port, config) { handlerWithDocs(docs) }
+): PelicanServer = start(port, host, config) { handlerWithDocs(docs) }
 
 /**
  * Bound as a template with no captures, so the path is matched exactly — these

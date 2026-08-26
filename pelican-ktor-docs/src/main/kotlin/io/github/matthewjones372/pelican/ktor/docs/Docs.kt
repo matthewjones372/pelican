@@ -84,7 +84,7 @@ fun Application.pelicanWithDocs(api: Api, docs: Docs = docs()) {
 /** [start], with the document and the Swagger UI page served alongside. */
 fun Api.startWithDocs(
     port: Int = 8080,
-    host: String = "0.0.0.0",
+    host: String = "127.0.0.1",
     factory: ApplicationEngineFactory<out ApplicationEngine, *> = CIO,
     docs: Docs = docs(),
 ): PelicanServer = start(port, host, factory) { pelicanWithDocs(it, docs) }
