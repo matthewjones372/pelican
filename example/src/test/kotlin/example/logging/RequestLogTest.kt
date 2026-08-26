@@ -133,18 +133,17 @@ class RequestLogTest {
      * access log above structurally cannot have seen it. `onRefusal` is the
      * only thing that does.
      *
-     * The template reads `_unmatched` here, and that is a limitation rather
-     * than the intent: a *path* parameter is decoded inside `RouteIndex.match`,
-     * which knows the endpoint it matched but throws to a call site that does
-     * not, so the route is lost on the way out. A query, header or cookie that
-     * will not decode is refused after the route is in hand and does carry the
-     * template. Pinned as it behaves, so that fixing it fails this line.
+     * The template is the route's, not `_unmatched`: a path parameter is
+     * decoded inside `RouteIndex.match`, which throws to a caller that has no
+     * endpoint in hand, so the route is looked up again to name the refusal.
+     * A query, header or cookie is decoded after the route is in hand and
+     * never had the problem.
      */
     @Test
     fun `a parameter that will not decode reaches the refusal observer alone`() {
         get("/widgets/not-a-number", "Authorization" to "Bearer let-me-in").statusCode() shouldBe 400
 
-        lines() shouldContain "INFO refused DECODE on _unmatched -> 400"
+        lines() shouldContain "INFO refused DECODE on /widgets/{widgetId} -> 400"
         withClue("nothing reached the filter chain, so the access log has nothing to say") {
             lines().none { it.contains("getWidget -> 400") } shouldBe true
         }

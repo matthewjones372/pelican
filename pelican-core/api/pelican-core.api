@@ -1041,8 +1041,10 @@ public final class io/github/matthewjones372/pelican/Outcome$Ok : io/github/matt
 }
 
 public final class io/github/matthewjones372/pelican/OutcomesKt {
+	public static final fun err (Lio/github/matthewjones372/pelican/ErrorOutput;)Ljava/lang/Void;
 	public static final fun err (Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
 	public static final fun of (Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/HeaderValue;
+	public static final fun ok (Lio/github/matthewjones372/pelican/Output;)Ljava/lang/Void;
 	public static final fun ok (Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
 	public static final fun or (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/DeclaredResponses;
 	public static final fun or (Lio/github/matthewjones372/pelican/Output;Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/DeclaredResponses;
@@ -1605,6 +1607,7 @@ public final class io/github/matthewjones372/pelican/spi/RequestsKt {
 public final class io/github/matthewjones372/pelican/spi/RouteIndex {
 	public final fun describesPath (Ljava/lang/String;)Z
 	public final fun match (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;Ljava/util/Map;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public final fun routeFor (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 }
 
 public final class io/github/matthewjones372/pelican/spi/RouteIndexKt {

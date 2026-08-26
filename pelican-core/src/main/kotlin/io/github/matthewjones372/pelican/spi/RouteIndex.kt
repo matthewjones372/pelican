@@ -58,6 +58,34 @@ class RouteIndex internal constructor(private val root: Node) {
     }
 
     /**
+     * The endpoint this method and path reach, decoding nothing.
+     *
+     * For the refusal path alone. A *capture* is decoded inside [match], which
+     * knows the endpoint it matched and throws to a caller that does not — so
+     * a path parameter that will not decode would be reported as a request
+     * nobody described, and counted under `_unmatched` rather than against the
+     * route it was aimed at. A query, header or cookie is decoded after the
+     * route is already in hand and never had the problem.
+     *
+     * Walked a second time rather than threaded out of [match], because this
+     * runs only for a request that is being refused anyway, and the alternative
+     * is a return type every interpreter pays for on the path that matters.
+     *
+     * Total by construction: this is called from a `catch`, and a path that is
+     * malformed rather than merely undecodable — `/things/%zz` — throws out of
+     * the walk itself. A second throw there would replace the refusal being
+     * rendered with one nobody is catching, so the answer is "no route to
+     * name" and the original refusal goes out as it would have.
+     */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    fun routeFor(method: Method, path: String): ServerEndpoint? =
+        try {
+            walk(root, method, path, at = 0, captured = ArrayList(INITIAL_CAPTURES))
+        } catch (_: Throwable) {
+            null
+        }
+
+    /**
      * Whether any method describes this path.
      *
      * For the backend that separates "no such path" from "not that method" and

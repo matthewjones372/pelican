@@ -78,6 +78,36 @@ fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)
 fun <E> err(value: E): Outcome<E, Nothing> = Outcome.Err(null, value)
 
 /**
+ * Refuses `err(theDeclaration)`, which is what a caller reaches for first: a
+ * declaration is a value, so passing one type-checks as a payload of its own
+ * and fails several lines later as `Outcome<ErrorOutput<E>, T>` — a mismatch
+ * naming a type nobody wrote. Calling the declaration is what names it.
+ */
+@Deprecated(
+    "A declared failure is not a payload. Call it — notFound(ApiError(404, \"...\")) — or pass err(...) " +
+        "the payload the failure carries.",
+    ReplaceWith("failure(payload)"),
+    DeprecationLevel.ERROR,
+)
+@Suppress("UnusedParameter", "UnusedPrivateMember")
+fun err(failure: ErrorOutput<*>): Nothing =
+    error("A declared failure is not a payload. Call $failure with what it carries.")
+
+/**
+ * The same refusal for [ok]. `ok(json<Order>())` hands the declaration over as
+ * the payload, and what fails is the codec, at the response, on a type the
+ * handler never mentions.
+ */
+@Deprecated(
+    "A declared response is not a value. Name it — orderPlaced(order) — or pass ok(...) the payload.",
+    ReplaceWith("declared(payload)"),
+    DeprecationLevel.ERROR,
+)
+@Suppress("UnusedParameter", "UnusedPrivateMember")
+fun ok(declared: Output<*>): Nothing =
+    error("A declared response is not a value. Call $declared with the payload it carries.")
+
+/**
  * Which declared success an [Outcome.Ok] names, and nothing else: a bare
  * `ok(value)` names none, and the first declared success is what that means.
  *

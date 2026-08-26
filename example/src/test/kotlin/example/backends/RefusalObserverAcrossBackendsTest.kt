@@ -80,8 +80,9 @@ class RefusalObserverAcrossBackendsTest {
         client: ApiClient,
     ) {
         val answered = listOf(
-            // A path capture that will not decode, refused while the route is
-            // still being chosen: there is no endpoint yet, so no template.
+            // A path capture that will not decode. The route is still being
+            // chosen when it fails, but the index knows which one it had
+            // matched, so the refusal is reported under that template.
             client.transport.send(client.request(countdown, 3).withPath("/countdown/not-a-number")).status,
             // A body no codec can read, on a route that did match.
             client.transport.send(client.request(echo, In2(null, Note("x"))).withBody("{ nope")).status,
@@ -105,7 +106,7 @@ class RefusalObserverAcrossBackendsTest {
 
         withClue("what $name observed") {
             seen(name) shouldBe listOf(
-                "decode 400 -",
+                "decode 400 /countdown/{from}",
                 "decode 400 /echo",
                 "accept 406 /strict",
                 "content_type 415 /sign-in",

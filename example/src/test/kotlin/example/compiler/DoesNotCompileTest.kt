@@ -133,6 +133,20 @@ class DoesNotCompileTest {
     }
 
     /**
+     * The mistake a caller makes on first contact: a declaration is a value, so
+     * `err(theDeclaration)` type-checks as a payload of its own and fails as a
+     * type nobody wrote. The guard turns it into a sentence naming the fix.
+     */
+    @Test
+    fun `passing a declaration to err is refused where it is written`() {
+        val errors = compile("$preamble\nval bound = fallible handledOrFail { err(gone) }")
+
+        withClue(errors.joinToString("\n")) {
+            errors.joinToString("\n") shouldContain "A declared failure is not a payload"
+        }
+    }
+
+    /**
      * The hole, written down as a passing test rather than a paragraph.
      *
      * `E` is pinned to the failure's *payload type*, not to the `ErrorOutput`

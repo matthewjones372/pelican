@@ -134,7 +134,11 @@ private fun methodRoute(
         val matched = try {
             index.match(method, req.uri.getPathString(), values)
         } catch (t: Throwable) {
-            return@extractRequest Directives.complete(errorResponse(t, api))
+            // A capture that would not decode is that route's 400, so the route
+            // is looked up again to name it: `renderError` reports the refusal
+            // under the template, and a metric tags it with the same.
+            val refused = index.routeFor(method, req.uri.getPathString())?.endpoint
+            return@extractRequest Directives.complete(errorResponse(t, api, refused))
         }
 
         if (matched == null) {

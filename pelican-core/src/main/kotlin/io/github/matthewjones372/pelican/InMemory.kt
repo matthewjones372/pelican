@@ -62,8 +62,9 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
         } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
             // A capture the trie will not decode is that endpoint's 400 rather
             // than a path nobody described, which is the distinction the
-            // backends draw at the same point.
-            return completed(errorResponse(t, null))
+            // backends draw at the same point — and the route is looked up
+            // again so the refusal is reported under its template.
+            return completed(errorResponse(t, index.routeFor(request.method, path)?.endpoint))
         } ?: return completed(errorResponse(unrouted(request.method, path, index.describesPath(path)), null))
 
         val endpoint = matched.endpoint

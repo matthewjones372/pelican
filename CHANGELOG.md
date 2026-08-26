@@ -193,6 +193,14 @@ one.
   above it keeps the Pekko it has and Gradle resolves upwards where it wants
   newer. The reference manual's Versions section carries the mixed-version
   error and its fix.
+- **A path parameter that will not decode is refused under its own route.**
+  `onRefusal` was told `_unmatched` for one, so `http.server.refusals` counted
+  it against nothing: a capture is decoded inside `RouteIndex.match`, which
+  knows the endpoint it matched and throws to a caller that does not. The new
+  `spi.routeFor(method, path)` looks the route up again on that path alone —
+  a request being refused anyway — and both the interpreter and the in-memory
+  transport now name it. A query, header or cookie is decoded after the route
+  is in hand and always carried the template.
 - **A dead node is retried on the shipped transport.** Pekko raises a
   connection refused or reset as `StreamTcpException`, a `RuntimeException`,
   so `RetryPolicy`'s default — retry an `IOException` — never fired for a
@@ -251,6 +259,12 @@ one.
 
 ### Added
 
+- **Passing a declaration where a payload belongs is refused where it is
+  written.** `err(notFound)` and `ok(json<Order>())` both type-check — a
+  declaration is a value — and then fail several lines later as
+  `Outcome<ErrorOutput<E>, T>`, a type the author never wrote. Both are now a
+  compile error naming the fix: call the declaration, or pass the payload.
+  `DoesNotCompileTest` pins the message.
 - **`err(value)`, the failure-side `ok`.** The single declared failure,
   carrying `value`, for the endpoint that declares one failure and would
   rather not name it on every return. With several declared failures a bare
