@@ -49,13 +49,13 @@ docs-pattern cannot mount (open question 1).
 
 ## Stack
 
-- [ ] **`spec-0031-protocol-stdio`** — `pelican-mcp-server`: initialize,
+- [x] **`spec-0031-protocol-stdio`** — `pelican-mcp-server`: initialize,
       tools/list, tools/call over stdio against `McpDispatch`.
       Done when: an MCP inspector session lists and calls a tool end-to-end.
-- [ ] **`spec-0031-streamable-http`** — `mcpRoutes(api)` per backend, the
+- [x] **`spec-0031-streamable-http`** — `mcpRoutes(api)` per backend, the
       docs-module pattern.
       Done when: the example service serves `/mcp` on all three backends with one suite green.
-- [ ] **`spec-0031-docs`** — reference section, README label flipped from
+- [x] **`spec-0031-docs`** — reference section, README label flipped from
       "descriptions half" to served, CHANGELOG.
       Done when: the 0025 label is updated rather than contradicted.
 
