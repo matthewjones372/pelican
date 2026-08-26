@@ -8,15 +8,11 @@ import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsoniter.JsoniterCodecs
-import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import org.junit.jupiter.api.Test
 import kotlin.reflect.typeOf
 
@@ -24,15 +20,12 @@ import kotlin.reflect.typeOf
  * A derived schema has to resolve where it is handed over, and for a consumer
  * with no OpenAPI document the only place left is the object it came back in.
  *
- * The hierarchy is annotated three times over because the three sources find a
- * union three different ways, and where each addresses its pointers is the
- * thing under test: kotlinx.serialization's and jsoniter's come from the
- * `SchemaComponents` they were handed, swagger-core's from `pelican-jackson`'s
+ * A source finds a union its own way, and where it addresses the pointers it
+ * writes is the thing under test: swagger-core's come from `pelican-jackson`'s
  * own rewrite, which until now asked nobody.
  */
 class StandaloneSchemasTest {
 
-    @Serializable
     data class Issuer(val name: String, val country: String)
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "method")
@@ -40,21 +33,14 @@ class StandaloneSchemasTest {
         JsonSubTypes.Type(value = Card::class, name = "card"),
         JsonSubTypes.Type(value = Transfer::class, name = "transfer"),
     )
-    @Serializable
     sealed interface PaymentMethod
 
-    @Serializable
-    @SerialName("card")
     data class Card(val number: String, val issuer: Issuer) : PaymentMethod
 
-    @Serializable
-    @SerialName("transfer")
     data class Transfer(val iban: String) : PaymentMethod
 
     private val sources = listOf(
         "JacksonCodecs" to JacksonCodecs,
-        "KotlinxCodecs" to KotlinxCodecs,
-        "JsoniterCodecs" to JsoniterCodecs,
     )
 
     private fun documentFrom(codecs: Codecs): JsonObj =
@@ -85,9 +71,9 @@ class StandaloneSchemasTest {
 
             withClue("$name registered no definitions") { defs.shouldNotBeNull() }
             // The hierarchy, its two branches and the type one branch holds.
-            // What a branch is *called* is not pinned: kotlinx.serialization
-            // uses its `@SerialName` where the other two use the class's, and
-            // reconciling that is not this pass's business.
+            // What a branch is *called* is not pinned: a source is free to use
+            // its own name for one, and reconciling that is not this pass's
+            // business.
             withClue("$name did not describe the whole hierarchy") { defs!!.fields.size shouldBe 4 }
             withClue("$name did not name the hierarchy, or the type a branch holds") {
                 defs!!.fields.keys shouldContainAll setOf("PaymentMethod", "Issuer")

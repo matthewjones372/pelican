@@ -1,9 +1,0 @@
-public final class io/github/matthewjones372/pelican/test/http4k/InMemoryKt {
-	public static final fun inMemoryHttp4k (Lio/github/matthewjones372/pelican/Api;)Lio/github/matthewjones372/pelican/test/ApiClient;
-}
-
-public final class io/github/matthewjones372/pelican/test/http4k/InMemoryTransport : io/github/matthewjones372/pelican/test/Transport {
-	public fun <init> (Lio/github/matthewjones372/pelican/Api;)V
-	public fun send (Lio/github/matthewjones372/pelican/test/RequestSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
-}
-

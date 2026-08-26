@@ -129,7 +129,7 @@ val readSpans = endpoint {
  * it is `Params.underlying`, which is the backend's own request object, and
  * naming that type is the one thing `pelican-metrics-otel` cannot do without
  * knowing which server is underneath. It is six lines here, and it would be six
- * different lines on http4k or Ktor.
+ * different lines on another backend.
  */
 val pekkoHeaders: TextMapGetter<Params> = object : TextMapGetter<Params> {
 

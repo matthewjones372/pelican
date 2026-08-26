@@ -12,8 +12,8 @@ import java.io.File
  *
  * Core and nothing else, which is the whole reason it is not a file inside
  * `pelican-openapi`: wanting one type described should not mean acquiring a
- * document generator. The three codecs are test-scoped, so the assertion is
- * about what ships rather than about what this JVM can load.
+ * document generator. The codecs are test-scoped, so the assertion is about
+ * what ships rather than about what this JVM can load.
  */
 class NoOtherDependenciesTest {
 

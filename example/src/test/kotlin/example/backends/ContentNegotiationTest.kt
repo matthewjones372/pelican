@@ -18,10 +18,6 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlin.reflect.KType
-import io.github.matthewjones372.pelican.http4k.handledNow as handledNowOnHttp4k
-import io.github.matthewjones372.pelican.http4k.start as startOnHttp4k
-import io.github.matthewjones372.pelican.ktor.handledNow as handledNowOnKtor
-import io.github.matthewjones372.pelican.ktor.start as startOnKtor
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
@@ -165,42 +161,6 @@ class ContentNegotiationTest {
                 export handledNowOnPekko { Widget(7) },
             ),
         ).startOnPekko(port = 0, systemName = "negotiation")
-
-        try {
-            probe(server.baseUrl)
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `http4k does the same`() {
-        val server = api(
-            listOf(
-                widget handledNowOnHttp4k { Widget(1) },
-                odd handledNowOnHttp4k { Widget(2) },
-                nothing handledNowOnHttp4k { },
-                export handledNowOnHttp4k { Widget(7) },
-            ),
-        ).startOnHttp4k(port = 0)
-
-        try {
-            probe(server.baseUrl)
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `and so does ktor`() {
-        val server = api(
-            listOf(
-                widget handledNowOnKtor { Widget(1) },
-                odd handledNowOnKtor { Widget(2) },
-                nothing handledNowOnKtor { },
-                export handledNowOnKtor { Widget(7) },
-            ),
-        ).startOnKtor(port = 0)
 
         try {
             probe(server.baseUrl)

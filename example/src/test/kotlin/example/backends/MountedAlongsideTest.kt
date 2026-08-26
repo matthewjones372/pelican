@@ -7,26 +7,12 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
 import org.apache.pekko.http.javadsl.server.Directives
-import org.http4k.core.Method
-import org.http4k.core.Response
-import org.http4k.core.Status
-import org.http4k.routing.bind
-import org.http4k.routing.routes
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import io.github.matthewjones372.pelican.http4k.handledNow as handledNowOnHttp4k
-import io.github.matthewjones372.pelican.http4k.start as startOnHttp4k
-import io.github.matthewjones372.pelican.http4k.toHttpHandler as toHttp4kHandler
-import io.github.matthewjones372.pelican.ktor.handledNow as handledNowOnKtor
-import io.github.matthewjones372.pelican.ktor.pelican as ktorPelican
-import io.github.matthewjones372.pelican.ktor.start as startOnKtor
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.toRoute as toPekkoRoute
@@ -63,37 +49,6 @@ class MountedAlongsideTest {
         val server = api(widget handledNowOnPekko { Widget(1) })
             .startOnPekko(port = 0, systemName = "mounted-alongside") { system ->
                 Directives.concat(handWritten, toPekkoRoute(system))
-            }
-
-        try {
-            bothAnswer(server.baseUrl)
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `http4k combines the handler with routes of its own`() {
-        val handWritten = "/health" bind Method.GET to { Response(Status.OK).body("ok") }
-
-        val server = api(widget handledNowOnHttp4k { Widget(1) })
-            .startOnHttp4k(port = 0) { routes(handWritten, toHttp4kHandler()) }
-
-        try {
-            bothAnswer(server.baseUrl)
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `ktor installs them in an existing routing block`() {
-        val server = api(widget handledNowOnKtor { Widget(1) })
-            .startOnKtor(port = 0) { bound ->
-                routing {
-                    get("/health") { call.respondText("ok") }
-                    ktorPelican(bound)
-                }
             }
 
         try {

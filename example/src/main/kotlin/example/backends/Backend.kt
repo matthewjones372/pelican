@@ -11,13 +11,13 @@ import io.github.matthewjones372.pelican.RefusalRenderer
  * descriptions with handlers of the right shape, start a server, say where to
  * reach it, stop.
  *
- * This is the seam that makes one test suite run against three interpreters.
- * The descriptions in `Greetings.kt` are already backend-agnostic; what is not
- * agnostic is the *binding* — `Source` on Pekko, `Sequence` on http4k, `Flow`
- * on Ktor — and that difference lives behind this interface and nowhere else in
- * the example. The server handle is no longer one of them: all three are
- * `AutoCloseable` with the same `block`, `stop` and `stopAsync`, which
- * `ServerShapeParityTest` holds.
+ * This is the seam that makes one test suite run against an interpreter without
+ * naming it. The descriptions in `Greetings.kt` are already backend-agnostic;
+ * what is not agnostic is the *binding* — the stream type a handler returns is
+ * `Source` on Pekko — and that difference lives behind this interface and
+ * nowhere else in the example. The server handle is not one of them: a started
+ * server is `AutoCloseable` with the same `block`, `stop` and `stopAsync`
+ * whoever bound it, which `ServerShapeParityTest` holds.
  */
 interface Backend {
     /** What the parameterised tests print, and what `Main` labels a server with. */
@@ -29,7 +29,7 @@ interface Backend {
      * [outerFilters] run outside the service's own; see `greetingsApi`. It is
      * here rather than in each suite's own wiring so that a test which needs to
      * watch every request — `MetricsAcrossBackendsTest` does — can still ask
-     * all three backends the same question through this one seam.
+     * every backend the same question through this one seam.
      *
      * [refusals] is the second thing a suite varies rather than a second
      * wiring: `RefusalsAcrossBackendsTest` runs the whole suite once per shipped
@@ -64,5 +64,9 @@ interface Running : AutoCloseable {
 
 /**
  * Every backend the example can run, in one list.
+ *
+ * 1.0 ships one, so the list holds one. It stays a list, and every suite below
+ * stays parameterised over it, because that is the socket a returning
+ * interpreter plugs into — see the `multi-backend` branch, where it holds three.
  */
-val allBackends: List<Backend> = listOf(OnPekko, OnHttp4k, OnKtor)
+val allBackends: List<Backend> = listOf(OnPekko)

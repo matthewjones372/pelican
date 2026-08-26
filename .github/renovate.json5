@@ -49,8 +49,6 @@
       ],
     },
     { groupName: "pekko", matchPackageNames: ["org.apache.pekko{/,}**"] },
-    { groupName: "ktor", matchPackageNames: ["io.ktor{/,}**"] },
-    { groupName: "http4k", matchPackageNames: ["org.http4k{/,}**"] },
     { groupName: "jackson", matchPackageNames: ["com.fasterxml.jackson{/,}**"] },
     {
       // swagger-core writes the schemas, swagger-parser reads the documents.

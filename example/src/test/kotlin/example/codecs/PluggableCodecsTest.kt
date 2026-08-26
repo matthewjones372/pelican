@@ -2,14 +2,11 @@ package example.codecs
 
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsoniter.JsoniterCodecs
-import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -17,13 +14,19 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import kotlin.reflect.typeOf
 
+/**
+ * The agreement matrix for the codec modules, run over the ones main ships.
+ *
+ * 1.0 ships one, so [libraries] holds one and every claim below is a claim
+ * about a singleton — true, and asserting less than it used to. The shape is
+ * kept because a returning codec module is a row added here and nothing else;
+ * the `multi-backend` branch is where the same file runs three.
+ */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class ThreeCodecsTest {
+class PluggableCodecsTest {
 
     private val libraries: List<Pair<String, Codecs>> = listOf(
         "jackson" to JacksonCodecs,
-        "kotlinx" to KotlinxCodecs,
-        "jsoniter" to JsoniterCodecs,
     )
 
     private lateinit var apps: Map<String, ApiClient>
@@ -49,17 +52,17 @@ class ThreeCodecsTest {
     }
 
     @Test
-    fun `the three write the same bytes`() {
+    fun `every library writes the same bytes`() {
         val bodies = apps.mapValues { (_, app) -> app.response(getNote, 2L).body }
 
         // No `"author":null`: the schema marks a nullable property optional, so
-        // all three leave one out rather than each choosing a spelling.
+        // a library leaves one out rather than choosing a spelling for it.
         bodies.values.distinct() shouldBe listOf("""{"id":2,"text":"Note 2","level":"WARN"}""")
     }
 
     @Test
     fun `a union travels the same way whichever library wrote it`() {
-        // The one shape each library had to be told about, and the reason the
+        // The one shape a library has to be told about, and the reason the
         // annotations in the example are lined up the way they are.
         val sent = Delivery(Note(7, "Ship it"), Sms("+441632960999"))
         val bodies = apps.mapValues { (_, app) -> app.response(deliverNote, sent).body }
@@ -85,12 +88,12 @@ class ThreeCodecsTest {
     }
 
     @Test
-    fun `every library reads a body any of the three wrote`() {
+    fun `every library reads a body any of them wrote`() {
         // Leaving a null property out is only honest if absent reads back as
         // null, and a consumer holding bytes from one of these services has to
-        // be able to post them to the other two. The three agree on the bytes,
-        // so this passes trivially today and stops the day one of them stops
-        // agreeing — which is the day it is worth knowing.
+        // be able to post them to the others. They agree on the bytes, so this
+        // passes trivially today and stops the day one of them stops agreeing —
+        // which is the day it is worth knowing.
         val sent = Delivery(Note(9, "Terse"), Email("ada@example.com"))
         val written = apps.mapValues { (_, app) -> app.response(deliverNote, sent).body }
 
@@ -104,31 +107,30 @@ class ThreeCodecsTest {
         }
     }
 
-    @Serializable
     data class Reading(val missing: String?, val samples: List<Long?>, val tagged: Map<String, String?>)
 
     @Test
-    fun `a null inside a list or a map is a value there, and all three write it`() {
+    fun `a null inside a list or a map is a value there, and every library writes it`() {
         // The line the omission stops at, and the reason `defaultMapper()` sets
         // content inclusion apart from property inclusion: an absent property
         // is one the schema called optional, while a null element is what the
         // list contains. Asked of the codecs rather than of a route, because it
-        // is a claim about the three libraries and not about a request.
+        // is a claim about the libraries and not about a request.
         val value = Reading(null, listOf(1L, null), mapOf("k" to null))
         val written = libraries.associate { (library, codecs) ->
             library to codecs.codec<Reading>(typeOf<Reading>()).encodeToString(value)
         }
 
-        withClue("the three wrote $written") {
+        withClue("the libraries wrote $written") {
             written.values.distinct() shouldBe listOf("""{"samples":[1,null],"tagged":{"k":null}}""")
         }
     }
 
     @Test
-    fun `the three publish the same document`() {
+    fun `every library publishes the same document`() {
         // Compared as trees, because the one thing that does differ is the
         // order the branch schemas are registered in — swagger-core reaches
-        // them after the payload that referenced the union, the other two on
+        // them after the payload that referenced the union, another library on
         // the way through it. An object's key order carries no meaning in JSON,
         // and `oneOf`, which is an array and does carry one, is compared in
         // order by the same assertion.

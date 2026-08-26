@@ -52,7 +52,7 @@ class DependenciesTest {
             "org.apache.http.client.HttpClient",
             "retrofit2.Retrofit",
             "androidx.annotation.NonNull",
-            "io.github.matthewjones372.pelican.ktor.PelicanServer",
+            "io.github.matthewjones372.pelican.pekko.PelicanServer",
             "io.github.matthewjones372.pelican.openapi.OpenApiKt",
         ).forEach { name ->
             withClue("$name is on this module's classpath") {
@@ -64,8 +64,8 @@ class DependenciesTest {
     /**
      * What makes adding the module the whole of choosing it — as long as it is
      * the only adapter present. `ClientTransport.default()` refuses to pick
-     * between two, which is why this module stays off the other three adapters'
-     * test classpaths and they stay off this.
+     * between two, which is why this module stays off the other adapters' test
+     * classpaths and they stay off this.
      */
     @Test
     fun `core finds this adapter as the default transport`() {

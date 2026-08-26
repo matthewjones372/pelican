@@ -14,14 +14,10 @@ import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.emptyJsonObj
 import io.github.matthewjones372.pelican.formCodec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsoniter.JsoniterCodecs
-import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
@@ -35,8 +31,8 @@ import kotlin.reflect.typeOf
  * `SchemaSource` and `CodecFactory` are separate interfaces on purpose — a
  * document has to be generatable with no server present — and separate
  * interfaces are two things that can disagree. `OpenApiSpecQualityTest` says the
- * document is well-formed and `ThreeCodecsTest` says the three libraries write
- * the same bytes; neither asks whether the bytes fit the schema.
+ * document is well-formed and `PluggableCodecsTest` says a codec module writes
+ * the bytes the others do; neither asks whether the bytes fit the schema.
  *
  * It is not documentation-only. `FormShape.of` reads the published schema to
  * decide whether a form field is a string, an integer or an array, so a
@@ -49,13 +45,10 @@ class SchemaAgreementTest {
 
     // ------------------------------------------------------------- the shapes
 
-    @Serializable
     data class Owner(val id: Long, val email: String)
 
-    @Serializable
     data class Item(val id: Long, val name: String, val owner: Owner?)
 
-    @Serializable
     data class Page(val items: List<Item>, val next: String?, val total: Long)
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
@@ -63,39 +56,27 @@ class SchemaAgreementTest {
         JsonSubTypes.Type(value = Draft::class, name = "draft"),
         JsonSubTypes.Type(value = Published::class, name = "published"),
     )
-    @Serializable
     sealed interface State
 
-    @Serializable
-    @SerialName("draft")
     data class Draft(val editedBy: String) : State
 
-    @Serializable
-    @SerialName("published")
     data class Published(val at: String) : State
 
-    @Serializable
     data class Envelope(val item: Item, val state: State)
 
     // ------------------------------------------------------- the harder ones
 
-    @Serializable
     data class Node(val name: String, val children: List<Node>)
 
     @JvmInline
-    @Serializable
     value class UserId(val raw: Long)
 
-    @Serializable
     data class Wrapped(val who: UserId, val tags: Map<String, List<Long?>>)
 
-    @Serializable
     enum class Level { LOW, HIGH }
 
-    @Serializable
     data class Scored(val level: Level, val score: Double)
 
-    @Serializable
     data class Signup(val name: String, val visits: Int?)
 
     /** One shape and a value of it, which is the pair every claim below needs. */
@@ -121,8 +102,6 @@ class SchemaAgreementTest {
 
     private val sources = listOf(
         "JacksonCodecs" to JacksonCodecs,
-        "KotlinxCodecs" to KotlinxCodecs,
-        "JsoniterCodecs" to JsoniterCodecs,
     )
 
     // -------------------------------------------------------------- the claim
@@ -145,9 +124,9 @@ class SchemaAgreementTest {
     /**
      * The inverse claim, and the one the encode direction cannot make: a caller
      * who sends exactly what the schema asks for and nothing more has to be
-     * read. What the schema calls optional is where the three libraries
-     * disagree, so the payload is built from the schema alone rather than from
-     * a value one of them wrote.
+     * read. What the schema calls optional is where codec modules disagree, so
+     * the payload is built from the schema alone rather than from a value one
+     * of them wrote.
      */
     @TestFactory
     fun `every codec reads the smallest payload its own published schema accepts`(): List<DynamicTest> =
@@ -172,8 +151,8 @@ class SchemaAgreementTest {
 
     /**
      * The one place a published schema decides how a request is *read* rather
-     * than how it is documented, so a disagreement here is a 400. All three
-     * sources spell a nullable Int the 3.1 way, as a type array.
+     * than how it is documented, so a disagreement here is a 400. A source has
+     * to spell a nullable Int the 3.1 way, as a type array.
      */
     @TestFactory
     fun `a form field its own schema calls a nullable integer arrives as an integer`(): List<DynamicTest> =
@@ -192,7 +171,7 @@ class SchemaAgreementTest {
      *
      * Every claim above passes today, so without this there is no evidence the
      * validator is looking at anything: a `getSchema` that silently accepted
-     * everything would be indistinguishable from three codecs that agree.
+     * everything would be indistinguishable from a codec that agrees.
      */
     @Test
     fun `a schema that contradicts the bytes is caught`() {

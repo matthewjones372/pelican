@@ -313,8 +313,8 @@ abstract class ClientContractTest {
         )
 
         // Absent rather than empty, and absent rather than written as the word:
-        // a null property is left out by all three codec modules, so what says
-        // which null it is is the value read back.
+        // a null property is left out by every codec module, so what says which
+        // null it is is the value read back.
         res.body shouldNotContain "session"
         app.decodeBody<ImportResult>(res).session shouldBe null
     }

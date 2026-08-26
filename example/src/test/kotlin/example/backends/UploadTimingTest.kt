@@ -9,19 +9,12 @@ import io.github.matthewjones372.pelican.ndjsonIn
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import kotlinx.coroutines.flow.map
 import org.junit.jupiter.api.Test
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.Socket
 import java.net.URI
 import java.nio.charset.StandardCharsets
-import io.github.matthewjones372.pelican.http4k.start as startOnHttp4k
-import io.github.matthewjones372.pelican.http4k.streamedNow as streamedNowOnHttp4k
-import io.github.matthewjones372.pelican.http4k.toSequence as toSequenceOnHttp4k
-import io.github.matthewjones372.pelican.ktor.start as startOnKtor
-import io.github.matthewjones372.pelican.ktor.streamedNow as streamedNowOnKtor
-import io.github.matthewjones372.pelican.ktor.toFlow as toFlowOnKtor
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 import io.github.matthewjones372.pelican.pekko.toSource as toSourceOnPekko
@@ -59,28 +52,6 @@ class UploadTimingTest {
     fun `pekko answers the first frame before the last one is sent`() {
         val server = api(relay streamedNowOnPekko { rows -> rows.toSourceOnPekko() })
             .startOnPekko(port = 0, systemName = "upload-timing")
-
-        try {
-            server.baseUrl.shouldAnswerBeforeTheUploadEnds()
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `http4k answers the first frame before the last one is sent`() {
-        val server = api(relay streamedNowOnHttp4k { rows -> rows.toSequenceOnHttp4k() }).startOnHttp4k(port = 0)
-
-        try {
-            server.baseUrl.shouldAnswerBeforeTheUploadEnds()
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `and ktor answers the first frame before the last one is sent`() {
-        val server = api(relay streamedNowOnKtor { rows -> rows.toFlowOnKtor().map { it } }).startOnKtor(port = 0)
 
         try {
             server.baseUrl.shouldAnswerBeforeTheUploadEnds()

@@ -13,11 +13,13 @@ import example.generated.PlaceOrderFailure
 import example.generated.StreamOrdersFailure
 import example.generated.SubmitOrderFailure
 import example.generated.SubmitOrderResult
-import io.github.matthewjones372.pelican.InMemoryClientTransport
 import io.github.matthewjones372.pelican.UploadedFile
+import io.github.matthewjones372.pelican.client.JavaHttpTransport
 import io.github.matthewjones372.pelican.codegen.kotlinClient
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
+import io.github.matthewjones372.pelican.pekko.PelicanServer
+import io.github.matthewjones372.pelican.pekko.start
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
@@ -28,10 +30,14 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayInputStream
 import java.io.File
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GeneratedKotlinClientTest {
 
     /**
@@ -45,17 +51,28 @@ class GeneratedKotlinClientTest {
     )
 
     /**
-     * No port, no bind, no adapter: the requests this client builds are handed
-     * to the API as a function. What they cross is the routing, the decoding,
-     * the filters and the handlers a bound server runs, so what is asserted
-     * below is still the service — `PekkoTransportClientTest` and
-     * `KtorTransportClientTest` are where the same calls go over a socket.
+     * The service on a socket, over the JDK adapter: the exhaustive suite, and
+     * the transport a generated client picks when nobody names one.
+     * `PekkoTransportClientTest` runs the calls a change of adapter can break
+     * over `pelican-client-pekko` instead.
+     *
+     * Bound rather than in memory because half the endpoints below answer with
+     * a stream, and a Pekko `Source` is the backend's own type: `InMemory`
+     * refuses one out loud rather than pretending to frame it.
      */
-    private val client = OrdersClient(
-        baseUrl = "http://orders.test",
-        codecs = codecs,
-        transport = InMemoryClientTransport(example.http4k.ordersApi()),
-    )
+    private lateinit var server: PelicanServer
+    private lateinit var client: OrdersClient
+
+    @BeforeAll
+    fun setUp() {
+        server = ordersApi().start(port = 0, systemName = "orders-generated-client")
+        client = OrdersClient(server.baseUrl, codecs, JavaHttpTransport())
+    }
+
+    @AfterAll
+    fun tearDown() {
+        server.stop()
+    }
 
     // ------------------------------------------------------------ plain calls
 

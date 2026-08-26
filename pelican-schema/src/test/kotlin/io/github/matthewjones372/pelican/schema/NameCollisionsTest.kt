@@ -3,17 +3,14 @@ package io.github.matthewjones372.pelican.schema
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.SchemaRegistry
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsoniter.JsoniterCodecs
-import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.kotest.assertions.withClue
-import kotlinx.serialization.Serializable
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
 import kotlin.reflect.typeOf
 import io.kotest.matchers.string.shouldContain as shouldContainText
 
 /**
- * A component is named after the type's simple name in all three sources, so
+ * A component is named after the type's simple name in every source, so
  * two types called the same thing want one name. Registering the second under
  * the first's name publishes a schema for a payload nothing sends, and every
  * consumer of the document — a validator, a generated client, the importer —
@@ -22,22 +19,17 @@ import io.kotest.matchers.string.shouldContain as shouldContainText
 class NameCollisionsTest {
 
     object Catalogue {
-        @Serializable
         data class Item(val sku: String)
     }
 
     object Basket {
-        @Serializable
         data class Item(val quantity: Int)
     }
 
-    @Serializable
     data class Order(val listed: Catalogue.Item, val taken: Basket.Item)
 
     private val sources = listOf(
         "JacksonCodecs" to JacksonCodecs,
-        "KotlinxCodecs" to KotlinxCodecs,
-        "JsoniterCodecs" to JsoniterCodecs,
     )
 
     @TestFactory

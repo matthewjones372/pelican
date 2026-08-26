@@ -8,8 +8,6 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.shouldBe
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.flow
 import org.apache.pekko.stream.javadsl.Source
 import org.junit.jupiter.api.Test
 import java.net.URI
@@ -17,22 +15,17 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlin.time.Duration.Companion.milliseconds
-import io.github.matthewjones372.pelican.http4k.start as startOnHttp4k
-import io.github.matthewjones372.pelican.http4k.streamedNow as streamedNowOnHttp4k
-import io.github.matthewjones372.pelican.ktor.start as startOnKtor
-import io.github.matthewjones372.pelican.ktor.streamedNow as streamedNowOnKtor
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 
 /**
- * An SSE stream that goes quiet still says something, on all three backends.
+ * An SSE stream that goes quiet still says something.
  *
  * A connection producing no events is indistinguishable from a dead one, and
  * the things between a server and a browser treat it accordingly. Pekko has
- * `Source.keepAlive` and has had it all along; Ktor and http4k have nothing
- * equivalent and build it by hand — a `withTimeoutOrNull` over a rendezvous
- * channel, and a producer thread over a `SynchronousQueue` respectively. Three
- * mechanisms, one claim, which is why the claim is asserted three times here.
+ * `Source.keepAlive` and has had it all along; a backend whose stream type has
+ * no equivalent builds one by hand, so the claim is asserted per backend rather
+ * than once over the mechanism.
  *
  * The stream below sends one event, says nothing for [QUIET], then sends
  * another and ends. With a keep-alive of [INTERVAL] the quiet stretch has to
@@ -82,52 +75,6 @@ class SseKeepAliveTest {
                     .throttle(1, java.time.Duration.ofMillis(QUIET_MILLIS))
             },
         ).startOnPekko(port = 0, systemName = "sse-keep-alive")
-
-        try {
-            body(server.baseUrl).shouldCarryKeepAlives()
-        } finally {
-            server.stop()
-        }
-    }
-
-    /**
-     * `Thread.sleep` rather than `delay`, although `sequence { }` is a suspend
-     * block: its suspension is the generator's own and restricted, so there is
-     * no dispatcher to yield to and `delay` will not compile there. Blocking is
-     * also what an http4k handler does — the stream is walked on a thread the
-     * server owns, which is exactly the thread this test needs to go quiet.
-     */
-    @Suppress("SleepInsteadOfDelay")
-    @Test
-    fun `http4k fills it from a thread of its own`() {
-        val server = api(
-            quiet streamedNowOnHttp4k {
-                sequence {
-                    yield(Tick(1))
-                    Thread.sleep(QUIET_MILLIS)
-                    yield(Tick(2))
-                }
-            },
-        ).startOnHttp4k(port = 0)
-
-        try {
-            body(server.baseUrl).shouldCarryKeepAlives()
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `and ktor from a timeout on the flow`() {
-        val server = api(
-            quiet streamedNowOnKtor {
-                flow {
-                    emit(Tick(1))
-                    delay(QUIET_MILLIS)
-                    emit(Tick(2))
-                }
-            },
-        ).startOnKtor(port = 0)
 
         try {
             body(server.baseUrl).shouldCarryKeepAlives()

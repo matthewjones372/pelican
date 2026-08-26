@@ -21,11 +21,11 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.io.ByteArrayInputStream
 
 /**
- * Cookies, forms and uploads, held to one answer across all three interpreters.
+ * Cookies, forms and uploads, held to one answer across every interpreter.
  *
- * Same shape as [AllBackendsTest]: a cookie decoded differently on Ktor, or a
- * form field Jackson coerced and kotlinx.serialization refused, is a
- * description two servers disagree about.
+ * Same shape as [AllBackendsTest]: a cookie one backend decodes differently, or
+ * a form field one codec module coerced and another refused, is a description
+ * two of them disagree about.
  */
 class CookiesFormsAndUploadsTest {
 
@@ -71,8 +71,8 @@ class CookiesFormsAndUploadsTest {
 
         res.status shouldBe 200
         // The session is absent rather than written as the word: a null
-        // property is left out by all three codec modules, so the value read
-        // back is what says which null it is.
+        // property is left out by every codec module, so the value read back is
+        // what says which null it is.
         res.body shouldBe """{"locale":"en"}"""
         client.decodeBody<Preferences>(res) shouldBe Preferences("en", null)
     }
@@ -304,7 +304,7 @@ class CookiesFormsAndUploadsTest {
     // ------------------------------------------------------------ and together
 
     @Test
-    fun `all three read a cookie, a form, a JSON body and a two-file upload identically`() {
+    fun `every backend reads a cookie, a form, a JSON body and a two-file upload identically`() {
         fun answers(question: (ApiClient) -> String): Set<String> =
             clients.values.map(question).toSet()
 

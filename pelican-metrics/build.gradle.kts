@@ -5,8 +5,8 @@
 // Micrometer for the registry to put the meters in. No server library — this
 // module reads a description and a `Filter`, and neither knows which
 // interpreter is serving it, which is what lets one `metrics(registry)` line
-// mean the same thing on Pekko, http4k and Ktor. `NoOtherDependenciesTest`
-// is that claim stated as a test.
+// mean the same thing on every backend. `NoOtherDependenciesTest` is that
+// claim stated as a test.
 //
 // Micrometer arrives as `api` rather than `implementation` because a
 // `MeterRegistry` is a parameter of this module's only public function: a

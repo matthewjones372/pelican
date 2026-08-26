@@ -42,7 +42,7 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
 
     // The one endpoint here that declares a failure, so this is the binder
     // that demands an `Outcome` — and the 429 it may answer with carries a
-    // `Retry-After`, on all three backends, from the one description.
+    // `Retry-After`, on every backend, from the one description.
     echo handledOrFail { (trace, note) -> echoOrRefuse(trace, note) },
 
     remember handledOneOf { (who, note) -> rememberGreeting(who, note) },

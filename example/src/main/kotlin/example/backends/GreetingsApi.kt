@@ -18,11 +18,10 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
  * Everything about this service that is not a handler.
  *
  * The codecs, the title, the version — none of it is a property of the server,
- * so all three bindings build their `Api` through here rather than each
- * repeating it. That is also what makes the three documents comparable:
- * `AllBackendsTest` asserts the OpenAPI generated from each wiring is the same
- * string, which it can only be if nothing about the backend reached the
- * description.
+ * so every binding builds its `Api` through here rather than each repeating it.
+ * That is also what makes the documents comparable: `AllBackendsTest` asserts
+ * the OpenAPI generated from each wiring is the same string, which it can only
+ * be if nothing about the backend reached the description.
  */
 fun greetingsApi(
     routes: List<ServerEndpoint>,
@@ -56,7 +55,7 @@ fun greetingsApi(
 
     title = "Greetings"
     version = "1.0.0"
-    description = "One set of endpoint descriptions, served by three different HTTP libraries."
+    description = "One set of endpoint descriptions, bound to an HTTP library they never name."
 
     cors = cors("https://console.example.com")
 

@@ -39,13 +39,12 @@ import io.github.matthewjones372.pelican.webhook
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * One description, three servers.
+ * One description, whichever server ends up serving it.
  *
- * This file imports `io.github.matthewjones372.pelican` and nothing else — no Pekko, no http4k, no
- * Ktor, no JSON library. That is what makes the next three files possible:
- * `OnPekko.kt`, `OnHttp4k.kt` and `OnKtor.kt` bind *these same values* to
- * handlers, and neither the endpoints below nor the OpenAPI document generated
- * from them knows which server ends up serving them.
+ * This file imports `io.github.matthewjones372.pelican` and nothing else — no
+ * server library, no JSON library. That is what makes `OnPekko.kt` possible: it
+ * binds *these same values* to handlers, and neither the endpoints below nor
+ * the OpenAPI document generated from them knows which server it was.
  */
 
 data class Greeting(val greeting: String, val language: String)
@@ -91,7 +90,7 @@ val session = cookieParam<String>("session", description = "An opaque session id
 
 /**
  * Four inputs carrying several values each, one per encoding OpenAPI can
- * describe — and the point of them being here is that the three interpreters
+ * describe — and the point of them being here is that the interpreters
  * below read all four without any of them saying so.
  */
 val tags = queryParam<String>("tag", description = "Only entries with these tags").repeated().optional()
@@ -159,10 +158,10 @@ val greet = endpoint(name, shout) {
 }
 
 /**
- * A streamed response, which is where the backends visibly differ: the
- * description says "a stream of Tick" and each backend's binder demands its own
- * stream type — a Pekko `Source`, an http4k `Sequence`, a Ktor `Flow`. The wire
- * format, newline-delimited JSON, is rendered by core in all three cases.
+ * A streamed response, which is where a backend is visible at all: the
+ * description says "a stream of Tick" and the binder demands the backend's own
+ * stream type — a `Source` on Pekko. The wire format, newline-delimited JSON,
+ * is rendered by core whichever type that is.
  */
 val countdown = endpoint(from) {
     get("countdown" / from)
@@ -258,7 +257,7 @@ val filters = endpoint(tags, ids, features, seenBefore) {
  * Three inputs nobody may leave out, which is what the rest of this file has
  * none of: every other query, header and cookie here is optional or defaulted,
  * so the 400 each interpreter raises for a missing one had nothing to raise it
- * for. One endpoint, so that refusal is asked of all three backends.
+ * for. One endpoint, so that refusal is asked of every backend.
  */
 val requiredTerm = queryParam<String>("term", description = "What to look for")
 val requiredKey = headerParam<String>("X-Key", description = "Who is asking")
@@ -298,10 +297,9 @@ val roundtrip = endpoint(segment, q) {
 }
 
 /**
- * Plain text and a routed 204. Neither was on the shared surface, so neither was
- * ever asked of all three backends — they were described twice instead, once in
- * `pelican-http4k`'s test fixtures and once in `pelican-ktor`'s, and not at all
- * on Pekko.
+ * Plain text and a routed 204. Neither was on the shared surface, so neither
+ * was ever asked through this seam — each backend described them in its own
+ * test fixtures instead, which is how a difference between them could hide.
  */
 val motd = endpoint {
     get("motd")
@@ -359,9 +357,9 @@ val logo = endpoint {
 }
 
 /**
- * A stream in the other direction, which is where the backends visibly differ
- * a second time: the frames arrive as a `Source` on Pekko, a `Sequence` on
- * http4k and a `Flow` on Ktor, and the framing at both ends is core's.
+ * A stream in the other direction, which is where a backend is visible a second
+ * time: the frames arrive as the backend's own stream type — a `Source` on
+ * Pekko — and the framing at both ends is core's.
  *
  * The answer is a value rather than a second stream, which is what makes the
  * two refusals below reachable: a response that has already begun cannot change
@@ -454,7 +452,7 @@ val greetingWebhooks: List<Webhook> = listOf(greetingRecorded)
  */
 val LOGO_BYTES: ByteArray = "PELICAN".toByteArray(Charsets.US_ASCII)
 
-/** A short, fixed run of events, so three backends can be compared frame for frame. */
+/** A short, fixed run of events, so backends can be compared frame for frame. */
 fun ticks(): List<Tick> = listOf(Tick(1, "one"), Tick(2, "two"))
 
 /**
@@ -467,7 +465,7 @@ fun ticksSince(lastEventId: String?): List<Tick> {
     return ticks().filter { it.seq > seen }
 }
 
-/** A short, fixed list, so three backends can be compared byte for byte. */
+/** A short, fixed list, so backends can be compared byte for byte. */
 fun greetingsOf(): List<Greeting> = listOf(Greeting("Hello", "en"), Greeting("Bonjour", "fr"))
 
 internal fun greetingOf(who: String, shout: Boolean): Greeting {
@@ -497,7 +495,7 @@ private const val WAIT_SECONDS = 5L
 /**
  * Either the echo, the declared 429 with the `Retry-After` that failure
  * promised, or — for [BOOM] — a failure nobody declared at all. A service has
- * bugs, and what all three backends answer for one is a claim like any other.
+ * bugs, and what a backend answers for one is a claim like any other.
  */
 internal fun echoOrRefuse(trace: String?, note: Note): Outcome<ApiError, Echoed> = when (note.text) {
     FLOOD -> tooMuch(ApiError(429, "Slow down"), retryAfter of WAIT_SECONDS)

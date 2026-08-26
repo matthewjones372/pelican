@@ -106,9 +106,9 @@ class FiltersAndHeadersTest {
     }
 
     /**
-     * The limit is bytes. Two of the three backends counted `String.length`,
-     * which is UTF-16 code units, so a body of 2,000 CJK characters — 6,000
-     * bytes against a 4,096-byte limit — was inside a limit it was well past.
+     * The limit is bytes. A backend that counted `String.length` counted UTF-16
+     * code units instead, so a body of 2,000 CJK characters — 6,000 bytes
+     * against a 4,096-byte limit — was inside a limit it was well past.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
@@ -146,9 +146,9 @@ class FiltersAndHeadersTest {
     }
 
     @Test
-    fun `all three backends document it identically`() {
+    fun `every backend documents it identically`() {
         val docs = allBackends.map { it.api().spec().openApiJson() }
-        withClue("the three documents differ") { docs.distinct().size shouldBe 1 }
+        withClue("the documents differ") { docs.distinct().size shouldBe 1 }
         withClue("the header is missing from the document") { docs.first() shouldContain "X-Request-Id" }
     }
 }

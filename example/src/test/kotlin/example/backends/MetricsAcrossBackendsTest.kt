@@ -17,17 +17,17 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 
 /**
- * The claim the whole design rests on, asked of all three interpreters at once:
- * the status a filter is told is the status the caller was sent.
+ * The claim the whole design rests on, asked of every interpreter at once: the
+ * status a filter is told is the status the caller was sent.
  *
  * Working out that status is core's job — `Endpoint.statusFor` — precisely so
- * that it is not three jobs. A filter cannot see the response the interpreter
- * renders after the chain has unwound, so it reads the answer off the
- * description instead, and the risk that buys is drift: the description says
+ * that it is not one job per backend. A filter cannot see the response the
+ * interpreter renders after the chain has unwound, so it reads the answer off
+ * the description instead, and the risk that buys is drift: the description says
  * 201 and Pekko sends 200, and the graph is wrong in a way nobody notices for a
  * quarter. This suite is what makes that drift a build failure. Each case drives
  * one request, reads the status off the socket, and asks the registry what it
- * recorded — on Pekko, on http4k and on Ktor.
+ * recorded, once per backend.
  *
  * The four cases are the four ways a request ends that a filter can see: a
  * plain success, a success the handler *named* out of several declared, a
@@ -81,7 +81,7 @@ class MetricsAcrossBackendsTest {
     @MethodSource("backends")
     fun `what the meters recorded is what the socket answered`(name: String, client: ApiClient) {
         // One request per way of ending, driven through the typed client so
-        // that all three backends are asked exactly the same thing.
+        // that every backend is asked exactly the same thing.
         val answered = listOf(
             // A plain success.
             "/hello/{name}" to client.response(greet, In2("ada", false)).status,
@@ -116,7 +116,7 @@ class MetricsAcrossBackendsTest {
     /**
      * The other half of the same claim, for the requests a filter is never
      * asked about. Three refusals, none of which reaches the chain, so none of
-     * which appears above — and all three of which appear here.
+     * which appears above — and all of which appear here.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")

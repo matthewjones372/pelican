@@ -5,7 +5,7 @@
 // Split out of `pelican-test` because it was the only thing in there that
 // needed a server library, and an `api(project(":pelican-pekko"))` on the
 // shared module put Pekko HTTP and Pekko streams on the test classpath of
-// every Ktor and http4k service that wanted a typed client.
+// every service on another backend that wanted a typed client.
 dependencies {
     api(project(":pelican-test"))
     api(project(":pelican-pekko"))

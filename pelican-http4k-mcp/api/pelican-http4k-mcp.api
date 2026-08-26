@@ -1,5 +1,0 @@
-public final class io/github/matthewjones372/pelican/http4k/mcp/McpKt {
-	public static final fun mcpRoutes (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;)Ljava/util/List;
-	public static synthetic fun mcpRoutes$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
-}
-

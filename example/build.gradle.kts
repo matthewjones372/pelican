@@ -2,9 +2,6 @@ import io.github.matthewjones372.pelican.gradle.DocumentFormat
 
 plugins {
     application
-    // For the codecs example, whose payload types are @Serializable so that
-    // kotlinx.serialization can be one of the three libraries reading them.
-    kotlin("plugin.serialization")
     // The build's own plugin, included from pluginManagement in settings.gradle.kts.
     // The example applies it by id exactly as a consumer would, which is what
     // keeps the plugin honest: if generation breaks, this build breaks.
@@ -22,11 +19,6 @@ dependencies {
     // what that looks like. `pelican-mcp` and `pelican-mcp-server` arrive
     // through it, which is why neither is declared here.
     implementation(project(":pelican-pekko-mcp"))
-    // The second and third backends, wired to the same endpoint descriptions.
-    implementation(project(":pelican-http4k"))
-    implementation(project(":pelican-http4k-docs"))
-    implementation(project(":pelican-ktor"))
-    implementation(project(":pelican-ktor-docs"))
     implementation(project(":pelican-jackson"))
     // Meters, which are opt-in in the same way serving the docs is: this is the
     // module that adds them, and `example.metrics` is what it looks like.
@@ -38,13 +30,6 @@ dependencies {
     // and not the library's.
     implementation(project(":pelican-metrics-otel"))
     implementation("io.opentelemetry:opentelemetry-sdk:1.65.0")
-    // The other two codec modules, for `example.codecs`: the same endpoints and
-    // handlers served three times, once per JSON library. `pelican-kotlinx` also
-    // carries the parser the assertions use — the tests read responses off a
-    // socket, and something has to turn them back into a tree, which
-    // `parseToJsonElement` does with no serializer of its own.
-    implementation(project(":pelican-kotlinx"))
-    implementation(project(":pelican-jsoniter"))
     runtimeOnly("ch.qos.logback:logback-classic:1.6.3")
 
     // The OpenAPI documents this repository emits are checked by a parser that
@@ -71,13 +56,17 @@ dependencies {
     // the transport it wants; see GeneratedKotlinClientTest.
     testImplementation(project(":pelican-client-java"))
     testImplementation(project(":pelican-client-pekko"))
-    testImplementation(project(":pelican-client-ktor"))
 
-    // What the suspending client generated below is written against. Declared
-    // rather than inherited: it arrives transitively with Ktor, and a version a
-    // generated file depends on should not be whichever one a server module
-    // happened to bring.
+    // What the suspending client generated below is written against.
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+
+    // The parser the assertions read responses back with. Deliberately not the
+    // library under test: a suite that checked Jackson's bytes by handing them
+    // to Jackson would be marking its own homework, which is the same reason
+    // swagger-parser sits in front of the emitted document above. Only the
+    // runtime is here — there is no serializer and no compiler plugin, because
+    // `parseToJsonElement` needs neither.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // The in-memory metric reader `TracedOrdersTest` collects the histogram
     // through. The in-memory *span* exporter lives in the same artifact, but
@@ -86,13 +75,12 @@ dependencies {
     testImplementation("io.opentelemetry:opentelemetry-sdk-testing:1.65.0")
 
     testImplementation(project(":pelican-test"))
-    // The in-memory transports are per-backend, so the suites that run twice
-    // ask for the one they need. `pelican-test` itself stays backend-agnostic.
+    // The in-memory transports are per-backend, so a suite asks for the one it
+    // needs. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
 
     // Version-less: the BOM comes transitively from pelican-pekko.
     testImplementation("org.apache.pekko:pekko-actor-testkit-typed_2.13")
-    testImplementation(project(":pelican-test-http4k"))
     // Golden files for the document and for the request lines: the half of the
     // contract a typed call is blind to. See GoldenContractTest.
     testImplementation(project(":pelican-test-golden"))
@@ -104,8 +92,8 @@ dependencies {
 
     // Generators, for the one suite that asks a question about *every* string
     // rather than about the seven a person thought of. Test scope, and only
-    // here: what it generates are request lines, and this is where all three
-    // backends are running side by side to be asked the same one.
+    // here: what it generates are request lines, and this is where the backends
+    // run behind one seam to be asked the same one.
     testImplementation("io.kotest:kotest-property:6.2.4")
 }
 
@@ -145,28 +133,20 @@ tasks.register<JavaExec>("runSecured") {
     mainClass.set("example.secured.SecuredReportsKt")
 }
 
-/** The same Orders service, served by http4k instead of Pekko. */
-tasks.register<JavaExec>("runHttp4k") {
-    group = "application"
-    description = "Runs the Orders example on the http4k backend"
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("example.http4k.Http4kOrdersKt")
-}
-
-/** The same two endpoints, served by all three backends at once, for comparing them. */
+/** The endpoints that never name a server library, bound to the one 1.0 ships. */
 tasks.register<JavaExec>("runBackends") {
     group = "application"
-    description = "Runs the greetings example on Pekko, http4k and Ktor side by side"
+    description = "Runs the greetings example through the backend seam"
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("example.backends.MainKt")
 }
 
-/** The same service, served three times over three JSON libraries. */
+/** The same service over whichever JSON library it is handed. */
 tasks.register<JavaExec>("runCodecs") {
     group = "application"
-    description = "Runs the notes example on Jackson, kotlinx.serialization and jsoniter side by side"
+    description = "Runs the notes example over a codec module it does not name"
     classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("example.codecs.ThreeCodecsKt")
+    mainClass.set("example.codecs.PluggableCodecsKt")
 }
 
 /** The same service with its tools beside its endpoints: `curl` `/mcp` with a JSON-RPC message. */

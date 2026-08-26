@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
  *
  * The rest is the same claim every module here makes: no server library, which
  * is what lets the one `openTelemetry(sdk)` line mean the same thing on all
- * three interpreters, and no OpenAPI generator, no JSON library, nothing that
+ * every interpreter, and no OpenAPI generator, no JSON library, nothing that
  * would arrive uninvited.
  */
 class NoOtherDependenciesTest {

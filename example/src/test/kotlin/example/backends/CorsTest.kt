@@ -156,7 +156,7 @@ class CorsTest {
     // ------------------------------------------------------------ and together
 
     @Test
-    fun `all three answer a preflight identically`() {
+    fun `every backend answers a preflight identically`() {
         val answers = clients.mapValues { (_, client) ->
             val res = client.preflight(from = ALLOWED)
             res.status to listOf(

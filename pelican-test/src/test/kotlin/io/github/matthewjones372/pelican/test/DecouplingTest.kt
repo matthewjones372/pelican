@@ -9,10 +9,10 @@ import org.junit.jupiter.api.Test
 /**
  * The claim this module makes about its own classpath, stated as a test.
  *
- * A backend on `pelican-test` reaches every consumer of a typed client: a Ktor
- * service asking for one would get Pekko HTTP and Pekko streams with it. The
- * in-memory transports live in `pelican-test-pekko` and `pelican-test-http4k`
- * for that reason, and this is what keeps them there.
+ * A backend on `pelican-test` reaches every consumer of a typed client: a
+ * service on another backend asking for one would get Pekko HTTP and Pekko
+ * streams with it. The in-memory transports live in `pelican-test-pekko` and
+ * its siblings for that reason, and this is what keeps them there.
  */
 class DecouplingTest {
 

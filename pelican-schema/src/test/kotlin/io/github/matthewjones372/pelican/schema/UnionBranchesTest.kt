@@ -10,18 +10,18 @@ import io.github.matthewjones372.pelican.JsonNum
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.JsonValue
+import io.github.matthewjones372.pelican.SchemaComponents
+import io.github.matthewjones372.pelican.SchemaSource
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsoniter.JsoniterCodecs
-import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
+import io.github.matthewjones372.pelican.jsonObj
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 import io.kotest.matchers.string.shouldContain as shouldContainText
 
@@ -33,7 +33,6 @@ import io.kotest.matchers.string.shouldContain as shouldContainText
  */
 class UnionBranchesTest {
 
-    @Serializable
     data class Issuer(val name: String, val country: String)
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "method")
@@ -41,21 +40,14 @@ class UnionBranchesTest {
         JsonSubTypes.Type(value = Card::class, name = "card"),
         JsonSubTypes.Type(value = Transfer::class, name = "transfer"),
     )
-    @Serializable
     sealed interface PaymentMethod
 
-    @Serializable
-    @SerialName("card")
     data class Card(val number: String, val issuer: Issuer) : PaymentMethod
 
-    @Serializable
-    @SerialName("transfer")
     data class Transfer(val iban: String) : PaymentMethod
 
     private val sources = listOf(
         "JacksonCodecs" to JacksonCodecs,
-        "KotlinxCodecs" to KotlinxCodecs,
-        "JsoniterCodecs" to JsoniterCodecs,
     )
 
     private fun documentFrom(codecs: Codecs): JsonObj =
@@ -88,8 +80,8 @@ class UnionBranchesTest {
                 union["discriminator"] shouldBe null
             }
             document.branchesOf("PaymentMethod").forEach { branch ->
-                // What the value is spelled as is the codec's business: jsoniter
-                // picks a branch by its class name where the other two read an
+                // What the value is spelled as is the codec's business: one
+                // picks a branch by its class name where another reads an
                 // annotation. That it is pinned at all is this pass's business.
                 val property = branch.constants().keys.singleOrNull()
                 withClue("$name left a branch with nothing saying which branch it is") {
@@ -104,7 +96,6 @@ class UnionBranchesTest {
 
     // ------------------------------------------------------------- refusals
 
-    @Serializable
     sealed interface Payable
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
@@ -133,13 +124,24 @@ class UnionBranchesTest {
         }
     }
 
-    @Serializable
     abstract class OpenPayment
+
+    /**
+     * A source that describes a hierarchy whose branches register at run time.
+     * Hand-written rather than taken from a codec module: the refusal reads the
+     * schema and never the codec, and no source main ships writes this note.
+     */
+    private object OpenPolymorphism : SchemaSource {
+        override fun schema(type: KType, components: SchemaComponents): JsonObj = jsonObj {
+            put("type", JsonStr("object"))
+            put("description", JsonStr("polymorphic: OpenPayment"))
+        }
+    }
 
     @Test
     fun `an open hierarchy is refused rather than described as an object that accepts anything`() {
         val message = assertThrows<IllegalArgumentException> {
-            StandaloneSchemas(KotlinxCodecs).schema(typeOf<OpenPayment>())
+            StandaloneSchemas(OpenPolymorphism).schema(typeOf<OpenPayment>())
         }.message.orEmpty()
 
         withClue("the refusal has to say what to write instead") { message shouldContainText "sealed" }

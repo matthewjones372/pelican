@@ -10,18 +10,16 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 import kotlin.reflect.jvm.kotlinFunction
-import io.github.matthewjones372.pelican.http4k.start as startOnHttp4k
-import io.github.matthewjones372.pelican.ktor.start as startOnKtor
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
 /**
- * The call a user types first, pinned to one shape on all three backends.
+ * The call a user types first, pinned to one shape whichever backend publishes
+ * it.
  *
- * `AllBackendsTest` asks the three servers the same questions once they are
- * running; nothing there notices that starting them used to be spelled three
- * ways — `start(host, port)` on Pekko, `start(port, host)` on Ktor, no host at
- * all on http4k — or that a bare `start()` reached the network on one of them
- * and loopback on the other.
+ * `AllBackendsTest` asks a running server its questions; nothing there notices
+ * that starting one used to be spelled a different way per backend, or that a
+ * bare `start()` reached the network on one of them and loopback on another.
+ * A returning backend is held to the shape by adding a row to [backends].
  */
 class StartParityTest {
 
@@ -40,8 +38,6 @@ class StartParityTest {
 
     private val backends = listOf(
         "pekko" to "io.github.matthewjones372.pelican.pekko",
-        "http4k" to "io.github.matthewjones372.pelican.http4k",
-        "ktor" to "io.github.matthewjones372.pelican.ktor",
     )
 
     @Test
@@ -70,21 +66,19 @@ class StartParityTest {
 
     /**
      * Reaching the network is a choice a service spells out, so the default is
-     * the one Pekko already had. What is asserted is the address each server
-     * was bound to and that it answers there — not that it refuses elsewhere,
-     * which depends on what interfaces the machine running this happens to have.
+     * the one Pekko already had. What is asserted is the address the server was
+     * bound to and that it answers there — not that it refuses elsewhere, which
+     * depends on what interfaces the machine running this happens to have.
      */
     @Test
     fun `a bare start binds loopback, and answers there`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "start-parity-pekko")
-        val http4k = http4kApi().startOnHttp4k(port = 0)
-        val ktor = ktorApi().startOnKtor(port = 0)
 
         try {
-            val bound = mapOf("pekko" to pekko.host, "http4k" to http4k.host, "ktor" to ktor.host)
+            val bound = mapOf("pekko" to pekko.host)
             withClue("bound: $bound") { bound.values.toSet() shouldBe setOf("127.0.0.1") }
 
-            listOf("pekko" to pekko.baseUrl, "http4k" to http4k.baseUrl, "ktor" to ktor.baseUrl)
+            listOf("pekko" to pekko.baseUrl)
                 .forEach { (name, baseUrl) ->
                     withClue(name) {
                         baseUrl shouldStartWith "http://127.0.0.1:"
@@ -93,8 +87,6 @@ class StartParityTest {
                 }
         } finally {
             pekko.stop()
-            http4k.stop()
-            ktor.stop()
         }
     }
 }

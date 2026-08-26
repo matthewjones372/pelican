@@ -14,7 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 
 /**
- * HEAD, which all three routers map and nothing asked for until now.
+ * HEAD, which every router maps and nothing asked for until now.
  *
  * Two different questions, and only the first is Pelican's: a *declared* HEAD
  * endpoint is a route like any other and has to answer everywhere. Whether an
@@ -71,21 +71,17 @@ class HeadRequestsTest {
 
     /**
      * A recorded difference, not a rule. Nothing in Pelican asks an engine to
-     * answer a method no endpoint declared, and normalising the three is a
+     * answer a method no endpoint declared, and normalising engines is a
      * behaviour change that deserves deciding on its own; this is the evidence
      * it would be decided with.
      *
-     * - Pekko ships `transparent-head-requests = off`, so nothing rewrites a
-     *   HEAD into the GET beside it. This API declares a HEAD endpoint, so the
-     *   HEAD route matches on method and rejects on path, and that rejection
-     *   swallows the other routes' method rejections — the mechanism
-     *   [MethodMismatchTest] documents.
-     * - http4k's router separates "no such path" from "not that method".
-     * - Ktor's does not make that distinction at all.
+     * Pekko ships `transparent-head-requests = off`, so nothing rewrites a HEAD
+     * into the GET beside it. This API declares a HEAD endpoint, so the HEAD
+     * route matches on method and rejects on path, and that rejection swallows
+     * the other routes' method rejections — the mechanism [MethodMismatchTest]
+     * documents.
      */
     private val pinned = mapOf(
         "pekko" to 404,
-        "http4k" to 405,
-        "ktor" to 404,
     )
 }

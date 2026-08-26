@@ -14,15 +14,14 @@ val jmhVersion = "1.37"
 
 dependencies {
     implementation(project(":pelican-core"))
-    implementation(project(":pelican-http4k"))
     implementation(project(":pelican-pekko"))
     implementation(project(":pelican-jackson"))
 
-    // http4k-core, pekko-http and jackson-module-kotlin all arrive as `api` of
-    // the three modules above. The hand-written baselines are written against
-    // exactly what a consumer of those modules already has, which is the point:
-    // a baseline reaching for a dependency Pelican does not would be measuring
-    // a different thing.
+    // pekko-http and jackson-module-kotlin both arrive as `api` of the modules
+    // above. The hand-written baselines are written against exactly what a
+    // consumer of those modules already has, which is the point: a baseline
+    // reaching for a dependency Pelican does not would be measuring a different
+    // thing.
     implementation("org.openjdk.jmh:jmh-core:$jmhVersion")
 }
 

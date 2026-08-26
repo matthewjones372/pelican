@@ -19,11 +19,11 @@ import org.junit.jupiter.params.provider.MethodSource
  * What a handler that simply breaks tells the caller.
  *
  * `renderError` decides it in core, and each interpreter then builds the
- * response from what it hands back at a call site of its own — three of them,
- * none previously asserted against another. The answer is the one thing a
- * production team reads at three in the morning, so it is asked of all three,
- * and of both shipped envelopes: choosing a dialect must not turn the 500 into
- * a place a stack trace can appear.
+ * response from what it hands back at a call site of its own, none previously
+ * asserted against another. The answer is the one thing a production team reads
+ * at three in the morning, so it is asked of every backend and of both shipped
+ * envelopes: choosing a dialect must not turn the 500 into a place a stack
+ * trace can appear.
  */
 class ThrowingHandlerTest {
 

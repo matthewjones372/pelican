@@ -8,10 +8,6 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletionStage
 import kotlin.concurrent.thread
-import io.github.matthewjones372.pelican.http4k.PelicanServer as Http4kServer
-import io.github.matthewjones372.pelican.http4k.start as startOnHttp4k
-import io.github.matthewjones372.pelican.ktor.PelicanServer as KtorServer
-import io.github.matthewjones372.pelican.ktor.start as startOnKtor
 import io.github.matthewjones372.pelican.pekko.PelicanServer as PekkoServer
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
@@ -20,15 +16,15 @@ import io.github.matthewjones372.pelican.pekko.start as startOnPekko
  *
  * `StartParityTest` pins how a server is started; this pins what comes back.
  * Pekko's was neither `AutoCloseable` nor blockable and its `stop()` returned a
- * `CompletionStage` where the other two returned nothing, so the `use { }`
- * block a reader learned on one backend did not compile on the next.
+ * `CompletionStage` where the others returned nothing, so the `use { }` block a
+ * reader learned on one backend did not compile on the next. The shape is
+ * pinned by reflection rather than by a supertype, so a returning backend is
+ * held to it by adding a row to [handles].
  */
 class ServerShapeParityTest {
 
     private val handles = listOf(
         "pekko" to PekkoServer::class.java,
-        "http4k" to Http4kServer::class.java,
-        "ktor" to KtorServer::class.java,
     )
 
     @Test
@@ -43,10 +39,10 @@ class ServerShapeParityTest {
         }
     }
 
-    // The same four lines, three times over. The duplication is the claim: the
-    // three `PelicanServer` types share no supertype but `AutoCloseable`, so
-    // nothing but their carrying the same members makes one block compile
-    // against all of them.
+    // The same four lines per backend. The duplication is the claim: the
+    // `PelicanServer` types share no supertype but `AutoCloseable`, so nothing
+    // but their carrying the same members makes one block compile against all
+    // of them.
 
     @Test
     fun `pekko serves inside a use block, and closing releases block`() {
@@ -59,36 +55,12 @@ class ServerShapeParityTest {
     }
 
     @Test
-    fun `http4k serves inside a use block, and closing releases block`() {
-        val parked = http4kApi().startOnHttp4k(port = 0).use { server ->
-            answersOn(server.baseUrl)
-            parkedIn(server::block)
-        }
-
-        parked.releasedWithin()
-    }
-
-    @Test
-    fun `ktor serves inside a use block, and closing releases block`() {
-        val parked = ktorApi().startOnKtor(port = 0).use { server ->
-            answersOn(server.baseUrl)
-            parkedIn(server::block)
-        }
-
-        parked.releasedWithin()
-    }
-
-    @Test
     fun `and stopAsync completes once the server is down, on every backend`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "shape-parity-async")
-        val http4k = http4kApi().startOnHttp4k(port = 0)
-        val ktor = ktorApi().startOnKtor(port = 0)
 
-        val parked = listOf("pekko" to parkedIn(pekko::block), "http4k" to parkedIn(http4k::block))
-            .plus("ktor" to parkedIn(ktor::block))
+        val parked = listOf("pekko" to parkedIn(pekko::block))
 
-        listOf(pekko::stopAsync, http4k::stopAsync, ktor::stopAsync)
-            .forEach { it().toCompletableFuture().join() }
+        listOf(pekko::stopAsync).forEach { it().toCompletableFuture().join() }
 
         parked.forEach { (name, thread) -> withClue(name) { thread.releasedWithin() } }
     }

@@ -3,11 +3,11 @@
 //
 // Backend-agnostic, and enforced as such by `DecouplingTest`. `ApiClient`,
 // `RequestSpec`/`ResponseSpec`, the assertions and `HttpClientTransport` know
-// only `pelican-core` and the JDK, so a service built on Ktor or http4k can
+// only `pelican-core` and the JDK, so a service built on another backend can
 // take this module without Pekko arriving with it.
 //
-// The in-memory transports are per-backend and live next door:
-// `pelican-test-pekko` and `pelican-test-http4k`.
+// The in-memory transports are per-backend and live next door, one module
+// each: `pelican-test-pekko` is the one main ships.
 dependencies {
     api(project(":pelican-core"))
 

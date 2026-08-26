@@ -1,9 +1,0 @@
-public final class io/github/matthewjones372/pelican/ktor/docs/DocsKt {
-	public static final fun pelicanDocs (Lio/ktor/server/routing/Route;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;)V
-	public static synthetic fun pelicanDocs$default (Lio/ktor/server/routing/Route;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)V
-	public static final fun pelicanWithDocs (Lio/ktor/server/application/Application;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;)V
-	public static synthetic fun pelicanWithDocs$default (Lio/ktor/server/application/Application;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)V
-	public static final fun startWithDocs (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lio/ktor/server/engine/ApplicationEngineFactory;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/ktor/PelicanServer;
-	public static synthetic fun startWithDocs$default (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lio/ktor/server/engine/ApplicationEngineFactory;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/ktor/PelicanServer;
-}
-

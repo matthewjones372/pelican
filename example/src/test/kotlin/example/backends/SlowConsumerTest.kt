@@ -7,9 +7,6 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.onCompletion
 import org.apache.pekko.stream.javadsl.Source
 import org.junit.jupiter.api.Test
 import java.io.InputStream
@@ -18,10 +15,6 @@ import java.net.URI
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
-import io.github.matthewjones372.pelican.http4k.start as startOnHttp4k
-import io.github.matthewjones372.pelican.http4k.streamedNow as streamedNowOnHttp4k
-import io.github.matthewjones372.pelican.ktor.start as startOnKtor
-import io.github.matthewjones372.pelican.ktor.streamedNow as streamedNowOnKtor
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 
@@ -36,12 +29,11 @@ import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
  * keep-alives are written into its socket, and then hangs up — so the server is
  * writing to a socket that is gone, which is the only way it finds out.
  *
- * What is asserted is the handler-side signal, because that is the one thing
- * all three can be asked for in their own terms: `watchTermination` on a
- * `Source`, `onCompletion` on a `Flow`, and the `finally` of a `Sequence` whose
- * walking thread is interrupted. Thread counts are a clue on failure and not an
- * assertion: a pool keeps threads for reasons of its own, and a test that
- * counts them fails on somebody else's timing.
+ * What is asserted is the handler-side signal, because that is the one thing a
+ * backend can be asked for in its own terms: `watchTermination` on a `Source`.
+ * Thread counts are a clue on failure and not an assertion: a pool keeps
+ * threads for reasons of its own, and a test that counts them fails on somebody
+ * else's timing.
  */
 class SlowConsumerTest {
 
@@ -88,60 +80,6 @@ class SlowConsumerTest {
         try {
             readOneFrameThenVanish(server.baseUrl)
             closed.shouldFireWithinTheTimeout("the source")
-        } finally {
-            server.stop()
-        }
-    }
-
-    /**
-     * `Thread.sleep` because a `sequence { }` block suspends only into its own
-     * generator — there is no dispatcher to yield to, so `delay` does not
-     * compile. It is also what an http4k handler does: the sequence is walked
-     * on a thread the server owns, and the interrupt that ends it is what runs
-     * the `finally`.
-     */
-    @Suppress("SleepInsteadOfDelay")
-    @Test
-    fun `http4k closes the sequence when the consumer disappears`() {
-        val closed = CountDownLatch(1)
-        val server = api(
-            drip streamedNowOnHttp4k {
-                sequence {
-                    try {
-                        yield(Tick(1))
-                        Thread.sleep(NEXT_ELEMENT_MILLIS)
-                        yield(Tick(2))
-                    } finally {
-                        closed.countDown()
-                    }
-                }
-            },
-        ).startOnHttp4k(port = 0)
-
-        try {
-            readOneFrameThenVanish(server.baseUrl)
-            closed.shouldFireWithinTheTimeout("the sequence")
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `and ktor cancels the flow`() {
-        val closed = CountDownLatch(1)
-        val server = api(
-            drip streamedNowOnKtor {
-                flow {
-                    emit(Tick(1))
-                    delay(NEXT_ELEMENT_MILLIS)
-                    emit(Tick(2))
-                }.onCompletion { closed.countDown() }
-            },
-        ).startOnKtor(port = 0)
-
-        try {
-            readOneFrameThenVanish(server.baseUrl)
-            closed.shouldFireWithinTheTimeout("the flow")
         } finally {
             server.stop()
         }

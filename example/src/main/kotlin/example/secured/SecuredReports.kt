@@ -266,8 +266,8 @@ val caller = attribute<Caller>("caller")
  * or does not check out.
  *
  * `Params.request` is the Pekko escape hatch — the raw request behind the call.
- * The Ktor and http4k modules each offer the same accessor for their own type,
- * so this is the one function that would change if the backend did.
+ * Each backend module offers the same accessor for its own request type, so
+ * this is the one function that would change if the backend did.
  */
 private fun callerOf(p: Params): Caller? {
     val header = p.request.getHeader("Authorization").orElse(null)?.value() ?: return null

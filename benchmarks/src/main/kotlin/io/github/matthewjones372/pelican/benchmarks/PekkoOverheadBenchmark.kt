@@ -45,8 +45,7 @@ import java.util.concurrent.TimeUnit
 private typealias SealedRoute = Function<HttpRequest, CompletionStage<HttpResponse>>
 
 /**
- * What the description costs on Pekko, the same question
- * [Http4kOverheadBenchmark] asks of http4k.
+ * What the description costs on Pekko.
  *
  * The same endpoint several times over: once described with Pelican and
  * interpreted onto a Pekko `Route`, then three ways of writing it straight
@@ -265,8 +264,7 @@ open class PekkoOverheadBenchmark {
         system.whenTerminated.toCompletableFuture().join()
     }
 
-    // The returned `HttpResponse` is what stops the JIT deleting the call; see
-    // the same note in Http4kOverheadBenchmark.
+    // The returned `HttpResponse` is what stops the JIT deleting the call.
 
     @Benchmark
     fun pelican(): HttpResponse = answer(described, request)

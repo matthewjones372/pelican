@@ -61,7 +61,7 @@ class RequestLinePropertyTest {
 
         /**
          * Enough cases to find a class of characters nobody listed, few enough
-         * that three servers answering all of them still leave a build worth
+         * that a server answering all of them still leaves a build worth
          * running. Seeded, so a failure names a case that can be reproduced.
          */
         private val everyString = PropTestConfig(iterations = 200, seed = 0x0022_0022L)
@@ -75,9 +75,9 @@ class RequestLinePropertyTest {
         /**
          * `.` and `..` are the two segments left out. They are dot segments,
          * which RFC 3986 says to resolve away: Pekko does and answers 404,
-         * http4k and Ktor hand them over as values. That is a disagreement
-         * about path *normalisation* rather than about decoding, and settling
-         * it is not this suite's to do.
+         * where another router may hand them over as values. That is a
+         * disagreement about path *normalisation* rather than about decoding,
+         * and settling it is not this suite's to do.
          */
         private val anySegment: Arb<String> = Arb.list(Arb.of(characters), 1..12)
             .map { it.joinToString("") }
@@ -138,8 +138,8 @@ class RequestLinePropertyTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `and one sent with no value at all is present and empty`(name: String, client: ApiClient) {
-        // `?q` is http4k's null — indistinguishable from unsent — and the other
-        // two backends' empty string. Two of three read what the caller meant.
+        // `?q` is an empty string here rather than a null indistinguishable
+        // from unsent, which is what the caller meant by writing it.
         withClue(name) { client.queryOf("/items/x?q") shouldBe "" }
     }
 
@@ -157,7 +157,7 @@ class RequestLinePropertyTest {
     /**
      * What arrived in the query, for a target built by hand rather than from a
      * value. A null property is left out of the body rather than written as the
-     * word, by all three codecs, so an absent key is how "nobody sent one"
+     * word, by every codec module, so an absent key is how "nobody sent one"
      * arrives here.
      */
     private fun ApiClient.queryOf(rawTarget: String): String? =

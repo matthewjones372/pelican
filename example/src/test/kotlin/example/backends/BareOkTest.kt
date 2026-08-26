@@ -11,10 +11,6 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import io.github.matthewjones372.pelican.http4k.handledOneOf as handledOneOfOnHttp4k
-import io.github.matthewjones372.pelican.http4k.start as startOnHttp4k
-import io.github.matthewjones372.pelican.ktor.handledOneOf as handledOneOfOnKtor
-import io.github.matthewjones372.pelican.ktor.start as startOnKtor
 import io.github.matthewjones372.pelican.pekko.handledOneOf as handledOneOfOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
@@ -38,32 +34,6 @@ class BareOkTest {
         val server = brokenApi(
             remember handledOneOfOnPekko { (_, note) -> ok(Greeting(note.text, language = "en")) },
         ).startOnPekko(port = 0, systemName = "greetings-bare-ok")
-
-        try {
-            asking(server.baseUrl).shouldBeRefused()
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `http4k refuses it too`() {
-        val server = brokenApi(
-            remember handledOneOfOnHttp4k { (_, note) -> ok(Greeting(note.text, language = "en")) },
-        ).startOnHttp4k(port = 0)
-
-        try {
-            asking(server.baseUrl).shouldBeRefused()
-        } finally {
-            server.stop()
-        }
-    }
-
-    @Test
-    fun `and so does ktor`() {
-        val server = brokenApi(
-            remember handledOneOfOnKtor { (_, note) -> ok(Greeting(note.text, language = "en")) },
-        ).startOnKtor(port = 0)
 
         try {
             asking(server.baseUrl).shouldBeRefused()

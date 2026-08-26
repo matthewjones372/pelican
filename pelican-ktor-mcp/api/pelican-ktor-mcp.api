@@ -1,5 +1,0 @@
-public final class io/github/matthewjones372/pelican/ktor/mcp/McpKt {
-	public static final fun pelicanMcp (Lio/ktor/server/routing/Route;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;)V
-	public static synthetic fun pelicanMcp$default (Lio/ktor/server/routing/Route;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;ILjava/lang/Object;)V
-}
-

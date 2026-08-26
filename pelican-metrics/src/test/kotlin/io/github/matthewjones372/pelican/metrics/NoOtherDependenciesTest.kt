@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
  * the meters live in a module of their own rather than in a backend: a service
  * asks for metrics, and what it gets is the descriptions it already had plus a
  * meter API. No server library — which is what lets the same one line mean the
- * same thing on all three interpreters — and no OpenAPI generator, no JSON
+ * same thing on every interpreter — and no OpenAPI generator, no JSON
  * library, and nothing that would arrive uninvited.
  *
  * `pelican-metrics-otel` is the other half of that, and the reason it is a

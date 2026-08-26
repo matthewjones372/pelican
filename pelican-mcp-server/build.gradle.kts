@@ -8,8 +8,8 @@
 // `ApplicationCall`, and `kotlin-sdk-server` compiles against `ktor-server-core`
 // even for stdio. Adopting it would put thirty-five jars — a Ktor server, a Ktor
 // client, kotlinx.serialization, kotlin-reflect, slf4j — behind `mcpServe` on a
-// service that runs Pekko or http4k, and would leave the HTTP half mountable on
-// one backend of the three.
+// service that runs something else, and would leave the HTTP half mountable on
+// Ktor alone.
 dependencies {
     api(project(":pelican-mcp"))
 

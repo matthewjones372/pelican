@@ -37,12 +37,12 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.io.ByteArrayInputStream
 
 /**
- * One suite, three interpreters.
+ * One suite, every interpreter.
  *
- * Every test below is written once and run against Pekko, http4k and Ktor,
- * because the thing under test is the *description* — and a description that
- * two backends honour differently is a description one of them is getting
- * wrong. The parameter is a [Backend], so adding a fourth is one line in
+ * Every test below is written once and run against each backend in
+ * `allBackends`, because the thing under test is the *description* — and a
+ * description that two backends honour differently is a description one of them
+ * is getting wrong. The parameter is a [Backend], so adding one is a line in
  * `allBackends` and no new assertions.
  *
  * The questions are built from the endpoint values themselves: [ApiClient]
@@ -177,8 +177,8 @@ class AllBackendsTest {
 
     /**
      * The frame number is what makes this refusal worth anything: a caller
-     * uploading a file is told which line to go and look at, and all three
-     * backends name the same line because core is what counted it.
+     * uploading a file is told which line to go and look at, and every backend
+     * names the same line because core is what counted it.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
@@ -213,7 +213,7 @@ class AllBackendsTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
-    fun `sse frames are core's, so all three write the same ones`(name: String, client: ApiClient) {
+    fun `sse frames are core's, so every backend writes the same ones`(name: String, client: ApiClient) {
         val res = client.response(ticker, Unit)
 
         withClue(name) {
@@ -229,7 +229,7 @@ class AllBackendsTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
-    fun `a stream that declares ids writes them, identically, on all three`(name: String, client: ApiClient) {
+    fun `a stream that declares ids writes them, identically, on every backend`(name: String, client: ApiClient) {
         val res = client.response(replay, Unit)
 
         withClue(name) {
@@ -391,10 +391,10 @@ class AllBackendsTest {
 
     // ------------------------------------------------ what the request line said
     //
-    // One decoder, in core, reached the same way by all three: the backends used
-    // to hand their router three different spellings of the same path and then
-    // decode it three different ways. `roundtrip` hands back what arrived, so
-    // every claim below is about the request line and nothing else.
+    // One decoder, in core, reached the same way by every backend: they used to
+    // hand their router their own spelling of the same path and then decode it
+    // their own way. `roundtrip` hands back what arrived, so every claim below
+    // is about the request line and nothing else.
 
     /** What arrived in the path, for a line built by hand rather than from a value. */
     private fun ApiClient.pathOf(rawPath: String): String =
@@ -653,7 +653,7 @@ class AllBackendsTest {
     // ------------------------------------------------------------- and together
 
     @Test
-    fun `all three answer identically, and generate the identical document`() {
+    fun `every backend answers identically, and generates the identical document`() {
         val bodies = clients.mapValues { (_, client) ->
             client.transport.send(client.request(greet, In2("ada", true))).body
         }

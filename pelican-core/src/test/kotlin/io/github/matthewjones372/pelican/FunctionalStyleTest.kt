@@ -72,15 +72,8 @@ class FunctionalStyleTest {
             "merging an `allOf` gathers the properties its branches declare, then freezes them into one schema",
         "pelican-jackson/src/main/kotlin/io/github/matthewjones372/pelican/jackson/KotlinAwareModelResolver.kt" to
             "swagger's Schema is a mutable Java bean; patching it is the integration",
-        "pelican-kotlinx/src/main/kotlin/io/github/matthewjones372/pelican/kotlinx/DescriptorSchemas.kt" to
-            "the same, for kotlinx.serialization descriptors",
 
         "pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Interpreter.kt" to
-            "the per-request value bag handed to Params",
-        "pelican-http4k/src/main/kotlin/io/github/matthewjones372/pelican/http4k/IndexedRoutes.kt" to
-            "the values the index decoded while matching are held for the handler http4k invokes a " +
-            "moment later, rather than the path being walked and decoded twice",
-        "pelican-ktor/src/main/kotlin/io/github/matthewjones372/pelican/ktor/Interpreter.kt" to
             "the per-request value bag handed to Params",
         "pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Responses.kt" to
             "the empty parameter map Pekko's customWithFixedCharset takes, and the cache of the content " +

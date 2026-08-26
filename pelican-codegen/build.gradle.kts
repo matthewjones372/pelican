@@ -5,8 +5,8 @@
 // so this module never has an opinion about how a body is written.
 //
 // What it *emits* depends on pelican-core too: the generated client takes a
-// `Codecs`, exactly as a server does, so the consumer picks Jackson or
-// kotlinx.serialization the same way and in the same place.
+// `Codecs`, exactly as a server does, so the consumer picks a codec module the
+// same way and in the same place.
 //
 // The emitted runtime lives in src/main/resources as real Kotlin rather than as
 // a string in this source set, so it can be read and edited as code.

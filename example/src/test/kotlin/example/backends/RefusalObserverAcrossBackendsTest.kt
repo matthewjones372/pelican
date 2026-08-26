@@ -25,11 +25,11 @@ import org.junit.jupiter.params.provider.MethodSource
  * `http.server.requests` is recorded by a filter, and a filter cannot be asked
  * about the requests that never reach it. This hook is called from the one
  * function that turns a refusal into a response — core's `renderError`, which
- * all three interpreters and the in-memory transport already answer through —
- * so parity here is not four implementations agreeing but one implementation
- * being reached four ways. What this suite proves is that the *route in* is the
- * same on each: the same request refused at the same point, carrying the same
- * template.
+ * every interpreter and the in-memory transport already answer through — so
+ * parity here is not several implementations agreeing but one implementation
+ * being reached several ways. What this suite proves is that the *route in* is
+ * the same on each: the same request refused at the same point, carrying the
+ * same template.
  */
 class RefusalObserverAcrossBackendsTest {
 
@@ -53,7 +53,7 @@ class RefusalObserverAcrossBackendsTest {
 
         private val clients: Map<String, ApiClient> =
             running.mapValues { (_, server) -> apiClient(server.baseUrl, JacksonCodecs) } +
-                (IN_MEMORY to ApiClient(OverInMemory(http4kApi(onRefusal = recorder(IN_MEMORY))), JacksonCodecs))
+                (IN_MEMORY to ApiClient(OverInMemory(pekkoApi(onRefusal = recorder(IN_MEMORY))), JacksonCodecs))
 
         @JvmStatic
         fun transports(): List<Array<Any>> =
@@ -119,8 +119,8 @@ class RefusalObserverAcrossBackendsTest {
      * left to be noticed as a flat line on a graph.
      *
      * A path nothing describes is handed back to the server library's own
-     * router — http4k's `UNMATCHED`, a Pekko rejection, Ktor's own 404 — which
-     * is what lets a Pelican route be mounted beside routes written by hand.
+     * router — a Pekko rejection — which is what lets a Pelican route be
+     * mounted beside routes written by hand.
      * Nothing renders that 404, so nothing observes it either. The in-memory
      * transport has no router underneath to decline to, so it answers the
      * refusal itself and does count it.

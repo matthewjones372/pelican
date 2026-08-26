@@ -13,7 +13,7 @@ import java.io.File
  * The protocol and no SDK. The official Kotlin SDK's server half is written
  * against Ktor — its transports are `Route.mcp` extensions — so adopting it
  * would put a Ktor server, a Ktor client, kotlinx.serialization and a logging
- * facade behind `mcpServe` on a service that runs Pekko or http4k. What is
+ * facade behind `mcpServe` on a service that runs something else. What is
  * spoken here is JSON-RPC 2.0 over lines of text, and core already has the
  * JSON tree to speak it with.
  */
