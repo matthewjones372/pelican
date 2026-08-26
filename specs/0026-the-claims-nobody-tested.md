@@ -45,10 +45,10 @@ propose two things.
 
 ## Stack
 
-- [ ] **`spec-0026-refusal-claims`** — the 500-shape, HEAD, chunked-limit,
+- [x] **`spec-0026-refusal-claims`** — the 500-shape, HEAD, chunked-limit,
       and two-line-header tests.
       Done when: all four run against all three backends in `AllBackendsTest` or a sibling suite.
-- [ ] **`spec-0026-slow-consumer`** — the stall-and-disconnect streaming
+- [x] **`spec-0026-slow-consumer`** — the stall-and-disconnect streaming
       test, per backend, over real sockets.
       Done when: the test fails against a deliberately-leaking `StreamingSunHttp` and passes against the shipped one.
 
