@@ -20,6 +20,9 @@ dependencies {
     // through it, which is why neither is declared here.
     implementation(project(":pelican-pekko-mcp"))
     implementation(project(":pelican-jackson"))
+    // Arrow's Either at the edge of a Pelican handler: `example.arrow` is what
+    // it looks like, and the module is the whole of what it takes.
+    implementation(project(":pelican-arrow"))
     // Meters, which are opt-in in the same way serving the docs is: this is the
     // module that adds them, and `example.telemetry` is what it looks like.
     implementation(project(":pelican-metrics"))
@@ -118,6 +121,28 @@ tasks.register<JavaExec>("runShop") {
     description = "Runs the Rookery Books example"
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("example.shop.ShopKt")
+}
+
+/**
+ * A domain written in Arrow, described by Pelican: `Either` at the edge, in one
+ * call. `./gradlew :example:runArrow --args=8083`.
+ */
+tasks.register<JavaExec>("runArrow") {
+    group = "application"
+    description = "Runs the Subscriptions example, whose domain is written in Arrow"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.arrow.SubscriptionsKt")
+}
+
+/**
+ * An access log at the level each status earns, and the refusals a filter
+ * cannot see. `./gradlew :example:runLogging --args=8084`.
+ */
+tasks.register<JavaExec>("runLogging") {
+    group = "application"
+    description = "Runs the Widgets example, which logs every call"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.logging.RequestLogKt")
 }
 
 /** The security example: basic auth, an external identity provider, and a docs page that can sign in. */

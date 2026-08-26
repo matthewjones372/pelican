@@ -1,5 +1,14 @@
 package example.backends
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // endpoint descriptions; no dependencies of its own
+ *         implementation("io.github.matthewjones372:pelican-core:1.0.0-RC1")
+ *     }
+ */
+
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.LongCodec

@@ -1,5 +1,14 @@
 package example.backends
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // endpoint descriptions; no dependencies of its own
+ *         implementation("io.github.matthewjones372:pelican-core:1.0.0-RC1")
+ *     }
+ */
+
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Filter

@@ -1,5 +1,12 @@
 package example
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *     }
+ */
+
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.IntCodec
@@ -21,7 +28,6 @@ import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.lensInputs
-import io.github.matthewjones372.pelican.mcp.server.post
 import io.github.matthewjones372.pelican.ndjsonIn
 import io.github.matthewjones372.pelican.nonEmpty
 import io.github.matthewjones372.pelican.optional

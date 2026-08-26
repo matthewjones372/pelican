@@ -1,5 +1,14 @@
 package example.telemetry
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // the interpreter; brings pelican-core and Pekko HTTP
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *     }
+ */
+
 import io.github.matthewjones372.pelican.pekko.start
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.config.MeterFilter

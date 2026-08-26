@@ -1,5 +1,14 @@
 package example
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // JacksonCodecs, and the schemas the document derives
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+ *     }
+ */
+
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs

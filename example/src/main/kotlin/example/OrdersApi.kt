@@ -1,5 +1,18 @@
 package example
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // the interpreter; brings pelican-core and Pekko HTTP
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *         // JacksonCodecs, and the schemas the document derives
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+ *         // startWithDocs, /openapi.json and Swagger UI
+ *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+ *     }
+ */
+
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.ServerEndpoint

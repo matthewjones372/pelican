@@ -1,6 +1,19 @@
 package example.hello
 
 /*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // the interpreter; brings pelican-core and Pekko HTTP
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *         // JacksonCodecs, and the schemas the document derives
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+ *         // startWithDocs, /openapi.json and Swagger UI
+ *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+ *     }
+ */
+
+/*
  * "Your first endpoint" from the README, verbatim, so it cannot rot: if this
  * file stops compiling, the front page of the project is wrong. Run it with
  * `./gradlew :example:runFirstEndpoint`, and see `FirstEndpointTest` for the

@@ -1,5 +1,18 @@
 package example.shop
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // the interpreter; brings pelican-core and Pekko HTTP
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *         // JacksonCodecs, and the schemas the document derives
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+ *         // startWithDocs, /openapi.json and Swagger UI
+ *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+ *     }
+ */
+
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.Endpoint
@@ -20,7 +33,6 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.matching
-import io.github.matthewjones372.pelican.mcp.server.post
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.openApiJson

@@ -1,5 +1,14 @@
 package example.backends
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // startWithDocs, /openapi.json and Swagger UI
+ *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+ *     }
+ */
+
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 

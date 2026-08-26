@@ -1,5 +1,16 @@
 package example.filters
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // the interpreter; brings pelican-core and Pekko HTTP
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *         // JacksonCodecs, and the schemas the document derives
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+ *     }
+ */
+
 /**
  * The README's "Filters" section, verbatim, so the two things it claims are
  * checked by the compiler rather than by the reader: that a filter puts what it

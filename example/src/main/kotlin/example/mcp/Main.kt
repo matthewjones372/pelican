@@ -1,5 +1,18 @@
 package example.mcp
 
+/*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // the interpreter; brings pelican-core and Pekko HTTP
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *         // the descriptions as MCP tools
+ *         implementation("io.github.matthewjones372:pelican-mcp:1.0.0-RC1")
+ *         // serves the MCP tools on /mcp
+ *         implementation("io.github.matthewjones372:pelican-pekko-mcp:1.0.0-RC1")
+ *     }
+ */
+
 import example.ordersApi
 import io.github.matthewjones372.pelican.mcp.McpOptions
 import io.github.matthewjones372.pelican.mcp.mcpOptions

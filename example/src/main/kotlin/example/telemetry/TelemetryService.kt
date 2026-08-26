@@ -1,6 +1,23 @@
 package example.telemetry
 
 /*
+ * To run this in a project of your own:
+ *
+ *     dependencies {
+ *         // the interpreter; brings pelican-core and Pekko HTTP
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *         // JacksonCodecs, and the schemas the document derives
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+ *         // Micrometer meters
+ *         implementation("io.github.matthewjones372:pelican-metrics:1.0.0-RC1")
+ *         // OpenTelemetry spans and metrics
+ *         implementation("io.github.matthewjones372:pelican-metrics-otel:1.0.0-RC1")
+ *         // which SDK is the service's choice, not the library's
+ *         implementation("io.opentelemetry:opentelemetry-sdk:1.65.0")
+ *     }
+ */
+
+/*
  * One service, instrumented twice.
  *
  * There were two files here once, one metered and one traced, each making the
