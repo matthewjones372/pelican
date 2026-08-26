@@ -147,6 +147,28 @@ one.
   chose to throw, which is what keeps the refusal counter disjoint from the
   request counter. Catch them by name if a filter was catching `ApiException`
   for either.
+- **Typed frames in the other direction.** `ndjsonIn<T>()` declares a request
+  body as newline-delimited JSON: one document per line, decoded by the
+  configured codec, handed to the handler as its own backend's stream —
+  `toSource()` on Pekko, `toSequence()` on http4k, `toFlow()` on Ktor. It
+  occupies the body slot and composes with path, query, header and cookie
+  parameters; a second body beside it is refused where it is declared. Core owns
+  the splitting and the per-frame decode, so an upload and a download agree on
+  where a frame ends by construction, and nothing is held but the frame being
+  read: the first frame reaches the handler before the last is sent, on all
+  three backends, over a socket. A frame that will not decode is a 400 naming
+  the line it was on; one longer than the new `maxFrameBytes` is a 413. Both are
+  classified refusals, so they go out in the service's own envelope and reach
+  `onRefusal` under `decode` and `body_limit`. The document publishes one
+  frame's schema under `application/x-ndjson` — `itemSchema` under 3.2, `schema`
+  under 3.1 — and an import reads both spellings back. A generated client takes
+  a `Sequence<T>` and streams it over `ClientRequest.Body.Streaming`; the typed
+  test client sends `frames(...)` buffered, and `InMemoryClientTransport`
+  refuses such a call by name for the reason it refuses a `bytes(...)` body.
+- **`maxFrameBytes`** in `api { }`: the largest single frame of a streamed
+  request body, taking `maxBodyBytes` where it is not set. A limit of its own
+  because a stream has no total length to bound, and one frame that never ends
+  is the way to run a service out of memory with a single upload.
 - **`spi.classifyError(t, api)`**, the classification without the body — the
   status, the sentence and the reference — for a caller answering in an
   envelope the protocol fixes rather than one the service chose. The MCP server

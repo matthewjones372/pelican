@@ -95,6 +95,13 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
         )
     },
 
+    // Both directions at once, and no materializer in sight: the answer is the
+    // upload's own graph with a `map` on it, so back-pressure runs from the
+    // downloading socket through the store to the uploading one.
+    ingestOrders streamedNow { (id, rows) ->
+        rows.toSource().map { req -> Store.create(id, req) }
+    },
+
     // The body arrives already decoded into whichever branch the `method`
     // property selected, so the handler matches on the Kotlin type rather than
     // on a string it has to check itself.

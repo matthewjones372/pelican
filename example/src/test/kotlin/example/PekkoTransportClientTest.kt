@@ -1,6 +1,7 @@
 package example
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import example.generated.CreateOrder
 import example.generated.OrderStatus
 import example.generated.OrdersClient
 import example.generated.Outcome
@@ -92,6 +93,21 @@ class PekkoTransportClientTest {
         val echoed = client.echo(ByteArrayInputStream("hello pelican".toByteArray()))
 
         echoed.use { it.readBytes().toString(Charsets.UTF_8) } shouldBe "hello pelican"
+    }
+
+    /**
+     * A stream each way in one call, which no in-memory transport can carry
+     * either: the frames go up over `Body.Streaming` and come back down as the
+     * response is read, so the whole exchange is two streams and one socket.
+     */
+    @Test
+    fun `a streamed upload goes up as frames and the placed orders come back as frames`() {
+        val rows = (1..3).asSequence().map { n -> CreateOrder("item-$n", quantity = n) }
+
+        val placed = client.ingestOrders(userId = 1L, body = rows).use { it.toList() }
+
+        placed.map { it.item } shouldBe listOf("item-1", "item-2", "item-3")
+        placed.map { it.quantity } shouldBe listOf(1, 2, 3)
     }
 
     @Test

@@ -9,6 +9,7 @@ import example.cancelOrder
 import example.echo
 import example.getUser
 import example.importOrders
+import example.ingestOrders
 import example.limit
 import example.listOrders
 import example.noSuchUser
@@ -39,6 +40,7 @@ import io.github.matthewjones372.pelican.http4k.handledOrFail
 import io.github.matthewjones372.pelican.http4k.handledWith
 import io.github.matthewjones372.pelican.http4k.streamedNow
 import io.github.matthewjones372.pelican.http4k.streamedOrFail
+import io.github.matthewjones372.pelican.http4k.toSequence
 import io.github.matthewjones372.pelican.http4k.toStream
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.lastEventId
@@ -131,6 +133,12 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
             session,
             declared,
         )
+    },
+
+    // The Pekko handler with `Source` read as `Sequence`, which is the whole
+    // of the difference: the upload is pulled as the answer is written.
+    ingestOrders streamedNow { (id, rows) ->
+        rows.toSequence().map { req -> Store.create(id, req) }
     },
 
     // Byte for byte the Pekko handler, because a decoded union branch is a

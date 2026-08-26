@@ -52,6 +52,13 @@ val newOrder = jsonBody<CreateOrder>(description = "The order to place")
 val payment = jsonBody<PaymentMethod>(description = "How the order is being paid for")
 val rawUpload = rawBody(description = "Anything; it is never buffered")
 
+/**
+ * A typed upload: one order per line, decoded and placed as the line arrives.
+ * `rawUpload` is the same promise without the types — this one names what a
+ * frame is, so the document says it and the codec enforces it.
+ */
+val orderRows = ndjsonIn<CreateOrder>(description = "One order to place per line")
+
 // A cookie is an ordinary input, not a credential: this one is a session the
 // caller may or may not have, and reading it is the same three lines a header
 // takes.
@@ -234,6 +241,21 @@ val importOrders = endpoint(userId, session, importLabel, importManifest, import
 }
 
 /**
+ * Streamed both ways in one call: the orders arrive a line at a time and the
+ * placed ones go back a line at a time, so a caller uploading a hundred
+ * thousand rows sees the first receipt without waiting for the last upload.
+ * Nothing but the frame being read is held at either end.
+ */
+val ingestOrders = endpoint(userId, orderRows) {
+    post("users" / userId / "orders" / "ingest")
+    summary = "Place a run of orders from a streamed upload"
+    operationId = "ingestOrders"
+    description = "Rows are decoded and placed as they arrive; a row that will not decode is a 400 naming it."
+    tag("orders")
+    ndjson<Order>()
+}
+
+/**
  * The lens style, for when there are more inputs than a tuple can carry
  * comfortably. Inputs are declared with query()/header() and read by key. The
  * trade: reading an undeclared key is a runtime error rather than a compile
@@ -267,7 +289,7 @@ val reindex = endpoint(apiKey) {
 /** Everything above, in one list, so the server and the docs cannot drift. */
 val allEndpoints: List<Endpoint<*, *>> = listOf(
     getUser, streamOrders, watchOrders, listOrders, placeOrder, submitOrder, placeOrderForm, importOrders,
-    payOrder, cancelOrder, echo, searchOrders, reindex,
+    ingestOrders, payOrder, cancelOrder, echo, searchOrders, reindex,
 )
 
 // ----------------------------------------------------------------- webhooks

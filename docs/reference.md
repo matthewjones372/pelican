@@ -4713,6 +4713,130 @@ Core also owns the framing — `NdjsonOutput.frame(codec, value)` renders one
 element — so the backend only supplies wire mechanics. Nothing about NDJSON or
 SSE format is duplicated per backend.
 
+## A typed upload
+
+`rawBody()` hands a handler the request body unread, and what a frame is stays
+that handler's own business. `ndjsonIn<T>()` says it in the description instead:
+one JSON document per line, decoded by the configured codec, handed over as the
+lines arrive.
+
+```kotlin
+val orderRows = ndjsonIn<CreateOrder>(description = "One order to place per line")
+
+val ingestOrders = endpoint(userId, orderRows) {
+    post("users" / userId / "orders" / "ingest")
+    ndjson<Order>()
+}
+```
+
+It occupies the body slot, so it composes with everything that does not travel
+in the body — path captures, query parameters, headers, cookies — and a second
+body beside it is refused where it is declared rather than silently replacing
+the first.
+
+The marker is an interface rather than the phantom [`StreamOf`](#how-streaming-stays-backend-agnostic)
+that types a streamed *response*, because a streamed input is one slot of the
+handler's argument tuple and no binder can retype one slot of a tuple. So the
+request carries a value, exactly as `rawBody()`'s `ByteStreamHandle` does, and
+each backend hands over its own stream:
+
+```kotlin
+// pelican-pekko
+fun <T> StreamIn<T>.toSource(): Source<T, NotUsed>
+
+// pelican-http4k
+fun <T> StreamIn<T>.toSequence(): Sequence<T>
+
+// pelican-ktor
+fun <T> StreamIn<T>.toFlow(): Flow<T>
+```
+
+Core owns the framing at this end too, so the splitter that reads an upload and
+the `NdjsonOutput.frame` that writes an answer agree on where a frame ends by
+construction. Nothing is held but the frame being read: on all three backends
+the first frame reaches the handler before the last one is sent, which
+`UploadTimingTest` asserts over a socket by writing one frame and reading its
+answer before writing the rest.
+
+### Answering with a value, or with a stream
+
+Answering with a stream is the shape above: the response is the upload's own
+graph with a `map` on it, and back-pressure runs from the downloading socket
+through the handler to the uploading one. No materializer is involved — the
+interpreter runs it.
+
+Answering with a *value* means consuming the upload first. On http4k and Ktor
+that is `count()`, `fold` or any other terminal operation. On Pekko consuming a
+`Source` needs a materializer, so `pelican-pekko` supplies one:
+
+```kotlin
+tally handledBy { rows ->
+    rows.runWith(Sink.fold(0) { n: Int, _ -> n + 1 }).thenApply { Tally(it) }
+}
+```
+
+Which shape to pick is also what decides whether a bad frame can be refused
+properly — see below.
+
+### What a bad frame is told
+
+Two refusals, both classified in core and rendered through the service's
+[configured envelope](#which-envelope-a-refusal-is-written-in):
+
+- **A frame that will not decode** is a 400 naming the frame — *"Frame 3 of the
+  request body could not be read: …"*. Blank lines are counted, so the number is
+  the line of the upload a caller can go and look at.
+- **A frame longer than `maxFrameBytes`** is a 413, refused on the byte that
+  crosses the line rather than once the frame has been assembled.
+
+```kotlin
+api(endpoints = routes, codecs = JacksonCodecs) {
+    maxBodyBytes = 8 * 1024 * 1024
+    maxFrameBytes = 64 * 1024      // unset, this takes maxBodyBytes
+}
+```
+
+`maxFrameBytes` is separate from `maxBodyBytes` because a stream has no total
+length to bound — bounding it would be refusing to stream — and one frame that
+never ends is the way to run a service out of memory with a single upload.
+
+Both reach `onRefusal` under the reasons a refusal counter already maps,
+`decode` and `body_limit`, so a streamed upload is counted like any other
+refused request.
+
+One consequence of streaming both ways: a response that has already begun cannot
+change its status. An endpoint answering `ndjson<T>()` has written `200` and its
+first frames before a bad frame further up the upload is reached, so the stream
+simply fails. An endpoint that answers with a value has not committed to
+anything yet, and that is where the 400 and the 413 are what a caller sees.
+
+### What the document says, and what a client sends
+
+The request body is published under `application/x-ndjson` with one frame's
+schema — under `itemSchema` in an OpenAPI 3.2 document and under `schema` in a
+3.1 one, exactly as a streamed *response* is. An import reads both spellings
+back into `ndjsonIn<T>()`; nothing about the declaration fails to travel, since
+`maxFrameBytes` is a setting on the service that reads the upload rather than
+anything a document says — the same way `maxBodyBytes` is for a strict body.
+
+A generated client takes a `Sequence<T>` and sends it over
+`ClientRequest.Body.Streaming`, encoding a frame when the transport asks for it:
+
+```kotlin
+val placed = client.ingestOrders(userId = 1L, body = rows).use { it.toList() }
+```
+
+A `Sequence` in both call styles, because a streamed *response* comes back as
+one in both: `Body.Streaming` hands the transport a `java.io.InputStream`, which
+is pulled rather than pushed, and a `Flow` bridged to it would either buffer the
+upload or park a thread per call.
+
+The typed test client sends the frames buffered — `client.call(tally,
+frames(rows))` — because a test that has already written its rows down as a list
+is not the test that proves they leave one at a time. `InMemoryClientTransport`
+refuses such a call by name, for the reason it refuses a `bytes(...)` body: the
+frames a handler reads are its backend's own stream, and core cannot build one.
+
 ## An event stream a caller can pick up again
 
 ```kotlin

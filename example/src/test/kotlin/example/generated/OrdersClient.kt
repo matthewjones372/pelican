@@ -847,6 +847,20 @@ class OrdersClient(
     }
 
     /**
+     * Place a run of orders from a streamed upload
+     *
+     * Rows are decoded and placed as they arrive; a row that will not decode is a 400 naming it.
+     *
+     * `POST /users/{userId}/orders/ingest`
+     */
+    fun ingestOrders(userId: Long, body: Sequence<CreateOrder>): Streamed<Order> {
+        val response = stream(request(Method.POST, "/users/${segment(userId)}/orders/ingest", body = ndjsonBody(body) { createOrderCodec.encodeToString(it) }, contentType = "application/x-ndjson", deadline = null))
+        if (!response.succeeded()) failedStream(Method.POST, "/users/{userId}/orders/ingest", response)
+        val stream = response.body
+        return Streamed(stream, ndjsonFrames(stream.bufferedReader()).map { orderCodec.decoded(it, Method.POST, "/users/{userId}/orders/ingest", response.status) })
+    }
+
+    /**
      * Pay for an order
      *
      * `POST /users/{userId}/orders/{orderId}/payment`

@@ -620,6 +620,61 @@
         }
       }
     },
+    "/users/{userId}/orders/ingest": {
+      "post": {
+        "summary": "Place a run of orders from a streamed upload",
+        "description": "Rows are decoded and placed as they arrive; a row that will not decode is a 400 naming it.",
+        "operationId": "ingestOrders",
+        "tags": [
+          "orders"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user's id",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "One order to place per line",
+          "content": {
+            "application/x-ndjson": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A newline-delimited JSON stream. Chunked; consume incrementally.",
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/users/{userId}/orders/{orderId}/payment": {
       "post": {
         "summary": "Pay for an order",
