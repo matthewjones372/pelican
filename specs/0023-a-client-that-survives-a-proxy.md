@@ -55,14 +55,14 @@ Ktor's plugin, so the honest fix is at the call site that knows it streams.
 
 ## Stack
 
-- [ ] **`spec-0023-decode-guard`** — codegen templates wrap success and
+- [x] **`spec-0023-decode-guard`** — codegen templates wrap success and
       failure decode in `ApiCallFailed`; golden clients regenerated; first
       tests for the `ApiCallFailed` paths, including HTML-for-JSON.
       Done when: a declared 404 with an HTML body surfaces status, path, and raw body.
-- [ ] **`spec-0023-inmemory-transport`** — `InMemoryClientTransport(api)` in
+- [x] **`spec-0023-inmemory-transport`** — `InMemoryClientTransport(api)` in
       core, streaming supported, one generated-client suite migrated to it.
       Done when: `GeneratedKotlinClientTest` passes with no port bound.
-- [ ] **`spec-0023-streaming-timeout`** — generated streamed calls stop
+- [x] **`spec-0023-streaming-timeout`** — generated streamed calls stop
       inheriting the blanket timeout; per-transport timeout semantics get a
       table in `docs/generated-client.md`, plus the missing `Authorization`
       recipe.
