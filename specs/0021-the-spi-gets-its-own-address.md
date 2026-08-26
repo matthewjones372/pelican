@@ -1,5 +1,12 @@
 # 0021 — The SPI gets its own address
 
+> Completion note (2026-08-26): `multipartBoundary` and `MultipartBody.decode`
+> — the multipart helpers this spec named — landed in `spi` with the RC.
+> `formCodec`, `parseFormBody` and `renderFormBody` deliberately stay in the
+> root package: a generated client imports `formCodec` from core, so they are
+> caller-facing surface, pinned by the `clients` fixture, not interpreter
+> plumbing.
+
 ## Problem
 
 About twenty functions exist only so interpreters in other modules can call

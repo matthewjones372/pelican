@@ -34,6 +34,9 @@ class SpiPackageTest {
         "decodeList",
         "acceptable",
         "CorsHeaders",
+        // `MultipartBody.decode` moved with it, but `decode` is also every
+        // codec's own method name, so the boundary is the name checked.
+        "multipartBoundary",
     )
 
     /** The directory the module's own classes were compiled into. */

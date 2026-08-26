@@ -880,11 +880,6 @@ public final class io/github/matthewjones372/pelican/MultipartBody : io/github/m
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/MultipartKt {
-	public static final fun decode (Lio/github/matthewjones372/pelican/MultipartBody;Ljava/lang/String;Ljava/io/InputStream;JLjava/util/Map;)V
-	public static final fun multipartBoundary (Ljava/lang/String;)Ljava/lang/String;
-}
-
 public abstract class io/github/matthewjones372/pelican/MultipartPart : io/github/matthewjones372/pelican/ParamKey {
 	public abstract fun getDescription ()Ljava/lang/String;
 	public abstract fun getName ()Ljava/lang/String;
@@ -1551,6 +1546,11 @@ public final class io/github/matthewjones372/pelican/spi/HandlersKt {
 	public static final fun failureNamedBy (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Outcome$Err;)Lio/github/matthewjones372/pelican/ErrorOutput;
 	public static final fun handlerFor (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/ServerEndpoint;)Lkotlin/jvm/functions/Function1;
 	public static final fun successNamedBy (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Outcome$Ok;)Lio/github/matthewjones372/pelican/Output;
+}
+
+public final class io/github/matthewjones372/pelican/spi/MultipartDecodeKt {
+	public static final fun decode (Lio/github/matthewjones372/pelican/MultipartBody;Ljava/lang/String;Ljava/io/InputStream;JLjava/util/Map;)V
+	public static final fun multipartBoundary (Ljava/lang/String;)Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/spi/NdjsonFrames {

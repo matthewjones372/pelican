@@ -7,12 +7,14 @@ package example.hello
  * two lines of test the README shows beside it.
  */
 
-import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pekko.*
-import io.github.matthewjones372.pelican.pekko.docs.Docs
+import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.pekko.handledNow
 
 data class Greeting(val message: String)
 

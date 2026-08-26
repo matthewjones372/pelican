@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican
 
+import io.github.matthewjones372.pelican.spi.decode
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
