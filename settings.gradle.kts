@@ -18,6 +18,7 @@ include(
     "pelican-openapi",
     "pelican-schema",
     "pelican-mcp",
+    "pelican-mcp-server",
     "pelican-codegen",
     "pelican-import",
     "pelican-jackson",

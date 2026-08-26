@@ -66,6 +66,7 @@ val moduleDescriptions = mapOf(
     "pelican-openapi" to "Endpoint descriptions to an OpenAPI 3.1.0 or 3.2.0 document.",
     "pelican-schema" to "A type to a self-contained JSON Schema 2020-12 document.",
     "pelican-mcp" to "Endpoint descriptions to MCP tool descriptions.",
+    "pelican-mcp-server" to "Serves those tools: MCP over stdio and Streamable HTTP, no SDK.",
     "pelican-codegen" to "Endpoint descriptions to a Kotlin client, as source.",
     "pelican-import" to "An OpenAPI document to endpoint descriptions, as source.",
     "pelican-jackson" to "Jackson codecs and swagger-core schemas for Pelican.",

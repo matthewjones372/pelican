@@ -1,0 +1,16 @@
+public final class io/github/matthewjones372/pelican/mcp/server/McpServer {
+	public final fun handle (Ljava/lang/String;)Ljava/util/concurrent/CompletionStage;
+}
+
+public final class io/github/matthewjones372/pelican/mcp/server/ProtocolKt {
+	public static final field MCP_PROTOCOL_VERSION Ljava/lang/String;
+	public static final fun mcpServer (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;)Lio/github/matthewjones372/pelican/mcp/server/McpServer;
+	public static synthetic fun mcpServer$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/mcp/server/McpServer;
+	public static final fun toJson (Lio/github/matthewjones372/pelican/mcp/ToolResult;)Lio/github/matthewjones372/pelican/JsonObj;
+}
+
+public final class io/github/matthewjones372/pelican/mcp/server/ServerKt {
+	public static final fun mcpServe (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/io/InputStream;Ljava/io/OutputStream;)V
+	public static synthetic fun mcpServe$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/io/InputStream;Ljava/io/OutputStream;ILjava/lang/Object;)V
+}
+
