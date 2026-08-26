@@ -539,8 +539,7 @@ descriptions in one file, a binding file per backend.
 ./gradlew :example:runBackends           # the greetings service, through the backend seam
 ./gradlew :example:runCodecs             # the notes service, over a codec module it does not name
 ./gradlew :example:runSecured            # a filter enforcing the security the descriptions declare
-./gradlew :example:runMetrics            # Micrometer meters tagged from the descriptions, at /admin/meters
-./gradlew :example:runTracing            # OpenTelemetry spans from the same descriptions, at /admin/traces
+./gradlew :example:runTelemetry          # meters and spans from one set of descriptions, at /admin/report
 ./gradlew :example:runShop               # a bookshop: three domain failures, three declared responses
 ./gradlew :example:runMcp                # the orders API with its tools served on /mcp
 ./gradlew :example:generateOrdersDocument  # the spec, with no server started

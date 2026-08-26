@@ -1,7 +1,5 @@
 package example.telemetry
 
-import example.tracing.RecordedSpans
-import example.tracing.recordingTelemetry
 import io.github.matthewjones372.pelican.pekko.start
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.config.MeterFilter

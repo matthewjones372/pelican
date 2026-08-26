@@ -1,7 +1,5 @@
 package example.telemetry
 
-import example.tracing.RecordedSpans
-import example.tracing.recordingTelemetry
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.pekko.inMemory
