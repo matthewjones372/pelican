@@ -51,13 +51,13 @@ considered: fine for `ClientRequest`, unpleasant for fifteen `Api` fields.
 
 ## Stack
 
-- [ ] **`spec-0019-api-builder`** — `api(...)` factory + builder in core, `Api`
+- [x] **`spec-0019-api-builder`** — `api(...)` factory + builder in core, `Api`
       constructor internal, call sites and docs migrated.
       Done when: `apiDump` shows no public `Api` constructor and `./gradlew build` is green.
-- [ ] **`spec-0019-satellites`** — same for `RetryPolicy`, `ClientRequest`
+- [x] **`spec-0019-satellites`** — same for `RetryPolicy`, `ClientRequest`
       (withers), `Docs`/`DocsOAuth`, `McpOptions`.
       Done when: no public constructor with more than four parameters remains in any dump.
-- [ ] **`spec-0019-abi-hygiene`** — `Ansi` internal behind a public no-op or
+- [x] **`spec-0019-abi-hygiene`** — `Ansi` internal behind a public no-op or
       moved into the report; `-jvm-default=no-compatibility` across modules;
       dumps regenerated once.
       Done when: no `DefaultImpls` entry and no reference to a non-public supertype in any `.api` file.
