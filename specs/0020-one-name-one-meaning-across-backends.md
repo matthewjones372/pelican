@@ -51,14 +51,14 @@ pitch is "same description, any backend".
 
 ## Stack
 
-- [ ] **`spec-0020-start-alignment`** — `start(port, host = "127.0.0.1", ...)`
+- [x] **`spec-0020-start-alignment`** — `start(port, host = "127.0.0.1", ...)`
       on Pekko and Ktor; http4k gains the host parameter.
       Done when: a parity test pins signature and bind default on all three.
-- [ ] **`spec-0020-server-shape`** — Pekko `PelicanServer` gains
+- [x] **`spec-0020-server-shape`** — Pekko `PelicanServer` gains
       `AutoCloseable`, `block()`, `stop(): Unit` (async stop stays as
       `stopAsync()`).
       Done when: the same `use { }` block compiles and passes against all three.
-- [ ] **`spec-0020-handled-now-doc`** — the "in place" definition in
+- [x] **`spec-0020-handled-now-doc`** — the "in place" definition in
       `docs/reference.md`, plus the binder-name parity test.
       Done when: the reference states the Ktor meaning and the test names all binders per backend.
 
