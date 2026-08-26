@@ -25,6 +25,8 @@ one.
 - **An encoded slash stays inside the segment that carried it.** The path is
   split on `/` before anything is decoded, so `/items/a%2Fb` is one captured
   value and never two segments and a different route.
+- **`?q` on http4k is a present, empty value**, as it already was on Pekko and
+  Ktor, rather than indistinguishable from a parameter nobody sent.
 
 ### Changed
 

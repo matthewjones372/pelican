@@ -96,6 +96,12 @@ dependencies {
     // library ships assertions that throw AssertionError; which matcher
     // library a suite uses on top is the suite's own choice.
     testImplementation("io.kotest:kotest-assertions-core:6.2.4")
+
+    // Generators, for the one suite that asks a question about *every* string
+    // rather than about the seven a person thought of. Test scope, and only
+    // here: what it generates are request lines, and this is where all three
+    // backends are running side by side to be asked the same one.
+    testImplementation("io.kotest:kotest-property:6.2.4")
 }
 
 /**

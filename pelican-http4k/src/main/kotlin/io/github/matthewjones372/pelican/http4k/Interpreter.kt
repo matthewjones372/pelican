@@ -207,7 +207,12 @@ private fun decodePlainInputs(ep: Endpoint<*, *>, req: Request, into: MutableMap
             put(q, q.decodeList(req.queries(q.name).filterNotNull()))
             return@forEach
         }
-        val raw = req.query(q.name)
+        // `?q`, with no `=`, is http4k's null — indistinguishable from a
+        // parameter nobody sent. Pekko and Ktor both read it as the name
+        // present and empty, which is what someone who typed it meant, so
+        // "present" is decided by the list and "what" by its first entry.
+        val sent = req.queries(q.name)
+        val raw = if (sent.isEmpty()) null else sent.first().orEmpty()
         put(
             q,
             when {

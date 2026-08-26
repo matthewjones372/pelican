@@ -184,9 +184,16 @@ Two of these used to be wrong three different ways. Captures were decoded with
 space; literals were matched raw while captures were matched decoded; and a
 malformed escape threw where a backend's last-resort catch turned it into a 500.
 
-Query values are a different question with a different answer: `+` there *does*
-mean a space, because that is what the form encoding a browser sends says, and
-each backend's own parser reads the query string.
+Query values are a different question with a different answer. A query string is
+`application/x-www-form-urlencoded`, so `?q=a+b` *is* `a b` there and `?q=a%2Bb`
+is `a+b`. `?q=` and a bare `?q` both arrive as a present, empty value, and only
+a parameter nobody sent at all is absent — which is the difference an
+`optional()` or a `default(...)` acts on.
+
+`RequestLinePropertyTest` makes both halves of this a property rather than a
+table: for two hundred generated strings per backend, a value sent in the path
+and in the query of one typed call comes back as itself, and a request line
+`java.net.URI` will not even hold is answered with a 4xx.
 
 ### The server underneath
 
