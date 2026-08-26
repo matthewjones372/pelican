@@ -30,7 +30,7 @@ Removed from main: `pelican-http4k`, `pelican-http4k-docs`,
 `pelican-jsoniter`, `pelican-kotlinx`.
 
 Kept: core, schema, openapi, import, codegen, gradle-plugin, jackson, mcp,
-mcp-server, pekko + pekko-docs + pekko-mcp, client-java, client-okhttp,
+mcp-server, pekko + pekko-docs + pekko-mcp, client-java, client-pekko, client-okhttp,
 test, test-golden, test-pekko, metrics, metrics-otel, benchmarks, example.
 
 Example keeps the `Backend`/`Running` seam and every parity test, running
