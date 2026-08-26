@@ -4614,6 +4614,39 @@ replay storage and fan-out stay where they were. Under 3.2 the described event's
 `id` says so in as many words, because a caller cannot infer from a string field
 that sending it back is how the stream is picked up again.
 
+### And on the calling side
+
+A generated method answering with an event stream takes a trailing
+`lastEventId: String? = null` and sends it as the header, and the `Streamed<T>`
+it hands back reports the id it reached:
+
+```kotlin
+val ticks = client.watchOrders(1L, limit = 2)
+ticks.map { it.seq }.toList()   // [1, 2]
+ticks.lastEventId               // "2"
+
+client.watchOrders(1L, limit = 2, lastEventId = ticks.lastEventId)  // 3, 4
+```
+
+`lastEventId` is the id of the last event *handed over*, so it is read after
+the sequence rather than off the response; a frame carrying no `id:` leaves the
+previous one standing, which is what the SSE specification says the last event
+id does. The parameter is generated for every endpoint answering
+`text/event-stream`, not only those whose description declares an extractor: a
+document cannot say whether a service assigns ids, so gating on it would make a
+client generated from the description differ from one generated from the
+document it publishes.
+
+`pelican-test`'s typed client takes the same argument —
+`app.collect(watchOrders, In2(1L, 3), lastEventId = "4")` — and `RequestSpec`
+already had `withHeader` for a hand-built one.
+
+**Reconnecting itself is not done for you.** No generated client loops,
+backs off, or decides how much of a gap is worth replaying: that is a policy,
+like retrying, and one whose right answer depends on what the stream carries.
+What is here is the seam — an id out, an id back in — so a caller can write the
+loop that suits them.
+
 `jsonArray<T>()` is the deliberate exception. Pekko already frames a stream of
 JSON documents as an array via `EntityStreamingSupport.json()`, and
 reimplementing brace-and-comma handling in core would be strictly worse than

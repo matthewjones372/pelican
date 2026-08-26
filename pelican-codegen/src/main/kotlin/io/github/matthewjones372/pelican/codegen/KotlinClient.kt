@@ -497,7 +497,11 @@ private class KotlinClientEmitter(
         val produced = when {
             isStream(out) -> {
                 appendLine("val body = response.body")
-                "Streamed(body, ${frames(out)}.map { ${decodeExpression(elementType(out), "it", at)} })"
+                val decode = decodeExpression(elementType(out), "it", at)
+                // An event stream hands back the id it reached as well as the
+                // values, so a caller that stops can say where to start again.
+                if (out is SseOutput<*>) "sseStreamed(body) { $decode }"
+                else "Streamed(body, ${frames(out)}.map { $decode })"
             }
 
             out is ByteStreamOutput -> "response.body"
@@ -722,6 +726,17 @@ private class KotlinClientEmitter(
         // first rendering, which is not the one this method decodes.
         rendering?.let { headerPairs += "\"Accept\" to ${kotlinString(checkNotNull(it.mediaType))}" }
         ep.cookieParams.forEach { parameter(it.name, it.codec, it.required, it.listStyle, cookiePairs) }
+
+        // Where a caller reconnecting to an event stream left off, sent as the
+        // header the server reads it from. A parameter rather than a loop the
+        // client runs: reconnecting is a policy, like retrying, and a client
+        // that decided it for the caller would be deciding how much of a gap
+        // is worth replaying.
+        if (declaredSuccesses(ep).any { it is SseOutput<*> }) {
+            val name = unique("lastEventId", taken)
+            optional += "$name: String? = null"
+            headerPairs += "${kotlinString(SseOutput.LAST_EVENT_ID)} to $name"
+        }
 
         val arguments = buildList {
             add("Method.${ep.method.name}")

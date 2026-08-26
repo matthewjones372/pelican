@@ -146,7 +146,9 @@ val watchOrders = endpoint(userId, limit) {
     summary = "Live order events over server-sent events"
     operationId = "watchOrders"
     tag("orders")
-    sse<Tick>(eventName = "order")
+    // Every event carries its sequence as the `id:`, so a caller whose
+    // connection drops sends the last one back and is answered from there.
+    sse<Tick>(eventName = "order", id = { it.seq.toString() })
 }
 
 /**

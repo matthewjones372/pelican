@@ -5,6 +5,7 @@ import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.lastEventId
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.openapi.docs
@@ -35,7 +36,10 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     },
 
     watchOrders streamedNow { (_, max) ->
-        Source.range(1, max)
+        // A reconnect says where it got to, so the run starts after that
+        // rather than replaying what the caller already has.
+        val from = lastEventId()?.toIntOrNull() ?: 0
+        Source.range(from + 1, from + max)
             .throttle(1, Duration.ofMillis(100))
             .map { seq -> Tick(seq, "order-event-$seq") }
     },

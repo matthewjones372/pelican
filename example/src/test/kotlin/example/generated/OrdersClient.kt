@@ -129,7 +129,15 @@ class TextResponse internal constructor(
 class Streamed<T> internal constructor(
     private val body: InputStream,
     private val elements: Sequence<T>,
+    private val ids: EventIds = EventIds(),
 ) : Sequence<T>, AutoCloseable {
+
+    /**
+     * The `id:` of the most recent event handed over, to reconnect from where
+     * this stream stopped — pass it back as the call's `lastEventId`. Null
+     * before the first one arrives, and on a stream that sends no ids at all.
+     */
+    val lastEventId: String? get() = ids.last
 
     private var iterated = false
 
@@ -151,24 +159,55 @@ internal fun ndjsonFrames(reader: BufferedReader): Sequence<String> =
     reader.lineSequence().filter { it.isNotBlank() }
 
 /**
+ * Where a stream that sends ids has reached. Written by the frame reader and
+ * read through [Streamed.lastEventId]; separate from both so the sequence can
+ * report progress to a response it is being read out of.
+ */
+internal class EventIds {
+    var last: String? = null
+}
+
+/**
+ * An event stream read as values, keeping the id of the last one delivered.
+ * The reader and the id it fills in are made together, so a caller of the
+ * generated method has nothing to wire up.
+ */
+internal fun <T> sseStreamed(body: InputStream, decode: (String) -> T): Streamed<T> {
+    val ids = EventIds()
+    return Streamed(body, sseFrames(body.bufferedReader(), ids).map(decode), ids)
+}
+
+/**
  * Server-sent events. A frame's payload may be split across several `data:`
  * lines, rejoined with newlines here — the same rule the server framed them by.
+ *
+ * An `id:` is recorded as its own frame is handed over, so the id a caller
+ * reads is the one belonging to the event it is holding. A frame carrying none
+ * leaves the previous id standing, which is what the SSE specification says the
+ * last event id does.
  */
-internal fun sseFrames(reader: BufferedReader): Sequence<String> = sequence {
+internal fun sseFrames(reader: BufferedReader, ids: EventIds = EventIds()): Sequence<String> = sequence {
     val data = mutableListOf<String>()
+    var id: String? = null
     for (raw in reader.lineSequence()) {
         val line = raw.removeSuffix("\r")
         when {
             line.isEmpty() -> if (data.isNotEmpty()) {
+                id?.let { ids.last = it }
                 yield(data.joinToString("\n"))
                 data.clear()
+                id = null
             }
 
             line.startsWith(":") -> Unit // comment, typically a keep-alive
+            line.startsWith("id:") -> id = line.removePrefix("id:").removePrefix(" ")
             line.startsWith("data:") -> data += line.removePrefix("data:").removePrefix(" ")
         }
     }
-    if (data.isNotEmpty()) yield(data.joinToString("\n"))
+    if (data.isNotEmpty()) {
+        id?.let { ids.last = it }
+        yield(data.joinToString("\n"))
+    }
 }
 
 /**
@@ -704,11 +743,11 @@ class OrdersClient(
      *
      * `GET /users/{userId}/orders/watch`
      */
-    fun watchOrders(userId: Long, limit: Int? = null): Streamed<Tick> {
-        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/watch", query = listOf("limit" to limit), deadline = null))
+    fun watchOrders(userId: Long, limit: Int? = null, lastEventId: String? = null): Streamed<Tick> {
+        val response = stream(request(Method.GET, "/users/${segment(userId)}/orders/watch", query = listOf("limit" to limit), headerParams = listOf("Last-Event-ID" to lastEventId), deadline = null))
         if (!response.succeeded()) failedStream(Method.GET, "/users/{userId}/orders/watch", response)
         val body = response.body
-        return Streamed(body, sseFrames(body.bufferedReader()).map { tickCodec.decoded(it, Method.GET, "/users/{userId}/orders/watch", response.status) })
+        return sseStreamed(body) { tickCodec.decoded(it, Method.GET, "/users/{userId}/orders/watch", response.status) }
     }
 
     /**

@@ -270,6 +270,18 @@ class GeneratedKotlinClientTest {
         withClue("two of ten events took ${elapsedMs}ms — that looks buffered") { elapsedMs shouldBeLessThan 700 }
     }
 
+    @Test
+    fun `a stream reports the id it reached, and reconnecting from it picks up after`() {
+        val first = client.watchOrders(1L, limit = 2)
+        first.map { it.seq }.toList() shouldBe listOf(1, 2)
+        // Read after the sequence, because it is the id of the last event
+        // handed over rather than a property of the response.
+        first.lastEventId shouldBe "2"
+
+        val resumed = client.watchOrders(1L, limit = 2, lastEventId = first.lastEventId)
+        resumed.map { it.seq }.toList() shouldBe listOf(3, 4)
+    }
+
     // ------------------------------------------------------------ the file itself
 
     @Test

@@ -41,6 +41,7 @@ import io.github.matthewjones372.pelican.http4k.streamedNow
 import io.github.matthewjones372.pelican.http4k.streamedOrFail
 import io.github.matthewjones372.pelican.http4k.toStream
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.lastEventId
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.openapi.docs
@@ -75,7 +76,8 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
         // The sequence is walked as the socket drains, so sleeping in it delays
         // the next event rather than the whole response — the `Source.throttle`
         // of a server that answers on the calling thread.
-        (1..max).asSequence().map { seq ->
+        val from = lastEventId()?.toIntOrNull() ?: 0
+        (from + 1..from + max).asSequence().map { seq ->
             Thread.sleep(100)
             Tick(seq, "order-event-$seq")
         }

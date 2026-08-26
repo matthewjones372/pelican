@@ -130,6 +130,17 @@ one.
   nothing stops a filter forging. What is done with it stays the service's:
   Pelican frames and delivers, and retention is not its business. Under
   OpenAPI 3.2 the described event's `id` carries the contract in words.
+- **Clients that can pick a stream up again.** A generated method answering
+  `text/event-stream` takes a trailing `lastEventId: String? = null` and sends
+  it as the header, and the `Streamed<T>` it returns reports `lastEventId` —
+  the id of the last event handed over, so it is read after the sequence rather
+  than off the response. `pelican-test`'s `collect(...)` takes the same
+  argument. The parameter is generated for every event stream rather than only
+  those declaring an extractor, so a client generated from a description and
+  one generated from the document it publishes stay identical. Reconnecting
+  itself is deliberately not done for you: no loop, no backoff, no decision
+  about how much of a gap is worth replaying — that is a policy, like retrying,
+  and what is here is the seam for writing it.
 - **One response, several renderings**, chosen by the caller's `Accept`:
   `negotiated(json<Report>(200), media<Report>("text/csv", 200))` is one
   declared response written two ways. The handler goes on returning a `Report`;
