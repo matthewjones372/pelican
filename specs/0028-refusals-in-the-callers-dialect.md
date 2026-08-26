@@ -45,10 +45,10 @@ construction.
 
 ## Stack
 
-- [ ] **`spec-0028-renderer-value`** — `RefusalRenderer`, the two shipped
+- [x] **`spec-0028-renderer-value`** — `RefusalRenderer`, the two shipped
       renderers, `renderError` routed through it.
       Done when: default output is byte-identical to today across the refusal suite.
-- [ ] **`spec-0028-document`** — refusal schemas in the emitted document
+- [x] **`spec-0028-document`** — refusal schemas in the emitted document
       follow the configured renderer.
       Done when: `OpenApiSpecQualityTest` and the golden files agree with the selected envelope.
 
