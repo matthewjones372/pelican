@@ -57,6 +57,8 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
 
     forget handledWith { _ -> },
 
+    peek handledWith { _ -> },
+
     ticker streamedNow { ticks().asSequence() },
     everyone streamedNow { greetingsOf().asSequence() },
 

@@ -56,6 +56,8 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
 
     forget handledWith { _ -> },
 
+    peek handledWith { _ -> },
+
     ticker streamedNow { Source.from(ticks()) },
     everyone streamedNow { Source.from(greetingsOf()) },
 

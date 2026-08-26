@@ -64,6 +64,15 @@ one.
 
 ### Added
 
+- **Four claims the parity suite made and never asked.** A handler that throws
+  answers the same `ApiError` on all three backends — a 500 whose detail is a
+  reference to grep the log for, nothing of the throwable, and the header a
+  filter stamped still on it. A declared HEAD endpoint answers on all three; a
+  HEAD aimed at a GET endpoint is pinned per backend as the difference it is
+  (Pekko 404, http4k 405, Ktor 404). A chunked body over the limit is refused
+  on http4k and Ktor, as it already was on Pekko. And a list header split over
+  two field lines decodes as two values, not one.
+
 - **Three refusals where something was published as what it is not.** Two types
   wanting one component name are refused where the schema is built, naming both
   — all three sources named a component after the simple name and let the second

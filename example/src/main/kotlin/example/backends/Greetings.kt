@@ -3,6 +3,7 @@ package example.backends
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.LongCodec
+import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.StringCodec
 import io.github.matthewjones372.pelican.UploadedFile
@@ -25,6 +26,7 @@ import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.or
 import io.github.matthewjones372.pelican.orFail
+import io.github.matthewjones372.pelican.path
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.positive
 import io.github.matthewjones372.pelican.queryParam
@@ -316,6 +318,20 @@ val forget = endpoint(name) {
 }
 
 /**
+ * A declared HEAD, which every router here maps and no description used. The
+ * headers are the whole answer — see `HeadRequestsTest`, which also pins what
+ * each engine does with a HEAD nobody declared.
+ */
+val peek = endpoint {
+    route(Method.HEAD, path("peek"))
+    summary = "Say the service is up, in headers alone"
+    operationId = "peek"
+    tag("greetings")
+    emits(requestId)
+    empty(200)
+}
+
+/**
  * The three remaining output kinds core frames itself, and the one input it
  * hands over unread. Same reason as [motd]: described once here rather than
  * twice in two backends' fixtures and nowhere on the third.
@@ -365,7 +381,7 @@ val ticker = endpoint {
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
-        roundtrip, motd, forget, everyone, logo, echoRaw, ticker,
+        roundtrip, motd, forget, peek, everyone, logo, echoRaw, ticker,
     )
 
 /**
@@ -415,16 +431,28 @@ internal fun echoed(trace: String?, note: Note) = Echoed(note.text, trace)
 /** The note that this service refuses to repeat; see [echoOrRefuse]. */
 internal const val FLOOD = "flood"
 
+/** The note this service breaks on; see [echoOrRefuse]. */
+internal const val BOOM = "boom"
+
+/**
+ * What the bug says. Nothing a caller is entitled to, which is the claim
+ * `ThrowingHandlerTest` makes of the 500 that comes back.
+ */
+internal const val BOOM_DETAIL = "the note that broke the handler"
+
 /** How long the refusal says to wait. */
 private const val WAIT_SECONDS = 5L
 
 /**
- * Either the echo or the declared 429, with the `Retry-After` that failure
- * promised.
+ * Either the echo, the declared 429 with the `Retry-After` that failure
+ * promised, or — for [BOOM] — a failure nobody declared at all. A service has
+ * bugs, and what all three backends answer for one is a claim like any other.
  */
-internal fun echoOrRefuse(trace: String?, note: Note): Outcome<ApiError, Echoed> =
-    if (note.text == FLOOD) tooMuch(ApiError(429, "Slow down"), retryAfter of WAIT_SECONDS)
-    else ok(echoed(trace, note))
+internal fun echoOrRefuse(trace: String?, note: Note): Outcome<ApiError, Echoed> = when (note.text) {
+    FLOOD -> tooMuch(ApiError(429, "Slow down"), retryAfter of WAIT_SECONDS)
+    BOOM -> error(BOOM_DETAIL)
+    else -> ok(echoed(trace, note))
+}
 
 /** The names this service already knows. See [rememberGreeting]. */
 private val known = setOf("ada", "grace")

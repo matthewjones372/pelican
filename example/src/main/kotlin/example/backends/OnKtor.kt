@@ -60,6 +60,8 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
 
     forget handledWith { _ -> },
 
+    peek handledWith { _ -> },
+
     ticker streamedNow { ticks().asFlow() },
     everyone streamedNow { greetingsOf().asFlow() },
 

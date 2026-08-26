@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.UploadedFile
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.test.ApiClient
+import io.github.matthewjones372.pelican.test.RequestSpec
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.rawText
 import io.github.matthewjones372.pelican.test.shouldBeFailure
@@ -247,6 +248,29 @@ class AllBackendsTest {
         request.target shouldContain "id=1%2C2"
         request.headers shouldContain ("X-Feature" to "beta,dark")
         request.headers shouldContain ("Cookie" to "seen=x; seen=y")
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a list header split over two field lines is still two values`(name: String, client: ApiClient) {
+        // RFC 9110 says two lines under one name are one field joined by
+        // commas, and a proxy is free to rewrite one spelling into the other.
+        // The client sends the joined line, so this is the spelling no test
+        // sent: two pairs, which the transport writes as two field lines.
+        val joined = client.request(filters, In4(null, null, listOf("beta", "dark"), null))
+        val split = RequestSpec(
+            joined.method,
+            joined.path,
+            joined.query,
+            joined.headers.filterNot { it.first == "X-Feature" } +
+                listOf("X-Feature" to "beta", "X-Feature" to "dark"),
+            joined.body,
+        )
+
+        withClue(name) {
+            client.transport.send(split).body shouldBe
+                """{"tags":[],"ids":[],"features":["beta","dark"],"seen":[]}"""
+        }
     }
 
     @ParameterizedTest(name = "{0}")
