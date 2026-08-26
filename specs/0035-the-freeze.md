@@ -61,10 +61,11 @@ discover after.
 
 ## Open questions
 
-1. `FallibleOutput` — keep, or rename (`DeclaredResponses` was floated)
-   while it is still free? Maintainer's call; the freeze-audit entry
-   applies whatever is decided and this question must be answered before
-   that entry starts.
+1. **Decided (maintainer, 2026-08-26): `FallibleOutput` becomes
+   `DeclaredResponses`.** The freeze-audit entry carries the rename: the
+   type, `Fallible.kt` → `Outcomes.kt`, the refusal-message and doc
+   mentions, and the dumps — after 0034, so it touches only the kept
+   surface. `Outcome`, `or`, `orFail` and `errorJson` keep their names.
 2. RC first or straight to 1.0.0? Recommend `v1.0.0-RC1` in strangers'
    hands before the promise is signed; either way the tag is the
    maintainer's.
