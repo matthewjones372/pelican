@@ -73,4 +73,4 @@ private fun validateWebhook(name: String, ep: Endpoint<*, *>) {
 }
 
 private fun successesOf(out: Output<*>): List<Output<*>> =
-    if (out is FallibleOutput<*, *>) out.successes else listOf(out)
+    if (out is DeclaredResponses<*, *>) out.successes else listOf(out)

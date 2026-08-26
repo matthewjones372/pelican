@@ -439,7 +439,7 @@ private fun <I, R> build(
 ): Endpoint<I, R> {
     // A failure declared outside the block is documented here; one declared
     // with errorJson(...) inside it is already recorded.
-    if (out is FallibleOutput<*, *>) {
+    if (out is DeclaredResponses<*, *>) {
         out.failures
             .filterNot { declared -> b.declaredFailures.any { it === declared } }
             .forEach { b.errors += it.spec() }
@@ -598,9 +598,9 @@ private fun validateParts(ep: Endpoint<*, *>, body: MultipartBody) {
  * the promise is unkeepable, so it is refused rather than never sent.
  */
 private fun validateResponseHeaders(ep: Endpoint<*, *>) {
-    val declared = ep.output.let { if (it is FallibleOutput<*, *>) it.successes else listOf(it) }
+    val declared = ep.output.let { if (it is DeclaredResponses<*, *>) it.successes else listOf(it) }
 
-    if (ep.output !is FallibleOutput<*, *> && ep.output.headers.isNotEmpty()) {
+    if (ep.output !is DeclaredResponses<*, *> && ep.output.headers.isNotEmpty()) {
         error(
             "$ep declares ${ep.output.headers.joinToString { it.name }} on its only response, and a handler " +
                 "for a single response returns the payload alone, so nothing could supply them. " +

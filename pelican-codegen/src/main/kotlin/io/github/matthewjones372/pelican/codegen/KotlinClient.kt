@@ -3,10 +3,10 @@ package io.github.matthewjones372.pelican.codegen
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.BodyInput
 import io.github.matthewjones372.pelican.ByteStreamOutput
+import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.EmptyOutput
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.ErrorOutput
-import io.github.matthewjones372.pelican.FallibleOutput
 import io.github.matthewjones372.pelican.FilePart
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonArrayOutput
@@ -876,10 +876,10 @@ private class KotlinClientEmitter(
 
     /** The successful responses this endpoint declares: several where it names them, else its output. */
     private fun declaredSuccesses(ep: Endpoint<*, *>): List<Output<*>> =
-        (ep.output as? FallibleOutput<*, *>)?.successes ?: listOf(ep.output)
+        (ep.output as? DeclaredResponses<*, *>)?.successes ?: listOf(ep.output)
 
     private fun declaredFailures(ep: Endpoint<*, *>): List<ErrorOutput<*>> =
-        (ep.output as? FallibleOutput<*, *>)?.failures.orEmpty()
+        (ep.output as? DeclaredResponses<*, *>)?.failures.orEmpty()
 
     /**
      * The sealed type an endpoint's several successes become. One member per

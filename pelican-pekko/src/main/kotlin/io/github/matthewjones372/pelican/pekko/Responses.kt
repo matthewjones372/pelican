@@ -43,7 +43,7 @@ internal fun buildResponse(
 
     // The declaration the handler named supplies the status, the media type
     // and the type the body is written as.
-    if (out is FallibleOutput<*, *>) {
+    if (out is DeclaredResponses<*, *>) {
         return when (val outcome = value as Outcome<*, *>) {
             is Outcome.Ok<*> -> successResponse(out, outcome, codecs, accept)
             is Outcome.Err<*> -> failureResponse(out, outcome, codecs)
@@ -99,7 +99,7 @@ internal fun buildResponse(
         )
 
         // Unreachable: both are handled above, before any payload is touched.
-        is FallibleOutput<*, *>, is NegotiatedOutput<*> -> error("Unreachable")
+        is DeclaredResponses<*, *>, is NegotiatedOutput<*> -> error("Unreachable")
     }
 
     return HttpResponse.create().withStatus(statusOf(out.status)).withEntity(entity)
@@ -112,7 +112,7 @@ internal fun buildResponse(
  * three chances to send an undescribed response.
  */
 private fun successResponse(
-    out: FallibleOutput<*, *>,
+    out: DeclaredResponses<*, *>,
     ok: Outcome.Ok<*>,
     codecs: EndpointCodecs,
     accept: List<String>,
@@ -130,7 +130,7 @@ private fun successResponse(
  * than the payload's type, so two failures sharing a type stay distinct.
  */
 private fun failureResponse(
-    out: FallibleOutput<*, *>,
+    out: DeclaredResponses<*, *>,
     err: Outcome.Err<*>,
     codecs: EndpointCodecs,
 ): HttpResponse {

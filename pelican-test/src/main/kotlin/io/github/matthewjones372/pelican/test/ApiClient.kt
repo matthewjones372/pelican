@@ -208,13 +208,13 @@ class ApiClient(
      * reads the same either way. Use [outcome] when *which* response came back
      * is the subject.
      */
-    @JvmName("callFallible")
+    @JvmName("callOutcome")
     @Suppress("UNCHECKED_CAST")
     fun <I, E, T> call(endpoint: Endpoint<I, Outcome<E, T>>, input: I): T {
         val req = request(endpoint, input)
         val res = transport.send(req)
         if (!res.isSuccess) throw ApiCallFailed(endpoint, req, res)
-        val out = endpoint.output as FallibleOutput<E, T>
+        val out = endpoint.output as DeclaredResponses<E, T>
         return decodeSuccess(endpoint, chosenSuccess(out, res), res) as T
     }
 
@@ -223,7 +223,7 @@ class ApiClient(
      * status. Two 2xx sharing one are refused at declaration, so at most one
      * matches.
      */
-    private fun <E, T> chosenSuccess(out: FallibleOutput<E, T>, res: ResponseSpec): Output<out T> =
+    private fun <E, T> chosenSuccess(out: DeclaredResponses<E, T>, res: ResponseSpec): Output<out T> =
         out.successes.singleOrNull()
             ?: out.successes.firstOrNull { it.status == res.status }
             ?: error(
@@ -240,7 +240,7 @@ class ApiClient(
     fun <I, E, T> outcome(endpoint: Endpoint<I, Outcome<E, T>>, input: I): Outcome<E, T> {
         val req = request(endpoint, input)
         val res = transport.send(req)
-        val out = endpoint.output as FallibleOutput<E, T>
+        val out = endpoint.output as DeclaredResponses<E, T>
 
         val declared = out.failures.firstOrNull { it.status == res.status }
         return when {
@@ -290,7 +290,7 @@ class ApiClient(
             is ByteStreamOutput ->
                 error("$endpoint returns opaque bytes; use response(...) and read the body")
 
-            is FallibleOutput<*, *> ->
+            is DeclaredResponses<*, *> ->
                 error("$endpoint declares its failures; use outcome(...) rather than call(...)")
         }
 
@@ -325,7 +325,7 @@ class ApiClient(
      * As [collect], where the endpoint declares failures. A declared failure is
      * still a failed call here; use [response] or [outcome] for the error path.
      */
-    @JvmName("collectFallible")
+    @JvmName("collectOutcome")
     @Suppress("UNCHECKED_CAST")
     fun <I, E, T> collect(
         endpoint: Endpoint<I, Outcome<E, StreamOf<T>>>,
@@ -335,7 +335,7 @@ class ApiClient(
         val req = request(endpoint, input).resuming(lastEventId)
         val res = transport.send(req)
         if (!res.isSuccess) throw ApiCallFailed(endpoint, req, res)
-        val out = endpoint.output as FallibleOutput<E, StreamOf<T>>
+        val out = endpoint.output as DeclaredResponses<E, StreamOf<T>>
         return decodeStream(endpoint, out.success, res) as List<T>
     }
 

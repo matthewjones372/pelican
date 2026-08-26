@@ -314,6 +314,17 @@ public final class io/github/matthewjones372/pelican/CorsPreflight$Refused : io/
 	public final fun getReason ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/DeclaredResponses : io/github/matthewjones372/pelican/Output {
+	public final fun getFailures ()Ljava/util/List;
+	public fun getMediaType ()Ljava/lang/String;
+	public fun getPayloadType ()Lkotlin/reflect/KType;
+	public fun getProduces ()Ljava/util/Set;
+	public fun getStatus ()I
+	public final fun getSuccess ()Lio/github/matthewjones372/pelican/Output;
+	public final fun getSuccesses ()Ljava/util/List;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/matthewjones372/pelican/DecodeFailure : java/lang/RuntimeException {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -448,29 +459,6 @@ public final class io/github/matthewjones372/pelican/ErrorSpec {
 	public final fun getHeaders ()Ljava/util/List;
 	public final fun getStatus ()Ljava/lang/Integer;
 	public final fun getType ()Lkotlin/reflect/KType;
-}
-
-public final class io/github/matthewjones372/pelican/FallibleKt {
-	public static final fun of (Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/HeaderValue;
-	public static final fun ok (Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
-	public static final fun or (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/FallibleOutput;
-	public static final fun or (Lio/github/matthewjones372/pelican/Output;Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/FallibleOutput;
-	public static final fun or (Lio/github/matthewjones372/pelican/Output;[Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/FallibleOutput;
-	public static final fun orFail (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/FallibleOutput;
-	public static final fun orFail (Lio/github/matthewjones372/pelican/FallibleOutput;[Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/FallibleOutput;
-	public static final fun orFail (Lio/github/matthewjones372/pelican/Output;Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/FallibleOutput;
-	public static final fun orFail (Lio/github/matthewjones372/pelican/Output;[Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/FallibleOutput;
-}
-
-public final class io/github/matthewjones372/pelican/FallibleOutput : io/github/matthewjones372/pelican/Output {
-	public final fun getFailures ()Ljava/util/List;
-	public fun getMediaType ()Ljava/lang/String;
-	public fun getPayloadType ()Lkotlin/reflect/KType;
-	public fun getProduces ()Ljava/util/Set;
-	public fun getStatus ()I
-	public final fun getSuccess ()Lio/github/matthewjones372/pelican/Output;
-	public final fun getSuccesses ()Ljava/util/List;
-	public fun toString ()Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/FilePart : io/github/matthewjones372/pelican/MultipartPart {
@@ -1041,6 +1029,18 @@ public final class io/github/matthewjones372/pelican/Outcome$Ok : io/github/matt
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/OutcomesKt {
+	public static final fun of (Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/HeaderValue;
+	public static final fun ok (Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
+	public static final fun or (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/DeclaredResponses;
+	public static final fun or (Lio/github/matthewjones372/pelican/Output;Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/DeclaredResponses;
+	public static final fun or (Lio/github/matthewjones372/pelican/Output;[Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/DeclaredResponses;
+	public static final fun orFail (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/DeclaredResponses;
+	public static final fun orFail (Lio/github/matthewjones372/pelican/DeclaredResponses;[Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/DeclaredResponses;
+	public static final fun orFail (Lio/github/matthewjones372/pelican/Output;Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/DeclaredResponses;
+	public static final fun orFail (Lio/github/matthewjones372/pelican/Output;[Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/DeclaredResponses;
+}
+
 public abstract class io/github/matthewjones372/pelican/Output {
 	public fun getDescription ()Ljava/lang/String;
 	public fun getHeaders ()Ljava/util/List;
@@ -1547,9 +1547,9 @@ public final class io/github/matthewjones372/pelican/spi/CorsHeaders {
 
 public final class io/github/matthewjones372/pelican/spi/HandlersKt {
 	public static final fun declaredInputCount (Lio/github/matthewjones372/pelican/Endpoint;)I
-	public static final fun failureNamedBy (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/Outcome$Err;)Lio/github/matthewjones372/pelican/ErrorOutput;
+	public static final fun failureNamedBy (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Outcome$Err;)Lio/github/matthewjones372/pelican/ErrorOutput;
 	public static final fun handlerFor (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/ServerEndpoint;)Lkotlin/jvm/functions/Function1;
-	public static final fun successNamedBy (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/Outcome$Ok;)Lio/github/matthewjones372/pelican/Output;
+	public static final fun successNamedBy (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Outcome$Ok;)Lio/github/matthewjones372/pelican/Output;
 }
 
 public final class io/github/matthewjones372/pelican/spi/NdjsonFrames {

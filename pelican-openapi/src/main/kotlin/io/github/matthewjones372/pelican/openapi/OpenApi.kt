@@ -300,7 +300,7 @@ private fun refusalResponse(refusals: RefusalRenderer, components: SchemaCompone
 
 /** The successful responses an output describes: several where it names them, else itself. */
 private fun successesOf(out: Output<*>): List<Output<*>> =
-    if (out is FallibleOutput<*, *>) out.successes else listOf(out)
+    if (out is DeclaredResponses<*, *>) out.successes else listOf(out)
 
 /**
  * The `content` of a successful response: which media type it is, and which
@@ -327,7 +327,7 @@ private fun successBody(
     schemas: SchemaSource,
     components: SchemaComponents,
 ): JsonObj? {
-    if (out is FallibleOutput<*, *>) return successBody(out.success, version, schemas, components)
+    if (out is DeclaredResponses<*, *>) return successBody(out.success, version, schemas, components)
 
     // One entry per rendering, all the same schema — one value written several
     // ways, as a negotiated *request* body is one value read several ways.
@@ -482,7 +482,7 @@ private fun schemaOf(
     is EmptyOutput -> null
 
     // Failures are documented from ep.errors, so this is the success schema.
-    is FallibleOutput<*, *> -> schemaOf(out.success, version, schemas, components)
+    is DeclaredResponses<*, *> -> schemaOf(out.success, version, schemas, components)
 
     // Every rendering carries one value; `successBody` puts that schema under
     // each of the media types.
@@ -579,7 +579,7 @@ private fun impliedDescription(out: Output<*>): String = when (out) {
     is SseOutput<*> -> "A server-sent event stream." + reconnectionNote(out)
     is ByteStreamOutput -> "A byte stream."
     is EmptyOutput -> "No content."
-    is FallibleOutput<*, *> -> successDescription(out.success)
+    is DeclaredResponses<*, *> -> successDescription(out.success)
     else -> "Success."
 }
 

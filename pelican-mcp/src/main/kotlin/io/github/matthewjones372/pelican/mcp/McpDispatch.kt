@@ -4,10 +4,10 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.BodyDecodeFailure
 import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.DecodeFailure
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.ErrorOutput
-import io.github.matthewjones372.pelican.FallibleOutput
 import io.github.matthewjones372.pelican.JsonBool
 import io.github.matthewjones372.pelican.JsonNum
 import io.github.matthewjones372.pelican.JsonObj
@@ -144,7 +144,7 @@ internal class BoundTool(
 
     /** A handler's result as the answer a model reads, and as data where a schema binds it. */
     fun resultOf(value: Any?): ToolResult = when (val out: Output<*> = endpoint.output) {
-        is FallibleOutput<*, *> -> when (val outcome = value as Outcome<*, *>) {
+        is DeclaredResponses<*, *> -> when (val outcome = value as Outcome<*, *>) {
             is Outcome.Ok<*> -> success(out.successNamedBy(outcome), outcome.value)
             is Outcome.Err<*> -> failure(outcome.declared, outcome.error)
         }

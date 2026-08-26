@@ -35,7 +35,7 @@ class SeveralResponsesTest {
             created or accepted
         }
 
-        val out = ep.output as FallibleOutput<*, *>
+        val out = ep.output as DeclaredResponses<*, *>
         out.successes.map { it.status } shouldBe listOf(201, 202)
         out.failures.shouldBeEmpty()
 
@@ -52,7 +52,7 @@ class SeveralResponsesTest {
             created or accepted or empty(status = 204)
         }
 
-        (ep.output as FallibleOutput<*, *>).successes.map { it.status } shouldBe listOf(201, 202, 204)
+        (ep.output as DeclaredResponses<*, *>).successes.map { it.status } shouldBe listOf(201, 202, 204)
     }
 
     @Test
@@ -62,9 +62,9 @@ class SeveralResponsesTest {
             json<Order>(status = 200) or json<Order>(status = 201) or empty(status = 204)
         }
 
-        val out = ep.output as FallibleOutput<*, *>
+        val out = ep.output as DeclaredResponses<*, *>
         out.successes.map { it.status } shouldBe listOf(200, 201, 204)
-        out.successes.none { it is FallibleOutput<*, *> } shouldBe true
+        out.successes.none { it is DeclaredResponses<*, *> } shouldBe true
     }
 
     /** The failures survive the splice, whichever overload did the splicing. */
@@ -75,7 +75,7 @@ class SeveralResponsesTest {
             (json<Order>(status = 200) orFail badKey) or json<Order>(status = 201) or empty(status = 204)
         }
 
-        val out = ep.output as FallibleOutput<*, *>
+        val out = ep.output as DeclaredResponses<*, *>
         out.successes.map { it.status } shouldBe listOf(200, 201, 204)
         out.failures.map { it.status } shouldBe listOf(401)
     }
@@ -87,7 +87,7 @@ class SeveralResponsesTest {
             created or accepted orFail badKey
         }
 
-        val out = ep.output as FallibleOutput<*, *>
+        val out = ep.output as DeclaredResponses<*, *>
         out.successes.map { it.status } shouldBe listOf(201, 202)
         out.failures.map { it.status } shouldBe listOf(401)
         ep.errors.map { it.status } shouldBe listOf(401)
@@ -261,7 +261,7 @@ class SeveralResponsesTest {
             ndjson<Order>() orFail badKey
         }
 
-        val out = ep.output as FallibleOutput<*, *>
+        val out = ep.output as DeclaredResponses<*, *>
         out.successes.single().mediaType shouldBe "application/x-ndjson"
         out.failures.single().status shouldBe 401
     }

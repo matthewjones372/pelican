@@ -43,9 +43,9 @@ class DefaultResponseTest {
         declared.type shouldBe typeOf<Problem>()
         declared.headers shouldBe listOf(retryAfter)
 
-        // Not a `FallibleOutput`: nothing was added to the output, so the
+        // Not a `DeclaredResponses`: nothing was added to the output, so the
         // handler for this endpoint returns a Widget and has nothing to name.
-        (ep.output is FallibleOutput<*, *>) shouldBe false
+        (ep.output is DeclaredResponses<*, *>) shouldBe false
     }
 
     @Test
@@ -58,7 +58,7 @@ class DefaultResponseTest {
         }
 
         ep.errors.map { it.status } shouldBe listOf(null, 404)
-        (ep.output as FallibleOutput<*, *>).failures.map { it.status } shouldBe listOf(404)
+        (ep.output as DeclaredResponses<*, *>).failures.map { it.status } shouldBe listOf(404)
     }
 
     @Test

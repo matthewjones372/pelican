@@ -282,7 +282,7 @@ class NegotiatedOutput<T> internal constructor(
         }
 
         alternatives.forEach { alternative ->
-            require(alternative !is FallibleOutput<*, *>) {
+            require(alternative !is DeclaredResponses<*, *>) {
                 "$alternative declares responses of its own, so it is not one rendering of one value. " +
                     "Declare failures beside the group — negotiated(...) orFail ... — rather than inside it."
             }
@@ -334,7 +334,7 @@ class NegotiatedOutput<T> internal constructor(
  * success, and each representation inside a negotiated one.
  */
 fun Output<*>.representations(): List<Output<*>> = when (this) {
-    is FallibleOutput<*, *> -> successes.flatMap { it.representations() }
+    is DeclaredResponses<*, *> -> successes.flatMap { it.representations() }
     is NegotiatedOutput<*> -> alternatives
     else -> listOf(this)
 }

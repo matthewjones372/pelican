@@ -3,9 +3,9 @@ package io.github.matthewjones372.pelican.mcp
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.BodyInput
 import io.github.matthewjones372.pelican.ByteStreamOutput
+import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.EmptyOutput
 import io.github.matthewjones372.pelican.Endpoint
-import io.github.matthewjones372.pelican.FallibleOutput
 import io.github.matthewjones372.pelican.JsonArrayOutput
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonOutput
@@ -206,7 +206,7 @@ private fun Endpoint<*, *>.refuseWhatMcpCannotCarry(options: McpOptions) {
 private fun Output<*>.isOneAnswer(): Boolean = when (this) {
     is JsonOutput<*>, is TextOutput, is EmptyOutput, is MediaOutput<*>, is NegotiatedOutput<*> -> true
     is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*>, is ByteStreamOutput -> false
-    is FallibleOutput<*, *> -> successes.all { it.isOneAnswer() }
+    is DeclaredResponses<*, *> -> successes.all { it.isOneAnswer() }
 }
 
 /**
@@ -219,7 +219,7 @@ private fun Output<*>.isJsonAnswer(): Boolean = when (this) {
 
     is NegotiatedOutput<*> -> alternatives.any { it is JsonOutput<*> }
 
-    is FallibleOutput<*, *> -> successes.all { it.isJsonAnswer() }
+    is DeclaredResponses<*, *> -> successes.all { it.isJsonAnswer() }
 
     is JsonOutput<*>, is TextOutput, is EmptyOutput,
     is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*>, is ByteStreamOutput,
@@ -243,7 +243,7 @@ private fun Endpoint<*, *>.successType(): KType? = when (val out: Output<*> = ou
     // the one that binds.
     is NegotiatedOutput<*> -> (out.alternatives.firstOrNull { it is JsonOutput<*> } as? JsonOutput<*>)?.type
 
-    is FallibleOutput<*, *> -> when (val only = out.successes.singleOrNull()) {
+    is DeclaredResponses<*, *> -> when (val only = out.successes.singleOrNull()) {
         is JsonOutput<*> -> only.type
         is NegotiatedOutput<*> -> (only.alternatives.firstOrNull { it is JsonOutput<*> } as? JsonOutput<*>)?.type
         else -> null

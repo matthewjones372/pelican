@@ -131,7 +131,7 @@ fun Codecs.responseCodecs(output: Output<*>): Map<Any, BodyCodec<Any?>> {
     val successes = output.representations().mapNotNull { out ->
         out.payloadType?.let { out as Any to codec<Any?>(it, out.writtenAs()) }
     }
-    val failures = (output as? FallibleOutput<*, *>)?.failures.orEmpty()
+    val failures = (output as? DeclaredResponses<*, *>)?.failures.orEmpty()
         .map { failure -> failure as Any to codec<Any?>(failure.type) }
 
     return (successes + failures).associateTo(IdentityHashMap<Any, BodyCodec<Any?>>()) { it }

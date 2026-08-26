@@ -192,7 +192,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
         fun payload(): BodyCodec<Any?> =
             checkNotNull(resolved.payloadFor(out)) { "No codec was resolved for $out" }
 
-        if (out is FallibleOutput<*, *>) {
+        if (out is DeclaredResponses<*, *>) {
             return when (val outcome = value as Outcome<*, *>) {
                 is Outcome.Ok<*> ->
                     respond(out.successNamedBy(outcome), outcome.value, resolved, accept).plus(outcome.headers)
@@ -241,7 +241,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
                 ClientResponse(out.status, listOf(CONTENT_TYPE to out.mediaType), value as InputStream)
 
             // Handled above, before any payload was touched.
-            is FallibleOutput<*, *> -> error("Unreachable")
+            is DeclaredResponses<*, *> -> error("Unreachable")
         }
     }
 

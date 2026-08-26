@@ -30,7 +30,7 @@ private const val INVERSE_LOAD_FACTOR_DENOMINATOR = 3
  * Which declared success an [Outcome.Ok] names, and the one place a success is
  * checked against what it promised.
  */
-fun FallibleOutput<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
+fun DeclaredResponses<*, *>.successNamedBy(ok: Outcome.Ok<*>): Output<*> {
     val chosen = chosenSuccess(ok)
     if (successes.none { it === chosen }) {
         throw UndeclaredResponse(
@@ -83,7 +83,7 @@ private fun Output<*>.doesNotCarry(value: Any?): Boolean {
  * the compiler will not say. Three interpreters deciding that separately is
  * three chances to send an undescribed response.
  */
-fun FallibleOutput<*, *>.failureNamedBy(err: Outcome.Err<*>): ErrorOutput<*> {
+fun DeclaredResponses<*, *>.failureNamedBy(err: Outcome.Err<*>): ErrorOutput<*> {
     val declared = err.declared
     if (failures.none { it === declared }) {
         throw UndeclaredResponse(

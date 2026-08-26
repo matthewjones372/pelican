@@ -72,7 +72,7 @@ fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)
  * measuring, and a metric that throws is a worse outage than the missing
  * measurement it was trying to avoid.
  */
-internal fun FallibleOutput<*, *>.chosenSuccess(ok: Outcome.Ok<*>): Output<*> =
+internal fun DeclaredResponses<*, *>.chosenSuccess(ok: Outcome.Ok<*>): Output<*> =
     ok.declared ?: successes.first()
 
 /**
@@ -174,7 +174,7 @@ inline fun <reified E> errorJson(
  * The responses one endpoint declares: at least one success, and the failures a
  * handler may return instead.
  */
-class FallibleOutput<E, T> internal constructor(
+class DeclaredResponses<E, T> internal constructor(
     /** In declaration order. The first is the one a bare [ok] means. */
     val successes: List<Output<out T>>,
     val failures: List<ErrorOutput<E>>,
@@ -240,11 +240,11 @@ internal fun Output<*>.streams(): Boolean =
 /**
  * Declares a second successful response — `json<Order>(201) or empty(202)`.
  */
-infix fun <T> Output<out T>.or(other: Output<out T>): FallibleOutput<Nothing, T> =
+infix fun <T> Output<out T>.or(other: Output<out T>): DeclaredResponses<Nothing, T> =
     responses(listOf(this, other), emptyList())
 
 /** Three or more, declared in one call rather than chained. */
-fun <T> Output<out T>.or(vararg others: Output<out T>): FallibleOutput<Nothing, T> =
+fun <T> Output<out T>.or(vararg others: Output<out T>): DeclaredResponses<Nothing, T> =
     responses(listOf(this) + others, emptyList())
 
 /**
@@ -253,11 +253,11 @@ fun <T> Output<out T>.or(vararg others: Output<out T>): FallibleOutput<Nothing, 
  * picks it while the third payload fits and widens through the one above when
  * it does not.
  */
-infix fun <E, T> FallibleOutput<E, T>.or(other: Output<out T>): FallibleOutput<E, T> =
+infix fun <E, T> DeclaredResponses<E, T>.or(other: Output<out T>): DeclaredResponses<E, T> =
     responses(listOf(this, other), emptyList())
 
 /** Declares the one failure this output's handler may return instead. */
-infix fun <E, T> Output<T>.orFail(failure: ErrorOutput<E>): FallibleOutput<E, T> =
+infix fun <E, T> Output<T>.orFail(failure: ErrorOutput<E>): DeclaredResponses<E, T> =
     orFailAll(listOf(this), listOf(failure))
 
 /**
@@ -265,7 +265,7 @@ infix fun <E, T> Output<T>.orFail(failure: ErrorOutput<E>): FallibleOutput<E, T>
  * their common supertype, so a sealed hierarchy makes the handler's `when`
  * exhaustive.
  */
-fun <E, T> Output<T>.orFail(vararg failures: ErrorOutput<out E>): FallibleOutput<E, T> =
+fun <E, T> Output<T>.orFail(vararg failures: ErrorOutput<out E>): DeclaredResponses<E, T> =
     orFailAll(listOf(this), failures.toList())
 
 /**
@@ -273,18 +273,18 @@ fun <E, T> Output<T>.orFail(vararg failures: ErrorOutput<out E>): FallibleOutput
  * no failures yet (`Nothing` is what [or] produces), so declaring failures stays
  * one statement.
  */
-infix fun <E, T> FallibleOutput<Nothing, T>.orFail(failure: ErrorOutput<E>): FallibleOutput<E, T> =
+infix fun <E, T> DeclaredResponses<Nothing, T>.orFail(failure: ErrorOutput<E>): DeclaredResponses<E, T> =
     orFailAll(listOf(this), listOf(failure))
 
 /** As above, for several failures at once. */
-fun <E, T> FallibleOutput<Nothing, T>.orFail(vararg failures: ErrorOutput<out E>): FallibleOutput<E, T> =
+fun <E, T> DeclaredResponses<Nothing, T>.orFail(vararg failures: ErrorOutput<out E>): DeclaredResponses<E, T> =
     orFailAll(listOf(this), failures.toList())
 
 /** Every spelling of `orFail` ends here, so they cannot disagree about what one means. */
 private fun <E, T> orFailAll(
     declared: List<Output<*>>,
     failures: List<ErrorOutput<out E>>,
-): FallibleOutput<E, T> {
+): DeclaredResponses<E, T> {
     require(failures.isNotEmpty()) { "orFail needs at least one declared failure" }
     return responses(declared, failures)
 }
@@ -295,15 +295,15 @@ private fun <E, T> orFailAll(
 private fun <E, T> responses(
     declared: List<Output<*>>,
     added: List<ErrorOutput<out E>>,
-): FallibleOutput<E, T> {
-    val nested = declared.filterIsInstance<FallibleOutput<*, *>>()
+): DeclaredResponses<E, T> {
+    val nested = declared.filterIsInstance<DeclaredResponses<*, *>>()
 
     val already = nested.firstOrNull { it.failures.isNotEmpty() }
     require(added.isEmpty() || already == null) { "orFail is already applied to $already" }
 
-    val successes = declared.flatMap { if (it is FallibleOutput<*, *>) it.successes else listOf(it) }
+    val successes = declared.flatMap { if (it is DeclaredResponses<*, *>) it.successes else listOf(it) }
     val failures = nested.flatMap { it.failures } + added
 
     @Suppress("UNCHECKED_CAST")
-    return FallibleOutput(successes as List<Output<out T>>, failures as List<ErrorOutput<E>>)
+    return DeclaredResponses(successes as List<Output<out T>>, failures as List<ErrorOutput<E>>)
 }

@@ -41,7 +41,7 @@ fun Endpoint<*, *>.statusFor(result: Any?, error: Throwable?): Int {
         // failures carrying the same type stay distinct.
         result is Outcome.Err<*> -> result.declared.status
 
-        result is Outcome.Ok<*> && out is FallibleOutput<*, *> -> out.chosenSuccess(result).status
+        result is Outcome.Ok<*> && out is DeclaredResponses<*, *> -> out.chosenSuccess(result).status
 
         // One declared response, or a stream: the description already said.
         else -> out.status
