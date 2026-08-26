@@ -34,6 +34,7 @@ include(
     "pelican-client-java",
     "pelican-client-pekko",
     "pelican-client-ktor",
+    "pelican-client-okhttp",
     "pelican-test",
     "pelican-test-golden",
     "pelican-test-pekko",

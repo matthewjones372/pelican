@@ -1,0 +1,7 @@
+public final class io/github/matthewjones372/pelican/client/okhttp/OkHttpTransport : io/github/matthewjones372/pelican/ClientTransport {
+	public fun <init> ()V
+	public fun <init> (Lokhttp3/OkHttpClient;)V
+	public synthetic fun <init> (Lokhttp3/OkHttpClient;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
+}
+
