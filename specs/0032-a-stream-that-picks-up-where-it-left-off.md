@@ -48,13 +48,13 @@ existing pins green.
 
 ## Stack
 
-- [ ] **`spec-0032-frame-fields`** — id extractor and retry hint in the
+- [x] **`spec-0032-frame-fields`** — id extractor and retry hint in the
       declaration, frame writer, and all three backends' write paths.
       Done when: frames are byte-identical across backends with and without ids, pinned in `AllBackendsTest`.
-- [ ] **`spec-0032-resume-input`** — `lastEventId()` on `Params`, the
+- [x] **`spec-0032-resume-input`** — `lastEventId()` on `Params`, the
       document note, a parity test reconnecting with `Last-Event-ID`.
       Done when: a reconnect delivers the header value to the handler on all three.
-- [ ] **`spec-0032-clients`** — the SSE-consuming paths surface event ids
+- [x] **`spec-0032-clients`** — the SSE-consuming paths surface event ids
       and pass `Last-Event-ID` on retry.
       Done when: a client suite resumes a stream against the example service.
 
