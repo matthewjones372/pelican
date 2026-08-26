@@ -29,6 +29,14 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
+// File-level rather than in a companion: `const` in a private companion is
+// still a public static field on the class, so these would be frozen into the
+// published surface by a dump that has no reason to describe them.
+private const val CONTENT_TYPE = "Content-Type"
+private const val CONTENT_LENGTH = "Content-Length"
+
+private val READ_LIMIT: Duration = Duration.ofDays(1)
+
 /**
  * A [ClientTransport] over Pekko HTTP's client, for a caller who would rather
  * send through the stack their service already runs than acquire a second one.
@@ -205,13 +213,6 @@ class PekkoHttpTransport @JvmOverloads constructor(
 
     private fun pekkoMethod(method: Method): HttpMethod =
         HttpMethods.lookup(method.name).orElseThrow { IllegalArgumentException("Pekko knows no method ${method.name}") }
-
-    private companion object {
-        const val CONTENT_TYPE = "Content-Type"
-        const val CONTENT_LENGTH = "Content-Length"
-
-        val READ_LIMIT: Duration = Duration.ofDays(1)
-    }
 }
 
 /**

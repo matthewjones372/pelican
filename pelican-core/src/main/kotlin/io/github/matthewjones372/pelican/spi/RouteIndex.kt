@@ -2,6 +2,11 @@ package io.github.matthewjones372.pelican.spi
 
 import io.github.matthewjones372.pelican.*
 
+// File-level rather than in a companion: `const` in a private companion is
+// still a public static field on the class, and this is a sizing hint, not
+// something the published surface should promise.
+private const val INITIAL_CAPTURES = 4
+
 /**
  * The endpoint a request reaches, found without trying the others.
  *
@@ -127,8 +132,6 @@ class RouteIndex internal constructor(private val root: Node) {
     )
 
     private companion object {
-        const val INITIAL_CAPTURES = 4
-
         /**
          * A refusal rather than a 404: a request line nobody could have written
          * is the caller's mistake, and answering "no such path" would send them

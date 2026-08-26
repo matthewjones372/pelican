@@ -1586,7 +1586,6 @@ public final class io/github/matthewjones372/pelican/spi/RequestsKt {
 }
 
 public final class io/github/matthewjones372/pelican/spi/RouteIndex {
-	public static final field INITIAL_CAPTURES I
 	public final fun describesPath (Ljava/lang/String;)Z
 	public final fun match (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;Ljava/util/Map;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 }
