@@ -4,8 +4,8 @@ Linked from the [README](../README.md). Models, inputs, endpoints, handlers,
 store, server and docs, in one file — too long for a front page, and the thing
 to read once you want to see all of it at once.
 
-Models, inputs, endpoints, handlers, store, server and docs. This block lives in
-the repo as [`ReadmeExample.kt`](../example/src/main/kotlin/example/readme/ReadmeExample.kt),
+This block lives in the repository as
+[`ReadmeExample.kt`](../example/src/main/kotlin/example/readme/ReadmeExample.kt),
 so it compiles on every build. Run it with `./gradlew :example:runReadmeExample`.
 
 ```kotlin

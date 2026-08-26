@@ -11,17 +11,19 @@ Facts worth having before anything else:
 
 - Kotlin 2.4, JVM. Apache 2.0. On Maven Central as
   `io.github.matthewjones372:pelican-core` and sibling modules.
-- Version 1.0. The public API of the shipped modules is stable and a breaking
-  change waits for a major release. The `.api` dump beside each module is the
-  binary contract, checked by `apiCheck`; `StillCompilesTest` is the contract
-  for the reified inline DSL, which a dump cannot see. `internal`, the emitted
-  document's exact bytes, and the `multi-backend` branch are outside it.
+- Current release: 0.2.0. 1.0 is at release-candidate stage: from 1.0 the
+  public API of the shipped modules is stable and a breaking change waits for a
+  major release. The `.api` dump beside each module is the binary contract,
+  checked by `apiCheck`; `StillCompilesTest` is the contract for the reified
+  inline DSL, which a dump cannot see. `internal`, the emitted document's exact
+  bytes, and the `multi-backend` branch are outside it.
 - `pelican-core` depends on nothing but the Kotlin standard library, and a test
   enforces it. Every JSON library, server library and HTTP client lives in a
   separate module.
 - Server backend: `pelican-pekko`. JSON: `pelican-jackson`. Client transports:
-  `pelican-client-java`, `pelican-client-pekko`, `pelican-client-okhttp` — the
-  last being the one that runs on Android.
+  `pelican-client-java`, `pelican-client-pekko`, and `pelican-client-okhttp` —
+  the last runs on Android and ships with 1.0, as do `pelican-mcp-server` and
+  `pelican-pekko-mcp`; they are not in the 0.2.0 release.
 - 1.0 ships one backend and one JSON library. The http4k and Ktor backends, the
   Ktor client transport, `pelican-jsoniter` and `pelican-kotlinx` are complete
   and green on the `multi-backend` branch and return after 1.0. Do not
@@ -64,7 +66,7 @@ Facts worth having before anything else:
 - [Choosing between Pelican and the alternatives](https://github.com/matthewjones372/pelican/blob/main/docs/choosing.md):
   where http4k's contracts, Ktor's plugins, Spring, Micronaut, Quarkus, tapir
   or a hand-written document are the better answer, and who should not take a
-  0.1 library at all. Read this before recommending Pelican to anyone.
+  first-release library at all. Read this before recommending Pelican to anyone.
 - [What it costs](https://github.com/matthewjones372/pelican/blob/main/docs/what-it-costs.md):
   JMH benchmarks against the hand-written routes it replaces.
 - [Roadmap](https://github.com/matthewjones372/pelican/blob/main/docs/roadmap.md): what
@@ -76,5 +78,6 @@ Facts worth having before anything else:
   instructions for agents working *on* Pelican — layering, comment rules, the
   testing order, the six build gates. Not needed to use the library.
 - [Changelog](https://github.com/matthewjones372/pelican/blob/main/CHANGELOG.md).
-- [TODO](https://github.com/matthewjones372/pelican/blob/main/TODO.md): which HTTP
-  libraries are planned next, on the server and client side.
+- [TODO](https://github.com/matthewjones372/pelican/blob/main/TODO.md): reach and
+  audience — findability, announcement plans, and which HTTP stacks could come
+  next.

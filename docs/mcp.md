@@ -20,14 +20,17 @@ shapes it answers with.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-mcp:0.1.0")         // the tools as values
-    implementation("io.github.matthewjones372:pelican-mcp-server:0.1.0")  // and spoken
-    implementation("io.github.matthewjones372:pelican-pekko-mcp:0.1.0")   // over HTTP, on your backend
+    implementation("io.github.matthewjones372:pelican-mcp:$pelicanVersion")         // the tools as values
+    implementation("io.github.matthewjones372:pelican-mcp-server:$pelicanVersion")  // and spoken
+    implementation("io.github.matthewjones372:pelican-pekko-mcp:$pelicanVersion")   // over HTTP, on your backend
 }
 ```
 
 Core and [`pelican-schema`](schemas.md) for the first, and no MCP SDK for
-either: a tool list is a value, and the protocol is JSON-RPC over lines of text.
+either: a tool list is a value, and the protocol is JSON-RPC over lines of
+text. `pelican-mcp` is on Maven Central at 0.2.0; the two serving modules are
+new since 0.2.0 and first release with 1.0 — until it is tagged,
+`./gradlew publishToMavenLocal` installs all three as `0.2.0-SNAPSHOT`.
 
 ```kotlin
 val tools = ordersSpec().mcpTools(options)              // descriptions only

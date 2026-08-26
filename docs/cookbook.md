@@ -269,8 +269,8 @@ importOrders handledNow { (caption, file) ->      // String, UploadedFile
 ```
 
 The multipart envelope is parsed by core rather than by the backend, so a part
-decodes to the same value on all three. Tests pass the same `UploadedFile` the
-handler receives:
+decodes to the same value whichever server is underneath. Tests pass the same
+`UploadedFile` the handler receives:
 
 ```kotlin
 app.call(importOrders, In3("March", manifest, UploadedFile("orders.csv", "text/csv", stream)))
@@ -363,10 +363,11 @@ api(routes, JacksonCodecs) {
 }
 ```
 
-A handler reads what a filter put there by the same key:
+A handler reads what a filter put there by the same key — `this` is the
+request's `Params`:
 
 ```kotlin
-fileReport handledNow { req -> Reports.file(p[caller].subject, req) }
+fileReport handledNow { req -> Reports.file(this[caller].subject, req) }
 ```
 
 ---

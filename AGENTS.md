@@ -132,7 +132,7 @@ asserts the document generator and the other backends are absent.
 
 A dependency added to core is a build failure, not a judgement call. Core
 declares an interface; an adapter module carries the library. `Codecs`, the
-three interpreters and `ClientTransport` are all that shape.
+interpreters and `ClientTransport` are all that shape.
 
 ## Values, errors and effects
 
@@ -182,8 +182,10 @@ Work out which of these a change can break:
   path strings, no hand-written JSON.
 - **URL pins**, in a separate file, with `shouldBuild`. Behaviour tests should
   survive a rename; the pin should not.
-- **Backend parity.** A change to one `Interpreter.kt` usually means the same
-  change to the other two. `AllBackendsTest` runs one suite against all three.
+- **Backend parity.** `AllBackendsTest` runs one suite over `allBackends` —
+  one entry on `main`, three on the `multi-backend` branch. A change to
+  `Interpreter.kt` usually means the same change to the branch's two when they
+  return, so keep the harness shapes intact.
 - **Golden files.** A moved golden is the test working. Read the diff and
   decide whether the break is intended; do not regenerate for green.
 - **Spec quality.** `OpenApiSpecQualityTest` reads emitted documents with a
@@ -242,7 +244,8 @@ Before saying it is done:
 
 - The failing test came first, and fails without the change.
 - `./gradlew build` is green, gates included.
-- If an interpreter changed, all three did, and parity is asserted.
+- If interpreter behaviour changed, the parity suite asserts it — and the
+  change is one the `multi-backend` branch's interpreters can follow.
 - If a caller-visible behaviour changed, the document changed with it.
 - No new dependency in `pelican-core`.
 - `docs/reference.md` reflects the change, or the change is invisible from

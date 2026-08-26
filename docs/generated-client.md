@@ -8,7 +8,7 @@ or on another release cycle, get a file generated from them instead. It is a
 Gradle task: no `main` to write, no `JavaExec` to wire.
 
 ```kotlin
-plugins { id("io.github.matthewjones372.pelican") version "0.1.0" }
+plugins { id("io.github.matthewjones372.pelican") version "0.2.0" }
 
 pelican {
     clients {
@@ -75,7 +75,7 @@ entirely: a server serves what it serves, and no description moves a request.
 
 A `webhook(...)` becomes a sender rather than a call: `orderPlaced(url, body,
 xSignature)`, with the destination first because the document does not know it.
-See [Webhooks](#webhooks).
+See [Webhooks](reference.md#webhooks-the-calls-the-service-sends).
 
 The generated file needs `pelican-core`, which has no dependencies of its own,
 a `Codecs` chosen by the caller, and a `ClientTransport` to send with. The
@@ -115,7 +115,7 @@ fun interface ClientTransport {
 module and a client finds it through `ServiceLoader`, with no line to write.
 
 ```kotlin
-dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
+dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.2.0") }
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 ```

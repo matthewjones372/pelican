@@ -446,7 +446,7 @@ one.
   streamed response that is not a `Sequence` are refused by name, because the
   values behind those belong to a backend rather than to core.
 
-## [0.2.0]
+## [0.2.0] — 2026-08-25
 
 Ninety-seven commits since 0.1.0. One breaking change, named below.
 

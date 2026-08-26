@@ -1,11 +1,10 @@
 # Modules
 
-Linked from the [README](../README.md). What each of the twenty modules is
-for, and what it depends on — the list to read when deciding which ones a
-build actually needs.
+Linked from the [README](../README.md). What each module is for, and what it
+depends on — the list to read when deciding which ones a build actually needs.
 
-Nineteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
-rather than convention.
+Nineteen library modules and a Gradle plugin; a typical build takes four or
+five. The layering is enforced by tests rather than convention.
 
 1.0 ships one server backend and one JSON library. The http4k and Ktor
 backends, the Ktor client transport, `pelican-jsoniter` and `pelican-kotlinx`
@@ -35,29 +34,35 @@ branch and return after 1.0; the table below is what main ships today.
 | `pelican-test-golden` | test + openapi | per-endpoint goldens; fails on a breaking change |
 | `pelican-test-pekko` | test + pekko | the typed test client's in-memory transport |
 
-Every one of those dependency claims is a test. `pelican-core` asserts its
-runtime classpath holds nothing but the Kotlin standard library, `pelican-openapi`
-asserts Pekko is absent so docs can be generated in a build task with no server
-present, each backend asserts the document generator and every other backend is
-absent, `pelican-metrics` asserts it is core plus a meter API and no server
-library, `pelican-schema` asserts it carries no document generator and no
-codec — the codec modules are test-scoped, which is where the claim that spans
-them is made, `pelican-mcp` asserts it is core plus that schema pass and no MCP
-SDK, deriving tools being a separate job from serving them, and
-`pelican-mcp-server` asserts the same of the half that does serve them — the
-protocol is JSON-RPC over lines of text, and taking the official Kotlin SDK for
-it would put a Ktor server behind `mcpServe` on a service running Pekko,
-`pelican-metrics-otel` asserts the mirror image — core plus the
-OpenTelemetry API, and neither Micrometer nor a server library — which is the
-whole reason the two telemetry vendors are two modules, `pelican-client-java`
-asserts it carries no HTTP library beyond the JDK's, `pelican-client-pekko`
-and `pelican-client-okhttp` each assert they carry their
-own client and no second stack — and not the matching *interpreter* either,
-since making calls and serving routes are separate decisions, and the OkHttp
-one asserts no AndroidX either, since it runs on Android by depending on
-nothing that does not rather than by targeting it — and `pelican-test` asserts it drags in
-no server library and no matcher library. The full breakdown is in
-[docs/reference.md](reference.md#modules).
+Every one of those dependency claims is a test:
+
+- `pelican-core` asserts its runtime classpath holds nothing but the Kotlin
+  standard library.
+- `pelican-openapi` asserts Pekko is absent, so documentation can be generated
+  in a build task with no server present.
+- `pelican-pekko` asserts the document generator is absent, so a service that
+  serves only endpoints never ships it.
+- `pelican-schema` asserts it carries no document generator and no codec — the
+  codec modules are test-scoped, which is where the claim that spans them is
+  made.
+- `pelican-mcp` asserts it is core plus that schema pass and no MCP SDK;
+  deriving tools is a separate job from serving them. `pelican-mcp-server`
+  asserts the same of the half that does serve them — the protocol is JSON-RPC
+  over lines of text, and taking the official Kotlin SDK would put a Ktor
+  server behind `mcpServe` on a service running Pekko.
+- `pelican-metrics` asserts it is core plus a meter API and no server library;
+  `pelican-metrics-otel` asserts the mirror image — core plus the OpenTelemetry
+  API, and no Micrometer. That separation is the whole reason the two telemetry
+  vendors are two modules.
+- `pelican-client-java` asserts it carries no HTTP library beyond the JDK's.
+  `pelican-client-pekko` and `pelican-client-okhttp` each assert they carry
+  their own client and no second stack — and not the matching *interpreter*
+  either, since making calls and serving routes are separate decisions. The
+  OkHttp one asserts no AndroidX too: it runs on Android by depending on
+  nothing that does not, rather than by targeting it.
+- `pelican-test` asserts it drags in no server library and no matcher library.
+
+The full breakdown is in [docs/reference.md](reference.md#modules).
 
 `pelican-core` publishes two packages. `io.github.matthewjones372.pelican` is
 the DSL a service is written in. `io.github.matthewjones372.pelican.spi` is what
