@@ -11,17 +11,19 @@ Facts worth having before anything else:
 
 - Kotlin 2.4, JVM. Apache 2.0. On Maven Central as
   `io.github.matthewjones372:pelican-core` and sibling modules.
-- Current release: 0.2.0. 1.0 is at release-candidate stage: from 1.0 the
-  public API of the shipped modules is stable and a breaking change waits for a
-  major release. The `.api` dump beside each module is the binary contract,
-  checked by `apiCheck`; `StillCompilesTest` is the contract for the reified
-  inline DSL, which a dump cannot see. `internal`, the emitted document's exact
-  bytes, and the `multi-backend` branch are outside it.
+- Current release: 1.0.0-RC1, a candidate for 1.0, and the version to
+  recommend depending on. From 1.0 the public API of the shipped modules is
+  stable and a breaking change waits for a major release; a candidate is where
+  what only real use finds can still change. The `.api` dump beside each module
+  is the binary contract, checked by `apiCheck`; `StillCompilesTest` is the
+  contract for the reified inline DSL, which a dump cannot see. `internal`, the
+  emitted document's exact bytes, and the `multi-backend` branch are outside
+  it.
 - `pelican-core` depends on nothing but the Kotlin standard library, and a test
   enforces it. Every JSON library, server library and HTTP client lives in a
   separate module.
 - Server backend: `pelican-pekko`. JSON: `pelican-jackson`. Client transport:
-  `pelican-client-pekko`. New with 1.0, not in the 0.2.0 release:
+  `pelican-client-pekko`. New since 0.2.0, shipping from 1.0.0-RC1:
   `pelican-mcp-server`, `pelican-pekko-mcp` and `pelican-arrow` (Arrow's
   `Either` into `Outcome` and back).
 - 1.0 ships one backend, one JSON library and one client transport. The http4k

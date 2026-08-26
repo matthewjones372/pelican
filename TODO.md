@@ -30,12 +30,14 @@ Free, and mostly absent today.
       GitHub exposes no endpoint for it, so it has to be done in the browser.
       GitHub does not read the file from the repository. Regenerate with
       `python3 docs/assets/social-preview.py`.
-- [x] **A GitHub release per Central version.** `v0.1.0` is published, carrying
-      its changelog entry as the notes. `--notes-from-tag` is not enough on its
-      own: the tag sits on a merge commit, so it produced "Merge pull request
-      #2 from matthewjones372/feat/jsoniter-codecs" as the release body. Cut
-      the next one from `CHANGELOG.md`.
-- [x] **`CHANGELOG.md`.** A 0.x library promising breaking changes needs one.
+- [x] **A GitHub release per Central version.** `v0.1.0`, `v0.2.0` and
+      `v1.0.0-RC1` are published, each carrying its changelog entry as the
+      notes. `--notes-from-tag` is not enough on its own: the tag sits on a
+      merge commit, so it produced "Merge pull request #2 from
+      matthewjones372/feat/jsoniter-codecs" as the release body. Cut the next
+      one from `CHANGELOG.md`, and mark a candidate `--prerelease`.
+- [x] **`CHANGELOG.md`.** A library promising a stable surface from 1.0 needs
+      one, and it is the only place a break is recorded.
 
 ## Machine-readable
 

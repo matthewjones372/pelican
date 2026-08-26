@@ -121,10 +121,10 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-The current release is **0.2.0**, on Maven Central under
-`io.github.matthewjones372`; the release candidate, **1.0.0-RC1**, is what this
-page describes. Until its tag lands, `./gradlew publishToMavenLocal` builds it
-from source.
+The current release is **1.0.0-RC1**, on Maven Central under
+`io.github.matthewjones372`. It is a release candidate: the surface below is
+what 1.0 ships, and the stability promise takes effect at 1.0 rather than here
+— see [Stability](#stability).
 
 ```kotlin
 dependencies {
@@ -582,10 +582,12 @@ on core alone, so neither needs an HTTP library present.
 
 ## Stability
 
-The current release is 0.2.0. 1.0 is at release-candidate stage: the API
-surface it promises is frozen and guarded now, and the promise itself — the
-public API of the shipped modules is stable, and a breaking change waits for a
-major release — takes effect from 1.0.
+The current release is 1.0.0-RC1, a candidate for 1.0. The API surface it
+promises is frozen and guarded now; the promise itself — the public API of the
+shipped modules is stable, and a breaking change waits for a major release —
+takes effect at 1.0. A candidate exists so that what only real use finds can
+still change, and any break between here and 1.0 is recorded in
+[the changelog](CHANGELOG.md) like any other.
 
 Two things in the repository say what that covers, and both fail the build
 rather than being promised in prose. The `.api` dump beside each module is the

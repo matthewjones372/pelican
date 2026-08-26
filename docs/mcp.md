@@ -29,8 +29,7 @@ dependencies {
 Core and [`pelican-schema`](schemas.md) for the first, and no MCP SDK for
 either: a tool list is a value, and the protocol is JSON-RPC over lines of
 text. `pelican-mcp` has been on Maven Central since 0.2.0; the two serving
-modules are new since then and first release with 1.0 — `1.0.0-RC1` carries
-all three.
+modules are new since then, and `1.0.0-RC1` carries all three.
 
 ```kotlin
 val tools = ordersSpec().mcpTools(options)              // descriptions only
