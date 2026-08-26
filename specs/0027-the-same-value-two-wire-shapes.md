@@ -48,13 +48,13 @@ documented truthfully in OpenAPI.
 
 ## Stack
 
-- [ ] **`spec-0027-negotiated-output`** — the type, the builder, the
+- [x] **`spec-0027-negotiated-output`** — the type, the builder, the
       status-clash carve-out, core tests.
       Done when: the sealed `when` in all three interpreters fails to compile until handled.
-- [ ] **`spec-0027-interpreters`** — selection in Pekko, http4k, Ktor;
+- [x] **`spec-0027-interpreters`** — selection in Pekko, http4k, Ktor;
       `ContentNegotiationTest` grows the selection cases.
       Done when: the same request with two `Accept` values gets two wire shapes, byte-pinned, on all three.
-- [ ] **`spec-0027-document-and-clients`** — multi-entry response content
+- [x] **`spec-0027-document-and-clients`** — multi-entry response content
       map; generated client sends `Accept` and exposes the chosen type.
       Done when: `OpenApiSpecQualityTest` passes and the round trip re-imports the negotiated response.
 
