@@ -93,7 +93,7 @@ import java.util.concurrent.ConcurrentHashMap
  * so reading an arbitrary header is the one thing this module cannot do
  * without knowing which server is underneath. One function per service closes
  * that gap — on Pekko it is `params.request.getHeader(key)` — and
- * `example/src/main/kotlin/example/tracing/` has it written out.
+ * `example/src/main/kotlin/example/telemetry/` has it written out.
  *
  * Left out, the parent is [Context.current] instead. That is deliberate rather
  * than a stub: a service running the OpenTelemetry Java agent already has an

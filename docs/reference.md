@@ -2833,10 +2833,10 @@ so the status a refusal would report never reached a caller; `spi.classifyError`
 gives the protocol its classification without the render — and so without the
 observation.
 
-`example/src/main/kotlin/example/metrics/MeteredOrders.kt` is a service wired
+`example/src/main/kotlin/example/telemetry/TelemetryService.kt` is a service wired
 this way — a 200, a declared 404, a 201 and a deprecated endpoint, with
 `/admin/meters` rendering what was recorded. Run it with
-`./gradlew :example:runMetrics`.
+`./gradlew :example:runTelemetry`.
 
 ### OpenTelemetry, from the same descriptions
 
@@ -2989,10 +2989,10 @@ classpath of every service already calling `metrics(registry)` and turn a
 working deployment into a `NoClassDefFoundError`. Two modules, a
 `NoOtherDependenciesTest` in each, and neither audience pays for the other.
 
-`example/src/main/kotlin/example/tracing/TracedOrders.kt` is a service wired
+`example/src/main/kotlin/example/telemetry/TelemetryService.kt` is a service wired
 this way, with `/admin/traces` rendering the spans it produced and a deliberate
 500 to show what a span says that a response body does not. Run it with
-`./gradlew :example:runTracing`.
+`./gradlew :example:runTelemetry`.
 
 ## Errors, and what a caller is told
 

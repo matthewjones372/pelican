@@ -3,11 +3,11 @@ package example.telemetry
 /*
  * One service, instrumented twice.
  *
- * `example/metrics` and `example/tracing` each made this argument well and each
- * made it alone, so the claim a reader most wants checked — that both
- * instruments come from one set of descriptions — was the one neither could
- * show. This file is that claim: two filters, one endpoint list, and a report at
- * the end that answers the three questions a dashboard is built from.
+ * There were two files here once, one metered and one traced, each making the
+ * argument well and each making it alone — so the claim a reader most wants
+ * checked, that both instruments come from one set of descriptions, was the one
+ * neither could show. This is that claim: two filters, one endpoint list, and a
+ * report at the end answering the three questions a dashboard is built from.
  *
  * There are two lines here about telemetry, both in the filter list, and no
  * handler below mentions a meter, a span, a tag or a status. What either

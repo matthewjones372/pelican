@@ -21,10 +21,10 @@ dependencies {
     implementation(project(":pelican-pekko-mcp"))
     implementation(project(":pelican-jackson"))
     // Meters, which are opt-in in the same way serving the docs is: this is the
-    // module that adds them, and `example.metrics` is what it looks like.
+    // module that adds them, and `example.telemetry` is what it looks like.
     implementation(project(":pelican-metrics"))
     // The same idea through the other vendor's API, and a separate module for
-    // exactly that reason: `example.tracing` is what it looks like. The SDK is
+    // exactly that reason: `example.telemetry` is what it looks like. The SDK is
     // declared here rather than arriving through the module, because which SDK
     // a service runs — or whether it runs one at all — is the service's choice
     // and not the library's.
@@ -158,21 +158,7 @@ tasks.register<JavaExec>("runMcp") {
 }
 
 /** The metered service: `curl` it, then read `/admin/meters` to see what that recorded. */
-tasks.register<JavaExec>("runMetrics") {
-    group = "application"
-    description = "Runs the Orders example with Micrometer meters taken from the descriptions"
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("example.metrics.MeteredOrdersKt")
-}
-
 /** The traced service: `curl` it, then read `/admin/traces` to see the spans that produced. */
-tasks.register<JavaExec>("runTracing") {
-    group = "application"
-    description = "Runs the Orders example with OpenTelemetry spans taken from the descriptions"
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("example.tracing.TracedOrdersKt")
-}
-
 tasks.register<JavaExec>("runTelemetry") {
     group = "application"
     description = "One service, metered and traced, with a report that answers both."
