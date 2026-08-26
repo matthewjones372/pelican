@@ -47,12 +47,12 @@ exactly is the better sales pitch.
 
 ## Stack
 
-- [ ] **`spec-0025-doc-truth`** — the false sentence rewritten around
+- [x] **`spec-0025-doc-truth`** — the false sentence rewritten around
       `UndeclaredResponse`; failures-are-JSON, disconnect semantics,
       status-clash wording, MCP label, Kover numbers, the stale
       `RoutingTest` comment (`ktor Interpreter.kt:61`).
       Done when: no claim in `reference.md` contradicts a test, checked by reading the diff against the fixture list.
-- [ ] **`spec-0025-fixtures`** — fixtures for the wrong-input-type,
+- [x] **`spec-0025-fixtures`** — fixtures for the wrong-input-type,
       wrong-stream-element, and value-for-stream messages
       (`reference.md:3038-3049`); a pinned-open fixture for lens-style
       undeclared-key reads; the seventh-input refusal.
