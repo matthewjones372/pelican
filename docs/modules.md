@@ -45,3 +45,14 @@ stack — and not the matching *interpreter* either, since making calls and
 serving routes are separate decisions — and `pelican-test` asserts it drags in
 no server library and no matcher library. The full breakdown is in
 [docs/reference.md](reference.md#modules).
+
+`pelican-core` publishes two packages. `io.github.matthewjones372.pelican` is
+the DSL a service is written in. `io.github.matthewjones372.pelican.spi` is what
+an interpreter or a transport calls to turn those descriptions into a running
+server — `handlerFor`, `routeIndex`, `requestBodyCodec`, `readStrictBody`,
+`acceptable`, `successNamedBy`, `renderError` and a handful more. None of them
+can be `internal`, because a backend is a separate module by design, so the
+package is the fence instead: both are covered by the same binary-compatibility
+gate, and neither is more or less supported than the other — but a service that
+finds itself importing `spi` is reaching for plumbing rather than for the DSL.
+`SpiPackageTest` in core is what holds the two apart.

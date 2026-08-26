@@ -20,14 +20,14 @@ import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.QueryParam
 import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.decodeList
 import io.github.matthewjones372.pelican.emptyJsonObj
-import io.github.matthewjones372.pelican.handlerFor
 import io.github.matthewjones372.pelican.operationName
 import io.github.matthewjones372.pelican.parseJson
 import io.github.matthewjones372.pelican.payloadType
 import io.github.matthewjones372.pelican.schema.StandaloneSchemas
-import io.github.matthewjones372.pelican.successNamedBy
+import io.github.matthewjones372.pelican.spi.decodeList
+import io.github.matthewjones372.pelican.spi.handlerFor
+import io.github.matthewjones372.pelican.spi.successNamedBy
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 

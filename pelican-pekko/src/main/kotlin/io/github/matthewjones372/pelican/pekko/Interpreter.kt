@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.pekko
 
 import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.spi.*
 import org.apache.pekko.actor.ClassicActorSystemProvider
 import org.apache.pekko.http.javadsl.model.*
 import org.apache.pekko.http.javadsl.model.headers.RawHeader

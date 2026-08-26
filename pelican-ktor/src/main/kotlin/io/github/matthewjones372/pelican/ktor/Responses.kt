@@ -14,9 +14,9 @@ import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.TextOutput
-import io.github.matthewjones372.pelican.failureNamedBy
-import io.github.matthewjones372.pelican.renderError
-import io.github.matthewjones372.pelican.successNamedBy
+import io.github.matthewjones372.pelican.spi.failureNamedBy
+import io.github.matthewjones372.pelican.spi.renderError
+import io.github.matthewjones372.pelican.spi.successNamedBy
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall

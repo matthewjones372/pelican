@@ -2,8 +2,8 @@ package io.github.matthewjones372.pelican.http4k
 
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.ParamKey
-import io.github.matthewjones372.pelican.RouteIndex
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.spi.RouteIndex
 import org.http4k.core.Filter
 import org.http4k.core.Request
 import org.http4k.core.Response

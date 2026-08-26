@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.pekko
 
 import io.github.matthewjones372.pelican.*
+import io.github.matthewjones372.pelican.spi.*
 import org.apache.pekko.NotUsed
 import org.apache.pekko.http.javadsl.common.EntityStreamingSupport
 import org.apache.pekko.http.javadsl.model.*

@@ -1,7 +1,6 @@
 package io.github.matthewjones372.pelican.ktor.docs
 
 import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.CorsHeaders
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.ktor.PelicanServer
@@ -12,6 +11,7 @@ import io.github.matthewjones372.pelican.openapi.oauth2RedirectHtml
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.openapi.swaggerUiHtml
+import io.github.matthewjones372.pelican.spi.CorsHeaders
 import io.ktor.http.ContentType
 import io.ktor.server.application.Application
 import io.ktor.server.cio.CIO

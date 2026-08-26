@@ -1,7 +1,6 @@
 package io.github.matthewjones372.pelican.pekko.docs
 
 import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.CorsHeaders
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.openapi.docs
@@ -12,6 +11,7 @@ import io.github.matthewjones372.pelican.openapi.swaggerUiHtml
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.pekko.toRoute
+import io.github.matthewjones372.pelican.spi.CorsHeaders
 import org.apache.pekko.actor.ClassicActorSystemProvider
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.http.javadsl.model.ContentType
