@@ -15,14 +15,16 @@ a public post that nobody else can make.
 
 Free, and mostly absent today.
 
-- [x] **Topics.** Set: `kotlin`, `openapi`, `http4k`, `ktor`, `pekko`,
+- [x] **Topics.** Set: `kotlin`, `openapi`, `http4k`, `ktor`, `pekko`, `mcp`,
       `type-safe`, `api-first`, `rest-api`, `kotlin-library`,
-      `openapi-generator`.
-- [ ] **Homepage URL.** Left empty, deliberately. There is no docs site, and a
-      Sonatype artifact page is a package listing rather than a front page —
-      the badge already links it. Worth filling in when there is somewhere that
-      reads as the project's own: the published KDoc on javadoc.io once a
-      release ships the Dokka jar, or a real docs site if one is ever built.
+      `openapi-generator`. This entry was ticked once before `http4k` and `ktor`
+      were actually on the repository, so a search for either found nothing
+      while the list here said otherwise — checked against `gh repo view` this
+      time rather than against the intention.
+- [x] **Homepage URL.** Set to the published KDoc on javadoc.io, which is what
+      this entry was waiting for: two releases have now shipped a Dokka jar, so
+      there is something to point at that reads as the project's own rather
+      than as a package listing. A real docs site would replace it.
 - [!] **Social preview.** `docs/assets/social-preview.png`, uploaded under
       Settings → General → Social preview. **The only item here with no API** —
       GitHub exposes no endpoint for it, so it has to be done in the browser.
