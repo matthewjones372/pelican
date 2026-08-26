@@ -48,7 +48,7 @@ class FunctionalStyleTest {
             "scheme registration accumulates, then the document reads it",
         "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Params.kt" to
             "the attribute bag a filter writes into: mutable for the length of one request, by design",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/RouteIndex.kt" to
+        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/spi/RouteIndex.kt" to
             "the walk collects captured segments as it descends and unwinds them when a branch " +
             "fails, which is what lets a literal be tried before a capture without matching twice",
         "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/BodyCodec.kt" to

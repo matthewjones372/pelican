@@ -1,5 +1,8 @@
 package io.github.matthewjones372.pelican
 
+import io.github.matthewjones372.pelican.spi.renderError
+import io.github.matthewjones372.pelican.spi.statusOfError
+
 /**
  * What status this endpoint is about to answer with, given what came back out
  * of the handler.

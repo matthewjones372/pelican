@@ -1,4 +1,6 @@
-package io.github.matthewjones372.pelican
+package io.github.matthewjones372.pelican.spi
+
+import io.github.matthewjones372.pelican.*
 
 /**
  * The endpoint a request reaches, found without trying the others.

@@ -245,9 +245,3 @@ private const val ALLOW_METHODS = "Access-Control-Allow-Methods"
 private const val ALLOW_HEADERS = "Access-Control-Allow-Headers"
 private const val EXPOSE_HEADERS = "Access-Control-Expose-Headers"
 private const val MAX_AGE = "Access-Control-Max-Age"
-
-/** The request headers a backend reads to answer a preflight. */
-object CorsHeaders {
-    const val ORIGIN = "Origin"
-    const val REQUEST_METHOD = "Access-Control-Request-Method"
-}

@@ -82,10 +82,6 @@ public final class io/github/matthewjones372/pelican/ApiKeyScheme : io/github/ma
 	public final fun getParamName ()Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/ApiKt {
-	public static final fun handlerFor (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/ServerEndpoint;)Lkotlin/jvm/functions/Function1;
-}
-
 public final class io/github/matthewjones372/pelican/ApiSpec {
 	public fun <init> (Ljava/util/List;Lio/github/matthewjones372/pelican/SchemaSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
 	public synthetic fun <init> (Ljava/util/List;Lio/github/matthewjones372/pelican/SchemaSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -111,8 +107,6 @@ public abstract interface class io/github/matthewjones372/pelican/BodyCodec {
 
 public final class io/github/matthewjones372/pelican/BodyCodecKt {
 	public static final fun orNull (Lio/github/matthewjones372/pelican/JsonObj;)Lio/github/matthewjones372/pelican/JsonObj;
-	public static final fun readStrictBody (Ljava/io/InputStream;J)Ljava/lang/String;
-	public static final fun requestBodyCodec (Lio/github/matthewjones372/pelican/Codecs;Lio/github/matthewjones372/pelican/BodyInput;)Lio/github/matthewjones372/pelican/RequestBodyCodecs;
 	public static final fun withNullabilityOf (Lio/github/matthewjones372/pelican/JsonObj;Lkotlin/reflect/KType;)Lio/github/matthewjones372/pelican/JsonObj;
 }
 
@@ -236,12 +230,6 @@ public final class io/github/matthewjones372/pelican/Cors {
 	public final fun getExposedHeaders ()Ljava/util/List;
 	public final fun getMaxAgeSeconds ()Ljava/lang/Long;
 	public final fun getOrigins ()Lio/github/matthewjones372/pelican/CorsOrigins;
-}
-
-public final class io/github/matthewjones372/pelican/CorsHeaders {
-	public static final field INSTANCE Lio/github/matthewjones372/pelican/CorsHeaders;
-	public static final field ORIGIN Ljava/lang/String;
-	public static final field REQUEST_METHOD Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/CorsKt {
@@ -404,7 +392,6 @@ public final class io/github/matthewjones372/pelican/EndpointBuilder {
 }
 
 public final class io/github/matthewjones372/pelican/EndpointKt {
-	public static final fun declaredInputCount (Lio/github/matthewjones372/pelican/Endpoint;)I
 	public static final fun endpoint (Lio/github/matthewjones372/pelican/Inputs;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/Endpoint;
 	public static final fun endpoint (Lio/github/matthewjones372/pelican/ParamKey;Lio/github/matthewjones372/pelican/ParamKey;Lio/github/matthewjones372/pelican/ParamKey;Lio/github/matthewjones372/pelican/ParamKey;Lio/github/matthewjones372/pelican/ParamKey;Lio/github/matthewjones372/pelican/ParamKey;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/Endpoint;
 	public static final fun endpoint (Lio/github/matthewjones372/pelican/ParamKey;Lio/github/matthewjones372/pelican/ParamKey;Lio/github/matthewjones372/pelican/ParamKey;Lio/github/matthewjones372/pelican/ParamKey;Lio/github/matthewjones372/pelican/ParamKey;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/Endpoint;
@@ -445,7 +432,6 @@ public final class io/github/matthewjones372/pelican/ErrorSpec {
 }
 
 public final class io/github/matthewjones372/pelican/FallibleKt {
-	public static final fun failureNamedBy (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/Outcome$Err;)Lio/github/matthewjones372/pelican/ErrorOutput;
 	public static final fun of (Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/HeaderValue;
 	public static final fun ok (Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
 	public static final fun or (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/Output;)Lio/github/matthewjones372/pelican/FallibleOutput;
@@ -455,7 +441,6 @@ public final class io/github/matthewjones372/pelican/FallibleKt {
 	public static final fun orFail (Lio/github/matthewjones372/pelican/FallibleOutput;[Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/FallibleOutput;
 	public static final fun orFail (Lio/github/matthewjones372/pelican/Output;Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/FallibleOutput;
 	public static final fun orFail (Lio/github/matthewjones372/pelican/Output;[Lio/github/matthewjones372/pelican/ErrorOutput;)Lio/github/matthewjones372/pelican/FallibleOutput;
-	public static final fun successNamedBy (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/Outcome$Ok;)Lio/github/matthewjones372/pelican/Output;
 }
 
 public final class io/github/matthewjones372/pelican/FallibleOutput : io/github/matthewjones372/pelican/Output {
@@ -859,9 +844,6 @@ public final class io/github/matthewjones372/pelican/Method : java/lang/Enum {
 
 public final class io/github/matthewjones372/pelican/MultiKt {
 	public static final fun decodeAll (Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;Lio/github/matthewjones372/pelican/ListStyle;Ljava/util/List;)Ljava/util/List;
-	public static final fun decodeList (Lio/github/matthewjones372/pelican/CookieParam;Ljava/util/List;)Ljava/lang/Object;
-	public static final fun decodeList (Lio/github/matthewjones372/pelican/HeaderParam;Ljava/util/List;)Ljava/lang/Object;
-	public static final fun decodeList (Lio/github/matthewjones372/pelican/QueryParam;Ljava/util/List;)Ljava/lang/Object;
 	public static final fun defaultExplodeFor (Ljava/lang/String;)Z
 	public static final fun defaultStyleAt (Ljava/lang/String;)Ljava/lang/String;
 	public static final fun encodeAll (Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;Lio/github/matthewjones372/pelican/ListStyle;Ljava/util/List;)Ljava/util/List;
@@ -904,10 +886,6 @@ public final class io/github/matthewjones372/pelican/NegotiatedBody : io/github/
 	public final fun getAlternatives ()Ljava/util/List;
 	public fun getDescription ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class io/github/matthewjones372/pelican/NegotiationKt {
-	public static final fun acceptable (Ljava/util/List;Ljava/util/Set;)Z
 }
 
 public final class io/github/matthewjones372/pelican/NoCodecs : io/github/matthewjones372/pelican/Codecs {
@@ -1182,18 +1160,6 @@ public final class io/github/matthewjones372/pelican/RefinedKt {
 	public static final fun withFacets (Lio/github/matthewjones372/pelican/PlainCodec;Lio/github/matthewjones372/pelican/JsonObj;)Lio/github/matthewjones372/pelican/PlainCodec;
 }
 
-public final class io/github/matthewjones372/pelican/RenderedError {
-	public fun <init> (Lio/github/matthewjones372/pelican/ApiError;Ljava/util/List;Ljava/lang/Throwable;Ljava/lang/String;)V
-	public final fun getError ()Lio/github/matthewjones372/pelican/ApiError;
-	public final fun getHeaders ()Ljava/util/List;
-	public final fun getReference ()Ljava/lang/String;
-	public final fun getUnexpected ()Ljava/lang/Throwable;
-}
-
-public final class io/github/matthewjones372/pelican/RequestBodyCodecs {
-	public final fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
-}
-
 public final class io/github/matthewjones372/pelican/ResponseHeader {
 	public fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;Z)V
 	public synthetic fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -1271,16 +1237,6 @@ public final class io/github/matthewjones372/pelican/RetryingTransport : io/gith
 	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
 }
 
-public final class io/github/matthewjones372/pelican/RouteIndex {
-	public static final field INITIAL_CAPTURES I
-	public final fun describesPath (Ljava/lang/String;)Z
-	public final fun match (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;Ljava/util/Map;)Lio/github/matthewjones372/pelican/ServerEndpoint;
-}
-
-public final class io/github/matthewjones372/pelican/RouteIndexKt {
-	public static final fun routeIndex (Ljava/util/List;)Lio/github/matthewjones372/pelican/RouteIndex;
-}
-
 public abstract interface class io/github/matthewjones372/pelican/SchemaComponents {
 	public abstract fun isRegistered (Ljava/lang/String;)Z
 	public abstract fun ref (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonObj;
@@ -1356,11 +1312,6 @@ public final class io/github/matthewjones372/pelican/ServerEndpoint {
 	public fun <init> (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function1;)V
 	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
 	public final fun getInvoke ()Lkotlin/jvm/functions/Function1;
-}
-
-public final class io/github/matthewjones372/pelican/ServerErrorsKt {
-	public static final fun renderError (Ljava/lang/Throwable;Z)Lio/github/matthewjones372/pelican/RenderedError;
-	public static synthetic fun renderError$default (Ljava/lang/Throwable;ZILjava/lang/Object;)Lio/github/matthewjones372/pelican/RenderedError;
 }
 
 public final class io/github/matthewjones372/pelican/SseOutput : io/github/matthewjones372/pelican/Output {
@@ -1461,5 +1412,54 @@ public final class io/github/matthewjones372/pelican/WebhooksKt {
 	public static final fun getOperationName (Lio/github/matthewjones372/pelican/Webhook;)Ljava/lang/String;
 	public static final fun webhook (Ljava/lang/String;Lio/github/matthewjones372/pelican/Method;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/Webhook;
 	public static synthetic fun webhook$default (Ljava/lang/String;Lio/github/matthewjones372/pelican/Method;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/Webhook;
+}
+
+public final class io/github/matthewjones372/pelican/spi/CorsHeaders {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/spi/CorsHeaders;
+	public static final field ORIGIN Ljava/lang/String;
+	public static final field REQUEST_METHOD Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/spi/HandlersKt {
+	public static final fun declaredInputCount (Lio/github/matthewjones372/pelican/Endpoint;)I
+	public static final fun failureNamedBy (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/Outcome$Err;)Lio/github/matthewjones372/pelican/ErrorOutput;
+	public static final fun handlerFor (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/ServerEndpoint;)Lkotlin/jvm/functions/Function1;
+	public static final fun successNamedBy (Lio/github/matthewjones372/pelican/FallibleOutput;Lio/github/matthewjones372/pelican/Outcome$Ok;)Lio/github/matthewjones372/pelican/Output;
+}
+
+public final class io/github/matthewjones372/pelican/spi/RenderedError {
+	public fun <init> (Lio/github/matthewjones372/pelican/ApiError;Ljava/util/List;Ljava/lang/Throwable;Ljava/lang/String;)V
+	public final fun getError ()Lio/github/matthewjones372/pelican/ApiError;
+	public final fun getHeaders ()Ljava/util/List;
+	public final fun getReference ()Ljava/lang/String;
+	public final fun getUnexpected ()Ljava/lang/Throwable;
+}
+
+public final class io/github/matthewjones372/pelican/spi/RequestBodyCodecs {
+	public final fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+}
+
+public final class io/github/matthewjones372/pelican/spi/RequestsKt {
+	public static final fun acceptable (Ljava/util/List;Ljava/util/Set;)Z
+	public static final fun decodeList (Lio/github/matthewjones372/pelican/CookieParam;Ljava/util/List;)Ljava/lang/Object;
+	public static final fun decodeList (Lio/github/matthewjones372/pelican/HeaderParam;Ljava/util/List;)Ljava/lang/Object;
+	public static final fun decodeList (Lio/github/matthewjones372/pelican/QueryParam;Ljava/util/List;)Ljava/lang/Object;
+	public static final fun readStrictBody (Ljava/io/InputStream;J)Ljava/lang/String;
+	public static final fun requestBodyCodec (Lio/github/matthewjones372/pelican/Codecs;Lio/github/matthewjones372/pelican/BodyInput;)Lio/github/matthewjones372/pelican/spi/RequestBodyCodecs;
+}
+
+public final class io/github/matthewjones372/pelican/spi/RouteIndex {
+	public static final field INITIAL_CAPTURES I
+	public final fun describesPath (Ljava/lang/String;)Z
+	public final fun match (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;Ljava/util/Map;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+}
+
+public final class io/github/matthewjones372/pelican/spi/RouteIndexKt {
+	public static final fun routeIndex (Ljava/util/List;)Lio/github/matthewjones372/pelican/spi/RouteIndex;
+}
+
+public final class io/github/matthewjones372/pelican/spi/ServerErrorsKt {
+	public static final fun renderError (Ljava/lang/Throwable;Z)Lio/github/matthewjones372/pelican/spi/RenderedError;
+	public static synthetic fun renderError$default (Ljava/lang/Throwable;ZILjava/lang/Object;)Lio/github/matthewjones372/pelican/spi/RenderedError;
 }
 

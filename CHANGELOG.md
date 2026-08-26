@@ -16,6 +16,15 @@ one.
 
 ### Changed — read this one
 
+- **The interpreter SPI lives in `io.github.matthewjones372.pelican.spi`.**
+  `handlerFor`, `routeIndex`/`RouteIndex`, `renderError`/`RenderedError`,
+  `readStrictBody`, `requestBodyCodec`/`RequestBodyCodecs`, `successNamedBy`,
+  `failureNamedBy`, `decodeList`, `acceptable`, `declaredInputCount` and
+  `CorsHeaders` moved out of the root package, with their signatures unchanged
+  and no forwarders left behind. Nothing in the DSL moved. A service written
+  against Pelican compiles as it was; a backend or transport written against
+  core adds one import per file. The fence goes up before 1.0 because after it
+  the same move would break every backend at once.
 - **An `Api` is built by `api(routes, codecs = ...) { }`**, and its constructor
   is internal. A fifteen-parameter constructor with defaults freezes twice over
   — the descriptor and the synthetic constructor carrying the defaults both

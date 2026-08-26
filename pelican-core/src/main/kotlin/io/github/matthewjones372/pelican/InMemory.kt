@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican
 
+import io.github.matthewjones372.pelican.spi.*
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URLDecoder

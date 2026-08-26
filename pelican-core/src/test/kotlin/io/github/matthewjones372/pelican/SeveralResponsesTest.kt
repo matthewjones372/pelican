@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican
 
+import io.github.matthewjones372.pelican.spi.*
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty

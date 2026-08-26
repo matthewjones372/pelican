@@ -598,18 +598,3 @@ private fun derivedOperationName(method: Method, pathSpec: PathSpec): String {
     }
     return method.name.lowercase() + parts.joinToString("")
 }
-
-/**
- * How many values a request will decode, for sizing the bag they go into.
- * `LinkedHashMap()` with no argument allocates sixteen buckets, which is most
- * of a request's allocation for an endpoint declaring two.
- */
-fun Endpoint<*, *>.declaredInputCount(): Int {
-    val declared = pathSpec.captures.size + queries.size + headerParams.size +
-        cookieParams.size + (if (bodyInput == null) 0 else 1)
-    return if (declared == 0) 1 else declared * INVERSE_LOAD_FACTOR_NUMERATOR / INVERSE_LOAD_FACTOR_DENOMINATOR + 1
-}
-
-/** A hash map grows at three quarters full; 4/3 of what goes in is what to ask for. */
-private const val INVERSE_LOAD_FACTOR_NUMERATOR = 4
-private const val INVERSE_LOAD_FACTOR_DENOMINATOR = 3

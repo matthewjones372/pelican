@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican
 
+import io.github.matthewjones372.pelican.spi.acceptable
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 import kotlin.time.Duration

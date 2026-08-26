@@ -113,36 +113,3 @@ fun listSchema(element: PlainCodec<*>): JsonObj = jsonObj {
         element.openApiSchema() + (element.example?.let { jsonObj { "example" to it } } ?: emptyJsonObj),
     )
 }
-
-/**
- * What a multi-valued parameter contributes, given every occurrence under its
- * name. Shared by the three locations because the subtle part is common: an
- * empty occurrence is not an element, so a list that comes out empty is a
- * parameter the caller did not send.
- */
-fun QueryParam<*>.decodeList(wire: List<String>): Any? =
-    listValue(name, codec, listStyle, required, default, "query parameter", wire)
-
-fun HeaderParam<*>.decodeList(wire: List<String>): Any? =
-    listValue(name, codec, listStyle, required, default, "header", wire)
-
-fun CookieParam<*>.decodeList(wire: List<String>): Any? =
-    listValue(name, codec, listStyle, required, default, "cookie", wire)
-
-@Suppress("LongParameterList") // The declaration's facets, from three classes with no common supertype.
-private fun listValue(
-    name: String,
-    codec: PlainCodec<*>,
-    style: ListStyle?,
-    required: Boolean,
-    default: Any?,
-    noun: String,
-    wire: List<String>,
-): Any? {
-    val values = codec.decodeAll(name, checkNotNull(style) { "'$name' was not declared as a list" }, wire)
-    return when {
-        values.isNotEmpty() -> values
-        required -> throw ApiException(400, "Missing required $noun '$name'")
-        else -> default
-    }
-}

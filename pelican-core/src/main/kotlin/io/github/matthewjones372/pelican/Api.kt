@@ -121,13 +121,6 @@ class ServerEndpoint(
 )
 
 /**
- * The handler with this API's filters wrapped around it. Called once per
- * endpoint at route-build time, so the chain is folded once, not per request.
- */
-fun Api.handlerFor(se: ServerEndpoint): (Params) -> CompletionStage<Any?> =
-    filters.wrap(se.invoke)
-
-/**
  * Bound endpoints plus the settings shared between them. Built by [api]: the
  * constructor is internal so that a setting can be added without breaking every
  * caller compiled against the last release.
