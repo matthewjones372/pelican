@@ -44,10 +44,10 @@ exists to avoid.
 
 ## Stack
 
-- [ ] **`spec-0029-observer-hook`** — the core value, invoked from all three
+- [x] **`spec-0029-observer-hook`** — the core value, invoked from all three
       interpreters' refusal sites.
       Done when: a parity test sees the same observations for the same refusals on all three backends.
-- [ ] **`spec-0029-meters`** — the counter in pelican-metrics and the OTel
+- [x] **`spec-0029-meters`** — the counter in pelican-metrics and the OTel
       equivalent; `docs/reference.md`'s metrics table updated.
       Done when: `MetricsAcrossBackendsTest` asserts the refusal counter for the 400/406/413 cases.
 
