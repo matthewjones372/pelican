@@ -17,7 +17,7 @@ rather than convention.
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
 | `pelican-schema` | core | one type → a JSON Schema 2020-12 document that resolves on its own |
-| `pelican-mcp` | core + schema | descriptions → MCP tool descriptions, and a dispatch that runs them |
+| `pelican-mcp` | core + schema | descriptions → MCP tool descriptions, and a dispatch that runs them. Descriptions half only: **serving is roadmap** — no SDK, no transport, nothing that speaks the protocol |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | core | where a generated client's requests go, over the JDK's `HttpClient` |
 | `pelican-client-pekko` | core + pekko-http | the same, over Pekko HTTP's client |

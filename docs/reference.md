@@ -15,7 +15,7 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 or 3.2.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-schema` | **core** | one type → a self-contained JSON Schema 2020-12 document: pointers under `$defs`, a union's branches carrying the property that picks them. No document generator, no codec |
-| `pelican-mcp` | core, schema | descriptions → MCP tool descriptions, and a dispatch that decodes a tool call into the handler the route already has. No MCP SDK, no transport |
+| `pelican-mcp` | core, schema | descriptions → MCP tool descriptions, and a dispatch that decodes a tool call into the handler the route already has. The descriptions half only: no MCP SDK, no transport, and **serving them is roadmap** |
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
 | `pelican-client-pekko` | core, pekko-http | the same seam over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-client-ktor` | core, ktor-client-cio | the same seam over Ktor's `HttpClient`, for a service that already runs one. Not `pelican-ktor`: calling is not interpreting |
@@ -158,6 +158,16 @@ completes a future the interpreter awaits. Cancellation travels down — a clien
 that disconnects cancels the handler — and failures are caught rather than left
 to the coroutine builder, since a child that fails cancels its parent, and a
 cancelled call cannot answer 404 to the `notFound(...)` that caused it.
+
+That last point is the one thing a disconnect does not mean the same on all
+three, and it follows from how each runs a handler. Ktor's is a child of the
+call's coroutine, so a caller who goes away cancels it. Pekko's is a
+`CompletionStage` nobody holds a cancel for and http4k's is a blocking call on a
+server thread: both run to completion, and what they produce is written to a
+connection that is no longer there. Plan for a handler that charges a card
+accordingly. A *stream* is the exception and behaves the same everywhere — a
+consumer that stops reading closes the handler's stream, which
+`SlowConsumerTest` asserts through each backend's own signal.
 
 `example/backends/` is the smallest version of this: `Greetings.kt` describes three
 endpoints; `OnPekko.kt`, `OnHttp4k.kt` and `OnKtor.kt` bind them; and
@@ -3086,7 +3096,9 @@ implementation. Two settings on the `Api` change it:
   line with your own, for the fields your aggregator wants.
 
 Declared failures are untouched: a 404 you described still carries the payload
-you described, because that is not a surprise.
+you described, as `application/json`, because that is not a surprise. Every row
+above is JSON too — `renderError` writes one shape, so a caller parsing a 400
+and a 500 parses the same thing.
 
 ## Limits and startup checks
 
@@ -3266,21 +3278,27 @@ No `query(...)` or `header(...)` call — listing them on `endpoint` did that. O
 declaration site, and the handler receives exactly what was declared. There is
 an overload per arity up to six.
 
-What the compiler catches (verified by feeding it each mistake):
+What the compiler catches, in its own words — `DoesNotCompileTest` compiles each
+of these and asserts the line, so a message this page invented would fail the
+build rather than persuade a reader:
 
 ```
 +(getUser handledNow { id: String -> ... })
-  e: Argument type mismatch: actual 'Function1<String, User>', expected 'Function1<Long, User>'
+  e: Argument type mismatch: actual type is 'Params.(String) -> User', but 'Params.(Long) -> User' was expected.
 
 +(watchOrders streamedNow { (_, max) -> Source.single("not a tick") })
-  e: Return type mismatch: expected 'Source<Tick, NotUsed>', actual 'Source<String, NotUsed>'
+  e: Return type mismatch: expected 'Source<Tick, NotUsed>', actual 'Source<String!, NotUsed!>!'.
 
 +(streamOrders handledNow { _ -> aUser })
-  e: Return type mismatch: expected 'StreamOf<Order>', actual 'User'
+  e: Return type mismatch: expected 'StreamOf<Order>', actual 'User'.
 
 +(getUser handledNow { id -> "a string" })
-  e: Return type mismatch: expected 'User', actual 'String'
+  e: Return type mismatch: expected 'User', actual 'String'.
 ```
+
+The handler type is `Params.(I) -> T` rather than `(I) -> T` because a handler
+can reach the request it is answering — `params[traceId]`, `setHeader(...)` —
+without that appearing in every signature.
 
 What it does **not** catch, honestly:
 
@@ -3312,10 +3330,18 @@ No arguments means no inputs: `endpoint { }` is an `Endpoint<Unit, R>` and its
 handler is given nothing, because there is nothing to give it.
 
 Past six inputs there is no overload, and tuples have stopped paying for
-themselves anyway. Ask for the whole bag by name — `endpoint(lensInputs) { }`
-with `query(...)`/`header(...)`, handler receives `Params`, read by key. The
-trade is that reading an undeclared key throws at request time instead of
-failing to compile, which is why it is a name rather than the default.
+themselves anyway. A seventh lands on nothing:
+
+```
++(endpoint(a, b, c, d, e, f, g) { get("z"); json<Item>() })
+  e: None of the following candidates is applicable:
+```
+
+Ask for the whole bag by name instead — `endpoint(lensInputs) { }` with
+`query(...)`/`header(...)`, handler receives `Params`, read by key. The trade is
+that reading an undeclared key compiles and throws on the request instead, which
+is why it is a name rather than the default. Both halves are fixtures:
+`DoesNotCompileTest` refuses the seventh input and accepts the undeclared read.
 
 ## Refined inputs
 
@@ -3845,6 +3871,13 @@ val placeOrder = endpoint(userId, apiKey, newOrder) {
 }
 ```
 
+**A declared failure is JSON.** `errorJson` is the only spelling there is: the
+payload is written by the configured `Codecs` as `application/json` on all three
+backends, and the document says `application/json` under that status. `text(...)`
+and `empty(...)` declare *successes*; nothing declares a failure as anything but
+JSON, so a caller reading a described 404 never has to ask which encoding this
+one used.
+
 The binder for that shape takes a handler returning an `Outcome`, so the
 failure has to be produced rather than thrown:
 
@@ -3872,13 +3905,13 @@ What the compiler catches:
 
 ```
 +(getUser handledOrFail { id -> Store.user(id)!! })
-  e: Return type mismatch: expected 'Outcome<ApiError, User>', actual 'User'
+  e: Return type mismatch: expected 'Outcome<ApiError, User>', actual 'User'.
 
 +(getUser handledOrFail { _ -> otherFailure(OtherProblem("no")) })
-  e: Return type mismatch: expected 'Outcome<ApiError, User>', actual 'Outcome<OtherProblem, Nothing>'
+  e: Return type mismatch: expected 'Outcome<ApiError, User>', actual 'Outcome<OtherProblem, Nothing>'.
 
 +(getUser handledNow { id -> Store.user(id)!! })
-  e: Return type mismatch: expected 'Outcome<ApiError, User>', actual 'User'
+  e: Return type mismatch: expected 'Outcome<ApiError, User>', actual 'User'.
 ```
 
 With several payload types the error parameter infers to their common
@@ -4212,8 +4245,15 @@ success side. Which means everything about it is already familiar:
   the response instead. This is only reachable where there is a choice — a
   header on an endpoint's *only* response is already refused when the endpoint
   is built.
-- **A response the endpoint never declared does not compile**, exactly as an
-  undeclared failure does not.
+- **A response the endpoint never declared is refused when it is written**, not
+  by the compiler. `or` widens `T` to what the alternatives have in common and
+  `orFail` widens `E` the same way, so naming a response another endpoint
+  declared is a call that typechecks. What catches it is `successNamedBy` /
+  `failureNamedBy` in core — one place, so the three backends cannot disagree —
+  throwing `UndeclaredResponse`, which reaches the caller as a 500 with a
+  reference and reaches the log through `onServerError` with the response it
+  named and the ones the endpoint declares. That is the guarantee: not that the
+  mistake cannot be written, but that it cannot be *sent*.
 
 The alternatives are declared as *values* rather than inside the block, because
 a response a handler names has to be nameable — the same reason a failure shared
@@ -4285,6 +4325,10 @@ is gone.
   thing separating two responses on the wire — it is what a test client, a
   generated client and a browser all match on — so a second 200 is a response no
   reader could pick out. Refused where the output is declared, naming the status.
+  Several *renderings* of one response are a different thing and this refusal
+  already reads that way: they would be one declared response carrying two media
+  types, which is what [response negotiation](#what-isnt-here) would add and is
+  why adding it needs nothing here loosened.
 - **A streamed alternative among several.** `ndjson<Order>() or empty(202)` is
   refused: naming a response is what produces it, and producing a stream means
   handing over the backend's own type — a `Source`, a `Flow`, a `Sequence` —
@@ -4657,7 +4701,7 @@ sources. It is a ratchet, not a ban: sixteen files accumulate into a mutable
 collection and hand back something immutable, which is what a builder is, and
 each is listed with why. What it stops is the next file quietly starting.
 
-A test that reads files has to say which ones. The eleven library modules it
+A test that reads files has to say which ones. The eighteen library modules it
 judges are listed in `pelican-core/build.gradle.kts`, which declares their
 `src/main/kotlin` directories as inputs of `:pelican-core:test` and hands the
 same list to the test as a system property — one list, snapshotted by Gradle
@@ -4670,7 +4714,7 @@ it reads a comment exactly as it reads code.
 
 **Kover**, aggregated across modules rather than per-module — a line in
 `pelican-core` is exercised by the tests in `pelican-pekko` as often as by its
-own — with a floor of 80% wired into `check`. It sits at 87% line, 70% branch.
+own — with a floor of 90% wired into `check`. It sits at 92% line, 75% branch.
 
 **OpenApiSpecQualityTest** reads the emitted documents back with
 swagger-parser, an implementation that did not write them: `$ref`s resolved,

@@ -219,7 +219,7 @@ framing over a socket, connection handling. Everything decided by the routing
 tree is asked of `testRoute`, which seals the route exactly as a bound server
 does, and costs no port.
 
-Kover is aggregated across modules with a floor of 80% on `check`.
+Kover is aggregated across modules with a floor of 90% on `check`.
 
 ## Verifying
 
@@ -233,7 +233,7 @@ manual would otherwise be unverified.
 |---|---|---|
 | detekt | any finding | a suppression with no reason |
 | `FunctionalStyleTest` | a new file allocates a mutable collection | an unexplained entry |
-| Kover | aggregate line coverage under 80% | lowering the floor |
+| Kover | aggregate line coverage under 90% | lowering the floor |
 | `OpenApiSpecQualityTest` | emitted docs fail an independent parser | asserting against the emitter |
 | `checkOrdersClient` | the committed example client is stale | editing generated source |
 | `ImportedOrdersTest` | the round trip disagrees | special-casing the importer |

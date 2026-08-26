@@ -197,8 +197,11 @@ class FallibleOutput<E, T> internal constructor(
     init {
         require(successes.isNotEmpty()) { "An output declares at least one success" }
 
-        // A reader has the status and the bytes and nothing else, so two
-        // responses sharing a status are a pair none can separate.
+        // What separates two responses here is the status a handler names them
+        // by, so two under one status are a pair nothing downstream can pick
+        // between. Several *renderings* of one response would share a status by
+        // design; that is one declared response with alternatives inside it, and
+        // would be added there rather than by loosening this.
         val clashes = (successes.map { it.status } + failures.map { it.status })
             .groupingBy { it }
             .eachCount()
@@ -206,7 +209,10 @@ class FallibleOutput<E, T> internal constructor(
             .keys
         require(clashes.isEmpty()) {
             "Two responses are declared for status ${clashes.joinToString()} on the same output. " +
-                "An endpoint answers one status one way; give them different statuses, or declare one."
+                "Naming a response is what produces it, and the status is what names it, so a second " +
+                "one under the same status could never be picked: give them different statuses, or " +
+                "declare one. Two media types for the same response would be that one response " +
+                "declaring both, not two responses."
         }
 
         // Naming a response is what produces it, and producing a stream means

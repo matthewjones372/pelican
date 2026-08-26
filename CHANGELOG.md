@@ -94,6 +94,16 @@ one.
   string spelling of `type`, so the `["integer","null"]` OpenAPI 3.1 publishes
   for an `Int?` fell through to a string and the value reached the codec quoted
   — a 400 on jsoniter and a silent coercion on the other two.
+- **Documentation that promised more than the library does.** The reference said
+  a response an endpoint never declared "does not compile"; both halves are
+  false, and what actually happens — `UndeclaredResponse` where the response is
+  written, a 500 with a reference and the whole story in the log — is now what it
+  says. Two of the compiler lines it and the README quote were invented: a
+  handler is `Params.(String) -> User`, never `Function1<String, User>`, and a
+  Pekko `Source` built from a Java constant arrives with platform-type marks.
+  Every quoted line is now the compiler's own, asserted verbatim. The Kover
+  floor reads 90 in `AGENTS.md`, as the build has, and `FunctionalStyleTest`
+  judges eighteen modules rather than the eleven the reference claimed.
 
 ### Added
 
@@ -124,6 +134,13 @@ one.
   `ignoreUnknownKeys`, `encodeDefaults` and `explicitNulls` are what it reads.
   And a success carrying a payload its response never declared is now an
   `UndeclaredResponse` naming both types, the check a failure already had.
+- **Three truths the manual left unwritten.** A declared failure is always JSON —
+  `errorJson` is the only spelling, on all three backends and in the document.
+  A client that disconnects cancels a Ktor handler and does not cancel a Pekko
+  or http4k one, which both run to completion and answer a connection that is
+  gone; a *stream* closes on all three. And the refusal of two responses under
+  one status says why in terms that leave room for several renderings of one
+  response, which would be that one response declaring both media types.
 - **`InMemoryClientTransport(api)`**, in `pelican-core`: a `ClientTransport`
   that answers a generated client's requests by calling the `Api` in memory —
   the same routing, decoding, filters, handlers and response building a bound

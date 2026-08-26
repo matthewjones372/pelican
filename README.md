@@ -227,14 +227,17 @@ Each of these came from feeding the mistake to the compiler:
 
 ```
 +(getUser handledNow { id: String -> ... })
-  e: Argument type mismatch: actual 'Function1<String, User>', expected 'Function1<Long, User>'
+  e: Argument type mismatch: actual type is 'Params.(String) -> User', but 'Params.(Long) -> User' was expected.
 
 +(watchOrders streamedNow { (_, max) -> Source.single("not a tick") })
-  e: Return type mismatch: expected 'Source<Tick, NotUsed>', actual 'Source<String, NotUsed>'
+  e: Return type mismatch: expected 'Source<Tick, NotUsed>', actual 'Source<String!, NotUsed!>!'.
 
 +(getBookmark handledOrFail { id -> Bookmarks.find(id)!! })
-  e: Return type mismatch: expected 'Outcome<NoSuchBookmark, Bookmark>', actual 'Bookmark'
+  e: Return type mismatch: expected 'Outcome<NoSuchBookmark, Bookmark>', actual 'Bookmark'.
 ```
+
+`DoesNotCompileTest` compiles each of those on every build and asserts the line,
+so a wording this page invented would fail rather than persuade.
 
 Mismatches the type system cannot see are checked when the endpoint value is
 constructed, at class-init rather than on the first request:
