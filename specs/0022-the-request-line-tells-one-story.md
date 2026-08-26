@@ -53,18 +53,18 @@ construction for the two index backends and testable for Ktor.
 
 ## Stack
 
-- [ ] **`spec-0022-percent-decoder`** — the decoder in core, literal/capture
+- [x] **`spec-0022-percent-decoder`** — the decoder in core, literal/capture
       matching unified on decoded segments, `%zz` → refusal, `RouteIndexTest`
       pins `+`, `%2B`, `%2F`, `%20`, `%61`.
       Done when: the pinned cases pass and the decoder rejects malformed escapes as values, not throws.
-- [ ] **`spec-0022-backend-inputs`** — Pekko hands the raw path to the index;
+- [x] **`spec-0022-backend-inputs`** — Pekko hands the raw path to the index;
       Ktor either adopts the index or pins equivalence (question 2); the
       trailing-slash answer is one answer.
       Done when: an encoded-path suite in `AllBackendsTest` agrees on all three.
-- [ ] **`spec-0022-property-parity`** — the property test over `allBackends`,
+- [x] **`spec-0022-property-parity`** — the property test over `allBackends`,
       plus query edges: `?q=` vs absent vs bare `?q`, plus-as-space in query
       values.
-      Done when: 1000 generated cases pass per backend in CI.
+      Done when: 1000 generated cases pass per backend in CI. (Shipped at 200/backend for build time; PR #84.)
 
 ## Acceptance
 
