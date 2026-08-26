@@ -19,6 +19,7 @@ import io.github.matthewjones372.pelican.pekko.handledOrFail
 import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.test.ApiCallFailed
 import io.github.matthewjones372.pelican.test.ApiClient
+import io.github.matthewjones372.pelican.test.decodeBody
 import io.github.matthewjones372.pelican.test.pekko.InMemoryTransport
 import io.github.matthewjones372.pelican.test.pekko.client
 import io.github.matthewjones372.pelican.test.pekko.inMemory
@@ -300,7 +301,11 @@ abstract class ClientContractTest {
             ).withoutHeader("Cookie"),
         )
 
-        res.body shouldContain "\"session\":null"
+        // Absent rather than empty, and absent rather than written as the word:
+        // a null property is left out by all three codec modules, so what says
+        // which null it is is the value read back.
+        res.body shouldNotContain "session"
+        app.decodeBody<ImportResult>(res).session shouldBe null
     }
 
     // ------------------------------------------------------------ lens style

@@ -91,10 +91,12 @@ class JsoniterCodecsTest {
     }
 
     @Test
-    fun `nulls and defaults are written rather than dropped`() {
-        // An absent field and a null one mean different things to a document
-        // that says the field is nullable.
-        codec<Line>().encodeToString(Line("s")) shouldBe """{"sku":"s","quantity":1,"note":null}"""
+    fun `a default is written and a null is left out`() {
+        // The one spelling the three codec modules share: a nullable property
+        // is optional in the schema, so its null is absence rather than a word
+        // one library writes and another does not. A default is a value and is
+        // written, which is what `encodeDefaults` means for the other two.
+        codec<Line>().encodeToString(Line("s")) shouldBe """{"sku":"s","quantity":1}"""
     }
 
     @Test
@@ -128,10 +130,13 @@ class JsoniterCodecsTest {
 
     @Test
     fun `a nullable element inside a collection survives both directions`() {
+        // The null element stays where a null property would be dropped: an
+        // absent property is one the schema called optional, and a missing
+        // element would be a shorter list.
         val attempts = listOf(Line("a"), null)
         val text = codec<List<Line?>>().encodeToString(attempts)
 
-        text shouldBe """[{"sku":"a","quantity":1,"note":null},null]"""
+        text shouldBe """[{"sku":"a","quantity":1},null]"""
         codec<List<Line?>>().decodeFromString(text) shouldBe attempts
     }
 
@@ -235,10 +240,15 @@ class JsoniterCodecsTest {
         // wrapper out of most signatures, so the document and the wire agree
         // on the value or they agree on nothing.
         val priced = Priced(Sku("sku-1"), Pence(250), null, Sku("sku-2"))
-        val text = """{"sku":"sku-1","pence":250,"discount":null,"alternative":"sku-2"}"""
+        val text = """{"sku":"sku-1","pence":250,"alternative":"sku-2"}"""
 
         codec<Priced>().encodeToString(priced) shouldBe text
         codec<Priced>().decodeFromString(text) shouldBe priced
+        // And the spelling that writes the null still reads, which is what
+        // makes leaving it out a choice about the wire and not about meaning.
+        codec<Priced>().decodeFromString(
+            """{"sku":"sku-1","pence":250,"discount":null,"alternative":"sku-2"}""",
+        ) shouldBe priced
 
         // And as a body in its own right, where the wrapper is all there is.
         codec<Sku>().encodeToString(Sku("sku-1")) shouldBe """"sku-1""""
@@ -280,7 +290,7 @@ class JsoniterCodecsTest {
         val indented = JsoniterCodecs(jsoniterConfig { indentionStep(2) })
 
         indented.codec<Line>(typeOf<Line>()).encodeToString(Line("sku-1")) shouldBe
-            "{\n  \"sku\": \"sku-1\",\n  \"quantity\": 1,\n  \"note\": null\n}"
+            "{\n  \"sku\": \"sku-1\",\n  \"quantity\": 1\n}"
         indented.codec<Payment>(typeOf<Payment>()).encodeToString(Payment.Transfer("GB33")) shouldBe
             "{\n  \"type\": \"Transfer\",\n  \"iban\": \"GB33\"\n}"
     }
@@ -290,10 +300,10 @@ class JsoniterCodecsTest {
         val terse = JsoniterCodecs(jsoniterConfig { omitDefaultValue(true) })
 
         terse.codec<Line>(typeOf<Line>()).encodeToString(Line("sku-1", quantity = 0)) shouldBe """{"sku":"sku-1"}"""
-        // And the setting is the config's, not the module's: the default config
-        // still writes a null the document says can be null.
-        codec<Line>().encodeToString(Line("sku-1", quantity = 0)) shouldBe
-            """{"sku":"sku-1","quantity":0,"note":null}"""
+        // And the setting is the config's, not the module's: jsoniter's rule
+        // drops a zero as well as a null, and the default config writes the
+        // zero, which is a value the document describes.
+        codec<Line>().encodeToString(Line("sku-1", quantity = 0)) shouldBe """{"sku":"sku-1","quantity":0}"""
     }
 
     @Test

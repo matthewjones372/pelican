@@ -90,9 +90,14 @@ fun defaultMapper(): ObjectMapper = jacksonMapperBuilder()
     .addModule(JavaTimeModule())
     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
     .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-    // A null field is written rather than dropped: absent and null mean
-    // different things where the document says the field is nullable.
-    .defaultPropertyInclusion(JsonInclude.Value.construct(JsonInclude.Include.ALWAYS, JsonInclude.Include.ALWAYS))
+    // A null property is dropped, which is the one spelling all three codec
+    // modules write: the schema marks a nullable property optional, and every
+    // one of the three reads an absent one back as null. `NON_NULL` rather than
+    // `NON_ABSENT` because kotlinx.serialization's `explicitNulls = false` is
+    // the rule being matched and it has no notion of an absent Optional.
+    // Content stays `ALWAYS` for the same reason: a null *inside* a list or a
+    // map is a value there, and all three write it.
+    .defaultPropertyInclusion(JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.ALWAYS))
     .build()
 
 // ------------------------------------------------- swagger Schema -> JsonObj

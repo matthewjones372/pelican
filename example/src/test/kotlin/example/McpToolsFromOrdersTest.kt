@@ -109,8 +109,9 @@ class McpToolsFromOrdersTest {
             .join()
 
         result.isError.shouldBeTrue()
-        result.text shouldBe
-            "404 No user with that id: {\"status\":404,\"error\":\"No user 999\",\"detail\":null}"
+        // No `"detail":null`: the codecs leave a null property out, so what a
+        // model reads is the sentence and the fields that carry something.
+        result.text shouldBe "404 No user with that id: {\"status\":404,\"error\":\"No user 999\"}"
     }
 
     /**

@@ -154,10 +154,15 @@ class RequestLinePropertyTest {
         }
     }
 
-    /** What arrived in the query, for a target built by hand rather than from a value. */
+    /**
+     * What arrived in the query, for a target built by hand rather than from a
+     * value. A null property is left out of the body rather than written as the
+     * word, by all three codecs, so an absent key is how "nobody sent one"
+     * arrives here.
+     */
     private fun ApiClient.queryOf(rawTarget: String): String? =
         Json.parseToJsonElement(transport.send(request(roundtrip, In2("x", null)).withPath(rawTarget)).body)
-            .jsonObject["fromQuery"]!!.jsonPrimitive.contentOrNull
+            .jsonObject["fromQuery"]?.jsonPrimitive?.contentOrNull
 
     /**
      * One request line, written onto the socket as it stands. `URI.create`

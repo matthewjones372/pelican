@@ -6,6 +6,7 @@ import io.github.matthewjones372.pelican.UploadedFile
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.apiClient
+import io.github.matthewjones372.pelican.test.decodeBody
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
@@ -69,7 +70,11 @@ class CookiesFormsAndUploadsTest {
         )
 
         res.status shouldBe 200
-        res.body shouldBe """{"locale":"en","session":null}"""
+        // The session is absent rather than written as the word: a null
+        // property is left out by all three codec modules, so the value read
+        // back is what says which null it is.
+        res.body shouldBe """{"locale":"en"}"""
+        client.decodeBody<Preferences>(res) shouldBe Preferences("en", null)
     }
 
     @ParameterizedTest(name = "{0}")

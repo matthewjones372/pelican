@@ -9,11 +9,13 @@ import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import kotlin.reflect.typeOf
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ThreeCodecsTest {
@@ -47,17 +49,12 @@ class ThreeCodecsTest {
     }
 
     @Test
-    fun `the three write the same bytes, but for the null kotlinx leaves out`() {
+    fun `the three write the same bytes`() {
         val bodies = apps.mapValues { (_, app) -> app.response(getNote, 2L).body }
 
-        // kotlinx.serialization reads an absent nullable property only with
-        // `explicitNulls = false`, and that flag governs writing too. The
-        // schema marks `author` nullable and not required, so both spellings
-        // are payloads it describes — and every library reads both, which is
-        // the claim two tests below.
-        bodies.getValue("jackson") shouldBe """{"id":2,"text":"Note 2","level":"WARN","author":null}"""
-        bodies.getValue("jsoniter") shouldBe bodies.getValue("jackson")
-        bodies.getValue("kotlinx") shouldBe """{"id":2,"text":"Note 2","level":"WARN"}"""
+        // No `"author":null`: the schema marks a nullable property optional, so
+        // all three leave one out rather than each choosing a spelling.
+        bodies.values.distinct() shouldBe listOf("""{"id":2,"text":"Note 2","level":"WARN"}""")
     }
 
     @Test
@@ -66,36 +63,34 @@ class ThreeCodecsTest {
         // annotations in the example are lined up the way they are.
         val sent = Delivery(Note(7, "Ship it"), Sms("+441632960999"))
         val bodies = apps.mapValues { (_, app) -> app.response(deliverNote, sent).body }
-        val channel = """"to":{"type":"Sms","number":"+441632960999"}}"""
 
-        bodies.getValue("jackson") shouldBe
-            """{"note":{"id":7,"text":"Ship it","level":"INFO","author":null},""" + channel
-        bodies.getValue("jsoniter") shouldBe bodies.getValue("jackson")
-        bodies.getValue("kotlinx") shouldBe """{"note":{"id":7,"text":"Ship it","level":"INFO"},""" + channel
+        bodies.values.distinct() shouldBe listOf(
+            """{"note":{"id":7,"text":"Ship it","level":"INFO"},""" +
+                """"to":{"type":"Sms","number":"+441632960999"}}""",
+        )
     }
 
     @Test
     fun `a body may leave out what has a default, whichever library reads it`() {
         val partial = """{"note":{"id":9,"text":"Terse"},"to":{"type":"Email","address":"ada@example.com"}}"""
-        val whole = Delivery(Note(9, "Terse"), Email("ada@example.com"))
 
         apps.forEach { (library, app) ->
             withClue(library) {
-                val request = app.request(deliverNote, whole)
-                // Against what that library writes for the whole value rather
-                // than one spelling of it: the answer to a body missing what
-                // has a default is the value, not somebody else's bytes.
+                val request = app.request(deliverNote, Delivery(Note(9, "Terse"), Email("ada@example.com")))
                 app.transport.send(request.withBody(partial)).body shouldBe
-                    app.response(deliverNote, whole).body
+                    """{"note":{"id":9,"text":"Terse","level":"INFO"},""" +
+                    """"to":{"type":"Email","address":"ada@example.com"}}"""
             }
         }
     }
 
     @Test
     fun `every library reads a body any of the three wrote`() {
-        // What makes the omitted null harmless, and the direction the document
-        // is read in: a consumer holding bytes from one of these services has
-        // to be able to post them to the other two.
+        // Leaving a null property out is only honest if absent reads back as
+        // null, and a consumer holding bytes from one of these services has to
+        // be able to post them to the other two. The three agree on the bytes,
+        // so this passes trivially today and stops the day one of them stops
+        // agreeing — which is the day it is worth knowing.
         val sent = Delivery(Note(9, "Terse"), Email("ada@example.com"))
         val written = apps.mapValues { (_, app) -> app.response(deliverNote, sent).body }
 
@@ -106,6 +101,26 @@ class ThreeCodecsTest {
                         written.getValue(reader)
                 }
             }
+        }
+    }
+
+    @Serializable
+    data class Reading(val missing: String?, val samples: List<Long?>, val tagged: Map<String, String?>)
+
+    @Test
+    fun `a null inside a list or a map is a value there, and all three write it`() {
+        // The line the omission stops at, and the reason `defaultMapper()` sets
+        // content inclusion apart from property inclusion: an absent property
+        // is one the schema called optional, while a null element is what the
+        // list contains. Asked of the codecs rather than of a route, because it
+        // is a claim about the three libraries and not about a request.
+        val value = Reading(null, listOf(1L, null), mapOf("k" to null))
+        val written = libraries.associate { (library, codecs) ->
+            library to codecs.codec<Reading>(typeOf<Reading>()).encodeToString(value)
+        }
+
+        withClue("the three wrote $written") {
+            written.values.distinct() shouldBe listOf("""{"samples":[1,null],"tagged":{"k":null}}""")
         }
     }
 

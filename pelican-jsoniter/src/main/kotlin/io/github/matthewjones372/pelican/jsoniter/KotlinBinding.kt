@@ -280,13 +280,15 @@ private fun encoderFor(type: Type, config: JsoniterConfig): Encoder? {
  * Its order is the declared one, which `Class.getDeclaredFields` does not
  * promise.
  *
- * Every property is written, including one that holds null or its default,
- * unless the config asks for `omitDefaultValue` — jsoniter's own setting,
- * applied by jsoniter's own rule. Off, which is the default, an absent field
- * and a null one keep the different meanings a document that marks the field
- * nullable gives them, the same choice `defaultMapper()` makes. `defaultJson()`
- * leaves a null out, because the flag that lets kotlinx.serialization *read*
- * an absent nullable property governs writing too.
+ * A property holding null is left out, which is the one spelling the three
+ * codec modules write — see `defaultMapper()` and `defaultJson()`. The schema
+ * marks a nullable property optional and all three read an absent one back as
+ * null, so writing the word would be a second spelling of one fact. A null
+ * *inside* a list or a map is a value there and is written, which is where
+ * jsoniter's own encoders take over anyway.
+ *
+ * A property holding its default is still written unless the config asks for
+ * `omitDefaultValue` — jsoniter's own setting, applied by jsoniter's own rule.
  */
 private class ObjectEncoder(
     kclass: KClass<*>,
@@ -317,7 +319,7 @@ private class ObjectEncoder(
         }
         for (property in properties) {
             val held = property.read(value)
-            if (property.omit?.shouldOmit(held) == true) continue
+            if (held == null || property.omit?.shouldOmit(held) == true) continue
             if (first) stream.writeIndention() else stream.writeMore()
             first = false
             stream.writeObjectField(property.name)

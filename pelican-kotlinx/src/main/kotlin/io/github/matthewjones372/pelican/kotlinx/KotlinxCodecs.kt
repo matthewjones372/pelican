@@ -37,18 +37,18 @@ class KotlinxCodecs(private val json: Json) : Codecs {
 }
 
 /**
- * The `Json` used when none is supplied, configured to read what the schema
- * this module publishes says a caller may send.
+ * The `Json` used when none is supplied, configured to behave as the Jackson
+ * and jsoniter defaults do, so switching codecs changes the library and not
+ * the wire.
  */
 fun defaultJson(): Json = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
     // A nullable property with no default is not `required` in the schema, and
     // without this kotlinx.serialization throws MissingFieldException when one
-    // is absent — a 400 for a payload the document, Jackson and jsoniter all
-    // accept. The flag governs writing too, so this module leaves a null out
-    // where the other two spell it; both satisfy the schema, and only one of
-    // the two directions was ever a refusal.
+    // is absent — a 400 for a payload the document says is valid. The flag
+    // governs writing too: a null property is left out, and `defaultMapper()`
+    // and jsoniter's ObjectEncoder leave it out to match.
     explicitNulls = false
 }
 

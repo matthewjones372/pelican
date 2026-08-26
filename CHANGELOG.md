@@ -58,11 +58,16 @@ one.
   and the trailing-slash rule are one answer on all three. Where a request lands
   is still Ktor's: a constant segment scores above the tailcard these routes
   install, so routes written by hand beside them keep the paths they describe.
-- **`KotlinxCodecs` leaves a null property out where the other two write it.**
-  The flag that lets kotlinx.serialization read an absent nullable property
-  governs writing too. Both spellings satisfy the published schema and all three
-  libraries read either; `ThreeCodecsTest` pins the difference and the
-  cross-reading. Pass your own `Json` to write the nulls back.
+- **All three codecs now leave a null property out.** The flag that lets
+  kotlinx.serialization read an absent nullable property governs writing too, so
+  `defaultMapper()` moved to Jackson's `NON_NULL` and jsoniter's encoder skips a
+  null property, rather than one library writing `"detail": null` and another
+  omitting it. The schema already marks a nullable property optional and all
+  three read an absent one back as null, so this is one spelling of a fact that
+  had two. A null *inside* a list or a map is unaffected — it is a value there,
+  and all three still write it. A response body carrying nullable fields is
+  shorter and no longer carries their names; pass your own mapper or `Json` to
+  write them back.
 
 ## [0.2.0]
 
