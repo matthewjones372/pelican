@@ -55,8 +55,11 @@ class FunctionalStyleTest {
             "codecs are resolved once per type and cached against it, and SchemaNames remembers which " +
             "type claimed each component name while one is being described",
         "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/InMemory.kt" to
-            "the per-request value bag handed to Params, as in each interpreter, and an IdentityHashMap " +
-            "of declared response to codec resolved once when the transport is built",
+            "the per-request value bag handed to Params, as in each interpreter",
+        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/spi/Requests.kt" to
+            "the response-to-codec table, keyed by identity because two responses can carry one payload " +
+            "type and a negotiated one carries the same type under several encodings; built once per " +
+            "endpoint and handed to the interpreter as a Map",
         "pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/OpenApi.kt" to
             "component schemas are collected as the document is walked, then emitted once",
         "pelican-schema/src/main/kotlin/io/github/matthewjones372/pelican/schema/StandaloneSchemas.kt" to

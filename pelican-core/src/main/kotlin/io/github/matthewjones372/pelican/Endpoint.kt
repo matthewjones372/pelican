@@ -280,6 +280,17 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun text(status: Int = 200, vararg headers: ResponseHeader<*>, description: String? = null): TextOutput =
         TextOutput(status, headers.toList(), description)
 
+    /**
+     * A `T` written as [mediaType] rather than as JSON, by the writer this
+     * API's `Codecs` answers that media type with. [headers] as on [json].
+     */
+    inline fun <reified T> media(
+        mediaType: String,
+        status: Int = 200,
+        vararg headers: ResponseHeader<*>,
+        description: String? = null,
+    ): MediaOutput<T> = MediaOutput(status, mediaType, typeOf<T>(), headers.toList(), description)
+
     /** No body at all — a 204, or the `202 Accepted` beside a `200`. [headers] as on [json]. */
     fun empty(status: Int = 204, vararg headers: ResponseHeader<*>, description: String? = null): EmptyOutput =
         EmptyOutput(status, headers.toList(), description)

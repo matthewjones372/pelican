@@ -195,6 +195,121 @@ class ByteStreamOutput @PublishedApi internal constructor(
     init { checkStatus(toString(), status, carriesBody = true) }
 }
 
+/**
+ * A value written as a media type that is not JSON — `text/csv`, `text/xml`.
+ * The description holds the type, as [JsonOutput] does; what writes it comes
+ * from [CodecFactory.codec], which is where a service answering `text/csv`
+ * puts the writer for it.
+ */
+class MediaOutput<T> @PublishedApi internal constructor(
+    override val status: Int,
+    override val mediaType: String,
+    val type: KType,
+    override val headers: List<ResponseHeader<*>> = emptyList(),
+    override val description: String? = null,
+) : Output<T>() {
+    override val payloadType get() = type
+
+    init {
+        checkStatus(toString(), status, carriesBody = true)
+        val slash = mediaType.indexOf('/')
+        require(slash > 0 && slash < mediaType.length - 1 && '*' !in mediaType) {
+            "'$mediaType' is not a media type a response can be written as. It is one concrete " +
+                "type/subtype — \"text/csv\" — since what goes out has to be something in particular."
+        }
+    }
+
+    override fun toString() = "$mediaType:$status"
+}
+
+/**
+ * One response written several ways, the caller's `Accept` picking which: the
+ * same value under the same status, differing only in how it reaches the wire.
+ *
+ * See [negotiated]. Which one goes out is the interpreter's answer, from
+ * `selectedFor`, so a handler goes on returning a value.
+ */
+class NegotiatedOutput<T> internal constructor(
+    /** In declaration order. The first is what a caller expressing no preference gets. */
+    val alternatives: List<Output<out T>>,
+) : Output<T>() {
+
+    /** What the group reports as itself, since the group is one response. */
+    private val first: Output<out T> get() = alternatives.first()
+
+    override val status get() = first.status
+    override val mediaType get() = first.mediaType
+    override val payloadType get() = first.payloadType
+    override val description get() = alternatives.firstNotNullOfOrNull { it.description }
+
+    override val produces: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        alternatives.mapNotNull { it.mediaType }.toSet()
+    }
+
+    init {
+        require(alternatives.size > 1) {
+            "negotiated(...) offers a caller a choice, and this offers one representation: $first. " +
+                "Declare that response on its own."
+        }
+
+        alternatives.forEach { alternative ->
+            require(alternative !is FallibleOutput<*, *>) {
+                "$alternative declares responses of its own, so it is not one rendering of one value. " +
+                    "Declare failures beside the group — negotiated(...) orFail ... — rather than inside it."
+            }
+            require(!alternative.streams()) {
+                "$alternative streams, and a stream is handed over in the backend's own type rather than " +
+                    "written from a value. Declare the stream as the one response."
+            }
+            require(alternative.mediaType != null && alternative.payloadType != null) {
+                "$alternative describes no payload of its own, so nothing could write it as one rendering " +
+                    "of a value. Each alternative names a media type and the type written as it: " +
+                    "json<T>(200), media<T>(\"text/csv\", 200)."
+            }
+        }
+
+        val statuses = alternatives.map { it.status }.distinct()
+        require(statuses.size == 1) {
+            "A negotiated response is one response, and these are declared for status " +
+                "${statuses.joinToString()}. `Accept` picks a representation and never a status: give them " +
+                "one status, or declare them as the separate responses they are."
+        }
+
+        val clash = alternatives.groupBy { it.mediaType }.filterValues { it.size > 1 }.keys
+        require(clash.isEmpty()) {
+            "A response goes out as one Content-Type, so nothing could pick between two representations " +
+                "both written as ${clash.joinToString()}."
+        }
+
+        val types = alternatives.map { it.payloadType }.distinct()
+        require(types.size == 1) {
+            "A negotiated response is one value written several ways, and these carry " +
+                "${types.joinToString()}. Two payloads are two responses: give them different statuses, " +
+                "or answer them from different endpoints."
+        }
+
+        val withHeaders = alternatives.filter { it.headers.isNotEmpty() }
+        require(withHeaders.isEmpty()) {
+            "${withHeaders.joinToString()} declares headers of its own, and a header belongs to the " +
+                "response rather than to one rendering of it — a caller sending a different `Accept` would " +
+                "stop receiving it. Declare them with emits(...) on the endpoint."
+        }
+    }
+
+    override fun toString() =
+        "negotiated(" + alternatives.joinToString("|") { it.mediaType.orEmpty() } + "):$status"
+}
+
+/**
+ * The responses a codec may be asked to write for this output: each declared
+ * success, and each representation inside a negotiated one.
+ */
+fun Output<*>.representations(): List<Output<*>> = when (this) {
+    is FallibleOutput<*, *> -> successes.flatMap { it.representations() }
+    is NegotiatedOutput<*> -> alternatives
+    else -> listOf(this)
+}
+
 /*
  * The same three outputs EndpointBuilder has, declared outside a block so a
  * handler can name one: an output written inside the block is an expression
@@ -215,3 +330,29 @@ fun text(status: Int = 200, vararg headers: ResponseHeader<*>, description: Stri
 /** No body at all. See [EndpointBuilder.empty]. */
 fun empty(status: Int = 204, vararg headers: ResponseHeader<*>, description: String? = null): EmptyOutput =
     EmptyOutput(status, headers.toList(), description)
+
+/** A value written as [mediaType]. See [EndpointBuilder.media]. */
+inline fun <reified T> media(
+    mediaType: String,
+    status: Int = 200,
+    vararg headers: ResponseHeader<*>,
+    description: String? = null,
+): MediaOutput<T> = MediaOutput(status, mediaType, typeOf<T>(), headers.toList(), description)
+
+/**
+ * The same value under one status, written each of several ways —
+ * `negotiated(json<Report>(200), media<Report>("text/csv", 200))`. The
+ * caller's `Accept` picks one; a caller that takes none of them is refused
+ * with the same 406 the endpoint answers before the handler runs.
+ *
+ * Flattened, so `negotiated(a, negotiated(b, c))` is three alternatives rather
+ * than nested pairs — otherwise "the first" would depend on where the
+ * parentheses fell.
+ */
+@Suppress("UNCHECKED_CAST")
+fun <T> negotiated(first: Output<out T>, vararg others: Output<out T>): NegotiatedOutput<T> =
+    NegotiatedOutput(
+        (listOf(first) + others).flatMap { out ->
+            if (out is NegotiatedOutput<*>) out.alternatives else listOf(out)
+        } as List<Output<out T>>,
+    )

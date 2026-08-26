@@ -5,7 +5,6 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import java.util.IdentityHashMap
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
@@ -69,7 +68,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
             // stage, so the call itself is inside the try as well as its answer.
             handlers.getValue(matched)(params).handle { value, failure ->
                 if (failure != null) errorResponse(failure, endpoint).withHeaders(params)
-                else respond(endpoint.output, value, resolved).withHeaders(params)
+                else respond(endpoint.output, value, resolved, request.acceptLines()).withHeaders(params)
             }
         } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
             // As each interpreter does: whatever was raised becomes the response
@@ -96,9 +95,13 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
     private fun negotiate(endpoint: Endpoint<*, *>, request: ClientRequest) {
         val produced = endpoint.output.produces
         if (produced.isEmpty()) return
-        val accept = request.headers.filter { it.first.equals("Accept", ignoreCase = true) }.map { it.second }
+        val accept = request.acceptLines()
         if (accept.isNotEmpty() && !acceptable(accept, produced)) throw NotAcceptable(produced)
     }
+
+    /** Every `Accept` field line, since RFC 9110 says two lines are one field. */
+    private fun ClientRequest.acceptLines(): List<String> =
+        headers.filter { it.first.equals("Accept", ignoreCase = true) }.map { it.second }
 
     private fun decodeInputs(
         endpoint: Endpoint<*, *>,
@@ -166,14 +169,19 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
      * three interpreters do with the same values.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun respond(out: Output<*>, value: Any?, resolved: ResolvedCodecs): ClientResponse {
+    private fun respond(
+        out: Output<*>,
+        value: Any?,
+        resolved: ResolvedCodecs,
+        accept: List<String>,
+    ): ClientResponse {
         fun payload(): BodyCodec<Any?> =
             checkNotNull(resolved.payloadFor(out)) { "No codec was resolved for $out" }
 
         if (out is FallibleOutput<*, *>) {
             return when (val outcome = value as Outcome<*, *>) {
                 is Outcome.Ok<*> ->
-                    respond(out.successNamedBy(outcome), outcome.value, resolved).plus(outcome.headers)
+                    respond(out.successNamedBy(outcome), outcome.value, resolved, accept).plus(outcome.headers)
 
                 is Outcome.Err<*> -> {
                     val declared = out.failureNamedBy(outcome)
@@ -188,6 +196,12 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
             is JsonOutput<*> -> body(out.status, "application/json", payload().encodeToString(value))
 
             is TextOutput -> body(out.status, "text/plain; charset=utf-8", value as String)
+
+            is MediaOutput<*> -> body(out.status, out.mediaType, payload().encodeToString(value))
+
+            // Which rendering the caller asked for, from core's own scoring, so
+            // this transport answers the `Accept` a bound server would.
+            is NegotiatedOutput<*> -> respond(out.selectedFor(accept), value, resolved, accept)
 
             is EmptyOutput -> ClientResponse(out.status, emptyList(), empty())
 
@@ -255,12 +269,7 @@ private class ResolvedCodecs(
 private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): ResolvedCodecs = ResolvedCodecs(
     body = codecs.requestBodyCodec(bodyInput),
     payload = output.payloadType?.let { codecs.codec(it) },
-    alternatives = (output as? FallibleOutput<*, *>)?.let { declared ->
-        (
-            declared.successes.mapNotNull { s -> s.payloadType?.let { s as Any to codecs.codec<Any?>(it) } } +
-                declared.failures.map { f -> f as Any to codecs.codec<Any?>(f.type) }
-            ).associateTo(IdentityHashMap<Any, BodyCodec<Any?>>()) { it }
-    }.orEmpty(),
+    alternatives = codecs.responseCodecs(output),
 )
 
 /**

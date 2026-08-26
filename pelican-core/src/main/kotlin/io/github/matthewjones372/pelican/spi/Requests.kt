@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.*
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
+import java.util.IdentityHashMap
 
 /**
  * A strict request body as the text a codec reads, refusing anything past
@@ -103,6 +104,34 @@ fun Codecs.requestBodyCodec(input: BodyInput<*>?): RequestBodyCodecs? = when (in
     null, is RawBody, is MultipartBody -> null
 }
 
+/**
+ * A writer per response an endpoint may answer with, keyed by identity: every
+ * representation of every declared success, and every declared failure. Two
+ * responses can carry one payload type, and a negotiated one carries the same
+ * type under several encodings, so identity is what tells them apart.
+ *
+ * Resolved once, ahead of any request, by all four interpreters — a media type
+ * nothing can write is then a startup failure rather than a 500 for whoever
+ * asked for it.
+ */
+fun Codecs.responseCodecs(output: Output<*>): Map<Any, BodyCodec<Any?>> {
+    val successes = output.representations().mapNotNull { out ->
+        out.payloadType?.let { out as Any to codec<Any?>(it, out.writtenAs()) }
+    }
+    val failures = (output as? FallibleOutput<*, *>)?.failures.orEmpty()
+        .map { failure -> failure as Any to codec<Any?>(failure.type) }
+
+    return (successes + failures).associateTo(IdentityHashMap<Any, BodyCodec<Any?>>()) { it }
+}
+
+/**
+ * Which encoding writes this response. JSON unless the response says
+ * otherwise: a streamed one frames JSON documents under a media type of its
+ * own, and only [MediaOutput] declares the encoding itself.
+ */
+private fun Output<*>.writtenAs(): String =
+    if (this is MediaOutput<*>) mediaType else JSON_MEDIA_TYPE
+
 /** What reads a body of one media type. Every alternative is one of these. */
 private fun Codecs.oneBodyCodec(input: BodyInput<*>): BodyCodec<Any?> = when (input) {
     is JsonBody<*> -> codec(input.type)
@@ -156,6 +185,30 @@ fun acceptable(accept: List<String>, produced: Set<String>): Boolean {
     if (ranges.isEmpty()) return true
 
     return produced.any { type -> qualityOf(type, ranges) > 0.0 }
+}
+
+/**
+ * Which representation of a negotiated response goes out, given the `Accept`
+ * field lines this request arrived with.
+ *
+ * Declaration order is the answer where the caller expressed no preference —
+ * no header, an unparseable one, `*&#47;*` — and breaks ties between equally
+ * acceptable ones. A caller that will take none of them gets [NotAcceptable],
+ * the same 406 [acceptable] answers before the handler runs; it is reachable
+ * here because a group's `Accept` may exclude every representation while
+ * another declared response is still acceptable.
+ */
+fun NegotiatedOutput<*>.selectedFor(accept: List<String>): Output<*> {
+    val ranges = accept.flatMap { it.split(',') }.mapNotNull(::parseRange)
+    if (ranges.isEmpty()) return alternatives.first()
+
+    return alternatives
+        .map { it to qualityOf(checkNotNull(it.mediaType), ranges) }
+        .filter { (_, quality) -> quality > 0.0 }
+        // The first of the best, so declaration order is what settles a tie.
+        .maxByOrNull { (_, quality) -> quality }
+        ?.first
+        ?: throw NotAcceptable(produces)
 }
 
 /**

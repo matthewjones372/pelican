@@ -199,9 +199,9 @@ class FallibleOutput<E, T> internal constructor(
 
         // What separates two responses here is the status a handler names them
         // by, so two under one status are a pair nothing downstream can pick
-        // between. Several *renderings* of one response would share a status by
-        // design; that is one declared response with alternatives inside it, and
-        // would be added there rather than by loosening this.
+        // between. Several *renderings* of one response share a status by
+        // design, and are one declared response with its alternatives inside it
+        // — a [NegotiatedOutput], which arrives here as the single entry it is.
         val clashes = (successes.map { it.status } + failures.map { it.status })
             .groupingBy { it }
             .eachCount()
@@ -211,8 +211,8 @@ class FallibleOutput<E, T> internal constructor(
             "Two responses are declared for status ${clashes.joinToString()} on the same output. " +
                 "Naming a response is what produces it, and the status is what names it, so a second " +
                 "one under the same status could never be picked: give them different statuses, or " +
-                "declare one. Two media types for the same response would be that one response " +
-                "declaring both, not two responses."
+                "declare one. Two media types for the same response are that one response declaring " +
+                "both — negotiated(json<T>(200), media<T>(\"text/csv\", 200)) — not two responses."
         }
 
         // Naming a response is what produces it, and producing a stream means

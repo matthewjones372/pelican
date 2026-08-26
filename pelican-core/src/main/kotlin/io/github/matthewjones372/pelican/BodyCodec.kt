@@ -20,7 +20,23 @@ class BodyDecodeFailure(message: String, cause: Throwable? = null) : RuntimeExce
 /** Resolves a codec for a type. Implemented by `pelican-jackson` and `pelican-kotlinx`. */
 interface CodecFactory {
     fun <T> codec(type: KType): BodyCodec<T>
+
+    /**
+     * How a value is written as [mediaType]. A JSON library supplies the one
+     * encoding it knows; a service answering `text/csv` as well overrides this
+     * and answers that media type with a writer of its own. See [MediaOutput].
+     */
+    fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
+        if (mediaType.substringBefore(';').trim() == JSON_MEDIA_TYPE) codec(type)
+        else error(
+            "Nothing writes $type as $mediaType. A Codecs answers one encoding per type — the JSON one — " +
+                "so a response declared as $mediaType needs a writer for it: override " +
+                "codec(type, mediaType) on the Codecs this API was given and answer $mediaType there.",
+        )
 }
+
+/** The one encoding every [CodecFactory] has, and all the default [CodecFactory.codec] answers. */
+const val JSON_MEDIA_TYPE: String = "application/json"
 
 /**
  * Where named schemas accumulate while a document is being built. Schema
