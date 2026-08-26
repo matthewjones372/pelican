@@ -21,6 +21,7 @@ import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.SseOutput
+import io.github.matthewjones372.pelican.Unrouted
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.decode
 import io.github.matthewjones372.pelican.spi.CorsHeaders
@@ -152,7 +153,7 @@ private suspend fun ApplicationCall.respondPreflight(cors: CorsPolicy, api: Api)
     ) {
         // A bare OPTIONS, or one aimed at no described path: the same 404
         // Ktor's own router gives. See `MethodMismatchTest`.
-        is CorsPreflight.NotPreflight -> respondError(ApiException(404, "Not found"), api)
+        is CorsPreflight.NotPreflight -> respondError(Unrouted(404, "Not found"), api)
 
         is CorsPreflight.Refused -> respondError(ApiException(403, "Forbidden", decision.reason), api)
 

@@ -104,13 +104,12 @@ class NegotiatedBodyTest {
     fun `a media type the endpoint did not declare is a 415 naming the ones it did`() {
         val codecs = Schemas.requestBodyCodec(body)!!
 
-        val failure = shouldThrow<ApiException> { codecs.decode("application/xml", "<order/>") }
+        val failure = shouldThrow<UnsupportedMediaType> { codecs.decode("application/xml", "<order/>") }
 
-        failure.status shouldBe 415
-        val detail = failure.detail.orEmpty()
-        withClue(detail) {
-            detail shouldContain "application/json"
-            detail shouldContain "application/x-www-form-urlencoded"
+        statusOfError(failure) shouldBe 415
+        withClue(failure.detail) {
+            failure.detail shouldContain "application/json"
+            failure.detail shouldContain "application/x-www-form-urlencoded"
         }
     }
 
@@ -118,7 +117,7 @@ class NegotiatedBodyTest {
     fun `no Content-Type at all is the same 415, because nothing says which decode was meant`() {
         val codecs = Schemas.requestBodyCodec(body)!!
 
-        shouldThrow<ApiException> { codecs.decode(null, "{}") }.status shouldBe 415
+        statusOfError(shouldThrow<UnsupportedMediaType> { codecs.decode(null, "{}") }) shouldBe 415
     }
 
     @Test

@@ -24,6 +24,8 @@ class SpiPackageTest {
         "routeIndex",
         "RenderedError",
         "renderError",
+        "ClassifiedError",
+        "classifyError",
         "RequestBodyCodecs",
         "requestBodyCodec",
         "readStrictBody",

@@ -21,6 +21,7 @@ import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.SseOutput
+import io.github.matthewjones372.pelican.Unrouted
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.decode
 import io.github.matthewjones372.pelican.spi.CorsHeaders
@@ -119,7 +120,7 @@ private fun preflightResponse(cors: CorsPolicy, req: Request, api: Api): Respons
         // A bare OPTIONS, or one aimed at no described path: what the router
         // would have said before this route existed.
         is CorsPreflight.NotPreflight ->
-            errorResponse(ApiException(405, "Method not allowed", "OPTIONS ${req.uri.path}"), api)
+            errorResponse(Unrouted(405, "Method not allowed", "OPTIONS ${req.uri.path}"), api)
 
         is CorsPreflight.Refused -> errorResponse(ApiException(403, "Forbidden", decision.reason), api)
 

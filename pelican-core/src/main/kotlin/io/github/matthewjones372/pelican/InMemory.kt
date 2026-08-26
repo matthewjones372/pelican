@@ -284,9 +284,9 @@ private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): ResolvedCodecs = Resol
  * backend's router makes, made here because there is no router underneath to
  * decline to.
  */
-private fun unrouted(method: Method, path: String, described: Boolean): ApiException =
-    if (described) ApiException(405, "Method not allowed", "$method $path")
-    else ApiException(404, "Not found", "$method $path")
+private fun unrouted(method: Method, path: String, described: Boolean): Unrouted =
+    if (described) Unrouted(405, "Method not allowed", "$method $path")
+    else Unrouted(404, "Not found", "$method $path")
 
 private fun completed(response: ClientResponse): CompletionStage<ClientResponse> =
     CompletableFuture.completedStage(response)

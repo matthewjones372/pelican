@@ -116,6 +116,32 @@ one.
 
 ### Added
 
+- **The refusals a request metric cannot see, reported.** `onRefusal(...)`
+  inside `api { }` takes a `RefusalObserver`, told about each request refused
+  before the filter chain was entered: a parameter or body that would not
+  decode, a `Content-Type` nothing declared, an `Accept` taking nothing the
+  endpoint sends, a body over `maxBodyBytes`. `http.server.requests` counts what
+  reached the chain and by construction cannot count what did not, which is why
+  its 4xx rate goes quiet exactly during an attack or a broken-client rollout.
+  The observer is called from `spi.renderError` — the one function that turns a
+  refusal into a response — so a refusal cannot be answered and left uncounted,
+  and all three backends plus the in-memory transport report identically
+  because they report through the same function rather than three of their own.
+  It is handed a `RefusalReason`, the status, and the *path template* of the
+  route that refused; never the request, the throwable or the detail, so it has
+  nothing high-cardinality to be tagged with.
+- **`Unrouted` and `UnsupportedMediaType`**, the two refusals Pelican used to
+  raise as an `ApiException`. Same status, same sentence, same body: what
+  changes is that a 404 the router raised can now be told from one a handler
+  chose to throw, which is what keeps the refusal counter disjoint from the
+  request counter. Catch them by name if a filter was catching `ApiException`
+  for either.
+- **`spi.classifyError(t, api)`**, the classification without the body — the
+  status, the sentence and the reference — for a caller answering in an
+  envelope the protocol fixes rather than one the service chose. The MCP server
+  uses it instead of `renderError`, whose body it always discarded: a refused
+  tool call goes out as a 200 carrying a JSON-RPC result, so counting it as a
+  refused request would put a status on a meter no caller was ever sent.
 - **Refusals in the caller's dialect.** `refusals(ProblemDetails)` inside
   `api { }` writes the built-in refusals — a 400 nothing could decode, a 406, a
   413, a 500 nobody described — as RFC 9457 `application/problem+json` instead

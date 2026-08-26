@@ -180,3 +180,26 @@ fun tooManyRequests(message: String = "Too many requests", retryAfterSeconds: Lo
  */
 class PayloadTooLarge(val limit: Long, detail: String? = null) :
     RuntimeException(detail ?: "Request body exceeds the configured limit of $limit bytes")
+
+/**
+ * Nothing this service describes answers this request: 405 where some other
+ * method describes the path, 404 otherwise.
+ *
+ * A type of its own rather than an [ApiException] because the two are the same
+ * response and different traffic. `notFound()` from a handler is the endpoint
+ * doing its job and is already counted as a request; this is a request that
+ * never reached one, and only this one belongs in [RefusalReason.UNMATCHED].
+ */
+class Unrouted(
+    val status: Int,
+    override val message: String,
+    val detail: String? = null,
+) : RuntimeException(message)
+
+/**
+ * The request body arrived under a media type no codec this endpoint declared
+ * can read. Its own type for the same reason [Unrouted] is.
+ */
+class UnsupportedMediaType(val detail: String) : RuntimeException("Unsupported media type") {
+    override val message: String get() = "Unsupported media type"
+}

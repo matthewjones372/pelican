@@ -204,6 +204,12 @@ class Api internal constructor(
      * `errorJson<E>` already carries whatever type the endpoint promised.
      */
     val refusals: RefusalRenderer = ApiErrorEnvelope,
+
+    /**
+     * Told about each refusal as it is rendered, which is the only point at
+     * which one is certainly going out. Null observes nothing.
+     */
+    val onRefusal: RefusalObserver? = null,
 ) {
     init {
         val bound = endpoints.map { it.endpoint }

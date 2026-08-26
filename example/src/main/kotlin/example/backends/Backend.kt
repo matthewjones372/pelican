@@ -3,6 +3,7 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 
 /**
@@ -33,10 +34,14 @@ interface Backend {
      * [refusals] is the second thing a suite varies rather than a second
      * wiring: `RefusalsAcrossBackendsTest` runs the whole suite once per shipped
      * renderer, which is the same claim as running it once per backend.
+     *
+     * [onRefusal] is the third, and it is here rather than in [outerFilters]
+     * because the traffic it watches is exactly the traffic no filter sees.
      */
     fun api(
         outerFilters: List<Filter> = emptyList(),
         refusals: RefusalRenderer = ApiErrorEnvelope,
+        onRefusal: RefusalObserver? = null,
     ): Api
 
     /** Binds [api] on [port]; pass 0 to let the OS choose, which is what tests do. */
@@ -44,6 +49,7 @@ interface Backend {
         port: Int = 0,
         outerFilters: List<Filter> = emptyList(),
         refusals: RefusalRenderer = ApiErrorEnvelope,
+        onRefusal: RefusalObserver? = null,
     ): Running
 }
 

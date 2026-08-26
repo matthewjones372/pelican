@@ -27,6 +27,53 @@ class Refusal(
 class RefusalBody(val mediaType: String, val bytes: ByteArray)
 
 /**
+ * Why a request was refused before it reached the filter chain.
+ *
+ * A closed set, because it is a metric dimension: the label of every reason is
+ * written here, so the number of series a refusal counter can grow is a
+ * property of this file rather than of what a caller sends.
+ */
+enum class RefusalReason(val label: String) {
+    /** Nothing described the path, or nothing described it under this method. */
+    UNMATCHED("unmatched"),
+
+    /** A parameter or a body that would not decode into what was declared. */
+    DECODE("decode"),
+
+    /** A body over `Api.maxBodyBytes`, or over a multipart part's own bound. */
+    BODY_LIMIT("body_limit"),
+
+    /** A `Content-Type` no codec on the endpoint reads. */
+    CONTENT_TYPE("content_type"),
+
+    /** An `Accept` that takes nothing the endpoint produces. */
+    ACCEPT("accept"),
+}
+
+/**
+ * Told about each request refused before any filter ran.
+ *
+ * `http.server.requests` counts what reached the chain, and by construction
+ * cannot count what did not: a 413 is answered where the body is read, several
+ * layers outside the outermost filter. That gap is the traffic a dashboard is
+ * least able to do without, because it widens exactly during an attack or a
+ * broken-client rollout. This is where it is reported, and `pelican-metrics`
+ * turns it into a counter.
+ *
+ * It is handed the classification and nothing else. Not the request, not the
+ * throwable, and not the detail that goes in the body: every one of those
+ * varies per caller, and an observer given one would sooner or later be tagging
+ * a meter with it. [pathTemplate] is the route that refused — `/orders/{orderId}`
+ * — and is null where nothing matched.
+ *
+ * Called on the thread that is about to answer, so an implementation that
+ * blocks delays a response. Incrementing a counter is what it is for.
+ */
+fun interface RefusalObserver {
+    fun refused(reason: RefusalReason, status: Int, pathTemplate: String?)
+}
+
+/**
  * Turns a classified refusal into the body a caller reads.
  *
  * One of these per service rather than one per backend: the three interpreters

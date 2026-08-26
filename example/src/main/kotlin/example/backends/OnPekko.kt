@@ -3,6 +3,7 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.lastEventId
@@ -75,17 +76,23 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
 fun pekkoApi(
     outerFilters: List<Filter> = emptyList(),
     refusals: RefusalRenderer = ApiErrorEnvelope,
-): Api = greetingsApi(pekkoRoutes, outerFilters = outerFilters, refusals = refusals)
+    onRefusal: RefusalObserver? = null,
+): Api = greetingsApi(pekkoRoutes, outerFilters = outerFilters, refusals = refusals, onRefusal = onRefusal)
 
 object OnPekko : Backend {
     override val name = "pekko"
 
-    override fun api(outerFilters: List<Filter>, refusals: RefusalRenderer): Api =
-        pekkoApi(outerFilters, refusals)
+    override fun api(outerFilters: List<Filter>, refusals: RefusalRenderer, onRefusal: RefusalObserver?): Api =
+        pekkoApi(outerFilters, refusals, onRefusal)
 
-    override fun start(port: Int, outerFilters: List<Filter>, refusals: RefusalRenderer): Running {
+    override fun start(
+        port: Int,
+        outerFilters: List<Filter>,
+        refusals: RefusalRenderer,
+        onRefusal: RefusalObserver?,
+    ): Running {
         // The actor system is this backend's alone; nothing outside sees it.
-        val server = api(outerFilters, refusals).start(port = port, systemName = "greetings-pekko")
+        val server = api(outerFilters, refusals, onRefusal).start(port = port, systemName = "greetings-pekko")
         return object : Running {
             override val baseUrl = server.baseUrl
             override fun stop() {

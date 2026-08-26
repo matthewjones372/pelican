@@ -36,53 +36,97 @@ class RenderedError(
  */
 private fun described(t: Throwable): ApiError? = when (t) {
     is ApiException -> ApiError(t.status, t.message, t.detail)
+    is Unrouted -> ApiError(t.status, t.message, t.detail)
     is DecodeFailure -> ApiError(400, "Invalid parameter", t.message)
     is BodyDecodeFailure -> ApiError(400, "Malformed request body", t.message)
+    is UnsupportedMediaType -> ApiError(415, t.message, t.detail)
     is NotAcceptable -> ApiError(406, "Not acceptable", t.message)
     is PayloadTooLarge -> ApiError(413, "Payload too large", t.message)
     else -> null
 }
 
 /**
+ * Which of these was a request refused before the chain, and under what name.
+ *
+ * Narrower than [described] on purpose, and the narrowing is the whole design
+ * of the counter it feeds. An [ApiException] is missing because it is what a
+ * filter and a handler throw as well as what an interpreter throws, so counting
+ * it would count requests `http.server.requests` has already counted; the 500
+ * nobody described is missing for the same reason. Every entry below is a type
+ * only Pelican itself raises, and it raises them all before the outermost
+ * filter is entered.
+ */
+private fun reasonOf(t: Throwable): RefusalReason? = when (t) {
+    is Unrouted -> RefusalReason.UNMATCHED
+    is DecodeFailure, is BodyDecodeFailure -> RefusalReason.DECODE
+    is UnsupportedMediaType -> RefusalReason.CONTENT_TYPE
+    is NotAcceptable -> RefusalReason.ACCEPT
+    is PayloadTooLarge -> RefusalReason.BODY_LIMIT
+    else -> null
+}
+
+/** What a throwable says about itself, without the body that would go out with it. */
+class ClassifiedError(val error: ApiError, val unexpected: Throwable?, val reference: String?)
+
+/**
  * Decides the response for a throwable, and writes it in the dialect [api] was
  * configured with.
  *
- * [api] is the whole settings value rather than the two fields this reads, and
+ * [api] is the whole settings value rather than the three fields this reads, and
  * it has no default, because a call site that forgot one would answer in an
  * envelope nobody chose — silently, and only for the refusals that reach it.
  * Null is for the caller with no service in scope at all; every interpreter has
  * one.
+ *
+ * [Api.onRefusal] is told here rather than at the point each refusal is raised,
+ * because a raised refusal is not yet one that went out: a filter can catch it,
+ * and only this function is on the way to the wire. Nothing else may report a
+ * refusal, so a refusal cannot be answered and left uncounted.
  */
 fun renderError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): RenderedError {
     val t = unwrapCompletion(raw)
     val renderer = api?.refusals ?: ApiErrorEnvelope
     val template = endpoint?.pathSpec?.template
+    val classified = classify(t, api)
 
+    val observer = api?.onRefusal
+    if (observer != null) reasonOf(t)?.let { observer.refused(it, classified.error.status, template) }
+
+    return RenderedError(
+        classified.error,
+        // Only an ApiException carries headers of its own; the rest are raised
+        // where no response was being described.
+        if (t is ApiException) t.headers else emptyList(),
+        classified.unexpected,
+        classified.reference,
+        body = renderer.bodyFor(classified.error.refusal(classified.reference, template)),
+    )
+}
+
+/**
+ * The classification alone, for a caller that answers in an envelope it does not
+ * choose.
+ *
+ * An MCP tool result is JSON-RPC, whose shape the protocol fixes, so neither
+ * [Api.refusals] nor [Api.onRefusal] has anything to say about it: the body is
+ * not written here, and the call carried no HTTP status that a refusal counter
+ * could honestly report.
+ */
+fun classifyError(raw: Throwable, api: Api?): ClassifiedError = classify(unwrapCompletion(raw), api)
+
+private fun classify(t: Throwable, api: Api?): ClassifiedError {
     val described = described(t)
-    if (described != null) {
-        return RenderedError(
-            described,
-            // Only an ApiException carries headers of its own; the rest are
-            // raised where no response was being described.
-            if (t is ApiException) t.headers else emptyList(),
-            unexpected = null,
-            reference = null,
-            body = renderer.bodyFor(described.refusal(reference = null, pathTemplate = template)),
-        )
-    }
+    if (described != null) return ClassifiedError(described, unexpected = null, reference = null)
 
     val reference = newReference()
-    val error = ApiError(
-        INTERNAL_SERVER_ERROR,
-        "Internal server error",
-        if (api?.exposeInternalErrors == true) t.toString() else "Reference: $reference",
-    )
-    return RenderedError(
-        error,
-        emptyList(),
+    return ClassifiedError(
+        ApiError(
+            INTERNAL_SERVER_ERROR,
+            "Internal server error",
+            if (api?.exposeInternalErrors == true) t.toString() else "Reference: $reference",
+        ),
         unexpected = t,
         reference = reference,
-        body = renderer.bodyFor(error.refusal(reference, template)),
     )
 }
 

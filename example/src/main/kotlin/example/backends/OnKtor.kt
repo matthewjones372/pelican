@@ -3,6 +3,7 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.ktor.bytesNow
@@ -77,16 +78,22 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
 fun ktorApi(
     outerFilters: List<Filter> = emptyList(),
     refusals: RefusalRenderer = ApiErrorEnvelope,
-): Api = greetingsApi(ktorRoutes, outerFilters = outerFilters, refusals = refusals)
+    onRefusal: RefusalObserver? = null,
+): Api = greetingsApi(ktorRoutes, outerFilters = outerFilters, refusals = refusals, onRefusal = onRefusal)
 
 object OnKtor : Backend {
     override val name = "ktor"
 
-    override fun api(outerFilters: List<Filter>, refusals: RefusalRenderer): Api =
-        ktorApi(outerFilters, refusals)
+    override fun api(outerFilters: List<Filter>, refusals: RefusalRenderer, onRefusal: RefusalObserver?): Api =
+        ktorApi(outerFilters, refusals, onRefusal)
 
-    override fun start(port: Int, outerFilters: List<Filter>, refusals: RefusalRenderer): Running {
-        val server = api(outerFilters, refusals).start(port = port)
+    override fun start(
+        port: Int,
+        outerFilters: List<Filter>,
+        refusals: RefusalRenderer,
+        onRefusal: RefusalObserver?,
+    ): Running {
+        val server = api(outerFilters, refusals, onRefusal).start(port = port)
         return object : Running {
             override val baseUrl = server.baseUrl
             override fun stop() = server.stop()

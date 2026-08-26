@@ -78,9 +78,7 @@ class RequestBodyCodecs internal constructor(private val byMediaType: Map<String
         byMediaType.values.singleOrNull()?.let { return it }
 
         val declared = contentType?.substringBefore(';')?.trim()?.lowercase()
-        return byMediaType[declared] ?: throw ApiException(
-            415,
-            "Unsupported media type",
+        return byMediaType[declared] ?: throw UnsupportedMediaType(
             "The request body arrived as ${declared ?: "no media type at all"}, and this endpoint " +
                 "reads ${byMediaType.keys.joinToString(" or ")}. Send one of those in Content-Type.",
         )

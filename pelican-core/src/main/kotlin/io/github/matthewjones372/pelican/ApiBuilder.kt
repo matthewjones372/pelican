@@ -40,6 +40,7 @@ class ApiBuilder internal constructor() {
     private val filters = mutableListOf<Filter>()
     private var onServerError: ((reference: String, endpoint: Endpoint<*, *>?, error: Throwable) -> Unit)? = null
     private var refusals: RefusalRenderer = ApiErrorEnvelope
+    private var onRefusal: RefusalObserver? = null
 
     /** Outermost first: a chain is written a line at a time, in the order it runs. */
     fun filter(filter: Filter) {
@@ -54,6 +55,11 @@ class ApiBuilder internal constructor() {
     /** [Api.refusals] — `refusals(ProblemDetails)` for RFC 9457. */
     fun refusals(renderer: RefusalRenderer) {
         refusals = renderer
+    }
+
+    /** [Api.onRefusal] — `onRefusal(refusalCounter(registry))` for the meter. */
+    fun onRefusal(observer: RefusalObserver) {
+        onRefusal = observer
     }
 
     internal fun build(endpoints: List<ServerEndpoint>, codecs: Codecs): Api = Api(
@@ -73,5 +79,6 @@ class ApiBuilder internal constructor() {
         covers = covers,
         webhooks = webhooks,
         refusals = refusals,
+        onRefusal = onRefusal,
     )
 }

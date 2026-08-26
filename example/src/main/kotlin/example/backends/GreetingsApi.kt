@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
@@ -43,11 +44,15 @@ fun greetingsApi(
 
     /** Which dialect this service refuses in. See [Backend.api]. */
     refusals: RefusalRenderer = ApiErrorEnvelope,
+
+    /** Who is told about the requests no filter here will ever see. See [Backend.api]. */
+    onRefusal: RefusalObserver? = null,
 ): Api = api(
     endpoints = routes,
     codecs = JacksonCodecs,
 ) {
     refusals(refusals)
+    onRefusal?.let { onRefusal(it) }
 
     title = "Greetings"
     version = "1.0.0"

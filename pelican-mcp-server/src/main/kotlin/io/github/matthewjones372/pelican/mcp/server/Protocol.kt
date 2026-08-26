@@ -18,7 +18,7 @@ import io.github.matthewjones372.pelican.mcp.mcpOptions
 import io.github.matthewjones372.pelican.mcp.toJson
 import io.github.matthewjones372.pelican.operationName
 import io.github.matthewjones372.pelican.parseJson
-import io.github.matthewjones372.pelican.spi.renderError
+import io.github.matthewjones372.pelican.spi.classifyError
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
@@ -154,14 +154,16 @@ class McpServer internal constructor(private val api: Api, private val dispatch:
      * give a model, and it carries the reference [Api.onServerError] was handed
      * so that one log line covers both halves of the service.
      *
-     * The classification is taken; the body [renderError] wrote beside it is
-     * not. A tool call is answered in JSON-RPC, whose envelope MCP fixes and a
-     * service does not choose, so `refusals(...)` reaches the HTTP wire and
-     * stops there — putting a problem+json document inside a result's `text`
-     * would describe a response nobody sent.
+     * The classification is taken and nothing beside it, which is why this is
+     * [classifyError] rather than the render the three backends do. A tool call
+     * is answered in JSON-RPC, whose envelope MCP fixes and a service does not
+     * choose: `refusals(...)` reaches the HTTP wire and stops there, and so does
+     * `onRefusal(...)`. A refused tool call went out as a 200 carrying a result,
+     * so counting it as a refused *request* would put a status on a meter that
+     * no caller was ever sent.
      */
     private fun threw(id: JsonValue, tool: String, thrown: Throwable): String {
-        val rendered = renderError(thrown, api, endpointNamed(tool))
+        val rendered = classifyError(thrown, api)
         val unexpected = rendered.unexpected
             ?: return reply(id, ToolResult(described(rendered.error), isError = true).toJson())
 
