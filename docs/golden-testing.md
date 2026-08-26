@@ -35,7 +35,7 @@ server library, no matcher library, no test framework. The assertions throw
 plain `AssertionError`, so JUnit, kotest and `kotlin.test` all report them.
 
 You only need an in-memory transport if you record a response;
-`pelican-test-pekko` and `pelican-test-http4k` stay optional.
+`pelican-test-pekko` and its siblings stay optional.
 
 ## One line covers every endpoint
 

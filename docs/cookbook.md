@@ -14,7 +14,7 @@ and elided after:
 ```kotlin
 import io.github.matthewjones372.pelican.*
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.pekko.*          // or .http4k.* / .ktor.*
+import io.github.matthewjones372.pelican.pekko.*
 ```
 
 `import ...pelican.*` is deliberate — core's vocabulary is the point, and the
@@ -291,12 +291,12 @@ val streamOrders = endpoint(userId, limit) {
 ```
 
 ```kotlin
-// pelican-pekko
+// pelican-pekko — Source<T, NotUsed>
 streamOrders streamedNow { (id, max) -> Source.from(Store.orders(id, max)) }
-
-// pelican-http4k  — Sequence<T>
-// pelican-ktor    — suspend (I) -> Flow<T>
 ```
+
+The stream type is the backend's own: a binder demands it, and the wire format
+— NDJSON, SSE, a chunked JSON array — is rendered by core either way.
 
 `sse<T>()` and a chunked JSON array are the other two shapes. Collect them in a
 test with `app.collect(...)`.
@@ -402,18 +402,19 @@ the test working — read the diff and decide whether the break was intended.
 
 ## Switching backend
 
-One import, and the binders for streamed endpoints. Everything else — the
-descriptions, the document, the tests through the typed client — is unchanged:
-
-```kotlin
-import io.github.matthewjones372.pelican.http4k.*     // was .pekko.*
-```
-
-`example/backends` runs the same small service on all three at once:
+1.0 ships one: `pelican-pekko`. The seam it plugs into is still there, and
+`example/backends` is what it looks like — the descriptions in `Greetings.kt`
+name no server library, and `OnPekko.kt` is the whole of binding them:
 
 ```bash
 ./gradlew :example:runBackends
 ```
+
+Switching is one import and the binders for streamed endpoints; everything else
+— the descriptions, the document, the tests through the typed client — is
+unchanged. The http4k and Ktor interpreters are complete and green on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch, where that suite runs against all three, and return after 1.0.
 
 ---
 

@@ -44,11 +44,12 @@ worth keeping next to the result of following it.
   interpreter to fix.
 - **Item 2** shipped as [Choosing between Pelican and the alternatives](choosing.md).
 - **Item 3** is done. It shipped in three parts:
-  - `ClientTransport` lives in core, and there is an adapter for each of the
-    three clients a Pelican service is likely to be running already:
-    `pelican-client-java` over the JDK's own `HttpClient`,
-    `pelican-client-pekko` over Pekko HTTP's, and `pelican-client-ktor` over
-    Ktor's. The second of them made the classpath question real rather than
+  - `ClientTransport` lives in core, and there is an adapter for each client a
+    Pelican service is likely to be running already: `pelican-client-java` over
+    the JDK's own `HttpClient`, `pelican-client-pekko` over Pekko HTTP's,
+    `pelican-client-okhttp` over OkHttp's, and `pelican-client-ktor` over
+    Ktor's — that last one on the `multi-backend` branch, with the Ktor server.
+    The second of them made the classpath question real rather than
     hypothetical: `ClientTransport.default()` refuses to choose between two
     providers, so a build carrying more than one names the transport at each
     client it constructs.
@@ -149,8 +150,9 @@ runtime preamble the generator emits, not a swapped field.
 
 - **`ClientTransport` lives in core.** An interface and two holders, no library
   types, which keeps `NoThirdPartyDependenciesTest` true. Adapters —
-  `pelican-client-java`, `pelican-client-ktor`, `pelican-client-pekko` — carry
-  their own dependencies, exactly as the three server modules do.
+  `pelican-client-java`, `pelican-client-pekko`, `pelican-client-okhttp`, and
+  `pelican-client-ktor` on the `multi-backend` branch — carry their own
+  dependencies, exactly as a server module does.
 - **Not `pelican-test`'s `Transport`.** That one is blocking and carries a
   `String` body deliberately, which is precisely why the test client cannot
   upload binary. A real client needs a streamed request body for a file part
@@ -248,10 +250,11 @@ anyone writes. Worth knowing where the bar actually sits: tapir does not escape
 this either, its `TupleArity` instances stopping at twenty-one. So the gap is
 six against twenty-one rather than six against no limit at all.
 
-Separately: the small greetings example runs on all three backends, but the
-fuller orders service is wired on Pekko and http4k only. "The backend is just a
-choice" is a claim the examples should demonstrate rather than assert, so the
-Ktor wiring should exist too.
+Separately: the greetings example runs through the `Backend` seam and the
+fuller orders service is wired directly. "The backend is just a choice" is a
+claim the examples should demonstrate rather than assert, so every backend main
+ships wants a wiring in `example/backends`, and the ones on the
+`multi-backend` branch have theirs there.
 
 ## 8. OpenAPI 3.2.0 — done, and what the survey found
 
@@ -314,8 +317,8 @@ the codec then refuses. Both are described in [Tools a model can call](mcp.md).
 
 `pelican-mcp-server` carries them: JSON-RPC 2.0 over stdio with
 `mcpServe(api)`, and the request/response half of Streamable HTTP mounted by
-`pelican-pekko-mcp`, `pelican-http4k-mcp` and `pelican-ktor-mcp` — a module of
-its own per backend, exactly as serving the OpenAPI document is. It turned out
+`pelican-pekko-mcp` — a module of its own per backend, exactly as serving the
+OpenAPI document is. It turned out
 not to need an MCP SDK at all: the official Kotlin one's server half is Ktor's,
 so taking it would have put a Ktor server behind `mcpServe` on a service
 running Pekko. The revision spoken is `2025-11-25`, pinned to that SDK's
@@ -334,8 +337,8 @@ refused rather than half-served, which means a service publishing tools has
 decided which of its endpoints a model gets.
 
 **Touched** four new modules — the protocol and one mounting per backend — and
-one line in `pelican-ktor`, where a bound handler needed a request to run on.
-Nothing in `pelican-core`.
+one line in a backend interpreter, where a bound handler needed a request to run
+on. Nothing in `pelican-core`.
 
 ## Coming back after 1.0
 
@@ -354,9 +357,12 @@ module plugs back into a live socket.
 Things that look like gaps and are not, with the reasoning in
 [What isn't here](reference.md#what-isnt-here): writing OpenAPI 3.0, validating
 credentials, `callbacks`, `anyOf`/`not`, a lenient importer, nested objects in
-form bodies, more than one streamed file part. A fourth backend belongs here
-too — three is already enough to prove the interpreter is not shaped by any one
-of them.
+form bodies, more than one streamed file part. A *fourth* backend belongs here
+too. The claim a backend count buys is that the interpreter is not shaped by any
+one of them, and three of them is proof enough of that — the proof exists, on
+the `multi-backend` branch, where the same descriptions and the same parity
+suite run against Pekko, http4k and Ktor. Narrowing what 1.0 ships does not
+un-prove it, and it is not an argument for a fourth.
 
 ## Stability
 

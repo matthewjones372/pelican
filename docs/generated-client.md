@@ -88,7 +88,9 @@ branch, and what string selects each one, has to be written down. So those
 declarations are annotated for one library, and `codec.set("kotlinx")` on the
 client entry chooses which — the same setting an `endpoints` entry takes,
 because a client's bodies are read by the same library the service's are. Unset
-is Jackson, and a spec with no union generates the same client either way.
+is Jackson, and a spec with no union generates the same client either way. The
+annotations are a property of the emitted source rather than of a Pelican
+module: the kotlinx flavour is for a consumer whose own build reads it.
 
 `ordersSpec().writeKotlinClient(sourceRoot, packageName = "com.example.orders")`
 is the same thing without the build task, for a build that would rather make the
@@ -127,22 +129,7 @@ configuration:
 val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTransport(system))
 ```
 
-`pelican-client-ktor` is the third, over Ktor's `HttpClient`, and the one
-a service already running Ktor wants — it takes the client that service has
-already configured, so the calls go out through its engine, its plugins and its
-connection pool:
-
-```kotlin
-val client = OrdersClient("https://orders.internal", JacksonCodecs, KtorHttpTransport(http))
-```
-
-Passing nothing there is also allowed, and then the adapter keeps a CIO client
-of its own: a caller who has not chosen a Ktor engine does not have to choose
-one to make a call. The suspending client behind the `CompletionStage`, and
-what a per-request timeout does and does not bound there, are in
-[docs/reference.md](reference.md#on-ktor).
-
-`pelican-client-okhttp` is the fourth, over OkHttp's `Call`, and it takes the
+`pelican-client-okhttp` is the third, over OkHttp's `Call`, and it takes the
 `OkHttpClient` an application has already built — its interceptors, its cache
 and its connection pool included:
 
@@ -154,21 +141,15 @@ val client = OrdersClient("https://orders.internal", JacksonCodecs, OkHttpTransp
 
 The module is plain JVM — core and `okhttp`, no Android plugin and no AndroidX,
 which `DependenciesTest` asserts rather than promises. On a server it is one
-adapter among four, worth taking when OkHttp is already the stack in the
-process. On Android it is the only one of the four that runs at all: there is
-no `java.net.http` on the platform, Pekko and Ktor-CIO are a second networking
-stack in an app that already ships one, and OkHttp is what the platform uses
-underneath anyway.
+adapter among three, worth taking when OkHttp is already the stack in the
+process. On Android it is the only one of the three that runs at all: there is
+no `java.net.http` on the platform, Pekko is a second networking stack in an app
+that already ships one, and OkHttp is what the platform uses underneath anyway.
 
 OkHttp **4.x is the floor**. Gradle resolves upwards, so a build already on
-OkHttp 5 keeps it. A fleet pinned to OkHttp 3 has no adapter here and keeps the
-escape hatch that predates this module — Ktor's client over an OkHttp engine,
-which brings the Ktor machinery but leaves the socket work with the OkHttp 3
-already in the build:
-
-```kotlin
-val client = OrdersClient("https://orders.internal", JacksonCodecs, KtorHttpTransport(HttpClient(OkHttp)))
-```
+OkHttp 5 keeps it. A fleet pinned to OkHttp 3 has no adapter here and has to
+hand `OrdersClient` a `ClientTransport` of its own over the OkHttp 3 already in
+the build.
 
 More generally, a service that already runs an HTTP client passes that one as
 the third argument and gets its pooling, its metrics and its tuning rather than
@@ -217,23 +198,21 @@ so. The lambda is for what every call carries.
 
 `OrdersClient(..., timeout = Duration.ofSeconds(30))` is the deadline every
 call is built with, and it reaches the transport as `ClientRequest.timeout`.
-What that bounds is the transport's answer, and the four do not agree, so it
-is worth knowing which you have:
+What that bounds is the transport's answer, and the adapters do not agree, so
+it is worth knowing which you have:
 
 | Transport | What the deadline bounds | Where it comes from |
 |---|---|---|
 | `pelican-client-java` | the response head; the body streams on after it | `HttpRequest.timeout` |
 | `pelican-client-pekko` | the response head, likewise | the adapter, on the stage: Pekko's own timeouts are pool settings |
-| `pelican-client-ktor`, with `HttpTimeout` installed | the whole exchange, the reading of the body included | `requestTimeoutMillis` |
-| `pelican-client-ktor`, without it | the response head — the adapter imposes it, since Ktor would drop it | the adapter's own deadline |
 | `pelican-client-okhttp` | the response head, likewise | the adapter, on the stage: OkHttp's `callTimeout` is the whole exchange, so it is not used |
 | `InMemoryClientTransport` | nothing; there is no clock in a function call | — |
 
 A streamed call — `ndjson`, `sse`, `jsonArray` or `bytes` — carries no deadline
 at all. A deadline is for a call that ends, and an SSE subscription is meant to
-stay open: inheriting the client's would have ended it mid-body on Ktor and
-left it running on the other two, which is a difference no description
-mentions. Bound a stream by taking what you need from it and closing it —
+stay open: inheriting the client's would end it mid-body on a transport whose
+deadline covers the whole exchange and leave it running on one whose does not,
+which is a difference no description mentions. Bound a stream by taking what you need from it and closing it —
 `use { it.take(100).toList() }` — or by the idle timeout on the engine you
 handed over.
 
@@ -260,9 +239,9 @@ Two things a backend owns cannot cross, and both are refused by name rather
 than by `ClassCastException`. A `bytes(...)` request body: the handle a handler
 reads it through is that backend's own type, and core has no value to hand
 over. And a streamed response a handler produced as something other than a
-`Sequence` — Pekko's `Source`, Ktor's `Flow` — which core cannot read without
-depending on that library. An http4k binding streams as a `Sequence` and
-crosses whole; for the other two, those calls belong against a bound server.
+`Sequence` — Pekko's `Source` — which core cannot read without depending on
+that library. A backend whose binder streams as a `Sequence` crosses whole; on
+Pekko, those calls belong against a bound server.
 
 ## Blocking or suspending
 

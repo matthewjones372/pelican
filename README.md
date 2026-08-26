@@ -37,9 +37,9 @@ by whoever remembers. Here there is no second source of truth, because there is
 no second description.
 
 It is a library rather than a framework: it does not own your `main`, and it
-serves through a web stack you already run — Pekko HTTP, http4k or Ktor. If you
-know tapir from Scala, this is that idea, scoped to what Kotlin's type system
-can express without implicits.
+serves through a web stack you already run — Pekko HTTP, for 1.0. If you know
+tapir from Scala, this is that idea, scoped to what Kotlin's type system can
+express without implicits.
 
 A description, then the handler that answers it:
 
@@ -89,14 +89,15 @@ is why the wire contract your callers hold is pinned separately, in one line per
 endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
 
 **Swapping backends does not touch your descriptions.** Only the type a
-streaming handler returns changes: `Source` on Pekko, `Sequence` on http4k,
-`Flow` on Ktor.
+streaming handler returns changes — `Source` on Pekko. 1.0 ships one backend;
+the interpreters that prove the point sit on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch and
+return after it.
 
 **And it is not slow.** Interpreting a description is not free, but what it
-costs is measured rather than argued about — 75ns a request against an http4k
-route someone tuned by hand, 131ns against a Pekko one, and cheaper than the
-idiomatic version of either. The numbers, the error bars they came with and the
-baselines they need are in [what it costs](docs/what-it-costs.md).
+costs is measured rather than argued about — 131ns a request against a Pekko
+route someone tuned by hand, and cheaper than the idiomatic version of it. The
+numbers, the error bars they came with and the baselines they need are in
+[what it costs](docs/what-it-costs.md).
 
 ## Contents
 
@@ -129,7 +130,7 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-All twenty-nine modules are on Maven Central under `io.github.matthewjones372`,
+All nineteen modules are on Maven Central under `io.github.matthewjones372`,
 with sources and an empty javadoc jar.
 
 ```kotlin
@@ -491,7 +492,7 @@ importOrders handledNow { (locale, caption, manifest, file) -> // String, String
 
 A form carries strings and nothing else, so what `visits=3` means comes from the
 schema published for the body type. That is what makes a form body decode
-identically under Jackson and under kotlinx.serialization, which coerce
+identically under any codec module, where the libraries underneath them coerce
 differently when left to themselves.
 
 `or` says the same payload arrives several ways: one `SignIn`, two encodings,
@@ -642,9 +643,8 @@ routes(api.mcpRoutes() + api.toHttpHandler())         // or /mcp beside the endp
 ```
 
 `pelican-mcp-server` speaks the protocol — JSON-RPC 2.0, revision `2025-11-25`
-— with no MCP SDK on the classpath, and `pelican-pekko-mcp`,
-`pelican-http4k-mcp` and `pelican-ktor-mcp` mount it exactly as the `-docs`
-modules mount the document. See [Tools a model can call](docs/mcp.md) for what
+— with no MCP SDK on the classpath, and `pelican-pekko-mcp` mounts it exactly
+as `pelican-pekko-docs` mounts the document. See [Tools a model can call](docs/mcp.md) for what
 is refused and why — a streamed response, a cookie, a multipart body — and for
 the whole mapping.
 
@@ -693,39 +693,18 @@ ordersApi().start(port = 8080) { system ->
 }
 ```
 
-**http4k** — `toHttpHandler()` is a `RoutingHttpHandler`:
-
-```kotlin
-val health = "/health" bind Method.GET to { Response(OK).body("ok") }
-
-ordersApi().start(port = 8080) { routes(health, toHttpHandler()) }
-```
-
-**Ktor** — `pelican(api)` installs the endpoints into a `Route`, so it composes
-with everything Ktor routing composes with: put it behind a `route("/v2")`,
-inside an `authenticate { }` block, or beside handwritten routes:
-
-```kotlin
-ordersApi().start(port = 8080) { api ->
-    install(CallLogging)
-    routing {
-        get("/health") { call.respondText("ok") }
-        pelican(api)
-    }
-}
-```
-
-Or bind the route yourself and never call `start` at all — `toRoute`,
-`toHttpHandler` and `Route.pelican` are the whole interface, and none of them
-starts anything.
+Or bind the route yourself and never call `start` at all — `toRoute` is the
+whole interface, and it starts nothing. Each backend module publishes one of
+these: `toHttpHandler` on http4k and `Route.pelican` on Ktor, on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch.
 
 ### Filters
 
 A filter runs around every handler and sees the request with its inputs already
 decoded — `p[reportId]` is a `Long`, not a string to parse again. Rejecting is
 throwing: `unauthorized()`, `forbidden()`, `tooManyRequests(retryAfterSeconds = 3600)`,
-so a refusal is rendered by the code that renders every other failure, on all
-three backends.
+so a refusal is rendered by the code that renders every other failure, on
+every backend.
 
 What a filter works out goes into an *attribute*, which is how it reaches the
 handler without becoming an input the document would have to declare:
@@ -870,29 +849,24 @@ network error.
 
 ```kotlin
 api(routes, codecs = JacksonCodecs)      // Jackson + swagger-core schemas
-api(routes, codecs = KotlinxCodecs)      // kotlinx.serialization
-api(routes, codecs = JsoniterCodecs)     // jsoniter
 api(routes, codecs = JacksonCodecs(myObjectMapper))
 ```
 
 Descriptions carry a `KType` and nothing else, no serializer and no mapper, so
-swapping libraries touches no endpoint. That they produce the *same document* is
-a test, over models covering defaults, nullability (including inside a `List` or
-a `Map`, where erasure means only the Kotlin type still knows), enums, maps,
-nesting and recursion. The two shapes where Jackson and kotlinx.serialization
-disagree are named in [docs/reference.md](docs/reference.md#what-isnt-here).
+swapping libraries touches no endpoint. That two codec modules produce the *same
+document* is a test, over models covering defaults, nullability (including
+inside a `List` or a `Map`, where erasure means only the Kotlin type still
+knows), enums, maps, nesting and recursion. 1.0 ships one of them; the two
+shapes where Jackson and kotlinx.serialization disagree are named in
+[docs/reference.md](docs/reference.md#what-isnt-here), and `pelican-kotlinx` and
+`pelican-jsoniter` are on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch until they return
+after 1.0.
 
-jsoniter is the odd one: it was finished before Kotlin was common, so it has no
-metadata to describe a type with and no idea what a data class is.
-`pelican-jsoniter` binds through the primary constructor instead — which is also
-what its schemas are derived from, so the document and the wire format come from
-one place. Payload types need no annotations and no compiler plugin.
-
-All three run side by side under `./gradlew :example:runCodecs` — one set of
-endpoints, one set of handlers, three JSON libraries, and the same bytes out of
-each. `example/src/main/kotlin/example/codecs/ThreeCodecs.kt` is also where the
-annotations that keep a sealed hierarchy lined up across the three are written
-down, since that is the one shape none of them can read off the Kotlin.
+`./gradlew :example:runCodecs` is the service written against a codec it does
+not name, and `example/src/main/kotlin/example/codecs/PluggableCodecs.kt` is
+also where the annotations that keep a sealed hierarchy lined up across codec
+modules are written down, since that is the one shape none of them can read off
+the Kotlin.
 
 A sealed hierarchy publishes the same way through either: `oneOf` over the
 branches with a `discriminator` and a full `mapping`, so the document says which
@@ -1014,36 +988,20 @@ handler returns:
 watchOrders streamedNow { (_, max) ->
     Source.range(1, max).throttle(1, ofMillis(100)).map { tick(it) }
 }
-
-// pelican-http4k: a stream is a Sequence, pulled as the body is written
-watchOrders streamedNow { (_, max) ->
-    (1..max).asSequence().map { Thread.sleep(100); tick(it) }
-}
-
-// pelican-ktor: a stream is a Flow, collected as the body is written
-watchOrders streamedNow { (_, max) ->
-    flow { for (i in 1..max) { delay(100); emit(tick(i)) } }
-}
 ```
 
-Ktor is the one backend whose handlers are `suspend` functions, because that is
-how Ktor asks a question. `handledNow { id -> repository.find(id) }` may await
-whatever it likes, and a lambda that suspends nowhere still fits, so there is no
-second set of blocking binders.
+The stream type is the backend's own and the binder demands it — a `Sequence`
+on http4k and a `Flow` on Ktor, on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch. The wire format is core's whichever it is.
 
 
-`example/backends/` is one description file, three binding files, and a `main`
-that starts all three servers so the endpoints can be curled side by side.
-`AllBackendsTest` is one suite run three times, with its questions built from the
-endpoint values, so it cannot ask two backends different things, and a final test
-asserts the three answers match byte for byte down to the generated OpenAPI
-document being the identical string.
-
-One caveat: http4k's `SunHttp` and `Undertow` hold small writes in a buffer,
-which turns a streamed response into a slow one, while `Jetty` does not. Rather
-than ship a default that quietly breaks streaming, `pelican-http4k` binds
-`StreamingSunHttp` (the JDK's server, flushing each frame, no extra dependency).
-Pass any other `ServerConfig` to `start(config = ...)`.
+`example/backends/` is one description file, one binding file per backend, and
+a `main` that starts them so the endpoints can be curled. `AllBackendsTest` is
+one suite run once per backend, with its questions built from the endpoint
+values, so it cannot ask two backends different things, and a final test asserts
+the answers match byte for byte down to the generated OpenAPI document being the
+identical string. `allBackends` holds one entry on main and three on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch; the suite is the same file.
 
 ---
 
@@ -1064,7 +1022,7 @@ Nine things that wanted a page rather than a section, and one benchmark:
 | [Golden files](docs/golden-testing.md) | A test that fails when a change would break the callers you already have — a new required field, a deleted endpoint — and stays quiet when it would not. |
 | [Tools a model can call](docs/mcp.md) | The same endpoints as MCP tool descriptions and a dispatch that runs them — what becomes what, what is refused, where a credential comes from, and what a tool result cannot carry. |
 | [A schema that resolves on its own](docs/schemas.md) | A derived JSON Schema handed to something that does not hold your OpenAPI document — where the pointers go, what a union's branches carry instead of a `discriminator`, and what is refused. |
-| [Modules](docs/modules.md) | What each of the twenty-nine modules is for and what it depends on, for deciding which ones your build needs. |
+| [Modules](docs/modules.md) | What each of the nineteen modules is for and what it depends on, for deciding which ones your build needs. |
 | [What it costs](docs/what-it-costs.md) | The interpreter measured by JMH against the hand-written routes it replaces, with the baselines that comparison needs and the error bars it came with. |
 | [Roadmap](docs/roadmap.md) | What is not built yet and the order it is worth building in — a different list from the deliberate refusals, and the argument for the order written down so it can be disagreed with. |
 
@@ -1076,8 +1034,8 @@ Nine things that wanted a page rather than a section, and one benchmark:
 ./gradlew build                          # all modules: tests, detekt, spotless, coverage
 ./gradlew :example:runReadmeExample      # the service above, on :8080
 ./gradlew :example:run                   # the fuller orders API (streaming, SSE, raw bodies)
-./gradlew :example:runBackends           # all three backends at once, on :8080-:8082
-./gradlew :example:runCodecs             # all three JSON libraries at once, on :8080-:8082
+./gradlew :example:runBackends           # the greetings service, through the backend seam
+./gradlew :example:runCodecs             # the notes service, over a codec module it does not name
 ./gradlew :example:runSecured            # a filter enforcing the security the descriptions declare
 ./gradlew :example:runMetrics            # Micrometer meters tagged from the descriptions, at /admin/meters
 ./gradlew :example:runTracing            # OpenTelemetry spans from the same descriptions, at /admin/traces
@@ -1087,7 +1045,7 @@ Nine things that wanted a page rather than a section, and one benchmark:
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ```
 
-`runHttp4k` and `runBookmarks` are there too, and every example takes a port with
+`runBookmarks` is there too, and every example takes a port with
 `--args=8081`. The two generator tasks come from the repository's own Gradle
 plugin, and they start nothing: `pelican-openapi` and `pelican-codegen` depend
 on core alone, so neither needs an HTTP library present.

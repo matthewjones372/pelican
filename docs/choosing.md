@@ -31,11 +31,12 @@ either left out or stated as the weaker thing that could be supported.
 
 ## http4k's contracts and lenses
 
-Checked against http4k 6.58.0.0, which is the version `pelican-http4k` itself
-builds against.
+Checked against http4k 6.58.0.0, which is the version `pelican-http4k` builds
+against on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch.
 
-This is the closest neighbour by a distance, and it is also one of Pelican's
-three backends, which makes the comparison an awkward one to write. If you are
+This is the closest neighbour by a distance, and http4k is also a backend
+Pelican interprets onto — on that branch, and after 1.0 on main — which makes
+the comparison an awkward one to write. If you are
 already on http4k, http4k's own contract module is sitting in the same
 repository you are already pulling from, and it needs no new concept and no new
 dependency tree.
@@ -65,7 +66,7 @@ It is enormously broader. The 6.58.0.0 API documentation publishes 221 modules.
 Beyond API description there is chaos engineering, Servirtium service
 virtualisation, approval testing, WebDriver and Playwright drivers, serverless
 adapters for five clouds, an AWS surface where most services ship with a
-matching fake, and a large MCP and LLM section. Pelican is twenty-nine modules
+matching fake, and a large MCP and LLM section. Pelican is nineteen modules
 that describe HTTP endpoints and does nothing else on purpose, which is a
 smaller promise, not a better one.
 
@@ -102,7 +103,7 @@ and http4k's answer to it is a perfectly reasonable one.
 ## Ktor's OpenAPI and Resources plugins
 
 Checked against Ktor 3.5.2, released 4 August 2026, which is the version
-`pelican-ktor` builds against.
+`pelican-ktor` builds against on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch.
 
 Ktor's OpenAPI story changed shape recently and a lot of material written about
 it is now wrong, so it is worth stating what is there today. The Ktor Gradle
@@ -219,8 +220,8 @@ native images that Pelican has never measured itself against.
 than HTTP description — persistence, messaging, scheduling, a security model —
 and want one framework to supply it; when your team already knows the
 annotations; when you need commercial support; or when native-image startup time
-is a requirement, since none of Pelican's three backends has been characterised
-for that here.
+is a requirement, since no Pelican backend has been characterised for that
+here.
 
 The one thing worth being clear about, in all three, is that the document is
 derived from the code and is not enforced against traffic. The routing is read
@@ -376,12 +377,19 @@ because there is nothing yet to deprecate against. A service that will be
 maintained for years by people who did not choose this is taking on a risk that
 a Spring or Ktor service is not.
 
-**Three backends, and only three.** Pekko HTTP, http4k and Ktor. If you are on
+**One backend at 1.0.** Pekko HTTP, and nothing else on main. If you are on
 Vert.x, Helidon, Armeria, Netty directly, Jakarta REST, Javalin or Spring MVC,
 there is no module for you, and writing one is a real piece of work even though
-the reference manual puts the last one at about five hundred lines. Nor are the
-three equally exercised: the larger orders example is bound on Pekko and http4k
-only, and the client contract suite runs against those two.
+the reference manual puts the last one at about five hundred lines.
+
+The interpreter is not shaped by Pekko, and that is provable rather than
+asserted: http4k and Ktor interpreters exist, complete and green, on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch, where one parity suite runs the same descriptions
+against all three and asserts they answer byte for byte. What narrowed for 1.0
+is the *promise*, not the design — a first release's stability guarantee covers
+the pair the maintainer can stand behind, and the other two return after it as
+restores. Until they do, "the backend is a choice" is a claim about the code you
+can read on a branch, not about a module you can depend on today.
 
 **The refusals are deliberate and they will not be argued away.** Each of these
 is a documented decision with reasoning in the reference manual, not a gap
@@ -427,10 +435,11 @@ That is more than a toy. But there is no published client artifact — the file 
 generated into your build, and you own it. Four transports are written:
 `pelican-client-java` over the JDK's own `HttpClient`, `pelican-client-pekko`
 over Pekko HTTP's client, which takes the `ActorSystem` a Pekko service already
-has, `pelican-client-ktor` over Ktor's, which takes the `HttpClient` a Ktor
-service already configures, and `pelican-client-okhttp` over OkHttp's `Call`,
-which takes the `OkHttpClient` an application already built and is the one that
-runs on Android. A build carrying more than one has to name the
+has, `pelican-client-okhttp` over OkHttp's `Call`, which takes the
+`OkHttpClient` an application already built and is the one that runs on Android,
+and `pelican-client-ktor` over Ktor's, which is on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch with the Ktor server and not published at 1.0. A build carrying more
+than one has to name the
 transport at each client it constructs, since nothing can choose between two
 providers on one classpath. The generated methods block by default, joining the
 stage the transport answers with; a `suspend` surface is generated instead when

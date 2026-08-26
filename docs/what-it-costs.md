@@ -15,7 +15,7 @@ the same Jackson mapper, so what is left in the difference is the interpreter.
 
 ```bash
 ./gradlew :benchmarks:jmh                       # everything: six minutes
-./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 Http4k"   # one file, one fork
+./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 Pekko"    # one file, one fork
 ./gradlew :benchmarks:jmh -PbenchmarkArgs="-prof jfr"     # a flight recording per fork
 ```
 
@@ -52,7 +52,14 @@ task left for an agent to attach to.
 Everything below is in-memory. No socket, no connection handling, no OS
 scheduling. That flatters both sides equally and isolates the layer under test.
 
-## http4k
+Some of the tables below hold http4k rows, taken while `pelican-http4k` was on
+main. That module and its benchmark now live on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch
+and return after 1.0; the numbers are left in because they were really measured
+and because what they show is a claim about the interpreter rather than about
+one server. Each such table says so. Running them again means running
+`:benchmarks:jmh` on that branch.
+
+## http4k — measured on the `multi-backend` branch
 
 One endpoint, `GET /items/{itemId}?limit=`, answering JSON.
 
@@ -82,13 +89,15 @@ thing a single-JVM loop cannot see and forks exist to expose. Read the row as
 
 Every table above uses an API of **one** endpoint, which measures decoding and
 rendering and says nothing about the thing that varies most between services.
-Pekko reduces its routes with `Directives.concat` and http4k's `routes(...)`
-tries them in order, so both are an ordered scan. The endpoint under test is
-declared last — the worst case a scan has, and the one a service acquires by
-adding endpoints over time.
+Registered with a router directly, the routes are reduced with
+`Directives.concat` into an ordered scan. The endpoint under test is declared
+last — the worst case a scan has, and the one a service acquires by adding
+endpoints over time.
 
 `./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"` — a class of its
-own, so the six-minute run above is unchanged.
+own, so the six-minute run above is unchanged. The two http4k columns are the
+branch's, as above; `RoutingScaleBenchmark` on main runs the Pekko column and
+its hand-written control.
 
 | endpoints | **Pelican on http4k** | http4k routes, by hand | **Pelican on Pekko** |
 |---|---|---|---|
@@ -116,9 +125,9 @@ a scan. Only owning the dispatch moves the number.
 
 Ktor dispatches through the same index — `Route.pelican` installs one route per
 method the descriptions use and the trie decides which endpoint answers — and is
-not yet measured here.
+not measured here either.
 
-## An endpoint with nothing to decode
+## An endpoint with nothing to decode — on the `multi-backend` branch
 
 `GET /ping`, answering text.
 

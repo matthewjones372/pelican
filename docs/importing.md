@@ -80,7 +80,10 @@ that is not in the lockfile. The whole of it is under
 
 A `oneOf` with a `discriminator` comes back as a sealed interface and one data
 class per branch, annotated so that Jackson or kotlinx.serialization can
-actually read it — `codec.set("kotlinx")` chooses which. Branches are named
+actually read it — `codec.set("kotlinx")` chooses which. Which annotations
+the emitted source carries is a property of that source and not of a Pelican
+module: the kotlinx flavour is for a consumer whose own build reads it.
+Branches are named
 from the `discriminator.mapping` key, then the referenced component, then
 `<Parent>Variant<n>`, all read out of the document so that the same document
 generates the same names every time. An `allOf` of several schemas is flattened

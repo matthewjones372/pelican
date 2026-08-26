@@ -3,9 +3,8 @@
 The long version: every module, every trade-off, and the limitations spelled
 out. Start with the [README](../README.md) if you have not read it yet.
 
-Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
-`HttpHandler`, a set of Ktor routes, and an OpenAPI document — 3.1.0 or
-3.2.0, whichever the people reading it can use.
+Endpoints are values; interpreters turn them into a Pekko HTTP route and an
+OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 
 ## Modules
 
@@ -19,30 +18,28 @@ Endpoints are values; interpreters turn them into a Pekko HTTP route, an http4k
 | `pelican-mcp-server` | core, mcp | those tools served: JSON-RPC 2.0 — `initialize`, `tools/list`, `tools/call`, `ping` — over stdio with `mcpServe(api)`, and the request/response half of Streamable HTTP for a backend to mount. Protocol revision `2025-11-25`. Still no MCP SDK |
 | `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's `HttpClient`. No HTTP library of its own |
 | `pelican-client-pekko` | core, pekko-http | the same seam over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
-| `pelican-client-ktor` | core, ktor-client-cio | the same seam over Ktor's `HttpClient`, for a service that already runs one. Not `pelican-ktor`: calling is not interpreting |
-| `pelican-client-okhttp` | core, okhttp | the same seam over OkHttp's `Call`, for an application that already runs one — and the only one of the four that runs on Android, where there is no `java.net.http`. Plain JVM: no Android plugin, no AndroidX |
+| `pelican-client-okhttp` | core, okhttp | the same seam over OkHttp's `Call`, for an application that already runs one — and the only one of the three that runs on Android, where there is no `java.net.http`. Plain JVM: no Android plugin, no AndroidX |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
-| `pelican-jackson` | core, Jackson, swagger-core | the default `Codecs`: Jackson reads bodies, swagger-core describes types |
-| `pelican-kotlinx` | core, kotlinx.serialization | the alternative `Codecs` |
-| `pelican-jsoniter` | core, jsoniter, kotlin-reflect | a third `Codecs`, bound and described through the primary constructor |
+| `pelican-jackson` | core, Jackson, swagger-core | the `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and Swagger UI over HTTP |
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
-| `pelican-http4k` | core, http4k-core | descriptions → an http4k `HttpHandler`, plus a server that streams |
-| `pelican-http4k-docs` | http4k, openapi | the same two pages, on http4k |
-| `pelican-http4k-mcp` | http4k, mcp-server | the same endpoint, on http4k |
-| `pelican-ktor` | core, ktor-server-core, ktor-server-cio | descriptions → Ktor routes, with `suspend` handlers and `Flow` streams |
-| `pelican-ktor-docs` | ktor, openapi | the same two pages, on Ktor |
-| `pelican-ktor-mcp` | ktor, mcp-server | the same endpoint, on Ktor |
 | `pelican-metrics` | core, micrometer-core | descriptions → Micrometer meters, tagged from what the descriptions already say |
 | `pelican-metrics-otel` | core, opentelemetry-api | descriptions → OpenTelemetry server spans and the specified duration histogram |
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
-| `pelican-test-http4k` | test, http4k | the in-memory transport, on http4k |
 | `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
-| `example` | core, openapi, jackson, all three backends | the orders, bookmarks, greetings and secured services |
-| `benchmarks` | core, jackson, pekko, http4k, JMH | the interpreter measured against hand-written routes. Not published, not run by `build`. |
+| `example` | core, openapi, jackson, pekko | the orders, bookmarks, greetings and secured services |
+| `benchmarks` | core, jackson, pekko, JMH | the interpreter measured against hand-written Pekko routes. Not published, not run by `build`. |
+
+1.0 ships one backend and one codec module. The http4k and Ktor interpreters
+and their `-docs` and `-mcp` modules, the http4k in-memory transport, the Ktor
+client transport, `pelican-jsoniter` and `pelican-kotlinx` are complete and
+green on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch, and return after 1.0. Where the reasoning below is easier to read with
+one of them beside it, the branch is named.
 
 The layering is load-bearing, not decorative, and each edge is a test:
 
@@ -56,15 +53,11 @@ The layering is load-bearing, not decorative, and each edge is a test:
   is absent from its classpath, so a service that serves only endpoints never
   compiles or ships the document generator. Publishing docs is one extra
   module and one explicit call.
-- `pelican-http4k` asserts the same about `pelican-openapi`, *and* that
-  `org.apache.pekko` is absent: a second backend sharing a server library with
-  the first would be no evidence that the abstractions in core hold.
-- `pelican-ktor` asserts all three: no `pelican-openapi`, no Pekko, no http4k.
 - `pelican-metrics` asserts that what a consumer gets is core plus a meter API
   and nothing besides — no server library in particular. It reads a description
   and a `Filter`, neither of which knows which interpreter is serving it, and
-  that is what lets one `metrics(registry)` line mean the same thing on all
-  three backends.
+  that is what lets one `metrics(registry)` line mean the same thing on every
+  backend.
 - `pelican-metrics-otel` asserts the mirror image: core plus the OpenTelemetry
   API, no server library, and — the reason it is a module rather than a second
   file next door — no Micrometer. `pelican-metrics` asserts it carries no
@@ -79,12 +72,6 @@ The layering is load-bearing, not decorative, and each edge is a test:
   `pelican-pekko` is absent, which is the edge worth having — the interpreter
   and the transport are both Pekko, and a caller who only makes calls should
   not compile a route builder in to do it.
-- `pelican-client-ktor` asserts the same claim with Ktor in the place of the
-  JDK: core, Ktor's client and its own closure, and nothing else — no OkHttp
-  and no Apache client, which is most of what choosing CIO for the engine is
-  about. It also asserts that `pelican-ktor` is absent, which is the edge worth
-  having: the interpreter and the transport are both Ktor, and a caller who
-  only makes calls should not compile a route builder in to do it.
 - `pelican-client-okhttp` asserts core, OkHttp and okio, and nothing else —
   no second HTTP stack, no interpreter, and no AndroidX. The last one is the
   point of the module rather than a detail of it: it runs on Android because
@@ -101,10 +88,10 @@ The layering is load-bearing, not decorative, and each edge is a test:
 - `pelican-test` asserts that no server library and no matcher library is on its
   runtime classpath. This module was the hole in the story for a while: it
   declared `api(project(":pelican-pekko"))` for the sake of one in-memory
-  transport and one convenience function, so a Ktor or http4k service that
-  wanted a typed client got Pekko HTTP and Pekko streams as well — and exported
-  kotest's matchers to everyone who already had their own. Both are now
-  somewhere else, and this test is what stops them coming back.
+  transport and one convenience function, so a service on any other backend
+  that wanted a typed client got Pekko HTTP and Pekko streams as well — and
+  exported kotest's matchers to everyone who already had their own. Both are
+  now somewhere else, and this test is what stops them coming back.
 
   The repository's own tests are written with kotest's matchers — that is a
   test-scope dependency of each module and never an exported one, which is why
@@ -112,92 +99,87 @@ The layering is load-bearing, not decorative, and each edge is a test:
   kotest is on the test classpath here by construction, and what a consumer
   gets is the part worth holding.
 
-## Three backends
+## The backend
 
 The backend is a choice about handlers. Descriptions do not change, and neither
 do the OpenAPI document, the generated client or the typed test client — they
 read the endpoint values, not the server.
 
-What differs is the type a streaming handler returns, and the type a raw body
-arrives as:
+What a binding decides is the type a streaming handler returns, and the type a
+raw body arrives as:
 
-| | `pelican-pekko` | `pelican-http4k` | `pelican-ktor` |
-|---|---|---|---|
-| entry point | `Api.toRoute(system)` / `Api.start(...)` | `Api.toHttpHandler()` / `Api.start(...)` | `Route.pelican(api)` / `Api.start(...)` |
-| a handler | `(I) -> T` | `(I) -> T` | `suspend (I) -> T` |
-| a stream | `Source<T, NotUsed>` | `Sequence<T>`, pulled as the body is written | `Flow<T>`, collected as the body is written |
-| raw body | `handle.toSource()` | `handle.toStream()` | `handle.toChannel()` |
-| an uploaded file | `file.stream()` | `file.stream()` | `file.stream()` |
-| raw output | `Source<ByteString, NotUsed>` | `InputStream` | `ByteReadChannel` |
-| escape hatch | `params.request: HttpRequest` | `params.request: Request` | `params.call: ApplicationCall` |
-| in-memory testing | `pelican-test`'s `InMemoryTransport` | the handler itself — it *is* `(Request) -> Response` | Ktor's own `testApplication` |
-| wrong method on a known path | 405, or 404 when another endpoint declares that method | 405 | 404 |
+| | `pelican-pekko` |
+|---|---|
+| entry point | `Api.toRoute(system)` / `Api.start(...)` |
+| a handler | `(I) -> T` |
+| a stream | `Source<T, NotUsed>` |
+| raw body | `handle.toSource()` |
+| an uploaded file | `file.stream()` |
+| raw output | `Source<ByteString, NotUsed>` |
+| escape hatch | `params.request: HttpRequest` |
+| in-memory testing | `pelican-test`'s `InMemoryTransport` |
+| wrong method on a known path | 405, or 404 when another endpoint declares that method |
 
-The one row that does not vary is worth noticing. A raw body is the request's
-entity, which each backend already has a name for, so a handler asks that
-backend for it. A *part* of a multipart envelope only exists because the
-envelope was parsed, the parsing is core's, and so the stream is core's too —
-which is why an upload is read the same way on all three. See
+One row is not the backend's at all. A raw body is the request's entity, which
+a server library already has a name for, so a handler asks that backend for it.
+A *part* of a multipart envelope only exists because the envelope was parsed,
+the parsing is core's, and so the stream is core's too — which is why an upload
+is read the same way whoever bound it. See
 [Multipart uploads](#multipart-uploads).
 
 **`handledNow` means handled in place, on the request** — and *in place* is a
-thread on Pekko and http4k, a coroutine on Ktor. `-Now` is a claim about
-*when*, not about what the answer is carried on: the handler produces the value
-during the call rather than handing back something that completes later, which
-is `handledBy` and its `…By` family. The name is the same on all three because
-the description is: `getUser handledNow { id -> Store.user(id) }` is one line
-whichever server ends up running it. Renaming Ktor's binder `handledSuspending`
-would buy naming purity by making the first example a reader meets differ per
-backend, which is the wrong trade for a library whose pitch is "same
-description, any backend".
-
-Ktor is the only one of the three whose handlers suspend, because that is Ktor's
-own calling convention: a handler runs inside the call's coroutine and may await
-anything. A lambda that suspends nowhere still satisfies a `suspend` parameter,
-so there is one set of binders rather than a blocking set and a suspending one —
-and, for the same reason, no `handledBy`/`streamedBy` taking a
-`CompletionStage`, which on the other two backends exist to reach concurrency
-this style already has. `BinderNameParityTest` names the binders each backend
-publishes: the eight in-place ones everywhere, the five `…By` ones on Pekko and
-http4k only.
+thread on Pekko. `-Now` is a claim about *when*, not about what the answer is
+carried on: the handler produces the value during the call rather than handing
+back something that completes later, which is `handledBy` and its `…By` family.
+The name does not vary per backend, because the description does not:
+`getUser handledNow { id -> Store.user(id) }` is one line whichever server ends
+up running it, and a binder renamed for the calling convention underneath it
+would make the first example a reader meets differ per backend.
+`BinderNameParityTest` holds every backend to the same binder names — the eight
+in-place ones everywhere, and the five `…By` ones on a backend that answers on
+a thread, where they exist to reach concurrency the calling convention does not
+already have.
 
 Core's handler type is `(Params) -> CompletionStage<Any?>`, being the most it
-can say without picking a concurrency library, so `pelican-ktor` bridges the gap
-in one private function: the handler runs as a child coroutine of the call and
-completes a future the interpreter awaits. Cancellation travels down — a client
-that disconnects cancels the handler — and failures are caught rather than left
-to the coroutine builder, since a child that fails cancels its parent, and a
-cancelled call cannot answer 404 to the `notFound(...)` that caused it.
+can say without picking a concurrency library. A backend whose calling
+convention is something else bridges that in its own interpreter: on the
+`multi-backend` branch, `pelican-ktor` runs the handler as a child coroutine of
+the call and completes a future the interpreter awaits, in one private
+function.
 
-That last point is the one thing a disconnect does not mean the same on all
-three, and it follows from how each runs a handler. Ktor's is a child of the
-call's coroutine, so a caller who goes away cancels it. Pekko's is a
-`CompletionStage` nobody holds a cancel for and http4k's is a blocking call on a
-server thread: both run to completion, and what they produce is written to a
-connection that is no longer there. Plan for a handler that charges a card
-accordingly. A *stream* is the exception and behaves the same everywhere — a
-consumer that stops reading closes the handler's stream, which
-`SlowConsumerTest` asserts through each backend's own signal.
+A disconnect is where that bridge shows, and it is worth knowing what Pekko
+does. A handler here is a `CompletionStage` nobody holds a cancel for, so it
+runs to completion and what it produces is written to a connection that is no
+longer there. Plan for a handler that charges a card accordingly. A *stream* is
+the exception — a consumer that stops reading closes the handler's stream,
+which `SlowConsumerTest` asserts through the backend's own signal.
 
-`example/backends/` is the smallest version of this: `Greetings.kt` describes three
-endpoints; `OnPekko.kt`, `OnHttp4k.kt` and `OnKtor.kt` bind them; and
-`AllBackendsTest` asserts all three servers answer identically — including that
-every wiring generates the same OpenAPI document, byte for byte.
+`example/backends/` is the smallest version of this: `Greetings.kt` describes
+the endpoints, `OnPekko.kt` binds them, and `AllBackendsTest` runs one
+parameterised suite over `allBackends` — one entry on main, three on the branch
+— asserting that every wiring answers identically and generates the same
+OpenAPI document, byte for byte.
 
-The three bindings sit behind a deliberately thin `Backend` interface — `api()`,
-`start(port)`, `stop()` — which is what lets one parameterised suite run against
-all of them. It hides exactly one thing: the stream type each binder demands.
-Anything more would start hiding the differences the example exists to show,
-which is why `MethodMismatchTest` still reaches for each backend's own module
+The binding sits behind a deliberately thin `Backend` interface — `api()`,
+`start(port)`, `stop()` — which is what lets that one suite run without naming
+an interpreter. It hides exactly one thing: the stream type each binder
+demands. Anything more would start hiding the differences the example exists to
+show, which is why `MethodMismatchTest` reaches for the backend's own module
 directly.
 
-At scale, `example/OrdersApi.kt` and `example/http4k/Http4kOrders.kt` bind the
-same endpoint list on either backend, and `ClientContractTest` — written entirely
-against descriptions — runs against both, so any divergence is a failing test.
+At scale, `example/OrdersApi.kt` binds the orders endpoint list on Pekko, and
+`ClientContractTest` — written entirely against descriptions — runs against it,
+so any divergence is a failing test.
+
+The server a binding runs on is the backend's own business, and it can be more
+than a parameter: on the branch, `pelican-http4k` ships a flushing
+`ServerConfig` of its own as the default because http4k's stock one buffers a
+streamed body, which makes the promise a streamed output carries false. The
+measurement behind that is on the branch with the module.
 
 ### Starting and stopping one
 
-`start` reads the same way on all three, and so does the handle it returns:
+`start` reads the same way on every backend, and so does the handle it returns:
 
 ```kotlin
 val server = ordersApi().start(port = 8080)                    // binds 127.0.0.1
@@ -209,13 +191,12 @@ server.use { it.block() }        // AutoCloseable everywhere; block() returns wh
 **Loopback is the default everywhere.** Reaching the network is a deployment
 decision, and a `start()` that took it silently is one an engine chose rather
 than a service. `host` is the second parameter, after `port`, on `start` and on
-`startWithDocs`, and everything after it is the backend's own: `systemName` and
-`route` on Pekko, `config` on http4k, `factory` and `module` on Ktor.
+`startWithDocs`, and everything after it is the backend's own — `systemName`
+and `route` on Pekko.
 
-`PelicanServer.host` reports what was bound. On http4k it reports what was
-*asked for*: the socket belongs to the `ServerConfig`, and a `config` of your
-own binds where it says. `StartParityTest` pins both the parameter order and
-the default.
+`PelicanServer.host` reports what was bound. `StartParityTest` pins both the
+parameter order and the default, and holds a returning backend to them by a
+row.
 
 The handle is the same five members on every backend:
 
@@ -227,23 +208,20 @@ The handle is the same five members on every backend:
 | `block()` | parks the calling thread until `stop()` — what a `main` wants |
 | `close()` | `stop()`, so `use { }` works |
 
-`stop()` used to return a `CompletionStage` on Pekko and nothing on the other
-two, so a shutdown written against one backend did not compile against the
-next. It returns nothing everywhere now; `stopAsync()` is the stage, and on
-Pekko it is still the one that completes only once the actor system has
-actually terminated.
+`stop()` returns nothing, so a shutdown written against one backend compiles
+against the next; `stopAsync()` is the stage, and on Pekko it is the one that
+completes only once the actor system has actually terminated.
 
-`block()` means the same thing on all three: released by `stop()`, not by the
-process ending. On Pekko and http4k that is a latch — Pekko's system may be a
-borrowed one that never terminates, and http4k's own `Http4kServer.block()` is
-`Thread.currentThread().join()`, which stopping the server does not release.
-`ServerShapeParityTest` runs the same `use { }` block against all three.
+`block()` is released by `stop()`, not by the process ending. On Pekko that is
+a latch, because the system may be a borrowed one that never terminates.
+`ServerShapeParityTest` pins the five members by reflection rather than by a
+supertype, so a returning backend is held to the shape by a row.
 
 ### What the request line says
 
-All three hand the path, as it arrived, to the same router. `RouteIndex` splits
-it on `/` **first** and then percent-decodes each segment once, so a request
-line means one thing whichever server read it:
+Every backend hands the path, as it arrived, to the same router. `RouteIndex`
+splits it on `/` **first** and then percent-decodes each segment once, so a
+request line means one thing whichever server read it:
 
 | the line | what the handler is given |
 |---|---|
@@ -271,37 +249,13 @@ table: for two hundred generated strings per backend, a value sent in the path
 and in the query of one typed call comes back as itself, and a request line
 `java.net.URI` will not even hold is answered with a 4xx.
 
-### The server underneath
-
-`pelican-http4k` interprets an API into a plain `HttpHandler`; which http4k
-`ServerConfig` runs it is `start(config = ...)`, defaulting to
-`StreamingSunHttp`.
-
-That default is this module's own, and exists because of a measurement. Ten
-NDJSON rows produced 100ms apart, time to the first row:
-
-| backend | first row | all ten |
-|---|---|---|
-| `StreamingSunHttp` (default) | ~150ms | ~1100ms |
-| http4k `Jetty` | ~140ms | ~1080ms |
-| http4k `SunHttp` | ~1120ms | ~1140ms |
-| http4k `Undertow` | ~1070ms | ~1080ms |
-
-http4k's stock `SunHttp` copies a response body to the socket without flushing,
-so the JDK's chunked stream holds frames until its own 4KB buffer fills;
-`Undertow` aggregates similarly. Since a streamed output is a promise about
-*when* bytes leave, shipping a default that broke it would make the promise
-false. `StreamingSunHttp` is http4k's `SunHttp` — whose source invites exactly
-this — flushing after each write, on the JDK's own server, so the default needs
-no dependency beyond http4k-core. Pass `Jetty(port)` or any other
-`ServerConfig` for a service under real load.
-
 ### Bringing your own ActorSystem
 
 `Api` is a `pelican-core` type and holds no `ActorSystem`. It cannot: core's
 runtime classpath is asserted to be the Kotlin standard library and nothing
-else, and one description has to be servable on http4k and Ktor as well. The
-system belongs to the binding, so it is a parameter of the Pekko `start`:
+else, and one description has to be servable by an interpreter core has never
+heard of. The system belongs to the binding, so it is a parameter of the Pekko
+`start`:
 
 ```kotlin
 val system = ActorSystem.create(Behaviors.empty<Void>(), "orders")   // yours: cluster, persistence, streams
@@ -337,7 +291,7 @@ codec is resolved when the `Api` is assembled, which is why switching JSON
 libraries is one line in one file and touches no endpoint:
 
 ```kotlin
-api(routes, codecs = JacksonCodecs)              // or KotlinxCodecs, or JsoniterCodecs
+api(routes, codecs = JacksonCodecs)              // the codec module 1.0 ships
 ApiSpec(endpoints, schemas = JacksonCodecs)      // docs need only the schema half
 ```
 
@@ -357,105 +311,53 @@ Codecs are resolved **once per endpoint when the route is built**, never per
 request — `KType` → `JavaType` reflection is not cheap. It also means a missing
 or unusable codec is a startup failure rather than a surprise on first traffic.
 
-That the implementations agree is a test, not a claim: `CodecAgreementTest`
-generates one document through Jackson and one through kotlinx.serialization and
-compares them, over models covering defaults, nullability, enums, maps, nesting
-and recursion. It also round-trips a value encoded by one codec through the
-other. `JsoniterAgreementTest` makes the same comparison for the third module,
-against Jackson, over models carrying no annotation of any kind.
+Whether the codec modules agree is asked as a test rather than asserted here.
+`example.codecs` is one set of endpoints and handlers in `PluggableCodecs.kt`,
+an `Api` per codec module differing in the `codecs` argument alone, and
+`PluggableCodecsTest` comparing the bytes and the document each one produces.
+Its `libraries` list holds the modules main ships, which is one, so every row
+it asserts is a row about a singleton; a returning module is a line added there
+and no new assertions. The cross-library comparisons that make the matrix say
+something are on the `multi-backend` branch, where the same file runs three.
+`./gradlew :example:runCodecs` serves one.
 
-A sealed hierarchy is the one payload type neither library can read off the
+A sealed hierarchy is the one payload type a JSON library cannot read off the
 Kotlin — nothing in `sealed interface PaymentMethod` says which property carries
-the branch or what string selects each one — so each is described from the
-annotations that make it readable, `@JsonTypeInfo`/`@JsonSubTypes` for Jackson
-and `@Serializable`/`@SerialName` for kotlinx.serialization. Both publish the
-result the same way; see [The publishing direction](#the-publishing-direction).
+the branch or what string selects each one — so it is described from the
+annotations that make it readable, `@JsonTypeInfo`/`@JsonSubTypes` for Jackson.
+What a codec module publishes for one is the same document whichever library it
+reads with; see [The publishing direction](#the-publishing-direction).
 
-`example.codecs` is all three at once: one set of endpoints and handlers, three
-`Api`s differing in the `codecs` argument, and a test asserting that the bytes
-and the document do not differ. `./gradlew :example:runCodecs` serves them side
-by side.
+**A null property is left out.** The schema marks a nullable property optional,
+so an absent one is what the document already describes, and an absent property
+reads back as null. Writing `"author": null` would be a second spelling of one
+fact, and it is a spelling not every library can read: on the branch,
+`defaultJson()` sets kotlinx.serialization's `explicitNulls = false`, without
+which it refuses a payload that omits a nullable property with no default. That
+flag governs writing too, which is why `defaultMapper()` uses Jackson's
+`NON_NULL` — so that two modules write the same bytes rather than one of them
+writing a property the other cannot read back.
 
-**A null property is left out, by all three.** The schema marks a nullable
-property optional, so an absent one is what the document already describes, and
-all three read an absent property back as null. Writing `"author": null` would
-be a second spelling of one fact — and one of the three could not read it back:
-`defaultJson()` sets `explicitNulls = false`, without which kotlinx.serialization
-refuses a payload that omits a nullable property with no default. That flag
-governs writing too, so `defaultMapper()` uses Jackson's `NON_NULL` and
-jsoniter's encoder skips a null property, and the three still write the same
-bytes.
+A null *inside* a list or a map is a value there and is written: an absent
+property is one the schema called optional, where a missing element would be a
+shorter list. Pass your own mapper to write property nulls back — the document
+describes both spellings, and Jackson reads both.
 
-A null *inside* a list or a map is a value there and is written by all three:
-an absent property is one the schema called optional, where a missing element
-would be a shorter list. Pass your own mapper or `Json` to write property nulls
-back — the document describes both spellings, and every codec here reads both.
-
-Pass your own mapper, `Json` or jsoniter config when the defaults do not fit:
+Pass your own mapper when the defaults do not fit:
 
 ```kotlin
 api(routes, codecs = JacksonCodecs(myObjectMapper))
-api(routes, codecs = KotlinxCodecs(myJson))
-api(routes, codecs = JsoniterCodecs(jsoniterConfig { escapeUnicode(false) }))
 ```
 
-Two things are refused rather than published as something they are not:
+One thing is refused rather than published as something it is not:
 
 | Refused | Why, and the way out |
 |---|---|
-| A `Json` setting other than `classDiscriminator`, `ignoreUnknownKeys`, `encodeDefaults` and `explicitNulls` | Schemas here come from `SerialDescriptor`s, which know nothing about the `Json` that will write them. A `SnakeCase` naming strategy writes `placed_at` while the document still publishes `placedAt`, and the caller following it is refused by the service that published it. Refused at `KotlinxCodecs(...)`, naming the setting. Leave it as kotlinx.serialization has it, or describe the payloads the way they are written |
-| Two types wanting one component name | All three sources name a component after the type's simple name, so `catalogue.Item` and `basket.Item` in one payload both want `Item` — and the second silently took the first's schema. Refused where the schema is built, naming both types. Rename one, or keep them out of the same document |
+| Two types wanting one component name | A schema source names a component after the type's simple name, so `catalogue.Item` and `basket.Item` in one payload both want `Item` — and the second silently took the first's schema. Refused where the schema is built, naming both types. Rename one, or keep them out of the same document |
 
-### jsoniter, and what a library that never met Kotlin needs
-
-`pelican-jsoniter` is the third module and the one whose library has no
-serialization metadata to read: jsoniter was finished in 2018, describes no
-types, and binds a JSON object the way its era did — construct the bean, then
-set a field per property. A Kotlin data class survives neither half of that. It
-has no no-argument constructor, so `data class Line(val sku: String, val
-quantity: Int = 1)` is refused outright: `no constructor for: class Line`.
-jsoniter's own answer, `@JsonCreator` on the constructor, gets the object built
-and loses the defaults with it — the `quantity` nobody sent throws inside the
-constructor call, because Kotlin keeps its defaults in a synthetic constructor
-that nothing but `callBy` reaches.
-
-So the binding is done in the module, over `kotlin.reflect`, and handed to
-jsoniter through the two hooks its `Extension` interface offers. A payload type
-is read by collecting the properties that arrived and calling the primary
-constructor once, with `callBy` — the one call that applies Kotlin's defaults. A
-property that is missing and merely nullable becomes null; a property that is
-missing with neither a default nor a null to fall back on is an error naming the
-property. Everything else — the parser, the printer, collections, maps, numbers,
-strings — stays jsoniter's.
-
-The schemas come from the same constructor, which is the point: there is no
-second metadata system here to drift from the first. `java.time` values and
-`UUID`s travel as the strings the document says they do, because jsoniter has no
-reading of them at all and would otherwise publish `string` and write an object.
-A sealed hierarchy travels under a `type` discriminator carrying the branch's
-own name, described as a `oneOf` with a full `mapping`, so it publishes the same
-shape as the other two modules — with no annotations to declare it, since there
-is no annotation this library reads.
-
-A value class travels as the value inside it, in both directions and in the
-document. The JVM erases the wrapper out of most signatures — a `Sku` property
-reflects as the `String` it wraps — so describing the wrapper would describe
-something no payload ever carries.
-
-jsoniter's own settings still apply to what the module writes: `indentionStep`
-indents an object the way jsoniter indents one, and `omitDefaultValue` leaves
-out what jsoniter's rule leaves out. The codegen modes are the exception — they
-compile decoders with javassist, which is not a dependency here, so a config
-asking for one is refused at assembly rather than failing on the first request.
-
-Three things are worth knowing before choosing it. The library has been
-unmaintained since 2018. The config must come from `jsoniterConfig { }`: a plain
-jsoniter `Config` parses perfectly well and cannot bind a data class at all, so
-`JsoniterCodecs` refuses one at assembly rather than failing per request. And
-a payload type with type parameters — `Page<Order>` — is refused too, in both
-directions and in the document: nothing carries the argument to where the
-binding happens, so jsoniter would read an `Order` back as a map. Both other
-codec modules bind that shape properly, and the message says so.
+jsoniter's story — binding and describing a Kotlin data class through its
+primary constructor, for a library that has no serialization metadata to read —
+is on the branch with `pelican-jsoniter`.
 
 ## Getting the OpenAPI docs
 
@@ -767,7 +669,7 @@ able to move a route to another host would be a description deciding where a
 request lands, which is the one thing a description must not do. Binding this
 endpoint to a handler routes `/users/{userId}/orders/import` on the server you
 started, exactly as it would without the line. `AllBackendsTest` asserts that on
-all three backends.
+every backend.
 
 What honours it is the two readings that are about somewhere else:
 
@@ -807,8 +709,7 @@ Inside the document both are correct. Handed to anything else — a validator, a
 registry with its own layout, a tool description a model reads — the first is a
 dangling reference and the second is worse: a branch schema the validator
 accepts and the codec that described it then refuses, for want of a property
-that belongs to no Kotlin type and that all three codecs synthesise when
-encoding.
+that belongs to no Kotlin type and that a codec synthesises when encoding.
 
 `pelican-schema` is that pass, and it is core-only:
 
@@ -832,18 +733,19 @@ picks it, as a `const`, required, and the `discriminator` is dropped: it now
 says nothing the branches do not.
 
 The property and the value are read rather than derived, which is what lets one
-pass cover three sources that agree on almost nothing else — Jackson takes them
-from `@JsonTypeInfo` and `@JsonSubTypes`, kotlinx.serialization from
-`@JsonClassDiscriminator` and `@SerialName`, jsoniter from the class's own name
-under a `type` property. The test builds each branch's smallest acceptable
-payload out of the schema alone and decodes it through the codec that wrote the
-schema, for all three.
+pass cover schema sources that agree on almost nothing else — Jackson takes
+them from `@JsonTypeInfo` and `@JsonSubTypes`, and a source on the
+`multi-backend` branch takes them from somewhere else again. `SchemaAgreementTest`
+is parameterised over the sources main ships: it builds each branch's smallest
+acceptable payload out of the schema alone and decodes it through the codec
+that wrote the schema.
 
-Two things are refused rather than half-described. kotlinx.serialization's open
-polymorphism registers its subclasses at run time, so no closed schema of it is
-honest; make the hierarchy `sealed`, or describe the property as one branch. And
-a class that is a branch of two hierarchies picking it differently would need
-both properties at once, which is a payload neither codec writes.
+Two things are refused rather than half-described. A polymorphic hierarchy
+whose subclasses are registered at run time, as kotlinx.serialization's open
+polymorphism does on the branch, has no honest closed schema; make the
+hierarchy `sealed`, or describe the property as one branch. And a class that is
+a branch of two hierarchies picking it differently would need both properties
+at once, which is a payload no codec writes.
 
 The emitted OpenAPI document is untouched by any of this: `#/components/schemas/`
 is where its schemas actually are, and `discriminator` is how 3.1 says which
@@ -889,26 +791,25 @@ golden with no server on the classpath. Serving them is the module next to it.
 `initialize`, `notifications/initialized`, `tools/list`, `tools/call`, `ping`:
 
 ```kotlin
-mcpServe(api, options)                                // stdio: a message per line, until EOF
-routes(api.mcpRoutes(options) + api.toHttpHandler())  // Streamable HTTP on /mcp, here on http4k
+mcpServe(api, options)                                   // stdio: a message per line, until EOF
+api.start(port = 8080) { system -> routeWithMcp(system, options) }   // Streamable HTTP on /mcp
 ```
 
 The stdio loop is what a desktop client launches as a subprocess; stdout is the
 transport, so a handler that prints goes to stderr or the client tries to parse
-it. The HTTP endpoint is mounted by `pelican-pekko-mcp`, `pelican-http4k-mcp`
-or `pelican-ktor-mcp` — the same split, and for the same reason, as the
-`-docs` modules: a service that serves endpoints alone never compiles the
-protocol in. Both drive the same `McpDispatch`, so a tool call over either is
-the execution path an HTTP request takes.
+it. The HTTP endpoint is mounted by `pelican-pekko-mcp` — the same split, and
+for the same reason, as the `-docs` modules: a service that serves endpoints
+alone never compiles the protocol in. Both drive the same `McpDispatch`, so a
+tool call over either is the execution path an HTTP request takes.
 
 **No MCP SDK.** The official Kotlin SDK resolves and is current, and its server
 half is Ktor's — `Route.mcp`, `mcpStreamableHttp`, an SSE transport over
 `ApplicationCall`, and `kotlin-sdk-server` compiling against `ktor-server-core`
 even for stdio. Adopting it would put a Ktor server, a Ktor client,
 kotlinx.serialization and a logging facade behind `mcpServe` on a service that
-runs Pekko, and would leave the HTTP half mountable on one backend of the
-three. What is spoken here is JSON-RPC over lines of text, and core already has
-the JSON tree to speak it with. The revision is pinned to that SDK's
+runs Pekko, and would leave the HTTP half mountable only where Ktor is already
+running. What is spoken here is JSON-RPC over lines of text, and core already
+has the JSON tree to speak it with. The revision is pinned to that SDK's
 `LATEST_PROTOCOL_VERSION` rather than to whatever is newest, so the number in
 the handshake is one a client library on the other end supports.
 
@@ -975,8 +876,8 @@ whoever is sending it.
 ### It cannot be served
 
 `webhooks` is a field of its own on `Api` and `ApiSpec`, beside `endpoints` and
-not among them. The three interpreters build their routes from `endpoints`, so
-there is nothing for them to look at. Two more things hold the line:
+not among them. An interpreter builds its routes from `endpoints`, so there is
+nothing for it to look at. Two more things hold the line:
 
 - A `Webhook`'s operation carries a `webhookName`, and `api(...)` and
   `ApiSpec(...)` refuse one in the endpoints list. `Webhook.operation` is public
@@ -984,7 +885,7 @@ there is nothing for them to look at. Two more things hold the line:
   to read it — Kotlin's `internal` stops at the module boundary — so `webhook
   handledNow { ... }` will compile. It fails at construction, naming the
   webhook, rather than quietly serving `POST /`.
-- `AllBackendsTest` asserts the 404 on Pekko, http4k and Ktor, and the same
+- `AllBackendsTest` asserts the 404 on every backend, and the same
   suite asserts the document still declares it. The alternative was a second
   description model with its own inputs, outputs and DSL — the same code with
   the arrows reversed, and every future feature written twice.
@@ -1138,7 +1039,7 @@ and Gradle's are not the same Jackson.
 | `clientName` | clients | the spec's title: `Orders` → `OrdersClient` |
 | `baseUrl` | clients | the spec's first server |
 | `includeHidden` | clients | `false` — hidden endpoints are left out, as they are left out of the document |
-| `codec` | clients | unset: `jackson`. `kotlinx` annotates the payload types for the other library. See below |
+| `codec` | clients | unset: `jackson`. `kotlinx` annotates the payload types for kotlinx.serialization instead, for a caller whose own build reads them. See below |
 | `outputDir` | clients | `build/generated/pelican/<name>` |
 | `format` | documents | `JSON`; `YAML` writes the same document the other way |
 | `openApiVersion` | documents | unset: `3.1.0`. `"3.2.0"` writes the current specification instead. See [Which version the document says](#which-version-the-document-says-and-how-to-choose) |
@@ -1148,7 +1049,7 @@ and Gradle's are not the same Jackson.
 | `packageName` | endpoints | — required |
 | `exclude` | endpoints | empty: `operationId`s to leave out. See below |
 | `discriminator` | endpoints | none: `discriminator("Payment", property = "kind")` states which property tells an undiscriminated `oneOf`'s branches apart. See below |
-| `handlers` | endpoints | unset: `pekko`, `http4k` or `ktor` writes stubs |
+| `handlers` | endpoints | unset: `pekko`, `http4k` or `ktor` writes stubs bound against that interpreter. Only `pekko` names a module 1.0 ships |
 | `codec` | endpoints | unset: `jackson`. The same setting a client entry takes. See below |
 | `outputDir` | endpoints | `build/generated/pelican/<name>` |
 
@@ -1250,14 +1151,19 @@ create("orders") {
 The setting is `endpoints`' one, spelled and defaulted the same way, because it
 is the same decision made in two places: a client generated for a service on
 kotlinx.serialization and annotated for Jackson is a client whose payload types
-that service cannot read. A spec with no union generates the same file either
-way, and `kotlinx` is not free in the same way `jackson` is — it has no
-reflective fallback, so every generated payload type carries `@Serializable`.
+that service cannot read. What the client is annotated for is the *caller's*
+build, not this one — the generated file is Kotlin somebody else compiles, so
+`kotlinx` is a live setting whether or not a codec module here reads that
+library. A spec with no union generates the same file either way, and `kotlinx`
+is not free in the same way `jackson` is: it has no reflective fallback, so
+every generated payload type carries `@Serializable` rather than only the
+hierarchy.
 
-`pelican-kotlinx`'s `GeneratedClientUnionTest` is what stands behind that
-claim: it generates a client for a kotlinx service, builds a payload out of the
-discriminator and branch names the *generated file* declares, and decodes it
-with the real `KotlinxCodecs`.
+`pelican-codegen`'s `KotlinClientTest` is what stands behind that: it generates
+a client both ways and reads the annotations off the file, including that
+nothing generated for one library reaches for the other. Decoding such a
+payload with the real `KotlinxCodecs` is asserted on the `multi-backend`
+branch, which is where that module lives.
 
 ### Whether its methods block or suspend
 
@@ -1336,25 +1242,25 @@ fun interface ClientTransport {
 the order the client wrote them, an optional per-request timeout, and a body
 that is `Empty`, `Text` or `Streaming`. `ClientResponse` is a status, headers,
 and a body that has not been read yet. Both are core's own types: no
-`java.net.http`, no Ktor, no Pekko, and nothing on core's runtime classpath but
-the Kotlin standard library, which is still the test it was.
+`java.net.http`, no OkHttp, no Pekko, and nothing on core's runtime classpath
+but the Kotlin standard library, which is still the test it was.
 
-The reason there is an interface here at all is the reason there are three
-server backends. A service that already runs Ktor, and has already tuned one
-Ktor `HttpClient` engine, should not acquire a second HTTP stack because it
-generated a Pelican client. The server side settled that argument with one
-description and three interpreters; this is the same answer facing the other
-way.
+The reason there is an interface here at all is the reason there is an
+interpreter seam on the other side. A service that has already tuned one HTTP
+client's engine should not acquire a second HTTP stack because it generated a
+Pelican client. The server side settled that argument with one description and
+an interpreter it does not name; this is the same answer facing the other way.
 
 ### Choosing one
 
-Four adapters are written. `pelican-client-java` is the one over the JDK's own
-`HttpClient`; `pelican-client-pekko` is the one over Pekko HTTP's client,
-`pelican-client-ktor` the one over Ktor's and `pelican-client-okhttp` the one
-over OkHttp's `Call`, for a service that already runs one of those and would
-rather not start a second HTTP stack to call out of. On Android the choice is
-made for you: `java.net.http` is not there, and OkHttp is. A generated client
-finds whichever is present without being told:
+Three adapters are written. `pelican-client-java` is the one over the JDK's own
+`HttpClient`; `pelican-client-pekko` is the one over Pekko HTTP's client and
+`pelican-client-okhttp` the one over OkHttp's `Call`, for a service that
+already runs one of those and would rather not start a second HTTP stack to
+call out of. A fourth, over Ktor's `HttpClient`, is on the `multi-backend`
+branch. On Android the choice is made for you: `java.net.http` is not there,
+and OkHttp is. A generated client finds whichever is present without being
+told:
 
 ```kotlin
 dependencies { implementation("io.github.matthewjones372:pelican-client-java:0.1.0") }
@@ -1523,17 +1429,20 @@ result it already has — which is exactly why the typed test client
 ### What a deadline bounds, and what carries none
 
 `timeout` on a generated client's constructor is put on every `ClientRequest`
-it builds, and each adapter maps it onto what its library has. Two of the three
-bound the arrival of the response head and leave the body to the connection's
-own idle timeout; Ktor's `HttpTimeout` plugin bounds the whole exchange, the
-reading of the body included. The table in
+it builds, and each adapter maps it onto what its library has. All three bound
+the arrival of the response head and leave the body to the connection's own
+idle timeout — two of them by imposing the deadline on the stage, because the
+library's own setting is either a pool setting or a bound on the whole
+exchange. The table in
 [docs/generated-client.md](generated-client.md#how-long-a-call-may-take) is the
 short form.
 
-That difference has no consequence for a call read whole, and one consequence
+An adapter whose deadline *is* the whole exchange is not hypothetical: Ktor's
+`requestTimeoutMillis`, on the `multi-backend` branch, ends the reading of the
+body too. That has no consequence for a call read whole, and one consequence
 for a call that is not: an `sse` subscription inheriting a 30-second deadline
-died at 30 seconds on Ktor and ran on for hours on the other two — the same
-description, the same client, two behaviours, and nothing in either to say so.
+would die at 30 seconds there and run on for hours here — the same description,
+the same client, two behaviours, and nothing in either to say so.
 
 So a generated streamed call sends no deadline. `ndjson`, `sse`, `jsonArray`
 and `bytes` build their request with `deadline = null` and everything else
@@ -1559,7 +1468,7 @@ val client = OrdersClient("http://orders.test", JacksonCodecs, InMemoryClientTra
 It is in `pelican-core` because everything it needs is already there. `Api` and
 `ClientTransport` are core types, the handler chain is `CompletionStage`-based,
 and routing, input decoding, error rendering and response framing are core's
-own — so the bridge is a reading of the same values rather than a fourth
+own — so the bridge is a reading of the same values rather than another
 backend, and it adds nothing to a runtime classpath that is still the Kotlin
 standard library.
 
@@ -1575,12 +1484,12 @@ Two things cannot cross, and both are refused by name rather than by the
 `ClassCastException` that would otherwise arrive a moment later:
 
 - **A `bytes(...)` request body.** The handle a handler reads it through is
-  `Http4kByteStream`, `PekkoByteStream` or `KtorByteStream` — the backend's own
-  type, held behind that backend's own accessor. Core has no value to hand
-  over, and says so naming the endpoint.
-- **A streamed response that is not a `Sequence`.** http4k's binders hand back
-  a `Sequence` and it crosses whole; Pekko's hand back a `Source` and Ktor's a
-  `Flow`, which core cannot read without becoming a dependent of that library.
+  `PekkoByteStream` — the backend's own type, held behind that backend's own
+  accessor. Core has no value to hand over, and says so naming the endpoint.
+- **A streamed response that is not a `Sequence`.** A `Sequence` crosses whole,
+  because core can walk one. Pekko's binders hand back a `Source`, which core
+  cannot read without becoming a dependent of that library; a `Flow` on the
+  `multi-backend` branch is the same refusal for the same reason.
 
 Both are `UnsupportedInMemoryCall`, and both mean the same thing: that call
 belongs against a bound server. `example` runs `GeneratedKotlinClientTest` this
@@ -1645,6 +1554,7 @@ working rather than failing. What is raised on expiry is a
 `java.util.concurrent.TimeoutException` naming the call, rather than the JDK's
 `HttpTimeoutException`, so a caller catching a timeout by type catches the one
 its own transport raises.
+
 ### Retrying, and what is safe to retry
 
 Nothing retries unless somebody wrapped a transport in something that does:
@@ -1701,142 +1611,25 @@ in flight and the retry that was going to follow it.
 
 ### On Ktor
 
-`KtorHttpTransport` takes an `HttpClient`, or does without one:
+`pelican-client-ktor` is on the `multi-backend` branch, not in 1.0. It is the
+same seam over Ktor's `HttpClient` — a suspending client bridged to a
+`CompletionStage`, a `ByteReadChannel` handed to the SPI as an `InputStream`,
+and `requestTimeoutMillis` as the one deadline here that bounds a whole
+exchange rather than the arrival of a head.
 
-```kotlin
-val client = OrdersClient("https://orders.internal", JacksonCodecs, KtorHttpTransport(http))
-```
-
-A service that already runs Ktor passes the client it has, and the calls go out
-through that client's engine, its plugins and its connection pool. Closing it
-stays that service's business — nothing in the adapter closes a client it was
-handed, because two transports sharing one must not be able to shut each other
-down. A caller that does not run Ktor passes nothing and never has to choose an
-engine: the module keeps a CIO client for that case, built on the first request
-rather than in the constructor, shared by every transport that asked for none,
-and closed by nobody, which is why its threads have to be — and are — daemons.
-
-CIO is the default engine because it is Ktor's own networking rather than a
-second HTTP stack wearing a Ktor interface: adding this adapter adds no OkHttp
-and no Apache client, and a service already using `pelican-ktor` has most of
-what CIO needs on the classpath already, since that module ships
-`ktor-server-cio`. An engine anyone prefers is a client away — build the
-`HttpClient` with it and hand that over.
-
-#### A suspending client behind a `CompletionStage`
-
-Ktor's client suspends and `ClientTransport` does not, and the bridge is the
-part of this adapter worth reading. Each `send` launches a coroutine and
-returns a `CompletableFuture` that the coroutine completes when the response
-head arrives; no thread waits anywhere, and the caller's `join` is the only
-blocking in the picture. The coroutine is launched in a scope built from the
-client's own context with a `SupervisorJob` under the client's job, so the
-adapter starts no dispatcher and keeps no scope of its own: a closed client
-cancels the calls made on it, and one failed exchange is one failed exchange
-rather than the end of the others.
-
-Cancellation runs both ways across that seam, and both are needed. Cancelling
-the stage cancels the coroutine, which unwinds Ktor's `execute` block and
-releases the connection rather than leaving it open for a response nobody will
-read — including the race where the cancellation arrives while the head is
-still in flight, which is why the coroutine checks whether its
-`CompletableFuture.complete` was the one that won. In the other direction, an
-exchange that fails before the head arrives fails the stage. Neither can happen
-twice, because a `CompletableFuture` completes once.
-
-#### Streams, in both directions
-
-`prepareRequest(...)` and `execute { }` are what leave the response body on the
-socket: inside that block the body is a live `ByteReadChannel`, and Ktor
-releases the connection as soon as the block returns. So the block does not
-return until the caller has finished with the stream — the coroutine hands the
-`ClientResponse` over and then waits, and closing the body, or reading it to
-its end, is what lets it go. A caller who does neither is the one case this
-cannot cover; the exchange stays open, holding its connection, until the client
-is closed or a timeout ends it.
-
-The channel reaches the SPI as an `InputStream` through Ktor's own
-`toInputStream()`, wrapped for two reasons. One is the release just described.
-The other is a defect worth knowing about if you write this bridge yourself:
-`InputStream.read(b, off, 0)` must return zero, and Ktor's bridge waits for
-content before it looks at the length, so the zero-length read that every
-`readNBytes` ends with blocks until the next chunk arrives. A caller taking a
-fixed number of bytes off an `sse` stream would wait for a chunk it had already
-been handed the bytes of. The wrapper answers that read itself.
-
-Going out, a `Body.Streaming` becomes a `WriteChannelContent` that opens the
-stream when the connection is ready to take the bytes, and opens it again if
-Ktor sends the request a second time after a redirect — which is what `open`
-being a function is for. Writing to a full channel suspends, so an upload is
-read at the speed the socket drains it and nothing is held but one buffer. A
-caller who said how long the body is gets a sized request rather than a chunked
-one, so the `Content-Length` they wrote is the one that goes out.
-
-#### `Content-Type`, `Content-Length` and repeats
-
-Ktor renders those two off the body rather than out of the header list, and
-prefers the body's copy where both exist. So the adapter reads them off the
-`ClientRequest` and builds the content from them, which is the difference
-between a declared type arriving once and arriving twice — or not at all.
-Coming back they need nothing: Ktor hands over the response headers as they
-were received, both among them, and adding either back from the body would be
-what doubled it.
-
-One rendering does differ from the JDK adapter's, and it is worth knowing
-rather than discovering. A header a caller wrote twice goes out once, carrying
-both values separated by a comma, because that is what Ktor's engines do with
-repeats — the form RFC 9110 makes equivalent for every list-valued header. The
-generated client's own cookies are unaffected: it joins them into one `Cookie`
-header itself, with the `; ` that header requires.
-
-#### Deadlines, and the one thing that does not map
-
-A `ClientRequest.timeout` becomes Ktor's per-request `requestTimeoutMillis`,
-and what it bounds is not quite what the JDK adapter's `HttpRequest.timeout`
-bounds: Ktor's request timeout ends the whole exchange, the reading of a
-streamed body included, where the JDK's bounds the arrival of the response head
-and leaves the body alone. Given a timeout, an `ndjson` or `sse` response that
-outlives it is cut off rather than left running. That is Ktor's semantics and
-the adapter does not paper over it; a caller streaming a long response through
-this transport should leave the per-request timeout unset, exactly as Ktor's
-own SSE client does.
-
-Two consequences follow from the same place. The first is that the client this
-module keeps installs `HttpTimeout` with an infinite request timeout, because
-CIO's own default is fifteen seconds and it is a deadline on the whole
-exchange: left alone it would cut off every response that stayed open longer,
-including the ones whose callers set no timeout at all. A client you hand over
-keeps whatever deadline you configured on it, that fifteen seconds included.
-
-The second is that a request's timeout is a *capability*, and only the
-`HttpTimeout` plugin turns a capability into a cancellation. A client handed
-over without that plugin installed would drop the deadline in silence, which is
-not a thing an adapter may do to a promise the SPI makes — so where the client
-cannot honour it, the adapter imposes it on the stage instead, and raises the
-`HttpRequestTimeoutException` Ktor would have raised, so that a caller catching
-a timeout by type catches it whichever of the two imposed it. That fallback
-bounds the arrival of the head only, like the JDK adapter's.
-
-Ktor's client has no size limit to lift: nothing in it caps a response body
-read as a channel, so a `bytes()` response larger than the process crosses on
-the strength of never being buffered. What bounds a large response there is
-time, which is the paragraph above.
-
-Two smaller decisions round it out. Every request is sent with
-`expectSuccess = false`, whatever the handed-over client was configured with,
-because a declared failure is a status this client is expected to *read* rather
-than an exception to be thrown at it. And the method is `HttpMethod.parse`,
-which mints an unknown method rather than refusing it.
+The last of those is why the section above says a streamed call sends no
+deadline at all: the rule is the seam's, and it was written so that one
+description behaves the same way whichever transport carries it.
 
 ### Writing another one
 
-An adapter is small: the three here run to about 250 lines each including the
-comments, and in every one of them nearly all of what took thought was the
-stream bridge and the cancellation rather than the mapping. A fourth — OkHttp,
-Apache, something a house already runs — starts by reading whichever of the
-three is closest in shape. `pelican-client-java` is the plainest, since the
-JDK's `sendAsync` is already the shape `send` wants; `pelican-client-pekko` and
-`pelican-client-ktor` are the ones to read for how a streaming client's
+An adapter is small: the three here run to between 100 and 280 lines including
+the comments, and in every one of them nearly all of what took thought was the
+stream bridge and the cancellation rather than the mapping. Another — Apache,
+something a house already runs — starts by reading whichever of the three is
+closest in shape. `pelican-client-java` is the plainest, since the JDK's
+`sendAsync` is already the shape `send` wants; `pelican-client-pekko` and
+`pelican-client-okhttp` are the ones to read for how a streaming client's
 laziness survives the crossing into an `InputStream`.
 
 ## Importing an OpenAPI document
@@ -2056,11 +1849,14 @@ create("orders") {
 }
 ```
 
-Jackson by default, because `pelican-jackson` is the default codec module. A
-document with no union generates the same file either way — nothing is written
-unless a hierarchy is generated. `kotlinx` is not free in the same way:
-kotlinx.serialization has no reflective fallback, so choosing it puts
-`@Serializable` on every generated payload type.
+Jackson by default, because `pelican-jackson` is the codec module 1.0 ships.
+`kotlinx` is still a setting worth having, because the file is source that a
+*consumer's* build compiles: a project on kotlinx.serialization takes its
+descriptions annotated for the library it reads them with, whatever this
+repository ships. A document with no union generates the same file either way —
+nothing is written unless a hierarchy is generated — and `kotlinx` is not free
+in the same way: kotlinx.serialization has no reflective fallback, so choosing
+it puts `@Serializable` on every generated payload type.
 
 A `clients` entry takes the same setting under the same name; see "Which codec
 the client is annotated for" above. One decision, one spelling — a service that
@@ -2203,7 +1999,7 @@ would accept payloads the document rejects.
 
 ### The publishing direction
 
-Both codecs publish a sealed hierarchy the same way: `oneOf` over the branches,
+A codec module publishes a sealed hierarchy one way: `oneOf` over the branches,
 a `discriminator` naming the property that tells them apart, and a full
 `mapping` from each wire value to the schema it selects.
 
@@ -2227,8 +2023,9 @@ missing the mapping is not vague about the wire format, it is confidently wrong
 about it, and every client generated from it encodes a payload the service
 rejects.
 
-`KotlinxCodecs` has always written it: a kotlinx descriptor carries the serial
-name of every branch, `@SerialName("card")` right there in the metadata.
+Some libraries hand it over: a kotlinx descriptor carries the serial name of
+every branch, `@SerialName("card")` right there in the metadata, so
+`KotlinxCodecs` on the `multi-backend` branch has always written it.
 
 `JacksonCodecs` describes types with swagger-core, which writes the 3.0 spelling
 above and no `mapping` at all — the names in `@JsonSubTypes` never reach its
@@ -2242,9 +2039,9 @@ inherits it.
 
 Which spelling to publish was the choice, and `oneOf` won on three counts: the
 documents are 3.1 or later, where it is the native spelling; the 3.0 spelling
-has nowhere to put a `mapping`, which is the fact being rescued; and two codecs
-publishing one shape means a service can swap JSON libraries without its
-published document changing shape underneath its readers. Matching classes back to the components
+has nowhere to put a `mapping`, which is the fact being rescued; and every
+codec module publishing one shape means a service can swap JSON libraries
+without its published document changing shape underneath its readers. Matching classes back to the components
 swagger-core named them under is what makes it possible at all, and it has to
 hold for a hierarchy reached anywhere — a property of a payload, an element of a
 list, a branch of another hierarchy — not only for one an operation names at the
@@ -2258,8 +2055,9 @@ under the root's property with its own name — `kind: "card"`, never
 `kind: "electronic"` and never a second property beside it. The document says
 exactly that: one `oneOf` over the leaves, and the level between them described
 by the leaves it stands for rather than listed as a branch nothing can be.
-kotlinx.serialization flattens a nested sealed hierarchy the same way, so the
-two codecs still publish one shape. The nesting stays in the Kotlin, which is
+kotlinx.serialization flattens a nested sealed hierarchy the same way, which is
+why a codec module for it publishes the same shape rather than a rival one. The
+nesting stays in the Kotlin, which is
 where it was ever real; the reasoning, and what happens to a document that says
 otherwise, are under
 [Two levels of hierarchy](#two-levels-of-hierarchy).
@@ -2556,12 +2354,18 @@ chosen:
 
 ### Handler stubs
 
-`handlers.set("pekko")` — or `http4k`, or `ktor` — writes a second file with
-one `TODO()` per operation, bound with the right binder for each output kind:
-`handledOrFail` where failures are declared, `streamedNow` for NDJSON and SSE,
-`bytesNow` for a byte stream, `handledWith` where there is no body. It compiles
-immediately and throws the moment a request reaches something unwritten, which
-is the honest state of a service nobody has written yet.
+`handlers.set("pekko")` writes a second file with one `TODO()` per operation,
+bound with the right binder for each output kind: `handledOrFail` where
+failures are declared, `streamedNow` for NDJSON and SSE, `bytesNow` for a byte
+stream, `handledWith` where there is no body. It compiles immediately and
+throws the moment a request reaches something unwritten, which is the honest
+state of a service nobody has written yet.
+
+`http4k` and `ktor` are accepted too, and write the same stubs importing that
+interpreter's binders instead. The generated file is source a consumer's build
+compiles, so the setting is about what *they* have on their classpath — and the
+two interpreters it names are on the `multi-backend` branch, so a stub asking
+for one needs that branch published.
 
 It is written once and never overwritten. After the first run it is not
 generated code any more. Inside `build/` the whole directory belongs to the
@@ -2830,11 +2634,11 @@ does. A filter runs *inside* the interpreter — the chain returns, and only the
 is a response built — so a filter cannot be handed the status the interpreter
 rendered, and something has to work it out from the description instead. Doing
 that once, in core, beside the code that renders it, is what stops the metric
-and the response from drifting apart; doing it three times, once per backend, or
-once per service that wants a request count, is what guarantees they eventually
-will. `MetricsAcrossBackendsTest` in the example holds all three interpreters to
-that agreement by comparing what a filter was told against what came back over
-the socket.
+and the response from drifting apart; doing it once per backend, or once per
+service that wants a request count, is what guarantees they eventually will.
+`MetricsAcrossBackendsTest` in the example holds every interpreter to that
+agreement by comparing what a filter was told against what came back over the
+socket.
 
 Two things `afterStatus` sees that `after` does not, and one that neither can:
 
@@ -2998,9 +2802,9 @@ is an enum, so the number of series is a property of the library rather than of
 the traffic.
 
 The hook is called from `spi.renderError`, the one function that turns a refusal
-into a response, so a refusal cannot be answered and left uncounted, and all
-three backends and the in-memory transport report identically because they
-report through one implementation rather than three of their own.
+into a response, so a refusal cannot be answered and left uncounted, and every
+backend and the in-memory transport report identically because they report
+through one implementation rather than one of their own each.
 `RefusalObserver` is an interface on the `Api` rather than a `Filter` precisely
 because a filter is the thing these requests never reach.
 
@@ -3008,7 +2812,7 @@ Three things it does not count, each on purpose:
 
 - **A 404 or 405 for a path nothing describes**, when a bound server answered
   it. Pelican hands an unmatched request back to the server library's own
-  router — an http4k `UNMATCHED`, a Pekko rejection, Ktor's own 404 — which is
+  router — a Pekko rejection — which is
   what lets a Pelican route be mounted beside routes written by hand. Nothing
   renders that response, so nothing observes it. The `unmatched` reason is
   reported by `InMemoryClientTransport`, which has no router underneath to
@@ -3057,7 +2861,7 @@ like every attribute below, are read off the endpoint:
 | `pelican.deprecated` | `endpoint.deprecated` |
 
 `http.route` is the attribute worth the module. A general-purpose agent
-instrumenting Pekko or http4k sees a routing tree it has no way to name, so it
+instrumenting Pekko HTTP sees a routing tree it has no way to name, so it
 either leaves the route off — which costs every per-endpoint view a trace
 backend offers — or falls back to the request's own path and produces one
 distinct operation per order id. Pelican has the template because the route was
@@ -3111,7 +2915,7 @@ cannot write for you. `Params` carries the inputs the endpoint *declared*, and
 an incoming trace context is not part of an API's contract — it should not
 appear in its OpenAPI document — so the only route to the header is
 `Params.underlying`, which is the backend's own request object. Naming that type
-is exactly what a filter working identically on three interpreters must not do.
+is exactly what a filter that works on any interpreter must not do.
 
 Left out, the parent is `Context.current()` instead, which is not a stub: a
 service running the OpenTelemetry Java agent already has the caller's context
@@ -3167,7 +2971,7 @@ One more, particular to spans: the attributes the conventions mark required for
 a server span and this module does not set — `url.path`, `url.scheme`, and the
 recommended `server.address`, `client.address` and `network.*` — are left off
 rather than guessed. Every one of them is a property of the socket rather than
-of the description, and a filter that behaves identically on three interpreters
+of the description, and a filter that behaves identically on any interpreter
 is looking at the description. A service that wants them supplies them from a
 filter that knows its own backend, or runs the agent, whose server span is the
 one carrying them.
@@ -3191,7 +2995,7 @@ this way, with `/admin/traces` rendering the spans it produced and a deliberate
 ## Errors, and what a caller is told
 
 Which throwable becomes which response is decided in `pelican-core`
-(`renderError`), so the three backends cannot drift apart about it:
+(`renderError`), so no two backends can drift apart about it:
 
 | Throwable | Response |
 |---|---|
@@ -3269,11 +3073,11 @@ sentence, detail, reference, template — and never the request or the throwable
 so a 500 cannot leak an exception message and a renderer cannot echo a header a
 caller sent.
 
-One renderer serves all three backends and the in-memory transport, including
+One renderer serves every backend and the in-memory transport, including
 the refusals raised before a route was chosen: a CORS preflight refused with a
 403, a path capture that will not decode. `RefusalsAcrossBackendsTest` and
 `ThrowingHandlerTest` each run their whole suite once per backend *and* once per
-shipped renderer, which is six answers to every question they ask.
+shipped renderer, so every question they ask is asked of each combination.
 
 It reaches the HTTP wire and stops there. An MCP tool call is answered in
 JSON-RPC, whose envelope the protocol fixes and a service does not choose, so
@@ -3412,7 +3216,7 @@ Three details worth knowing:
 - **A refused *preflight* is a 403**, carrying the usual error body saying which
   check failed — the origin, or a method that path never describes.
 
-The document is covered too. `pelican-*-docs` serves `/openapi.json` and the
+The document is covered too. `pelican-pekko-docs` serves `/openapi.json` and the
 Swagger UI page with the same headers, since a browser tool reading the spec
 cross-origin is blocked by the same rule as one calling an endpoint; reading
 either is a plain `GET`, so there is nothing to preflight there.
@@ -3422,8 +3226,8 @@ only added to paths that do not. There is no per-endpoint CORS: the policy is
 one value on the `Api`, since a browser asks about a path rather than about an
 operation.
 
-`CorsPolicy` is where the decisions live, in `pelican-core`, so the three
-backends serve one implementation rather than three — `CorsPolicyTest` holds the
+`CorsPolicy` is where the decisions live, in `pelican-core`, so a backend serves
+that implementation rather than one of its own — `CorsPolicyTest` holds the
 decisions and `example/backends/CorsTest` asserts each backend puts them on the
 wire.
 
@@ -3796,10 +3600,10 @@ value that does not decode, and `in: cookie` in the document. There is nothing
 new to learn because there is nothing new here.
 
 The parsing is in `pelican-core` (`Cookies`), not in each backend, and that is
-deliberate. All three servers have a cookie API and the three disagree in small
+deliberate. Every server library has a cookie API and they disagree in small
 ways — one unquotes a `"value"`, another does not; one splits on `,` as well as
 `;`. A cookie parameter is supposed to decode to the same value whichever
-server is underneath, so the splitting happens once and the backends only hand
+server is underneath, so the splitting happens once and the backend only hands
 the header over. `CookiesTest` is where those decisions are written down.
 
 Two details worth stating:
@@ -3850,8 +3654,11 @@ configured `BodyCodec`.
 The alternative was to hand the pairs to the codec and let it sort them out,
 and it fails on the project's own terms: Jackson coerces `"3"` into an `Int`
 happily and kotlinx.serialization refuses, so a form body would decode
-differently depending on a choice that is supposed to change nothing.
-`CodecAgreementTest` now reads one form through both and gets the same value.
+differently depending on a choice that is supposed to change nothing. Shaping
+the pairs against the published schema first is what makes the choice change
+nothing; `FormBodyTest` holds the shaping and
+`example/backends/CookiesFormsAndUploadsTest` sends the form at a running
+server.
 
 That trip needs to read JSON as well as write it, which is why `pelican-core`
 gained a small `parseJson`. It is not offered as a general-purpose parser and
@@ -3875,9 +3682,9 @@ other codec, so:
   the button that was clicked and whatever hidden inputs the page had; refusing
   those would make an ordinary HTML form impossible to point at an endpoint.
 - **A nullable field is still the type the schema names.** OpenAPI 3.1 spells
-  `Int?` as `type: ["integer","null"]`, which is what all three schema sources
-  publish, so the type array is read rather than treated as a schema naming no
-  type at all.
+  `Int?` as `type: ["integer","null"]`, which is what a schema source publishes,
+  so the type array is read rather than treated as a schema naming no type at
+  all.
 - **Only scalars and arrays of scalars.** A nested object would need a bracket
   convention nobody agrees on — `user[name]` in PHP, `user.name` in Spring —
   and inventing a fourth is worse than saying no. Saying no happens when the
@@ -3962,12 +3769,12 @@ it back into the same declaration.
 
 ### The envelope is parsed by core
 
-Not by each backend, and that is the load-bearing decision. http4k-core has no
-multipart support at all, Pekko's is a stream of its own shape and Ktor's is a
-suspending one — three parsers would be three sets of behaviour to reconcile:
-which part wins when a name repeats, what an absent `filename` means, whether a
-text field is trimmed. One parser is one answer, and `MultipartTest` is where
-that answer is written down.
+Not by each backend, and that is the load-bearing decision. Server libraries
+disagree about multipart more than about anything else — Pekko's is a stream of
+its own shape, and some have none at all — so a parser per backend would be a
+set of behaviours per backend to reconcile: which part wins when a name
+repeats, what an absent `filename` means, whether a text field is trimmed. One
+parser is one answer, and `MultipartTest` is where that answer is written down.
 
 It costs `pelican-core` about two hundred lines and no dependency. The subtle
 half is that a part's body is a live window on the request: bytes are handed
@@ -3977,12 +3784,12 @@ two reads, and checking what *follows* a match — a boundary of `b0undary` make
 check a part whose content contains a longer boundary-like line is silently cut
 in half.
 
-The backends supply an `InputStream` and nothing else: http4k's body already is
-one, Pekko's comes from `StreamConverters.asInputStream` and is read on the
-system's dispatcher rather than on the routing thread, and Ktor's comes from
-`receiveChannel().toInputStream()` on `Dispatchers.IO`. That last one is the
-honest cost of one parser instead of three: on the backend whose whole calling
-convention is suspending, reading an upload blocks a thread.
+A backend supplies an `InputStream` and nothing else: Pekko's comes from
+`StreamConverters.asInputStream` and is read on the system's dispatcher rather
+than on the routing thread. That is the honest cost of one parser rather than
+one per backend — on a backend whose calling convention is suspending, as
+`pelican-ktor` is on the `multi-backend` branch, reading an upload blocks a
+thread.
 
 ### Two files, one of them streamed
 
@@ -4081,8 +3888,8 @@ val placeOrder = endpoint(userId, apiKey, newOrder) {
 ```
 
 **A declared failure is JSON.** `errorJson` is the only spelling there is: the
-payload is written by the configured `Codecs` as `application/json` on all three
-backends, and the document says `application/json` under that status. `text(...)`
+payload is written by the configured `Codecs` as `application/json` on every
+backend, and the document says `application/json` under that status. `text(...)`
 and `empty(...)` declare *successes*; nothing declares a failure as anything but
 JSON, so a caller reading a described 404 never has to ask which encoding this
 one used.
@@ -4316,7 +4123,7 @@ Three things are checked when the failure is produced:
 The arity is additive: a failure that declares no headers is returned as it
 always was, `noSuchUser(ApiError(404, "No user $id"))`.
 
-It reaches every interpreter. All three backends write the headers on that
+It reaches every interpreter. A backend writes the headers on that
 response and no other; `pelican-openapi` publishes them under that status
 alongside its body; a generated client reads them back as properties on the
 typed failure; and `app.outcome(...)` hands them back decoded:
@@ -4444,7 +4251,7 @@ success side. Which means everything about it is already familiar:
   alternatives are not failures. Same signature, same `Outcome`; two names
   because `handledOrFail` on an endpoint that declares no failure reads as a
   mistake, and the call site is where a name is read. `handledByOneOf` is the
-  asynchronous one on Pekko and http4k.
+  asynchronous one on Pekko.
 - **`ok(value)` names none, and means the first declared success.** With one
   success that is the only one there is, so nothing about a single-response
   endpoint changed. Where the response it means declares a header it always
@@ -4458,7 +4265,7 @@ success side. Which means everything about it is already familiar:
   by the compiler. `or` widens `T` to what the alternatives have in common and
   `orFail` widens `E` the same way, so naming a response another endpoint
   declared is a call that typechecks. What catches it is `successNamedBy` /
-  `failureNamedBy` in core — one place, so the three backends cannot disagree —
+  `failureNamedBy` in core — one place, so no two backends can disagree —
   throwing `UndeclaredResponse`, which reaches the caller as a 500 with a
   reference and reaches the log through `onServerError` with the response it
   named and the ones the endpoint declares. That is the guarantee: not that the
@@ -4541,10 +4348,11 @@ is gone.
   one response it is.
 - **A streamed alternative among several.** `ndjson<Order>() or empty(202)` is
   refused: naming a response is what produces it, and producing a stream means
-  handing over the backend's own type — a `Source`, a `Flow`, a `Sequence` —
-  which core cannot name. The alternative would be an `invoke` per backend with
-  the element type unchecked, which is three copies of the one thing the phantom
-  marker exists to avoid. A stream is still a success; it is just the only one,
+  handing over the backend's own type — a `Source`, or whatever the next
+  interpreter's is — which core cannot name. The alternative would be an
+  `invoke` per backend with the element type unchecked, which is a copy per
+  backend of the one thing the phantom marker exists to avoid. A stream is
+  still a success; it is just the only one,
   and `ndjson<Order>() orFail noSuchUser` is unchanged — a failure decided before
   the first element, as before.
 - **A success carrying the wrong payload.** `or` widens `T` to what the
@@ -4585,8 +4393,8 @@ Which rendering goes out is the interpreter's decision, from the request's
 `Accept` and the same RFC 9110 scoring that already answered the 406: each
 rendering is scored by the most specific range matching it — exact beats
 `text/*` beats `*/*` — and the highest score goes out, ties falling to
-declaration order. `q=0` is *not this one*, not a weak yes. All three backends
-read it through one function in core, so they cannot differ about it.
+declaration order. `q=0` is *not this one*, not a weak yes. Every backend
+reads it through one function in core, so they cannot differ about it.
 
 - `Accept: text/csv` gets the CSV.
 - `Accept: application/json;q=0.2, text/csv;q=0.9` gets the CSV as well.
@@ -4697,17 +4505,13 @@ and the backend cashes it in for its own type:
 // pelican-pekko
 infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedNow(f: (I) -> Source<T, NotUsed>): ServerEndpoint
 
-// pelican-http4k
-infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedNow(f: (I) -> Sequence<T>): ServerEndpoint
-
-// pelican-ktor
+// pelican-ktor, on the multi-backend branch
 infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedNow(f: suspend (I) -> Flow<T>): ServerEndpoint
 ```
 
-That third line is the whole claim tested rather than argued: the marker was
-designed before there was a second backend, and neither the second nor the third
-needed any change to it — including the third, whose handlers suspend and whose
-stream type is nothing core has ever heard of.
+That second line is the whole claim tested rather than argued: the marker was
+designed against `Source`, and a backend whose handlers suspend and whose
+stream type is nothing core has ever heard of needed no change to it.
 
 Core also owns the framing — `NdjsonOutput.frame(codec, value)` renders one
 element — so the backend only supplies wire mechanics. Nothing about NDJSON or
@@ -4738,25 +4542,21 @@ The marker is an interface rather than the phantom [`StreamOf`](#how-streaming-s
 that types a streamed *response*, because a streamed input is one slot of the
 handler's argument tuple and no binder can retype one slot of a tuple. So the
 request carries a value, exactly as `rawBody()`'s `ByteStreamHandle` does, and
-each backend hands over its own stream:
+the backend hands over its own stream:
 
 ```kotlin
 // pelican-pekko
 fun <T> StreamIn<T>.toSource(): Source<T, NotUsed>
 
-// pelican-http4k
-fun <T> StreamIn<T>.toSequence(): Sequence<T>
-
-// pelican-ktor
+// pelican-ktor, on the multi-backend branch
 fun <T> StreamIn<T>.toFlow(): Flow<T>
 ```
 
 Core owns the framing at this end too, so the splitter that reads an upload and
 the `NdjsonOutput.frame` that writes an answer agree on where a frame ends by
-construction. Nothing is held but the frame being read: on all three backends
-the first frame reaches the handler before the last one is sent, which
-`UploadTimingTest` asserts over a socket by writing one frame and reading its
-answer before writing the rest.
+construction. Nothing is held but the frame being read: the first frame reaches
+the handler before the last one is sent, which `UploadTimingTest` asserts over a
+socket by writing one frame and reading its answer before writing the rest.
 
 ### Answering with a value, or with a stream
 
@@ -4765,9 +4565,10 @@ graph with a `map` on it, and back-pressure runs from the downloading socket
 through the handler to the uploading one. No materializer is involved — the
 interpreter runs it.
 
-Answering with a *value* means consuming the upload first. On http4k and Ktor
-that is `count()`, `fold` or any other terminal operation. On Pekko consuming a
-`Source` needs a materializer, so `pelican-pekko` supplies one:
+Answering with a *value* means consuming the upload first. On a backend whose
+stream is walked by the caller that is `count()`, `fold` or any other terminal
+operation; on Pekko, consuming a `Source` needs a materializer, so
+`pelican-pekko` supplies one:
 
 ```kotlin
 tally handledBy { rows ->
@@ -4868,7 +4669,7 @@ place for it: attaching it to the first event would leave a stream that has yet
 to produce one having said nothing, and repeating it on every frame would say
 the same thing over and over.
 
-All three backends prepend the same directive to the same frames — `AllBackendsTest`
+Every backend prepends the same directive to the same frames — `AllBackendsTest`
 pins the bytes with ids as it already pinned them without.
 
 ### Reading where the caller left off
@@ -4884,7 +4685,7 @@ arity of every SSE handler for the sake of something most of them ignore. A
 handler that never calls it streams from now, as it always did.
 
 The header is read only where the endpoint's output declares an event stream —
-`Endpoint.resumable`, decided in core so three interpreters cannot each read it
+`Endpoint.resumable`, decided in core so two interpreters cannot each read it
 for a different set of endpoints — and the value is carried on `Params` rather
 than through an attribute, so nothing running before the handler can forge one.
 
@@ -4930,10 +4731,10 @@ loop that suits them.
 JSON documents as an array via `EntityStreamingSupport.json()`, and
 reimplementing brace-and-comma handling in core would be strictly worse than
 calling it — so that one output is framed by the backend. It sits alongside
-NDJSON and SSE rather than replacing them. Neither http4k nor Ktor has an
-equivalent, so each supplies the brackets and commas itself (`jsonArrayFrames`
-in both); that is what "framed by the backend" costs when the backend cannot do
-it for you — about ten lines.
+NDJSON and SSE rather than replacing them. A backend whose library has no
+equivalent supplies the brackets and commas itself, which is what "framed by
+the backend" costs when the backend cannot do it for you — about ten lines,
+and `InMemoryClientTransport`'s own `jsonArrayFrames` is that shape in core.
 
 ## Streaming behaviour
 
@@ -4942,20 +4743,9 @@ it for you — about ten lines.
   Streams to your source. Tests throttle a source and fail if the first frame
   does not arrive well before the last — for SSE and for the JSON array, whose
   whole risk is looking streamed while quietly being assembled first.
-- On http4k the same outputs become a body backed by `FrameInputStream`, which
-  encodes one element per read: the sequence is walked at the speed the socket
-  drains. `StreamingTest` asserts the laziness without a socket — read one
-  frame, and exactly one element has been produced — and `StreamingTimingTest`
-  asserts the delivery over one.
-- On Ktor the same outputs are written with `respondBytesWriter`, collecting the
-  handler's flow and flushing each frame as it is encoded, so the flow is walked
-  at the speed the socket drains. Unlike http4k, no engine can undo this by
-  buffering: the flush is the interpreter's, not the engine's.
-  `StreamingTimingTest` asserts the delivery over a socket.
 - `rawBody()` hands the handler the request body unconsumed, as a
-  `Source<ByteString, Any>` via `.toSource()` on Pekko, an `InputStream` via
-  `.toStream()` on http4k, or a `ByteReadChannel` via `.toChannel()` on Ktor.
-  `/echo` pipes request straight to response.
+  `Source<ByteString, Any>` via `.toSource()` on Pekko. `/echo` pipes request
+  straight to response.
 - `jsonBody<T>()` and `formBody<T>()` are the strict reads, because neither a
   JSON object nor a form can be decoded incrementally into a data class.
   `strictBodyTimeoutMillis` bounds them.
@@ -5024,9 +4814,9 @@ class OverHttpContractTest : ClientContractTest() {
 which depends on `pelican-core` and nothing else — a socket transport is the
 JDK's own `HttpClient`, and a request built from a description is not a
 backend-shaped thing. The *in-memory* transport is, so it lives in a module
-named for its backend: `inMemory()` comes from `pelican-test-pekko` and
-`inMemoryHttp4k()` from `pelican-test-http4k`. A service on Ktor takes neither
-and still gets the typed client.
+named for its backend: `inMemory()` comes from `pelican-test-pekko`. A service
+on a backend with no in-memory transport of its own takes none of them and
+still gets the typed client.
 
 `ApiClient(HttpClientTransport(url), codecs)` points the same suite at a
 deployed service — every call in it, including one whose endpoint declares a
@@ -5067,8 +4857,8 @@ against the declaration.
 
 The split is worth stating in one line: **behaviour tests should not break on a
 rename, and the contract test should.** `BookmarksContractTest` holds both, and
-`AllBackendsTest` pins the greetings URLs and then sends the pinned call, so
-three interpreters agreeing on how to *build* a request is backed by each one
+`AllBackendsTest` pins the greetings URLs and then sends the pinned call, so an
+interpreter's agreement about how to *build* a request is backed by it
 answering at the address itself.
 
 ### Golden files
@@ -5214,11 +5004,11 @@ could ban `mutableListOf` outright now that the stdlib resolves again, but that
 was never the claim: what matters is whether the mutation escapes. A builder
 that fills a local list and hands back a read-only view is the shape half of
 `Endpoint.kt` is written in, so the claim lives in a test that reads the
-sources. It is a ratchet, not a ban: sixteen files accumulate into a mutable
+sources. It is a ratchet, not a ban: nineteen files accumulate into a mutable
 collection and hand back something immutable, which is what a builder is, and
 each is listed with why. What it stops is the next file quietly starting.
 
-A test that reads files has to say which ones. The nineteen library modules it
+A test that reads files has to say which ones. The fourteen library modules it
 judges are listed in `pelican-core/build.gradle.kts`, which declares their
 `src/main/kotlin` directories as inputs of `:pelican-core:test` and hands the
 same list to the test as a system property — one list, snapshotted by Gradle
@@ -5231,7 +5021,7 @@ it reads a comment exactly as it reads code.
 
 **Kover**, aggregated across modules rather than per-module — a line in
 `pelican-core` is exercised by the tests in `pelican-pekko` as often as by its
-own — with a floor of 90% wired into `check`. It sits at 92% line, 75% branch.
+own — with a floor of 90% wired into `check`. It sits at 92% line, 74% branch.
 
 **OpenApiSpecQualityTest** reads the emitted documents back with
 swagger-parser, an implementation that did not write them: `$ref`s resolved,
@@ -5270,7 +5060,7 @@ Two smaller things. The Pekko route tests run through Pekko's own route
 testkit, behind a JUnit 5 extension in `PekkoRouteTestKit` — the testkit drives
 its `ActorSystem` from a JUnit 4 `@Rule`, which Jupiter does not run. And the
 `benchmarks` module measures what the interpreter costs against hand-written
-http4k and Pekko routes. It is a JMH harness rather than a test — forked,
+Pekko routes. It is a JMH harness rather than a test — forked,
 warmed and blackholed, with allocation read off `-prof gc` — and `build` never
 runs it; see [What it costs](what-it-costs.md).
 
@@ -5279,9 +5069,8 @@ runs it; see [What it costs](what-it-costs.md).
 ```bash
 ./gradlew build                     # every module and the plugin: tests and every gate above
 ./gradlew :example:run              # server on :8080, on Pekko
-./gradlew :example:runHttp4k        # the same service on :8080, on http4k
-./gradlew :example:runBackends      # the small example on all three backends at once
-./gradlew :example:runCodecs        # one service, served three times over three JSON libraries
+./gradlew :example:runBackends      # the small example, through the backend seam
+./gradlew :example:runCodecs        # one service, over the codec module it does not name
 ./gradlew :example:generateOrdersDocument  # spec, no server
 ./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
 ./gradlew :example:generateImportedEndpoints  # the document, read back as descriptions
@@ -5351,12 +5140,15 @@ open  localhost:8080/api-docs                                 # Swagger UI
   nothing to add: a webhook you receive arrives at a path on your own service,
   so it is an ordinary `endpoint(...)` with a handler. `webhook(...)` is for the
   half you send.
-- **A fourth server backend.** `pelican-ktor` was the third, and cost what
-  `pelican-http4k` cost: the binders above, a request-to-`Params` step and a
-  response writer, in about 500 lines including the comments.
-- **A Ktor wiring of the *orders* example.** The small `example/backends/`
-  service runs on all three; the larger orders service is bound on Pekko and
-  http4k only, and `ClientContractTest` runs against those two.
+- **A fourth server backend.** The point of a second and a third was to show
+  that the interpreter seam is not shaped by any one server library, and three
+  proved it: the binders above, a request-to-`Params` step and a response
+  writer, in about 500 lines each including the comments, with no change to
+  core. That proof is on the `multi-backend` branch, where `pelican-http4k` and
+  `pelican-ktor` are; a fourth would restate it.
+- **A second wiring of the *orders* example.** The small `example/backends/`
+  service runs through the `Backend` seam; the larger orders service is bound
+  on Pekko, and `ClientContractTest` runs against that.
 - **A codec for a second representation.** `negotiated(...)` says a response is
   written several ways and `media<T>("text/csv")` names one of them; what turns
   a `T` into those bytes is a writer the service supplies on its `Codecs`.
@@ -5376,12 +5168,11 @@ open  localhost:8080/api-docs                                 # Swagger UI
   the endpoint, and a `Filter` slot to enforce it from — see the security
   chapter above, and `example/secured/SecuredReports.kt` for a filter that
   reads `endpoint.security` and needs no second list.
-- **Two shapes where the two schema sources genuinely disagree.** Neither is
-  about nullability — `CodecAgreementTest` now covers that at property level,
-  inside a `List` and a `Map`, through nested generics and through a body whose
-  own type is a collection — and both predate the 3.1 move:
+- **Two shapes where two schema sources genuinely disagree.** Both are on the
+  `multi-backend` branch, where there is a second source to disagree with, and
+  neither is about nullability:
   - **`Set<T>`.** swagger-core knows it is a set and emits `uniqueItems: true`;
-    the descriptor walker sees kotlinx's `StructureKind.LIST` and emits a plain
+    kotlinx's descriptor walker sees `StructureKind.LIST` and emits a plain
     array. The Jackson side is the more informative of the two.
   - **A generic class, instantiated.** swagger-core names the component for the
     instantiation — `Box<Inner>` becomes `BoxInner` — while the descriptor
@@ -5389,30 +5180,31 @@ open  localhost:8080/api-docs                                 # Swagger UI
     second instantiation appeared in the same document. The Jackson side is
     right here too.
 
-  Both are the Jackson side knowing something kotlinx's descriptors do not
-  carry, so closing them means teaching the walker to recognise a set and to
-  name an instantiation. Not written; a service that stays on one codec sees
-  neither.
+  Both are the Jackson side knowing something a descriptor does not carry, so
+  closing them means teaching the walker to recognise a set and to name an
+  instantiation. Not written; a service that stays on one codec sees neither.
 - **A payload whose type is spread over two properties.** A `oneOf` branch that
   is itself a discriminated `oneOf` — `kind: "electronic"` above and
   `type: "card"` below — is refused on the way in, and refused on the way out
-  where the annotations say it. Not a gap: neither JSON library reads a type at
-  two levels, both say so on purpose, and `sealed interface Inner : Outer` would
+  where the annotations say it. Not a gap: no JSON library reads a type at
+  two levels, they say so on purpose, and `sealed interface Inner : Outer` would
   have generated cleanly and decoded nothing. A *Kotlin* hierarchy nested inside
   another is fine and travels flat — one discriminator, the leaf's own name —
-  which is what both codecs now publish and what imports back. The whole of the
+  which is what a codec module publishes and what imports back. The whole of the
   reasoning is under
   [Two levels of hierarchy](#two-levels-of-hierarchy); what the intermediate
   level costs is its own name on the wire, which it never had.
 - **`anyOf` of several branches, and `not`.** Both are still refused, and the
   reasoning is in "What it refuses" above rather than here: neither is a gap
   waiting to be filled, they are shapes with no faithful Kotlin.
-- **405 vs 404 fidelity is the router's, not Pelican's** — a wrong method on a
-  known path answers 405 on http4k, whose router separates "no such path" from
-  "not that method", and 404 on Ktor, whose router does not. On Pekko it is 405
-  only when no endpoint declares that method; when one does, that endpoint's
-  path rejection swallows the method rejection and Pekko answers 404.
-  `MethodMismatchTest` and `KtorInterpreterTest` hold all of this.
+- **405 vs 404 fidelity is the router's, not Pelican's.** Pelican hands an
+  unmatched request back to the server library's router, and what that router
+  answers for a wrong method on a known path is its own decision: one that
+  separates "no such path" from "not that method" says 405, and one that does
+  not says 404. On Pekko it is 405 only when no endpoint declares that method;
+  when one does, that endpoint's path rejection swallows the method rejection
+  and Pekko answers 404. `MethodMismatchTest` holds that, and no assertion
+  anywhere else holds a backend to one number for it.
 - **A *compile-time* check that every declared endpoint is bound.** `api { covers
   = ...)` closes this at startup — hand it the list the spec is built from and
   an unbound endpoint fails the constructor — but nothing in Kotlin's type
@@ -5421,17 +5213,13 @@ open  localhost:8080/api-docs                                 # Swagger UI
 
 ## Versions
 
-Kotlin 2.4.10 · Pekko 1.7.0 · Pekko HTTP 1.4.0 · http4k 6.58.0.0 · Ktor 3.5.2 ·
-Jackson 2.22.2 · swagger-core 2.2.54 · kotlinx.serialization 1.11.0 ·
-jsoniter 0.9.23 · slf4j-api 2.0.18 · snakeyaml-engine 2.10 · JDK 21 ·
+Kotlin 2.4.10 · Pekko 1.7.0 · Pekko HTTP 1.4.0 · Jackson 2.22.2 ·
+swagger-core 2.2.54 · slf4j-api 2.0.18 · snakeyaml-engine 2.10 ·
+Micrometer 1.17.1 · OpenTelemetry 1.65.0 · OkHttp 4.12.0 · JDK 21 ·
 Gradle 9.7.1
 
 This is the only copy of that list. The README carried a second one until the
 two disagreed about half of it, and now points here instead.
-
-http4k built against a newer stdlib than the compiler reading it fails on
-metadata, so the two are bumped together; `pelican-http4k/build.gradle.kts`
-records the pairing where the version is set.
 
 The Gradle plugin is built against the Gradle 9.7.1 API as Java 21 bytecode, so
 the build applying it runs on Java 21 or newer.

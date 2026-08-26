@@ -7,11 +7,10 @@ package example.compiler
  * broke. Each fixture is given a package of its own before it is compiled, so
  * two of them may declare the same `Order`.
  *
- * Only modules that survive spec 0034's narrowing appear below: core, schema,
- * openapi, import, jackson, mcp, the Pekko trio, `pelican-client-java` and the
- * test modules. A fixture reaching for http4k, Ktor, kotlinx or jsoniter would
- * compile today and stop compiling when the strip lands, which is the one
- * failure this suite must never produce.
+ * Only the modules main ships appear below: core, schema, openapi, import,
+ * jackson, mcp, the Pekko trio, `pelican-client-java` and the test modules.
+ * The surfaces on the `multi-backend` branch are frozen there, in this file's
+ * counterpart, and return with the modules.
  *
  * Every public reified-inline function in those modules has a line here, since
  * those are the ones no `.api` dump lists. The rest is what a user types around

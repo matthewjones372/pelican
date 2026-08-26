@@ -14,6 +14,30 @@ one.
 
 ## [Unreleased]
 
+### Removed — read this one first
+
+- **1.0 ships one backend and one codec module: Pekko HTTP and Jackson.** Ten
+  modules leave `main`: `pelican-http4k`, `pelican-http4k-docs`,
+  `pelican-http4k-mcp`, `pelican-test-http4k`, `pelican-ktor`,
+  `pelican-ktor-docs`, `pelican-ktor-mcp`, `pelican-client-ktor`,
+  `pelican-jsoniter` and `pelican-kotlinx`. A build depending on any of them
+  has no artifact to resolve at the next release.
+
+  They are not abandoned and they are not deleted. All ten live, complete and
+  green, on the
+  [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+  branch — cut from `main` immediately before this change, built by the same
+  specs and passing the same parity suites — and each returns after 1.0 as a
+  restore rather than a rewrite. Nothing about the interpreter, the codec seam
+  or the client SPI changed to make this possible: the point of a first
+  release's stability promise is that it covers what the maintainer can stand
+  behind, and this is that narrowing and nothing else.
+
+  `allBackends`, the parity suites and the codec agreement matrix keep their
+  shapes on `main` with a single entry each, so a returning module plugs into a
+  live socket. The entries below that describe an http4k or Ktor module still
+  describe it accurately — on that branch.
+
 ### Changed — read this one
 
 - **`spi.renderError` takes the `Api`, not a boolean.**

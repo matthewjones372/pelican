@@ -210,18 +210,9 @@ line the client tries to parse as a message.
 ```kotlin
 // Pekko
 api.routeWithMcp(system, toolOptions)
-
-// http4k
-routes(api.mcpRoutes(toolOptions) + api.toHttpHandler())
-
-// Ktor
-routing {
-    pelicanMcp(api, toolOptions)
-    pelican(api)
-}
 ```
 
-`pelican-pekko-mcp`, `pelican-http4k-mcp` and `pelican-ktor-mcp` are the same
+`pelican-pekko-mcp` and the mountings on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch are the same
 split the `-docs` modules make, for the same reason: a service that serves
 endpoints alone never compiles the protocol in. `example.mcp` is the Orders
 service with both on one port — `./gradlew :example:runMcp`, then:
@@ -237,7 +228,7 @@ Ktor's: `Route.mcp`, `mcpStreamableHttp`, an SSE transport over
 `ApplicationCall`, and `kotlin-sdk-server` compiling against `ktor-server-core`
 even for stdio. Taking it would put a Ktor server, a Ktor client,
 kotlinx.serialization and a logging facade behind `mcpServe` on a service that
-runs Pekko, and would leave the HTTP half mountable on one backend of three.
+runs Pekko, and would leave the HTTP half mountable on Ktor alone.
 The protocol here is JSON-RPC over lines of text, and core already has the JSON
 tree to speak it with. The revision is pinned to that SDK's
 `LATEST_PROTOCOL_VERSION`, so the number in the handshake is one a client

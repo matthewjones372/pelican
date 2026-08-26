@@ -78,7 +78,7 @@ def main():
     d.text((x, 452), "Describe an endpoint once, as a value.", font=body, fill=BODY)
     d.text((x, 490), "The route, the OpenAPI document and a", font=body, fill=BODY)
     d.text((x, 528), "typed client all come from it.", font=body, fill=BODY)
-    d.text((x, 580), "Pekko HTTP  ·  http4k  ·  Ktor", font=mono, fill=KOTLIN)
+    d.text((x, 580), "Pekko HTTP  ·  Jackson  ·  OpenAPI", font=mono, fill=KOTLIN)
 
     # The idea itself, rather than a claim about it.
     px0, py0, px1, py1 = 700, 150, 1200, 470

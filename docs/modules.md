@@ -1,19 +1,24 @@
 # Modules
 
-Linked from the [README](../README.md). What each of the thirty modules is
+Linked from the [README](../README.md). What each of the twenty modules is
 for, and what it depends on — the list to read when deciding which ones a
 build actually needs.
 
-Twenty-nine modules and a Gradle plugin; you take four or five. The layering is enforced by tests
+Nineteen modules and a Gradle plugin; you take four or five. The layering is enforced by tests
 rather than convention.
+
+1.0 ships one server backend and one JSON library. The http4k and Ktor
+backends, the Ktor client transport, `pelican-jsoniter` and `pelican-kotlinx`
+are complete and green on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch and return after 1.0; the table below is what main ships today.
 
 | Module | Depends on | Contains |
 |---|---|---|
 | `pelican-core` | **nothing** | endpoint descriptions, plain codecs, a minimal JSON tree, the client SPI and its in-memory implementation |
-| `pelican-jackson` / `-kotlinx` / `-jsoniter` | core + one JSON library | your `Codecs` |
-| `pelican-pekko` / `-http4k` / `-ktor` | core + one server library | descriptions → that server's routes |
-| `pelican-*-docs` | its backend, openapi | serves the document and Swagger UI |
-| `pelican-*-mcp` | its backend, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
+| `pelican-jackson` | core + Jackson | your `Codecs` |
+| `pelican-pekko` | core + Pekko HTTP | descriptions → that server's routes |
+| `pelican-pekko-docs` | pekko, openapi | serves the document and Swagger UI |
+| `pelican-pekko-mcp` | pekko, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
@@ -23,21 +28,20 @@ rather than convention.
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-java` | core | where a generated client's requests go, over the JDK's `HttpClient` |
 | `pelican-client-pekko` | core + pekko-http | the same, over Pekko HTTP's client |
-| `pelican-client-ktor` | core + ktor-client-cio | the same, over Ktor's `HttpClient` |
 | `pelican-client-okhttp` | core + okhttp | the same, over OkHttp's `Call` — and the one that runs on Android |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
 | `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-golden` | test + openapi | per-endpoint goldens; fails on a breaking change |
-| `pelican-test-pekko` / `-http4k` | test + that backend | the typed test client's in-memory transport |
+| `pelican-test-pekko` | test + pekko | the typed test client's in-memory transport |
 
 Every one of those dependency claims is a test. `pelican-core` asserts its
 runtime classpath holds nothing but the Kotlin standard library, `pelican-openapi`
 asserts Pekko is absent so docs can be generated in a build task with no server
-present, each backend asserts the document generator and the other backends are
+present, each backend asserts the document generator and every other backend is
 absent, `pelican-metrics` asserts it is core plus a meter API and no server
 library, `pelican-schema` asserts it carries no document generator and no
-codec — the three codecs are test-scoped, which is where the claim that spans
+codec — the codec modules are test-scoped, which is where the claim that spans
 them is made, `pelican-mcp` asserts it is core plus that schema pass and no MCP
 SDK, deriving tools being a separate job from serving them, and
 `pelican-mcp-server` asserts the same of the half that does serve them — the
@@ -46,8 +50,8 @@ it would put a Ktor server behind `mcpServe` on a service running Pekko,
 `pelican-metrics-otel` asserts the mirror image — core plus the
 OpenTelemetry API, and neither Micrometer nor a server library — which is the
 whole reason the two telemetry vendors are two modules, `pelican-client-java`
-asserts it carries no HTTP library beyond the JDK's, `pelican-client-pekko`,
-`pelican-client-ktor` and `pelican-client-okhttp` each assert they carry their
+asserts it carries no HTTP library beyond the JDK's, `pelican-client-pekko`
+and `pelican-client-okhttp` each assert they carry their
 own client and no second stack — and not the matching *interpreter* either,
 since making calls and serving routes are separate decisions, and the OkHttp
 one asserts no AndroidX either, since it runs on Android by depending on

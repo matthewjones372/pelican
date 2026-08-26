@@ -91,18 +91,18 @@ notice if it were not.
 ## What each codec spells it as
 
 The property and value are *read*, never derived — which is what lets one pass
-cover three sources that agree on almost nothing else:
+cover sources that agree on almost nothing else:
 
 | Codecs | Property | Value per branch |
 |---|---|---|
 | `JacksonCodecs` | `@JsonTypeInfo(property = …)` | `@JsonSubTypes.Type(name = …)` |
-| `KotlinxCodecs` | `@JsonClassDiscriminator`, else the configured `Json`'s, which defaults to `type` | `@SerialName`, else the qualified class name |
-| `JsoniterCodecs` | always `type` | the class's simple name |
 
 A payload written to satisfy a branch schema decodes through the codec that
-described it, and the test asserts that for all three by building the payload
+described it, and the test asserts that per source by building the payload
 from the schema alone: a property the schema forgets is a property the payload
-lacks.
+lacks. `pelican-kotlinx` and `pelican-jsoniter` are two more rows, on the
+[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+branch until they return after 1.0.
 
 ## What is refused
 
@@ -111,7 +111,7 @@ instead.
 
 | Refused | Why |
 |---|---|
-| kotlinx.serialization's open polymorphism — an `abstract class` or interface that is `@Serializable` but not `sealed` | Its subclasses register at run time, so `{"type": "object"}` is all a closed schema could honestly say. A document a human reads beside the code can live with that; a validator or a model acting on one cannot. Make the hierarchy `sealed`, or describe the property as one branch. |
+| an open hierarchy — one whose branches a codec registers at run time rather than reading off a `sealed` declaration | Its subclasses are not known until something registers them, so `{"type": "object"}` is all a closed schema could honestly say. A document a human reads beside the code can live with that; a validator or a model acting on one cannot. Make the hierarchy `sealed`, or describe the property as one branch. |
 | a class that is a branch of two hierarchies which pick it differently | It would need both properties, and a payload carrying both is one neither codec writes. Give the hierarchies the same property and value, or give each a type of its own. |
 
 The open-polymorphism refusal reads the note the descriptor source writes into
