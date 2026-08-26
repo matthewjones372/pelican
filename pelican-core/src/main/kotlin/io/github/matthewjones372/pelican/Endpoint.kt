@@ -260,14 +260,17 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     /**
      * Server-sent events. Handler produces the backend's stream of `T`.
-     * [keepAlive] fills an idle stream; see [SseOutput.keepAlive].
+     * [keepAlive] fills an idle stream; see [SseOutput.keepAlive]. [id] and
+     * [retry] are what a caller resumes from; see [SseOutput.id].
      */
     inline fun <reified T> sse(
         status: Int = 200,
         eventName: String? = null,
         keepAlive: Duration? = null,
         description: String? = null,
-    ): SseOutput<T> = SseOutput(status, typeOf<T>(), eventName, keepAlive, description)
+        noinline id: ((T) -> String)? = null,
+        retry: Duration? = null,
+    ): SseOutput<T> = SseOutput(status, typeOf<T>(), eventName, keepAlive, description, id, retry)
 
     /** An opaque byte stream. Handler produces the backend's stream of bytes. */
     fun bytes(

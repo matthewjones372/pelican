@@ -35,6 +35,7 @@ import io.github.matthewjones372.pelican.repeated
 import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.textPart
 import io.github.matthewjones372.pelican.webhook
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * One description, three servers.
@@ -377,11 +378,26 @@ val ticker = endpoint {
     sse<Tick>(eventName = "tick")
 }
 
+/**
+ * The same events with the two fields a dropped connection needs: an `id:` per
+ * frame and the `retry:` the stream opens with. A description of its own rather
+ * than a change to [ticker], so the frames of a stream that sends neither stay
+ * pinned as they were.
+ */
+val replay = endpoint {
+    get("replay")
+    summary = "A short run of events a caller can pick up again"
+    operationId = "replay"
+    tag("greetings")
+    emits(requestId)
+    sse<Tick>(eventName = "tick", id = { it.seq.toString() }, retry = 15.seconds)
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
-        roundtrip, motd, forget, peek, everyone, logo, echoRaw, ticker,
+        roundtrip, motd, forget, peek, everyone, logo, echoRaw, ticker, replay,
     )
 
 /**

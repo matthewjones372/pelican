@@ -63,6 +63,7 @@ val ktorRoutes: List<ServerEndpoint> = listOf(
     peek handledWith { _ -> },
 
     ticker streamedNow { ticks().asFlow() },
+    replay streamedNow { ticks().asFlow() },
     everyone streamedNow { greetingsOf().asFlow() },
 
     logo bytesNow { io.ktor.utils.io.ByteReadChannel(LOGO_BYTES) },

@@ -1343,16 +1343,19 @@ public final class io/github/matthewjones372/pelican/ServerEndpoint {
 public final class io/github/matthewjones372/pelican/SseOutput : io/github/matthewjones372/pelican/Output {
 	public static final field Companion Lio/github/matthewjones372/pelican/SseOutput$Companion;
 	public static final field KEEP_ALIVE_FRAME Ljava/lang/String;
-	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun frame (Lio/github/matthewjones372/pelican/BodyCodec;Ljava/lang/Object;)Ljava/lang/String;
 	public fun getDescription ()Ljava/lang/String;
 	public final fun getEventName ()Ljava/lang/String;
+	public final fun getId ()Lkotlin/jvm/functions/Function1;
 	public final fun getKeepAlive-FghU774 ()Lkotlin/time/Duration;
 	public fun getMediaType ()Ljava/lang/String;
 	public fun getPayloadType ()Lkotlin/reflect/KType;
+	public final fun getRetry-FghU774 ()Lkotlin/time/Duration;
 	public fun getStatus ()I
 	public final fun getType ()Lkotlin/reflect/KType;
+	public final fun prelude ()Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/SseOutput$Companion {

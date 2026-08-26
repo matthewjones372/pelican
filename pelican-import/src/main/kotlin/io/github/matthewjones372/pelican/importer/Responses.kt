@@ -178,12 +178,19 @@ internal class Responses(private val reader: Reader, private val operation: Oper
      * The payload inside a 3.2 event stream's `itemSchema`.
      *
      * An item of a `text/event-stream` is the event as the SSE parser hands it
-     * over — `data`, and possibly `event`, `id` and `retry` — rather than the
-     * payload, and 3.2 points at `contentMediaType` with `contentSchema` for
-     * saying what a `data` field carrying JSON holds. `sse<T>` is that `T`, so
-     * this is where it is read back out. Anything else is refused rather than
-     * guessed at: a `data` described only as a string says nothing about what
-     * the stream carries, and there would be no type to name.
+     * over — `data`, and possibly `event` and `id` — rather than the payload,
+     * and 3.2 points at `contentMediaType` with `contentSchema` for saying what
+     * a `data` field carrying JSON holds. `sse<T>` is that `T`, so this is
+     * where it is read back out. Anything else is refused rather than guessed
+     * at: a `data` described only as a string says nothing about what the
+     * stream carries, and there would be no type to name.
+     *
+     * `event`, `id` and the stream's `retry` do not come back. They say how a
+     * service writes its frames rather than what the frames carry, and one of
+     * them cannot be written down at all: `sse(id = ...)` is a function of the
+     * event value, and a document holds no functions. Emitting an `sse<T>` that
+     * claimed to send ids nothing could compute would be worse than dropping
+     * them, so the import declares the payload and the service adds the rest.
      */
     private fun sseFrame(item: io.github.matthewjones372.pelican.JsonValue, status: Int, path: JsonPath): JsonObj {
         val data = (item as? JsonObj)?.obj("properties")?.obj("data")

@@ -604,9 +604,16 @@ text/event-stream:
     required: [event, data]
 ```
 
-`id` and `retry` are absent because `sse(...)` never sends them, on the same
-principle that stops a response header being documented and not sent. `event`
-is absent too where the output does not name one.
+Every field is there exactly when the frame writer writes it, on the same
+principle that stops a response header being documented and not sent: `event`
+is absent where the output names no event, and `id` is absent where it declares
+no id extractor.
+
+`retry` is never a property here. It is a directive about the stream rather
+than a field of a dispatched event — the stream opens with it once, and a frame
+carrying no `data` dispatches nothing — so the response's description is where
+it is said: *"A server-sent event stream. Clients are asked to wait 15000ms
+before reconnecting."*
 
 A streamed JSON array is *not* sequential under either revision — it is one
 document with brackets round it that happens to arrive in pieces — so
@@ -4550,6 +4557,40 @@ stream type is nothing core has ever heard of.
 Core also owns the framing — `NdjsonOutput.frame(codec, value)` renders one
 element — so the backend only supplies wire mechanics. Nothing about NDJSON or
 SSE format is duplicated per backend.
+
+## An event stream a caller can pick up again
+
+```kotlin
+sse<OrderEvent>(eventName = "order", id = { it.sequence.toString() }, retry = 15.seconds)
+```
+
+`id` is a projection of the event, not a counter the interpreter keeps: one
+source of truth for where a reconnecting caller left off, and nothing to get out
+of step with the payload. Declared, every frame carries an `id:` line; left out,
+the frames are byte for byte what they were before the option existed, which is
+what keeps `AllBackendsTest`'s existing pin green.
+
+`retry` is per-endpoint rather than per-`Api`, because it is part of what the
+endpoint promises a caller rather than something a deployment tunes. It is a
+*stream* directive, so it goes out once, ahead of the first event, as a frame of
+its own:
+
+```
+retry: 15000
+
+event: tick
+id: 1
+data: {"seq":1}
+
+```
+
+A frame carrying no `data:` dispatches no event, which is why that is the honest
+place for it: attaching it to the first event would leave a stream that has yet
+to produce one having said nothing, and repeating it on every frame would say
+the same thing over and over.
+
+All three backends prepend the same directive to the same frames — `AllBackendsTest`
+pins the bytes with ids as it already pinned them without.
 
 `jsonArray<T>()` is the deliberate exception. Pekko already frames a stream of
 JSON documents as an array via `EntityStreamingSupport.json()`, and

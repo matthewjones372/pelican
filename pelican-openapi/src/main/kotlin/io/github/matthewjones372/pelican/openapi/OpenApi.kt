@@ -301,12 +301,14 @@ private fun Output<*>.isSequential(): Boolean = this is NdjsonOutput<*> || this 
  * An item of an event stream is not the payload. 3.2 requires implementations
  * to "work with event data after it has been parsed according to the
  * `text/event-stream` specification", and what that parse yields is an event
- * with `data`, `event`, `id` and `retry` fields — so saying `itemSchema` is
- * the payload type would describe a stream nobody sends. [SseOutput.frame]
- * writes an `event:` line when the output names one and a `data:` line
- * carrying the payload as the body codec encoded it, and it writes neither
- * `id` nor `retry`; those two are therefore absent here, on the same principle
- * that stops a response header being documented and not sent.
+ * with `data`, `event` and `id` fields — so saying `itemSchema` is the payload
+ * type would describe a stream nobody sends. Each field is here exactly when
+ * [SseOutput.frame] writes it, on the same principle that stops a response
+ * header being documented and not sent.
+ *
+ * `retry` is not among them. It is a directive about the stream rather than a
+ * field of a dispatched event, and it goes out once ahead of the first one; the
+ * response's description is where it is said.
  *
  * `data` is a string, because every SSE field is. What is inside the string is
  * said with `contentMediaType` and `contentSchema`, which is the pair 3.2
@@ -327,15 +329,20 @@ private fun sseEventSchema(
                 "const" to name
             })
         }
+        if (out.id != null) put("id", jsonObj { "type" to "string" })
         put("data", jsonObj {
             "type" to "string"
             "contentMediaType" to "application/json"
             put("contentSchema", schemas.schema(out.type, components))
         })
     })
-    // Every frame carries both, so both are required. A named stream always
-    // writes its name; an unnamed one never does.
-    put("required", jsonStrings(listOfNotNull(out.eventName?.let { "event" }, "data")))
+    // Every frame carries every field the output declared, so each of them is
+    // required. A named stream always writes its name; an unnamed one never
+    // does, and the same goes for an id.
+    put(
+        "required",
+        jsonStrings(listOfNotNull(out.eventName?.let { "event" }, out.id?.let { "id" }, "data")),
+    )
 }
 
 private fun operation(
@@ -499,12 +506,19 @@ private fun successDescription(out: Output<*>): String = out.description ?: impl
 private fun impliedDescription(out: Output<*>): String = when (out) {
     is NdjsonOutput<*> -> "A newline-delimited JSON stream. Chunked; consume incrementally."
     is JsonArrayOutput<*> -> "A JSON array, chunked; elements are flushed as they are produced."
-    is SseOutput<*> -> "A server-sent event stream."
+    is SseOutput<*> -> "A server-sent event stream." + reconnectionNote(out)
     is ByteStreamOutput -> "A byte stream."
     is EmptyOutput -> "No content."
     is FallibleOutput<*, *> -> successDescription(out.success)
     else -> "Success."
 }
+
+/**
+ * The reconnection time in words, because it is a directive about the stream
+ * rather than a field of any event the described item could carry it on.
+ */
+private fun reconnectionNote(out: SseOutput<*>): String =
+    out.retry?.let { " Clients are asked to wait ${it.inWholeMilliseconds}ms before reconnecting." }.orEmpty()
 
 /**
  * A parameter's own description wins; a self-documenting codec supplies one

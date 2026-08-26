@@ -59,6 +59,7 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
     peek handledWith { _ -> },
 
     ticker streamedNow { Source.from(ticks()) },
+    replay streamedNow { Source.from(ticks()) },
     everyone streamedNow { Source.from(greetingsOf()) },
 
     logo bytesNow { Source.single(ByteString.fromArray(LOGO_BYTES)) },

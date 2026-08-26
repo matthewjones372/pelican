@@ -60,6 +60,7 @@ val http4kRoutes: List<ServerEndpoint> = listOf(
     peek handledWith { _ -> },
 
     ticker streamedNow { ticks().asSequence() },
+    replay streamedNow { ticks().asSequence() },
     everyone streamedNow { greetingsOf().asSequence() },
 
     logo bytesNow { java.io.ByteArrayInputStream(LOGO_BYTES) },

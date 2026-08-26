@@ -179,6 +179,24 @@ class AllBackendsTest {
         }
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a stream that declares ids writes them, identically, on all three`(name: String, client: ApiClient) {
+        val res = client.response(replay, Unit)
+
+        withClue(name) {
+            res shouldHaveStatus 200
+            res shouldHaveContentType "text/event-stream"
+            // `retry:` once ahead of the events, since it is a directive about
+            // the stream and a frame with no `data:` dispatches nothing; then
+            // `event:`, `id:`, `data:` per frame, in the order core writes them.
+            res.body shouldBe
+                "retry: 15000\n\n" +
+                "event: tick\nid: 1\ndata: {\"seq\":1,\"at\":\"one\"}\n\n" +
+                "event: tick\nid: 2\ndata: {\"seq\":2,\"at\":\"two\"}\n\n"
+        }
+    }
+
     // ------------------------------------------------------------- a simple GET
 
     @ParameterizedTest(name = "{0}")

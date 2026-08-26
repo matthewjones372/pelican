@@ -107,6 +107,20 @@ one.
 
 ### Added
 
+- **An event stream that says where a caller left off.**
+  `sse<T>(id = { it.sequence.toString() }, retry = 15.seconds)` puts an `id:`
+  on every frame and opens the stream with a `retry:` directive of its own —
+  once, ahead of the first event, because a frame carrying no `data:`
+  dispatches nothing. `id` is a projection of the event rather than a counter
+  the interpreter keeps, so there is one source of truth for the resume point.
+  Both are optional and additive: an `sse<T>()` that declares neither writes
+  the frames it always wrote, byte for byte, on all three backends. Under
+  OpenAPI 3.2 the described event gains an `id` property, required exactly when
+  the output sends one; `retry` is said in the response's description, being a
+  directive about the stream rather than a field of any event. Neither travels
+  through the OpenAPI importer — an id extractor is a function of the event
+  value and no document holds a function — so an imported event stream declares
+  its payload and the service adds the frame fields back.
 - **One response, several renderings**, chosen by the caller's `Accept`:
   `negotiated(json<Report>(200), media<Report>("text/csv", 200))` is one
   declared response written two ways. The handler goes on returning a `Report`;

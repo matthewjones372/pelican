@@ -32,6 +32,7 @@ import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -96,7 +97,7 @@ internal suspend fun respond(
             val o = out as SseOutput<Any?>
             val c = payload()
             val frames = elements(value).map { o.frame(c, it) }
-            call.stream(ContentType.Text.EventStream, status, frames.withKeepAlive(o.keepAlive))
+            call.stream(ContentType.Text.EventStream, status, frames.after(o.prelude()).withKeepAlive(o.keepAlive))
         }
 
         is JsonArrayOutput<*> ->
@@ -128,6 +129,13 @@ private suspend fun ApplicationCall.stream(
         flush()
     }
 }
+
+/** Puts an SSE stream's opening directive in front of its first event. */
+private fun Flow<String>.after(prelude: String?): Flow<String> =
+    if (prelude == null) this else flow {
+        emit(prelude)
+        emitAll(this@after)
+    }
 
 /**
  * Injects an SSE comment down a stream that has gone quiet. Idle rather than

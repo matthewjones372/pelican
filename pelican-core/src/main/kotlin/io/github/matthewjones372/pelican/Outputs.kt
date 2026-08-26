@@ -150,19 +150,45 @@ class SseOutput<T> @PublishedApi internal constructor(
      */
     val keepAlive: Duration? = null,
     override val description: String? = null,
+    /**
+     * The `id:` a frame carries, read off the event it belongs to. A projection
+     * rather than a counter so the stream has one source of truth for where a
+     * reconnecting caller left off; null sends no ids, and nothing can then be
+     * resumed from.
+     */
+    val id: ((T) -> String)? = null,
+    /**
+     * How long a caller whose connection drops is asked to wait before coming
+     * back, or null to leave it to the client's own default.
+     */
+    val retry: Duration? = null,
 ) : Output<StreamOf<T>>() {
     override val mediaType = "text/event-stream"
     override val payloadType get() = type
 
     fun frame(codec: BodyCodec<T>, value: T): String = buildString {
         if (eventName != null) append("event: ").append(eventName).append('\n')
+        id?.let { append("id: ").append(it(value)).append('\n') }
         append("data: ").append(codec.encodeToString(value)).append("\n\n")
     }
+
+    /**
+     * What goes out ahead of the first event, or null where there is nothing to
+     * say. `retry` is a directive about the stream and not a field of an event,
+     * and a frame carrying no `data` dispatches none — so it is sent once, here,
+     * rather than repeated on every frame or attached to the first one, which a
+     * stream that has yet to produce an event would never send at all.
+     */
+    fun prelude(): String? = retry?.let { "retry: ${it.inWholeMilliseconds}\n\n" }
 
     init {
         checkStatus(toString(), status, carriesBody = true)
         require(keepAlive == null || keepAlive > Duration.ZERO) {
             "keepAlive is how long the stream may be idle, so it is a positive duration or null; got $keepAlive"
+        }
+        require(retry == null || retry.inWholeMilliseconds > 0) {
+            "retry is how long a client waits before reconnecting, and SSE counts it in whole milliseconds, " +
+                "so it is a positive duration of at least one or null; got $retry"
         }
     }
 

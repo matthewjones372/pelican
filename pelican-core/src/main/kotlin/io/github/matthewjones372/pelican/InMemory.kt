@@ -214,7 +214,9 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
             is SseOutput<*> -> {
                 val o = out as SseOutput<Any?>
                 val codec = payload()
-                streamed(out.status, out.mediaType, elements(value, out).map { o.frame(codec, it) })
+                val frames = elements(value, out).map { o.frame(codec, it) }
+                val prelude = o.prelude()
+                streamed(out.status, out.mediaType, if (prelude == null) frames else sequenceOf(prelude) + frames)
             }
 
             is JsonArrayOutput<*> ->

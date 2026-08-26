@@ -81,7 +81,7 @@ internal fun buildResponse(
             val o = out as SseOutput<Any?>
             val c = payload()
             val frames = elements(value).map { ByteString.fromString(o.frame(c, it)) }
-            HttpEntities.createChunked(EVENT_STREAM, frames.withKeepAlive(o.keepAlive))
+            HttpEntities.createChunked(EVENT_STREAM, frames.after(o.prelude()).withKeepAlive(o.keepAlive))
         }
 
         is JsonArrayOutput<*> -> {
@@ -155,6 +155,10 @@ private fun elements(value: Any?): Source<Any?, NotUsed> = value as Source<Any?,
  */
 private fun statusOf(code: Int): StatusCode =
     StatusCodes.lookup(code).orElseGet { StatusCodes.custom(code, "", "") }
+
+/** Puts an SSE stream's opening directive in front of its first event. */
+private fun Source<ByteString, NotUsed>.after(prelude: String?): Source<ByteString, NotUsed> =
+    if (prelude == null) this else Source.single(ByteString.fromString(prelude)).concat(this)
 
 /**
  * Injects an SSE comment down a stream that has gone quiet. `Source.keepAlive`
