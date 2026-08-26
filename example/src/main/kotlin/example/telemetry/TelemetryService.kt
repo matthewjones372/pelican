@@ -58,7 +58,6 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.forbidden
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.metrics.metrics
 import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
@@ -71,7 +70,6 @@ import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
 import io.github.matthewjones372.pelican.pekko.request
 import io.github.matthewjones372.pelican.queryParam
-import io.github.matthewjones372.pelican.text
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.context.propagation.TextMapGetter

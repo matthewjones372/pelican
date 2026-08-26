@@ -1,6 +1,5 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint

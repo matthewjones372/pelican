@@ -1,6 +1,5 @@
 package io.github.matthewjones372.pelican.pekko
 
-import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs

@@ -1,7 +1,6 @@
 package io.github.matthewjones372.pelican.openapi
 
 import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.SchemaComponents
 import io.github.matthewjones372.pelican.SchemaSource

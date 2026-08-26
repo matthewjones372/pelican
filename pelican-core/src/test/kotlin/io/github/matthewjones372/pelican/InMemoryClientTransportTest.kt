@@ -6,7 +6,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionStage
 import kotlin.reflect.KType
 
 /**

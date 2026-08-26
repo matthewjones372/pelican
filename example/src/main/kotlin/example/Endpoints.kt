@@ -19,7 +19,6 @@ import io.github.matthewjones372.pelican.cookieParam
 import io.github.matthewjones372.pelican.default
 import io.github.matthewjones372.pelican.describedAs
 import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.empty
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.filePart

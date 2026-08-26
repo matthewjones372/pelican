@@ -9,15 +9,12 @@ import io.github.matthewjones372.pelican.apiKeyHeader
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.bearerAuth
 import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.empty
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.oauth2AuthorizationCode
 import io.github.matthewjones372.pelican.openapi.div
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.requires
-import io.github.matthewjones372.pelican.text
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -26,7 +23,6 @@ import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType

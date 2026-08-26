@@ -23,7 +23,6 @@ import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pekko.bytesNow
-import io.github.matthewjones372.pelican.pekko.docs.Docs
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOneOf
 import io.github.matthewjones372.pelican.pekko.handledOrFail
@@ -31,7 +30,6 @@ import io.github.matthewjones372.pelican.pekko.handledWith
 import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.github.matthewjones372.pelican.pekko.streamedOrFail
 import io.github.matthewjones372.pelican.pekko.toSource
-import io.github.matthewjones372.pelican.text
 import io.github.matthewjones372.pelican.unauthorized
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.javadsl.Source

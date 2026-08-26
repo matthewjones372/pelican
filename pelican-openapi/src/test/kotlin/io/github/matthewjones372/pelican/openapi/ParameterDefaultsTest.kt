@@ -1,6 +1,5 @@
 package io.github.matthewjones372.pelican.openapi
 
-import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.IntCodec
 import io.github.matthewjones372.pelican.LongCodec
 import io.github.matthewjones372.pelican.NoCodecs

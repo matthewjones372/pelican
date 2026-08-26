@@ -5,7 +5,6 @@ import com.sun.net.httpserver.HttpServer
 import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.pelican.ClientRequest
 import io.github.matthewjones372.pelican.Method
-import io.github.matthewjones372.pelican.RetryPolicy
 import io.github.matthewjones372.pelican.retryPolicy
 import io.github.matthewjones372.pelican.retrying
 import io.kotest.matchers.shouldBe

@@ -121,14 +121,17 @@ it should not repeat the name in longer words.
 
 ## Imports
 
-**No wildcard imports, anywhere.** One line per name, so an import block is an
-inventory of what a file uses and where each piece lives — and so a reader of
-the documentation's examples can see exactly what to import. detekt's
-`WildcardImport` fails the build on one, and `.editorconfig` tells ktlint and
-the IDE the same thing, so an optimize-imports cannot put one back.
+**No wildcard imports, anywhere, and no unused ones.** One line per name, so an
+import block is an inventory of what a file uses and where each piece lives —
+and so a reader of the documentation's examples can see exactly what to import.
+Two detekt rules fail the build on either mistake, `WildcardImport` and
+`UnusedImport`, and `.editorconfig` tells ktlint and the IDE the same thing so
+an optimize-imports cannot put a star back.
 
-The same holds in the docs: every complete example carries its imports written
-out, and the `dependencies { }` block naming the modules it needs.
+The same holds in the docs and the examples: every complete example carries its
+imports written out, and the `dependencies { }` block naming the modules it
+needs, with real coordinates. `example/` generates neither by hand — a file
+that grows an import grows a line in its block.
 
 ## Layout
 
@@ -238,6 +241,14 @@ Kover is aggregated across modules with a floor of 90% on `check`.
 
 `./gradlew build` runs tests, detekt and spotless. Run it before saying
 anything is done, and quote the result rather than predicting it.
+
+**Finish with `./gradlew spotlessApply`.** Formatting is a gate like any other,
+and a change that is correct but unformatted fails the build for whoever runs
+it next. Run it last, after the final edit, so nothing lands unformatted:
+
+```bash
+./gradlew spotlessApply && ./gradlew build
+```
 
 Six gates sit beyond the tests. Each exists because a claim in the reference
 manual would otherwise be unverified.

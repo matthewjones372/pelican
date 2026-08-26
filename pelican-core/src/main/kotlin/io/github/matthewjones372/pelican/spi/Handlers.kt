@@ -10,7 +10,6 @@ import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.UndeclaredResponse
 import io.github.matthewjones372.pelican.chosenSuccess
-import io.github.matthewjones372.pelican.payloadType
 import io.github.matthewjones372.pelican.streams
 import io.github.matthewjones372.pelican.wrap
 import java.util.concurrent.CompletionStage

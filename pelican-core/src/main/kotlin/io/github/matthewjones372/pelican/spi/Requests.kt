@@ -30,7 +30,6 @@ import io.github.matthewjones372.pelican.decodeAll
 import io.github.matthewjones372.pelican.default
 import io.github.matthewjones372.pelican.formCodec
 import io.github.matthewjones372.pelican.mediaType
-import io.github.matthewjones372.pelican.payloadType
 import io.github.matthewjones372.pelican.representations
 import java.io.ByteArrayOutputStream
 import java.io.InputStream

@@ -1,6 +1,5 @@
 package io.github.matthewjones372.pelican
 
-import io.github.matthewjones372.pelican.spi.decode
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.statusOfError
 import io.kotest.assertions.throwables.shouldThrow

@@ -5,7 +5,6 @@ import io.github.matthewjones372.pelican.SchemaComponents
 import io.github.matthewjones372.pelican.SchemaSource
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.empty
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.json

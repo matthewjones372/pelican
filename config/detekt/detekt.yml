@@ -66,6 +66,12 @@ style:
     # worth making it should be made deliberately, with a version bump, not by
     # a lint rule.
     active: false
+  UnusedImport:
+    # The other half of the no-wildcard rule: an explicit import list is only
+    # an inventory of what a file uses if the names it no longer uses are gone.
+    # ktlint removes them on `spotlessApply`; this fails the build for one that
+    # reached a commit anyway.
+    active: true
   WildcardImport:
     # A project principle: an explicit import list is the one place a reader
     # sees where every name in a file comes from, and it is what keeps the

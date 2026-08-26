@@ -5,7 +5,6 @@ import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.jsonArr
 import io.github.matthewjones372.pelican.jsonObj
-import io.github.matthewjones372.pelican.mcp.McpOptions
 import io.github.matthewjones372.pelican.mcp.mcpDispatch
 import io.github.matthewjones372.pelican.mcp.mcpOptions
 import io.github.matthewjones372.pelican.mcp.mcpTools

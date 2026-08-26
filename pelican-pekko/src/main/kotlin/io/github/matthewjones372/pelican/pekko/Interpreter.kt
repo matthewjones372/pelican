@@ -25,8 +25,6 @@ import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.corsPolicy
-import io.github.matthewjones372.pelican.default
-import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.spi.CorsHeaders
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex

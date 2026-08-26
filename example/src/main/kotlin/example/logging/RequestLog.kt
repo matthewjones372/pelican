@@ -24,6 +24,7 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.afterStatus
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attribute
+import io.github.matthewjones372.pelican.bearerAuth
 import io.github.matthewjones372.pelican.before
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
@@ -31,11 +32,9 @@ import io.github.matthewjones372.pelican.err
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
 import io.github.matthewjones372.pelican.metrics.otel.refusalCounter
 import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.onlyWhen
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.orFail
@@ -43,7 +42,6 @@ import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
-import io.github.matthewjones372.pelican.text
 import io.github.matthewjones372.pelican.unauthorized
 import io.opentelemetry.api.OpenTelemetry
 import org.slf4j.Logger
@@ -132,40 +130,39 @@ fun refusalLog(): RefusalObserver = RefusalObserver { reason, status, template -
 
 // ============================== 3. a filter on some endpoints and not others
 
+/** The scheme the descriptions declare, and what draws the padlock in Swagger UI. */
+val token = bearerAuth(name = "token", description = "A bearer token")
+
 private val authorization = headerParam<String>("Authorization").optional()
 
 private val caller = attribute<String>("caller")
 
 /**
- * The token check itself. It knows nothing about which endpoints it guards —
- * that is the next declaration's job, and keeping the two apart is what lets
- * one rule be applied by two different policies.
+ * One filter, bound to every endpoint, that asks the *description* whether this
+ * one needs a token — so `noSecurity()` on the health check is the whole of the
+ * exemption, written where a reader of the document sees it too.
+ *
+ * The alternative is to narrow the filter at the point it is registered:
+ *
+ *     filter(requireToken.onlyWhen { it.operationId != "health" })
+ *
+ * which works, and is worth reaching for when the rule is about something the
+ * description does not say — every endpoint carrying a tag, say, or every
+ * deprecated one. It is the wrong tool here: it restates a policy the endpoint
+ * already states, in a second place, as a negative, and every filter that
+ * cares needs its own copy of the predicate. Reading `endpoint.security` keeps
+ * one answer, and the padlock in Swagger UI agrees with the server by
+ * construction rather than by both being remembered.
  */
 private val requireToken = before { p ->
+    // Null is "said nothing", which inherits whatever the API requires; an
+    // empty list is `noSecurity()`, and deliberate.
+    val required = p.endpoint?.security.orEmpty()
+    if (required.isEmpty()) return@before
+
     val presented = p[authorization]?.removePrefix("Bearer ")
     p[caller] = presented?.takeIf { it == "let-me-in" }
         ?: unauthorized("Present a bearer token")
-}
-
-/**
- * `onlyWhen` narrows a filter to the endpoints a predicate accepts, so the
- * health check is served without a token while everything else is not.
- *
- * The predicate is handed the `Endpoint` the request matched, so it can read
- * anything the description says — an operation id, a tag, a path template,
- * `deprecated`. Two spellings of the same intent:
- *
- *     requireToken.onlyWhen { it.operationId != "health" }        // by name
- *     requireToken.onlyWhen { it.security?.isEmpty() != true }    // by declaration
- *
- * The second is the one that scales: `noSecurity()` on the description is then
- * the single place the exemption is written, the padlock in Swagger UI agrees
- * with the filter by construction, and adding an endpoint cannot forget to
- * tell the filter about itself. `:example:runSecured` takes that to its
- * conclusion.
- */
-private val tokenExceptHealth = requireToken.onlyWhen { endpoint ->
-    endpoint.security?.isEmpty() != true
 }
 
 // ============================================ 4. tracing, from the same values
@@ -195,6 +192,7 @@ val getWidget = endpoint(widgetId) {
     get("widgets" / widgetId)
     operationId = "getWidget"
     summary = "Fetch one widget"
+    security(token)
     json<Widget>() orFail noSuchWidget
 }
 
@@ -232,7 +230,7 @@ fun loggedApi(sdk: OpenTelemetry? = null): Api = api(loggedRoutes, JacksonCodecs
     // filter runs before any handler.
     filter(accessLog())
     sdk?.let { filter(tracing(it)) }
-    filter(tokenExceptHealth)
+    filter(requireToken)
     onRefusal(refusalLog())
     // The refusals a span cannot see either, counted through the same SDK.
     sdk?.let { onRefusal(refusalCounter(it)) }

@@ -1,7 +1,6 @@
 package example.bookmarks
 
 import io.github.matthewjones372.pelican.In2
-import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.start
@@ -10,7 +9,6 @@ import io.github.matthewjones372.pelican.test.pekko.client
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.github.matthewjones372.pelican.test.shouldBeApiError
 import io.github.matthewjones372.pelican.test.shouldBeError
-import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.github.matthewjones372.pelican.test.shouldHaveContentType
 import io.github.matthewjones372.pelican.test.shouldHaveNoBody

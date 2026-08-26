@@ -11,7 +11,6 @@ import io.github.matthewjones372.pelican.ErrorOutput
 import io.github.matthewjones372.pelican.JsonBool
 import io.github.matthewjones372.pelican.JsonNum
 import io.github.matthewjones372.pelican.JsonObj
-import io.github.matthewjones372.pelican.JsonOutput
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.Outcome

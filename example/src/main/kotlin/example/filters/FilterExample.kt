@@ -18,7 +18,6 @@ package example.filters
  * not have to ask again.
  */
 
-import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attribute
@@ -27,7 +26,6 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.pekko.handledNow

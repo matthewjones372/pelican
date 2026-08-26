@@ -2,7 +2,6 @@ package io.github.matthewjones372.pelican.openapi
 
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.ApiErrorEnvelope
-import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonValue

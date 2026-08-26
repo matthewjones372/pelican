@@ -2,7 +2,6 @@ package io.github.matthewjones372.pelican.benchmarks
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.IntCodec
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.default

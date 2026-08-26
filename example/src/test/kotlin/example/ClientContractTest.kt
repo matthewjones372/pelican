@@ -1,12 +1,10 @@
 package example
 
-import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.In3
 import io.github.matthewjones372.pelican.In4
 import io.github.matthewjones372.pelican.In5
-import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.UploadedFile
 import io.github.matthewjones372.pelican.api
@@ -31,8 +29,6 @@ import io.github.matthewjones372.pelican.test.shouldBeResponse
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
-import io.kotest.matchers.collections.shouldContain
-import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldNotBeNull

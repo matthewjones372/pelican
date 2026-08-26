@@ -7,8 +7,6 @@ import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.PathSegment
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.decodeSegment
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.text
 // File-level rather than in a companion: `const` in a private companion is
 // still a public static field on the class, and this is a sizing hint, not
 // something the published surface should promise.

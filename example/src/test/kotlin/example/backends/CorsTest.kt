@@ -8,12 +8,9 @@ import io.github.matthewjones372.pelican.test.RequestSpec
 import io.github.matthewjones372.pelican.test.ResponseSpec
 import io.github.matthewjones372.pelican.test.apiClient
 import io.kotest.assertions.withClue
-import io.kotest.matchers.collections.shouldContain
-import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest

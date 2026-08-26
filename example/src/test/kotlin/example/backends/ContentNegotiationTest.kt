@@ -1,6 +1,5 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.ServerEndpoint

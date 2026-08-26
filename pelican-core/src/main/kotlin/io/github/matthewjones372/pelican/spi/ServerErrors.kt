@@ -15,7 +15,6 @@ import io.github.matthewjones372.pelican.RefusalReason
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.Unrouted
 import io.github.matthewjones372.pelican.UnsupportedMediaType
-import io.github.matthewjones372.pelican.mediaType
 import io.github.matthewjones372.pelican.unwrapCompletion
 /**
  * What one throwable becomes on the wire, decided in core so the three backends

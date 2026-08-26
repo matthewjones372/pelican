@@ -6,7 +6,6 @@ import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalReason
-import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attempt
 import io.github.matthewjones372.pelican.attribute
 import io.github.matthewjones372.pelican.statusFor

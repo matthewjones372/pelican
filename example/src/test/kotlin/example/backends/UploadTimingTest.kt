@@ -7,7 +7,6 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ndjsonIn
 import io.kotest.assertions.withClue
-import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.io.InputStream

@@ -4,7 +4,6 @@ import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalReason
-import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.attempt
 import io.github.matthewjones372.pelican.statusFor
 import io.micrometer.core.instrument.Counter
