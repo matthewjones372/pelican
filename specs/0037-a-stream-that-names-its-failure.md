@@ -38,7 +38,8 @@ usual dependency test.
 val settled: CompletionStage<Exit<IngestError, Int>> =
     Stream.from(rows.toSource())                                     // Stream<Nothing, Row>
         .mapOrFail { row -> row.customer ?: fail(NoCustomer(row.id)) } // Stream<NoCustomer, Customer>
-        .mapAsync(4) { customer -> ledger.settle(customer) }           // CompletionStage<Outcome<Declined, Receipt>>
+        .mapAsync(4) { customer -> ledger.settle(customer) }           // CompletionStage<Either<Declined, Receipt>>
+        .map { it.toOutcome() }                                        // pelican-arrow, one import
         .divertErrors(to = declinedSink)                               // Stream<NoCustomer, Receipt>
         .runFold(0) { n, _ -> n + 1 }
         .run(system)
@@ -96,7 +97,10 @@ one failure value from handler to pipeline.
    depending on `pelican-streams`: no new library on its classpath.
 3. **`Stream` collides with `java.util.stream.Stream` at an import.**
    Recommend keeping it; `Flow` collides with two libraries.
-4. **Arrow overloads** — `divertLefts` over `Stream<E, Either<L, A>>`?
-   Recommend not: `.map { it.toOutcome() }` is one call.
+4. **Arrow overloads** — `divertLefts` over `Stream<E, Either<L, A>>`, so an
+   Arrow service never writes `toOutcome`? It needs a `pelican-streams-arrow`
+   module, since neither existing module may carry the other's library.
+   Recommend not yet: `.map { it.toOutcome() }` is one call; add the module
+   if that line turns up in every pipeline.
 5. **`Died` or a failed stage for defects?** Recommend `Died`: the swallowed
    null is the case for a defect being a value the caller must match.
