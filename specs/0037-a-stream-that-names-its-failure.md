@@ -1,87 +1,53 @@
-# 0037 — A stream that names its failure
+# 0037 — The bridge to a stream that names its failure
 
 ## Problem
 
-A Kotlin service on Pekko Streams writes the `javadsl`: `japi.Pair`,
-`NotUsed`, a `Supervision.Decider` set as an attribute far from the operator
-it governs, and one error channel typed `Throwable` for the whole graph.
-Teams that model failure as a value put an `Either` in every element, split
-it with `divertTo(sink, predicate)`, and cast the survivors back.
-
-Two things drop an element without a trace, and both are documented: a
-`mapAsync` whose `CompletionStage` completes with `null` "is not passed
-downstream", and a `Resume` decider means "the element is dropped and the
-stream continues". Kotlin makes the first trivial — a nullable lookup lifted
-into a future — and nothing in the types says so. A null was swallowed in
-production this way and left no evidence of where.
-
-Pelican has the value that says what a handler can fail with, `Outcome<E, T>`,
-and hands streaming handlers a bare `Source<T, NotUsed>`. The stream is where
-the declared-failure idea stops.
+A streaming handler is handed a bare `Source<T, NotUsed>` and an upload a
+bare `StreamIn<T>`. The typed stream DSL — `Stream<E, A>` over Pekko, with a
+non-null element bound and an `Exit` that carries a failure as a value — is a
+library of its own (decided by the maintainer in chat, 2026-09-03: nothing in
+it is HTTP, so it does not live here). Its spec 0001 is in that repository.
+What Pelican owes it is the seam.
 
 ## Not doing
 
-- **No second engine.** Every operator delegates to Pekko; `toSource()` and
-  `Stream.from(source)` are the escape hatch, so a missing operator is one
-  line away. No graph DSL, no materialised values beyond `NotUsed`.
-- **No supervision surface.** There is no `resume`. Dropping an element is
-  written as `divertErrors(to = sink)`, with the sink named.
-- **No coroutines, no Arrow.** `run` answers a `CompletionStage` as
-  `pelican-pekko` does, and `pelican-arrow` is already the `Either` seam.
+- **No stream operators here.** The library owns `Stream`; Pelican converts.
+- **No change to `streamedNow`.** `Stream<Nothing, T>.toSource()` already
+  fits it, and the binder keeps its one Pekko shape.
+- **Nothing until the library is published.** This spec is blocked on that
+  and says so, rather than vendoring a snapshot.
 
 ## Shape
 
-`pelican-streams`: core plus `pekko-stream`, no `pekko-http`, asserted by the
-usual dependency test.
+`pelican-streams`: `pelican-pekko` plus the library, asserted by the usual
+classpath test.
 
 ```kotlin
-val settled: CompletionStage<Exit<IngestError, Int>> =
-    Stream.from(rows.toSource())                                     // Stream<Nothing, Row>
-        .mapOrFail { row -> row.customer ?: fail(NoCustomer(row.id)) } // Stream<NoCustomer, Customer>
-        .mapAsync(4) { customer -> ledger.settle(customer) }           // CompletionStage<Either<Declined, Receipt>>
-        .map { it.toOutcome() }                                        // pelican-arrow, one import
-        .divertErrors(to = declinedSink)                               // Stream<NoCustomer, Receipt>
+ingestOrders handledBy { rows ->
+    rows.toStream()                                  // Stream<Nothing, CreateOrder>
+        .mapOrFail { it.customer ?: fail(NoCustomer(it)) }
+        .catchAll { Stream.empty() }
         .runFold(0) { n, _ -> n + 1 }
         .run(system)
+        .thenApply { Tally(it.getOrElse(0)) }
+}
 ```
 
-- `Stream<out E, out A : Any>`. The bound is the fix: `map { it.customer }` on
-  a nullable field does not compile; `mapOrFail` names what a missing one means.
-- `Exit<E, A>` is `Done(value)`, `Failed(error: E)` or `Died(cause: Throwable)`.
-  `run` completes normally with all three; a defect is matched on, not a
-  failed future nobody read.
-- `fail(e)` ends the stream with `E`, carried on Pekko's failure channel in a
-  private wrapper that only `run` unwraps, so fusion is untouched.
-- `mapAsync` turns a `null` completion into `Died(NullPointerException)`.
-- `either()`, `absolve()`, and `divertErrors(to: Sink<L, *>)` over
-  `Stream<E, Outcome<L, A>>` — the `divertTo` idiom with no predicate and no cast.
-- `catchAll` and `orElse` leave a failure type. `Stream<Nothing, T>.toSource()`
-  fits `streamedNow`; a stream still carrying an `E` has no status to become
-  mid-response, so it does not fit until the handler says what a failure means.
+- `StreamIn<T>.toStream(): Stream<Nothing, T>`, on the system the request
+  arrived on, as `runWith` is today.
+- `Either` into `Outcome` for a handler answering with a value is
+  `pelican-arrow`'s `toOutcome`, unchanged.
 
 ## Why this shape
 
-A typed view over `Source` keeps every Pekko guarantee and asks the compiler
-to hold two lines: an element is never null, and a failure is a named value
-until someone handles it. The alternative is a fresh engine over coroutines —
-more Kotlin, but a second runtime beside the one the service runs, and
-Pekko's operators to rewrite. `Outcome` rather than a stream-local `Either`:
-one failure value from handler to pipeline.
+One function and a module boundary, so a service that never streams never
+sees the library, and the library never learns what an endpoint is.
 
 ## Stack
 
-- [ ] **`spec-0037-stream`** — module, `Stream`, `Exit`, `from`, `map`,
-      `mapOrFail`, `filter`, `runFold`, `runCollect`, `run`.
-      Done when: a nullable `mapOrFail` body is in `DoesNotCompileTest` and
-      `fail(e)` arrives at `run` as `Exit.Failed(e)`.
-- [ ] **`spec-0037-async-and-split`** — `mapAsync`, `either`, `absolve`,
-      `divertErrors`, `catchAll`, `orElse`.
-      Done when: a `null` completion yields `Exit.Died`, and every
-      `Outcome.Err` through `divertErrors` is counted at the sink.
-- [ ] **`spec-0037-endpoints`** — `toSource`, `StreamIn.toStream`, the
-      `modules.md` row, a reference section.
-      Done when: `streamedNow { s.toSource() }` compiles only for
-      `Stream<Nothing, T>`, pinned in `DoesNotCompileTest`.
+- [ ] **`spec-0037-bridge`** — module, `toStream`, the `modules.md` row, a
+      reference paragraph.
+      Done when: `./gradlew build` is green with the module included.
 
 ## Acceptance
 
@@ -91,16 +57,8 @@ one failure value from handler to pipeline.
 
 ## Open questions
 
-1. **Pelican module or its own repository?** Nothing in it is HTTP. Recommend
-   the module: `Outcome` is the error value and the binders are the consumer.
-2. **Where does the `StreamIn` bridge live?** Recommend `pelican-pekko`
-   depending on `pelican-streams`: no new library on its classpath.
-3. **`Stream` collides with `java.util.stream.Stream` at an import.**
-   Recommend keeping it; `Flow` collides with two libraries.
-4. **Arrow overloads** — `divertLefts` over `Stream<E, Either<L, A>>`, so an
-   Arrow service never writes `toOutcome`? It needs a `pelican-streams-arrow`
-   module, since neither existing module may carry the other's library.
-   Recommend not yet: `.map { it.toOutcome() }` is one call; add the module
-   if that line turns up in every pipeline.
-5. **`Died` or a failed stage for defects?** Recommend `Died`: the swallowed
-   null is the case for a defect being a value the caller must match.
+1. **A module, or one function in `pelican-pekko`?** A function there would
+   put the library on every Pekko service's classpath. Recommend the module.
+2. **Does `Exit` need an `Outcome` conversion?** `Exit.Failed(e)` to a
+   declared failure reads well as `toOutcome(failure)`. Recommend waiting for
+   a handler that wants it.
