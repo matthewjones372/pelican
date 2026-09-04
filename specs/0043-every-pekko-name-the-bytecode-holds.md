@@ -59,11 +59,23 @@ mistaken for a class reference.
 
 ## Stack
 
-- [ ] **`spec-0043-linkage`** — the four project dependencies on the existing
+- [x] **`spec-0043-linkage`** — the four project dependencies on the existing
       source set, the linkage test, and an assertion that no `_2.13` artifact
       is on that classpath.
       Done when: `./gradlew build` is green and the test reports it scanned
       every one of the five modules.
+
+## Measured
+
+Sixty-one distinct Pekko types across fourteen Pelican classpath entries, and
+all sixty-one load against `_3`. The five modules name 148 between them, but
+they share the `javadsl` model, so the four added here contribute four types
+`pelican-pekko` did not already name — the coverage table above counts each
+module's own surface, not the union. The check is still worth having on all
+five: which module names a type is not fixed, and the scan follows the code.
+
+Verified against a failure: an absent name injected into the scanned set fails
+the test.
 
 ## Acceptance
 

@@ -67,6 +67,15 @@ dependencies {
     "scala3TestImplementation"(sourceSets.main.get().output)
     "scala3TestImplementation"(project(":pelican-core"))
     "scala3TestImplementation"(project(":pelican-jackson"))
+
+    // The other four modules that name Pekko, so the linkage check covers all
+    // of them. Since Pekko is `compileOnly` in each, a project dependency
+    // brings none of it — which `Scala3LinkageTest` asserts rather than
+    // assumes.
+    "scala3TestImplementation"(project(":pelican-client-pekko"))
+    "scala3TestImplementation"(project(":pelican-pekko-docs"))
+    "scala3TestImplementation"(project(":pelican-pekko-mcp"))
+    "scala3TestImplementation"(project(":pelican-test-pekko"))
     "scala3TestImplementation"("org.slf4j:slf4j-api:$slf4jVersion")
 
     "scala3TestImplementation"(platform("org.apache.pekko:pekko-bom_3:$pekkoVersion"))
