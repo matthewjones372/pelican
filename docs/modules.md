@@ -18,7 +18,7 @@ branch and return after 1.0; the table below is what main ships today.
 | `pelican-core` | **nothing** | endpoint descriptions, plain codecs, a minimal JSON tree, the client SPI and its in-memory implementation |
 | `pelican-jackson` | core + Jackson | your `Codecs` |
 | `pelican-arrow` | core + arrow-core | Arrow's `Either` into Pelican's `Outcome` and back |
-| `pelican-pekko` | core + Pekko HTTP | descriptions → that server's routes |
+| `pelican-pekko` | core, Pekko HTTP *provided* | descriptions → that server's routes |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and Swagger UI |
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
@@ -28,7 +28,7 @@ branch and return after 1.0; the table below is what main ships today.
 | `pelican-mcp` | core + schema | descriptions → MCP tool descriptions, and a dispatch that runs them. Values only, so deriving a tool list needs no server |
 | `pelican-mcp-server` | core + mcp | those tools **served**: JSON-RPC 2.0 over stdio, and the request/response half of Streamable HTTP. No MCP SDK |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
-| `pelican-client-pekko` | core + pekko-http | where a generated client's requests go, over Pekko HTTP's client |
+| `pelican-client-pekko` | core, pekko-http *provided* | where a generated client's requests go, over Pekko HTTP's client |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
 | `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
@@ -55,9 +55,14 @@ Every one of those dependency claims is a test:
   `pelican-metrics-otel` asserts the mirror image — core plus the OpenTelemetry
   API, and no Micrometer. That separation is the whole reason the two telemetry
   vendors are two modules.
-- `pelican-client-pekko` asserts it carries Pekko HTTP's own client and no
-  second stack — and not the matching *interpreter* either, since making calls
-  and serving routes are separate decisions.
+- `pelican-client-pekko` asserts it ships no Pekko at all, and not the
+  matching *interpreter* either, since making calls and serving routes are
+  separate decisions. Pekko is *provided* in every module that speaks it:
+  `pekko-actor_2.13` and `pekko-actor_3` are separate Maven modules holding
+  identical class names, so a resolver reconciles nothing and a service on the
+  Scala 3 cross-build that received ours would carry both. The application
+  names the cross-build it already runs; see
+  [reference.md](reference.md#versions).
 - `pelican-arrow` asserts it is core plus `arrow-core` and nothing else.
 - `pelican-test` asserts it drags in no server library and no matcher library.
 

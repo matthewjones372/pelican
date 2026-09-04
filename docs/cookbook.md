@@ -13,7 +13,12 @@ The recipes share one set of Gradle dependencies, written once here:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")       // brings pelican-core, and Pekko itself, transitively
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")       // brings pelican-core; compiles against Pekko
+    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
     implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")     // JacksonCodecs
     implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")  // startWithDocs and Swagger UI
     testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC1")    // the typed test client
@@ -74,6 +79,7 @@ And its test, in full:
 // build.gradle.kts
 dependencies {
     testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC1")
+    // Pekko itself comes from the shared block at the top of this page.
 }
 ```
 
@@ -471,6 +477,7 @@ fileReport handledNow { req -> Reports.file(this[caller].subject, req) }
 // build.gradle.kts
 dependencies {
     testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC1")
+    // Pekko itself comes from the shared block at the top of this page.
 }
 ```
 

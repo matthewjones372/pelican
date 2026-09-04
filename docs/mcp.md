@@ -23,6 +23,11 @@ dependencies {
     implementation("io.github.matthewjones372:pelican-mcp:$pelicanVersion")         // the tools as values
     implementation("io.github.matthewjones372:pelican-mcp-server:$pelicanVersion")  // and spoken
     implementation("io.github.matthewjones372:pelican-pekko-mcp:$pelicanVersion")   // over HTTP, on your backend
+    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
 }
 ```
 

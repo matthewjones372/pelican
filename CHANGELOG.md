@@ -72,6 +72,25 @@ like any other.
 
 ### Changed — read this one
 
+- **Pekko is no longer a dependency of the modules that speak it; a service
+  declares its own.** `pelican-pekko`, `pelican-client-pekko`,
+  `pelican-pekko-docs`, `pelican-pekko-mcp` and `pelican-test-pekko` declare
+  Pekko `compileOnly`, so no `org.apache.pekko` artifact is published in any
+  Pelican POM or module metadata. A build that added `pelican-pekko` alone now
+  fails to resolve `org.apache.pekko.http.javadsl.server.Route`; add
+  `pekko-bom`, `pekko-actor-typed`, `pekko-stream` and `pekko-http` beside it.
+  [reference.md](docs/reference.md#versions) has the block to paste.
+
+  Pelican pinned the Scala 2.13 cross-build. `pekko-actor_2.13` and
+  `pekko-actor_3` are different Maven modules carrying identical class names,
+  so no resolver reconciles them and `pekko-bom_3` never constrained the
+  `_2.13` set: an application already on Scala 3 that added Pelican got both
+  cross-builds on one classpath and Pekko's own version check refused to start
+  the service. Pelican compiles against `javadsl` and four names identical in
+  both cross-builds, so the suffix was never ours to choose. Either one works
+  now; the build and every suite still run at `_2.13`, Pekko 1.2.1 and Pekko
+  HTTP 1.3.0.
+
 - **The importer refuses to write handler stubs for a backend 1.0 does not
   ship.** `handlers.set("ktor")` and `handlers.set("http4k")` used to emit a
   file whose first import named `…pelican.ktor.*`, which nothing on the

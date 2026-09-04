@@ -76,7 +76,7 @@ promise was exercised rather than what a consumer resolves to.
       their own; `DependenciesTest`'s claim inverted.
       Done when: `./gradlew build` is green and `publishToMavenLocal` writes no
       `org.apache.pekko` entry into any Pelican POM or `.module`.
-- [ ] **`spec-0037-docs-truth`** — every `dependencies { }` block naming a Pekko
+- [x] **`spec-0037-docs-truth`** — every `dependencies { }` block naming a Pekko
       module across README, `docs/reference.md`, `modules.md`, `cookbook.md`,
       `mcp.md`, `a-whole-service.md`, `what-it-costs.md`, `llms.txt`; Versions
       reworded from floors to tested-against; the mixed-version troubleshooting

@@ -1274,7 +1274,14 @@ branch and return after 1.0. A generated client finds the adapter on the
 classpath without being told:
 
 ```kotlin
-dependencies { implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1") }
+dependencies {
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
+    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+}
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 ```
@@ -5286,10 +5293,30 @@ Micrometer 1.17.1 · OpenTelemetry 1.65.0 · arrow-core 2.1.2 · JDK 21 ·
 Gradle 9.7.1
 
 These are floors, not pins — Gradle resolves upwards, so a service already on
-a newer Pekko keeps its own. The Pekko floor is deliberately old: a library
-that pinned the newest Pekko would upgrade every app that adds it, and Pekko
-refuses to run mixed versions in one JVM. The whole build and every suite run
-at the floor, so what is tested is what the floor promises.
+a newer Jackson keeps its own. The whole build and every suite run at the
+floor, so what is tested is what the floor promises.
+
+Pekko is the exception: Pelican ships none of it. Every module that speaks
+Pekko declares it `compileOnly`, so no `org.apache.pekko` dependency reaches
+a consumer, and the service names the version *and* the Scala cross-build it
+already runs:
+
+```kotlin
+dependencies {
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+
+    // _2.13 or _3 — Pelican compiles against `javadsl` and four names that are
+    // identical in both, so it has no opinion.
+    implementation(platform("org.apache.pekko:pekko-bom_3:1.2.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_3")
+    implementation("org.apache.pekko:pekko-stream_3")
+    implementation("org.apache.pekko:pekko-http_3:1.3.0")
+    runtimeOnly("org.apache.pekko:pekko-slf4j_3")
+}
+```
+
+The versions listed above are what this repository builds and tests at, on
+`_2.13`. Anything at or above them works.
 
 ### If the service refuses to start naming two Pekko versions
 
@@ -5299,12 +5326,25 @@ you (perhaps indirectly) also depend on older versions of related artifacts.
 ```
 
 That is Pekko's own mixed-version check, not Pelican's: some Pekko artifacts
-on the classpath resolved to one version and some to another — usually a
-version pinned in one build file while another dependency brings a different
-one. The fix is the one the message names: align every `org.apache.pekko`
-artifact to one version, most simply by depending on `pekko-bom` at the
-version your app wants. Anything at or above the floor above works with
-Pelican.
+on the classpath resolved to one version and some to another. The fix is the
+one the message names — align every `org.apache.pekko` artifact to one
+version, most simply by depending on `pekko-bom` at the version your app
+wants.
+
+A version conflict no resolver reports looks the same from the JVM.
+`pekko-actor_2.13` and `pekko-actor_3` are different Maven modules carrying
+identical fully-qualified class names, so Gradle sees no conflict to resolve
+and `pekko-bom_3` never constrains the `_2.13` set: both jars land, and the
+check above reads two versions out of two manifests. Run
+`./gradlew dependencies --configuration runtimeClasspath | grep pekko` and
+look for two suffixes. Pelican is not the source of one — it ships no Pekko —
+but a dependency that does can be excluded:
+
+```kotlin
+implementation("some.library:that-ships-pekko:1.0") {
+    exclude(group = "org.apache.pekko")
+}
+```
 
 This is the only copy of that list. The README carried a second one until the
 two disagreed about half of it, and now points here instead.

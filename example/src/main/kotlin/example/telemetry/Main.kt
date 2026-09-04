@@ -4,8 +4,13 @@ package example.telemetry
  * To run this in a project of your own:
  *
  *     dependencies {
- *         // the interpreter; brings pelican-core and Pekko HTTP
+ *         // the interpreter; brings pelican-core, and compiles against Pekko
  *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *         // Pekko itself: Pelican ships no Scala cross-build, so name yours
+ *         implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+ *         implementation("org.apache.pekko:pekko-actor-typed_2.13")
+ *         implementation("org.apache.pekko:pekko-stream_2.13")
+ *         implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
  *     }
  */
 

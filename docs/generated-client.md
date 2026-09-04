@@ -34,6 +34,11 @@ document from the same function; see
 dependencies {
     implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
     implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
+    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
 }
 ```
 
@@ -132,7 +137,14 @@ the module and a client finds it through `ServiceLoader`, with no line to
 write.
 
 ```kotlin
-dependencies { implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1") }
+dependencies {
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
+    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+}
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 ```

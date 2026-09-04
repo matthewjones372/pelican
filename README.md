@@ -128,8 +128,13 @@ what 1.0 ships, and the stability promise takes effect at 1.0 rather than here
 
 ```kotlin
 dependencies {
-    // The interpreter. Brings pelican-core and Pekko HTTP itself transitively.
+    // The interpreter. Brings pelican-core; compiles against Pekko HTTP.
     implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
     // The codec module: Jackson, and the schemas the document derives.
     implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
     // /openapi.json and Swagger UI beside the endpoints — startWithDocs lives here.
@@ -139,7 +144,7 @@ dependencies {
 }
 ```
 
-Those four lines are the whole canonical stack — everything on this page
+Those modules are the whole canonical stack — everything on this page
 compiles against them. [Modules](docs/modules.md) lists all eighteen and what
 each depends on. New since 0.2.0: `pelican-mcp-server`, `pelican-pekko-mcp`
 and `pelican-arrow`.
@@ -181,6 +186,11 @@ dependencies {
     implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
     implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
     implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
 }
 ```
 

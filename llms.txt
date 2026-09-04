@@ -26,6 +26,12 @@ Facts worth having before anything else:
   `pelican-client-pekko`. New since 0.2.0, shipping from 1.0.0-RC1:
   `pelican-mcp-server`, `pelican-pekko-mcp` and `pelican-arrow` (Arrow's
   `Either` into `Outcome` and back).
+- Pekko is `compileOnly` in every module that speaks it, so Pelican ships no
+  `org.apache.pekko` dependency. Any example adding `pelican-pekko` or
+  `pelican-client-pekko` must also add `pekko-bom`, `pekko-actor-typed`,
+  `pekko-stream` and `pekko-http`. Never name a Scala suffix on the user's
+  behalf: `_2.13` and `_3` both work, and picking one for them is what puts
+  two cross-builds on a classpath.
 - 1.0 ships one backend, one JSON library and one client transport. The http4k
   and Ktor backends, the JDK, OkHttp and Ktor client transports,
   `pelican-jsoniter` and `pelican-kotlinx` are complete and green on the
