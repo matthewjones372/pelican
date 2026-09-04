@@ -47,7 +47,11 @@ firehose streamedNow {
 
 1. **A stalled consumer stops the producer.** Read a few frames, stop reading,
    let the buffers fill, sample `produced`, wait, sample again. The two samples
-   are equal: nothing is draining the source on the reader's behalf.
+   are equal: nothing is draining the source on the reader's behalf. The first
+   sample is also asserted below a ceiling — equal samples alone pass with any
+   bounded buffer, however large, because a big one still fills during the
+   settle. Measured: ~20,400 elements ahead of a stalled reader, which is
+   Pekko's stage buffers plus the TCP window; the ceiling is ten times that.
 2. **A fast consumer gets everything, in order.** A million elements through
    `ndjson<Tick>()`, read as fast as the socket allows. All arrive, in
    sequence, and the run finishes in seconds — so nothing accumulates and
@@ -66,7 +70,7 @@ broken: a producer that never gets going also stops when the reader does.
 
 ## Stack
 
-- [ ] **`spec-0038-unbounded-stream`** — one test class in
+- [x] **`spec-0038-unbounded-stream`** — one test class in
       `example/src/test/kotlin/example/backends/`, both tests, on the harness
       shapes `SlowConsumerTest` already uses.
       Done when: `./gradlew build` is green, and both tests fail on an
