@@ -5345,6 +5345,12 @@ dependencies {
 The versions listed above are what this repository builds and tests at, on
 `_2.13`. Anything at or above them works.
 
+That `_3` works too is a gate rather than a claim: `pelican-pekko` has a
+`scala3Test` source set whose classpath is this module's compiled output — the
+same bytecode a consumer downloads — against Pekko `_3` and nothing else. It
+describes an endpoint, interprets it, and answers a request. A class that moved
+between the cross-builds fails the build here.
+
 ### If the service refuses to start naming two Pekko versions
 
 ```

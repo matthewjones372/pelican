@@ -53,6 +53,43 @@ dependencies {
     testRuntimeOnly("org.apache.pekko:pekko-slf4j_$scalaBinary")
 }
 
+// The claim 0037 rests on: this module's compiled output links against either
+// Scala cross-build of Pekko, because it names `javadsl` and four types that
+// are identical in both. Everything else here runs at `_2.13`, so without this
+// source set that claim is an argument from an import list.
+//
+// `sourceSets.main.output` rather than a project dependency: the project would
+// bring the `_2.13` artifacts back with it, and the bytecode on its own is what
+// a consumer downloads.
+val scala3Test: SourceSet = sourceSets.create("scala3Test")
+
+dependencies {
+    "scala3TestImplementation"(sourceSets.main.get().output)
+    "scala3TestImplementation"(project(":pelican-core"))
+    "scala3TestImplementation"(project(":pelican-jackson"))
+    "scala3TestImplementation"("org.slf4j:slf4j-api:$slf4jVersion")
+
+    "scala3TestImplementation"(platform("org.apache.pekko:pekko-bom_3:$pekkoVersion"))
+    "scala3TestImplementation"("org.apache.pekko:pekko-actor-typed_3")
+    "scala3TestImplementation"("org.apache.pekko:pekko-stream_3")
+    "scala3TestImplementation"("org.apache.pekko:pekko-http_3:$pekkoHttpVersion")
+
+    "scala3TestImplementation"(kotlin("test"))
+    "scala3TestImplementation"("org.junit.jupiter:junit-jupiter:6.1.3")
+    "scala3TestImplementation"("io.kotest:kotest-assertions-core:6.2.4")
+    "scala3TestRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+}
+
+val scala3TestTask = tasks.register<Test>("scala3Test") {
+    description = "Runs the interpreter against the Scala 3 cross-build of Pekko."
+    group = "verification"
+    testClassesDirs = scala3Test.output.classesDirs
+    classpath = scala3Test.runtimeClasspath
+    useJUnitPlatform()
+}
+
+tasks.named("check") { dependsOn(scala3TestTask) }
+
 tasks.test {
     // The main runtime classpath, so DependenciesTest can assert on what is
     // actually shipped rather than on what the test JVM happens to load.

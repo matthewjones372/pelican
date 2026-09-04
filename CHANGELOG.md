@@ -72,6 +72,13 @@ like any other.
 
 ### Changed — read this one
 
+- **Either Scala cross-build of Pekko is now a gate, not an argument.**
+  `pelican-pekko` gained a `scala3Test` source set: this module's compiled
+  output, which is `_2.13`-compiled, on a classpath holding Pekko `_3` and no
+  `_2.13` artifact at all. It describes an endpoint, interprets it and answers
+  a request, so a Pekko class that moved between the cross-builds fails
+  `./gradlew build` rather than somebody's service. It runs on `check`.
+
 - **Pekko is no longer a dependency of the modules that speak it; a service
   declares its own.** `pelican-pekko`, `pelican-client-pekko`,
   `pelican-pekko-docs`, `pelican-pekko-mcp` and `pelican-test-pekko` declare
