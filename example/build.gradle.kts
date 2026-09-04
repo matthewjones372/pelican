@@ -13,6 +13,15 @@ dependencies {
     implementation(project(":pelican-openapi"))
     implementation(project(":pelican-codegen"))
     implementation(project(":pelican-pekko"))
+    // Pelican compiles against Pekko and ships none of it, so a service names
+    // the version and the Scala cross-build it runs. Either cross-build works;
+    // this repository builds and tests at `_2.13`.
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+    // Pekko's own logging at the slf4j API `pelican-pekko` writes to.
+    runtimeOnly("org.apache.pekko:pekko-slf4j_2.13")
     // Serving the docs is opt-in: this is the module that adds them to a server.
     implementation(project(":pelican-pekko-docs"))
     // And serving the tools is opt-in in exactly the same way: `example.mcp` is
@@ -81,7 +90,7 @@ dependencies {
     // needs. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
 
-    // Version-less: the BOM comes transitively from pelican-pekko.
+    // Version-less: the BOM is declared at implementation scope above.
     testImplementation("org.apache.pekko:pekko-actor-testkit-typed_2.13")
     // Golden files for the document and for the request lines: the half of the
     // contract a typed call is blind to. See GoldenContractTest.

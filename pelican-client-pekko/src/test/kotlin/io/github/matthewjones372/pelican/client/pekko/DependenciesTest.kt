@@ -12,23 +12,19 @@ import java.io.File
 /**
  * The claim this module makes about its own classpath, stated as a test.
  *
- * An adapter is what a caller adds to choose an HTTP stack, so it must carry
- * exactly one: core, Pekko, and Pekko's own closure. `pelican-pekko` is not on
- * the list either — sending a request and interpreting a description into a
- * route are separate decisions, and a caller making only calls should not
- * compile the interpreter in.
+ * Pekko is provided, not shipped: `pekko-actor_2.13` and `pekko-actor_3` are
+ * different Maven modules holding identical class names, so a resolver sees no
+ * conflict and an application on the Scala 3 build that received ours would run
+ * both until Pekko's version check stopped it. Shipping none lets the
+ * application name the suffix it already runs.
  */
 class DependenciesTest {
 
-    /** Kotlin's own runtime, core, and what Pekko HTTP brings with it. */
-    private val allowed = listOf(
-        "kotlin-stdlib", "annotations-", "pelican-core",
-        "pekko-", "scala-library", "config-", "ssl-config-core",
-        "reactive-streams", "parboiled", "slf4j-api",
-    )
+    /** Kotlin's own runtime and core. Nothing here has a Scala suffix. */
+    private val allowed = listOf("kotlin-stdlib", "annotations-", "pelican-core")
 
     @Test
-    fun `the main runtime classpath is core, kotlin, pekko, and nothing else`() {
+    fun `the published runtime classpath is core and kotlin, with no pekko on it`() {
         val raw = System.getProperty("pelican.client.pekko.runtimeClasspath")
         withClue("the build must pass -Dpelican.client.pekko.runtimeClasspath; see build.gradle.kts") {
             raw.shouldNotBeNull()
@@ -38,7 +34,7 @@ class DependenciesTest {
             .filter { it.isNotBlank() }
             .filterNot { entry -> allowed.any { entry.startsWith(it) } }
 
-        withClue("this adapter must carry nothing but core and Pekko, but found: $unexpected") {
+        withClue("a consumer brings their own Pekko, so this module must ship none, but found: $unexpected") {
             unexpected.shouldBeEmpty()
         }
     }

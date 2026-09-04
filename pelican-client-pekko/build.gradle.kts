@@ -12,14 +12,20 @@ val scalaBinary = "2.13"
 dependencies {
     api(project(":pelican-core"))
 
-    api(platform("org.apache.pekko:pekko-bom_$scalaBinary:$pekkoVersion"))
-    api("org.apache.pekko:pekko-actor-typed_$scalaBinary")
-    api("org.apache.pekko:pekko-stream_$scalaBinary")
-    api("org.apache.pekko:pekko-http_$scalaBinary:$pekkoHttpVersion")
+    // Provided, for the reason `pelican-pekko/build.gradle.kts` gives: the
+    // Scala suffix belongs to the application, not to us.
+    compileOnly(platform("org.apache.pekko:pekko-bom_$scalaBinary:$pekkoVersion"))
+    compileOnly("org.apache.pekko:pekko-actor-typed_$scalaBinary")
+    compileOnly("org.apache.pekko:pekko-stream_$scalaBinary")
+    compileOnly("org.apache.pekko:pekko-http_$scalaBinary:$pekkoHttpVersion")
 
-    // Nothing extra for the tests. They send at the JDK's own `HttpServer`,
-    // which proves more about what goes on the wire than Pekko's testkit
-    // talking to the server half of the same library would.
+    // The tests send at the JDK's own `HttpServer`, which proves more about
+    // what goes on the wire than Pekko's testkit talking to the server half of
+    // the same library would. They still need a Pekko to run against.
+    testImplementation(platform("org.apache.pekko:pekko-bom_$scalaBinary:$pekkoVersion"))
+    testImplementation("org.apache.pekko:pekko-actor-typed_$scalaBinary")
+    testImplementation("org.apache.pekko:pekko-stream_$scalaBinary")
+    testImplementation("org.apache.pekko:pekko-http_$scalaBinary:$pekkoHttpVersion")
 }
 
 tasks.test {

@@ -71,7 +71,7 @@ promise was exercised rather than what a consumer resolves to.
 
 ## Stack
 
-- [ ] **`spec-0037-provided-pekko`** — the five modules' Pekko dependencies to
+- [x] **`spec-0037-provided-pekko`** — the five modules' Pekko dependencies to
       `compileOnly` + `testImplementation`; `example` and `benchmarks` declare
       their own; `DependenciesTest`'s claim inverted.
       Done when: `./gradlew build` is green and `publishToMavenLocal` writes no

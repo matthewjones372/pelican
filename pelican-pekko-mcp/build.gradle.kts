@@ -1,3 +1,7 @@
+val pekkoVersion = "1.2.1"
+val pekkoHttpVersion = "1.3.0"
+val scalaBinary = "2.13"
+
 // The Pekko mounting of what pelican-mcp-server speaks, and the only thing in
 // it: a route that hands a POST body to the protocol and turns the answer into
 // an HttpResponse. Separate from pelican-pekko for the reason
@@ -6,4 +10,10 @@
 dependencies {
     api(project(":pelican-pekko"))
     api(project(":pelican-mcp-server"))
+
+    // Provided, as in `pelican-pekko`: it is `compileOnly` there, so it does
+    // not reach this module's compile classpath through the `api` above.
+    compileOnly(platform("org.apache.pekko:pekko-bom_$scalaBinary:$pekkoVersion"))
+    compileOnly("org.apache.pekko:pekko-stream_$scalaBinary")
+    compileOnly("org.apache.pekko:pekko-http_$scalaBinary:$pekkoHttpVersion")
 }
