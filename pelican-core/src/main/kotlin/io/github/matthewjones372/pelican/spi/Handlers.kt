@@ -15,11 +15,12 @@ import io.github.matthewjones372.pelican.wrap
 import java.util.concurrent.CompletionStage
 import kotlin.reflect.KClass
 /**
- * The handler with this API's filters wrapped around it. Called once per
- * endpoint at route-build time, so the chain is folded once, not per request.
+ * The handler with this API's filters wrapped around it, and then the
+ * endpoint's own inside them. Called once per endpoint at route-build time, so
+ * the chain is folded once, not per request.
  */
 fun Api.handlerFor(se: ServerEndpoint): (Params) -> CompletionStage<Any?> =
-    filters.wrap(se.invoke)
+    (if (se.filters.isEmpty()) filters else filters + se.filters).wrap(se.invoke)
 
 /**
  * How many values a request will decode, for sizing the bag they go into. A

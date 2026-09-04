@@ -118,10 +118,17 @@ private fun refuseRepeatedWebhooks(webhooks: List<Webhook>) {
  * because only a backend knows what a streaming handler returns, so each owns
  * its typed binders and produces one of these.
  */
-class ServerEndpoint(
+class ServerEndpoint internal constructor(
     val endpoint: Endpoint<*, *>,
     val invoke: (Params) -> CompletionStage<Any?>,
-)
+    /** What this endpoint alone runs behind, attached by [filteredBy]. */
+    val filters: List<Filter>,
+) {
+    // Two arguments, as it was: a binder compiled against an earlier release
+    // calls this one, and filters are attached afterwards rather than passed.
+    constructor(endpoint: Endpoint<*, *>, invoke: (Params) -> CompletionStage<Any?>) :
+        this(endpoint, invoke, emptyList())
+}
 
 /**
  * Bound endpoints plus the settings shared between them. Built by [api]: the

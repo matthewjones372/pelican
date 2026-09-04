@@ -284,6 +284,18 @@ like any other.
 
 ### Added
 
+- **`filteredBy` puts a filter over some of the endpoints rather than all of
+  them.** `filter(...)` on the `Api` runs for everything in it, so a service
+  with a public group and an authenticated one had to write a membership
+  predicate into `onlyWhen`, split into two `Api` values and lose one document,
+  or check in each handler. A list of bound endpoints now carries its own
+  filters: `secured.filteredBy(authenticate, rateLimit)`, concatenated with the
+  open ones into one `Api`. The API's filters stay outermost. It is folded by
+  `handlerFor`, so the Pekko interpreter, the in-memory transport behind the
+  typed test client and MCP dispatch all see it. Where the *description*
+  carries the distinction, `onlyWhen` reading `p.endpoint?.security` is still
+  the better tool — it cannot drift from the document.
+
 - **Passing a declaration where a payload belongs is refused where it is
   written.** `err(notFound)` and `ok(json<Order>())` both type-check — a
   declaration is a value — and then fail several lines later as

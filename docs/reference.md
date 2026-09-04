@@ -2635,6 +2635,33 @@ val timing = Filter { params, next ->
 without the fold, and `onlyWhen { endpoint -> ... }` narrows a filter to the
 endpoints it applies to.
 
+### A filter over some of the endpoints
+
+`filter(...)` on the `Api` runs for every endpoint in it. Where a service has
+two groups, `filteredBy` attaches filters to a list of bound endpoints, and the
+groups are concatenated like any other lists:
+
+```kotlin
+val open = listOf(health handledNow { "ok" })
+
+val secured = listOf(
+    getReport handledNow { id -> Reports.get(id, this[caller]) },
+).filteredBy(authenticate, rateLimit)
+
+val api = api(endpoints = open + secured, codecs = JacksonCodecs) {
+    filter(requestLog)          // still every endpoint
+}
+```
+
+The API's filters are outermost, then the group's, then the handler — so
+`requestLog` above sees the 401 `authenticate` throws. One `Api`, so the
+document, the MCP tool list and the typed test client stay whole.
+
+Use it where the grouping is structural. Where the *description* carries the
+distinction, `onlyWhen` is the better tool: a filter reading
+`p.endpoint?.security` enforces exactly what the document promises, and the two
+cannot drift. `example/secured` is that shape.
+
 ### The status, on the way out
 
 `after` is told what the handler *returned*, which is one step short of what an

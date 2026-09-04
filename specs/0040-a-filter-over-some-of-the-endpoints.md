@@ -73,7 +73,7 @@ here, and this keeps bound endpoints values too. Recommended.
 
 ## Stack
 
-- [ ] **`spec-0040-endpoint-filters`** — `filters` on `ServerEndpoint`,
+- [x] **`spec-0040-endpoint-filters`** — `filters` on `ServerEndpoint`,
       `filteredBy` for one and for a list, the `handlerFor` line, `.api` dumps.
       Done when: a suite proves an api-wide filter runs for both groups, a
       group's filter runs for its own group only, and the order is

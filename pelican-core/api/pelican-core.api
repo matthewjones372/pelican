@@ -499,6 +499,8 @@ public final class io/github/matthewjones372/pelican/FilterKt {
 	public static final fun attempt (Lio/github/matthewjones372/pelican/Params;Lkotlin/jvm/functions/Function1;)Ljava/util/concurrent/CompletionStage;
 	public static final fun attribute (Ljava/lang/String;)Lio/github/matthewjones372/pelican/Attribute;
 	public static final fun before (Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/Filter;
+	public static final fun filteredBy (Lio/github/matthewjones372/pelican/ServerEndpoint;[Lio/github/matthewjones372/pelican/Filter;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun filteredBy (Ljava/util/List;[Lio/github/matthewjones372/pelican/Filter;)Ljava/util/List;
 	public static final fun onlyWhen (Lio/github/matthewjones372/pelican/Filter;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/Filter;
 	public static final fun wrap (Ljava/util/List;Lkotlin/jvm/functions/Function1;)Lkotlin/jvm/functions/Function1;
 }
@@ -1422,6 +1424,7 @@ public abstract interface class io/github/matthewjones372/pelican/SecurityScheme
 public final class io/github/matthewjones372/pelican/ServerEndpoint {
 	public fun <init> (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function1;)V
 	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
+	public final fun getFilters ()Ljava/util/List;
 	public final fun getInvoke ()Lkotlin/jvm/functions/Function1;
 }
 

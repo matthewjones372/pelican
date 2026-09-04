@@ -92,6 +92,17 @@ fun Filter.onlyWhen(predicate: (Endpoint<*, *>) -> Boolean): Filter = Filter { p
 }
 
 /**
+ * The endpoint behind [filters], which run inside the API's own. For a group
+ * the description does not distinguish — `onlyWhen` is the answer when it does.
+ */
+fun ServerEndpoint.filteredBy(vararg filters: Filter): ServerEndpoint =
+    if (filters.isEmpty()) this else ServerEndpoint(endpoint, invoke, this.filters + filters)
+
+/** The same, over a list, so a group of bound endpoints stays a value. */
+fun List<ServerEndpoint>.filteredBy(vararg filters: Filter): List<ServerEndpoint> =
+    if (filters.isEmpty()) this else map { it.filteredBy(*filters) }
+
+/**
  * Folds the chain into one function. The first filter ends up outermost, so
  * the list reads in the order the request travels.
  */
