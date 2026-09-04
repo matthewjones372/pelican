@@ -82,7 +82,9 @@ real edits happen and it can be split by module without a red build in between.
 > which gets what this spec wanted — know what you publish, notice when it
 > changes — with no source churn, and makes `explicitApi` an informed decision:
 > the 1,429 declarations it pins are the list to read before deciding what
-> should have been `internal`. Rewrite these two against that dump.
+> should have been `internal`. Rewrite these two against that dump —
+> done in [spec 0044](0044-what-the-surface-does-not-need.md), which reads
+> it and supersedes both entries.
 
 ## Acceptance
 
