@@ -62,17 +62,46 @@ compiling, and `Codecs` implementors outside this repository are unaffected.
 
 ## Stack
 
-- [ ] **`spec-0039-measure`** — a JMH benchmark in `benchmarks/`, no socket:
+- [x] **`spec-0039-measure`** — a JMH benchmark in `benchmarks/`, no socket:
       `frame` + `ByteString.fromString` against a hand-written bytes path, for
       NDJSON and SSE, at three payload sizes. Reports numbers; changes no
       production code.
       Done when: `./gradlew :benchmarks:jmh` reports both paths, and the
       numbers are written into this spec under a **Measured** heading.
-- [ ] **`spec-0039-bytes`** — conditional on the numbers above: `encodeTo` on
+- [ ] ~~**`spec-0039-bytes`**~~ — not happening; see Measured. — conditional on the numbers above: `encodeTo` on
       `BodyCodec`, the Jackson override, `frameBytes` on both streaming
       outputs, `fromArrayUnsafe` in `Responses.kt`, `.api` dumps updated.
       Done when: `./gradlew build` is green and the benchmark shows the win the
       first entry predicted.
+
+## Measured
+
+`FramingBenchmark`, 2026-09-04, JMH on the maintainer's machine, ns/op:
+
+| payload | `ndjson` String | `ndjson` bytes | `sse` String | `sse` bytes |
+|---|---|---|---|---|
+| 100 B | **142** | 175 | 202 | **180** |
+| 1 KB | **678** | 1157 | **775** | 1156 |
+| 64 KB | **57,424** | 69,822 | **63,188** | 70,423 |
+
+The String path is faster in five rows of six. The one win — SSE at 100 bytes,
+11% — is below the bar. A `ByteArrayOutputStream` variant was slower still, so
+the bytes rows above use Jackson's own recycled buffers, which is the best
+plausible implementation rather than a strawman.
+
+Allocation moves the other way, from the first run (`-prof gc`, B/op):
+896 → 728 for `ndjson` at 100 bytes, and 393,968 → 131,600 at 64 KB; `sse` at
+64 KB, 590,976 → 131,684. Real, and largest exactly where the time regression
+is also largest.
+
+So the premise was wrong. `writeValueAsString` plus `ByteString.fromString` is
+not three naive allocations — Jackson recycles its character buffers and
+Pekko's UTF-8 encoder is fast — while `writeValueAsBytes` pays for a second
+generator setup and the framing pays for an array copy. Even the small-payload
+allocation win is 19%, under the bar on either metric.
+
+**Entry two does not happen.** `BodyCodec` keeps its two methods, 1.0 ships no
+new surface for this, and the benchmark stays as the reason.
 
 ## Acceptance
 
