@@ -1,5 +1,6 @@
 build/
 .gradle/
+.kotlin/
 *.log
 .idea/
 .claude/worktrees/
