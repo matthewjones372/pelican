@@ -19,10 +19,10 @@ dependencies {
 
     // Pekko is declared here for the reason a consumer declares it: it is
     // `compileOnly` in `pelican-pekko`, which ships no Scala cross-build.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.0"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.0")
 
     // jackson-module-kotlin arrives as `api` of the module above, and the
     // hand-written baselines are written against exactly what a consumer of
