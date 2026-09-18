@@ -47,7 +47,7 @@ dependencies {
 
     // The compiler, so that "this does not compile, and here is what it says"
     // can be a test rather than a sentence in a document that goes stale.
-    testImplementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.10")
+    testImplementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.20")
 
     // The importer's own DSL — `importOptions(...) { }` — is part of the frozen
     // surface, so StillCompilesTest compiles a call site for it. Test scope
