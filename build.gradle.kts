@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "2.4.10" apply false
     kotlin("plugin.serialization") version "2.4.10" apply false
-    id("com.diffplug.spotless") version "8.10.0"
+    id("com.diffplug.spotless") version "8.10.2"
     id("dev.detekt") version "2.0.0-alpha.6" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.9"
     // The version comes from the nearest `v` tag rather than a property, so
