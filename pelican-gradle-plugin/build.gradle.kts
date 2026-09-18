@@ -3,7 +3,7 @@ plugins {
     `java-gradle-plugin`
     // The same two the library modules are held to, with the same
     // configuration — a build of its own should not mean standards of its own.
-    id("com.diffplug.spotless") version "8.10.0"
+    id("com.diffplug.spotless") version "8.10.2"
     id("dev.detekt") version "2.0.0-alpha.6"
     // The Plugin Portal is where `plugins { id(...) }` resolves from without a
     // `pluginManagement` block, so the plugin goes to both it and Central.
