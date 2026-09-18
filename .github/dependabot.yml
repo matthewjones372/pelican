@@ -1,10 +1,77 @@
+# Dependabot rather than Renovate because Dependabot is already installed on
+# this repository and reads what this build actually looks like: literal
+# coordinates, and the `val pekkoVersion = "1.2.1"` a `platform(...)` three
+# lines later interpolates. Two things it cannot see are noted below.
 version: 2
 updates:
+  # `directories` is needed rather than a single `/` because
+  # `pelican-gradle-plugin` is not in the `include(...)` list in
+  # settings.gradle.kts -- it is an included build under `pluginManagement`,
+  # which the manifest scan does not follow. The modules that ARE in that list
+  # come with the root entry.
   - package-ecosystem: "gradle"
-    directory: "/"
+    directories:
+      - "/"
+      - "/pelican-gradle-plugin"
+    # One batch a week, before the working week rather than during it.
     schedule:
       interval: "weekly"
+      day: "monday"
+    # A wall of open PRs is a wall nobody reads. The groups below are what keep
+    # this number from being the binding constraint.
+    open-pull-requests-limit: 6
+    # The history is Conventional Commits, and a bot PR should not be the one
+    # exception.
+    commit-message:
+      prefix: "build"
+      include: "scope"
+    # One PR per upstream project, not per artifact. Pekko alone is six
+    # coordinates that only ever move together; opentelemetry is declared in
+    # two modules at one version.
+    groups:
+      pekko:
+        patterns: ["org.apache.pekko:*"]
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin:*"
+          - "org.jetbrains.kotlinx:*"
+      jackson:
+        patterns: ["com.fasterxml.jackson*:*"]
+      swagger:
+        patterns: ["io.swagger*:*"]
+      opentelemetry:
+        patterns: ["io.opentelemetry:*"]
+      junit:
+        patterns: ["org.junit*:*", "junit:junit"]
+      # Everything that shapes the build rather than the published bytecode.
+      build-tooling:
+        patterns:
+          - "com.diffplug.spotless*"
+          - "org.jetbrains.kotlinx.kover*"
+          - "pl.allegro.tech.build.axion-release*"
+          - "com.vanniktech.maven.publish*"
+          - "com.gradle.plugin-publish*"
+          - "org.gradle.toolchains.foojay-resolver-convention*"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "build"
+      include: "scope"
+    groups:
+      actions:
+        patterns: ["*"]
+
+# Two versions in this repository have no entry above, because no Dependabot
+# ecosystem covers them:
+#
+#   - The Gradle wrapper. `gradle/wrapper/gradle-wrapper.properties` decides
+#     which Gradle every contributor and every CI job runs, and Dependabot's
+#     gradle ecosystem does not update it. `./gradlew wrapper --gradle-version`,
+#     by hand.
+#   - ktlint. `val ktlintVersion` in build.gradle.kts is handed to Spotless as
+#     a function argument rather than declared as a coordinate, so no manifest
+#     scan finds it.
