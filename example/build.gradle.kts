@@ -52,7 +52,7 @@ dependencies {
     // is not the one that wrote them — swagger-parser reads the document back
     // and reports what is wrong with it. A generator marking its own homework
     // is worth very little; see OpenApiSpecQualityTest.
-    testImplementation("io.swagger.parser.v3:swagger-parser:2.1.47")
+    testImplementation("io.swagger.parser.v3:swagger-parser:2.1.48")
 
     // The compiler, so that "this does not compile, and here is what it says"
     // can be a test rather than a sentence in a document that goes stale.

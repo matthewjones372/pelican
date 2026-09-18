@@ -10,5 +10,5 @@ dependencies {
     api("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.2")
     api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2")
 
-    implementation("io.swagger.core.v3:swagger-core-jakarta:2.2.54")
+    implementation("io.swagger.core.v3:swagger-core-jakarta:2.2.55")
 }
