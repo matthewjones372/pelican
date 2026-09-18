@@ -24,15 +24,15 @@
 // dependency a second time to say so.
 dependencies {
     api(project(":pelican-core"))
-    api("io.opentelemetry:opentelemetry-api:1.65.0")
+    api("io.opentelemetry:opentelemetry-api:1.66.0")
 
     // The SDK, with its in-memory span exporter and metric reader, is how the
     // tests read back what was emitted without a collector and without a
     // network. Test-scoped on purpose: what this module puts on a consumer's
     // classpath is the API, and which SDK — if any — is wired underneath is
     // the service's own decision.
-    testImplementation("io.opentelemetry:opentelemetry-sdk:1.65.0")
-    testImplementation("io.opentelemetry:opentelemetry-sdk-testing:1.65.0")
+    testImplementation("io.opentelemetry:opentelemetry-sdk:1.66.0")
+    testImplementation("io.opentelemetry:opentelemetry-sdk-testing:1.66.0")
 }
 
 tasks.test {
