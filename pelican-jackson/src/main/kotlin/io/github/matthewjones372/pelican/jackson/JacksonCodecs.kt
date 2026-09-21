@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.jackson
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.core.JacksonException
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -8,6 +9,7 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonMapperBuilder
 import io.github.matthewjones372.pelican.BodyCodec
+import io.github.matthewjones372.pelican.BodyDecodeFailure
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.JsonArr
 import io.github.matthewjones372.pelican.JsonBool
@@ -58,11 +60,32 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
         // `@JsonTypeInfo`, so a `List<PaymentMethod>` went out with no
         // discriminator on any of its members and could not be read back.
         val writer = mapper.writerFor(javaType)
+        // `readerFor`, for the reason `writerFor` is here: resolved once with
+        // the codec rather than once per request. `mapper.readValue` looks up a
+        // root deserializer and builds a DeserializationContext on every call,
+        // and a codec is built when the Api is assembled and used for the life
+        // of the service.
+        val reader = mapper.readerFor(javaType)
         return object : BodyCodec<T> {
             override fun encodeToString(value: T): String = writer.writeValueAsString(value)
-            override fun decodeFromString(text: String): T = mapper.readValue(text, javaType)
+            override fun decodeFromString(text: String): T = reader.readValue(text)
+
+            /** `UTF8StreamJsonParser` rather than the char-based reader, on the bytes as they arrived. */
+            override fun decodeFrom(bytes: ByteArray): T = reader.readValue(bytes)
         }
     }
+
+    /**
+     * Jackson's parser, with the `StreamReadConstraints` its mapper carries —
+     * a depth and a document size this never has to state, and core's own
+     * reader has no equivalent of.
+     */
+    override fun readTree(text: String): JsonValue =
+        try {
+            mapper.readTree(text).toJsonValue()
+        } catch (e: JacksonException) {
+            throw BodyDecodeFailure(e.originalMessage ?: "The text is not JSON", e)
+        }
 
     override fun schema(type: KType, components: SchemaComponents): JsonObj {
         describer.freshPass()
@@ -124,20 +147,26 @@ fun defaultMapper(): ObjectMapper = jacksonMapperBuilder()
  * the 3.1 spelling — so a half-converted pipeline loses nullability silently.
  */
 private fun Schema<*>.toJsonObj(): JsonObj =
-    SwaggerJson31.mapper().convertValue(this, JsonNode::class.java).toJsonValue() as? JsonObj
+    SwaggerJson31.mapper().convertValue(this, JsonNode::class.java)
+        .toJsonValue(drop = SWAGGER_BOOKKEEPING) as? JsonObj
         ?: jsonObj { "type" to "object" }
 
 /** An artefact of swagger's object model, not part of the schema. */
 private const val SWAGGER_BOOKKEEPING = "exampleSetFlag"
 
-private fun JsonNode.toJsonValue(): JsonValue = when {
+/**
+ * [drop] is named by the caller rather than baked in: only the schema pass has
+ * a key that is bookkeeping, and a document read through `readTree` may hold a
+ * field of that name meaning it.
+ */
+private fun JsonNode.toJsonValue(drop: String? = null): JsonValue = when {
     isObject -> JsonObj(
         properties()
-            .filter { (name, _) -> name != SWAGGER_BOOKKEEPING }
-            .associate { (name, value) -> name to value.toJsonValue() },
+            .filter { (name, _) -> name != drop }
+            .associate { (name, value) -> name to value.toJsonValue(drop) },
     )
 
-    isArray -> JsonArr(map { it.toJsonValue() })
+    isArray -> JsonArr(map { it.toJsonValue(drop) })
 
     isTextual -> JsonStr(textValue())
 

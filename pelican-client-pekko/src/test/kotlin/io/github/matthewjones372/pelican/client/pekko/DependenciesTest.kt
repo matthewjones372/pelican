@@ -21,7 +21,7 @@ import java.io.File
 class DependenciesTest {
 
     /** Kotlin's own runtime and core. Nothing here has a Scala suffix. */
-    private val allowed = listOf("kotlin-stdlib", "annotations-", "pelican-core")
+    private val allowed = listOf("kotlin-stdlib", "annotations-", "jackson-core-", "pelican-core")
 
     @Test
     fun `the published runtime classpath is core and kotlin, with no pekko on it`() {

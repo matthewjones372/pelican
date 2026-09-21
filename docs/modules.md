@@ -15,7 +15,7 @@ branch and return after 1.0; the table below is what main ships today.
 
 | Module | Depends on | Contains |
 |---|---|---|
-| `pelican-core` | **nothing** | endpoint descriptions, plain codecs, a minimal JSON tree, the client SPI and its in-memory implementation |
+| `pelican-core` | `jackson-core` *only* | endpoint descriptions, plain codecs, a minimal JSON tree and the parser under it, the client SPI and its in-memory implementation |
 | `pelican-jackson` | core + Jackson | your `Codecs` |
 | `pelican-arrow` | core + arrow-core | Arrow's `Either` into Pelican's `Outcome` and back |
 | `pelican-pekko` | core, Pekko HTTP *provided* | descriptions → that server's routes |
@@ -38,7 +38,8 @@ branch and return after 1.0; the table below is what main ships today.
 Every one of those dependency claims is a test:
 
 - `pelican-core` asserts its runtime classpath holds nothing but the Kotlin
-  standard library.
+  standard library and `jackson-core`, and separately that databind, kotlinx
+  and Pekko are all absent — the parser is in, the object mapper is not.
 - `pelican-openapi` asserts Pekko is absent, so documentation can be generated
   in a build task with no server present.
 - `pelican-pekko` asserts the document generator is absent, so a service that

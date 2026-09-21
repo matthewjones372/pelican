@@ -685,7 +685,7 @@ private fun defaultOf(codec: PlainCodec<*>, value: Any): JsonValue {
     val encoded = (codec as PlainCodec<Any>).encode(value)
     return when (codec.openApiType) {
         "integer" -> encoded.toLongOrNull()?.let { JsonNum(it) } ?: JsonStr(encoded)
-        "number" -> encoded.toDoubleOrNull()?.let { JsonNum(it) } ?: JsonStr(encoded)
+        "number" -> encoded.toDoubleOrNull()?.takeIf { it.isFinite() }?.let { JsonNum(it) } ?: JsonStr(encoded)
         "boolean" -> encoded.toBooleanStrictOrNull()?.let { JsonBool(it) } ?: JsonStr(encoded)
         else -> JsonStr(encoded)
     }
