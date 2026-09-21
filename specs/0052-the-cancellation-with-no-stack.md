@@ -22,17 +22,19 @@ genuinely execute, which gave a long-standing intermittent failure two more
 chances per run to appear. It was always there; `build (21)` was simply being
 run three times under three names.
 
-**The throw site is unknown, and spec 0051 does not recover it.** 0051 makes
-Gradle print the *type* it could not rebuild, which is how the exception above
-is named at all. It cannot restore the stack: reconstruction failed, so the
-original frames were never rebuilt on the daemon side, and the test-report XML
-carries Gradle's own trace rather than Pekko's. We know what was thrown and
-nothing about where.
+**The throw site is unknown, and nothing can read it off the exception.** Spec
+0051 makes Gradle print the *type* it could not rebuild, which is how the
+exception above is named at all. It does not give a stack — and neither would
+anything else, because there is no stack to give. `StageWasCompleted` is a
+`SubscriptionWithCancelException.NonFailureCancellation`, which implements
+`scala.util.control.NoStackTrace` and so never captures frames; and it is a
+Scala `object`, one instance constructed once, so even forcing capture records
+where the singleton was initialised rather than where it was thrown. Both are
+measured below.
 
-That is the whole difficulty. `StageWasCompleted` is a
-`SubscriptionWithCancelException.NonFailureCancellation` — Pekko's signal that a
-subscription was cancelled because its stage had already finished — and without
-frames there is no saying which stage, on which side of the socket.
+That is the whole difficulty. Pekko's signal that a subscription was cancelled
+because its stage had already finished carries no evidence of which stage, on
+which side of the socket.
 
 The test is two sequential calls through the generated client over a real
 socket, and the body is fully consumed on both (`text()` reads it before the
@@ -63,46 +65,48 @@ cancellation could originate, which is a list of suspects rather than a finding.
 
 ## Shape
 
-Entry one buys the stack, because nothing can be decided without it. That is
-the alternative spec 0051 named and deferred: a listener inside the test JVM
-that records the throwable before Gradle ever serialises it.
+**Entry one cannot be "recover the stack". There is no stack, and there cannot
+be one** — established under **Measured** below. So entry one is the smallest
+thing that can actually name a culprit: log at each of the three places the
+transport can end a body, and see which one fires when the test fails.
 
 ```kotlin
-/** Gradle cannot rebuild a Scala `case object`, so its stack is gone by the time a report is written. This keeps it. */
-class LogRealFailure : TestWatcher {
-    override fun testFailed(context: ExtensionContext, cause: Throwable) {
-        // to stdout, which Gradle forwards verbatim
-    }
+// in PekkoHttpTransport, temporary and removed by entry two
+answer.isDone -> { log("discarding: caller gave up"); response.discardEntityBytes(running) }
+else -> {
+    val crossed = clientResponse(response)
+    if (!answer.complete(crossed)) { log("closing: lost the complete race"); crossed.body.close() }
 }
 ```
 
-Registered where it costs nothing to have and something to lack — a
-`junit-platform.properties` auto-registration, so no test has to remember it.
-
 ## Why this shape
 
-0051 recommended the one-line logging change and said the listener was worth
-building "only if something is found that the message does not name". This is
-that thing. The type is named; the frames are not; and the frames are the whole
-question.
+The first draft proposed a JUnit listener to capture the throwable before Gradle
+serialised it, on the reasoning that Gradle had lost the frames. Gradle had not
+lost them. They were never taken, and forcing them to be taken yields the wrong
+site. Both are measured below.
 
-A listener is also the smaller commitment it looks like: it observes and
-prints, changes no behaviour, and can be deleted the day Gradle learns to keep
-a stack it could not rebuild.
+What is left is that the throw site cannot be read off the exception at all, so
+it has to be observed where our own code makes the call. Three places can end a
+response body; logging all three costs a few lines and removes the guessing.
 
-The alternative is to reason from the three candidate sites and patch the most
-likely one. That is how a flake becomes two flakes.
+`StageWasCompleted` is also, by Pekko's own naming, a `NonFailureCancellation` —
+a signal that a stage finished, not a fault. That a *non-failure* reaches a test
+as a failure suggests the fix may be that the transport should not propagate one
+at all. That is a hypothesis for entry two to confirm, not a licence to change
+the transport now.
 
 ## Stack
 
-- [ ] **`spec-0052-keep-the-stack`** — a JUnit `TestWatcher`, auto-registered,
-      printing the real throwable and its stack before Gradle serialises the
-      failure.
-      Done when: a test throwing `StageWasCompleted` shows Pekko's own frames in
-      the console, and `./gradlew build` is green.
-- [ ] **`spec-0052-the-fix`** — whatever the frames from entry one show.
-      Done when: the reproduction from entry one stops failing, and `main` is
-      green on 21, 23 and 25 across consecutive runs.
+- [ ] **`spec-0052-name-the-canceller`** — logging at the transport's three
+      body-ending paths, temporary, removed by entry two.
+      Done when: a run that reproduces the failure says which path ran, recorded
+      here under **Measured**.
+- [ ] **`spec-0052-the-fix`** — whatever entry one names. The standing
+      hypothesis is that a `NonFailureCancellation` should not reach a caller
+      as a thrown exception.
+      Done when: the reproduction stops failing and `main` is green on 21, 23
+      and 25 across consecutive runs.
 
 ## Acceptance
 
@@ -110,21 +114,66 @@ likely one. That is how a flake becomes two flakes.
 ./gradlew build
 ```
 
+## Measured
+
+Three things established with a throwaway `TestWatcher` in `pelican-pekko`
+throwing the real exception reflectively, on `1d225d5`.
+
+**A `TestWatcher` does see the throwable.** The first open question asked
+whether the exception surfaces on a stream thread where JUnit would never
+report it. It does not — the watcher fired and named it:
+
+```
+PROBE-SAW: org.apache.pekko.stream.SubscriptionWithCancelException$StageWasCompleted$
+```
+
+**But it carries no stack, and never did.**
+
+```
+PROBE-FRAMES:
+```
+
+`SubscriptionWithCancelException$NonFailureCancellation extends RuntimeException
+implements scala.util.control.NoStackTrace`, and overrides `fillInStackTrace()`
+to return `this` without filling. Gradle never lost the frames; Pekko never took
+them. No listener, on any thread, can recover what was not captured.
+
+**And forcing them to be taken gives the wrong site.** Scala's `NoStackTrace`
+has an escape hatch — `NoStackTrace$`'s static initialiser reads
+`System.getProperty("scala.control.noTraceSuppression")`, and `fillInStackTrace`
+calls the real one when it is `"true"`. With
+`systemProperty("scala.control.noTraceSuppression", "true")` the stack fills, and
+is useless:
+
+```
+org.apache.pekko.stream.SubscriptionWithCancelException$NonFailureCancellation.<init>(SubscriptionWithCancelException.scala:41)
+org.apache.pekko.stream.SubscriptionWithCancelException$StageWasCompleted$.<init>(SubscriptionWithCancelException.scala:43)
+org.apache.pekko.stream.SubscriptionWithCancelException$StageWasCompleted$.<clinit>(SubscriptionWithCancelException.scala:43)
+java.base/java.lang.Class.forName0(Native Method)
+```
+
+It ends at `<clinit>`. `StageWasCompleted` is a Scala `object`: one instance,
+constructed once, so its stack records where the singleton was first touched —
+here, the probe's own `Class.forName`. In production it would record whichever
+code first initialised the class, which has nothing to do with where it was
+later thrown. The property is not worth setting.
+
 ## Open questions
 
-- **Does a `TestWatcher` see it?** The exception may surface from a stream
-  thread rather than the test thread, in which case JUnit never reports it as
-  the failure cause and the listener sees nothing. Recommend checking that
-  first, before building the registration: if it does not, the answer is an
-  uncaught-exception handler on the transport's dispatcher instead.
-- **Which side throws — client or server?** Both are in one JVM here, so a
-  stack will say, and nothing before then will. Recommend not speculating in
-  the meantime.
+- ~~**Does a `TestWatcher` see it?**~~ **Answered: yes**, and it does not help.
+  See **Measured**.
+- **Which side throws — client or server?** Still unknown, and the exception
+  cannot say. Entry one's logging is on the client side because that is where
+  our code ends a body; if none of the three paths fires, the answer is the
+  server and entry one needs a second pass there.
 - **Is `StreamConverters.asInputStream` the wrong bridge?** It is a blocking
   reader over a stream whose lifetime the caller controls, which is the shape
-  that produces cancellation races. Possibly the finding, possibly a red
-  herring; entry one decides.
-- **How reproducible is it locally?** 0049 needed a soak of tens of thousands
-  of iterations and never hit it. Recommend budgeting for the same and using CI
-  as the reproducer if a loop will not do it — three sightings in a day of
-  ordinary runs suggests CI provokes it more readily than a tight loop does.
+  that produces cancellation races. Entry one's third log line is on it.
+- **Should a `NonFailureCancellation` ever reach a caller?** Pekko's own name
+  says no. Recommend treating that as entry two's likely answer rather than
+  entry one's assumption — if the logging shows something else entirely, this
+  would have been a comfortable wrong turn.
+- **How reproducible is it locally?** Unknown and probably poorly: 0049 needed
+  a soak of tens of thousands of iterations and never hit its race. Three
+  sightings in a day of ordinary CI suggests CI provokes this more readily than
+  a loop will, so entry one's logging may have to land and wait.
