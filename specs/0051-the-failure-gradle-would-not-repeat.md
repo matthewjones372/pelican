@@ -26,8 +26,12 @@ Three things combine, and only the last is ours.
 
 **Gradle reconstructs the exception in the daemon.** The test JVM serialises a
 failure across a socket, and `TestEventSerializer$DefaultTestFailureSerializer`
-rebuilds it on the other side. A Scala `object` — the trailing `$` — has no
-constructor it can call, so reconstruction fails and Gradle substitutes a
+rebuilds it on the other side. A Scala `case object` does not serialise as
+itself: it has a `writeReplace()` returning a
+`scala.runtime.ModuleSerializationProxy` that holds its own `Class`. The daemon
+has no scala-library on its classpath, so it cannot load the proxy, and
+reconstruction fails with `ClassNotFoundException:
+scala.runtime.ModuleSerializationProxy`. Gradle substitutes a
 `TestFailureSerializationException`.
 
 **That substitute carries the truth in its message.** Gradle names the real
@@ -57,16 +61,16 @@ wrong thing, and today it cost an afternoon on a two-line dependency bump.
 
 ## Shape
 
-One line, in the block at `build.gradle.kts:191` that already configures every
-`Test` task:
+One line, in the block that already configures every `Test` task:
 
 ```kotlin
 tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
-
-    // Gradle rebuilds a failure in the daemon and cannot rebuild a Scala
-    // `object`, so it substitutes an exception naming the real one in its
-    // message. SHORT, the default, prints class names and never messages.
+    // A Scala `case object` thrown by a test serialises
+    // through `scala.runtime.ModuleSerializationProxy`, which the daemon
+    // cannot load because it carries no scala-library. Gradle then reports a
+    // `TestFailureSerializationException` naming the real type in its
+    // *message* — and `SHORT`, the default, prints types and never
+    // messages. See spec 0051.
     testLogging { exceptionFormat = TestExceptionFormat.FULL }
 }
 ```
@@ -93,12 +97,62 @@ noisier. That is the right trade for a log that currently names the wrong class.
 
 ## Stack
 
-- [ ] **`spec-0051-full-exception-format`** — `testLogging { exceptionFormat =
+- [x] **`spec-0051-full-exception-format`** — `testLogging { exceptionFormat =
       TestExceptionFormat.FULL }` in the shared `Test` configuration, with the
       reason in a comment.
       Done when: a test made to throw a Scala `object` exception prints the real
       class name in the console output of `./gradlew build`, where today it
       prints `ClassNotFoundException`.
+
+## Measured
+
+Reproduced and fixed locally on `e55e59c`, with a throwaway test in
+`pelican-pekko` that throws the real exception reflectively:
+
+```kotlin
+val cls = Class.forName("org.apache.pekko.stream.SubscriptionWithCancelException$StageWasCompleted$")
+throw cls.getField("MODULE$").get(null) as Throwable
+```
+
+**Before** — the CI failure, reproduced exactly:
+
+```
+ScratchMaskingTest > a test that throws a scala case object exception() FAILED
+    org.gradle.api.internal.tasks.testing.TestFailureSerializationException at TestEventSerializer.java:359
+        Caused by: java.lang.ClassNotFoundException at URLClassLoader.java:445
+```
+
+**After**, with `exceptionFormat = FULL`:
+
+```
+ScratchMaskingTest > a test that throws a scala case object exception() FAILED
+    org.gradle.api.internal.tasks.testing.TestFailureSerializationException: An exception of type org.apache.pekko.stream.SubscriptionWithCancelException$StageWasCompleted$ was thrown by the test, but Gradle was unable to recreate the exception in the build process
+        java.lang.ClassNotFoundException: scala.runtime.ModuleSerializationProxy
+```
+
+The real type is named without leaving the console.
+
+Two claims in this spec's first draft were wrong, and the reproduction is what
+established it.
+
+**A Scala `case object` is not unreconstructible for want of a constructor.**
+`javap` shows `StageWasCompleted$` with a public no-arg constructor. What
+defeats the daemon is `writeReplace()`, which replaces the instance with a
+`scala.runtime.ModuleSerializationProxy` — and the missing class in the second
+line above is that proxy, not the Pekko type. The Gradle daemon carries no
+scala-library at all.
+
+**Kotlin `object` declarations do not have the same shape.** A Kotlin
+`private object NotReconstructible : RuntimeException(...)` thrown from a test
+in `pelican-core` reported as itself before any change:
+
+```
+ScratchMaskingTest > a test that throws an object exception() FAILED
+    io.github.matthewjones372.pelican.ScratchMaskingTest$NotReconstructible at ScratchMaskingTest.kt:12
+```
+
+No `writeReplace`, so Gradle's placeholder path keeps the type and message. The
+hazard is Scala's, not every `object`'s.
 
 ## Acceptance
 
@@ -138,6 +192,9 @@ from memory:
 - **Should `showCauses` and `showStackTraces` be set too?** They default true,
   so `FULL` alone should be enough. Worth confirming while building entry one
   rather than setting them blind.
-- **Which other exceptions does this hit?** `StageWasCompleted` is one Scala
-  `object` among many in Pekko, and Kotlin `object` declarations have the same
-  shape. Recommend not enumerating them: the fix does not depend on the list.
+- **Which other exceptions does this hit?** Every Scala `case object` thrown as
+  a Throwable, because all of them serialise through
+  `ModuleSerializationProxy` and the daemon has no scala-library. **Not** Kotlin
+  `object` declarations: measured below, one reconstructs and prints its own
+  type. Recommend not enumerating the Scala side: the fix does not depend on
+  the list.
