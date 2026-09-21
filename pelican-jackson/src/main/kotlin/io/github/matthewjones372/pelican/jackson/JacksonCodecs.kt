@@ -58,9 +58,15 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
         // `@JsonTypeInfo`, so a `List<PaymentMethod>` went out with no
         // discriminator on any of its members and could not be read back.
         val writer = mapper.writerFor(javaType)
+        // `readerFor`, for the reason `writerFor` is here: resolved once with
+        // the codec rather than once per request. `mapper.readValue` looks up a
+        // root deserializer and builds a DeserializationContext on every call,
+        // and a codec is built when the Api is assembled and used for the life
+        // of the service.
+        val reader = mapper.readerFor(javaType)
         return object : BodyCodec<T> {
             override fun encodeToString(value: T): String = writer.writeValueAsString(value)
-            override fun decodeFromString(text: String): T = mapper.readValue(text, javaType)
+            override fun decodeFromString(text: String): T = reader.readValue(text)
         }
     }
 
