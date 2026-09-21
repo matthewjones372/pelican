@@ -27,6 +27,7 @@ class FormBodyTest {
         val visits: Int,
         val tags: List<String>,
         val age: Int?,
+        val price: Double,
     )
 
     data class Nested(val inner: SignIn)
@@ -58,6 +59,7 @@ class FormBodyTest {
                                 put("user", jsonObj { "type" to "string" })
                                 put("remember", jsonObj { "type" to "boolean" })
                                 put("visits", jsonObj { "type" to "integer"; "format" to "int32" })
+                                put("price", jsonObj { "type" to "number"; "format" to "double" })
                                 put(
                                     "tags",
                                     jsonObj {
@@ -141,6 +143,22 @@ class FormBodyTest {
         // An untouched number input submits "", which is not a number. Leaving
         // the property out is what lets the type's own default apply.
         codec.decodeFromString("user=&visits=") shouldBe """{"user":""}"""
+    }
+
+    /**
+     * `"NaN".toDoubleOrNull()` is `NaN`, not null, so the obvious decode
+     * accepted it — and the JSON grammar has no NaN, so what went to the codec
+     * was a document it could never read back. A sender gets the 400 that any
+     * other unusable value gets.
+     */
+    @Test
+    fun `a number the JSON grammar cannot carry is refused rather than written out`() {
+        listOf("NaN", "Infinity", "-Infinity").forEach { sent ->
+            val failure = shouldThrow<DecodeFailure> { codec.decodeFromString("price=$sent") }
+
+            failure.paramName shouldBe "price"
+            failure.raw shouldBe sent
+        }
     }
 
     @Test

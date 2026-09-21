@@ -67,6 +67,21 @@ data class JsonStr(val value: String) : JsonValue {
 }
 
 data class JsonNum(val value: Number) : JsonValue {
+    /**
+     * The JSON grammar has no NaN and no infinity, so a tree holding one could
+     * be written and never read back. Refused here rather than at `write`,
+     * because the mistake is made where the value is built and a render-time
+     * throw would surface it inside an interpreter instead.
+     */
+    init {
+        val finite = when (value) {
+            is Double -> value.isFinite()
+            is Float -> value.isFinite()
+            else -> true
+        }
+        require(finite) { "$value cannot be written as JSON: the grammar has no NaN and no infinity." }
+    }
+
     override fun write(sb: StringBuilder) { sb.append(value.toString()) }
 }
 
