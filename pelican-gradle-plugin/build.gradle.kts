@@ -3,11 +3,11 @@ plugins {
     `java-gradle-plugin`
     // The same two the library modules are held to, with the same
     // configuration — a build of its own should not mean standards of its own.
-    id("com.diffplug.spotless") version "8.10.0"
+    id("com.diffplug.spotless") version "8.10.2"
     id("dev.detekt") version "2.0.0-alpha.6"
     // The Plugin Portal is where `plugins { id(...) }` resolves from without a
     // `pluginManagement` block, so the plugin goes to both it and Central.
-    id("com.gradle.plugin-publish") version "2.1.1"
+    id("com.gradle.plugin-publish") version "2.2.1"
     // Central, via the Portal. It wraps `maven-publish` and `signing`.
     id("com.vanniktech.maven.publish") version "0.37.0"
     // The same tag this repository's other build reads. An included build is
