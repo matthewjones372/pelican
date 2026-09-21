@@ -5,6 +5,7 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.kotest.assertions.fail
 import io.kotest.assertions.withClue
 import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
@@ -15,7 +16,9 @@ import java.io.InputStream
 import java.net.Socket
 import java.net.URI
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 
@@ -39,8 +42,14 @@ class UnboundedStreamTest {
         /** Short, so several are written into the stalled socket. */
         val KEEP_ALIVE = 100.milliseconds
 
-        /** Long enough for Pekko's buffers to fill and settle. */
-        const val SETTLE_MILLIS = 500L
+        /**
+         * How long a settle may take before the source is presumed never to
+         * settle. Only a failing run waits this out, so it is generous.
+         */
+        val SETTLE_TIMEOUT = 10.seconds
+
+        /** How often the counter is read while waiting for it to stop moving. */
+        const val SAMPLE_MILLIS = 50L
 
         /** The window in which nothing may be produced. */
         const val STALL_MILLIS = 500L
@@ -97,8 +106,7 @@ class UnboundedStreamTest {
 
                 // Nothing is read from here on. Whatever buffering exists fills
                 // up, and then demand has to stop reaching the source.
-                Thread.sleep(SETTLE_MILLIS)
-                val settled = produced.get()
+                val settled = produced.settled(within = SETTLE_TIMEOUT)
                 Thread.sleep(STALL_MILLIS)
 
                 withClue("the source produced ${produced.get() - settled} elements with nobody reading") {
@@ -150,6 +158,24 @@ class UnboundedStreamTest {
         } finally {
             server.stop()
         }
+    }
+
+    /**
+     * Settled when two consecutive reads agree. How long that takes is the
+     * machine's business; a source that never settles is the bug this test
+     * exists to catch, so the deadline fails rather than returning a number.
+     */
+    @Suppress("SleepInsteadOfDelay") // As above: elapsed wall clock is the measurement.
+    private fun AtomicLong.settled(within: Duration): Long {
+        val deadline = System.nanoTime() + within.inWholeNanoseconds
+        var last = get()
+        while (System.nanoTime() < deadline) {
+            Thread.sleep(SAMPLE_MILLIS)
+            val now = get()
+            if (now == last) return now
+            last = now
+        }
+        fail("the source was still producing after $within with nobody reading: $last elements")
     }
 
     private fun request(socket: Socket, uri: URI, path: String, accept: String) {

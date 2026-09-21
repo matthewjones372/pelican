@@ -32,7 +32,7 @@ class NoOtherDependenciesTest {
      * a dependency that crept in.
      */
     private val allowed = listOf(
-        "kotlin-stdlib", "annotations-", "pelican-core",
+        "kotlin-stdlib", "annotations-", "jackson-core-", "pelican-core",
         "micrometer-core", "micrometer-commons", "micrometer-observation", "HdrHistogram", "jspecify",
     )
 

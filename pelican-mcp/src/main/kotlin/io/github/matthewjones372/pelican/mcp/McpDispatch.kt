@@ -21,7 +21,6 @@ import io.github.matthewjones372.pelican.QueryParam
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.emptyJsonObj
 import io.github.matthewjones372.pelican.operationName
-import io.github.matthewjones372.pelican.parseJson
 import io.github.matthewjones372.pelican.payloadType
 import io.github.matthewjones372.pelican.schema.StandaloneSchemas
 import io.github.matthewjones372.pelican.spi.decodeList
@@ -158,7 +157,7 @@ internal class BoundTool(
         // Only where the tool published a schema for it: `structuredContent`
         // is validated against that schema, and one sent without it is a
         // client's problem to work out.
-        val structured = if (tool.outputSchema == null) null else parseJson(text) as? JsonObj
+        val structured = if (tool.outputSchema == null) null else codecs.readTree(text) as? JsonObj
         return ToolResult(text, structured)
     }
 
