@@ -95,11 +95,11 @@ claims this way — `FunctionalStyleTest`, `NoThirdPartyDependenciesTest`,
 
 ## Stack
 
-- [ ] **`spec-0047-ascii-names`** — the two names lose their em dashes, and a
+- [x] **`spec-0047-ascii-names`** ([#118](https://github.com/matthewjones372/pelican/pull/118)) — the two names lose their em dashes, and a
       test keeps non-ASCII out of backticked declarations.
       Done when: `env -u LANG -u LC_ALL ./gradlew build` gets past
       `:example:compileTestKotlin`.
-- [x] ~~**`spec-0047-locale-guard`**~~ — not happening as written; see
+- [x] ~~**`spec-0047-locale-guard`**~~ ([#124](https://github.com/matthewjones372/pelican/pull/124)) — not happening as written; see
       **Measured**. What it was for is covered by extending entry one's test to
       source file names.
       Done when: a source file named with a character a file name cannot hold is
