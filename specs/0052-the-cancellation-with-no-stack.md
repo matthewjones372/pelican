@@ -98,10 +98,12 @@ the transport now.
 
 ## Stack
 
-- [ ] **`spec-0052-name-the-canceller`** — logging at the transport's three
-      body-ending paths, temporary, removed by entry two.
-      Done when: a run that reproduces the failure says which path ran, recorded
-      here under **Measured**.
+- [x] **`spec-0052-name-the-canceller`** — a `CancellationTrace` transport
+      decorator in `example`'s tests, recording the observer's stack when a
+      Pekko cancellation surfaces. Test-scoped, so nothing published changes.
+      Done when: the decorator's own tests prove it fires with frames, and the
+      suite that fails in CI runs through it. **Both hold; the trace from a real
+      CI failure goes under Measured when one appears.**
 - [ ] **`spec-0052-the-fix`** — whatever entry one names. The standing
       hypothesis is that a `NonFailureCancellation` should not reach a caller
       as a thrown exception.
@@ -157,6 +159,27 @@ constructed once, so its stack records where the singleton was first touched —
 here, the probe's own `Class.forName`. In production it would record whichever
 code first initialised the class, which has nothing to do with where it was
 later thrown. The property is not worth setting.
+
+
+### Entry one, as built
+
+The draft put the logging inside `PekkoHttpTransport`. It went into
+`example`'s tests instead, as a `ClientTransport` decorator the failing suite
+wraps its transport in — `OrdersClient(baseUrl, codecs,
+CancellationTrace(PekkoHttpTransport()))`. Nothing in a published module
+changes, there is no `.api` churn, and nothing has to be removed by entry two.
+
+It catches `SubscriptionWithCancelException.NonFailureCancellation` rather than
+`RuntimeException`, which is both more precise and the only legal choice:
+detekt's `TooGenericExceptionCaught` excludes `Interpreter.kt`, `Server.kt` and
+`Responses.kt`, and nothing else.
+
+Its own tests prove it fires rather than assuming it will — a cancellation on
+read is reported with the reader's frames and rethrown untouched, an ordinary
+`IOException` is left alone, a successful read reports nothing, and a
+cancellation nested under another failure is still found. That mattered:
+instrumentation that silently does not fire would leave the next CI failure as
+uninformative as the four before it.
 
 ## Open questions
 
