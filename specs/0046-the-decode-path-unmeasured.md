@@ -79,6 +79,49 @@ about a different half, and it is worth no more than it was worth then.
       Done when: the build is green and the benchmark shows the win the entry
       above predicted.
 
+## Measured
+
+`DecodeBenchmark`, 2026-09-21, JMH in a container, 3 forks × 15 iterations,
+`-prof gc`.
+
+Time, ns/op:
+
+| payload | `viaString` | `viaBytes` | bytes faster by |
+|---|---|---|---|
+| 100 B | 774.4 ± 42.0 | **629.5 ± 31.8** | 18.7% |
+| 1 KB | 1863.9 ± 66.0 | **1449.3 ± 40.6** | 22.2% |
+| 64 KB | 198,672 ± 4,835 | **106,545 ± 5,125** | 46.4% |
+
+Allocation, `gc.alloc.rate.norm`, B/op:
+
+| payload | `viaString` | `viaBytes` | |
+|---|---|---|---|
+| 100 B | 1,632 | **1,552** | 4.9% better |
+| 1 KB | 3,480 | **2,480** | 28.7% better |
+| 64 KB | **132,545** | 263,737 | 99% worse |
+
+**The bytes path is faster at every size**, which is the opposite of what 0039
+found on the encode side — there is no recycled-buffer counterpart here to the
+one that made `writeValueAsString` hard to beat, and skipping the UTF-16
+materialisation is work genuinely not done.
+
+**The small-payload row misses the stated 20% bar, at 18.7% — and straddles
+it.** The error bars are wide enough to matter: worst case for bytes the gap is
+9.7%, best case 26.8%. The 1 KB and 64 KB rows clear the bar outside their error
+bars, so the bar is met at every size except the one the bar was written about.
+
+**Allocation regresses at 64 KB, and the copy is not the reason.** A first run
+had `viaBytes` call `ByteString.toArray()`; that copy was removed in favour of
+`toArrayUnsafe` and the row improved on both axes at 100 B and 1 KB — but 64 KB
+barely moved, 329,314 → 263,737 against the String path's 132,545. What is left
+is Jackson's UTF-8 parser buffering a 64 KB string field, not anything the
+interpreter would control.
+
+So the numbers do not answer the question the way 0039's did. There the String
+path won outright and entry two died cleanly. Here time favours bytes
+everywhere, allocation favours bytes below about a kilobyte and loses badly
+above it, and the one row the bar names sits on the line.
+
 ## Acceptance
 
 ```bash
