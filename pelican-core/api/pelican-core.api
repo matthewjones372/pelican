@@ -228,6 +228,7 @@ public final class io/github/matthewjones372/pelican/ClientTransport$Companion {
 public abstract interface class io/github/matthewjones372/pelican/CodecFactory {
 	public abstract fun codec (Lkotlin/reflect/KType;)Lio/github/matthewjones372/pelican/BodyCodec;
 	public fun codec (Lkotlin/reflect/KType;Ljava/lang/String;)Lio/github/matthewjones372/pelican/BodyCodec;
+	public fun readTree (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonValue;
 }
 
 public final class io/github/matthewjones372/pelican/CodecKt {

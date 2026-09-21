@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.mcp.server
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.BodyDecodeFailure
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.JsonNull
 import io.github.matthewjones372.pelican.JsonObj
@@ -17,7 +18,6 @@ import io.github.matthewjones372.pelican.mcp.mcpDispatch
 import io.github.matthewjones372.pelican.mcp.mcpOptions
 import io.github.matthewjones372.pelican.mcp.toJson
 import io.github.matthewjones372.pelican.operationName
-import io.github.matthewjones372.pelican.parseJson
 import io.github.matthewjones372.pelican.spi.classifyError
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -55,11 +55,12 @@ class McpServer internal constructor(private val api: Api, private val dispatch:
      * which JSON-RPC answers with silence.
      */
     fun handle(message: String): CompletionStage<String?> {
+        // The service's own codec, not core's reader: this is the one place a
+        // message arrives from somewhere nobody vouched for, and a JSON library
+        // brings limits — a depth, a document size — that core's has none of.
         val parsed = try {
-            parseJson(message)
-        } catch (e: IllegalArgumentException) {
-            return completed(failure(JsonNull, PARSE_ERROR, "The message is not JSON: ${e.message}"))
-        } catch (e: IllegalStateException) {
+            api.codecs.readTree(message)
+        } catch (e: BodyDecodeFailure) {
             return completed(failure(JsonNull, PARSE_ERROR, "The message is not JSON: ${e.message}"))
         }
         return answer(parsed)

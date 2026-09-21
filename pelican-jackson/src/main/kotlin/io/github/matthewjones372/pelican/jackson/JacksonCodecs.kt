@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.jackson
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.core.JacksonException
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -8,6 +9,7 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonMapperBuilder
 import io.github.matthewjones372.pelican.BodyCodec
+import io.github.matthewjones372.pelican.BodyDecodeFailure
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.JsonArr
 import io.github.matthewjones372.pelican.JsonBool
@@ -63,6 +65,18 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
             override fun decodeFromString(text: String): T = mapper.readValue(text, javaType)
         }
     }
+
+    /**
+     * Jackson's parser, with the `StreamReadConstraints` its mapper carries —
+     * a depth and a document size this never has to state, and core's own
+     * reader has no equivalent of.
+     */
+    override fun readTree(text: String): JsonValue =
+        try {
+            mapper.readTree(text).toJsonValue()
+        } catch (e: JacksonException) {
+            throw BodyDecodeFailure(e.originalMessage ?: "The text is not JSON", e)
+        }
 
     override fun schema(type: KType, components: SchemaComponents): JsonObj {
         describer.freshPass()
@@ -124,20 +138,26 @@ fun defaultMapper(): ObjectMapper = jacksonMapperBuilder()
  * the 3.1 spelling — so a half-converted pipeline loses nullability silently.
  */
 private fun Schema<*>.toJsonObj(): JsonObj =
-    SwaggerJson31.mapper().convertValue(this, JsonNode::class.java).toJsonValue() as? JsonObj
+    SwaggerJson31.mapper().convertValue(this, JsonNode::class.java)
+        .toJsonValue(drop = SWAGGER_BOOKKEEPING) as? JsonObj
         ?: jsonObj { "type" to "object" }
 
 /** An artefact of swagger's object model, not part of the schema. */
 private const val SWAGGER_BOOKKEEPING = "exampleSetFlag"
 
-private fun JsonNode.toJsonValue(): JsonValue = when {
+/**
+ * [drop] is named by the caller rather than baked in: only the schema pass has
+ * a key that is bookkeeping, and a document read through `readTree` may hold a
+ * field of that name meaning it.
+ */
+private fun JsonNode.toJsonValue(drop: String? = null): JsonValue = when {
     isObject -> JsonObj(
         properties()
-            .filter { (name, _) -> name != SWAGGER_BOOKKEEPING }
-            .associate { (name, value) -> name to value.toJsonValue() },
+            .filter { (name, _) -> name != drop }
+            .associate { (name, value) -> name to value.toJsonValue(drop) },
     )
 
-    isArray -> JsonArr(map { it.toJsonValue() })
+    isArray -> JsonArr(map { it.toJsonValue(drop) })
 
     isTextual -> JsonStr(textValue())
 

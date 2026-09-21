@@ -33,6 +33,28 @@ interface CodecFactory {
                 "so a response declared as $mediaType needs a writer for it: override " +
                 "codec(type, mediaType) on the Codecs this API was given and answer $mediaType there.",
         )
+
+    /**
+     * Reads JSON into core's own tree, for the places that need the shape of a
+     * document rather than a value of a declared type — a form body's fields, a
+     * JSON-RPC envelope, a tool result being published as `structuredContent`.
+     *
+     * The default is [parseJson], which is core's own small reader. A codec
+     * module overrides it so those places are read by the library the service
+     * already configured, and get that library's limits with it: `McpServer`
+     * reads untrusted messages through here.
+     *
+     * Throws [BodyDecodeFailure] and nothing else, so a caller has one thing to
+     * catch whichever library is underneath.
+     */
+    fun readTree(text: String): JsonValue =
+        try {
+            parseJson(text)
+        } catch (e: IllegalArgumentException) {
+            throw BodyDecodeFailure(e.message ?: "The text is not JSON", e)
+        } catch (e: IllegalStateException) {
+            throw BodyDecodeFailure(e.message ?: "The text is not JSON", e)
+        }
 }
 
 /** The one encoding every [CodecFactory] has, and all the default [CodecFactory.codec] answers. */
