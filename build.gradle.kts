@@ -188,9 +188,24 @@ subprojects {
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 
+    val toolchains = extensions.getByType<JavaToolchainService>()
+
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
 
+        // `jvmToolchain(21)` above sets the Java toolchain as well as the
+        // Kotlin one, and a `Test` task with no launcher of its own takes it.
+        // So every job in the CI matrix compiled *and ran* on 21, and the
+        // matrix named three runtimes while exercising one. Compilation stays
+        // on 21 — that is the bytecode the release has to keep working — and
+        // the tests move to whichever JDK started the build.
+        javaLauncher.set(
+            toolchains.launcherFor {
+                languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
+            },
+        )
+
+        systemProperty("pelican.launcherJavaVersion", JavaVersion.current().majorVersion)
         systemProperty("junit.jupiter.execution.timeout.default", "60s")
     }
 

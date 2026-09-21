@@ -24,8 +24,9 @@ jobs:
       matrix:
         # 21 is the toolchain the modules compile against, so it is what the
         # published bytecode has to keep working on; 23 and 25 are what the repo
-        # is developed and run on. Running all three is what catches "works on
-        # my machine" before someone else finds it.
+        # is developed and run on. Each job compiles to 21 and runs the suites on
+        # its own JDK, so the three rows are three runtimes rather than three
+        # spellings of 21 — which is what they were until spec 0049.
         include:
           - java: "21"
             gradleArgs: ""

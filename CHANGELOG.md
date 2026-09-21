@@ -215,6 +215,14 @@ like any other.
 
 ### Fixed
 
+- **The CI matrix tests the three JDKs it names.** `jvmToolchain(21)` sets the
+  Java toolchain as well as the Kotlin one, so a `Test` task with no launcher of
+  its own took it: the 21, 23 and 25 jobs all compiled to 21 and all *ran* on
+  21, and nothing was exercising 23 or 25 at runtime. Compilation still targets
+  21 — that is the bytecode a release has to keep working — and the suites now
+  run on whichever JDK started the build.
+  `TestRuntimeIsTheBuildRuntimeTest` fails if that drifts back.
+
 - **`PelicanServer.stop()` no longer fails on an interrupt the actor system took
   during its own shutdown.** Pekko runs `stopScheduler()` as a termination
   callback, and on JDK 21 a plain `ForkJoinPool.shutdown()` interrupts the
