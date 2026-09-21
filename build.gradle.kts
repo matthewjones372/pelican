@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
 plugins {
     kotlin("jvm") version "2.4.10" apply false
     kotlin("plugin.serialization") version "2.4.20" apply false
@@ -207,6 +209,14 @@ subprojects {
 
         systemProperty("pelican.launcherJavaVersion", JavaVersion.current().majorVersion)
         systemProperty("junit.jupiter.execution.timeout.default", "60s")
+
+        // A Scala `case object` thrown by a test serialises through
+        // `scala.runtime.ModuleSerializationProxy`, which the daemon cannot
+        // load because it carries no scala-library. Gradle then reports a
+        // `TestFailureSerializationException` naming the real type in its
+        // *message* — and `SHORT`, the default, prints types and never
+        // messages. See spec 0051.
+        testLogging { exceptionFormat = TestExceptionFormat.FULL }
     }
 
     apply(plugin = "org.jetbrains.kotlinx.kover")
