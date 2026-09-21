@@ -215,6 +215,22 @@ like any other.
 
 ### Fixed
 
+- **`PelicanServer.stop()` no longer fails on an interrupt the actor system took
+  during its own shutdown.** Pekko runs `stopScheduler()` as a termination
+  callback, and on JDK 21 a plain `ForkJoinPool.shutdown()` interrupts the
+  worker it runs on; Scala boxes that `InterruptedException` into the future's
+  result, so the stage `stop()` was joining failed although the system had
+  terminated. It surfaced three times as a whole suite going red on one trace
+  and green on a re-run. `stop()` now treats a boxed interrupt as termination,
+  because what threw is housekeeping that runs after the guardian is already
+  dead, and rethrows anything else. Spec 0049 has the trace, and
+  `tools/flake-0049` the kit that found it.
+- **`stop()` waits with a deadline instead of forever.** A `join()` on a stage
+  Pekko never completes parks the calling thread with nothing to say. In this
+  suite JUnit's 60s default timeout would have ended it; in an application
+  nothing would. It now fails after 30 seconds either way, and
+  `stopAsync().awaitTerminated(duration)` is the spelling for a different
+  deadline. `InMemoryTransport.close()` shares the same wait.
 - **Pelican no longer force-upgrades an app's Pekko.** The modules built
   against Pekko 1.7.0, so adding Pelican to an app holding any Pekko artifact
   at an older version ended at startup with Pekko's own mixed-version

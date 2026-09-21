@@ -209,6 +209,15 @@ The handle is the same five members on every backend:
 against the next; `stopAsync()` is the stage, and on Pekko it is the one that
 completes only once the actor system has actually terminated.
 
+`stop()` waits with a deadline rather than forever, and it does not fail on an
+interrupt that the actor system's own termination callbacks took — the system
+terminated, and what threw was housekeeping that runs afterwards. Spec 0049 has
+the trace. A caller wanting a different deadline awaits the stage itself:
+
+```kotlin
+server.stopAsync().awaitTerminated(Duration.ofMinutes(2))
+```
+
 `block()` is released by `stop()`, not by the process ending. On Pekko that is
 a latch, because the system may be a borrowed one that never terminates.
 `ServerShapeParityTest` pins the five members by reflection rather than by a

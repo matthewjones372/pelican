@@ -6,9 +6,12 @@ import org.apache.pekko.actor.typed.javadsl.Behaviors
 import org.apache.pekko.http.javadsl.Http
 import org.apache.pekko.http.javadsl.ServerBinding
 import org.apache.pekko.http.javadsl.server.Route
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
 
 /** A bound server, and the handle to shut it down again. */
 class PelicanServer internal constructor(
@@ -29,9 +32,13 @@ class PelicanServer internal constructor(
     val port: Int get() = binding.localAddress().port
     val baseUrl: String get() = "http://127.0.0.1:$port"
 
-    /** [stopAsync], waited on: the blocking spelling all three backends share. */
+    /**
+     * [stopAsync], waited on: the blocking spelling all three backends share.
+     * A caller wanting a different deadline awaits the stage itself, which is
+     * why this takes no timeout and the backends keep one shape.
+     */
     fun stop() {
-        stopAsync().toCompletableFuture().join()
+        stopAsync().awaitTerminated(STOP_TIMEOUT)
     }
 
     /**
@@ -62,6 +69,41 @@ class PelicanServer internal constructor(
 
     override fun close() = stop()
 }
+
+/**
+ * Waits for a Pekko shutdown stage, treating an interrupt boxed by the actor
+ * system's own termination callbacks as termination: spec 0049 traces one to a
+ * plain `ForkJoinPool.shutdown()` interrupting the worker running
+ * `stopScheduler()`, which is housekeeping that runs after the guardian is
+ * already dead. Anything else is rethrown, and a caller interrupted on its own
+ * thread keeps its interrupt status.
+ */
+fun CompletionStage<*>.awaitTerminated(timeout: Duration) {
+    try {
+        toCompletableFuture().get(timeout.toMillis(), TimeUnit.MILLISECONDS)
+    } catch (e: ExecutionException) {
+        if (!e.hasInterruptedCause()) throw e
+    } catch (e: InterruptedException) {
+        Thread.currentThread().interrupt()
+        throw e
+    }
+}
+
+/** The stage wraps Scala's boxed exception, so the interrupt is two causes down, not one. */
+private fun Throwable.hasInterruptedCause(): Boolean {
+    var cause: Throwable? = this
+    var depth = 0
+    while (cause != null && depth++ < MAX_CAUSE_DEPTH) {
+        if (cause is InterruptedException) return true
+        cause = cause.cause
+    }
+    return false
+}
+
+private const val MAX_CAUSE_DEPTH = 8
+
+/** Long enough that a real shutdown never hits it, short enough that a stuck one fails a build. */
+private val STOP_TIMEOUT: Duration = Duration.ofSeconds(30)
 
 /**
  * Binds this API on [host]:[port]; port 0 lets the OS choose. [route] is how a
