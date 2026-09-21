@@ -106,8 +106,14 @@ private class FormShape(private val fields: Map<String, Field>) {
      */
     private fun scalar(name: String, kind: Kind, raw: String): JsonValue = when (kind) {
         Kind.STRING -> JsonStr(raw)
+
         Kind.INTEGER -> JsonNum(raw.toLongOrNull() ?: throw DecodeFailure(name, raw, "a whole number"))
-        Kind.NUMBER -> JsonNum(raw.toDoubleOrNull() ?: throw DecodeFailure(name, raw, "a number"))
+
+        // `"NaN".toDoubleOrNull()` is NaN rather than null, and the grammar
+        // has no spelling for it, so it is refused like any other bad value.
+        Kind.NUMBER ->
+            JsonNum(raw.toDoubleOrNull()?.takeIf { it.isFinite() } ?: throw DecodeFailure(name, raw, "a number"))
+
         Kind.BOOLEAN -> JsonBool(BooleanCodec.decode(name, raw))
     }
 
