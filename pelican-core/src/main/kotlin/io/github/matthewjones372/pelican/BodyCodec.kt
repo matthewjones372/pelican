@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican
 
+import java.nio.charset.StandardCharsets
 import kotlin.reflect.KType
 
 /**
@@ -9,6 +10,16 @@ import kotlin.reflect.KType
 interface BodyCodec<T> {
     fun encodeToString(value: T): String
     fun decodeFromString(text: String): T
+
+    /**
+     * The body as the bytes it arrived as, for a backend holding them already.
+     * A JSON library reads UTF-8 directly; going through a String decodes the
+     * whole body into UTF-16 first so the parser can scan it back.
+     *
+     * The default keeps every codec written against 1.0 working unchanged. See
+     * spec 0046 for what overriding it is worth, measured.
+     */
+    fun decodeFrom(bytes: ByteArray): T = decodeFromString(String(bytes, StandardCharsets.UTF_8))
 }
 
 /**

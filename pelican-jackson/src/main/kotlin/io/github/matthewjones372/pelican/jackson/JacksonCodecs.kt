@@ -69,6 +69,9 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
         return object : BodyCodec<T> {
             override fun encodeToString(value: T): String = writer.writeValueAsString(value)
             override fun decodeFromString(text: String): T = reader.readValue(text)
+
+            /** `UTF8StreamJsonParser` rather than the char-based reader, on the bytes as they arrived. */
+            override fun decodeFrom(bytes: ByteArray): T = reader.readValue(bytes)
         }
     }
 
