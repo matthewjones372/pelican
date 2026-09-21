@@ -99,10 +99,34 @@ claims this way — `FunctionalStyleTest`, `NoThirdPartyDependenciesTest`,
       test keeps non-ASCII out of backticked declarations.
       Done when: `env -u LANG -u LC_ALL ./gradlew build` gets past
       `:example:compileTestKotlin`.
-- [ ] **`spec-0047-locale-guard`** — a configuration-time check that names the
-      fix, for what the test above does not cover.
-      Done when: on an ASCII-only JVM the build fails in a second naming `LANG`,
-      not five minutes in naming the compiler.
+- [x] ~~**`spec-0047-locale-guard`**~~ — not happening as written; see
+      **Measured**. What it was for is covered by extending entry one's test to
+      source file names.
+      Done when: a source file named with a character a file name cannot hold is
+      refused by the same gate that refuses a declaration named that way.
+
+## Measured
+
+Entry one landed and `env -u LANG -u LC_ALL ./gradlew build` came back
+**`BUILD SUCCESSFUL`** — `:example:compileTestKotlin` included, `468 tests
+completed`.
+
+That falsifies entry two's own **Done when**, which asked for a build that
+*fails* on an ASCII-only JVM. After entry one the build **works** there, which
+was the point. A guard meeting that condition would refuse the exact
+configuration entry one just fixed, and a contributor whose container ships no
+locale would be told to set one for no reason.
+
+The guard's stated job — "for anything the test above does not cover" — has one
+real gap, and it is not a locale question. A source file's own name becomes a
+class file name too: `Ünicode.kt` compiles to `ÜnicodeKt.class`, and no
+declaration inside it need be unusual for that to fail. That is checked
+statically, in the gate that already reads these sources, with a message naming
+the file rather than the encoding.
+
+**Entry two does not happen.** The build needs no locale, so nothing should
+demand one; what the guard was reaching for is a second assertion in entry one's
+test, and that is where it went.
 
 ## Acceptance
 
@@ -113,10 +137,8 @@ env -u LANG -u LC_ALL ./gradlew build
 
 ## Open questions
 
-- **Does entry two earn its place?** After entry one the build works on an ASCII
-  locale, so the guard only catches something new. Recommend keeping it: the
-  failure it replaces costs five minutes and names the wrong thing, and the
-  check is four lines.
+- **Does entry two earn its place?** Answered by building entry one: no. See
+  **Measured**.
 - **Where does the scan live?** The offending names are in *test* sources, and
   `pelican-core/build.gradle.kts:64` hands `pelican.style.sources` only the main
   ones. Recommend a test in `example` with its own wiring rather than widening
