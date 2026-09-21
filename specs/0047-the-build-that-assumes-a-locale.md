@@ -121,8 +121,11 @@ env -u LANG -u LC_ALL ./gradlew build
   `pelican-core/build.gradle.kts:64` hands `pelican.style.sources` only the main
   ones. Recommend a test in `example` with its own wiring rather than widening
   that property, which `FunctionalStyleTest` asserts the shape of.
-- **Em dash to what?** Recommend a colon in both — `a whole session: the
-  handshake, the tools, and one of them called` — which is the same sentence.
+- **Em dash to what?** Answered by the compiler: **not a colon**. Kotlin forbids
+  `: ; [ ] / < > . \` in a backticked name, because a JVM method name cannot
+  hold them — `Name contains illegal characters: :`. An ASCII hyphen is legal
+  and keeps the appositive reading, so `a whole session - the handshake, the
+  tools, and one of them called`.
 - **Should the rule cover all non-ASCII or only what the platform cannot
   encode?** Recommend all non-ASCII in backticked declarations: the rule is then
   readable and machine-independent, and no reviewer has to think about encodings.
