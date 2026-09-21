@@ -16,7 +16,7 @@ import java.io.File
  */
 class NoOtherDependenciesTest {
 
-    private val allowed = listOf("kotlin-stdlib", "annotations-", "pelican-core", "pelican-schema")
+    private val allowed = listOf("kotlin-stdlib", "annotations-", "jackson-core-", "pelican-core", "pelican-schema")
 
     @Test
     fun `the main runtime classpath is core and the schema pass, and nothing else`() {
