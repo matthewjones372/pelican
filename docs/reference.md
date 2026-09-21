@@ -5329,8 +5329,10 @@ Micrometer 1.17.1 · OpenTelemetry 1.65.0 · arrow-core 2.1.2 · JDK 21 ·
 Gradle 9.7.1
 
 These are floors, not pins — Gradle resolves upwards, so a service already on
-a newer Jackson keeps its own. The whole build and every suite run at the
-floor, so what is tested is what the floor promises.
+a newer Jackson keeps its own. Every module compiles to JDK 21 bytecode, which
+is the floor the published artifacts promise. The suites run on whichever JDK
+started the build, so CI runs them on 21, 23 and 25 rather than three times on
+21 — `TestRuntimeIsTheBuildRuntimeTest` is what holds that.
 
 Pekko is the exception: Pelican ships none of it. Every module that speaks
 Pekko declares it `compileOnly`, so no `org.apache.pekko` dependency reaches
