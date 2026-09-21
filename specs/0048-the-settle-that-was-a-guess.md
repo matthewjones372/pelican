@@ -96,7 +96,7 @@ on a healthy machine is shorter than today's 500 ms.
 
 ## Stack
 
-- [ ] **`spec-0048-settle-by-observation`** — `settled(within:)` replaces
+- [x] **`spec-0048-settle-by-observation`** ([#119](https://github.com/matthewjones372/pelican/pull/119)) — `settled(within:)` replaces
       `SETTLE_MILLIS`, with the deadline failing in the source's name.
       Done when: `./gradlew :example:test --tests "*UnboundedStreamTest*"
       --rerun-tasks` passes three times running in a container where it fails

@@ -74,17 +74,17 @@ core owning a parser nobody chose to own. The cost of taking it is core's
 
 ## Stack
 
-- [ ] **`spec-0045-read-tree`** — `readTree` defaulting to `parseJson`, the
+- [x] **`spec-0045-read-tree`** ([#120](https://github.com/matthewjones372/pelican/pull/120)) — `readTree` defaulting to `parseJson`, the
       Jackson override over a widened `toJsonValue`, and the three callers
       switched.
       Done when: a 10,000-deep JSON-RPC message answers `-32700` over stdio and
       the Pekko mount, because Jackson refused it.
-- [ ] **`spec-0045-jackson-core`** — core declares `jackson-core`, `parseJson`
+- [x] **`spec-0045-jackson-core`** ([#121](https://github.com/matthewjones372/pelican/pull/121)) — core declares `jackson-core`, `parseJson`
       becomes `JsonFactory`/`JsonParser`, `JsonReader` is deleted, and the four
       places claiming core depends on nothing say what it depends on.
       Done when: `parseJson("[".repeat(10_000))` throws rather than overflowing,
       and `NoThirdPartyDependenciesTest` names the one artifact it permits.
-- [ ] **`spec-0045-json-num-finite`** — `JsonNum` refuses non-finite values,
+- [x] **`spec-0045-json-num-finite`** ([#122](https://github.com/matthewjones372/pelican/pull/122)) — `JsonNum` refuses non-finite values,
       `Forms.kt` and `OpenApi.kt` move with it, and core gets the JSON tests it
       has never had.
       Done when: a form field `price=NaN` is a 400 rather than a document the

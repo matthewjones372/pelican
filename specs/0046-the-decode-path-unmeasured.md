@@ -65,16 +65,16 @@ about a different half, and it is worth no more than it was worth then.
 
 ## Stack
 
-- [ ] **`spec-0046-reader-cache`** — cache an `ObjectReader` beside the
+- [x] **`spec-0046-reader-cache`** ([#123](https://github.com/matthewjones372/pelican/pull/123)) — cache an `ObjectReader` beside the
       `ObjectWriter` already there. No SPI change, no `.api` churn, and it lands
       whatever the benchmark says.
       Done when: `codec()` builds a writer and a reader once, at `Api` assembly.
-- [ ] **`spec-0046-measure`** — `DecodeBenchmark` in `benchmarks/`:
+- [x] **`spec-0046-measure`** ([#125](https://github.com/matthewjones372/pelican/pull/125)) — `DecodeBenchmark` in `benchmarks/`:
       `utf8String()` + `readValue(String)` against `readValue(ByteArray)`, three
       payload sizes, with `-prof gc`. Changes no production code.
       Done when: `./gradlew :benchmarks:jmh` reports both paths and the numbers
       are written into this spec under a **Measured** heading.
-- [x] **`spec-0046-bytes`** — `decodeFrom` on `BodyCodec`, the Jackson
+- [x] **`spec-0046-bytes`** ([#126](https://github.com/matthewjones372/pelican/pull/126)) — `decodeFrom` on `BodyCodec`, the Jackson
       override, a byte-shaped `RequestBodyCodecs.decode` beside the String one,
       `Interpreter.kt` handing `toArrayUnsafe`, `.api` dumps updated.
       Done when: the build is green and the benchmark shows the win the entry
