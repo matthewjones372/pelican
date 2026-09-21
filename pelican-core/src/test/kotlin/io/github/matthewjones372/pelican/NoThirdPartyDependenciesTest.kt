@@ -9,18 +9,26 @@ import org.junit.jupiter.api.Test
 
 /**
  * `pelican-core` is meant to be describable-in-a-vacuum: endpoint values, a
- * minimal JSON tree, and nothing else. This is the same idea as
+ * minimal JSON tree, and one parser under it. This is the same idea as
  * `DecouplingTest`'s Pekko-absence check, one level stricter — rather than
- * naming the libraries that must be absent, it asserts that *nothing* beyond
- * the Kotlin standard library is there at all.
+ * naming the libraries that must be absent, it names the only ones that may be
+ * present and asserts nothing else is there at all.
+ *
+ * `jackson-core` is on that list by a decision recorded in spec 0045, and it is
+ * the streaming parser alone. The second test below is what keeps that from
+ * drifting into databind, which is the dependency this module exists without.
  */
 class NoThirdPartyDependenciesTest {
 
-    /** Artifacts the Kotlin plugin puts on every module's classpath. */
-    private val allowed = listOf("kotlin-stdlib", "annotations-")
+    /**
+     * Artifacts the Kotlin plugin puts on every module's classpath, and the one
+     * this module declares. A name added here is an architectural decision and
+     * wants a spec behind it.
+     */
+    private val allowed = listOf("kotlin-stdlib", "annotations-", "jackson-core-")
 
     @Test
-    fun `the main runtime classpath is the kotlin standard library and nothing else`() {
+    fun `the main runtime classpath is the kotlin standard library and the one parser`() {
         val raw = System.getProperty("pelican.core.runtimeClasspath")
         withClue("the build must pass -Dpelican.core.runtimeClasspath; see build.gradle.kts") { raw.shouldNotBeNull() }
 
@@ -28,13 +36,18 @@ class NoThirdPartyDependenciesTest {
             .filter { it.isNotBlank() }
             .filterNot { entry -> allowed.any { entry.startsWith(it) } }
 
-        withClue("pelican-core must have no third-party runtime dependencies, but found: $unexpected") {
+        withClue("pelican-core takes no runtime dependency beyond $allowed, but found: $unexpected") {
             unexpected.shouldBeEmpty()
         }
     }
 
+    /**
+     * The parser is in; the object mapper is not. Reading a document into
+     * [JsonValue] is a different job from binding one to a class, and it is
+     * binding that would decide the codec for every service.
+     */
     @Test
-    fun `no json library is reachable from core`() {
+    fun `no json databind is reachable from core`() {
         listOf(
             "kotlinx.serialization.json.Json",
             "com.fasterxml.jackson.databind.ObjectMapper",

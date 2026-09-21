@@ -14,7 +14,7 @@ import kotlin.reflect.KType
  */
 @Suppress("UNCHECKED_CAST")
 fun <T> Codecs.formCodec(type: KType): BodyCodec<T> =
-    FormCodec(codec<Any?>(type), FormShape.of(type, this)) as BodyCodec<T>
+    FormCodec(codec<Any?>(type), FormShape.of(type, this), this) as BodyCodec<T>
 
 /** The pairs an `application/x-www-form-urlencoded` body carries, in order. */
 fun parseFormBody(text: String): List<Pair<String, String>> =
@@ -37,13 +37,14 @@ private fun encodeFormValue(raw: String): String = URLEncoder.encode(raw, Standa
 private class FormCodec(
     private val json: BodyCodec<Any?>,
     private val shape: FormShape,
+    private val codecs: CodecFactory,
 ) : BodyCodec<Any?> {
 
     override fun decodeFromString(text: String): Any? =
         json.decodeFromString(shape.toJson(parseFormBody(text)).render())
 
     override fun encodeToString(value: Any?): String =
-        renderFormBody(shape.toPairs(parseJson(json.encodeToString(value))))
+        renderFormBody(shape.toPairs(codecs.readTree(json.encodeToString(value))))
 }
 
 private enum class Kind { STRING, INTEGER, NUMBER, BOOLEAN }
@@ -105,8 +106,14 @@ private class FormShape(private val fields: Map<String, Field>) {
      */
     private fun scalar(name: String, kind: Kind, raw: String): JsonValue = when (kind) {
         Kind.STRING -> JsonStr(raw)
+
         Kind.INTEGER -> JsonNum(raw.toLongOrNull() ?: throw DecodeFailure(name, raw, "a whole number"))
-        Kind.NUMBER -> JsonNum(raw.toDoubleOrNull() ?: throw DecodeFailure(name, raw, "a number"))
+
+        // `"NaN".toDoubleOrNull()` is NaN rather than null, and the grammar
+        // has no spelling for it, so it is refused like any other bad value.
+        Kind.NUMBER ->
+            JsonNum(raw.toDoubleOrNull()?.takeIf { it.isFinite() } ?: throw DecodeFailure(name, raw, "a number"))
+
         Kind.BOOLEAN -> JsonBool(BooleanCodec.decode(name, raw))
     }
 

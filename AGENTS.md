@@ -135,7 +135,8 @@ that grows an import grows a line in its block.
 
 ## Layout
 
-`pelican-core` depends on the Kotlin standard library and nothing else.
+`pelican-core` depends on the Kotlin standard library and `jackson-core` —
+the streaming parser, not databind — and nothing else.
 Everything with a third-party type in it is a leaf module: a JSON library, a
 server library, the OpenAPI generator, a client transport.
 
@@ -144,9 +145,13 @@ Every dependency claim in `docs/modules.md` is a test.
 asserts the document generator and the other backends are absent.
 `pelican-test` asserts no server library and no matcher library.
 
-A dependency added to core is a build failure, not a judgement call. Core
-declares an interface; an adapter module carries the library. `Codecs`, the
-interpreters and `ClientTransport` are all that shape.
+A dependency added to core is a build failure until a spec says otherwise.
+Core declares an interface; an adapter module carries the library. `Codecs`,
+the interpreters and `ClientTransport` are all that shape. One exception has
+been argued and made, in spec 0045: `jackson-core`, because core has to read
+JSON where no codec is configured and a hand-written reader on that path was a
+parser nobody chose to own. Adding a second wants the same argument, in
+writing, before the allowlist in `NoThirdPartyDependenciesTest` grows a line.
 
 ## Values, errors and effects
 

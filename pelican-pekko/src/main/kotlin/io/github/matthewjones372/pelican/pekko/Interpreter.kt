@@ -465,7 +465,10 @@ private fun readStrictBody(
             // Which codec, and what an undeclared media type means, are core's
             // answers — see `RequestBodyCodecs`. So is wrapping what it threw.
             values[body] = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
-                .decode(req.entity().contentType.toString(), strict.data.utf8String())
+                // `toArrayUnsafe`: the entity is strict and already whole, so this
+                // hands over the bytes rather than copying them into UTF-16 for a
+                // parser that reads UTF-8. See spec 0046.
+                .decode(req.entity().contentType.toString(), strict.data.toArrayUnsafe())
             Unit
         }
 }

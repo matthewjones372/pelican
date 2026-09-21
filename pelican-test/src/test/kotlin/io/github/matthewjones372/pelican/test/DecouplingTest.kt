@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test
 class DecouplingTest {
 
     /** Artifacts the Kotlin plugin puts on every module's classpath. */
-    private val allowed = listOf("kotlin-stdlib", "kotlin-reflect", "annotations-", "pelican-core")
+    private val allowed = listOf("kotlin-stdlib", "kotlin-reflect", "annotations-", "jackson-core-", "pelican-core")
 
     @Test
     fun `the main runtime classpath is core, the kotlin runtime, and nothing else`() {

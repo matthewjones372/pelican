@@ -132,7 +132,7 @@ class ShopContractTest {
     // ------------------------------------------------------------ the order
 
     @Test
-    fun `an undeliverable address is a 422 — well-formed, and still not placeable`() {
+    fun `an undeliverable address is a 422 - well-formed, and still not placeable`() {
         val order = PlaceOrder("Ada", "ada@example", items = listOf(CartLine("gilead", 1)))
 
         app.outcome(placeOrder, order)

@@ -54,7 +54,7 @@ class McpOverHttpTest {
     }
 
     @Test
-    fun `a whole session — the handshake, the tools, and one of them called`() {
+    fun `a whole session - the handshake, the tools, and one of them called`() {
         val handshake = post(
             """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{""" +
                 """"protocolVersion":"$MCP_PROTOCOL_VERSION","capabilities":{},""" +

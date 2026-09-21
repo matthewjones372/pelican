@@ -10,7 +10,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 
 | Module | Depends on | Contains |
 |---|---|---|
-| `pelican-core` | **nothing** | endpoint descriptions, plain-value codecs, a minimal JSON tree. No HTTP library, no JSON library. |
+| `pelican-core` | `jackson-core` *only* | endpoint descriptions, plain-value codecs, a minimal JSON tree and the parser under it. No HTTP library, and no JSON databind. |
 | `pelican-openapi` | core | descriptions → an OpenAPI 3.1.0 or 3.2.0 document, in JSON or YAML, and two documents → what changed for callers |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-schema` | **core** | one type → a self-contained JSON Schema 2020-12 document: pointers under `$defs`, a union's branches carrying the property that picks them. No document generator, no codec |
