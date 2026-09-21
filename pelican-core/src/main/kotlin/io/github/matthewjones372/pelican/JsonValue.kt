@@ -120,7 +120,7 @@ fun jsonStrings(values: List<String>): JsonArr = JsonArr(values.map { JsonStr(it
 fun parseJson(text: String): JsonValue =
     try {
         jsonFactory.createParser(text).use { parser ->
-            require(parser.nextToken() != null) { "Unexpected end of JSON" }
+            requireNotNull(parser.nextToken()) { "Unexpected end of JSON" }
             val value = parser.readValue()
             require(parser.nextToken() == null) {
                 "Trailing content after the JSON value, at ${parser.currentLocation().offsetDescription()}"
