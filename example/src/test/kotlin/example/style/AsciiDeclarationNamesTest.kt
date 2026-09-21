@@ -75,6 +75,24 @@ class AsciiDeclarationNamesTest {
         }
     }
 
+    /**
+     * The other half of the same hazard: a source file's own name becomes a
+     * class file name too — `Ünicode.kt` compiles to `ÜnicodeKt.class` — and no
+     * declaration inside it need be unusual for that to fail.
+     */
+    @Test
+    fun `no source file is named with a character a file name cannot hold`() {
+        val root = repoRoot()
+        val offenders = sources()
+            .filter { file -> file.name.any { it.code > MAX_ASCII } }
+            .map { it.relativeTo(root).path }
+            .sorted()
+
+        withClue("a source file's name becomes a class file name, and an ASCII locale cannot write it: $offenders") {
+            offenders.shouldBeEmpty()
+        }
+    }
+
     private companion object {
         /** The last code point `ANSI_X3.4-1968` can encode. */
         const val MAX_ASCII = 127
