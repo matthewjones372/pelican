@@ -209,6 +209,15 @@ The handle is the same five members on every backend:
 against the next; `stopAsync()` is the stage, and on Pekko it is the one that
 completes only once the actor system has actually terminated.
 
+`stop()` waits with a deadline rather than forever, and it does not fail on an
+interrupt that the actor system's own termination callbacks took — the system
+terminated, and what threw was housekeeping that runs afterwards. Spec 0049 has
+the trace. A caller wanting a different deadline awaits the stage itself:
+
+```kotlin
+server.stopAsync().awaitTerminated(Duration.ofMinutes(2))
+```
+
 `block()` is released by `stop()`, not by the process ending. On Pekko that is
 a latch, because the system may be a borrowed one that never terminates.
 `ServerShapeParityTest` pins the five members by reflection rather than by a
@@ -5320,8 +5329,10 @@ Micrometer 1.17.1 · OpenTelemetry 1.65.0 · arrow-core 2.1.2 · JDK 21 ·
 Gradle 9.7.1
 
 These are floors, not pins — Gradle resolves upwards, so a service already on
-a newer Jackson keeps its own. The whole build and every suite run at the
-floor, so what is tested is what the floor promises.
+a newer Jackson keeps its own. Every module compiles to JDK 21 bytecode, which
+is the floor the published artifacts promise. The suites run on whichever JDK
+started the build, so CI runs them on 21, 23 and 25 rather than three times on
+21 — `TestRuntimeIsTheBuildRuntimeTest` is what holds that.
 
 Pekko is the exception: Pelican ships none of it. Every module that speaks
 Pekko declares it `compileOnly`, so no `org.apache.pekko` dependency reaches

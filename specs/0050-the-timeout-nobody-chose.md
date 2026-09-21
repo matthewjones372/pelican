@@ -108,7 +108,7 @@ guess that `DoesNotCompileTest` will eventually fail on a slow runner.
 
 ## Stack
 
-- [ ] **`spec-0050-backstop-not-budget`** — the one line moves, carrying the
+- [x] **`spec-0050-backstop-not-budget`** — the one line moves, carrying the
       reason and the measurement in a comment.
       Done when: `./gradlew build` is green on 21, 23 and 25, and the comment
       names the slowest measured method so the next person can re-check it.
@@ -120,6 +120,27 @@ guess that `DoesNotCompileTest` will eventually fail on a slow runner.
 The second entry is the first thing to cut. It is worth doing only if the
 answer to the last open question below is a short, specific list.
 
+## Measured
+
+Re-measured on `1d225d5`, after #134 made `Test` tasks run on the JDK that
+launched the build. The first draft's figures were taken when every job ran 21
+whatever its label, so they were worth re-taking; they held.
+
+| slowest method | then | now |
+|---|---|---|
+| `DoesNotCompileTest > a failure of the same payload type compiles, whichever end` | 20.68s | **18.81s** |
+| `BorrowedSystemDocsTest > the endpoints and the document are both served on a borrowed system` | 16.94s | 13.43s |
+| `GroupFilterReachesTheClientTest > an endpoint outside the group is untouched` | 10.84s | 8.66s |
+| `StillCompilesTest > "endpoints"` | 14.27s | 8.05s |
+
+1,570 test methods; everything outside the top two is under 15% of the old 60s
+budget. The backstop moves to **5 minutes**, sixteen times the worst real case,
+which is the first open question's recommendation taken as written.
+
+Nothing here has ever hit the timeout, so this entry changes no observable
+behaviour. What it changes is what the number claims: a backstop that fires only
+on a hang rather than a wall-clock budget that a slow runner fails.
+
 ## Acceptance
 
 ```bash
@@ -128,10 +149,9 @@ answer to the last open question below is a short, specific list.
 
 ## Open questions
 
-- **What backstop value?** Recommend 5 minutes: fifteen times the slowest
-  measured method, so load or a slow runner cannot reach it, and still far
-  under the CI job's own limit. 2 minutes would also do and is less of a wait
-  when it does fire.
+- **What backstop value?** ~~Recommend 5 minutes~~ — **taken: 5 minutes**,
+  sixteen times the slowest measured method. 2 minutes would also have done and
+  is less of a wait when it does fire; changing it is one line.
 - **Is the root-commit reading right?** `ddbbf40` has no parent and the history
   was squashed or re-rooted there, so the line may predate this repository and
   have had a reason in whatever it was squashed from. Worth one question to

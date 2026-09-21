@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.test.pekko
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.pekko.PelicanServer
+import io.github.matthewjones372.pelican.pekko.awaitTerminated
 import io.github.matthewjones372.pelican.pekko.toRoute
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.RequestSpec
@@ -20,7 +21,7 @@ import org.apache.pekko.http.javadsl.model.HttpMethods
 import org.apache.pekko.http.javadsl.model.HttpRequest
 import org.apache.pekko.http.javadsl.model.HttpResponse
 import org.apache.pekko.http.javadsl.model.Uri
-import java.util.concurrent.TimeUnit
+import java.time.Duration
 
 /**
  * Runs requests straight through the interpreted route: no socket, but not a
@@ -67,7 +68,7 @@ class InMemoryTransport(
     override fun close() {
         if (!ownsSystem) return
         system.terminate()
-        system.getWhenTerminated().toCompletableFuture().get(shutdownTimeoutSeconds, TimeUnit.SECONDS)
+        system.getWhenTerminated().awaitTerminated(Duration.ofSeconds(shutdownTimeoutSeconds))
     }
 }
 

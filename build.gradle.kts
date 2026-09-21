@@ -1,6 +1,8 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
 plugins {
     kotlin("jvm") version "2.4.10" apply false
-    kotlin("plugin.serialization") version "2.4.10" apply false
+    kotlin("plugin.serialization") version "2.4.20" apply false
     id("com.diffplug.spotless") version "8.10.0"
     id("dev.detekt") version "2.0.0-alpha.6" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.9"
@@ -188,10 +190,39 @@ subprojects {
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 
+    val toolchains = extensions.getByType<JavaToolchainService>()
+
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
 
-        systemProperty("junit.jupiter.execution.timeout.default", "60s")
+        // `jvmToolchain(21)` above sets the Java toolchain as well as the
+        // Kotlin one, and a `Test` task with no launcher of its own takes it.
+        // So every job in the CI matrix compiled *and ran* on 21, and the
+        // matrix named three runtimes while exercising one. Compilation stays
+        // on 21 — that is the bytecode the release has to keep working — and
+        // the tests move to whichever JDK started the build.
+        javaLauncher.set(
+            toolchains.launcherFor {
+                languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
+            },
+        )
+
+        systemProperty("pelican.launcherJavaVersion", JavaVersion.current().majorVersion)
+        // A backstop, not a budget: it exists so one wedged test cannot burn
+        // the whole job, and it fires on nothing else. The slowest measured
+        // method is `DoesNotCompileTest > a failure of the same payload type
+        // compiles, whichever end` at 18.8s, so five minutes is sixteen times
+        // the worst real case — a tighter number would be a wall-clock
+        // assertion that a slow runner fails for no reason. See spec 0050.
+        systemProperty("junit.jupiter.execution.timeout.default", "5m")
+
+        // A Scala `case object` thrown by a test serialises through
+        // `scala.runtime.ModuleSerializationProxy`, which the daemon cannot
+        // load because it carries no scala-library. Gradle then reports a
+        // `TestFailureSerializationException` naming the real type in its
+        // *message* — and `SHORT`, the default, prints types and never
+        // messages. See spec 0051.
+        testLogging { exceptionFormat = TestExceptionFormat.FULL }
     }
 
     apply(plugin = "org.jetbrains.kotlinx.kover")
