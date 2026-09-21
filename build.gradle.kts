@@ -208,7 +208,13 @@ subprojects {
         )
 
         systemProperty("pelican.launcherJavaVersion", JavaVersion.current().majorVersion)
-        systemProperty("junit.jupiter.execution.timeout.default", "60s")
+        // A backstop, not a budget: it exists so one wedged test cannot burn
+        // the whole job, and it fires on nothing else. The slowest measured
+        // method is `DoesNotCompileTest > a failure of the same payload type
+        // compiles, whichever end` at 18.8s, so five minutes is sixteen times
+        // the worst real case — a tighter number would be a wall-clock
+        // assertion that a slow runner fails for no reason. See spec 0050.
+        systemProperty("junit.jupiter.execution.timeout.default", "5m")
 
         // A Scala `case object` thrown by a test serialises through
         // `scala.runtime.ModuleSerializationProxy`, which the daemon cannot
