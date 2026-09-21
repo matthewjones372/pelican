@@ -70,14 +70,14 @@ The deadline is the smaller half but fails loudly rather than quietly: a
 
 ## Stack
 
-- [ ] **`spec-0049-await-terminated`** — the helper, failing test first: a stage
+- [x] **`spec-0049-await-terminated`** ([#133](https://github.com/matthewjones372/pelican/pull/133)) — the helper, failing test first: a stage
       completed with `ExecutionException("Boxed Exception",
       InterruptedException())` leaves `stop()` returning normally, any other
       failure still throws, and a stage that never completes fails on the
       deadline instead of parking. `PelicanServer.stop()` and
       `InMemoryTransport.close()` both move onto it.
       Done when: those three tests pass and `./gradlew build` is green.
-- [ ] **`spec-0049-test-jdk`** — `Test` tasks run on the JDK that launched the
+- [x] **`spec-0049-test-jdk`** ([#134](https://github.com/matthewjones372/pelican/pull/134)) — `Test` tasks run on the JDK that launched the
       build rather than on the `jvmToolchain(21)` compile toolchain.
       Done when: `build (23)` and `build (25)` execute tests on 23 and 25, which
       today they do not.
