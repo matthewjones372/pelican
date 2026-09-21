@@ -138,10 +138,12 @@ From the JDK 21 and Pekko 1.2.1 sources and the test-report artifact of run
 **Provoking it is harder than this.** ~48,000 create-bind-stop iterations across
 JDK 21 and 25 — pool pinned to two threads, CPU burners, a 1ms dispatcher
 `shutdown-timeout`, ticks stretched to 200ms — produced nothing, and neither did
-17 consecutive runs of the whole `:example:test` suite. The loop is the wrong
-shape: the race wants the dispatcher's *scheduled* shutdown to land inside the
-scheduler's close, which a tight loop never idles long enough to arrange. Budget
-a soak, not an afternoon.
+185 consecutive runs of the whole `:example:test` suite with a probe installed
+on the dispatcher's worker threads, which recorded no interrupt at all. The loop
+is the wrong shape: the race wants the dispatcher's *scheduled* shutdown to land
+inside the scheduler's close, which a tight loop never idles long enough to
+arrange. CI has hit it three times in some hundreds of runs. Budget a soak, not
+an afternoon.
 
 ## Open questions
 
