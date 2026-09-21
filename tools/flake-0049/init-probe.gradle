@@ -1,0 +1,14 @@
+// Installs the interrupt probe as :example:test's default dispatcher, so every
+// Thread.interrupt() on a Pekko worker is logged with the interrupter's stack.
+// Needs probe/build-probe.sh to have run first.
+gradle.projectsEvaluated {
+    def p = gradle.rootProject.findProject(":example")
+    if (p == null) return
+    def classes = new File(gradle.rootProject.projectDir, "build/flake-0049/probe-classes")
+    def log = new File(gradle.rootProject.projectDir, "build/flake-0049/probe.log")
+    p.dependencies { testRuntimeOnly p.files(classes) }
+    p.tasks.named("test") {
+        jvmArgs("-Dpekko.actor.default-dispatcher.executor=ProbeConfigurator",
+                "-Dprobe.log=${log.absolutePath}")
+    }
+}
