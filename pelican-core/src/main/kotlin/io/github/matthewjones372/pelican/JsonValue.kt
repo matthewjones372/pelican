@@ -1,5 +1,11 @@
 package io.github.matthewjones372.pelican
 
+import com.fasterxml.jackson.core.JacksonException
+import com.fasterxml.jackson.core.JsonFactory
+import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.core.JsonToken
+import com.fasterxml.jackson.core.StreamReadConstraints
+
 /**
  * A minimal JSON tree. Core has to represent schemas without an opinion about
  * which library produces JSON — that being the pluggable part — and this is
@@ -100,148 +106,76 @@ fun jsonStrings(values: List<String>): JsonArr = JsonArr(values.map { JsonStr(it
 // ------------------------------------------------------------------- reading
 
 /**
- * Reads a JSON document into the tree above. Not a general-purpose parser: the
- * configured [Codecs] reads bodies. This exists because a form body has to be
- * turned into its fields, and the only description of a value core gets from a
- * `BodyCodec` is the JSON it produced. See [formCodec].
+ * Reads a JSON document into the tree above.
+ *
+ * Not a general-purpose entry point: a request body goes through the configured
+ * [Codecs], and [CodecFactory.readTree] is how anything holding one reads a
+ * document. This is what is left — a generated client parsing the document
+ * embedded in it, and the golden and compatibility tools reading documents this
+ * project did not write — and the default `readTree` falls back to it.
+ *
+ * Throws [IllegalArgumentException] for anything it will not accept, depth
+ * included.
  */
-fun parseJson(text: String): JsonValue {
-    val reader = JsonReader(text)
-    val value = reader.value()
-    reader.skipWhitespace()
-    require(reader.finished) { "Trailing content after the JSON value at offset ${reader.offset}" }
-    return value
+fun parseJson(text: String): JsonValue =
+    try {
+        jsonFactory.createParser(text).use { parser ->
+            require(parser.nextToken() != null) { "Unexpected end of JSON" }
+            val value = parser.readValue()
+            require(parser.nextToken() == null) {
+                "Trailing content after the JSON value, at ${parser.currentLocation().offsetDescription()}"
+            }
+            value
+        }
+    } catch (e: JacksonException) {
+        throw IllegalArgumentException(e.originalMessage ?: "That is not JSON", e)
+    }
+
+/**
+ * Bounded where the reader itself is, rather than in a check of our own: a
+ * document deeper than this is refused before the recursion below reaches it,
+ * which is what makes reading a message from the network safe. Sixty-four is
+ * six times the deepest document in this repository; Jackson's own default of
+ * a thousand is a stack's worth of frames, not a document's.
+ */
+private val jsonFactory: JsonFactory = JsonFactory.builder()
+    .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(MAX_DEPTH).build())
+    .build()
+
+private fun JsonParser.readValue(): JsonValue = when (currentToken()) {
+    JsonToken.START_OBJECT -> readObject()
+    JsonToken.START_ARRAY -> readArray()
+    JsonToken.VALUE_STRING -> JsonStr(text)
+    JsonToken.VALUE_NUMBER_INT -> JsonNum(readInteger())
+    JsonToken.VALUE_NUMBER_FLOAT -> JsonNum(doubleValue)
+    JsonToken.VALUE_TRUE -> JsonBool(true)
+    JsonToken.VALUE_FALSE -> JsonBool(false)
+    JsonToken.VALUE_NULL -> JsonNull
+    else -> throw IllegalArgumentException("Unexpected $currentToken at ${currentLocation().offsetDescription()}")
 }
 
-private class JsonReader(private val text: String) {
-    var offset = 0
-        private set
+/**
+ * `Long` first, so a whole number stays whole: rendering 1.0 back into a form
+ * field where the sender wrote 1 would be a round trip that changed the value.
+ * Past `Long`, the digits are kept rather than rounded into a `Double`.
+ */
+private fun JsonParser.readInteger(): Number =
+    if (numberType == JsonParser.NumberType.BIG_INTEGER) bigIntegerValue else longValue
 
-    val finished: Boolean get() = offset >= text.length
-
-    fun skipWhitespace() {
-        while (offset < text.length && text[offset].isWhitespace()) offset++
+private fun JsonParser.readObject(): JsonObj {
+    val fields = LinkedHashMap<String, JsonValue>()
+    while (nextToken() != JsonToken.END_OBJECT) {
+        val name = currentName()
+        nextToken()
+        fields[name] = readValue()
     }
+    return JsonObj(fields)
+}
 
-    fun value(): JsonValue {
-        skipWhitespace()
-        require(!finished) { "Unexpected end of JSON" }
-        return when (val c = text[offset]) {
-            '{' -> obj()
-            '[' -> arr()
-            '"' -> JsonStr(string())
-            't' -> literal("true", JsonBool(true))
-            'f' -> literal("false", JsonBool(false))
-            'n' -> literal("null", JsonNull)
-            else -> if (c == '-' || c.isDigit()) number() else error("Unexpected '$c' at offset $offset")
-        }
-    }
-
-    private fun obj(): JsonObj {
-        offset++ // '{'
-        val fields = LinkedHashMap<String, JsonValue>()
-        skipWhitespace()
-        if (peek() == '}') { offset++; return JsonObj(fields) }
-        while (true) {
-            skipWhitespace()
-            val name = string()
-            skipWhitespace()
-            expect(':')
-            fields[name] = value()
-            skipWhitespace()
-            when (val c = take()) {
-                ',' -> Unit
-                '}' -> return JsonObj(fields)
-                else -> error("Expected ',' or '}' but found '$c' at offset ${offset - 1}")
-            }
-        }
-    }
-
-    private fun arr(): JsonArr {
-        offset++ // '['
-        val items = mutableListOf<JsonValue>()
-        skipWhitespace()
-        if (peek() == ']') { offset++; return JsonArr(items) }
-        while (true) {
-            items += value()
-            skipWhitespace()
-            when (val c = take()) {
-                ',' -> Unit
-                ']' -> return JsonArr(items)
-                else -> error("Expected ',' or ']' but found '$c' at offset ${offset - 1}")
-            }
-        }
-    }
-
-    private fun string(): String {
-        expect('"')
-        val sb = StringBuilder()
-        while (true) {
-            when (val c = take()) {
-                '"' -> return sb.toString()
-
-                '\\' -> when (val escape = take()) {
-                    '"' -> sb.append('"')
-
-                    '\\' -> sb.append('\\')
-
-                    '/' -> sb.append('/')
-
-                    'b' -> sb.append('\b')
-
-                    'f' -> sb.append('\u000C')
-
-                    'n' -> sb.append('\n')
-
-                    'r' -> sb.append('\r')
-
-                    't' -> sb.append('\t')
-
-                    'u' -> {
-                        require(offset + UNICODE_ESCAPE_DIGITS <= text.length) {
-                            "Truncated \\u escape at offset $offset"
-                        }
-                        sb.append(text.substring(offset, offset + UNICODE_ESCAPE_DIGITS).toInt(HEX).toChar())
-                        offset += UNICODE_ESCAPE_DIGITS
-                    }
-
-                    else -> error("Unknown escape '\\$escape' at offset ${offset - 1}")
-                }
-
-                else -> sb.append(c)
-            }
-        }
-    }
-
-    private fun number(): JsonNum {
-        val start = offset
-        if (peek() == '-') offset++
-        while (offset < text.length && (text[offset].isDigit() || text[offset] in ".eE+-")) offset++
-        val raw = text.substring(start, offset)
-        // A whole number stays whole: rendering 1.0 back into a form field
-        // where the sender wrote 1 would be a round trip that changed the value.
-        val number: Number = raw.toLongOrNull() ?: raw.toDoubleOrNull()
-            ?: error("'$raw' is not a number, at offset $start")
-        return JsonNum(number)
-    }
-
-    private fun literal(word: String, value: JsonValue): JsonValue {
-        require(text.startsWith(word, offset)) { "Unexpected content at offset $offset" }
-        offset += word.length
-        return value
-    }
-
-    private fun peek(): Char? = if (finished) null else text[offset]
-
-    private fun take(): Char {
-        require(!finished) { "Unexpected end of JSON" }
-        return text[offset++]
-    }
-
-    private fun expect(c: Char) {
-        val actual = take()
-        require(actual == c) { "Expected '$c' but found '$actual' at offset ${offset - 1}" }
-    }
+private fun JsonParser.readArray(): JsonArr {
+    val items = mutableListOf<JsonValue>()
+    while (nextToken() != JsonToken.END_ARRAY) items += readValue()
+    return JsonArr(items)
 }
 
 /** Pretty-prints with two-space indentation. Only used for the served spec. */
@@ -265,3 +199,6 @@ fun JsonValue.renderPretty(indent: String = ""): String {
 /** `\uXXXX` is four hex digits, by the JSON grammar. */
 private const val UNICODE_ESCAPE_DIGITS = 4
 private const val HEX = 16
+
+/** See [jsonFactory]. */
+private const val MAX_DEPTH = 64
