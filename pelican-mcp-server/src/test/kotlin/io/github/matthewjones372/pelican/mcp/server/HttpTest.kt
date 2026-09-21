@@ -76,4 +76,24 @@ class HttpTest {
         answer.status shouldBe 200
         ((parseJson(answer.body) as JsonObj)["error"] as JsonObj)["code"].toString() shouldContain "-32700"
     }
+
+    /**
+     * The message is well-formed JSON and refused for its depth, so what is
+     * being asked is whether the reader has a bound at all. An unbounded
+     * recursive descent answers this by unwinding the stack past the handler:
+     * `handle` runs inside the directive that mounts it, so nothing between
+     * here and the socket catches an `Error`.
+     */
+    @Test
+    fun `a message nested past any reasonable depth is refused rather than unwinding the stack`() {
+        val answer = post("[".repeat(DEEPER_THAN_ANY_DOCUMENT) + "]".repeat(DEEPER_THAN_ANY_DOCUMENT))
+
+        answer.status shouldBe 200
+        ((parseJson(answer.body) as JsonObj)["error"] as JsonObj)["code"].toString() shouldContain "-32700"
+    }
+
+    private companion object {
+        /** Deep enough that a reader without a bound cannot survive it. */
+        const val DEEPER_THAN_ANY_DOCUMENT = 10_000
+    }
 }

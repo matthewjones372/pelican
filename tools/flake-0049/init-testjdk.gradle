@@ -1,0 +1,16 @@
+// Runs every Test task on -DtestJdk=N instead of the jvmToolchain(21) compile
+// toolchain. Prototype of spec 0049's second stack entry, and the way to soak
+// this flake on a JDK other than 21.
+import org.gradle.jvm.toolchain.JavaToolchainService
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+
+gradle.projectsEvaluated {
+    def ver = Integer.parseInt(System.getProperty("testJdk", "21"))
+    gradle.rootProject.subprojects.each { p ->
+        def tc = p.extensions.findByType(JavaToolchainService)
+        if (tc == null) return
+        p.tasks.withType(Test).configureEach {
+            javaLauncher.set(tc.launcherFor { it.languageVersion.set(JavaLanguageVersion.of(ver)) })
+        }
+    }
+}

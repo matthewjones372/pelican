@@ -1,9 +1,24 @@
-// Deliberately minimal. No server framework, no HTTP library, no OpenAPI — and
-// no JSON library either. Descriptions carry a KType, and `JsonValue` is enough
-// to represent a schema, so core has nothing on its runtime classpath but the
-// Kotlin standard library. `NoThirdPartyDependenciesTest` enforces that.
+// Deliberately minimal. No server framework, no HTTP library, no OpenAPI, and
+// no JSON *databind* — descriptions carry a KType and never a serializer, which
+// is what keeps the codec pluggable.
+//
+// One exception, and it is a judgement call made once: `jackson-core`, the
+// streaming parser under databind. Core has to read JSON as well as write it
+// — a generated client parses the document embedded in it, and the golden and
+// compatibility tools read documents this project did not produce — and a
+// hand-written reader on those paths was a parser nobody chose to own. See
+// spec 0045. It has no transitive dependencies of its own, and every service
+// using `pelican-jackson` already has it, so the shipped configuration gains
+// no jar. `NoThirdPartyDependenciesTest` permits exactly this one artifact and
+// still asserts databind, kotlinx and Pekko are absent.
 //
 // If this file ever grows a `pekko` dependency, the layering has been broken.
+
+dependencies {
+    // Pinned to match `pelican-jackson`, so a service running both resolves one
+    // version; an application's own BOM still wins.
+    api("com.fasterxml.jackson.core:jackson-core:2.22.2")
+}
 
 /**
  * The modules `FunctionalStyleTest` reads, in this file rather than in the test

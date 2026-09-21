@@ -34,7 +34,7 @@ class NoOtherDependenciesTest {
      * tests use and a consumer chooses for itself.
      */
     private val allowed = listOf(
-        "kotlin-stdlib", "annotations-", "pelican-core",
+        "kotlin-stdlib", "annotations-", "jackson-core-", "pelican-core",
         "opentelemetry-api", "opentelemetry-context", "opentelemetry-common",
     )
 
