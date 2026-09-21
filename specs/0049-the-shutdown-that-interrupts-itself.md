@@ -106,26 +106,28 @@ From the JDK 21 and Pekko 1.2.1 sources and the test-report artifact of run
   JDK 21's `tryTerminate` sets `STOP` and then interrupts every worker of the
   pool, including the one parked above. Nothing calls `shutdownNow()` — on the
   default dispatcher a plain `shutdown()` is enough.
-- **Measured.** A small program that blocks a worker in `managedBlock` and then
-  calls plain `shutdown()` gives, on 21.0.9, `InterruptedException at
-  AbstractQueuedSynchronizer.java:1167` — the exact CI frame — and on 23.0.1 and
-  25.0.4, a normal return. JDK 23 moved the interrupt out of `shutdown()` into a
-  `STOP` check inside `compensatedBlock`.
+- **Measured.** [`StopCheck`](../tools/flake-0049/jdk/StopCheck.java) blocks a
+  worker in `managedBlock`, then calls a plain `shutdown()`. On 21.0.9 it gives
+  `InterruptedException at AbstractQueuedSynchronizer.java:1167`, the exact CI
+  frame; on 23.0.1 and 25.0.4, a normal return. JDK 23 moved the interrupt out
+  of `shutdown()` into a `STOP` check inside `compensatedBlock`.
 - **The sightings are not on JDK 25.** `jvmToolchain(21)` sets the *Java*
   toolchain, so every `Test` task runs on 21 whatever the matrix says. The
   trace's `ForkJoinPool.java:3723`/`3740` are JDK 21's lines — 23 has 3965/3983,
-  25 has 4308/4326 — and a probe installed in `:example:test` prints
-  `java.version=21.0.9`. All three jobs run one runtime; which loses the race is
-  chance. Hence entry two.
+  25 has 4308/4326 — and [the
+  probe](../tools/flake-0049/probe/ProbeConfigurator.java) installed in
+  `:example:test` prints `java.version=21.0.9`. All three jobs run one runtime;
+  which loses the race is chance. Hence entry two.
 - **Then Scala boxes it.** `Future.andThen` catches only `NonFatal`, which
   excludes `InterruptedException`, so `Transformation.run` catches `Throwable`
   instead (`Promise.scala:539` → `:477`) and completes the promise with
   `resolve(Failure(t))` — the `ExecutionException("Boxed Exception", …)` at
   `Promise.scala:99`.
 - **Entry two costs nothing else.** `./gradlew build` with every `Test` task
-  forced onto 23 and then 25 is green on both, all six gates included. Nothing
-  in the suite depends on running at 21, so the change is the few lines it looks
-  like.
+  forced onto 23 and then 25 by
+  [`init-testjdk.gradle`](../tools/flake-0049/init-testjdk.gradle) is green on
+  both, all six gates included. Nothing in the suite depends on running at 21,
+  so the change is the few lines it looks like.
 - **And it moves the race off two of the three jobs — but not off the third.**
   On a pool already shut down, a worker blocking 200 consecutive times through
   `managedBlock` takes no interrupt at all on 23.0.1 or 25.0.4; on 21.0.9 the
@@ -135,15 +137,17 @@ From the JDK 21 and Pekko 1.2.1 sources and the test-report artifact of run
   principle — it was not reachable in this shape — and it reads differently when
   it does: an `InterruptedException` with no frame below `compensatedBlock`.
 
-**Provoking it is harder than this.** ~48,000 create-bind-stop iterations across
+**Provoking it is harder than this.** ~48,000
+[create-bind-stop](../tools/flake-0049/jdk/SyntheticLoop.java) iterations across
 JDK 21 and 25 — pool pinned to two threads, CPU burners, a 1ms dispatcher
 `shutdown-timeout`, ticks stretched to 200ms — produced nothing, and neither did
-185 consecutive runs of the whole `:example:test` suite with a probe installed
-on the dispatcher's worker threads, which recorded no interrupt at all. The loop
-is the wrong shape: the race wants the dispatcher's *scheduled* shutdown to land
-inside the scheduler's close, which a tight loop never idles long enough to
-arrange. CI has hit it three times in some hundreds of runs. Budget a soak, not
-an afternoon.
+185 consecutive runs of the whole `:example:test` suite under
+[`soak.sh`](../tools/flake-0049/soak.sh) with the probe installed on the
+dispatcher's worker threads, which recorded no interrupt at all. The loop is the
+wrong shape: the race wants the dispatcher's *scheduled* shutdown to land inside
+the scheduler's close, which a tight loop never idles long enough to arrange. CI
+has hit it three times in some hundreds of runs. Budget a soak, not an
+afternoon.
 
 ## Open questions
 
