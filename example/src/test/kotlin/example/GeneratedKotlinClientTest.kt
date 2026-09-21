@@ -13,6 +13,7 @@ import example.generated.PlaceOrderFailure
 import example.generated.StreamOrdersFailure
 import example.generated.SubmitOrderFailure
 import example.generated.SubmitOrderResult
+import example.trace.CancellationTrace
 import io.github.matthewjones372.pelican.UploadedFile
 import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
 import io.github.matthewjones372.pelican.codegen.kotlinClient
@@ -67,7 +68,9 @@ class GeneratedKotlinClientTest {
     @BeforeAll
     fun setUp() {
         server = ordersApi().start(port = 0, systemName = "orders-generated-client")
-        client = OrdersClient(server.baseUrl, codecs, PekkoHttpTransport())
+        // Spec 0052 entry one: this suite is where the cancellation shows, so
+        // it is where the stack of whoever observes one gets recorded.
+        client = OrdersClient(server.baseUrl, codecs, CancellationTrace(PekkoHttpTransport()))
     }
 
     @AfterAll
