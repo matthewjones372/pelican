@@ -122,6 +122,18 @@ From the JDK 21 and Pekko 1.2.1 sources and the test-report artifact of run
   instead (`Promise.scala:539` → `:477`) and completes the promise with
   `resolve(Failure(t))` — the `ExecutionException("Boxed Exception", …)` at
   `Promise.scala:99`.
+- **Entry two costs nothing else.** `./gradlew build` with every `Test` task
+  forced onto 23 and then 25 is green on both, all six gates included. Nothing
+  in the suite depends on running at 21, so the change is the few lines it looks
+  like.
+- **And it moves the race off two of the three jobs — but not off the third.**
+  On a pool already shut down, a worker blocking 200 consecutive times through
+  `managedBlock` takes no interrupt at all on 23.0.1 or 25.0.4; on 21.0.9 the
+  first block throws at `AbstractQueuedSynchronizer.java:1167`. `build (21)`
+  still runs tests on 21, so the flake stays reachable there and entry one is
+  still the fix. JDK 23's `STOP` check inside `compensatedBlock` could throw in
+  principle — it was not reachable in this shape — and it reads differently when
+  it does: an `InterruptedException` with no frame below `compensatedBlock`.
 
 **Provoking it is harder than this.** ~48,000 create-bind-stop iterations across
 JDK 21 and 25 — pool pinned to two threads, CPU burners, a 1ms dispatcher
@@ -133,13 +145,6 @@ a soak, not an afternoon.
 
 ## Open questions
 
-- **Does entry two belong here?** It is a second subject — the matrix has been
-  claiming three runtimes and testing one. Recommend keeping it: it is a few
-  lines, and until it lands nobody can tell which JDK a flake is on.
-- **Does entry two make the flake redder, or retire it?** Unknown, and either is
-  fine. 23 and 25 do not interrupt on plain `shutdown()`, so moving the tests
-  forward may end this race for two of the three runtimes we ship against. Entry
-  one lands first regardless.
 - **Swallow, or say something?** Recommend swallowing: it says nothing a caller
   can act on, and a warning would land in every CI log.
 - **Does the unrun `TaskRunOnClose` tail matter?** `close()` throws before
