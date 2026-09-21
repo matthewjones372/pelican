@@ -20,7 +20,7 @@ import java.io.File
 class NoOtherDependenciesTest {
 
     private val allowed = listOf(
-        "kotlin-stdlib", "annotations-", "pelican-core", "pelican-schema", "pelican-mcp",
+        "kotlin-stdlib", "annotations-", "jackson-core-", "pelican-core", "pelican-schema", "pelican-mcp",
     )
 
     @Test

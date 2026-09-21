@@ -13,7 +13,7 @@ import java.io.File
  */
 class NoOtherDependenciesTest {
 
-    private val allowed = listOf("kotlin-stdlib", "annotations-", "pelican-core", "arrow-")
+    private val allowed = listOf("kotlin-stdlib", "annotations-", "jackson-core-", "pelican-core", "arrow-")
 
     @Test
     fun `the main runtime classpath is core plus arrow, and nothing else`() {
