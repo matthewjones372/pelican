@@ -69,7 +69,14 @@ open class DecodeBenchmark {
     @Benchmark
     fun viaString(): Payload = codec.decodeFromString(body.utf8String())
 
-    /** The bytes Pekko already had, parsed as UTF-8. */
+    /**
+     * The bytes Pekko already had, parsed as UTF-8.
+     *
+     * `toArrayUnsafe`, not `toArray`: the latter copies the whole body, which
+     * is the allocation this row exists to avoid, and an interpreter written
+     * this way would no more copy here than `Responses.kt` copies with
+     * `fromArrayUnsafe` in the other direction.
+     */
     @Benchmark
-    fun viaBytes(): Payload = reader.readValue(body.toArray())
+    fun viaBytes(): Payload = reader.readValue(body.toArrayUnsafe())
 }
