@@ -137,6 +137,17 @@ one shows the interrupt comes from somewhere `stopAsync` does not control. Doing
   whose threads still hold continuations; `CoordinatedShutdown` hitting a phase
   timeout; Gradle's test worker tearing down after the last test. Recommend
   ruling out Gradle first by reproducing outside a test.
+
+  **JUnit's own timeout is already ruled out.** `build.gradle.kts:194` sets
+  `junit.jupiter.execution.timeout.default` to 60s, which cascades to
+  `...afterall.method.default` and is enforced in `SAME_THREAD` mode by
+  `SameThreadTimeoutInvocation$InterruptTask` calling `Thread.interrupt()` — so
+  it was a fair suspect. It is not the one: on every exit path
+  `SameThreadTimeoutInvocation` checks whether that task ran and, if it did,
+  throws a `TimeoutException` from `TimeoutExceptionFactory` with the original
+  attached. A fired timeout is reported as `TimeoutException: execution timed
+  out after 60000 ms`. All three sightings report a bare `CompletionException`,
+  so the interrupt came from somewhere else.
 - **Why only JDK 25?** Both CI sightings are 25, 21 and 23 have never shown it,
   and the local one's JDK was not recorded. That may be a real scheduling change
   or may be three coin flips. Recommend treating it as unexplained rather than
