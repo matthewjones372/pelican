@@ -133,6 +133,7 @@ public final class io/github/matthewjones372/pelican/Attribute {
 }
 
 public abstract interface class io/github/matthewjones372/pelican/BodyCodec {
+	public fun decodeFrom ([B)Ljava/lang/Object;
 	public abstract fun decodeFromString (Ljava/lang/String;)Ljava/lang/Object;
 	public abstract fun encodeToString (Ljava/lang/Object;)Ljava/lang/String;
 }
@@ -1593,6 +1594,7 @@ public final class io/github/matthewjones372/pelican/spi/RenderedError {
 
 public final class io/github/matthewjones372/pelican/spi/RequestBodyCodecs {
 	public final fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+	public final fun decode (Ljava/lang/String;[B)Ljava/lang/Object;
 }
 
 public final class io/github/matthewjones372/pelican/spi/RequestsKt {

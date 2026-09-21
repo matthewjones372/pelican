@@ -74,8 +74,9 @@ about a different half, and it is worth no more than it was worth then.
       payload sizes, with `-prof gc`. Changes no production code.
       Done when: `./gradlew :benchmarks:jmh` reports both paths and the numbers
       are written into this spec under a **Measured** heading.
-- [ ] **`spec-0046-bytes`** — conditional on the numbers: `decodeFrom`, the
-      Jackson override, `Interpreter.kt` handing bytes, `.api` dumps updated.
+- [x] **`spec-0046-bytes`** — `decodeFrom` on `BodyCodec`, the Jackson
+      override, a byte-shaped `RequestBodyCodecs.decode` beside the String one,
+      `Interpreter.kt` handing `toArrayUnsafe`, `.api` dumps updated.
       Done when: the build is green and the benchmark shows the win the entry
       above predicted.
 
@@ -131,17 +132,24 @@ above it, and the one row the bar names sits on the line.
 
 ## Open questions
 
-- **What is the bar?** 0039 used 20% at the small payload. Recommend the same
-  number, so a "no" here is as cheap as that one was and the two specs can be
-  read against each other.
+- **What is the bar?** Answered, and then outgrown. 20% at the small payload was
+  the number; 18.7% was the measurement, inside error bars spanning 9.7% to
+  26.8%, with both larger payloads clearing it outright. Decided by the
+  maintainer in chat, 2026-09-21: **entry three happens**, because time favours
+  the bytes path at every size and the row that misses is the one where the
+  error swamps the margin. The 64 KB allocation regression is a known cost, and
+  it is Jackson's buffering rather than anything the interpreter chooses.
 - **Payload sizes?** Recommend 100B, 1KB, 64KB — 0039's, for the same reason.
 - **Does `RequestBodyCodecs.decode(contentType, text: String)` grow a
-  byte-shaped sibling, or does the interpreter reach past it?** It is dumped API
-  at `pelican-core.api:1594`. Recommend the sibling: reaching past the SPI
-  leaves every other backend on the slow path with no way onto the fast one.
+  byte-shaped sibling, or does the interpreter reach past it?** The sibling,
+  built as recommended: reaching past the SPI would leave every other backend on
+  the slow path with no way onto the fast one.
 - **Does `readStrictBody(InputStream, Long): String` (`Requests.kt:53`) need one
-  too?** Recommend yes if entry three happens, so the `multi-backend` branch's
-  http4k and Ktor interpreters do not inherit a boundary Pekko no longer has.
+  too?** Not in this entry. Its only caller on `main` is the in-memory test
+  transport, whose speed is not what 0046 is about, and the http4k and Ktor
+  interpreters that would want it are on the `multi-backend` branch rather than
+  here. Adding public API to core for a caller that does not exist yet is the
+  surface spec 0044 argues against; it lands with the backend that needs it.
 - **Does additive surface belong in 1.0 or wait for 1.1?** 0039 answered "now,
   because a candidate is when additive surface should arrive". Recommend the
   same answer unless the freeze has moved.
