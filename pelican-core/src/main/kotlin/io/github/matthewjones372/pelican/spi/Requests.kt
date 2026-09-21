@@ -92,10 +92,21 @@ class RequestBodyCodecs internal constructor(private val byMediaType: Map<String
     /**
      * The body as the value it decodes to.
      */
-    fun decode(contentType: String?, text: String): Any? {
+    fun decode(contentType: String?, text: String): Any? =
+        decoded(contentType) { it.decodeFromString(text) }
+
+    /**
+     * The same, for a backend that already holds the body as bytes. A sibling
+     * rather than an interpreter reaching past this class: every backend has to
+     * be able to find the faster path, not only the one this repository ships.
+     */
+    fun decode(contentType: String?, bytes: ByteArray): Any? =
+        decoded(contentType) { it.decodeFrom(bytes) }
+
+    private inline fun decoded(contentType: String?, read: (BodyCodec<Any?>) -> Any?): Any? {
         val codec = select(contentType)
         return try {
-            codec.decodeFromString(text)
+            read(codec)
         } catch (t: BodyDecodeFailure) {
             throw t
         } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {

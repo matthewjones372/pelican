@@ -2,12 +2,14 @@ public final class io/github/matthewjones372/pelican/jackson/JacksonCodecs : io/
 	public static final field Default Lio/github/matthewjones372/pelican/jackson/JacksonCodecs$Default;
 	public fun <init> (Lcom/fasterxml/jackson/databind/ObjectMapper;)V
 	public fun codec (Lkotlin/reflect/KType;)Lio/github/matthewjones372/pelican/BodyCodec;
+	public fun readTree (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonValue;
 	public fun schema (Lkotlin/reflect/KType;Lio/github/matthewjones372/pelican/SchemaComponents;)Lio/github/matthewjones372/pelican/JsonObj;
 }
 
 public final class io/github/matthewjones372/pelican/jackson/JacksonCodecs$Default : io/github/matthewjones372/pelican/Codecs {
 	public fun codec (Lkotlin/reflect/KType;)Lio/github/matthewjones372/pelican/BodyCodec;
 	public fun codec (Lkotlin/reflect/KType;Ljava/lang/String;)Lio/github/matthewjones372/pelican/BodyCodec;
+	public fun readTree (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonValue;
 	public fun schema (Lkotlin/reflect/KType;Lio/github/matthewjones372/pelican/SchemaComponents;)Lio/github/matthewjones372/pelican/JsonObj;
 }
 

@@ -352,3 +352,49 @@ tasks.named("compileTestKotlin") {
 tasks.withType<Test>().configureEach { maxHeapSize = "2g" }
 
 // The benchmarks are a JMH harness in `:benchmarks`: `./gradlew :benchmarks:jmh`.
+
+/**
+ * The modules `AsciiDeclarationNamesTest` reads, in this file rather than in
+ * the test because Gradle is the one that has to know them. Both source sets:
+ * a backticked name becomes a class file name wherever it is declared, and the
+ * two that broke the build were test names.
+ */
+val namedModules = listOf(
+    "pelican-core", "pelican-openapi", "pelican-schema", "pelican-mcp", "pelican-mcp-server",
+    "pelican-codegen", "pelican-import",
+    "pelican-jackson", "pelican-arrow",
+    "pelican-pekko", "pelican-pekko-docs", "pelican-pekko-mcp",
+    "pelican-metrics", "pelican-metrics-otel",
+    "pelican-client-pekko",
+    "pelican-test", "pelican-test-golden", "pelican-test-pekko",
+    "example",
+)
+
+// One list, read twice, for the reason `pelican-core/build.gradle.kts` gives:
+// Gradle snapshots these to decide whether the answer still holds, and the test
+// walks these same directories to reach it.
+val namedSources = namedModules.flatMap {
+    listOf(rootDir.resolve("$it/src/main/kotlin"), rootDir.resolve("$it/src/test/kotlin"))
+}
+
+tasks.test {
+    inputs.files(namedSources.filter { it.isDirectory })
+        .withPropertyName("asciiDeclarationSources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property("asciiDeclarationModules", namedModules)
+
+    val repoRootPath = rootDir.path
+    val namedSourcePaths = namedSources.filter { it.isDirectory }
+        .joinToString(File.pathSeparator) { it.path }
+
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            // Absolute, and deliberately outside the input snapshot: where the
+            // checkout sits must not decide whether a cached result applies.
+            listOf(
+                "-Dpelican.ascii.repoRoot=$repoRootPath",
+                "-Dpelican.ascii.sources=$namedSourcePaths",
+            )
+        },
+    )
+}
