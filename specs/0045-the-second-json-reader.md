@@ -67,10 +67,10 @@ jackson-core for the fallback, rather than hardening what is there: it is the
 streaming layer under databind, no transitive dependencies, already on the
 classpath of everyone using `pelican-jackson`. It deletes a class of bugs —
 numbers past `Long`, lone surrogates, raw control characters, non-JSON
-whitespace, unbounded depth — instead of fixing each by hand. The alternative is
-to bound the hand-written reader and keep it, which leaves core owning a parser
-nobody chose to own. The cost either way is core's "depends on nothing", paid in
-entry two.
+whitespace, unbounded depth — instead of fixing each by hand. The alternative
+considered was bounding the hand-written reader and keeping it, which leaves
+core owning a parser nobody chose to own. The cost of taking it is core's
+"depends on nothing", and that cost is now accepted — see **Decided**.
 
 ## Stack
 
@@ -96,6 +96,25 @@ entry two.
 ./gradlew build
 ```
 
+## Decided
+
+Answered by the maintainer in chat, 2026-09-21, and recorded rather than left to
+be rediscovered:
+
+- **`pelican-core` takes `jackson-core`.** Entry two happens as written; it does
+  not move to a leaf module. The published claim changes with it: core depends on
+  the Kotlin standard library *and `jackson-core`*, in `AGENTS.md`,
+  `README.md`, `docs/modules.md` and `docs/reference.md`, and
+  `NoThirdPartyDependenciesTest` permits exactly that one artifact and keeps
+  asserting databind, kotlinx and Pekko are absent.
+- **A kotlinx-only user carrying jackson-core is accepted.** It serves the
+  fallback alone — their own reads go through `readTree` on their own codec — and
+  for anyone on `pelican-jackson`, which is what 1.0 ships, it adds no jar at all.
+
+`AGENTS.md`'s *"A dependency added to core is a build failure, not a judgement
+call"* becomes one judgement call, made once, with this as the reason. That
+sentence needs rewriting in entry two rather than quietly contradicting itself.
+
 ## Open questions
 
 - **Does the extra tree per message matter enough to return the codec's own node
@@ -105,9 +124,6 @@ entry two.
   and 20MB strings. Recommend setting `StreamReadConstraints` explicitly and low
   — nothing this reads is deeper than 10 — and pinning 2.22.2 to match
   `pelican-jackson`, letting an app's BOM win.
-- **Is jackson-core on a kotlinx-only user's classpath acceptable?** It serves
-  only the fallback; their own reads go through their codec. Recommend yes. If
-  not, entry two moves to a leaf module without touching entry one.
 - **Duplicate keys: refuse, or last-wins?** Jackson takes the last silently,
   kotlinx throws, and `Document.kt:53-60` already refuses them on the YAML side
   into the same importer. Recommend refuse.
