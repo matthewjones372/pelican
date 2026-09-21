@@ -14,7 +14,7 @@ import kotlin.reflect.KType
  */
 @Suppress("UNCHECKED_CAST")
 fun <T> Codecs.formCodec(type: KType): BodyCodec<T> =
-    FormCodec(codec<Any?>(type), FormShape.of(type, this)) as BodyCodec<T>
+    FormCodec(codec<Any?>(type), FormShape.of(type, this), this) as BodyCodec<T>
 
 /** The pairs an `application/x-www-form-urlencoded` body carries, in order. */
 fun parseFormBody(text: String): List<Pair<String, String>> =
@@ -37,13 +37,14 @@ private fun encodeFormValue(raw: String): String = URLEncoder.encode(raw, Standa
 private class FormCodec(
     private val json: BodyCodec<Any?>,
     private val shape: FormShape,
+    private val codecs: CodecFactory,
 ) : BodyCodec<Any?> {
 
     override fun decodeFromString(text: String): Any? =
         json.decodeFromString(shape.toJson(parseFormBody(text)).render())
 
     override fun encodeToString(value: Any?): String =
-        renderFormBody(shape.toPairs(parseJson(json.encodeToString(value))))
+        renderFormBody(shape.toPairs(codecs.readTree(json.encodeToString(value))))
 }
 
 private enum class Kind { STRING, INTEGER, NUMBER, BOOLEAN }
