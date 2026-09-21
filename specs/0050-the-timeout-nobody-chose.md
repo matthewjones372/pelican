@@ -52,9 +52,16 @@ thread: `SameThreadTimeoutInvocation$InterruptTask` calls `Thread.interrupt()`,
 and `SameThreadTimeoutInvocation` then reports a `TimeoutException` with
 whatever the interrupt broke attached to it. An interrupt delivered mid-flight
 into Pekko or into the compiler produces a second, unrelated-looking failure
-beside the real one. Spec 0049 spent real effort establishing that this
-mechanism was *not* the cause of its flake; that effort was only necessary
-because the mechanism is here at all.
+beside the real one.
+
+That made it a fair suspect for 0049's `InterruptedException`, and ruling it
+out took work: on every exit path `SameThreadTimeoutInvocation` checks whether
+the interrupt task ran and, if it did, throws a `TimeoutException` from
+`TimeoutExceptionFactory` with the original attached. A fired timeout is
+reported as `TimeoutException: execution timed out after 60000 ms`, and all
+three of 0049's sightings report a bare `CompletionException` — so this is not
+what interrupted those threads. That investigation was only necessary because
+the mechanism is here at all.
 
 ## Not doing
 
@@ -64,8 +71,8 @@ because the mechanism is here at all.
   line is not an improvement.
 - **Not making any test faster.** The runtimes above are the subject, not the
   target.
-- **Nothing to 0049.** This mechanism was ruled out as the cause of that flake.
-  The two are unrelated and neither blocks the other.
+- **Nothing to 0049.** That flake's interrupter is the JDK's own `ForkJoinPool`,
+  established there. The two are unrelated and neither blocks the other.
 
 ## Shape
 
@@ -134,6 +141,6 @@ answer to the last open question below is a short, specific list.
   terminates an actor system is doing different work from a test. Recommend
   one number until something needs two.
 - **Which tests can actually hang?** Needed before entry two is worth building.
-  Candidates: anything binding a socket, `UnboundedStreamTest`, and `stop()`
-  itself, whose wait has no deadline — which is 0049's last open question and
-  the one place these two specs touch.
+  Candidates: anything binding a socket and `UnboundedStreamTest`. Not `stop()`,
+  whose deadlineless wait is 0049's entry one — the one place these two specs
+  touch, and already covered there.
