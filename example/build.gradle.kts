@@ -16,10 +16,10 @@ dependencies {
     // Pelican compiles against Pekko and ships none of it, so a service names
     // the version and the Scala cross-build it runs. Either cross-build works;
     // this repository builds and tests at `_2.13`.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.0"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.0")
     // Pekko's own logging at the slf4j API `pelican-pekko` writes to.
     runtimeOnly("org.apache.pekko:pekko-slf4j_2.13")
     // Serving the docs is opt-in: this is the module that adds them to a server.

@@ -1,5 +1,5 @@
-val pekkoVersion = "1.2.1"
-val pekkoHttpVersion = "1.3.0"
+val pekkoVersion = "1.7.0"
+val pekkoHttpVersion = "1.4.0"
 val scalaBinary = "2.13"
 
 // The Pekko mounting of what pelican-mcp-server speaks, and the only thing in
