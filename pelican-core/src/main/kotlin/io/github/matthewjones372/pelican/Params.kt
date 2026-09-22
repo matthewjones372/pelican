@@ -32,10 +32,16 @@ class Params(
     operator fun contains(key: ParamKey<*>): Boolean = values.containsKey(key)
 
     /**
-     * The whole bag, for interpreters that need to walk it rather than read
-     * known keys — a client turning inputs back into a request, for one.
+     * The whole bag, for the one caller that walks it rather than reading known
+     * keys: `lensInputs`, turning a `Params` back into itself as an input tuple.
+     *
+     * `internal` since spec 0010. It was public, and its own doc offered it to
+     * "interpreters that need to walk it" — an audience that never arrived. No
+     * interpreter on `main` called it, none on the `multi-backend` branch did
+     * either, and a promise kept for nobody is still a promise. An interpreter
+     * that wants the bag can ask for it back, with a caller to point at.
      */
-    fun asMap(): Map<ParamKey<*>, Any?> = values
+    internal fun asMap(): Map<ParamKey<*>, Any?> = values
 
     // ---------------------------------------------------------- attributes
 

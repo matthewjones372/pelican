@@ -63,6 +63,16 @@ like any other.
   or OkHttp module — or say "all three backends" — still describe the branch
   accurately; on `main`, read them as describing the Pekko stack.
 
+- **`Params.asMap()` is `internal`.** It was public, and its own doc offered it
+  to "interpreters that need to walk it rather than read known keys" — an
+  audience that never arrived. Its only caller in the tree is `lensInputs`,
+  inside `pelican-core`; no interpreter on `main` called it, and none on the
+  [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
+  branch did either. One line leaves `pelican-core`'s dump. An interpreter that
+  wants the bag can ask for it back with a caller to point at; freezing it at
+  1.0 for nobody is the promise this release is trying not to make. See spec
+  0010.
+
 - **Three static fields nothing was meant to read.**
   `PekkoHttpTransport.CONTENT_TYPE`, `PekkoHttpTransport.CONTENT_LENGTH` and
   `RouteIndex.INITIAL_CAPTURES` are gone from the dumps. A `const val` in a

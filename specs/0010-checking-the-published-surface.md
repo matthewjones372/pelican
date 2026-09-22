@@ -108,7 +108,7 @@ thing this spec leaves behind.
 |---|---|---|
 | `Webhook.operation` | docs 10, README 2, example 12 | documented and used; nothing to reconsider |
 | `Retry`'s policy knobs | `retryPolicy` docs 3, example 7; each knob in docs and example | same |
-| **`Params.asMap`** | **none anywhere** | **still open** |
+| **`Params.asMap`** | **none anywhere** | **narrowed to `internal`** |
 
 `asMap` is public, named on no page, and has exactly one caller in the tree —
 `lensInputs` in `Tuples.kt`, inside its own module. **A first count said six
@@ -128,12 +128,23 @@ none on the `multi-backend` branch calls it either — checked across
 declaration is an extension point with no extant user, which is either the point
 of it or the argument against it.
 
-**Not decided here.** This spec's **Not doing** forbids narrowing anything
-public, and open question 4 says these three are noted *"not as work in this
-spec"*. It is the same shape as 0044's own open question about
-`Cors.allowedRequestHeaders`: recommend leaving it public and asking again when
-a second backend returns, since the interpreter that would call it is exactly
-what is missing.
+**Decided by the maintainer, 2026-09-22: `internal`.** The recommendation here
+had been to leave it and ask again when a second backend returns; the call went
+the other way, and the reasoning is the stronger one — an extension point with
+no extant user is a promise kept for nobody, and 1.0 is precisely the release
+that should not make it. An interpreter that wants the bag can ask, with a
+caller to point at.
+
+One line leaves `pelican-core`'s dump:
+
+```
+-	public final fun asMap ()Ljava/util/Map;
+```
+
+Recorded in `CHANGELOG.md` under **Removed**, which that file says is the only
+place a break is recorded. This spec's **Not doing** forbade narrowing anything
+public, so the narrowing is the maintainer's decision overriding the draft
+rather than this spec's own work — which is why it is written down here as one.
 
 ## Acceptance
 
@@ -153,7 +164,7 @@ what is missing.
 3. Should the refusals test parse the markdown, or is that too clever?
    Recommend a plain read of list-item text between the two headings, and a
    failure message quoting the offending line.
-4. ~~Which declarations should the dump make us reconsider first?~~ **Checked:
-   two of the three were fine, one is still open.** `Webhook.operation` and the
-   `Retry` knobs are documented and used; `Params.asMap` is named on no page and
-   has one in-module caller. See **Closing** for why it is left public anyway.
+4. ~~Which declarations should the dump make us reconsider first?~~ **Checked,
+   and one of the three was worth acting on.** `Webhook.operation` and the
+   `Retry` knobs are documented and used; `Params.asMap` was named on no page,
+   had one in-module caller, and is now `internal`. See **Closing**.
