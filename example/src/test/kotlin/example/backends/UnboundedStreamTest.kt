@@ -63,16 +63,27 @@ class UnboundedStreamTest {
         /**
          * How far ahead of a stalled reader the producer may get: Pekko's stage
          * buffers, the socket's write buffer and the TCP window between them.
-         * Far below anything that has collected the stream rather than buffered
-         * it — a collected stream runs to millions in the same window.
          *
-         * Measured rather than guessed, and the guess was wrong: this said
-         * "around twenty thousand small frames in practice, and this is ten
-         * times that". It is around a hundred and fifty thousand — 148,018 here
-         * across three runs, 156,222 on a CI runner — so the headroom is about
-         * a third, not ten times. See spec 0053.
+         * Set from both ends rather than guessed at either, because the failure
+         * this guards against is two-sided — too low and a busy runner's buffers
+         * trip it, too high and a stream nothing back-pressures slips under it.
+         * Both ends are measured, in the ~1050 ms window the settle occupies:
+         *
+         *  - **buffered**, which this must sit above: 148,018 locally across
+         *    three runs, 156,222 on a CI runner.
+         *  - **collected**, which this must sit below: 7.1, 8.8 and 10.2 million
+         *    — an unthrottled source into `Sink.ignore`, nothing pulling back.
+         *
+         * A million is the midpoint in the ratio that matters: about six times
+         * the worst buffering seen, and about seven times under the slowest
+         * collection seen. Its predecessor, 200,000, was 1.35× over one end and
+         * 35× under the other — a number that would have flaked long before it
+         * caught anything. See spec 0053.
+         *
+         * Unrelated to [ELEMENTS], which happens to share the value: that is how
+         * many elements the *other* test drains, not a ceiling.
          */
-        const val BOUNDED_AHEAD = 200_000L
+        const val BOUNDED_AHEAD = 1_000_000L
 
         const val SOCKET_TIMEOUT_MILLIS = 10_000
         const val BUFFER_BYTES = 8 * 1024
