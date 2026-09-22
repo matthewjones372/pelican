@@ -78,18 +78,63 @@ exist, which is where the 985-line estimate comes from.
 
 ## Stack
 
-- [ ] **`spec-0014-spring-routes`** — `pelican-spring` module, `Interpreter.kt`: route registration, method and path matching, plain input decode. No bodies.
+> **None of the six happen. See Closing.**
+
+- [ ] ~~**`spec-0014-spring-routes`**~~ — `pelican-spring` module, `Interpreter.kt`: route registration, method and path matching, plain input decode. No bodies.
       Done when: a two-endpoint API answers through a `RouterFunction`, and `NoOtherDependenciesTest` proves core + spring-webmvc + slf4j and nothing else.
-- [ ] **`spec-0014-spring-bodies`** — `Handlers.kt` binders (`handledNow`, `handledOrFail`, `handledOneOf`), body read and write, `Responses.kt` for status, headers and `RenderedError`.
+- [ ] ~~**`spec-0014-spring-bodies`**~~ — `Handlers.kt` binders (`handledNow`, `handledOrFail`, `handledOneOf`), body read and write, `Responses.kt` for status, headers and `RenderedError`.
       Done when: a declared failure answers its declared status with the same body the other three render.
-- [ ] **`spec-0014-spring-streaming`** — `streamedNow` over `Sequence`, SSE, and multipart uploads.
+- [ ] ~~**`spec-0014-spring-streaming`**~~ — `streamedNow` over `Sequence`, SSE, and multipart uploads.
       Done when: `SseKeepAliveTest` and `CookiesFormsAndUploadsTest` pass against Spring.
-- [ ] **`spec-0014-spring-cors-filters`** — `corsPolicy` folding, `Filter` application, oversize refusal.
+- [ ] ~~**`spec-0014-spring-cors-filters`**~~ — `corsPolicy` folding, `Filter` application, oversize refusal.
       Done when: `CorsTest`, `FiltersAndHeadersTest` and the 413 case pass.
-- [ ] **`spec-0014-spring-parity`** — `OnSpring` in `example/backends`, one entry in `allBackends`.
+- [ ] ~~**`spec-0014-spring-parity`**~~ — `OnSpring` in `example/backends`, one entry in `allBackends`.
       Done when: the whole `example` suite runs four backends green with no new assertions.
-- [ ] **`spec-0014-spring-docs`** — `pelican-spring-docs` and `pelican-test-spring`, plus `docs/modules.md`, `docs/choosing.md`, README and CHANGELOG.
+- [ ] ~~**`spec-0014-spring-docs`**~~ — `pelican-spring-docs` and `pelican-test-spring`, plus `docs/modules.md`, `docs/choosing.md`, README and CHANGELOG.
       Done when: `docsRoutes` serves the document and the UI, the in-memory transport works, and `docs/modules.md`'s dependency claims are tests.
+
+## Closing
+
+This spec was drafted against a three-interpreter world. It no longer describes
+the repository, and what it proposes is refused by a page already on `main`.
+
+**Its Problem is stale in its first sentence.** *"Three interpreters exist —
+Pekko, http4k, Ktor"*: one does.
+[Spec 0034](0034-one-backend-to-stand-behind.md) moved http4k and Ktor to the
+`multi-backend` branch on 2026-08-26 — the maintainer's decision that 1.0 ships
+Pekko and Jackson, because three backends were *"a maintenance surface three
+times the size of what 1.0 needs to promise"*. The estimate this spec rests on
+goes with it: *"`pelican-http4k` is 985 lines against that SPI. This is that
+shape a fourth time"* — it would be the second on main, and the model it is
+measured against is not here to read.
+
+Entry five cannot be met at all: *"the whole `example` suite runs four backends
+green"*, where `allBackends` has one entry.
+
+**And `docs/roadmap.md` refuses it by name.** Under *"Not on this list"* —
+things that look like gaps and are not:
+
+> A *fourth* backend belongs here too. The claim a backend count buys is that
+> the interpreter is not shaped by any one of them, and three of them is proof
+> enough of that … Narrowing what 1.0 ships does not un-prove it, and **it is
+> not an argument for a fourth.**
+
+Spring appears nowhere else on that page. So building this would ship three new
+modules against a published statement that they are not wanted — the drift this
+library exists to prevent, committed in the repository that argues against it.
+
+Closed on the maintainer's call, 2026-09-22, rather than rewritten: a Spring
+interpreter that is wanted after 1.0 is a fresh spec written against whatever
+the surface is then, not this one with its premises patched.
+
+### What does not close with it
+
+The audience argument is untouched and still true. `docs/choosing.md` § *"Spring
+Boot, Micronaut and Quarkus"* argues Pelican against springdoc over some
+seventy lines, to a reader whose only way to act is to replace their web stack.
+That is a real gap in a published page and it outlives this spec — but fixing it
+is an edit to an argument, not an interpreter, and belongs to whoever next reads
+that page with the one-backend world in mind.
 
 ## Acceptance
 
@@ -98,6 +143,12 @@ exist, which is where the 985-line estimate comes from.
 ```
 
 ## Open questions
+
+None are answered, and none need to be: each belongs to work that does not
+happen. They are left as written because a later Spring spec would ask most of
+them again, and question 6's debt — the shared pipeline copied per interpreter —
+is the one worth carrying forward on its own, since it is about the three
+backends that exist rather than the one that does not.
 
 1. Spring version floor — Framework 6.2 (Boot 3) or 7.0 (Boot 4)? Recommend
    6.2: it is the larger installed base and 7 reads it. Pin it with the note
