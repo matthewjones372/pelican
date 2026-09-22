@@ -37,6 +37,9 @@ class CancellationTrace(
     }
 }
 
+/** Enough to reach past this decorator and the transport into whoever cancelled. */
+private const val FRAMES = 40
+
 /**
  * The observer's own stack, because the cancellation has none: `StageWasCompleted`
  * is a Scala `case object` mixing in `NoStackTrace`, so it is one instance whose
@@ -48,7 +51,11 @@ internal fun describeCancellation(where: String, failed: Throwable): String? {
         ?: return null
 
     val chain = generateSequence(failed) { it.cause }.joinToString(" <- ") { it::class.java.name }
-    val frames = Thread.currentThread().stackTrace.drop(2).take(14).joinToString("\n    ")
+    // Was 14, which was too few. The first real sighting spent all fourteen on
+    // this decorator and the two transport stages above it, and cut off exactly
+    // where the interesting part starts: whatever inside Pekko completed the
+    // exchange. The frames below the transport are the ones worth having.
+    val frames = Thread.currentThread().stackTrace.drop(2).take(FRAMES).joinToString("\n    ")
     return "0052-TRACE $where\n  cancellation: ${cancellation::class.java.name}\n  chain: $chain\n    $frames"
 }
 
