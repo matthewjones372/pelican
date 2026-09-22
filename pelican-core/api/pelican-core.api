@@ -1086,7 +1086,6 @@ public abstract interface class io/github/matthewjones372/pelican/ParamKey {
 public final class io/github/matthewjones372/pelican/Params {
 	public fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun asMap ()Ljava/util/Map;
 	public final fun contains (Lio/github/matthewjones372/pelican/Attribute;)Z
 	public final fun contains (Lio/github/matthewjones372/pelican/ParamKey;)Z
 	public final fun find (Lio/github/matthewjones372/pelican/Attribute;)Ljava/lang/Object;
