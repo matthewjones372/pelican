@@ -4674,6 +4674,55 @@ tally handledBy { rows ->
 Which shape to pick is also what decides whether a bad frame can be refused
 properly — see below.
 
+### A stream that names its failure
+
+Consuming an upload with a `Sink` puts the failure back where the description
+worked to take it from: a row the handler cannot make sense of becomes a thrown
+exception a materialised stage reports later, which the interpreter has no
+choice but to render as a 500.
+
+`pelican-streams` is one function that hands the upload to
+[lark's](https://github.com/matthewjones372/lark) `Stream<E, A>`, which carries
+the failure as a value in the type:
+
+```kotlin
+import io.github.matthewjones372.pelican.streams.toStream
+
+tally handledBy { rows ->
+    rows.toStream()                                                   // Stream<Nothing, Note>
+        .mapOrFail { it.customer ?: raise(NoCustomer(it.id)) }         // Stream<IngestError, String>
+        .runFold(0) { seen, _ -> seen + 1 }
+        .run(system)
+        .thenApply { exit -> if (exit is Exit.Done) Tally(exit.value) else refused(exit) }
+}
+```
+
+`run` completes with an `Exit` — `Done`, `Failed` or `Died` — rather than a
+failed stage, so *which* of the three happened is a `when` in the handler and
+each one can answer differently. `Failed` carries the `E` the description
+declares; `Died` carries a throwable nobody declared, which is the only one that
+should still become a 500.
+
+Two things Pelican does not do. It owns no operators: `mapOrFail`, `catchAll`,
+`mapAsync` and the rest are lark's, and a service that never streams never sees
+them. And it ships neither dependency — Pekko is provided in every module that
+speaks it, and `lark-stream` pins `_2.13` as an `api` dependency of its own, so
+a consumer names both:
+
+```kotlin
+dependencies {
+    implementation("io.github.matthewjones372:pelican-streams:$pelicanVersion")
+    implementation("io.github.matthewjones372:lark-stream:0.4.0")
+    // plus the Pekko block from Versions, as for any Pekko module here.
+}
+```
+
+The element bound is the one thing the conversion insists on. `Stream` requires
+a non-null element, because an operator handed a null cannot promise that a
+missing value and a failure are different things — so `ndjsonIn<T>` with a
+nullable `T` does not convert, and says so at compile time rather than at the
+first null frame.
+
 ### What a bad frame is told
 
 Two refusals, both classified in core and rendered through the service's

@@ -29,6 +29,7 @@ include(
     "pelican-metrics",
     "pelican-metrics-otel",
     "pelican-client-pekko",
+    "pelican-streams",
     "pelican-test",
     "pelican-test-golden",
     "pelican-test-pekko",
