@@ -67,9 +67,9 @@ real edits happen and it can be split by module without a red build in between.
 
 ## Stack
 
-- [ ] **`spec-0010-explicit-api-warning`** — `explicitApiWarning()` in the subprojects block; the visibility and return-type edits in `pelican-core` only.
+- [ ] ~~**`spec-0010-explicit-api-warning`**~~ — superseded by 0044; see Closing. — `explicitApiWarning()` in the subprojects block; the visibility and return-type edits in `pelican-core` only.
       Done when: core builds warning-free under the flag, and every declaration made `internal` is one no example and no test used.
-- [ ] **`spec-0010-explicit-api-strict`** — the remaining modules, then `explicitApi()` strict.
+- [ ] ~~**`spec-0010-explicit-api-strict`**~~ — superseded by 0044; see Closing. — the remaining modules, then `explicitApi()` strict.
       Done when: `./gradlew build` is green with strict mode on, and each module's newly `internal` declarations are listed in the PR body.
 - [x] **`spec-0010-abi-dump`** — `binary-compatibility-validator`, checked-in `.api` files, wired into `check`; the two stale refusals deleted and the test that stops them coming back.
       Done when: adding a public function to core fails `apiCheck` until the dump is regenerated, and the refusals test fails if a "What isn't here" bullet names a module in `settings.gradle.kts`. Landed in [#69](https://github.com/matthewjones372/pelican/pull/69).
@@ -85,6 +85,55 @@ real edits happen and it can be split by module without a red build in between.
 > should have been `internal`. Rewrite these two against that dump —
 > done in [spec 0044](0044-what-the-surface-does-not-need.md), which reads
 > it and supersedes both entries.
+
+## Closing
+
+The note above already said what to do: rewrite the two `explicitApi` entries
+against the dump. [Spec 0044](0044-what-the-surface-does-not-need.md) is that
+rewrite, and it is now complete — both its entries landed, and it declined
+`explicitApi()` in either strength for the reason measured here. So this spec
+closes on its third entry, with the other two superseded rather than done.
+
+What 0044 bought instead of 423 mechanical `public` keywords: 704 declarations
+read, 71 unreferenced outside their own module, and six given a decision each —
+four made `internal`, one documented, one added to a table.
+
+### Open question 4, checked
+
+That question named three declarations as where a reading of the dump should
+start. Two are settled by the dump itself; the third is not, and is the one
+thing this spec leaves behind.
+
+| named | mentions on a page | verdict |
+|---|---|---|
+| `Webhook.operation` | docs 10, README 2, example 12 | documented and used; nothing to reconsider |
+| `Retry`'s policy knobs | `retryPolicy` docs 3, example 7; each knob in docs and example | same |
+| **`Params.asMap`** | **none anywhere** | **still open** |
+
+`asMap` is public, named on no page, and has exactly one caller in the tree —
+`lensInputs` in `Tuples.kt`, inside its own module. **A first count said six
+callers in tests, and all six were OpenTelemetry's unrelated
+`Attributes.asMap()` in `TelemetryTest.kt`**; the name collides, and a search
+for it has to read the receiver.
+
+That is the `Names.kt` shape 0044 narrowed — machinery, public by omission. What
+makes it different is its own KDoc:
+
+> The whole bag, for interpreters that need to walk it rather than read known
+> keys — a client turning inputs back into a request, for one.
+
+It claims an audience. No interpreter on main represents that audience, and
+none on the `multi-backend` branch calls it either — checked across
+`pelican-ktor`, `pelican-http4k` and all three shelved client transports. So the
+declaration is an extension point with no extant user, which is either the point
+of it or the argument against it.
+
+**Not decided here.** This spec's **Not doing** forbids narrowing anything
+public, and open question 4 says these three are noted *"not as work in this
+spec"*. It is the same shape as 0044's own open question about
+`Cors.allowedRequestHeaders`: recommend leaving it public and asking again when
+a second backend returns, since the interpreter that would call it is exactly
+what is missing.
 
 ## Acceptance
 
@@ -104,6 +153,7 @@ real edits happen and it can be split by module without a red build in between.
 3. Should the refusals test parse the markdown, or is that too clever?
    Recommend a plain read of list-item text between the two headings, and a
    failure message quoting the offending line.
-4. Which declarations should the dump make us reconsider first? Recommend
-   `Params.asMap`, `Webhook.operation` and `Retry`'s policy knobs — noted here
-   so the reading of the dump has somewhere to start, not as work in this spec.
+4. ~~Which declarations should the dump make us reconsider first?~~ **Checked:
+   two of the three were fine, one is still open.** `Webhook.operation` and the
+   `Retry` knobs are documented and used; `Params.asMap` is named on no page and
+   has one in-module caller. See **Closing** for why it is left public anyway.
