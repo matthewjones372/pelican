@@ -181,21 +181,85 @@ cancellation nested under another failure is still found. That mattered:
 instrumentation that silently does not fire would leave the next CI failure as
 uninformative as the four before it.
 
+### The sighting, and what it eliminated
+
+It came on 2026-09-22, on `build (25)` of an unrelated PR (#154, narrowing
+`Params.asMap`). Same test, same exception, and `CancellationTrace` fired:
+
+```
+0052-TRACE send POST http://127.0.0.1:37133/users/1/orders/submit
+  cancellation: org.apache.pekko.stream.SubscriptionWithCancelException$StageWasCompleted$
+  chain: java.util.concurrent.CompletionException <- …$StageWasCompleted$
+    example.trace.CancellationTrace.send$lambda$0(CancellationTrace.kt:32)
+    …
+    io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport.send$lambda$2(PekkoHttpTransport.kt:81)
+    …
+    io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport.deadline$lambda$0(PekkoHttpTransport.kt:125)
+```
+
+**None of the three suspects is involved.** Entry one's shape proposed logging
+the places the transport can end a body — `discardEntityBytes`, the lost
+`complete` race, and `asInputStream`. The cancellation reaches none of them. It
+arrives as the **failure of `singleRequest`'s own stage**: line 125 is
+`deadline`'s `failure != null` branch and line 81 is `send`'s, so both are
+propagating a failure that was handed to them.
+
+That answers the second open question — **client side, and before a body
+exists at all** — and falsifies the premise entry one was built on. Worth
+saying plainly: the instrumentation was pointed at the wrong half of the
+transport and still earned its keep, because what it ruled out is what made the
+next step obvious.
+
+The call is a `POST`, which Pekko's pool will not retry for being
+non-idempotent. That is consistent with a pooled connection going away under an
+in-flight request, and it is the reading the fix below assumes no more of than
+it has to.
+
+### What this entry does, and what it does not
+
+**`asIo` now maps a `NonFailureCancellation` to `IOException`**, as it already
+did for `StreamTcpException`. The argument is the one that function's own doc
+makes, applied to a second case it should always have covered: a Pekko
+`RuntimeException` crossing the SPI reads as neither refusal nor accident, so
+`RetryPolicy`'s default `failures` — `it is IOException` — does not retry it,
+and a caller sees an object with no stack and no message instead of a connection
+that went away. It carries no message of its own, so one is written.
+
+**This does not stop the cancellation happening, and the entry is not ticked.**
+It changes what a caller is told and whether a retry policy will act; the race
+inside the pool is untouched, and a caller without a retry policy — which is
+every call in `GeneratedKotlinClientTest` — still fails. Entry two's Done-when
+asks for the reproduction to stop and `main` to be green across consecutive
+runs, and that is not met.
+
+**What is missing is the rest of the stack.** `CancellationTrace` capped frames
+at fourteen, and the sighting spent all fourteen on the decorator and the two
+transport stages, cutting off exactly where the answer begins: whatever inside
+Pekko completed the exchange. The cap is now 40. The next sighting should name
+the origin, and that is what a root-cause fix waits on rather than another
+guess.
+
 ## Open questions
 
 - ~~**Does a `TestWatcher` see it?**~~ **Answered: yes**, and it does not help.
   See **Measured**.
-- **Which side throws — client or server?** Still unknown, and the exception
-  cannot say. Entry one's logging is on the client side because that is where
-  our code ends a body; if none of the three paths fires, the answer is the
-  server and entry one needs a second pass there.
-- **Is `StreamConverters.asInputStream` the wrong bridge?** It is a blocking
-  reader over a stream whose lifetime the caller controls, which is the shape
-  that produces cancellation races. Entry one's third log line is on it.
-- **Should a `NonFailureCancellation` ever reach a caller?** Pekko's own name
-  says no. Recommend treating that as entry two's likely answer rather than
-  entry one's assumption — if the logging shows something else entirely, this
-  would have been a comfortable wrong turn.
+- ~~**Which side throws — client or server?**~~ **Answered: the client, and
+  before a body exists.** It is `singleRequest`'s own stage failing, not any of
+  the three places the transport ends a body. See **The sighting**.
+- ~~**Is `StreamConverters.asInputStream` the wrong bridge?**~~ **Not this
+  time.** The cancellation never reaches it — it arrives while the response head
+  is still awaited. The question stands on its own merits for body-read races,
+  but it is not this flake.
+- ~~**Should a `NonFailureCancellation` ever reach a caller?**~~ **Answered: not
+  as itself.** It now crosses as an `IOException`, which is what the other
+  transports raise and what a retry policy acts on. Whether it should reach a
+  caller *at all* is the open part, and depends on the root cause below.
+- **What completes the exchange?** The one thing still unknown, and the only
+  thing a root-cause fix should be written on. The first sighting's frames were
+  capped at fourteen and ran out before reaching it; the cap is 40 now. Until a
+  sighting names it, the standing reading is a pooled connection going away
+  under an in-flight non-idempotent request — consistent with the `POST`, and
+  assumed no further than that.
 - **How reproducible is it locally?** Unknown and probably poorly: 0049 needed
   a soak of tens of thousands of iterations and never hit its race. Three
   sightings in a day of ordinary CI suggests CI provokes this more readily than

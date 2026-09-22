@@ -19,6 +19,7 @@ import org.apache.pekko.http.javadsl.model.HttpRequest
 import org.apache.pekko.http.javadsl.model.HttpResponse
 import org.apache.pekko.http.javadsl.model.RequestEntity
 import org.apache.pekko.stream.StreamTcpException
+import org.apache.pekko.stream.SubscriptionWithCancelException
 import org.apache.pekko.stream.javadsl.Source
 import org.apache.pekko.stream.javadsl.StreamConverters
 import org.apache.pekko.util.ByteString
@@ -89,17 +90,6 @@ class PekkoHttpTransport @JvmOverloads constructor(
             }
         }
         return answer
-    }
-
-    /**
-     * Pekko raises a connection refused or reset as `StreamTcpException`, a
-     * `RuntimeException` — so it would not read as the `IOException` the other
-     * transports raise and `RetryPolicy` retries by default. It crosses here as
-     * one, with Pekko's own as its cause.
-     */
-    private fun asIo(failed: Throwable): Throwable {
-        val cause = if (failed is CompletionException) failed.cause ?: failed else failed
-        return if (cause is StreamTcpException) IOException(cause.message, cause) else cause
     }
 
     /**
@@ -267,4 +257,36 @@ private val shared: ActorSystem<Void> by lazy {
         "pelican-client",
         ConfigFactory.parseString("pekko.daemonic = on").withFallback(ConfigFactory.load()),
     )
+}
+
+/**
+ * Pekko's own failures, as the `IOException` every other transport raises.
+ *
+ * Two of them leak a `RuntimeException` that reads as neither a refusal nor
+ * an accident, so neither would be retried by `RetryPolicy`'s default
+ * `failures`, which asks `it is IOException`. Both cross here as one, with
+ * Pekko's own as the cause.
+ *
+ * - **`StreamTcpException`** is a connection refused or reset.
+ * - **`SubscriptionWithCancelException.NonFailureCancellation`** is a stage
+ *   cancelled because something upstream had already finished — the pool's
+ *   slot going away under an in-flight request. Spec 0052 traced one from a
+ *   CI failure to exactly here: it arrived as the failure of
+ *   `singleRequest`'s own stage, and this function passed it through
+ *   untouched, so a caller saw an internal Pekko object with no stack and
+ *   no message rather than a connection that went away.
+ *
+ * It carries no message of its own — `NoStackTrace` and a Scala `object` —
+ * so one is written here rather than handing on a null.
+ */
+internal fun asIo(failed: Throwable): Throwable {
+    val cause = if (failed is CompletionException) failed.cause ?: failed else failed
+    return when (cause) {
+        is StreamTcpException -> IOException(cause.message, cause)
+
+        is SubscriptionWithCancelException.NonFailureCancellation ->
+            IOException("The exchange was cancelled before a response arrived: ${cause.javaClass.name}", cause)
+
+        else -> cause
+    }
 }
