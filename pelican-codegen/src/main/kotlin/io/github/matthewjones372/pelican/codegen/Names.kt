@@ -20,11 +20,11 @@ private val wordBoundary = Regex("[^A-Za-z0-9]+")
  * be. The JVM forbids these five characters in a member name, and no amount of
  * quoting gets them back.
  */
-fun isWritable(value: String): Boolean =
+internal fun isWritable(value: String): Boolean =
     value.isNotEmpty() && value.none { it in ".;[]/<>" }
 
 /** [value] as Kotlin writes it: bare where it is an identifier, in backticks where it is not. */
-fun asWritten(value: String): String = if (isIdentifier(value)) value else "`$value`"
+internal fun asWritten(value: String): String = if (isIdentifier(value)) value else "`$value`"
 
 /** A parameter or property name: `X-Api-Key` -> `xApiKey`, `limit` -> `limit`. */
 fun memberName(raw: String): String {
@@ -40,7 +40,7 @@ fun memberName(raw: String): String {
  * What one branch of a union is called, in the order the document is willing
  * to say it.
  */
-fun branchName(parent: String, index: Int, mapped: String?, ref: String?): String =
+internal fun branchName(parent: String, index: Int, mapped: String?, ref: String?): String =
     typeName(mapped?.takeIf { it.readsAsAName() } ?: ref ?: "${parent}Variant${index + 1}")
 
 private fun String.readsAsAName(): Boolean = none { it == '/' || it == '#' } && typeName(this) != "Value"
@@ -53,7 +53,7 @@ fun typeName(raw: String): String {
     return if (name.first().isDigit()) "_$name" else name
 }
 
-fun isIdentifier(value: String): Boolean =
+internal fun isIdentifier(value: String): Boolean =
     value.isNotEmpty() &&
         (value.first().isLetter() || value.first() == '_') &&
         value.all { it.isLetterOrDigit() || it == '_' } &&

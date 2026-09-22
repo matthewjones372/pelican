@@ -68,13 +68,41 @@ decisions rather than seventy mechanical ones.
 
 ## Stack
 
-- [ ] **`spec-0044-codegen-internal`** — the four `Names.kt` helpers to
+- [x] **`spec-0044-codegen-internal`** — the four `Names.kt` helpers to
       `internal`; `pelican-codegen`'s `.api` dump regenerated.
       Done when: `./gradlew build` is green and the dump is four lines shorter.
 - [ ] **`spec-0044-document-the-rest`** — `changesFrom` gets a reference
       section and a test; `badRequest` joins the refusals table.
       Done when: no declaration named in this spec is both public and
       unmentioned by any page.
+
+
+## Measured
+
+Entry one, on `c03c13b`. The dump went 98 lines to 94, and the four removed are
+the four named:
+
+```
+-	public static final fun asWritten (Ljava/lang/String;)Ljava/lang/String;
+-	public static final fun branchName (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+-	public static final fun isIdentifier (Ljava/lang/String;)Z
+-	public static final fun isWritable (Ljava/lang/String;)Z
+```
+
+All four are called inside the module, so they are machinery rather than dead
+code: `asWritten` and `isWritable` from `KotlinTypes.kt`, `isIdentifier` from
+both `KotlinTypes.kt` and `asWritten` itself, `branchName` from `Unions.kt`.
+
+**Confirming that took more than a `grep`.** `KotlinTypes.kt` holds a literal
+NUL byte in a string on line 217 — `"$context\u0000${obj.render()}"`, a
+separator no type name can contain — so `grep` treats the file as binary and
+prints `Binary file matches` instead of the lines. A first pass therefore
+reported `asWritten` and `isWritable` as used nowhere, which would have made
+them look like dead code rather than machinery. `grep -a` shows the truth.
+
+Worth knowing beyond this entry: any search over these sources silently skips
+that file unless it is forced to treat it as text. `Report.kt` and its test
+contain ESC bytes for terminal colour and read as binary for the same reason.
 
 ## Acceptance
 

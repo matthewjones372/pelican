@@ -74,11 +74,7 @@ public final class io/github/matthewjones372/pelican/codegen/KotlinTypes {
 }
 
 public final class io/github/matthewjones372/pelican/codegen/NamesKt {
-	public static final fun asWritten (Ljava/lang/String;)Ljava/lang/String;
-	public static final fun branchName (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 	public static final fun indent (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
-	public static final fun isIdentifier (Ljava/lang/String;)Z
-	public static final fun isWritable (Ljava/lang/String;)Z
 	public static final fun kdoc (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 	public static final fun kotlinString (Ljava/lang/String;)Ljava/lang/String;
 	public static final fun memberName (Ljava/lang/String;)Ljava/lang/String;
