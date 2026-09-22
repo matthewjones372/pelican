@@ -117,7 +117,7 @@ agreeing samples, typically ~100 ms; after this it cannot return in under
 
 ## Stack
 
-- [ ] **`spec-0053-settle-as-long-as-the-stall`** — `settled(still:, within:)`
+- [x] **`spec-0053-settle-as-long-as-the-stall`** — `settled(still:, within:)`
       replacing `settled(within:)`, with the caller passing `STALL_MILLIS`.
       Done when: the settle cannot return while the counter has moved within
       the last `STALL_MILLIS`, `./gradlew build` is green on 21, 23 and 25, and
@@ -130,8 +130,61 @@ agreeing samples, typically ~100 ms; after this it cannot return in under
 ./gradlew build
 ```
 
+## Measured
+
+Entry one, on `48f959f`. Three runs before and three after, reading the test's
+own time out of `example/build/test-results/test/`:
+
+| settle | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| two agreeing samples | 1.492 s | 1.463 s | 1.139 s |
+| still for `STALL_MILLIS` | 1.642 s | 1.661 s | 1.640 s |
+
+**The cost is ~290 ms, not the half second predicted.** The old settle did not
+return after one 50 ms sample: it ran while the buffers filled and then agreed,
+so part of the 500 ms was already being paid. Instrumenting the settle directly
+shows it now returns after 1152, 1052 and 1060 ms — roughly 550 ms of the
+counter still climbing, then the 500 ms of stillness the fix requires.
+
+The spread is the other half of the result. Before, the three runs vary by
+353 ms; after, by 21 ms. The settle is now floored, so what used to be the
+variable part of the test — *when* a pause happened to fall — no longer moves
+the total. A test whose duration is constant is also a test whose verdict does
+not depend on the machine's mood, which is the property the fix was for.
+
+### The stale comment was worse than stale
+
+The last open question asked why CI buffered 156,222 when `BOUNDED_AHEAD`'s
+comment claimed "around twenty thousand small frames in practice, and this is
+ten times that". Probing the settle's return value answers it:
+
+```
+0053-PROBE settled=148018 afterMillis=1152
+0053-PROBE settled=148018 afterMillis=1052
+0053-PROBE settled=148018 afterMillis=1060
+```
+
+**148,018, identical across three runs.** Not a loaded runner behaving oddly —
+this is simply what the buffers between the handler and a stalled socket hold.
+The CI figure of 156,222 is the same number with a different socket under it.
+
+So the comment was not merely out of date, it was wrong by a factor of seven in
+the direction that matters: `settled shouldBeLessThan BOUNDED_AHEAD` has about
+a third of headroom, not ten times. That assertion is much closer to failing
+than its own comment claimed, and nobody would have known from reading it. The
+comment now states the measured figure.
+
+Raising the constant is left alone deliberately — it is a judgement about what
+the test should tolerate, not part of making the settle honest, and the number
+to raise it *to* now exists.
+
 ## Open questions
 
+- **Should `BOUNDED_AHEAD` rise above 200,000?** Answered halfway: the real
+  buffered figure is ~150,000, so the margin is 1.35×. Recommend deciding this
+  separately — 200,000 still distinguishes buffering from collecting by orders
+  of magnitude, but it will flake if a runner buffers a third more than this
+  one did.
 - **Is `STALL_MILLIS` the right stillness, or should both grow?** 500 ms on each
   side is a second per run. Recommend keeping 500 and revisiting only if it
   recurs — the same discipline 0048 used, which did produce the evidence, just
@@ -141,11 +194,9 @@ agreeing samples, typically ~100 ms; after this it cannot return in under
   is the decoration. Recommend keeping both: boundedness alone would pass for a
   producer that never stops but stays under the ceiling, which is not what the
   test's name says.
-- **Why did this run buffer 156,222 when the constant's comment says "around
-  twenty thousand small frames in practice"?** Almost eight times the stated
-  typical figure, still under the ceiling. Either the comment is stale or that
-  runner behaved unusually. Worth a glance while building this, since it is the
-  one number here nobody has re-measured since it was written.
+- ~~**Why did this run buffer 156,222 when the constant's comment says "around
+  twenty thousand small frames in practice"?**~~ **Answered: the comment was
+  wrong.** 148,018 locally, three times over. See **Measured**.
 - **Does 0048 need a `Measured` section?** It has none, so what its fix achieved
   was never recorded and this recurrence had nothing to be checked against.
   Recommend this spec serves as that record rather than editing a shipped spec.
