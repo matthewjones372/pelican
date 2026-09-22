@@ -3064,7 +3064,33 @@ Which throwable becomes which response is decided in `pelican-core`
 | `PayloadTooLarge` | 413 |
 | anything else | 500, a reference, and nothing else |
 
-The last row is the one that changed. An exception's message is written for
+`ApiException` is the first row because it is the one a handler raises on
+purpose, and there is a function for each status worth naming:
+
+| Raise | Answers |
+|---|---|
+| `badRequest(message)` | 400 — the request itself is wrong in a way no parameter constraint describes |
+| `unauthorized(message, challenge)` | 401, with `WWW-Authenticate` when a challenge is given |
+| `forbidden(message)` | 403 |
+| `notFound(message)` | 404 |
+| `conflict(message)` | 409 |
+| `tooManyRequests(message, retryAfterSeconds)` | 429, with `Retry-After` when the seconds are given |
+
+Each throws, so each returns `Nothing` and ends the branch it is in — which is
+why `Store.user(id) ?: notFound("No user $id")` type-checks as a `User`. For a
+status not in the list, throw `ApiException(status, message)` directly; it takes
+any status that can carry a body, and refuses 204 and 304 at the throw rather
+than sending a body nothing is allowed to read.
+
+`badRequest` is worth a word, because there are two ways to a 400 and they are
+not interchangeable. A parameter that fails its declared constraint is a
+`DecodeFailure` — the second row above — and is raised before any handler runs,
+naming the parameter and what it had to satisfy. `badRequest` is for what only
+the handler knows: a date range that ends before it starts, an identifier that
+parses but belongs to somebody else. Nothing in the description can catch
+either, which is why it is a throw rather than a constraint.
+
+The last row of the first table is the one that changed. An exception's message is written for
 whoever is debugging and may name a table, a host, a query or a file; it used to
 be the `detail` of the 500. Meanwhile Pelican catches the throwable, so the
 server underneath never logged it — the message went to exactly the wrong
@@ -4991,6 +5017,59 @@ golden.request("place-order", requestsOnly(JacksonCodecs).request(placeOrder, In
 The whole of it — the table of what breaks, accepting a break you meant, and the
 `PELICAN_GOLDEN_UPDATE` switch — is in
 [docs/golden-testing.md](golden-testing.md).
+
+### The comparison on its own
+
+The classification above is not tied to the golden files or to the Gradle task.
+`pelican-openapi` publishes it as two functions, and which one to reach for is
+decided by what you are holding:
+
+```kotlin
+// Two documents: the published one is a file, and so is the proposed one.
+apiChanges(published, proposed)
+
+// The spec in this source tree, against the document that shipped.
+ordersSpec().changesFrom(published)
+```
+
+Both take `JsonObj`s. `documentOf(text)` turns the contents of a committed file
+into one, and fails saying so if the JSON is not an object.
+
+`changesFrom` is the common case written down. A comparison nearly always has a
+committed file on one side and the descriptions on the other — that asymmetry is
+the whole point, since one side is older than the source tree — so the spec is
+the receiver and the file is the argument:
+
+```kotlin
+@Test fun `nothing this release changes refuses an existing caller`() {
+    val published = documentOf(Path("api/openapi.json").readText())
+
+    ordersSpec().changesFrom(published)
+        .filter { it.compatibility == Compatibility.BREAKING }
+        .shouldBeEmpty()
+}
+```
+
+**The direction is not decoration.** The receiver is what is being *proposed*
+and the argument is what was *published*, and swapping them inverts every
+verdict rather than producing an error: a response field you deleted reads as a
+new one, which breaks nobody, and the check passes while the callers do not.
+`changesFrom` exists partly so that the order is named at the call site instead
+of being two positional arguments of the same type.
+
+Each `ApiChange` carries a `compatibility` (`BREAKING`, `COMPATIBLE` or
+`COSMETIC`), the operation it happened in as a caller names it — `POST
+/users/{userId}/orders` — what changed, and the consequence. The last two are
+separate fields because they are read differently: the claim is scanned, and the
+consequence is what somebody reads once they have stopped to look. `toString`
+puts them back together for a log line.
+
+Three ways to the same classification, then, and a project picks by where it
+wants the failure: `checkOrdersDocument` fails the build without a test suite
+([Checking against the document callers hold](#checking-against-the-document-callers-hold)),
+the goldens fail per endpoint inside one, and these two functions are for the
+check that is neither — a release note that lists what changed for callers, a
+gate in a script, a test that asserts something narrower than "nothing broke".
 
 ### Asserting on an outcome
 

@@ -474,4 +474,36 @@ class CompatibilityTest {
         breaking(before, fewer).map { it.where } shouldContainExactly listOf("POST orderPlaced")
         breaking(before, more).shouldBeEmpty()
     }
+
+    // ------------------------------------------- holding the spec, not a file
+
+    @Test
+    fun `a spec compared with a published document reports what the two-document form does`() {
+        val published = spec(shapes = mapOf("CreateOrder" to shape(Triple("item", true, string))))
+        val proposed = spec(
+            shapes = mapOf(
+                "CreateOrder" to shape(Triple("item", true, string), Triple("currency", true, string)),
+            ),
+        )
+
+        proposed.changesFrom(published.openApi()) shouldContainExactly
+            apiChanges(published.openApi(), proposed.openApi())
+    }
+
+    @Test
+    fun `the receiver is the proposed side, so a field it dropped reads as the loss it is`() {
+        val published = spec(
+            endpoints = listOf(getOrder),
+            shapes = mapOf("Order" to shape(Triple("id", true, string), Triple("nickname", true, string))),
+        )
+        val proposed = spec(endpoints = listOf(getOrder), shapes = mapOf("Order" to shape(Triple("id", true, string))))
+
+        val lost = proposed.changesFrom(published.openApi()).filter { it.compatibility == Compatibility.BREAKING }
+
+        // Compared the other way round this is a *new* response field, which
+        // breaks nobody — so the direction is the whole content of this test.
+        withClue("expected the dropped field to be breaking, got $lost") { lost shouldHaveSize 1 }
+        lost.single().what shouldContain "`nickname`"
+        lost.single().what shouldContain "is gone"
+    }
 }
