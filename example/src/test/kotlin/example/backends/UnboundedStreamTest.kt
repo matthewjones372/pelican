@@ -51,7 +51,11 @@ class UnboundedStreamTest {
         /** How often the counter is read while waiting for it to stop moving. */
         const val SAMPLE_MILLIS = 50L
 
-        /** The window in which nothing may be produced. */
+        /**
+         * The window in which nothing may be produced — and, since 0053, the
+         * stillness a settle has to observe before it may call the source
+         * quiescent. One number, so the test cannot accept less than it asserts.
+         */
         const val STALL_MILLIS = 500L
 
         const val ELEMENTS = 1_000_000L
@@ -59,9 +63,14 @@ class UnboundedStreamTest {
         /**
          * How far ahead of a stalled reader the producer may get: Pekko's stage
          * buffers, the socket's write buffer and the TCP window between them.
-         * Around twenty thousand small frames in practice, and this is ten
-         * times that — enough headroom for another machine's socket, and far
-         * below anything that has collected the stream rather than buffered it.
+         * Far below anything that has collected the stream rather than buffered
+         * it — a collected stream runs to millions in the same window.
+         *
+         * Measured rather than guessed, and the guess was wrong: this said
+         * "around twenty thousand small frames in practice, and this is ten
+         * times that". It is around a hundred and fifty thousand — 148,018 here
+         * across three runs, 156,222 on a CI runner — so the headroom is about
+         * a third, not ten times. See spec 0053.
          */
         const val BOUNDED_AHEAD = 200_000L
 
@@ -106,7 +115,7 @@ class UnboundedStreamTest {
 
                 // Nothing is read from here on. Whatever buffering exists fills
                 // up, and then demand has to stop reaching the source.
-                val settled = produced.settled(within = SETTLE_TIMEOUT)
+                val settled = produced.settled(still = STALL_MILLIS.milliseconds, within = SETTLE_TIMEOUT)
                 Thread.sleep(STALL_MILLIS)
 
                 withClue("the source produced ${produced.get() - settled} elements with nobody reading") {
@@ -161,19 +170,27 @@ class UnboundedStreamTest {
     }
 
     /**
-     * Settled when two consecutive reads agree. How long that takes is the
+     * Settled when the counter has not moved for [still]. Two agreeing samples
+     * are not enough: a scheduling pause shorter than one sample fakes them,
+     * and then the assertion demands ten times that stillness. Requiring the
+     * same window on both sides closes the gap. How long the wait takes is the
      * machine's business; a source that never settles is the bug this test
      * exists to catch, so the deadline fails rather than returning a number.
      */
     @Suppress("SleepInsteadOfDelay") // As above: elapsed wall clock is the measurement.
-    private fun AtomicLong.settled(within: Duration): Long {
+    private fun AtomicLong.settled(still: Duration, within: Duration): Long {
         val deadline = System.nanoTime() + within.inWholeNanoseconds
         var last = get()
+        var since = System.nanoTime()
         while (System.nanoTime() < deadline) {
             Thread.sleep(SAMPLE_MILLIS)
             val now = get()
-            if (now == last) return now
-            last = now
+            if (now != last) {
+                last = now
+                since = System.nanoTime()
+            } else if (System.nanoTime() - since >= still.inWholeNanoseconds) {
+                return now
+            }
         }
         fail("the source was still producing after $within with nobody reading: $last elements")
     }
