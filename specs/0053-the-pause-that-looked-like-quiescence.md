@@ -178,13 +178,46 @@ Raising the constant is left alone deliberately — it is a judgement about what
 the test should tolerate, not part of making the settle honest, and the number
 to raise it *to* now exists.
 
+### Raising the bound
+
+The finding above left `BOUNDED_AHEAD` with a third of headroom instead of the
+ten times its comment claimed, and recommended deciding separately. Decided:
+**1,000,000**.
+
+The reason it took a second measurement is that the first only found one end.
+`BOUNDED_AHEAD` guards a two-sided failure — too low and a busy runner's buffers
+trip it, too high and a stream nothing back-pressures slips under it — and the
+number was being argued about against the buffering end alone. So the other end
+was measured: an unthrottled source into `Sink.ignore`, nothing pulling back,
+timed over five million elements and scaled to the ~1050 ms the settle occupies.
+
+| in a 1050 ms window | measured |
+|---|---|
+| buffered, with a stalled reader | 148,018 / 148,018 / 148,018 local, 156,222 CI |
+| **collected**, nothing back-pressuring | **7,075,471 / 8,823,529 / 10,214,007** |
+
+Forty-five times apart, and the old constant sat almost against one wall: 1.35×
+over the buffering it had to clear, 35× under the collection it had to catch. It
+would have flaked on a runner buffering a third more than this one long before
+it ever caught a collected stream.
+
+A million is the midpoint in the ratio that matters — 6.4× over the worst
+buffering seen, 7.1× under the slowest collection seen. That is close enough to
+the geometric mean of the two poles (≈1,045,000) to call it that, and it is a
+number a reader can hold.
+
+**The probe had to be written twice.** The first attempt cancelled each run's
+`CompletionStage` and started the next; `cancel` does not stop a Pekko stream, so
+runs two and three competed with run one and read 275,104 and 93,979 against its
+6.4 million. Only the first run was clean. Taking a fixed count and timing it,
+with a fresh actor system per run, gives the three figures above — consistent to
+within 40%, where the cancelled version varied by seventy times.
+
 ## Open questions
 
-- **Should `BOUNDED_AHEAD` rise above 200,000?** Answered halfway: the real
-  buffered figure is ~150,000, so the margin is 1.35×. Recommend deciding this
-  separately — 200,000 still distinguishes buffering from collecting by orders
-  of magnitude, but it will flake if a runner buffers a third more than this
-  one did.
+- ~~**Should `BOUNDED_AHEAD` rise above 200,000?**~~ **Answered: yes, to
+  1,000,000.** See **Raising the bound** below — the second end got measured
+  too, and 200,000 turned out to be badly placed rather than merely tight.
 - **Is `STALL_MILLIS` the right stillness, or should both grow?** 500 ms on each
   side is a second per run. Recommend keeping 500 and revisiting only if it
   recurs — the same discipline 0048 used, which did produce the evidence, just
