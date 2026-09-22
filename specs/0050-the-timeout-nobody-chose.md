@@ -112,7 +112,8 @@ guess that `DoesNotCompileTest` will eventually fail on a slow runner.
       reason and the measurement in a comment.
       Done when: `./gradlew build` is green on 21, 23 and 25, and the comment
       names the slowest measured method so the next person can re-check it.
-- [ ] **`spec-0050-timeouts-where-hanging-is-real`** — explicit `@Timeout` on
+- [ ] ~~**`spec-0050-timeouts-where-hanging-is-real`**~~ — not happening; see
+      Measured. — explicit `@Timeout` on
       the tests that can genuinely wedge rather than merely run long.
       Done when: each annotation's value is justified by that test's measured
       duration, not by a shared constant.
@@ -141,6 +142,54 @@ Nothing here has ever hit the timeout, so this entry changes no observable
 behaviour. What it changes is what the number claims: a backstop that fires only
 on a hang rather than a wall-clock budget that a slow runner fails.
 
+### Entry two does not happen
+
+The entry was conditional: *"worth doing only if the answer to the last open
+question below is a short, specific list."* The list was surveyed. **It is
+empty, not short** — and the two candidates the spec named are both already
+bounded.
+
+What a `@Timeout` would add is a deadline where nothing else has one. Every
+category that could wedge has one:
+
+| where a wait could hang | what already bounds it |
+|---|---|
+| a request to a server the tests bound | Pekko's own `request-timeout = 20 s`, then `idle-timeout = 60 s` |
+| a raw `Socket` read | `soTimeout = 10_000` at all six sites that open one |
+| a `CountDownLatch` | all four `await` calls pass a timeout |
+| `server.stop()` | `STOP_TIMEOUT` via `awaitTerminated`, from 0049 |
+| `UnboundedStreamTest` | `settled` fails on its deadline; reads have `soTimeout`; `stop()` as above |
+
+The Pekko figures are read from the `reference.conf` in
+`pekko-http-core_2.13-1.4.0.jar` on this build's classpath, not from memory —
+the repository sets none of them, so the defaults are what applies. Both are
+*tighter* than the 5-minute backstop entry one just set, which means the
+framework underneath these tests already fails them before JUnit would.
+
+**`UnboundedStreamTest` was the spec's own named candidate, and it cannot
+hang.** Every wait in it has a deadline, one of which (`settled`) fails with a
+sentence naming what the source was still doing. Adding `@Timeout` would give
+it a second, worse deadline that reports "timed out" instead.
+
+That leaves the 64 `.join()` and 25 `.get()` calls across 23 test files, which
+is where a deadline is genuinely absent. But they are the argument *against* the
+entry, not for it, on two counts. They are not a short list — that is most of
+the integration suite, and 89 annotations is the "1,564 annotations to replace
+one line" the spec already refused, scaled down but not in kind. And what would
+hang there is an in-memory transport or our own future never completing, which
+is a deadlock: `@Timeout` would report it as a timeout and send the next reader
+looking for something slow, which is the misdirection this spec was written
+about in the first place.
+
+The compiler tests are the sharpest case. `DoesNotCompileTest` at 18.8s and
+`StillCompilesTest` at 8.1s are the slowest methods in the suite and the ones
+with nothing underneath them — exactly where a `@Timeout` is most tempting and
+most wrong, since the spec's own argument is that a number close to their real
+duration is a performance assertion a slow runner fails.
+
+So 0050 closes on one line changed. The last open question is answered, and the
+answer was that the work it gated was not worth doing.
+
 ## Acceptance
 
 ```bash
@@ -160,7 +209,8 @@ on a hang rather than a wall-clock budget that a slow runner fails.
   `...beforeall.method.default` separately. A fixture that binds a server and
   terminates an actor system is doing different work from a test. Recommend
   one number until something needs two.
-- **Which tests can actually hang?** Needed before entry two is worth building.
-  Candidates: anything binding a socket and `UnboundedStreamTest`. Not `stop()`,
-  whose deadlineless wait is 0049's entry one — the one place these two specs
-  touch, and already covered there.
+- ~~**Which tests can actually hang?**~~ **Answered: none that are not already
+  bounded**, the named candidates included. Both `stop()` and
+  `UnboundedStreamTest` turned out to be the pattern rather than the exception —
+  every category has a deadline, and the ones that do not are deadlocks a
+  `@Timeout` would mislabel. See **Measured**; entry two is cut.
