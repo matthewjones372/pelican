@@ -71,7 +71,7 @@ decisions rather than seventy mechanical ones.
 - [x] **`spec-0044-codegen-internal`** — the four `Names.kt` helpers to
       `internal`; `pelican-codegen`'s `.api` dump regenerated.
       Done when: `./gradlew build` is green and the dump is four lines shorter.
-- [ ] **`spec-0044-document-the-rest`** — `changesFrom` gets a reference
+- [x] **`spec-0044-document-the-rest`** — `changesFrom` gets a reference
       section and a test; `badRequest` joins the refusals table.
       Done when: no declaration named in this spec is both public and
       unmentioned by any page.
@@ -104,6 +104,62 @@ Worth knowing beyond this entry: any search over these sources silently skips
 that file unless it is forced to treat it as text. `Report.kt` and its test
 contain ESC bytes for terminal colour and read as binary for the same reason.
 
+### Entry two, as built
+
+The spec said `changesFrom` was "tested nowhere outside its own module". It was
+tested nowhere at all: `grep -a` over every `.kt`, `.md` and `.api` in the tree
+finds it in exactly two places, its own declaration and the dump. A public
+function with no caller, no test and no page.
+
+**The test that matters is the one about argument order.** `apiChanges` takes
+two `JsonObj`s, and `changesFrom` exists to name which is which at the call
+site. Get that backwards and nothing errors — every verdict silently inverts. A
+response field you deleted reads as a new one, `BREAKING` becomes `COMPATIBLE`,
+and a compatibility check passes while the callers do not.
+
+So two tests: one asserting `changesFrom` reports exactly what the two-document
+form does, and one asserting the receiver is the *proposed* side, by deleting a
+response field and requiring that to be breaking. Both were checked against the
+mistake rather than assumed to cover it — flipping the implementation to
+`apiChanges(openApi(), published)` turns them red, the second with the sentence
+that says why:
+
+```
+the receiver is the proposed side, so a field it dropped reads as the loss it is() FAILED
+    org.opentest4j.AssertionFailedError: expected the dropped field to be breaking, got []
+```
+
+Empty, not wrong — read backwards, a lost field is a gained one and a gained one
+breaks nobody. That is the failure mode the function's existence is an argument
+against, and now something catches it.
+
+**`badRequest` needed a table that did not exist.** The spec said it should
+"join the refusals table"; there is none. `docs/reference.md` had a
+throwable-to-response table whose first row read ``` `ApiException` (`notFound`,
+`forbidden`, …) ``` and left the rest to the ellipsis. Counting mentions across
+`docs/`, `README.md`, `example/` and every test:
+
+| helper | docs | README | example | tests |
+|---|---|---|---|---|
+| `badRequest` | 0 | 0 | 0 | 0 |
+| `conflict` | 2 | 0 | 0 | 5 |
+| `notFound` | 4 | 0 | 2 | 17 |
+| `unauthorized` | 6 | 2 | 12 | 10 |
+| `forbidden` | 3 | 1 | 6 | 11 |
+| `tooManyRequests` | 1 | 1 | 2 | 0 |
+
+`badRequest` is the only zero across the board, which is what the spec found —
+but `conflict` and `tooManyRequests` are thin for the same reason, so the fix is
+the table, not a sentence about one function. Six rows, each with its status and
+the header it carries where it carries one.
+
+It also documents the distinction a reader needs and could not have got
+anywhere: **there are two roads to a 400.** A parameter failing its declared
+constraint is a `DecodeFailure`, raised before a handler runs and naming what it
+had to satisfy. `badRequest` is for what only the handler knows — a date range
+that ends before it starts, an id that parses but belongs to somebody else.
+Nothing in a description can catch either, which is why one is a throw.
+
 ## Acceptance
 
 ```bash
@@ -113,10 +169,10 @@ contain ESC bytes for terminal colour and read as binary for the same reason.
 
 ## Open questions
 
-1. **Is `changesFrom` meant to be public?** It reads like the CI check
-   `pelican-test-golden` is for, arrived at from the other direction.
-   Recommend keeping it and documenting it: the golden files pin a document,
-   this compares two, and a service wants both.
+1. ~~**Is `changesFrom` meant to be public?**~~ **Answered: yes, kept and
+   documented.** The reference now says which of the three routes to the same
+   classification to take by where you want the failure — the Gradle task for
+   the build, the goldens for a suite, these functions for anything narrower.
 2. **`Cors.allowedRequestHeaders`** is public, unreferenced, and takes a list
    of endpoints — plausibly for a backend rather than a service. Recommend
    leaving it and asking again when a second backend returns, since
