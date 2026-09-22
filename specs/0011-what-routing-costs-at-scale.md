@@ -67,9 +67,9 @@ capture at the first segment means, which a bucket sidesteps by scanning both.
 
 - [x] **`spec-0011-routing-at-scale`** — the decoy parameter on the Pekko and http4k harnesses; the new section in `docs/what-it-costs.md`.
       Done when: the page reports per-request cost at 1, 50 and 200 endpoints for both, and says plainly whether the curve is flat. Landed in [#63](https://github.com/matthewjones372/pelican/pull/63).
-- [ ] **`spec-0011-ktor-benchmark`** — a Ktor harness beside the other two, same endpoint, same decoys.
+- [ ] ~~**`spec-0011-ktor-benchmark`**~~ — not happening; see Closing. — a Ktor harness beside the other two, same endpoint, same decoys.
       Done when: all three backends appear in the table and Ktor's curve is measured rather than asserted from its router.
-- [ ] **`spec-0011-segment-index`** — *conditional.* A first-literal-segment bucket in `orderedEndpoints`, Pekko and http4k.
+- [ ] ~~**`spec-0011-segment-index`**~~ — not happening; see Closing. — *conditional.* A first-literal-segment bucket in `orderedEndpoints`, Pekko and http4k.
       Done when: the 200-endpoint number is within noise of the 1-endpoint one, and `AllBackendsTest`, `ConcatenatedRoutesTest` and `Http4kInterpreterTest` are unchanged and green. Delete this entry if the first one shows a flat curve.
 
 > **The remaining two entries were overtaken.** The measurement showed the
@@ -79,6 +79,49 @@ capture at the first segment means, which a bucket sidesteps by scanning both.
 > of hand-written routing at every size. The Ktor harness is still unwritten:
 > Ktor uses its own routing tree and is exempt by construction, so it is the
 > least urgent of the three and the claim remains unmeasured.
+
+## Closing
+
+**Both remaining entries were overtaken by 0018, not one.** The note above
+records the third; the second went with it and nobody noticed, because the
+sentence it rests on stopped being true.
+
+This spec's **Problem** says Ktor is exempt by construction — *"`Route.pelican`
+installs one Ktor route per endpoint and lets Ktor's routing tree score them,
+and the KDoc says so"*. 0018 changed that. The KDoc on the `multi-backend`
+branch now reads:
+
+> Interprets an `Api` as Ktor routes: one route per method the descriptions use,
+> each dispatching through the same `RouteIndex` the other two backends walk, so
+> a request line means one thing whichever server reads it.
+>
+> **Ktor's own tree used to do the matching**, from `PathSpec.template`. It
+> decoded a segment its own way, applied its own trailing-slash rule and could
+> not be asked what the other two would have answered — three routers to keep in
+> step rather than one to prove.
+
+So entry two would measure a router that no longer matches anything. Ktor walks
+the same `RouteIndex` as Pekko, and *that* curve is the one already reported
+above: flat at 1, 50 and 200 endpoints. Running a Ktor sweep would re-measure
+the Pekko column with a different server's constant added to every row.
+
+What is genuinely still unmeasured is **Ktor's per-request constant** — its own
+overhead around the shared index, the sort of number the `GET /ping` row gives
+for http4k. That is a different question from this spec's, which was about the
+*shape of the curve*, and it belongs with the Ktor module rather than here.
+
+**And the module is not here.** [Spec 0034](0034-one-backend-to-stand-behind.md)
+moved `pelican-ktor` to the `multi-backend` branch by the maintainer's decision
+of 2026-08-26; 1.0 ships Pekko and Jackson, and the other backends *"return
+after 1.0 as restores"*. A benchmark for a module that is not on main cannot be
+built on main, and when the module comes back its restore is the place for it.
+
+`docs/what-it-costs.md` already tells this truth — *"Ktor dispatches through the
+same index … and is not measured here either"* — so nothing on a published page
+is over-claiming while this closes.
+
+Open question 5 closes with it: the stale `RoutingTest` reference is gone from
+`Route.pelican`'s KDoc, rewritten by 0018 along with the routing it described.
 
 ## Acceptance
 
@@ -100,6 +143,6 @@ capture at the first segment means, which a bucket sidesteps by scanning both.
 4. Does the JMH `@Param` sweep push the run past the six minutes the page
    quotes? Recommend a separate benchmark class so `./gradlew :benchmarks:jmh`
    stays what it is and the sweep is asked for by name.
-5. Fix the stale `RoutingTest` reference in `Route.pelican`'s KDoc here, or
-   leave it for 0010? Recommend here — it is one line and this is the spec
-   reading that KDoc.
+5. ~~Fix the stale `RoutingTest` reference in `Route.pelican`'s KDoc here, or
+   leave it for 0010?~~ **Moot: the reference is gone**, rewritten by 0018 with
+   the routing it described. See **Closing**.
