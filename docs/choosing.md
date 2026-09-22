@@ -168,6 +168,18 @@ Swagger UI 5.x.
 
 ## Spring Boot, Micronaut and Quarkus
 
+**Unlike the two sections above, none of these three is a backend Pelican
+interprets onto.** There is no `pelican-spring`, `pelican-micronaut` or
+`pelican-quarkus` — not on main, and not on the `multi-backend` branch either.
+So this section compares two ways of describing an HTTP API, and acting on it
+means moving the web layer to Pekko HTTP rather than adding a module to the
+stack you already run. See [One backend at 1.0](#when-pelican-is-the-wrong-choice)
+for what that costs, and [Not on this list](roadmap.md#not-on-this-list), which
+says a fourth backend is not planned rather than pending.
+
+Read the rest with that in mind: it is an argument about description, offered to
+a reader deciding what to start, not a migration you can take piecewise.
+
 The three annotation-driven stacks differ from each other more than the usual
 grouping suggests, mostly in *when* the document is produced.
 
@@ -211,9 +223,10 @@ answers to your specific question already written down, security and observabili
 and data access integrated with the same annotations, and vendor support you can
 buy. Each of the three is a complete application framework with dependency
 injection, configuration, testing and a native-image story; Pelican is a library
-that describes endpoints and deliberately owns nothing else, so on any of these
-stacks it would be replacing one part of something you would still need the rest
-of. Spring's springdoc documents Kotlin types and has Kotlin-specific settings;
+that describes endpoints and deliberately owns nothing else, so it would replace
+one part of what they give you and leave you to find the rest elsewhere — and,
+since none of the three has an interpreter, replacing that part means replacing
+the server under it too. Spring's springdoc documents Kotlin types and has Kotlin-specific settings;
 Micronaut and Quarkus both put a great deal of work into startup time and
 native images that Pelican has never measured itself against.
 
