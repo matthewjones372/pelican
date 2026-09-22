@@ -29,6 +29,7 @@ branch and return after 1.0; the table below is what main ships today.
 | `pelican-mcp-server` | core + mcp | those tools **served**: JSON-RPC 2.0 over stdio, and the request/response half of Streamable HTTP. No MCP SDK |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-pekko` | core, pekko-http *provided* | where a generated client's requests go, over Pekko HTTP's client |
+| `pelican-streams` | pekko, Pekko and `lark-stream` *both provided* | one function: a streaming body as a lark `Stream`, whose failure is a value |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
 | `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
@@ -65,6 +66,10 @@ Every one of those dependency claims is a test:
   names the cross-build it already runs; see
   [reference.md](reference.md#versions).
 - `pelican-arrow` asserts it is core plus `arrow-core` and nothing else.
+- `pelican-streams` asserts it ships neither Pekko nor `lark-stream`. Pekko for
+  the reason above; `lark-stream` for the same reason at one remove, since it
+  pins `_2.13` as an `api` dependency of its own and shipping it would put that
+  suffix back on a consumer's classpath through this module.
 - `pelican-test` asserts it drags in no server library and no matcher library.
 
 The full breakdown is in [docs/reference.md](reference.md#modules).
