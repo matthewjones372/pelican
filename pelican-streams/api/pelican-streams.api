@@ -1,4 +1,5 @@
 public final class io/github/matthewjones372/pelican/streams/StreamsKt {
+	public static final fun toOutcome (Ljava/util/concurrent/CompletionStage;Lio/github/matthewjones372/pelican/ErrorOutput;)Ljava/util/concurrent/CompletionStage;
 	public static final fun toStream (Lio/github/matthewjones372/pelican/StreamIn;)Lio/github/matthewjones372/lark/stream/Stream;
 }
 

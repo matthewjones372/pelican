@@ -49,12 +49,12 @@ sees the library, and the library never learns what an endpoint is.
       reference paragraph.
       Done when: `./gradlew build` is green with the module included. Landed in
       [#148](https://github.com/matthewjones372/pelican/pull/148).
-- [ ] **`spec-0037-exit-to-outcome`** — a `toOutcome(failure)` on the
+- [x] **`spec-0037-exit-to-outcome`** — a `toOutcome(failure)` on the
       `CompletionStage<Exit<E, A>>` that `run` returns, in `pelican-streams`,
       and the two examples that currently hand-roll it rewritten onto it.
       Done when: a handler answering `Outcome<E, A>` converts without naming
       `Exit` itself, a `Died` still reaches the interpreter as a throw, and
-      `pelican-streams.api` grows exactly one line.
+      `pelican-streams.api` grows exactly one line. **All three hold.**
 
 ## Measured
 
@@ -183,6 +183,29 @@ Not in `pelican-arrow`, though lark pulls `arrow-core` transitively and
 
 The bounds above were compiled against lark 0.4.0 and core rather than sketched,
 because the last thing this spec sketched was `Exit.getOrElse`.
+
+#### As built, and the one thing that had to be measured
+
+The signature is the one above, unchanged. Two things the draft did not know:
+
+**A third place was hand-rolling it.** The draft counted two — the reference and
+the `toStream` KDoc. `ToStreamTest` was a third, with a private
+`Exit<*, A>.valueOr(fallback)` at the bottom of the file that collapses `Failed`
+and `Died` into one fallback. That is the exact sloppiness this entry removes,
+written by the entry that introduced the seam.
+
+**A defect arrives as `Exit.Died` on a *successful* stage.** Whether a throwable
+raised inside a stage reaches `toOutcome` at all, or fails the stage before it,
+decides whether the conversion can do anything about it — and nothing in lark's
+signatures says which. Measured rather than assumed:
+
+```
+PROBE-DEFECT: success=true value=Died(cause=java.lang.IllegalStateException: boom on a) failure=null
+```
+
+So the conversion does see it, and rethrowing is what turns it back into the 500
+the interpreter already renders. `Died` is tested directly as well as through a
+socket, because an end-to-end 500 cannot say which branch produced it.
 
 ## Acceptance
 

@@ -4704,33 +4704,38 @@ worked to take it from: a row the handler cannot make sense of becomes a thrown
 exception a materialised stage reports later, which the interpreter has no
 choice but to render as a 500.
 
-`pelican-streams` is one function that hands the upload to
+`pelican-streams` is two functions. `toStream` hands the upload to
 [lark's](https://github.com/matthewjones372/lark) `Stream<E, A>`, which carries
-the failure as a value in the type:
+the failure as a value in the type, and `toOutcome` hands the result back as the
+`Outcome` the endpoint declared:
 
 ```kotlin
+import io.github.matthewjones372.pelican.streams.toOutcome
 import io.github.matthewjones372.pelican.streams.toStream
 
-tally handledBy { rows ->
+val badRows = errorJson<ApiError>(422, "A row could not be read")
+
+tally handledByOrFail { rows ->
     rows.toStream()                                                   // Stream<Nothing, Note>
         .mapOrFail { it.customer ?: raise(NoCustomer(it.id)) }         // Stream<IngestError, String>
-        .runFold(0) { seen, _ -> seen + 1 }
+        .runFold(Tally(0)) { seen, _ -> Tally(seen.counted + 1) }
         .run(system)
-        .thenApply { exit ->
-            when (exit) {
-                is Exit.Done -> Tally(exit.value)
-                is Exit.Failed -> refused(exit.error)
-                is Exit.Died -> throw exit.cause
-            }
-        }
+        .toOutcome(badRows)
 }
 ```
 
 `run` completes with an `Exit` — `Done`, `Failed` or `Died` — rather than a
-failed stage, so *which* of the three happened is a `when` in the handler and
-each one can answer differently. `Failed` carries the `E` the description
-declares; `Died` carries a throwable nobody declared, which is the only one that
-should still become a 500.
+failed stage, so *which* of the three happened is a value rather than a thrown
+thing. `toOutcome` decides all three the way the rest of this library does:
+`Done` is the value, `Failed` becomes the declared failure that fixes the
+status, and `Died` is rethrown, because a throwable nobody declared is what this
+library throws rather than returns.
+
+That last one is the case worth spelling out. A defect thrown inside a stage
+arrives as `Exit.Died` on a *successful* stage — not as a failed one — so a
+hand-written `when` that forgot the branch, or folded it into the declared
+failure, would answer 422 to a caller whose rows were fine and whose service
+broke. `toOutcome` exists so that decision is made once.
 
 `system` there is the service's own: a handler receives `Params`, which carries
 no materializer, so the system is the one it started and passed to
