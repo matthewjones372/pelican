@@ -75,13 +75,29 @@ promise was exercised rather than what a consumer resolves to.
       `compileOnly` + `testImplementation`; `example` and `benchmarks` declare
       their own; `DependenciesTest`'s claim inverted.
       Done when: `./gradlew build` is green and `publishToMavenLocal` writes no
-      `org.apache.pekko` entry into any Pelican POM or `.module`.
+      `org.apache.pekko` entry into any Pelican POM or `.module`. Landed in
+      [#116](https://github.com/matthewjones372/pelican/pull/116).
 - [x] **`spec-0037-docs-truth`** — every `dependencies { }` block naming a Pekko
       module across README, `docs/reference.md`, `modules.md`, `cookbook.md`,
       `mcp.md`, `a-whole-service.md`, `what-it-costs.md`, `llms.txt`; Versions
       reworded from floors to tested-against; the mixed-version troubleshooting
       section gains the suffix case; CHANGELOG breaking note.
-      Done when: no doc adds a Pekko module without Pekko beside it.
+      Done when: no doc adds a Pekko module without Pekko beside it. Landed in
+      [#116](https://github.com/matthewjones372/pelican/pull/116).
+
+## Closing
+
+Both entries landed, and the one thing this spec deliberately left unproven has
+since been proven by two specs of its own.
+
+The fourth decision below said *"either suffix works" is argued here, never
+run*, and that proving it needed a second `example` configuration resolving
+`_3`. That became [spec 0042](0042-the-other-cross-build.md) — a `scala3Test`
+source set running the interpreter against the other cross-build — and then
+[spec 0043](0043-every-pekko-name-the-bytecode-holds.md), which widened it from
+one interpreter to every Pekko name the bytecode holds. Both are complete. So
+the claim this spec made on argument is now a test, in the only way it could
+be: by resolving `_3` and running.
 
 ## Acceptance
 
