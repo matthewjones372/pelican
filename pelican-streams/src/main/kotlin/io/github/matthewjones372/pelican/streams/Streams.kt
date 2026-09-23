@@ -1,9 +1,14 @@
 package io.github.matthewjones372.pelican.streams
 
+import io.github.matthewjones372.lark.stream.Exit
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.from
+import io.github.matthewjones372.pelican.ErrorOutput
+import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.StreamIn
+import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.toSource
+import java.util.concurrent.CompletionStage
 
 /*
  * The seam, and only the seam.
@@ -34,23 +39,37 @@ import io.github.matthewjones372.pelican.pekko.toSource
  * over — since a handler is handed `Params` and no materializer.
  *
  * ```kotlin
- * ingestOrders handledBy { rows ->
+ * ingestOrders handledByOrFail { rows ->
  *     rows.toStream()                                                   // Stream<Nothing, Row>
  *         .mapOrFail { row -> row.customer ?: raise(NoCustomer(row.id)) } // Stream<IngestError, String>
- *         .runFold(0) { seen, _ -> seen + 1 }
+ *         .runFold(Tally(0)) { tally, _ -> Tally(tally.counted + 1) }
  *         .run(system)
- *         .thenApply { exit ->
- *             when (exit) {
- *                 is Exit.Done -> Tally(exit.value)
- *                 is Exit.Failed -> Tally(0)
- *                 is Exit.Died -> throw exit.cause
- *             }
- *         }
+ *         .toOutcome(badRows)
  * }
  * ```
- *
- * `run` completes with an [io.github.matthewjones372.lark.stream.Exit] rather
- * than a failed stage, so the `when` over `Done`, `Failed` and `Died` is where
- * a handler decides what each one answers.
  */
 fun <T : Any> StreamIn<T>.toStream(): Stream<Nothing, T> = Stream.from(toSource())
+
+/**
+ * The [Exit] a lark run completes with, as the [Outcome] a handler answers.
+ *
+ * `Done` is the value, `Failed` is [failure] — the endpoint's own declared
+ * error, which is what fixes the status — and `Died` is rethrown, because a
+ * throwable nobody declared is exactly what this library throws rather than
+ * returns.
+ *
+ * Applied to the stage rather than to the [Exit] because `run` completes with
+ * one and `handledByOrFail` takes one; converting at the [Exit] would leave the
+ * caller a `thenApply` to write, which is where a hand-written `when` goes
+ * wrong.
+ */
+fun <E : Any, A : Any> CompletionStage<Exit<E, A>>.toOutcome(
+    failure: ErrorOutput<E>,
+): CompletionStage<Outcome<E, A>> =
+    thenApply { exit ->
+        when (exit) {
+            is Exit.Done -> ok(exit.value)
+            is Exit.Failed -> failure(exit.error)
+            is Exit.Died -> throw exit.cause
+        }
+    }
