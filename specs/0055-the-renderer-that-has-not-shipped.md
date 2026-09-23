@@ -65,11 +65,12 @@ between two renderers that are otherwise interchangeable.
 
 0054's two entries, with a gate in front of them.
 
-- [ ] **`spec-0055-redoc3-render`** — no production code. Serve a Redoc
+- [x] **`spec-0055-redoc3-render`** — no production code. Serve a Redoc
       `3.0.0-rc.0` page from a scratch file against `example`'s document, both
       with `spec-url` and with an inlined document.
       Done when: **Measured** says in a paragraph whether the inlined form
-      works, with the page that proved it.
+      works, with the page that proved it. **Both work, and the gate found
+      something else.**
 - [ ] **`spec-0055-redoc3-html`** — as `spec-0054-redoc-html`, against the RC.
       Done when: the same claims hold, or the spec records which does not.
 - [ ] **`spec-0055-redoc3-route`** — as `spec-0054-redoc-route`.
@@ -80,6 +81,79 @@ between two renderers that are otherwise interchangeable.
 ./gradlew build
 curl -s http://127.0.0.1:8080/api-docs | grep 'redoc@3.0.0-rc.0/bundle/'
 ```
+
+## Measured
+
+Headless Chromium, `example`'s own document, both bundles served locally so the
+CDN was not the variable. The question this entry existed to answer is answered
+— and it is not the one that matters.
+
+**Both forms work.** The embedded form does have a programmatic entry point, so
+`openApiPath = null` keeps its meaning. But neither form works the way 0054
+writes it, because **the RC's bundle is an ES module**:
+
+```
+v3-url.html   rendered=NO  errors=SyntaxError: Unexpected token 'export'
+```
+
+A classic `<script src=…>` cannot load it. There is no `window.Redoc`, and the
+two forms become:
+
+```html
+<redoc spec-url="/openapi.json"></redoc>
+<script type="module" src="…/redoc.standalone.js"></script>
+```
+
+```html
+<script type="module">
+  import { init } from '…/redoc.standalone.js';
+  init(spec, {}, document.getElementById('ui'));
+</script>
+```
+
+Both then render: `h1` *"Orders (1.0.0)"*, the description, the servers and the
+operations, plus a search box 2.x has no equivalent of.
+
+### What the gate actually found
+
+**The RC sends telemetry, and the form 0054 uses cannot switch it off.**
+Rendering the fetching form makes an offsite request the 2.x page never makes:
+
+| page | offsite hosts |
+|---|---|
+| `2.5.4`, fetching | `cdn.redoc.ly` |
+| `3.0.0-rc.0`, fetching | `cdn.redoc.ly`, **`otel.cloud.redocly.com`** |
+| `3.0.0-rc.0`, embedded, `disableTelemetry: true` | `cdn.redoc.ly` |
+
+`@redocly/redoc-opentelemetry` is a dependency of the RC and not of 2.5.4, whose
+bundle does not contain the string `otel` at all. The default is on —
+`disableTelemetry:!1` in the bundle — and the option is reachable only through
+`init`'s second argument. The `<redoc spec-url>` element's own auto-initialiser
+reads exactly one attribute and calls `init` with `{}`:
+
+```js
+function Ure(){const e=Th("redoc");if(!e)return;const t=e.getAttribute("spec-url");t&&sC(t,{},e)}
+```
+
+So under the RC, a service serving the **default** shape — the fetching form, so
+that a reader can curl the same URL — would have every reader's browser report
+to a third party, with no attribute that turns it off. The embedded form can
+disable it, which means the choice would no longer be the service's to make
+freely: it would be *fetch the document and send telemetry* or *embed the
+document and do not*.
+
+### What this means for the two remaining entries
+
+They were written as *"as `spec-0054-…`, against the RC"*, and 0054 has since
+shipped, so they had already collapsed to changing one URL. They are now
+something else again: a `type="module"` script, an `import`, and a decision
+about telemetry that 2.5.4 does not force anybody to make.
+
+**Recommend cutting both.** Not for the reason this spec was written on — the
+eleven months — but for one it could not have known: 0054 ships a page that
+sends nothing to anybody, and the RC cannot do that in the form 0054 serves.
+The entries stay unticked and undeleted until the maintainer says so, because
+cutting a stack entry is an edit to the spec, not an agent's call.
 
 ## Open questions
 
