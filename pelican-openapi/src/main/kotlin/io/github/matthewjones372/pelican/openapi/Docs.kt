@@ -7,8 +7,11 @@ class Docs internal constructor(
     /** Where the generated OpenAPI document is served. Null disables it. */
     val openApiPath: String? = DEFAULT_OPENAPI_PATH,
 
-    /** Where the Swagger UI page is served. Null disables it. */
+    /** Where the documentation page is served. Null disables it. */
     val docsPath: String? = DEFAULT_DOCS_PATH,
+
+    /** Which page is served at [docsPath]. */
+    val ui: DocsUi = DocsUi.SwaggerUi,
 
     /**
      * Lets the docs page run the OAuth flow, so "Try it out" sends a real
@@ -37,16 +40,37 @@ class DocsBuilder internal constructor() {
 
     var openApiPath: String? = DEFAULT_OPENAPI_PATH
     var docsPath: String? = DEFAULT_DOCS_PATH
+    var ui: DocsUi = DocsUi.SwaggerUi
     var oauth: DocsOAuth? = null
     var version: OpenApiVersion = OpenApiVersion.V3_1_0
 
-    internal fun build(): Docs = Docs(
-        openApiPath = openApiPath,
-        docsPath = docsPath,
-        oauth = oauth,
-        version = version,
-    )
+    internal fun build(): Docs {
+        // Refused rather than ignored: Redoc has no "Try it out", so a service
+        // that configured a flow here would get a redirect page nothing opens
+        // and a token nothing sends.
+        require(ui != DocsUi.Redoc || oauth == null) {
+            "docs { ui = DocsUi.Redoc } takes no oauth: Redoc sends no requests, " +
+                "so there is nothing to authorize. Drop one of the two."
+        }
+
+        return Docs(
+            openApiPath = openApiPath,
+            docsPath = docsPath,
+            ui = ui,
+            oauth = oauth,
+            version = version,
+        )
+    }
 }
+
+/**
+ * Which page reads the document.
+ *
+ * [SwaggerUi] is a console built around "Try it out"; [Redoc] is a read-only
+ * three-panel reference. Both render the same document, and neither is
+ * configured beyond the title the API already carries.
+ */
+enum class DocsUi { SwaggerUi, Redoc }
 
 // Written once and read twice: the constructor states them, and [DocsBuilder]
 // starts from them.

@@ -35,6 +35,7 @@ public final class io/github/matthewjones372/pelican/openapi/Docs {
 	public final fun getDocsPath ()Ljava/lang/String;
 	public final fun getOauth ()Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
 	public final fun getOpenApiPath ()Ljava/lang/String;
+	public final fun getUi ()Lio/github/matthewjones372/pelican/openapi/DocsUi;
 	public final fun getVersion ()Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
 }
 
@@ -42,10 +43,12 @@ public final class io/github/matthewjones372/pelican/openapi/DocsBuilder {
 	public final fun getDocsPath ()Ljava/lang/String;
 	public final fun getOauth ()Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
 	public final fun getOpenApiPath ()Ljava/lang/String;
+	public final fun getUi ()Lio/github/matthewjones372/pelican/openapi/DocsUi;
 	public final fun getVersion ()Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
 	public final fun setDocsPath (Ljava/lang/String;)V
 	public final fun setOauth (Lio/github/matthewjones372/pelican/openapi/DocsOAuth;)V
 	public final fun setOpenApiPath (Ljava/lang/String;)V
+	public final fun setUi (Lio/github/matthewjones372/pelican/openapi/DocsUi;)V
 	public final fun setVersion (Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)V
 }
 
@@ -73,6 +76,14 @@ public final class io/github/matthewjones372/pelican/openapi/DocsOAuthBuilder {
 	public final fun setUsePkce (Z)V
 }
 
+public final class io/github/matthewjones372/pelican/openapi/DocsUi : java/lang/Enum {
+	public static final field Redoc Lio/github/matthewjones372/pelican/openapi/DocsUi;
+	public static final field SwaggerUi Lio/github/matthewjones372/pelican/openapi/DocsUi;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/openapi/DocsUi;
+	public static fun values ()[Lio/github/matthewjones372/pelican/openapi/DocsUi;
+}
+
 public final class io/github/matthewjones372/pelican/openapi/OpenApiKt {
 	public static final fun openApi (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)Lio/github/matthewjones372/pelican/JsonObj;
 	public static synthetic fun openApi$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/JsonObj;
@@ -88,6 +99,10 @@ public final class io/github/matthewjones372/pelican/openapi/OpenApiVersion : ja
 	public fun toString ()Ljava/lang/String;
 	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
 	public static fun values ()[Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/RedocKt {
+	public static final fun redocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/openapi/ReportKt {
