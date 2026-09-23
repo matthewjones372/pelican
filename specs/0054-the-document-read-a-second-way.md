@@ -66,10 +66,10 @@ Pairing the two should fail at build time naming both, the way
 
 ## Stack
 
-- [ ] **`spec-0054-redoc-html`** — `redocHtml`, `DocsUi` and the `ui` knob, the
+- [x] **`spec-0054-redoc-html`** — `redocHtml`, `DocsUi` and the `ui` knob, the
       OAuth refusal, the `.api` dump; tests in `pelican-openapi`.
       Done when: `redocHtml` passes the `</script>` escape test `swaggerUiHtml`
-      passes, and `Redoc` with `docsOAuth` fails naming both.
+      passes, and `Redoc` with `docsOAuth` fails naming both. **Both hold.**
 - [ ] **`spec-0054-redoc-route`** — `docsRoutes` serves the chosen renderer;
       `example` asserts it end to end; the `modules.md` and `reference.md` rows
       say there are two.
@@ -86,6 +86,31 @@ curl -s http://127.0.0.1:8080/api-docs | grep redoc.standalone.js
 No test can assert that a page renders, so the second entry ends with someone
 opening it.
 
+## Measured
+
+**Open question 2 is answered by rendering, not by grepping.** Both forms were
+served to headless Chromium against `example`'s own document, with the 2.5.4
+bundle served locally so the CDN was not the variable:
+
+| page | rendered | `h1` | sections | page errors |
+|---|---|---|---|---|
+| `<redoc spec-url="/openapi.json">` | yes | `Orders (1.0.0)` | 31 | none |
+| `Redoc.init(spec, {}, el)` | yes | `Orders (1.0.0)` | 31 | none |
+
+So the embedded form works and `openApiPath = null` keeps its meaning under
+either renderer. The draft's recommendation — render it before writing the form
+down — was worth taking: the first attempt rendered *neither* page, because the
+browser in that environment cannot reach a CDN, which is a failure mode a
+grep of the bundle would never have shown and which a service behind a proxy
+will hit for real. It is the same exposure the Swagger UI page already has, and
+open question 1 is where it is recorded.
+
+**Two escapes rather than one.** `swaggerUiHtml` writes everything into a
+script, so `</` → `<\/` covers it. Redoc's fetching form writes the path into
+an *attribute*, which that escape does not protect, so the path is escaped as
+HTML and the embedded document as JavaScript. Both are tested, and the script
+escape was checked by removing it and watching the test fail.
+
 ## Open questions
 
 1. **How tightly pinned?** Today's URL is `swagger-ui-dist@5` — a major only, so
@@ -93,10 +118,8 @@ opening it.
    while recording that consistency is the whole argument and an exact pin is
    the safer one. Pinning both exactly is a change to the Swagger UI page and so
    not this spec.
-2. **Does the inlined document work?** `openApiPath = null` embeds the document.
-   Redoc 2.5.4's bundle does expose a browser global, so `Redoc.init(spec, {},
-   el)` should cover it — confirmed by grepping the bundle, not by rendering.
-   Recommend entry one render it before the form is written down.
+2. ~~**Does the inlined document work?**~~ **Answered: yes**, by rendering both
+   forms in a browser. See **Measured**.
 3. **Enum or sealed type for `DocsUi`?** Recommend an enum. It becomes a sealed
    type the day a renderer needs options of its own, source-compatibly.
 4. **Is 2.x the right line?** [Spec 0055](0055-the-renderer-that-has-not-shipped.md)
