@@ -239,6 +239,40 @@ Pekko completed the exchange. The cap is now 40. The next sighting should name
 the origin, and that is what a root-cause fix waits on rather than another
 guess.
 
+### Two readings tried and dropped, 2026-09-23
+
+A second sighting has not come — eight `main` runs on the day the frame cap was
+raised, none of them cancelled — so the attempt was to stop waiting for one and
+produce it on demand instead. It did not work, and what it ruled out is worth
+more than that it failed.
+
+**A stale pooled connection across a reused port.** The suites bind `port = 0`,
+and every `PekkoHttpTransport()` built without a system shares one process-wide
+actor system, so its pool is keyed by host:port across the whole JVM. An
+ephemeral port returned to the OS and handed to the next server would then meet
+a pool entry holding a connection to a server that has gone — which fits a
+non-idempotent `POST` failing without a retry. It does not happen: a server
+bound to a fixed port, stopped, and rebound eight times over, with the same
+transport calling through each time, answered every call. `GET` and `POST`
+alike. Pekko notices the closed connection and dials again.
+
+**A dense soak of the failing sequence.** 3,200 runs of the two `POST`s that
+fail in CI, eight threads against one server on one client: no cancellation,
+no failure of any kind. This is 0049's result again, and the reason to record
+it is that it is now measured for *this* flake rather than inferred from that
+one.
+
+**And the deadline in the first sighting's frames is plumbing, not a clue.**
+`deadline$lambda$0` appears in that stack because the generated client sets
+`timeout = Duration.ofSeconds(30)` on every call, so every exchange goes through
+`deadline` whether or not anything is slow. Thirty seconds is not firing in a
+test that answers in milliseconds. Reading the frame as evidence that a deadline
+was involved in the cancellation would be reading the plumbing.
+
+So the standing reading is unchanged and still a reading: something inside
+Pekko completes the exchange, and nothing local provokes it. What would move
+this is the next CI sighting, which now has 40 frames to name the origin with.
+
 ## Open questions
 
 - ~~**Does a `TestWatcher` see it?**~~ **Answered: yes**, and it does not help.
