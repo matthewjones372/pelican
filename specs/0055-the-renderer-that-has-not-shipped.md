@@ -166,14 +166,14 @@ element form can disable telemetry by then. Nothing else here has changed.
 
 ## Open questions
 
-1. **This one or 0054?** Recommend 0054. This page is worth having either way,
-   so the next person to ask *"why 2.x?"* finds the eleven months in a file
-   rather than re-deriving them.
-2. **What happens at GA?** The URL changes and the page changes with it,
-   silently, for everyone who upgrades Pelican. Recommend that taking this spec
-   also means pinning Swagger UI exactly — one policy for both pages rather than
-   a loose `@5` beside an exact pre-release.
-3. **Is there a third option?** Ship neither, and document how to serve your own
-   page from the generated document. Recommend against — that is the status quo
-   and the status quo is what **Problem** is about — but it is the honest floor
-   to measure both specs against.
+1. ~~**This one or 0054?**~~ **0054**, shipped in
+   [#158](https://github.com/matthewjones372/pelican/pull/158) and
+   [#159](https://github.com/matthewjones372/pelican/pull/159); this spec's
+   remaining entries cut. See **Measured**.
+2. **What happens at GA?** Still open, and reframed by what entry one found: the
+   question to ask first is not whether the URL moved but whether the element
+   form can disable telemetry by then. If it cannot, the answer stays no however
+   settled 3.x is.
+3. ~~**Is there a third option?**~~ **Moot.** Shipping neither was a floor to
+   measure against while 0054 was a proposal. 0054 shipped, so the status quo
+   this spec's **Problem** describes is gone either way.
