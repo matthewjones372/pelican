@@ -3,10 +3,12 @@ package io.github.matthewjones372.pelican.pekko.docs
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.corsPolicy
+import io.github.matthewjones372.pelican.openapi.DocsUi
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectHtml
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
 import io.github.matthewjones372.pelican.openapi.openApiJson
+import io.github.matthewjones372.pelican.openapi.redocHtml
 import io.github.matthewjones372.pelican.openapi.swaggerUiHtml
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.start
@@ -52,15 +54,14 @@ fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
             add(staticRoute(specPath, ContentTypes.APPLICATION_JSON, document, cors))
         }
         if (uiPath != null) {
+            // Null under Redoc without a second check: `docs { }` refuses
+            // that renderer an `oauth` at all, so there is no flow to redirect.
             val redirectPath = docs.oauth?.let { oauth2RedirectPath(uiPath) }
-            add(
-                staticRoute(
-                    uiPath,
-                    ContentTypes.TEXT_HTML_UTF8,
-                    swaggerUiHtml(title, specPath.orEmpty(), document, docs.oauth, redirectPath),
-                    cors,
-                ),
-            )
+            val page = when (docs.ui) {
+                DocsUi.SwaggerUi -> swaggerUiHtml(title, specPath.orEmpty(), document, docs.oauth, redirectPath)
+                DocsUi.Redoc -> redocHtml(title, specPath.orEmpty(), document)
+            }
+            add(staticRoute(uiPath, ContentTypes.TEXT_HTML_UTF8, page, cors))
             // Next to the page, so the provider has one redirect URI to
             // register and it is on the docs' own origin.
             if (redirectPath != null) {
@@ -76,7 +77,7 @@ fun Api.routeWithDocs(system: ClassicActorSystemProvider, docs: Docs = docs()): 
     return routes.reduce { left, right -> Directives.concat(left, right) }
 }
 
-/** [start], with the document and the Swagger UI page served alongside. */
+/** [start], with the document and the documentation page served alongside. */
 fun Api.startWithDocs(
     port: Int = 8080,
     host: String = "127.0.0.1",

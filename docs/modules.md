@@ -19,7 +19,7 @@ branch and return after 1.0; the table below is what main ships today.
 | `pelican-jackson` | core + Jackson | your `Codecs` |
 | `pelican-arrow` | core + arrow-core | Arrow's `Either` into Pelican's `Outcome` and back |
 | `pelican-pekko` | core, Pekko HTTP *provided* | descriptions → that server's routes |
-| `pelican-pekko-docs` | pekko, openapi | serves the document and Swagger UI |
+| `pelican-pekko-docs` | pekko, openapi | serves the document and a page — Swagger UI or Redoc |
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |

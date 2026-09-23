@@ -70,11 +70,12 @@ Pairing the two should fail at build time naming both, the way
       OAuth refusal, the `.api` dump; tests in `pelican-openapi`.
       Done when: `redocHtml` passes the `</script>` escape test `swaggerUiHtml`
       passes, and `Redoc` with `docsOAuth` fails naming both. **Both hold.**
-- [ ] **`spec-0054-redoc-route`** — `docsRoutes` serves the chosen renderer;
+- [x] **`spec-0054-redoc-route`** — `docsRoutes` serves the chosen renderer;
       `example` asserts it end to end; the `modules.md` and `reference.md` rows
       say there are two.
       Done when: `ui = Redoc` serves a Redoc page at `docsPath` and the same
-      document at `openApiPath`, with the Swagger UI tests untouched.
+      document at `openApiPath`, with the Swagger UI tests untouched. **Both
+      hold, over a socket.**
 
 ## Acceptance
 
@@ -104,6 +105,11 @@ browser in that environment cannot reach a CDN, which is a failure mode a
 grep of the bundle would never have shown and which a service behind a proxy
 will hit for real. It is the same exposure the Swagger UI page already has, and
 open question 1 is where it is recorded.
+
+**The refusal paid for itself in the route.** `docsRoutes` picks the renderer
+in a `when` and needs no second check for OAuth: because `docs { }` refuses
+`Redoc` an `oauth` at all, `redirectPath` is already null on that branch. A
+refusal at construction turned into one less branch at the point of use.
 
 **Two escapes rather than one.** `swaggerUiHtml` writes everything into a
 script, so `</` → `<\/` covers it. Redoc's fetching form writes the path into
