@@ -21,7 +21,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-jackson` | core, Jackson, swagger-core | the `Codecs`: Jackson reads bodies, swagger-core describes types |
 | `pelican-arrow` | core, arrow-core | Arrow's `Either` into Pelican's `Outcome` and back: `toOutcome()`, its naming overload, and `toEither()` |
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
-| `pelican-pekko-docs` | pekko, openapi | serves the document and Swagger UI over HTTP |
+| `pelican-pekko-docs` | pekko, openapi | serves the document and a page — Swagger UI or Redoc — over HTTP |
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
 | `pelican-metrics` | core, micrometer-core | descriptions → Micrometer meters, tagged from what the descriptions already say |
 | `pelican-metrics-otel` | core, opentelemetry-api | descriptions → OpenTelemetry server spans and the specified duration histogram |
@@ -435,6 +435,29 @@ ordersApi().startWithDocs(port = 8080, docs = docs { openApiPath = "/v1/openapi.
 
 Set either path to `null` to turn that page off. `docsRoutes(docs)` hands back
 the routes on their own if the service already has a route to concat with.
+
+#### Which page reads it
+
+`docsPath` serves Swagger UI unless the block says otherwise:
+
+```kotlin
+ordersApi().startWithDocs(port = 8080, docs = docs { ui = DocsUi.Redoc; docsPath = "/api-docs" })
+```
+
+Swagger UI is a console: one operation expanded at a time, with the request form
+at the centre and *Try it out* sending real calls. Redoc is a read-only
+three-panel reference, which is the better of the two for a surface people read
+rather than poke. Both render the same document at the same path, and neither is
+configured beyond the title the API already carries — no logo, no CSS hook, no
+`x-tagGroups`.
+
+The one pairing that is refused rather than ignored is `ui = DocsUi.Redoc` with
+`oauth`: Redoc sends no requests, so a flow configured there would register a
+redirect page nothing opens. `docs { }` fails at build time naming both.
+
+Both pages load their JavaScript from a CDN — `unpkg` for Swagger UI,
+`jsDelivr` for Redoc — so a browser that cannot reach one gets an empty page.
+That is as true of the Swagger UI page today as of the Redoc one.
 
 ### Which version the document says, and how to choose
 
