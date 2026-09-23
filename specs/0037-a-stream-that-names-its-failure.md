@@ -47,7 +47,14 @@ sees the library, and the library never learns what an endpoint is.
 
 - [x] **`spec-0037-bridge`** — module, `toStream`, the `modules.md` row, a
       reference paragraph.
-      Done when: `./gradlew build` is green with the module included.
+      Done when: `./gradlew build` is green with the module included. Landed in
+      [#148](https://github.com/matthewjones372/pelican/pull/148).
+- [ ] **`spec-0037-exit-to-outcome`** — a `toOutcome(failure)` on the
+      `CompletionStage<Exit<E, A>>` that `run` returns, in `pelican-streams`,
+      and the two examples that currently hand-roll it rewritten onto it.
+      Done when: a handler answering `Outcome<E, A>` converts without naming
+      `Exit` itself, a `Died` still reaches the interpreter as a throw, and
+      `pelican-streams.api` grows exactly one line.
 
 ## Measured
 
@@ -103,6 +110,80 @@ far end instead, at `run(system)`, so `toStream` takes none and the caller
 chooses. In practice that is the same system: a service starts it and closes
 over it, which is what `ToStreamTest` does.
 
+### Where `system` comes from, and why nothing is exposed
+
+A handler is given `Params` and nothing else — every binder erases to
+`(Params) -> CompletionStage<Any?>` — and `Params` carries the request, its
+attributes and the response headers. No system, no materializer.
+
+The system is one field away. `PekkoFrames` holds the one the request arrived
+on, `internal`, and the only public door onto it is `runWith(sink)`. So
+exposing it would publish no new *capability*: a handler can already materialise
+whatever graph it likes on that system by handing `runWith` a `Sink`. lark
+cannot use that door only because `Run`'s graph is `internal` to lark, which
+leaves `run(provider)` as the way in.
+
+**Decided by the maintainer, 2026-09-23: nothing is exposed.** Nobody is stuck.
+A service that needs the provider starts one and passes it to `start(system)` —
+the documented form — then closes over it, which is what a service does anyway
+and what `ToStreamTest` does. The one form that hands back no system in time is
+`start(port = …)`, which creates its own inside the binding: `PelicanServer
+.system` exists only after the route has been built. That is a two-line change
+to such a service, not a wall.
+
+It is the same reasoning applied to `Params.asMap` a day earlier: an accessor
+with no extant user is a promise kept for nobody, and 1.0 is the release that
+should not make one. If a service does get stuck, the field is one line from
+public and this paragraph is where to start.
+
+**What was wrong was the documentation, not the surface.** Both places that
+show the call wrote `.run(system)` with `system` arriving from nowhere, which is
+what made the question look like a missing accessor. Corrected alongside this
+closing.
+
+### The conversion, and why `Died` was never the hard part
+
+The question asked whether `Exit` needs an `Outcome` conversion, and named
+`Died` as the case such a conversion would have to decide. `Died` was already
+decided, twice, by parties that are not this spec:
+
+- lark's own `awaitExit` does `Done` → the value, `Failed` → `raise`, `Died` →
+  rethrow the cause.
+- `AGENTS.md`: declared failures are values in the return type, and throwing is
+  for what nobody declared.
+
+Both say the same thing, so the conversion has one shape rather than a choice.
+
+What made it concrete is that the two places showing the call each hand-roll it,
+and each gets it wrong the same way — `if (exit is Exit.Done) … else …`, an
+`else` over a three-case sealed type, which is the one thing `AGENTS.md` says
+never to write. A conversion whose own examples cannot be written by hand
+without breaking the house rule is one the library should own.
+
+```kotlin
+fun <E : Any, A : Any> CompletionStage<Exit<E, A>>.toOutcome(
+    failure: ErrorOutput<E>,
+): CompletionStage<Outcome<E, A>> =
+    thenApply { exit ->
+        when (exit) {
+            is Exit.Done -> ok(exit.value)
+            is Exit.Failed -> failure(exit.error)
+            is Exit.Died -> throw exit.cause
+        }
+    }
+```
+
+On the `CompletionStage` rather than on `Exit`, because `run(system)` returns
+one and `handledByOrFail` takes one; converting at the `Exit` leaves the caller
+a `thenApply` to write, which is exactly where the hand-rolled `else` came from.
+
+Not in `pelican-arrow`, though lark pulls `arrow-core` transitively and
+`awaitExit` is the Arrow-shaped door already: it blocks, through `lark-pekko`'s
+`await`, which a handler returning a `CompletionStage` should not.
+
+The bounds above were compiled against lark 0.4.0 and core rather than sketched,
+because the last thing this spec sketched was `Exit.getOrElse`.
+
 ## Acceptance
 
 ```bash
@@ -115,13 +196,12 @@ over it, which is what `ToStreamTest` does.
    The reasoning got stronger than the draft knew — a function in
    `pelican-pekko` would have put `lark-stream`'s `_2.13` Pekko on every Pekko
    service's classpath, not merely the library.
-2. **Does `Exit` need an `Outcome` conversion?** `Exit.Failed(e)` to a
-   declared failure reads well as `toOutcome(failure)`. Recommend waiting for
-   a handler that wants it — still unanswered, and now concrete: `Died` is the
-   case such a conversion would have to decide about, since it is the only one
-   that should still become a 500.
-3. **Should `pelican-pekko` expose the request's actor system?** A handler that
-   does not already own one has no way to reach it, so `run(system)` needs a
-   system from somewhere. Every service has one; a library caller might not.
-   Recommend leaving it until someone is stuck, since exposing it widens a
-   published surface for a case nobody has hit.
+2. ~~**Does `Exit` need an `Outcome` conversion?**~~ **Answered: yes**, and its
+   shape is forced rather than chosen — lark and `AGENTS.md` had both already
+   decided `Died`. Drafted as `spec-0037-exit-to-outcome`; see **The
+   conversion**.
+3. ~~**Should `pelican-pekko` expose the request's actor system?**~~
+   **Answered: no.** The handle is withheld but the capability is not —
+   `runWith` already materialises on that system — and the service that needs
+   the provider starts one and passes it to `start(system)`. The documentation
+   was what needed fixing. See **Where `system` comes from**.

@@ -4693,7 +4693,13 @@ tally handledBy { rows ->
         .mapOrFail { it.customer ?: raise(NoCustomer(it.id)) }         // Stream<IngestError, String>
         .runFold(0) { seen, _ -> seen + 1 }
         .run(system)
-        .thenApply { exit -> if (exit is Exit.Done) Tally(exit.value) else refused(exit) }
+        .thenApply { exit ->
+            when (exit) {
+                is Exit.Done -> Tally(exit.value)
+                is Exit.Failed -> refused(exit.error)
+                is Exit.Died -> throw exit.cause
+            }
+        }
 }
 ```
 
@@ -4702,6 +4708,15 @@ failed stage, so *which* of the three happened is a `when` in the handler and
 each one can answer differently. `Failed` carries the `E` the description
 declares; `Died` carries a throwable nobody declared, which is the only one that
 should still become a 500.
+
+`system` there is the service's own: a handler receives `Params`, which carries
+no materializer, so the system is the one it started and passed to
+[`start(system)`](#bringing-your-own-actorsystem) and closed over. Pelican does
+materialise on the request's system where it can do so without being handed one
+— `StreamIn<T>.runWith(sink)` does exactly that — but lark builds its own
+runnable graph, so `run` wants the system itself. The service that calls
+`start(port = 8080)` and lets Pelican create a system has none to close over,
+and is the one case that has to create it first.
 
 Two things Pelican does not do. It owns no operators: `mapOrFail`, `catchAll`,
 `mapAsync` and the rest are lark's, and a service that never streams never sees

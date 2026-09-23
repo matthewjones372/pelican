@@ -29,7 +29,9 @@ import io.github.matthewjones372.pelican.pekko.toSource
  * than at the first null frame.
  *
  * Nothing is materialised here, and this takes no actor system: lark supplies
- * one at the far end, to `run`, rather than when the stream is built.
+ * one at the far end, to `run`, rather than when the stream is built. That
+ * system is the service's own — the one it passed to `start(system)` and closed
+ * over — since a handler is handed `Params` and no materializer.
  *
  * ```kotlin
  * ingestOrders handledBy { rows ->
@@ -37,7 +39,13 @@ import io.github.matthewjones372.pelican.pekko.toSource
  *         .mapOrFail { row -> row.customer ?: raise(NoCustomer(row.id)) } // Stream<IngestError, String>
  *         .runFold(0) { seen, _ -> seen + 1 }
  *         .run(system)
- *         .thenApply { exit -> if (exit is Exit.Done) Tally(exit.value) else Tally(0) }
+ *         .thenApply { exit ->
+ *             when (exit) {
+ *                 is Exit.Done -> Tally(exit.value)
+ *                 is Exit.Failed -> Tally(0)
+ *                 is Exit.Died -> throw exit.cause
+ *             }
+ *         }
  * }
  * ```
  *
