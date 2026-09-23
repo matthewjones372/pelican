@@ -71,9 +71,11 @@ between two renderers that are otherwise interchangeable.
       Done when: **Measured** says in a paragraph whether the inlined form
       works, with the page that proved it. **Both work, and the gate found
       something else.**
-- [ ] **`spec-0055-redoc3-html`** — as `spec-0054-redoc-html`, against the RC.
+- [ ] ~~**`spec-0055-redoc3-html`**~~ — not happening; see Measured. — as
+      `spec-0054-redoc-html`, against the RC.
       Done when: the same claims hold, or the spec records which does not.
-- [ ] **`spec-0055-redoc3-route`** — as `spec-0054-redoc-route`.
+- [ ] ~~**`spec-0055-redoc3-route`**~~ — not happening; see Measured. — as
+      `spec-0054-redoc-route`.
 
 ## Acceptance
 
@@ -149,22 +151,29 @@ shipped, so they had already collapsed to changing one URL. They are now
 something else again: a `type="module"` script, an `import`, and a decision
 about telemetry that 2.5.4 does not force anybody to make.
 
-**Recommend cutting both.** Not for the reason this spec was written on — the
-eleven months — but for one it could not have known: 0054 ships a page that
-sends nothing to anybody, and the RC cannot do that in the form 0054 serves.
-The entries stay unticked and undeleted until the maintainer says so, because
-cutting a stack entry is an edit to the spec, not an agent's call.
+**Cut by the maintainer, 2026-09-23.** Not for the reason this spec was written
+on — the eleven months — but for one it could not have known: 0054 ships a page
+that sends nothing to anybody, and the RC cannot do that in the form 0054
+serves.
+
+So this spec closes having bought exactly what its first entry was for. It cost
+one page of rendering and no production code, and it answers *"why 2.x?"* with
+a measurement rather than a preference — which is the thing a future reader,
+looking at a stale-looking version number, would otherwise have to re-derive.
+
+If 3.0 reaches GA the question reopens, and the one to ask first is whether the
+element form can disable telemetry by then. Nothing else here has changed.
 
 ## Open questions
 
-1. **This one or 0054?** Recommend 0054. This page is worth having either way,
-   so the next person to ask *"why 2.x?"* finds the eleven months in a file
-   rather than re-deriving them.
-2. **What happens at GA?** The URL changes and the page changes with it,
-   silently, for everyone who upgrades Pelican. Recommend that taking this spec
-   also means pinning Swagger UI exactly — one policy for both pages rather than
-   a loose `@5` beside an exact pre-release.
-3. **Is there a third option?** Ship neither, and document how to serve your own
-   page from the generated document. Recommend against — that is the status quo
-   and the status quo is what **Problem** is about — but it is the honest floor
-   to measure both specs against.
+1. ~~**This one or 0054?**~~ **0054**, shipped in
+   [#158](https://github.com/matthewjones372/pelican/pull/158) and
+   [#159](https://github.com/matthewjones372/pelican/pull/159); this spec's
+   remaining entries cut. See **Measured**.
+2. **What happens at GA?** Still open, and reframed by what entry one found: the
+   question to ask first is not whether the URL moved but whether the element
+   form can disable telemetry by then. If it cannot, the answer stays no however
+   settled 3.x is.
+3. ~~**Is there a third option?**~~ **Moot.** Shipping neither was a floor to
+   measure against while 0054 was a proposal. 0054 shipped, so the status quo
+   this spec's **Problem** describes is gone either way.
