@@ -218,18 +218,26 @@ within 40%, where the cancelled version varied by seventy times.
 - ~~**Should `BOUNDED_AHEAD` rise above 200,000?**~~ **Answered: yes, to
   1,000,000.** See **Raising the bound** below — the second end got measured
   too, and 200,000 turned out to be badly placed rather than merely tight.
-- **Is `STALL_MILLIS` the right stillness, or should both grow?** 500 ms on each
-  side is a second per run. Recommend keeping 500 and revisiting only if it
-  recurs — the same discipline 0048 used, which did produce the evidence, just
-  later than anyone wanted.
-- **Should `BOUNDED_AHEAD` be the primary assertion?** It held through the
-  failure, which is an argument that it is the claim that matters and quiescence
-  is the decoration. Recommend keeping both: boundedness alone would pass for a
-  producer that never stops but stays under the ceiling, which is not what the
-  test's name says.
+- **Is `STALL_MILLIS` the right stillness, or should both grow?** Still open,
+  and deliberately. 500 ms on each side is a second per run; keep it and revisit
+  only if it recurs. **Seventeen green `main` runs since the fix, nine of them
+  since the bound rose, each running this test on three JDKs — and that is not
+  enough to close this.** 0048's settle also looked settled for longer than that
+  before a lull faked a sample. Closing this question on a day of green is the
+  mistake this spec exists to record, so it stays open until either a recurrence
+  or a stretch long enough to mean something.
+- ~~**Should `BOUNDED_AHEAD` be the primary assertion?**~~ **Both, as
+  recommended.** Boundedness alone would pass for a producer that never stops
+  but stays under the ceiling, which is not what the test's name says — and the
+  measurement since has made the pair sharper rather than redundant, since the
+  two ends now bound a 45× gap rather than sitting against one wall.
 - ~~**Why did this run buffer 156,222 when the constant's comment says "around
   twenty thousand small frames in practice"?**~~ **Answered: the comment was
   wrong.** 148,018 locally, three times over. See **Measured**.
-- **Does 0048 need a `Measured` section?** It has none, so what its fix achieved
-  was never recorded and this recurrence had nothing to be checked against.
-  Recommend this spec serves as that record rather than editing a shipped spec.
+- ~~**Does 0048 need a `Measured` section?**~~ **No — but it needed to say this
+  spec exists, and did not.** Retro-fitting numbers to a shipped spec is not
+  worth it; this page is the record. What was worth it is that 0048's own third
+  open question — *"Are two agreeing samples enough? … revisiting only if it
+  proves otherwise"* — had proved otherwise, and nothing on that page said so.
+  It is struck there now, pointing here. A record nobody can find from where
+  they are standing is not a record.
