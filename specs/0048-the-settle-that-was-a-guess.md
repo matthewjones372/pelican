@@ -115,10 +115,14 @@ for i in 1 2 3; do ./gradlew :example:test --tests "*UnboundedStreamTest*" --rer
   `SOCKET_TIMEOUT_MILLIS` in the same file, so the two waits in this test agree.
 - **What sample interval?** Recommend 50 ms: ten samples inside today's 500 ms,
   and short enough that a healthy run settles sooner than it does now.
-- **Are two agreeing samples enough?** A pause in scheduling could fake one.
-  Recommend two and a 50 ms gap as sufficient given the source is unthrottled —
-  it produces continuously when it produces at all — and revisiting only if it
-  proves otherwise.
+- ~~**Are two agreeing samples enough?**~~ **Answered: no, and it proved
+  otherwise on 2026-09-22.** A pause did fake one — the source stalls for longer
+  than 50 ms, so two samples agreed while it was merely between bursts and the
+  settle returned on a lull. [Spec 0053](0053-the-pause-that-looked-like-quiescence.md)
+  replaces the two-sample settle with one that waits out a stillness as long as
+  the stall it asserts, and measures what this spec never did: the cost, the
+  variance, and how much headroom `BOUNDED_AHEAD` actually had. The revisit
+  condition named here is what caught it, which is the argument for writing one.
 - **Does this hide a regression that a fixed settle would catch?** A slow settle
   would now pass where it once failed. Recommend accepting that: the test's
   claim is that production stops, not how quickly, and `BOUNDED_AHEAD` already
