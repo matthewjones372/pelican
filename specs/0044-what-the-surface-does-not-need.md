@@ -177,6 +177,9 @@ Nothing in a description can catch either, which is why one is a throw.
    of endpoints — plausibly for a backend rather than a service. Recommend
    leaving it and asking again when a second backend returns, since
    `multi-backend`'s interpreters are the callers that would say.
-3. **Does this spec supersede 0010's two entries, or reopen them?** Recommend
-   superseding: the dump answered the question `explicitApi` was going to ask,
-   and 0010's own note says to rewrite rather than resume.
+3. ~~**Does this spec supersede 0010's two entries, or reopen them?**~~
+   **Superseded**, as recommended, and
+   [0010](0010-checking-the-published-surface.md)'s two entries are struck
+   pointing here. The dump answered what `explicitApi` was going to ask, so
+   resuming a 2026-07 plan against a surface it no longer describes would have
+   been the more expensive way to learn the same thing.

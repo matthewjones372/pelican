@@ -126,8 +126,15 @@ escape was checked by removing it and watching the test fail.
    not this spec.
 2. ~~**Does the inlined document work?**~~ **Answered: yes**, by rendering both
    forms in a browser. See **Measured**.
-3. **Enum or sealed type for `DocsUi`?** Recommend an enum. It becomes a sealed
-   type the day a renderer needs options of its own, source-compatibly.
-4. **Is 2.x the right line?** [Spec 0055](0055-the-renderer-that-has-not-shipped.md)
-   is this same change against `3.0.0-rc.0`, written to be read beside this one.
-   They are alternatives, not a sequence. Recommend this one.
+3. ~~**Enum or sealed type for `DocsUi`?**~~ **Taken: the enum**, shipped in
+   [#158](https://github.com/matthewjones372/pelican/pull/158). Two renderers
+   in and neither has wanted options of its own, so the day it becomes a sealed
+   type has not arrived — and when it does it arrives source-compatibly, which
+   is why this was the cheap way round.
+4. ~~**Is 2.x the right line?**~~ **Yes**, and
+   [spec 0055](0055-the-renderer-that-has-not-shipped.md) closed rather than
+   this one. Its render gate found the argument neither draft could have known:
+   the RC's bundle is an ES module whose `<redoc spec-url>` element calls
+   `init` with `{}`, so the fetching form — the default shape here — sends
+   telemetry to a third party with no attribute that turns it off. 2.x sends
+   nothing. Reopens at GA; see that spec's remaining question.
