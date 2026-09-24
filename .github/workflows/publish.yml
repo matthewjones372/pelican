@@ -3,7 +3,21 @@ name: publish
 on:
   push:
     tags: ["v*"]
+  # A tag push publishes everything, which is the release. The inputs exist for
+  # the other case: a registry that was skipped at the time — the Plugin Portal
+  # step below skips itself when no key is configured — and has to be caught up
+  # afterwards, without re-uploading to a registry that already has the version.
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag to build and publish. Empty: the dispatched ref."
+        type: string
+        default: ""
+      targets:
+        description: "Which registries to publish to."
+        type: choice
+        options: [both, central, portal]
+        default: both
 
 permissions:
   contents: read
@@ -26,6 +40,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # A dispatch runs the workflow file from the ref it was dispatched on,
+          # so catching up an old release means dispatching on `main` — for this
+          # file — and naming the tag here, for the source and the version.
+          ref: ${{ inputs.ref || github.ref }}
           # The version is derived from the nearest `v` tag, and a shallow
           # checkout has no tags to derive it from.
           fetch-depth: 0
@@ -37,6 +55,20 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      # The version comes from the nearest `v` tag, so a dispatch that names a
+      # branch rather than a tag would build a snapshot — which the Plugin
+      # Portal refuses and Central should not be asked for. Fail here, before
+      # either upload rather than between them.
+      - name: Refuse to publish a snapshot
+        run: |
+          version=$(./gradlew -p pelican-gradle-plugin -q currentVersion \
+            | sed -n 's/^Project version: //p')
+          echo "version: $version"
+          case "$version" in
+            "") echo "could not read the version"; exit 1 ;;
+            *-SNAPSHOT) echo "refusing to publish a snapshot"; exit 1 ;;
+          esac
+
       # The same gate a pull request goes through. A release that cannot build
       # is worth finding out about before it is on Maven Central for good,
       # which is why this runs the tests rather than skipping them.
@@ -47,11 +79,13 @@ jobs:
       # it is a click there: a staged bundle can be dropped, a released one is
       # permanent. Set `mavenCentralAutomaticPublishing` to skip the click.
       - name: Publish the modules to Maven Central
+        if: inputs.targets != 'portal'
         run: ./gradlew publishToMavenCentral --no-configuration-cache
 
       # The Gradle plugin is a build of its own, so the root build's publish
       # tasks do not reach it.
       - name: Publish the Gradle plugin to Maven Central
+        if: inputs.targets != 'portal'
         run: >
           ./gradlew -p pelican-gradle-plugin publishToMavenCentral
           --no-configuration-cache
@@ -61,7 +95,7 @@ jobs:
       # does not, so a missing key skips this rather than failing the release
       # that already reached Central.
       - name: Publish the Gradle plugin to the Gradle Plugin Portal
-        if: env.GRADLE_PUBLISH_KEY != ''
+        if: env.GRADLE_PUBLISH_KEY != '' && inputs.targets != 'central'
         run: >
           ./gradlew -p pelican-gradle-plugin publishPlugins
           --no-configuration-cache
