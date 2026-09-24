@@ -36,6 +36,14 @@ rather than here: a candidate exists so that the things only real use finds
 can still change. Breaks between a candidate and `1.0.0` are recorded here
 like any other.
 
+**`1.0.0-RC2` is the second, cut 2026-09-24.** RC1 is 157 commits behind this
+section: `pelican-streams`, the Redoc renderer, the measured decode path and
+the two test-harness fixes all landed after it, so a reader evaluating the
+library against RC1 was reading a surface a month out of date. Five
+declarations left the dumps between the two candidates — `Params.asMap()` and
+four `pelican-codegen` helpers — and both changes are under **Removed**, which
+is what the paragraph above promises.
+
 ### Removed — read this one first
 
 - **1.0 ships one backend, one codec module and one client transport: Pekko
@@ -72,6 +80,14 @@ like any other.
   wants the bag can ask for it back with a caller to point at; freezing it at
   1.0 for nobody is the promise this release is trying not to make. See spec
   0010.
+
+- **Four `pelican-codegen` name helpers are `internal`.** `asWritten`,
+  `branchName`, `isIdentifier` and `isWritable` are gone from that module's
+  dump, which is four lines shorter. All four are machinery the generator calls
+  on itself — `KotlinTypes.kt` and `Unions.kt` are the callers — rather than
+  anything a consumer was meant to hold, and no caller outside the module
+  exists in this repository or on the `multi-backend` branch. A generator that
+  needs one of them back can ask, with the caller that wants it. See spec 0044.
 
 - **Three static fields nothing was meant to read.**
   `PekkoHttpTransport.CONTENT_TYPE`, `PekkoHttpTransport.CONTENT_LENGTH` and
