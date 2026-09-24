@@ -325,6 +325,49 @@ like any other.
 
 ### Added
 
+- **`pelican-streams`, a streaming body as a stream that names its failure.**
+  `rows.toStream()` reads a `StreamIn<T>` as a `Stream<Nothing, T>` from
+  `io.github.matthewjones372:lark-stream`, where a row that cannot be
+  understood is a declared `E` in the type rather than a thrown exception a
+  materialised stage reports later. `toOutcome(failure)` is the way
+  back: it takes the `Exit<E, A>` that lark's `run(system)` completes with and
+  answers the `Outcome` a handler returns — `Done` is the value, `Failed` is
+  the endpoint's own declared error, which is what fixes the status, and `Died`
+  is rethrown, because a throwable nobody declared is what this library throws
+  rather than returns. The element bound is `T : Any`: an operator handed a
+  null cannot promise that a missing value and a failure are different things.
+
+  Two functions, and the whole published surface of the module. Pelican
+  converts; every operator is lark's and every endpoint description is
+  Pelican's, so a service that never streams never sees the library and the
+  library never learns what an endpoint is. Both sides are `compileOnly`:
+  `lark-stream` pins `pekko-stream_2.13` as an `api` dependency, so taking it
+  normally would republish a Scala suffix through the back door and undo the
+  decision `pelican-pekko` had already made. A consumer declares
+  `lark-stream` beside the Pekko it already declares, and `DependenciesTest`
+  asserts the published runtime classpath holds neither. See spec 0037.
+
+- **A second way to read the document: `docs { ui = DocsUi.Redoc }`.** Swagger
+  UI is a console — one operation expanded at a time, the request form at the
+  centre, *Try it out* sending real calls — which is the wrong tool for a
+  surface people read rather than poke. Redoc is a read-only three-panel
+  reference over the same document, at the same `docsPath`, with the same
+  content type and CORS headers. The page is `redocHtml(title, specPath, spec)`
+  in `pelican-openapi`, beside `swaggerUiHtml` and taking the same two forms:
+  fetch the document from `openApiPath`, so a reader can curl the same URL, or
+  embed it when there is none. Swagger UI stays the default and nothing changes
+  for a service that does not set `ui`.
+
+  `ui = DocsUi.Redoc` with `oauth` is refused where it is written rather than
+  ignored — Redoc sends no requests, so `docsOAuth` would configure a flow
+  nothing reads — and the refusal names both. The bundle comes from
+  `cdn.jsdelivr.net/npm/redoc@2`, the same kind of CDN link the Swagger UI page
+  has always used, with the same exposure: a browser that cannot reach it gets
+  an empty page. 2.x rather than the 3.0 candidate for a measured reason rather
+  than a cautious one: spec 0055 rendered both and found the RC's element form
+  reports to a third party with no attribute that turns it off. See specs 0054
+  and 0055.
+
 - **`filteredBy` puts a filter over some of the endpoints rather than all of
   them.** `filter(...)` on the `Api` runs for everything in it, so a service
   with a public group and an authenticated one had to write a membership
