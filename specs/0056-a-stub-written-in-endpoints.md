@@ -55,17 +55,17 @@ alternative is to render once at stub time. That is simpler, but it cannot serve
 
 ## Stack
 
-- [ ] **`spec-0056-wiremock-stubs`**: `pelican-test-wiremock` with `stub`,
-      `answers`, `fails`, `breaksWith`, `verify` and `calls`, as a plain
-      `AutoCloseable`.
+One entry: the module is small, and a stub API without its extension or its
+dependency test is not reviewable on its own terms. It will run past the
+200-line soft cap on tests alone; the main source is expected near 200.
+
+- [ ] **`spec-0056-wiremock`**: `pelican-test-wiremock` with `stub`, `answers`,
+      `fails`, `breaksWith`, `verify` and `calls` as a plain `AutoCloseable`,
+      the JUnit 5 extension over it, the `docs/modules.md` row with its
+      dependency test, and a reference section.
       Done when: the example's `OrdersClient` passes a suite against it that
-      names no path and no JSON.
-- [ ] **`spec-0056-wiremock-junit`**: the JUnit 5 extension over it.
-      Done when: a test with only `@RegisterExtension` gets a started server
-      and a stopped one.
-- [ ] **`spec-0056-wiremock-docs`**: `docs/modules.md` row and its dependency
-      test, a reference section, README link.
-      Done when: the module's dependency claim is a test.
+      names no path and no JSON, a test with only `@RegisterExtension` gets a
+      started and stopped server, and the module's dependency claim is a test.
 
 ## Acceptance
 
