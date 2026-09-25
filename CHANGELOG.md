@@ -44,6 +44,11 @@ declarations left the dumps between the two candidates — `Params.asMap()` and
 four `pelican-codegen` helpers — and both changes are under **Removed**, which
 is what the paragraph above promises.
 
+**`1.0.0-RC3` is the third, cut 2026-09-25.** RC2 was tagged the day before
+`pelican-test-wiremock` landed, so the one thing between the two candidates is
+that module. Nothing left the dumps: every line RC2's `.api` files carried is
+still there, and the only new ones are the module's own.
+
 ### Removed — read this one first
 
 - **1.0 ships one backend, one codec module and one client transport: Pekko

@@ -81,7 +81,7 @@ One entry: the module is small, and a stub API without its extension or its
 dependency test is not reviewable on its own terms. It will run past the
 200-line soft cap on tests alone; the main source is expected near 200.
 
-- [ ] **`spec-0056-wiremock`**: `pelican-test-wiremock` with `stub`, `answers`,
+- [x] **`spec-0056-wiremock`** ([#169](https://github.com/matthewjones372/pelican/pull/169)): `pelican-test-wiremock` with `stub`, `answers`,
       `fails`, `breaksWith`, `verify` and `calls` as a plain `AutoCloseable`,
       the JUnit 5 extension over it, the `docs/modules.md` row with its
       dependency test, and a reference section.
