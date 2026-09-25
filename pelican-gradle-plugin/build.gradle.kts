@@ -12,7 +12,7 @@ plugins {
     id("com.vanniktech.maven.publish") version "0.37.0"
     // The same tag this repository's other build reads. An included build is
     // still the same working tree, so both land on the same version.
-    id("pl.allegro.tech.build.axion-release") version "1.21.3"
+    id("pl.allegro.tech.build.axion-release") version "1.21.4"
 }
 
 scmVersion {
