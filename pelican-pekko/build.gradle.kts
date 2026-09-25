@@ -85,7 +85,7 @@ dependencies {
 
     "scala3TestImplementation"(kotlin("test"))
     "scala3TestImplementation"("org.junit.jupiter:junit-jupiter:6.1.3")
-    "scala3TestImplementation"("io.kotest:kotest-assertions-core:6.2.4")
+    "scala3TestImplementation"("io.kotest:kotest-assertions-core:6.2.5")
     "scala3TestRuntimeOnly"("org.junit.platform:junit-platform-launcher")
 }
 
