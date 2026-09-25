@@ -467,6 +467,9 @@ internal val frozenCallSites: Map<String, String> = mapOf(
         val discovered: ClientTransport = ClientTransport.default()
         val retrying: ClientTransport = PekkoHttpTransport().retrying(retryPolicy { maxAttempts = 2 })
         val wrapped: ClientTransport = RetryingTransport(PekkoHttpTransport(), retryPolicy())
+        val held = RetryScheduler { _, task -> task.run() }
+        val scheduled: ClientTransport = PekkoHttpTransport().retrying(retryPolicy(), held)
+        val onTheJdk: ClientTransport = RetryingTransport(PekkoHttpTransport(), retryPolicy(), RetryScheduler.jdk)
 
         // No socket at all: the same client shape, answered by the routes.
         val inProcess: ClientTransport = InMemoryClientTransport(service)

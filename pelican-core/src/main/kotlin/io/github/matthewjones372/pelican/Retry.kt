@@ -6,7 +6,6 @@ import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.CompletionStage
-import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 import kotlin.math.min
@@ -238,8 +237,15 @@ class RetryPolicyBuilder internal constructor() {
  */
 class RetryingTransport(
     private val delegate: ClientTransport,
-    private val policy: RetryPolicy = retryPolicy(),
+    private val policy: RetryPolicy,
+    private val scheduler: RetryScheduler,
 ) : ClientTransport {
+
+    // A second constructor rather than a defaulted third parameter, so the
+    // synthetic default-argument constructor callers were compiled against
+    // keeps its signature.
+    constructor(delegate: ClientTransport, policy: RetryPolicy = retryPolicy()) :
+        this(delegate, policy, RetryScheduler.jdk)
 
     override fun send(request: ClientRequest): CompletionStage<ClientResponse> {
         val answer = CompletableFuture<ClientResponse>()
@@ -297,7 +303,7 @@ class RetryingTransport(
                 answer.complete(response)
             } else {
                 response.body.close()
-                schedule(wait) { attempt(request, number + 1, answer) }
+                scheduler.schedule(wait) { attempt(request, number + 1, answer) }
             }
             return
         }
@@ -310,20 +316,32 @@ class RetryingTransport(
         if (wait == null) {
             answer.completeExceptionally(raised)
         } else {
-            schedule(wait) { attempt(request, number + 1, answer) }
+            scheduler.schedule(wait) { attempt(request, number + 1, answer) }
         }
     }
+}
 
-    private fun schedule(wait: Duration, next: () -> Unit) = delayed(wait).execute(next)
+/**
+ * What a [RetryingTransport] waits on between attempts.
+ *
+ * A test passes one that holds the task, so the moment a retry would fire is
+ * the test's to choose rather than the wall clock's.
+ */
+fun interface RetryScheduler {
+    /** Runs [task] once [after] has passed. */
+    fun schedule(after: Duration, task: Runnable)
 
-    /**
-     * The JDK's own delayed executor, which runs the task on a shared daemon
-     * timer thread. `Thread.sleep` would have turned a wait into a parked
-     * thread per call in flight, which is exactly what a client that answers
-     * with a stage exists to avoid.
-     */
-    private fun delayed(wait: Duration): Executor =
-        CompletableFuture.delayedExecutor(wait.toMillis(), TimeUnit.MILLISECONDS)
+    companion object {
+        /**
+         * The JDK's shared daemon timer. `Thread.sleep` would have turned a
+         * wait into a parked thread per call in flight, which is exactly what
+         * a client that answers with a stage exists to avoid.
+         */
+        @JvmField
+        val jdk: RetryScheduler = RetryScheduler { after, task ->
+            CompletableFuture.delayedExecutor(after.toMillis(), TimeUnit.MILLISECONDS).execute(task)
+        }
+    }
 }
 
 /**
@@ -331,6 +349,10 @@ class RetryingTransport(
  * at the point a client is constructed.
  */
 fun ClientTransport.retrying(policy: RetryPolicy = retryPolicy()): ClientTransport = RetryingTransport(this, policy)
+
+/** The same, waiting on [scheduler] between attempts. */
+fun ClientTransport.retrying(policy: RetryPolicy, scheduler: RetryScheduler): ClientTransport =
+    RetryingTransport(this, policy, scheduler)
 
 /** What a `CompletionStage` callback was handed, unwrapped to what was thrown. */
 private fun unwrapped(failure: Throwable): Throwable =

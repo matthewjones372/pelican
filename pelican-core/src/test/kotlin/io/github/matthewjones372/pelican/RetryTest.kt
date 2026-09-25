@@ -260,15 +260,21 @@ class RetryTest {
             CompletableFuture.completedFuture(response(503))
         }
 
-        // Long enough that the retry is still waiting when the cancellation
-        // arrives, and short enough that a mistake here shows up as a failure
-        // rather than as a slow suite.
+        val waits = mutableListOf<Duration>()
+        val pending = mutableListOf<Runnable>()
+        val held = RetryScheduler { after, task ->
+            waits += after
+            pending += task
+        }
+
         val waiting = retryPolicy { jitter = 0.0; initialBackoff = Duration.ofMillis(500) }
-        val answer = transport.retrying(waiting).send(get).toCompletableFuture()
+        val answer = transport.retrying(waiting, held).send(get).toCompletableFuture()
 
         answer.cancel(true)
-        Thread.sleep(1_000)
+        // The retry's moment arrives after the cancel, however long the wait was.
+        pending.forEach(Runnable::run)
 
+        waits shouldBe listOf(Duration.ofMillis(500))
         attempts.get() shouldBe 1
     }
 

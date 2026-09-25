@@ -51,16 +51,17 @@ fun interface RetryScheduler {
     }
 }
 
-class RetryingTransport @JvmOverloads constructor(
+class RetryingTransport(
     private val delegate: ClientTransport,
-    private val policy: RetryPolicy = retryPolicy(),
-    private val scheduler: RetryScheduler = RetryScheduler.jdk,
-) : ClientTransport
+    private val policy: RetryPolicy,
+    private val scheduler: RetryScheduler,
+) : ClientTransport {
+    constructor(delegate: ClientTransport, policy: RetryPolicy = retryPolicy()) :
+        this(delegate, policy, RetryScheduler.jdk)
+}
 
-fun ClientTransport.retrying(
-    policy: RetryPolicy = retryPolicy(),
-    scheduler: RetryScheduler = RetryScheduler.jdk,
-): ClientTransport
+fun ClientTransport.retrying(policy: RetryPolicy = retryPolicy()): ClientTransport
+fun ClientTransport.retrying(policy: RetryPolicy, scheduler: RetryScheduler): ClientTransport
 ```
 
 The test then takes no time and proves a stronger claim:
@@ -88,8 +89,12 @@ service has to implement a dozen methods, and this needs one. The JDK service
 still fits in one line:
 `RetryScheduler { d, t -> ses.schedule(t, d.toMillis(), MILLISECONDS) }`.
 
-`@JvmOverloads` keeps the two-argument JVM constructor, so the
-`pelican-core.api` dump only gains entries and loses none.
+The scheduler is an overload beside each existing signature, not a defaulted
+parameter on it, so the `pelican-core.api` dump only gains entries. This draft
+first proposed `@JvmOverloads`, which keeps the two-argument JVM constructor
+but not the synthetic `$default` constructor and `retrying$default` that
+Kotlin callers are compiled against. Adding a parameter changes both of their
+signatures.
 
 ## Stack
 

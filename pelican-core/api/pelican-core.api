@@ -1300,6 +1300,7 @@ public final class io/github/matthewjones372/pelican/RetryKt {
 	public static final fun retryPolicy (Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/RetryPolicy;
 	public static synthetic fun retryPolicy$default (Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/RetryPolicy;
 	public static final fun retrying (Lio/github/matthewjones372/pelican/ClientTransport;Lio/github/matthewjones372/pelican/RetryPolicy;)Lio/github/matthewjones372/pelican/ClientTransport;
+	public static final fun retrying (Lio/github/matthewjones372/pelican/ClientTransport;Lio/github/matthewjones372/pelican/RetryPolicy;Lio/github/matthewjones372/pelican/RetryScheduler;)Lio/github/matthewjones372/pelican/ClientTransport;
 	public static synthetic fun retrying$default (Lio/github/matthewjones372/pelican/ClientTransport;Lio/github/matthewjones372/pelican/RetryPolicy;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/ClientTransport;
 }
 
@@ -1345,9 +1346,19 @@ public final class io/github/matthewjones372/pelican/RetryPolicyBuilder {
 	public final fun setStatuses (Ljava/util/Set;)V
 }
 
+public abstract interface class io/github/matthewjones372/pelican/RetryScheduler {
+	public static final field Companion Lio/github/matthewjones372/pelican/RetryScheduler$Companion;
+	public static final field jdk Lio/github/matthewjones372/pelican/RetryScheduler;
+	public abstract fun schedule (Ljava/time/Duration;Ljava/lang/Runnable;)V
+}
+
+public final class io/github/matthewjones372/pelican/RetryScheduler$Companion {
+}
+
 public final class io/github/matthewjones372/pelican/RetryingTransport : io/github/matthewjones372/pelican/ClientTransport {
 	public fun <init> (Lio/github/matthewjones372/pelican/ClientTransport;Lio/github/matthewjones372/pelican/RetryPolicy;)V
 	public synthetic fun <init> (Lio/github/matthewjones372/pelican/ClientTransport;Lio/github/matthewjones372/pelican/RetryPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/github/matthewjones372/pelican/ClientTransport;Lio/github/matthewjones372/pelican/RetryPolicy;Lio/github/matthewjones372/pelican/RetryScheduler;)V
 	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
 }
 
