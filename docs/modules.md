@@ -3,7 +3,7 @@
 Linked from the [README](../README.md). What each module is for, and what it
 depends on — the list to read when deciding which ones a build actually needs.
 
-Eighteen library modules and a Gradle plugin; a typical build takes four or
+Twenty library modules and a Gradle plugin; a typical build takes four or
 five. The layering is enforced by tests rather than convention.
 
 1.0 ships one server backend, one JSON library and one client transport. The
@@ -35,6 +35,7 @@ branch and return after 1.0; the table below is what main ships today.
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-golden` | test + openapi | per-endpoint goldens; fails on a breaking change |
 | `pelican-test-pekko` | test + pekko | the typed test client's in-memory transport |
+| `pelican-test-wiremock` | core + WireMock | WireMock stubbed and verified in endpoint values |
 
 Every one of those dependency claims is a test:
 
@@ -71,6 +72,8 @@ Every one of those dependency claims is a test:
   pins `_2.13` as an `api` dependency of its own and shipping it would put that
   suffix back on a consumer's classpath through this module.
 - `pelican-test` asserts it drags in no server library and no matcher library.
+- `pelican-test-wiremock` asserts it is core plus WireMock: no server library,
+  and no JUnit, which it compiles against and does not ship.
 
 The full breakdown is in [docs/reference.md](reference.md#modules).
 

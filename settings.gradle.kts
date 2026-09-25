@@ -33,6 +33,7 @@ include(
     "pelican-test",
     "pelican-test-golden",
     "pelican-test-pekko",
+    "pelican-test-wiremock",
     "example",
     // Not a library and not an example: a JMH harness, run only when asked
     // for. See benchmarks/build.gradle.kts for why it is not a source set in

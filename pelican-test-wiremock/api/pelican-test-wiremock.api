@@ -1,0 +1,27 @@
+public class io/github/matthewjones372/pelican/test/wiremock/PelicanWireMock : java/lang/AutoCloseable {
+	public fun <init> (Lio/github/matthewjones372/pelican/Codecs;)V
+	public final fun calls (Lio/github/matthewjones372/pelican/Endpoint;)I
+	public fun close ()V
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getWireMock ()Lcom/github/tomakehurst/wiremock/WireMockServer;
+	public final fun reset ()V
+	public final fun stub (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/test/wiremock/PelicanWireMock$Stubbing;
+	public final fun stub (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function1;)V
+	public final fun verify (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;I)V
+	public static synthetic fun verify$default (Lio/github/matthewjones372/pelican/test/wiremock/PelicanWireMock;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;IILjava/lang/Object;)V
+}
+
+public final class io/github/matthewjones372/pelican/test/wiremock/PelicanWireMock$Stubbing {
+	public final fun answers (Lio/github/matthewjones372/pelican/Outcome;)V
+	public final fun answers-HG0u8IE (Lio/github/matthewjones372/pelican/Outcome;J)V
+	public final fun breaksWith (I)V
+	public final fun fails (Lcom/github/tomakehurst/wiremock/http/Fault;)V
+}
+
+public final class io/github/matthewjones372/pelican/test/wiremock/PelicanWireMockExtension : io/github/matthewjones372/pelican/test/wiremock/PelicanWireMock, org/junit/jupiter/api/extension/AfterEachCallback, org/junit/jupiter/api/extension/BeforeAllCallback, org/junit/jupiter/api/extension/BeforeEachCallback {
+	public fun <init> (Lio/github/matthewjones372/pelican/Codecs;)V
+	public fun afterEach (Lorg/junit/jupiter/api/extension/ExtensionContext;)V
+	public fun beforeAll (Lorg/junit/jupiter/api/extension/ExtensionContext;)V
+	public fun beforeEach (Lorg/junit/jupiter/api/extension/ExtensionContext;)V
+}
+

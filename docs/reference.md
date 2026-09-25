@@ -28,6 +28,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
+| `pelican-test-wiremock` | core, WireMock | WireMock stubbed and verified in endpoint values, for testing a client of somebody else's API |
 | `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
 | `example` | core, openapi, jackson, pekko | the orders, bookmarks, greetings and secured services |
 | `benchmarks` | core, jackson, pekko, JMH | the interpreter measured against hand-written Pekko routes. Not published, not run by `build`. |
@@ -5109,6 +5110,50 @@ golden.request("place-order", requestsOnly(JacksonCodecs).request(placeOrder, In
 The whole of it — the table of what breaks, accepting a break you meant, and the
 `PELICAN_GOLDEN_UPDATE` switch — is in
 [docs/golden-testing.md](golden-testing.md).
+
+### Stubbing somebody else's service
+
+The other direction: the service under test is the *caller*, and the API it
+calls belongs to somebody else. `pelican-test-wiremock` runs a WireMock server
+stubbed in that API's endpoint values, whether written by hand or imported from
+its OpenAPI document by the plugin's `endpoints` entry:
+
+```kotlin
+dependencies {
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC1")
+}
+```
+
+```kotlin
+import com.github.tomakehurst.wiremock.http.Fault
+import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
+
+@JvmField @RegisterExtension
+val orders = PelicanWireMockExtension(JacksonCodecs)     // random port; stubs cleared after each test
+
+orders.stub(getUser, 1L) answers ok(User(1, "Ada", "ada@example.com"))
+orders.stub(getUser, 2L) answers noSuchUser(ApiError(404, "no such user"))
+orders.stub(getUser, 3L).answers(ok(user), after = 5.seconds)
+orders.stub(getUser, 4L) breaksWith 502                  // a status the endpoint never declared
+orders.stub(getUser, 5L) fails Fault.CONNECTION_RESET_BY_PEER
+orders.stub(getUser) { id -> ok(User(id, "user $id", "$id@example.com")) }
+
+orders.verify(getUser, 1L)
+orders.calls(getUser)
+orders.wireMock.stubFor(get("/health").willReturn(ok()))  // what no endpoint describes
+```
+
+The client under test points at `orders.baseUrl`, and it does not have to be
+Pelican's. A request matches a stub when Pelican's own routing and decoding turn
+it into the stubbed input. So query order, percent-encoding, a JSON field left
+at its default and an undeclared header make no difference, and a declared
+header does. An answer is an `Outcome` the endpoint declares, rendered by the
+same code a server answers with, so its status, content type, declared headers
+and body are the ones the real service would send.
+
+`PelicanWireMock` is the same thing without JUnit, as an `AutoCloseable`;
+JUnit is `compileOnly` here, so a build without it never loads a JUnit type.
 
 ### The comparison on its own
 
