@@ -21,7 +21,7 @@ codec that described it then refuses.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-schema:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-schema:1.0.0-RC3")
 }
 ```
 

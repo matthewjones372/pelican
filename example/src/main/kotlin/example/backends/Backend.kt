@@ -5,7 +5,7 @@ package example.backends
  *
  *     dependencies {
  *         // endpoint descriptions; no dependencies of its own
- *         implementation("io.github.matthewjones372:pelican-core:1.0.0-RC1")
+ *         implementation("io.github.matthewjones372:pelican-core:1.0.0-RC3")
  *     }
  */
 

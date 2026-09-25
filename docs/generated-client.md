@@ -8,7 +8,7 @@ or on another release cycle, get a file generated from them instead. It is a
 Gradle task: no `main` to write, no `JavaExec` to wire.
 
 ```kotlin
-plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC1" }
+plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC3" }
 
 pelican {
     clients {
@@ -32,8 +32,8 @@ document from the same function; see
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC3")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
@@ -138,7 +138,7 @@ write.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC3")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
