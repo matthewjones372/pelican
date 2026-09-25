@@ -1663,6 +1663,26 @@ timer entry and not a parked thread — which is what the asynchronous shape of
 `send` was for. And cancelling what the caller holds cancels both the exchange
 in flight and the retry that was going to follow it.
 
+The timer is a `RetryScheduler`, and `RetryScheduler.jdk` (the JDK's shared
+daemon timer) is the one used when none is named. Passing your own is how a
+test decides when a retry's moment arrives, rather than sleeping until it does:
+
+```kotlin
+import io.github.matthewjones372.pelican.RetryScheduler
+import io.github.matthewjones372.pelican.retrying
+import io.github.matthewjones372.pelican.retryPolicy
+
+val pending = mutableListOf<Runnable>()
+val held = RetryScheduler { _, task -> pending += task }
+
+val answer = transport.retrying(retryPolicy(), held).send(request)
+answer.toCompletableFuture().cancel(true)
+pending.forEach(Runnable::run) // the retry fires now, after the cancel, and does nothing
+```
+
+`RetryingTransport(delegate, policy, scheduler)` is the same thing spelled as a
+constructor.
+
 ### On Ktor
 
 `pelican-client-ktor` is on the `multi-backend` branch, not in 1.0. It is the
