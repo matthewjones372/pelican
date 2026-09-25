@@ -25,6 +25,18 @@ updates:
     commit-message:
       prefix: "build"
       include: "scope"
+    # A security advisory Dependabot cannot act on. `org.freemarker:freemarker`
+    # is five levels inside the Kover plugin's own buildscript classpath --
+    # kover-gradle-plugin -> kover-features-jvm -> intellij-coverage-reporter
+    # -> coverage-report -> freemarker -- so no manifest in this repository
+    # names it and the security job ends `security_update_dependency_not_found`
+    # on every push. It reaches no published artifact either: it is on no
+    # module's runtime or test classpath, in this build or the plugin's. The
+    # version moves when Kover ships a release that upgrades the reporter,
+    # which the `build-tooling` group below will offer like any other.
+    ignore:
+      - dependency-name: "org.freemarker:freemarker"
+
     # One PR per upstream project, not per artifact. Pekko alone is six
     # coordinates that only ever move together; opentelemetry is declared in
     # two modules at one version.
