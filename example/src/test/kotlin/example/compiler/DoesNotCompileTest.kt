@@ -169,14 +169,24 @@ class DoesNotCompileTest {
         }
     }
 
+    /**
+     * Kotlin 2.4.20 weakened this one. 2.4.10 named both handler types —
+     * `Params.(String) -> User` against `Params.(Long) -> User`, which told the
+     * author what to write. 2.4.20 reports the receiver instead, so the author
+     * is told `String` where `Params` was expected and has to work the rest out.
+     *
+     * The refusal still holds, which is what this suite is for, so the quoted
+     * line follows the compiler rather than the compiler being held to the old
+     * one. If a later release restores the fuller message, this is where that
+     * shows up.
+     */
     @Test
-    fun `a handler taking an input the endpoint types differently names both handler types`() {
+    fun `a handler taking an input the endpoint types differently does not compile`() {
         val errors = compile("$typed\nval bound = getUser handledNow { id: String -> User(1) }")
 
         withClue(errors.joinToString("\n")) {
             errors.joinToString("\n") shouldContain
-                "Argument type mismatch: actual type is 'Params.(String) -> User', " +
-                "but 'Params.(Long) -> User' was expected."
+                "Parameter type mismatch: actual type is 'String', but 'Params' was expected."
         }
     }
 
