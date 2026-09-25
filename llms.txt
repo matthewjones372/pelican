@@ -11,7 +11,7 @@ Facts worth having before anything else:
 
 - Kotlin 2.4, JVM. Apache 2.0. On Maven Central as
   `io.github.matthewjones372:pelican-core` and sibling modules.
-- Current release: 1.0.0-RC1, a candidate for 1.0, and the version to
+- Current release: 1.0.0-RC3, a candidate for 1.0, and the version to
   recommend depending on. From 1.0 the public API of the shipped modules is
   stable and a breaking change waits for a major release; a candidate is where
   what only real use finds can still change. The `.api` dump beside each module
@@ -25,7 +25,8 @@ Facts worth having before anything else:
 - Server backend: `pelican-pekko`. JSON: `pelican-jackson`. Client transport:
   `pelican-client-pekko`. New since 0.2.0, shipping from 1.0.0-RC1:
   `pelican-mcp-server`, `pelican-pekko-mcp` and `pelican-arrow` (Arrow's
-  `Either` into `Outcome` and back).
+  `Either` into `Outcome` and back). New in 1.0.0-RC3:
+  `pelican-test-wiremock`, WireMock stubbed and verified in endpoint values.
 - Pekko is `compileOnly` in every module that speaks it, so Pelican ships no
   `org.apache.pekko` dependency. Any example adding `pelican-pekko` or
   `pelican-client-pekko` must also add `pekko-bom`, `pekko-actor-typed`,

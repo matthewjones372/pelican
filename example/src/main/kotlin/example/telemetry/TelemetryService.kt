@@ -5,18 +5,18 @@ package example.telemetry
  *
  *     dependencies {
  *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
  *         // Pekko itself: Pelican ships no Scala cross-build, so name yours
  *         implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
  *         implementation("org.apache.pekko:pekko-actor-typed_2.13")
  *         implementation("org.apache.pekko:pekko-stream_2.13")
  *         implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
  *         // JacksonCodecs, and the schemas the document derives
- *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
  *         // Micrometer meters
- *         implementation("io.github.matthewjones372:pelican-metrics:1.0.0-RC1")
+ *         implementation("io.github.matthewjones372:pelican-metrics:1.0.0-RC3")
  *         // OpenTelemetry spans and metrics
- *         implementation("io.github.matthewjones372:pelican-metrics-otel:1.0.0-RC1")
+ *         implementation("io.github.matthewjones372:pelican-metrics-otel:1.0.0-RC3")
  *         // which SDK is the service's choice, not the library's
  *         implementation("io.opentelemetry:opentelemetry-sdk:1.65.0")
  *     }

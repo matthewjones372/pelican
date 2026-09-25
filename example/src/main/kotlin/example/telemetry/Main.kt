@@ -5,7 +5,7 @@ package example.telemetry
  *
  *     dependencies {
  *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
  *         // Pekko itself: Pelican ships no Scala cross-build, so name yours
  *         implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
  *         implementation("org.apache.pekko:pekko-actor-typed_2.13")

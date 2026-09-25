@@ -5,7 +5,7 @@ package example
  *
  *     dependencies {
  *         // startWithDocs, /openapi.json and Swagger UI
- *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+ *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC3")
  *     }
  */
 

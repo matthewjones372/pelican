@@ -3,7 +3,7 @@
 Linked from the [README](../README.md). The page for deciding *against* Pelican
 quickly, and for a reason that is actually true.
 
-Pelican's current release is 1.0.0-RC1, the candidate for 1.0. The
+Pelican's current release is 1.0.0-RC3, the candidate for 1.0. The
 README explains what it does and the reference manual explains how, but
 neither answers the question a reader arrives with, which is whether the thing
 they already have is worse. Usually it is not. This page is the honest version

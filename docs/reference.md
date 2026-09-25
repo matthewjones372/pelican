@@ -1010,7 +1010,7 @@ The document and the client are both readings of the same values, and both are
 build tasks:
 
 ```kotlin
-plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC1" }
+plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC3" }
 
 pelican {
     documents {
@@ -1107,7 +1107,7 @@ importer:
 
 ```kotlin
 val pelicanImport: Configuration by configurations.creating
-dependencies { pelicanImport("io.github.matthewjones372:pelican-import:1.0.0-RC1") }
+dependencies { pelicanImport("io.github.matthewjones372:pelican-import:1.0.0-RC3") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
@@ -1308,7 +1308,7 @@ classpath without being told:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC3")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
@@ -5120,7 +5120,7 @@ its OpenAPI document by the plugin's `endpoints` entry:
 
 ```kotlin
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC1")
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
 }
 ```
 
@@ -5557,7 +5557,7 @@ already runs:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
 
     // _2.13 or _3 — Pelican compiles against `javadsl` and four names that are
     // identical in both, so it has no opinion.

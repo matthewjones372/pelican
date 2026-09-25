@@ -121,7 +121,7 @@ The reference manual, with the reasoning behind each design decision, is
 
 ## Install
 
-The current release is **1.0.0-RC1**, on Maven Central under
+The current release is **1.0.0-RC3**, on Maven Central under
 `io.github.matthewjones372`. It is a release candidate: the surface below is
 what 1.0 ships, and the stability promise takes effect at 1.0 rather than here
 — see [Stability](#stability).
@@ -129,18 +129,18 @@ what 1.0 ships, and the stability promise takes effect at 1.0 rather than here
 ```kotlin
 dependencies {
     // The interpreter. Brings pelican-core; compiles against Pekko HTTP.
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
     implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
     // The codec module: Jackson, and the schemas the document derives.
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
     // /openapi.json and Swagger UI beside the endpoints — startWithDocs lives here.
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC3")
     // The typed test client.
-    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC1")
+    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
 }
 ```
 
@@ -164,7 +164,7 @@ pluginManagement {
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC1" }
+plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC3" }
 ```
 
 To build against unreleased changes, `./gradlew publishToMavenLocal` installs
@@ -183,9 +183,9 @@ the example module, so the front page cannot drift from what runs.
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC3")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
@@ -592,7 +592,7 @@ on core alone, so neither needs an HTTP library present.
 
 ## Stability
 
-The current release is 1.0.0-RC1, a candidate for 1.0. The API surface it
+The current release is 1.0.0-RC3, a candidate for 1.0. The API surface it
 promises is frozen and guarded now; the promise itself — the public API of the
 shipped modules is stable, and a breaking change waits for a major release —
 takes effect at 1.0. A candidate exists so that what only real use finds can

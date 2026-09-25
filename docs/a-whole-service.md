@@ -11,9 +11,9 @@ so it compiles on every build. Run it with `./gradlew :example:runReadmeExample`
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC1")
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC3")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")

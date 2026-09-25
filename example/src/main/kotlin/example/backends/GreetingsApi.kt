@@ -5,7 +5,7 @@ package example.backends
  *
  *     dependencies {
  *         // JacksonCodecs, and the schemas the document derives
- *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC1")
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
  *     }
  */
 
