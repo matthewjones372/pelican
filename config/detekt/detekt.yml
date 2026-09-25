@@ -47,7 +47,7 @@ exceptions:
     # the 500-and-log path each backend documents.
     excludes: ['**/Interpreter.kt', '**/Server.kt', '**/Responses.kt']
   SwallowedException:
-    excludes: ['**/test/**']
+    excludes: ['**/test/**', '**/scala3Test/**']
 
 naming:
   MatchingDeclarationName:
@@ -56,7 +56,7 @@ naming:
     active: false
   FunctionNaming:
     # Test names are sentences in backticks.
-    excludes: ['**/test/**']
+    excludes: ['**/test/**', '**/scala3Test/**']
 
 style:
   AbstractClassCanBeInterface:
@@ -81,7 +81,7 @@ style:
     active: true
   MagicNumber:
     # A status code in a test is the assertion, not a number needing a name.
-    excludes: ['**/test/**']
+    excludes: ['**/test/**', '**/scala3Test/**']
     ignorePropertyDeclaration: true
     ignoreCompanionObjectPropertyDeclaration: true
     ignoreNamedArgument: true
@@ -120,7 +120,7 @@ style:
     # `@ParameterizedTest(name = "{0}")` takes the case's label as its first
     # parameter and uses it for the test name, not in the body. That is the
     # whole of this rule's catch in the test sources.
-    excludes: ['**/test/**']
+    excludes: ['**/test/**', '**/scala3Test/**']
   ForbiddenVoid:
     # `ActorSystem<Void>` is Pekko's Java DSL, not our choice:
     # `Behaviors.empty<Void>()` is how a guardian with no protocol is spelled.
@@ -165,6 +165,16 @@ style:
     # The example services sleep on purpose, to have something slow to stream,
     # and the timing tests sleep to make a gap they can measure.
     excludes: ['**/test/**', '**/example/**']
+  ForbiddenMethodCall/NoRunCatching:
+    # A second instance, so the ban reaches the tests and examples the one
+    # above excludes. `runCatching` catches Throwable — cancellation and
+    # errors included — and turns it into a `Result` that is one `getOrNull`
+    # from silence. Catch the exception the call actually throws, or assert
+    # with `shouldThrow`.
+    active: true
+    methods:
+      - reason: 'Catch the specific exception, or use shouldThrow in a test.'
+        value: 'kotlin.runCatching'
 
 # ------------------------------------------------------------- what is meant
 #
@@ -189,4 +199,4 @@ potential-bugs:
     # This line was written for the benchmarks, which used to be tests here and
     # formatted their own numbers with `"%8.0f".format(...)`. They are a JMH
     # harness now and format nothing.
-    excludes: ['**/test/**']
+    excludes: ['**/test/**', '**/scala3Test/**']

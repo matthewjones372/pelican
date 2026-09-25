@@ -168,6 +168,11 @@ Do not wrap a handler in `runCatching` and map the result into a failure. That
 produces a second error model beside the declared one. `example/shop` shows the
 shape.
 
+`runCatching` is not used anywhere, tests and examples included; detekt fails
+the build on it. It catches `Throwable`, so it hides cancellation and errors
+behind a `Result`. Catch the exception the call throws, or use `shouldThrow` in
+a test.
+
 `catch (t: Throwable)` belongs in `Interpreter.kt`, `Server.kt` and
 `Responses.kt`. detekt permits it nowhere else.
 

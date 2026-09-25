@@ -15,6 +15,7 @@ import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.emptyJsonObj
 import io.github.matthewjones372.pelican.formCodec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -141,10 +142,8 @@ class SchemaAgreementTest {
                         validate(document.render(), minimal).shouldBeEmpty()
                     }
 
-                    val refusal = runCatching { codecs.codec<Any>(shape.type).decodeFromString(minimal) }
-                        .exceptionOrNull()
-                    withClue("$library published a schema that accepts $minimal, and refuses it: $refusal") {
-                        refusal shouldBe null
+                    withClue("$library published a schema that accepts $minimal, and refuses it") {
+                        shouldNotThrowAny { codecs.codec<Any>(shape.type).decodeFromString(minimal) }
                     }
                 }
             }

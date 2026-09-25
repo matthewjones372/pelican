@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.schema
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.SchemaRegistry
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.assertions.withClue
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
@@ -47,10 +48,7 @@ class NameCollisionsTest {
         }
 
     private fun refusalFrom(codecs: Codecs): String =
-        runCatching { codecs.schema(typeOf<Order>(), SchemaRegistry()) }
-            .exceptionOrNull()
-            .let { failure ->
-                requireNotNull(failure) { "$codecs described two types called Item and said nothing" }
-                failure.message.orEmpty()
-            }
+        withClue("$codecs described two types called Item and said nothing") {
+            shouldThrowAny { codecs.schema(typeOf<Order>(), SchemaRegistry()) }.message.orEmpty()
+        }
 }

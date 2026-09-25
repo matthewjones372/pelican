@@ -24,6 +24,7 @@ import java.time.Duration
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.test.assertFailsWith
@@ -42,12 +43,14 @@ class PekkoHttpTransportTest {
     /** Released by the test that wants a second chunk written, once it has read the first. */
     private val drip = CountDownLatch(1)
 
+    /** Answers `/slow` late without holding the server's only dispatch thread while it waits. */
+    private val later = Executors.newSingleThreadScheduledExecutor()
+
     private val server: HttpServer = HttpServer.create(InetSocketAddress(0), 0).apply {
         createContext("/echo") { exchange -> echo(exchange) }
         createContext("/empty") { exchange -> exchange.sendResponseHeaders(NO_CONTENT, -1); exchange.close() }
         createContext("/slow") { exchange ->
-            Thread.sleep(SLOW_MILLIS)
-            respond(exchange, "late")
+            later.schedule({ respond(exchange, "late") }, SLOW_MILLIS, TimeUnit.MILLISECONDS)
         }
         createContext("/drip") { exchange ->
             exchange.sendResponseHeaders(OK, 0)
@@ -85,6 +88,7 @@ class PekkoHttpTransportTest {
     @AfterAll
     fun tearDown() {
         server.stop(0)
+        later.shutdownNow()
         ownSystem.terminate()
     }
 

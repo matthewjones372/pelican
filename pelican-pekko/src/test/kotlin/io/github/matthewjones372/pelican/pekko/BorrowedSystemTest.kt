@@ -3,8 +3,8 @@ package io.github.matthewjones372.pelican.pekko
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import org.apache.pekko.actor.testkit.typed.annotations.JUnit5TestKit
 import org.apache.pekko.actor.testkit.typed.javadsl.ActorTestKit
 import org.apache.pekko.actor.testkit.typed.javadsl.JUnit5TestKitBuilder
@@ -12,6 +12,7 @@ import org.apache.pekko.actor.testkit.typed.javadsl.TestKitJUnit5Extension
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
+import java.io.IOException
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -94,9 +95,7 @@ class BorrowedSystemTest {
         val url = "${server.baseUrl}/hello"
         server.stop()
 
-        val refused = runCatching { get(url) }.exceptionOrNull()
-
-        refused shouldNotBe null
+        shouldThrow<IOException> { get(url) }
     }
 
     @Test

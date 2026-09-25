@@ -2,7 +2,6 @@ package io.github.matthewjones372.pelican.schema
 
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
-import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.JsonArr
 import io.github.matthewjones372.pelican.JsonBool
@@ -14,6 +13,7 @@ import io.github.matthewjones372.pelican.SchemaComponents
 import io.github.matthewjones372.pelican.SchemaSource
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsonObj
+import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldHaveSize
@@ -64,7 +64,7 @@ class UnionBranchesTest {
                 val payload = document.payloadFor(branch).render()
                 val codec = codecs.codec<PaymentMethod>(typeOf<PaymentMethod>())
                 withClue("$name: $payload satisfies the schema and does not decode") {
-                    codec.decodes(payload) shouldBe true
+                    shouldNotThrowAny { codec.decodeFromString(payload) }
                 }
             }
         }
@@ -149,9 +149,6 @@ class UnionBranchesTest {
 }
 
 // ------------------------------------------------------------------ helpers
-
-private fun BodyCodec<*>.decodes(payload: String): Boolean =
-    runCatching { decodeFromString(payload) }.isSuccess
 
 private fun JsonObj.defs(): JsonObj = this["\$defs"] as? JsonObj ?: JsonObj(emptyMap())
 

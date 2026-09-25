@@ -75,15 +75,17 @@ fun afterStatus(action: (params: Params, status: Int, error: Throwable?) -> Unit
  * A filter that must see every ending calls `next` through this rather than
  * directly. Rejecting is throwing, and a `before` throws where it stands rather
  * than failing a stage, so a refusal raised further in leaves the chain past
- * anything built on `handle` alone. `runCatching` rather than a catch clause
- * because what is being caught here is genuinely everything: a filter's
- * refusal, a decoding mistake made on the way in, and whatever else a handler
- * manages to raise before it returns a stage at all. Nothing is swallowed — the
- * throwable comes back out of the stage, which is where the interpreter is
- * already looking for it.
+ * anything built on `handle` alone. What is caught here is genuinely
+ * everything: a filter's refusal, a decoding mistake made on the way in, and
+ * whatever else a handler manages to raise before it returns a stage at all.
+ * Nothing is swallowed — the throwable comes back out of the stage, which is
+ * where the interpreter is already looking for it.
  */
-fun attempt(params: Params, next: (Params) -> CompletionStage<Any?>): CompletionStage<Any?> =
-    runCatching { next(params) }.getOrElse { CompletableFuture.failedFuture(it) }
+fun attempt(params: Params, next: (Params) -> CompletionStage<Any?>): CompletionStage<Any?> = try {
+    next(params)
+} catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
+    CompletableFuture.failedFuture(t)
+}
 
 /** Narrows a filter to the endpoints [predicate] accepts. */
 fun Filter.onlyWhen(predicate: (Endpoint<*, *>) -> Boolean): Filter = Filter { params, next ->
