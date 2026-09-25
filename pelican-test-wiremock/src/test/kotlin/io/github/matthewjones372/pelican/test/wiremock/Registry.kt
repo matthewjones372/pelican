@@ -3,7 +3,6 @@ package io.github.matthewjones372.pelican.test.wiremock
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
