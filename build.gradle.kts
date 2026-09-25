@@ -9,7 +9,7 @@ plugins {
     // The version comes from the nearest `v` tag rather than a property, so
     // cutting a release is `git tag v0.1.0 && git push --tags` and nothing
     // else. An untagged commit is a -SNAPSHOT of the next one.
-    id("pl.allegro.tech.build.axion-release") version "1.21.3"
+    id("pl.allegro.tech.build.axion-release") version "1.21.4"
     // So the root project has `check`/`build`, and the scripts formatted here
     // are covered by a plain `./gradlew build` like everything else.
     base
