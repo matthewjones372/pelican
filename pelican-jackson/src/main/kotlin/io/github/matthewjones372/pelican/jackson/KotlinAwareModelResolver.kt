@@ -46,8 +46,11 @@ internal class KotlinAwareModelResolver(mapper: ObjectMapper) : ModelResolver(ma
     ): Schema<*>? {
         val resolved = super.resolve(annotatedType, context, chain) ?: return null
 
-        val kClass = runCatching { _mapper.constructType(annotatedType.type).rawClass.kotlin }
-            .getOrNull() ?: return resolved
+        val kClass = try {
+            _mapper.constructType(annotatedType.type).rawClass.kotlin
+        } catch (_: IllegalArgumentException) {
+            return resolved
+        }
 
         // With resolveAsRef the returned schema is a pointer; the model is
         // the one the context has just defined.

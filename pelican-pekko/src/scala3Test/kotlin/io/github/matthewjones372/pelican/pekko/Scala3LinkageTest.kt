@@ -38,6 +38,15 @@ class Scala3LinkageTest {
     private fun pelicanEntries(): List<File> =
         classpath().filter { "pelican-" in it.path && it.exists() }
 
+    private fun loads(name: String): Boolean = try {
+        Class.forName(name, false, javaClass.classLoader)
+        true
+    } catch (_: ClassNotFoundException) {
+        false
+    } catch (_: LinkageError) {
+        false
+    }
+
     private fun namesIn(bytes: ByteArray): Set<String> =
         pekkoName.findAll(String(bytes, Charsets.ISO_8859_1))
             .map { it.value.replace('/', '.') }
@@ -73,9 +82,7 @@ class Scala3LinkageTest {
             referenced.size shouldBeGreaterThan atLeast
         }
 
-        val missing = referenced.filterNot { name ->
-            runCatching { Class.forName(name, false, javaClass.classLoader) }.isSuccess
-        }
+        val missing = referenced.filterNot { name -> loads(name) }
 
         withClue("these types are named by Pelican's bytecode and absent from Pekko's _3 build") {
             missing.shouldBeEmpty()

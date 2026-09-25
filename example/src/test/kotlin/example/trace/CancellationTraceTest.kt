@@ -1,5 +1,7 @@
 package example.trace
 
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -29,7 +31,7 @@ class CancellationTraceTest {
         val seen = mutableListOf<String>()
         val body = watched("body GET /orders", throwingOnRead(stageWasCompleted)) { seen += it }
 
-        runCatching { body.read() }
+        shouldThrowAny { body.read() }
 
         seen.size shouldBe 1
         seen.single() shouldContain "0052-TRACE body GET /orders"
@@ -42,7 +44,7 @@ class CancellationTraceTest {
     fun `the cancellation is rethrown untouched, so the caller sees what it always saw`() {
         val body = watched("body", throwingOnRead(stageWasCompleted)) { }
 
-        val thrown = runCatching { body.read() }.exceptionOrNull()
+        val thrown = shouldThrowAny { body.read() }
 
         thrown shouldBe stageWasCompleted
     }
@@ -52,7 +54,7 @@ class CancellationTraceTest {
         val seen = mutableListOf<String>()
         val body = watched("body", throwingOnRead(IOException("connection reset"))) { seen += it }
 
-        runCatching { body.read() }
+        shouldThrow<IOException> { body.read() }
 
         seen.shouldBeEmpty()
     }

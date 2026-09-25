@@ -229,7 +229,13 @@ internal class Remote private constructor(
      * A redirect is refused rather than followed, even to a named host.
      */
     private fun refuseRedirect(uri: URI, path: JsonPath, status: Int, location: String?): Nothing {
-        val target = location?.let { runCatching { uri.resolve(it) }.getOrNull() }
+        val target = location?.let {
+            try {
+                uri.resolve(it)
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        }
         val allowedTarget = target?.let { moved ->
             moved.scheme != null && moved.host != null &&
                 Origin(moved.scheme.lowercase(), moved.host, port(moved.scheme.lowercase(), moved.port)) in allowed
@@ -435,8 +441,11 @@ internal class Remote private constructor(
          */
         private fun origin(written: String): Origin {
             val hasScheme = written.contains("://")
-            val uri = runCatching { URI(if (hasScheme) written else "https://$written") }.getOrNull()
-                ?: refuse(unreadable(written))
+            val uri = try {
+                URI(if (hasScheme) written else "https://$written")
+            } catch (_: URISyntaxException) {
+                refuse(unreadable(written))
+            }
             val scheme = uri.scheme?.lowercase() ?: refuse(unreadable(written))
             val host = uri.host ?: refuse(unreadable(written))
 

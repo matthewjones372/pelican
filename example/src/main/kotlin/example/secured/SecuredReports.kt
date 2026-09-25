@@ -330,7 +330,11 @@ private fun callerOf(p: Params): Caller? {
         "bearer" -> Introspection.introspect(credential)
 
         "basic" -> {
-            val decoded = runCatching { String(Base64.getDecoder().decode(credential)) }.getOrNull()
+            val decoded = try {
+                String(Base64.getDecoder().decode(credential))
+            } catch (_: IllegalArgumentException) {
+                null
+            }
             val (user, password) = decoded?.split(':', limit = 2)?.takeIf { it.size == 2 } ?: return null
             StaffDirectory.check(user, password)
         }

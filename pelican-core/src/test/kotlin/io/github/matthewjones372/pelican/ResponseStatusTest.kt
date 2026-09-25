@@ -1,10 +1,12 @@
 package io.github.matthewjones372.pelican
 
 import io.github.matthewjones372.pelican.spi.renderError
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 import java.util.concurrent.CompletionStage
 /**
  * What a filter is told the status is, asked of the description alone.
@@ -108,7 +110,7 @@ class ResponseStatusTest {
             before { forbidden("not yours") },
         ).wrap(handler)
 
-        runCatching { chain(Params(emptyMap(), null, several)).toCompletableFuture().join() }
+        shouldThrow<CompletionException> { chain(Params(emptyMap(), null, several)).toCompletableFuture().join() }
 
         // The point of resolving from what a filter *sees* rather than from
         // something the handler recorded: the handler never ran, and a 403 is

@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.JsonObj
+import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.Webhook
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.openapi.ApiChange
@@ -227,7 +228,7 @@ class Golden(
      * it — which is also how the file says whether it was a route or a webhook.
      */
     private fun recorded(golden: Path, section: String): String? {
-        val document = runCatching { parseJson(Files.readString(golden)) as? JsonObj }.getOrNull() ?: return null
+        val document = parseJsonOrNull(Files.readString(golden)) as? JsonObj ?: return null
         val entries = (document[section] as? JsonObj)?.fields ?: return null
         val (key, item) = entries.entries.firstOrNull() ?: return null
         val method = (item as? JsonObj)?.fields?.keys?.firstOrNull() ?: return null
@@ -353,7 +354,7 @@ class Golden(
     /** The recorded document, and the text it was recorded as, normalised for comparison. */
     private fun read(golden: Path): Pair<JsonObj, String> {
         val text = Files.readString(golden).replace("\r\n", "\n").trimEnd('\n') + "\n"
-        val document = runCatching { parseJson(text) as? JsonObj }.getOrNull()
+        val document = parseJsonOrNull(text) as? JsonObj
             ?: throw AssertionError(
                 "${golden.toAbsolutePath()} is not an OpenAPI document this can read back. It is a golden " +
                     "recorded by `contract`, `document` or `operations`, which write JSON; if it was written " +
@@ -543,7 +544,13 @@ fun ResponseSpec.wireText(ignoring: Set<String> = VOLATILE_HEADERS): String = bu
 private fun readable(body: String): String {
     val trimmed = body.trim()
     if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return body
-    return runCatching { parseJson(trimmed).renderPretty() }.getOrDefault(body)
+    return parseJsonOrNull(trimmed)?.renderPretty() ?: body
+}
+
+private fun parseJsonOrNull(text: String): JsonValue? = try {
+    parseJson(text)
+} catch (_: IllegalArgumentException) {
+    null
 }
 
 /**

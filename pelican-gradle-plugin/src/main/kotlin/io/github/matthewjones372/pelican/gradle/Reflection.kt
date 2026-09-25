@@ -185,7 +185,7 @@ internal object Pelican {
     }
 
     /** `writeKotlinClient` with these trailing parameters after the six every arity takes, or null. */
-    private fun clientWriter(codegen: Class<*>, apiSpec: Class<*>, vararg trailing: Class<*>): Method? = runCatching {
+    private fun clientWriter(codegen: Class<*>, apiSpec: Class<*>, vararg trailing: Class<*>): Method? = try {
         @Suppress("SpreadOperator") // Two class literals at most; the copy is the readable spelling.
         codegen.getMethod(
             WRITES_CLIENT,
@@ -197,14 +197,20 @@ internal object Pelican {
             Boolean::class.javaPrimitiveType,
             *trailing,
         )
-    }.getOrNull()
+    } catch (_: NoSuchMethodException) {
+        null
+    }
 
     /**
      * An enum the library publishes, by name, or null where the library on this
      * task's classpath is older than the setting it stands for.
      */
     private fun enumNamed(codegen: Class<*>, className: String): Class<*>? =
-        runCatching { Class.forName(className, true, codegen.classLoader) }.getOrNull()
+        try {
+            Class.forName(className, true, codegen.classLoader)
+        } catch (_: ClassNotFoundException) {
+            null
+        }
 
     /**
      * The enum constant the entry named, matched case-insensitively:
@@ -347,7 +353,7 @@ internal object Pelican {
         allowRemote: Set<String>,
         acceptChanges: Boolean,
     ): List<*> {
-        val method = runCatching {
+        val method = try {
             importer.getMethod(
                 UPDATES_LOCK,
                 File::class.java,
@@ -356,16 +362,18 @@ internal object Pelican {
                 Set::class.java,
                 Boolean::class.javaPrimitiveType,
             )
-        }.getOrNull() ?: refuse(
-            "`${importer.name}` has no `$UPDATES_LOCK`. The `$IMPORT_MODULE` on this task's classpath is " +
-                "older than remote references, so there is no lockfile for this task to write. Upgrade " +
-                "$IMPORT_MODULE, or remove the `$REMOTE` entry.",
-        )
+        } catch (_: NoSuchMethodException) {
+            refuse(
+                "`${importer.name}` has no `$UPDATES_LOCK`. The `$IMPORT_MODULE` on this task's classpath is " +
+                    "older than remote references, so there is no lockfile for this task to write. Upgrade " +
+                    "$IMPORT_MODULE, or remove the `$REMOTE` entry.",
+            )
+        }
         return method.invokeUnwrapped(null, document, lockfile, name, allowRemote, acceptChanges) as List<*>
     }
 
     /** `importEndpoints` with these trailing parameters after the five every arity takes, or null. */
-    private fun importEndpoints(importer: Class<*>, vararg trailing: Class<*>): Method? = runCatching {
+    private fun importEndpoints(importer: Class<*>, vararg trailing: Class<*>): Method? = try {
         @Suppress("SpreadOperator") // Three class literals, once per task run; the copy is the readable spelling.
         importer.getMethod(
             "importEndpoints",
@@ -376,7 +384,9 @@ internal object Pelican {
             Set::class.java,
             *trailing,
         )
-    }.getOrNull()
+    } catch (_: NoSuchMethodException) {
+        null
+    }
 
     /**
      * What a setting the library cannot carry is told, in one sentence used by
@@ -405,10 +415,12 @@ internal object Pelican {
     fun document(renderer: Class<*>, apiSpec: Class<*>, function: String, spec: Any, version: String?): String {
         // A `pelican-openapi` from before the version was selectable has a
         // renderer that takes the spec and nothing else.
-        val withVersion = runCatching {
+        val withVersion = try {
             val versions = Class.forName(OPEN_API_VERSION, true, renderer.classLoader)
             versions to renderer.getMethod(function, apiSpec, versions)
-        }.getOrNull()
+        } catch (_: ReflectiveOperationException) {
+            null
+        }
 
         if (withVersion != null) {
             val (versions, method) = withVersion
