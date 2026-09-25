@@ -17,7 +17,7 @@
 dependencies {
     // Pinned to match `pelican-jackson`, so a service running both resolves one
     // version; an application's own BOM still wins.
-    api("com.fasterxml.jackson.core:jackson-core:2.22.2")
+    api("com.fasterxml.jackson.core:jackson-core:2.22.3")
 }
 
 /**
