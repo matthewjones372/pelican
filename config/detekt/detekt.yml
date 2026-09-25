@@ -164,7 +164,7 @@ style:
         value: 'java.lang.Thread.sleep'
     # The example services sleep on purpose, to have something slow to stream,
     # and the timing tests sleep to make a gap they can measure.
-    excludes: ['**/test/**', '**/scala3Test/**', '**/example/**']
+    excludes: ['**/test/**', '**/example/**']
   ForbiddenMethodCall/NoRunCatching:
     # A second instance, so the ban reaches the tests and examples the one
     # above excludes. `runCatching` catches Throwable — cancellation and
