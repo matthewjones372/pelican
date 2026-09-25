@@ -98,7 +98,7 @@ the transport now.
 
 ## Stack
 
-- [x] **`spec-0052-name-the-canceller`** — a `CancellationTrace` transport
+- [x] **`spec-0052-name-the-canceller`** ([#142](https://github.com/matthewjones372/pelican/pull/142)) — a `CancellationTrace` transport
       decorator in `example`'s tests, recording the observer's stack when a
       Pekko cancellation surfaces. Test-scoped, so nothing published changes.
       Done when: the decorator's own tests prove it fires with frames, and the
