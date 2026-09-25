@@ -98,7 +98,7 @@ signatures.
 
 ## Stack
 
-- [ ] **`spec-0057-retry-scheduler`**: `RetryScheduler`, the new parameter on
+- [x] **`spec-0057-retry-scheduler`** ([#186](https://github.com/matthewjones372/pelican/pull/186)): `RetryScheduler`, the new parameter on
       `RetryingTransport` and `retrying`, `RetryTest`'s sleep replaced with a
       held task, a `FrozenCallSites` line, and `docs/reference.md`.
       Done when: `RetryTest` has no `Thread.sleep`, the cancel test fails if
