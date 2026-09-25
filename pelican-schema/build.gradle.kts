@@ -11,7 +11,7 @@ dependencies {
 
     // A validator that did not write the schema, on the principle that already
     // puts swagger-parser in front of the emitted document.
-    testImplementation("com.networknt:json-schema-validator:1.5.9")
+    testImplementation("com.networknt:json-schema-validator:3.0.7")
 
     testImplementation(project(":pelican-jackson"))
 }
