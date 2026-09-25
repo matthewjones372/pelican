@@ -2,8 +2,9 @@ package io.github.matthewjones372.pelican.schema
 
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
-import com.networknt.schema.JsonSchemaFactory
-import com.networknt.schema.SpecVersion
+import com.networknt.schema.InputFormat
+import com.networknt.schema.SchemaRegistry
+import com.networknt.schema.SpecificationVersion
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.JsonArr
 import io.github.matthewjones372.pelican.JsonBool
@@ -187,13 +188,23 @@ class SchemaAgreementTest {
     private fun write(codecs: Codecs, shape: Shape): String =
         codecs.codec<Any>(shape.type).encodeToString(shape.value)
 
-    private fun validate(schema: String, instance: String): List<String> {
-        val factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012)
-        val mapper = com.fasterxml.jackson.databind.ObjectMapper()
-        return factory.getSchema(schema)
-            .validate(mapper.readTree(instance))
+    /**
+     * Both sides as text, which is the point: the schema is what this library
+     * publishes and the instance is what its codec wrote, so neither is parsed
+     * here by a mapper of this suite's choosing. The validator reads both, and
+     * a disagreement is its finding rather than an artefact of how the test
+     * fed it.
+     *
+     * It also keeps Jackson out of the test. `json-schema-validator` 3 moved to
+     * Jackson 3 (`tools.jackson`), while Pelican's codec is Jackson 2
+     * (`com.fasterxml.jackson`); handing this a parsed node would mean picking
+     * one of the two and keeping them in step forever.
+     */
+    private fun validate(schema: String, instance: String): List<String> =
+        SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
+            .getSchema(schema, InputFormat.JSON)
+            .validate(instance, InputFormat.JSON)
             .map { it.message }
-    }
 }
 
 // ------------------------------------------------------------------ helpers
