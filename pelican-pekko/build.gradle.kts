@@ -97,7 +97,9 @@ val scala3TestTask = tasks.register<Test>("scala3Test") {
     useJUnitPlatform()
 }
 
-tasks.named("check") { dependsOn(scala3TestTask) }
+// The root build wires detektMain and detektTest into `check`; this source set
+// is the one it does not know about.
+tasks.named("check") { dependsOn(scala3TestTask, "detektScala3Test") }
 
 tasks.test {
     // The main runtime classpath, so DependenciesTest can assert on what is
