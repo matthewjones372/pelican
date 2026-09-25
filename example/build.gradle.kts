@@ -89,6 +89,8 @@ dependencies {
     // The in-memory transports are per-backend, so a suite asks for the one it
     // needs. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
+    // The generated client against a stubbed service, stubbed in the same descriptions. Spec 0056.
+    testImplementation(project(":pelican-test-wiremock"))
 
     // Version-less: the BOM is declared at implementation scope above.
     testImplementation("org.apache.pekko:pekko-actor-testkit-typed_2.13")

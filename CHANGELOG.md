@@ -341,6 +341,14 @@ is what the paragraph above promises.
 
 ### Added
 
+- **`pelican-test-wiremock`, a stub written in endpoints.** A WireMock server
+  stubbed and verified in the endpoint values of the API a service *calls*:
+  `stub(getUser, 1L) answers ok(user)`, `fails(Fault)`, `breaksWith(502)`,
+  `answers(..., after = 5.seconds)`, `verify` and `calls`. A request matches by
+  what Pelican decodes it to, so a client that is not Pelican's matches too; an
+  answer is rendered by Pelican's own response code. `PelicanWireMockExtension`
+  is the JUnit 5 form. See spec 0056.
+
 - **`pelican-streams`, a streaming body as a stream that names its failure.**
   `rows.toStream()` reads a `StreamIn<T>` as a `Stream<Nothing, T>` from
   `io.github.matthewjones372:lark-stream`, where a row that cannot be

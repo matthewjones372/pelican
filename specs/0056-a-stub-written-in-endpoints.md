@@ -49,10 +49,10 @@ val client = Retrofit.Builder().baseUrl(registry.baseUrl)/* … */.create(Regist
 registry.wireMock.stubFor(get("/health").willReturn(ok()))   // anything the contract leaves out
 ```
 
-- A stub matches the parts of the request `ApiClient.request(endpoint, input)`
-  builds: method, path, each query parameter, and the body as JSON. It does not
-  match the exact URL string, because another client may order or encode the
-  query differently and mean the same request.
+- A request matches a stub when Pelican's own routing and decoding turn it into
+  the stubbed input. It does not match the exact URL or body string, because
+  another client may order or encode the query differently, or leave a
+  defaulted field out, and mean the same request.
 - An answer is `Outcome<E, T>` for that endpoint, so only a declared failure
   compiles. It is rendered by `InMemoryClientTransport` over a one-endpoint
   `api`, bound with `ServerEndpoint`'s public constructor, so there's no Pekko.
@@ -64,9 +64,11 @@ body are the ones a Pelican server would send, rather than a second encoder that
 can drift. The per-input `stub(endpoint, input)` is the common case; the handler
 form `stub(endpoint) { input -> … }` covers load tests and anything stateful.
 
-Matching by parts is what lets a non-Pelican client hit the stub. Matching the
-exact string would be stricter, and it would fail on `?a=1&b=2` against
-`?b=2&a=1`, which is noise rather than a finding. `wireMock` exposes the
+Matching by decoded input is what lets a non-Pelican client hit the stub.
+Matching the exact string would fail on `?a=1&b=2` against `?b=2&a=1`, which is
+noise rather than a finding. Matching by parts was tried first, and it failed on
+the example's own generated client, which leaves a defaulted field out of the
+body. `wireMock` exposes the
 underlying server for what no endpoint describes, so nobody has to run a
 second WireMock beside this one.
 
@@ -107,5 +109,7 @@ Each open question in the draft took its recommendation.
 4. **`breaksWith`:** kept, for a status the endpoint never declared.
 5. **Petshop:** keeps its copy until this ships in an RC, then deletes it in the
    PR that bumps Pelican.
-6. **Matching:** headers are ignored and extra query parameters are allowed.
+6. **Matching:** by decoded input, so undeclared headers and query parameters
+   make no difference and declared ones do. With this, the module needs only
+   `pelican-core`, not `pelican-test`.
 7. **`wireMock`:** exposed.
