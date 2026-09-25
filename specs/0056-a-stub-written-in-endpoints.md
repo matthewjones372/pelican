@@ -28,7 +28,7 @@ so nobody has to write them by hand.
 
 ```kotlin
 @JvmField @RegisterExtension
-val registry = PelicanWireMock()                        // random port, stopped after each test
+val registry = PelicanWireMockExtension()               // random port; stubs cleared after each test
 
 registry.stub(lookupChip, 1L) answers ok(chip)
 registry.stub(lookupChip, 2L) answers noSuchChip(Problem("never chipped"))
@@ -95,28 +95,17 @@ dependency test is not reviewable on its own terms. It will run past the
 ./gradlew :pelican-test-wiremock:test
 ```
 
-## Open questions
+## Decisions
 
-1. **Name.** `pelican-test-wiremock`, beside `pelican-test-golden` and
-   `pelican-test-pekko`, or `pelican-wiremock`? *Recommend the first.*
-2. **Which WireMock.** `wiremock-standalone` shades Jetty and Jackson and so
-   cannot clash with a service's own. `wiremock` is smaller and brings Jetty 11
-   onto the test classpath. *Recommend standalone.*
-3. **JUnit coupling.** `pelican-test-golden` claims no test framework. Should
-   `junit-jupiter-api` be `compileOnly`, so the extension is there only for a
-   build that already has JUnit? *Recommend yes.*
-4. **Should `breaksWith` exist?** It is the one answer the contract does not describe, and
-   also the one a client most needs to survive. *Recommend keeping it, named
-   so it reads as undeclared.*
-5. **Petshop meanwhile.** Should petshop keep its copy until this ships in an RC,
-   or consume a `publishToMavenLocal` build? *Recommend keeping the copy, then deleting it
-   in the PR that bumps Pelican.*
-6. **How loose is a match?** Headers are ignored and unknown query parameters
-   are allowed, the way WireMock matches by default. Should an extra query
-   parameter the endpoint does not declare fail the match instead? *Recommend
-   allowing it. A client sending more than the contract asks for is not what
-   these tests are about.*
-7. **Exposing `wireMock`.** It lets a test reach around the contract. Should it
-   be there, or should anything undescribed go on a second server? *Recommend
-   exposing it. Health checks and auth endpoints are rarely in a vendor's
-   document.*
+Each open question in the draft took its recommendation.
+
+1. **Name:** `pelican-test-wiremock`.
+2. **WireMock:** `wiremock-standalone`, as `api`.
+3. **JUnit:** `junit-jupiter-api` is `compileOnly`. `PelicanWireMock` is a plain
+   `AutoCloseable`, and `PelicanWireMockExtension` adds the callbacks, so a
+   build without JUnit never loads a JUnit type.
+4. **`breaksWith`:** kept, for a status the endpoint never declared.
+5. **Petshop:** keeps its copy until this ships in an RC, then deletes it in the
+   PR that bumps Pelican.
+6. **Matching:** headers are ignored and extra query parameters are allowed.
+7. **`wireMock`:** exposed.
