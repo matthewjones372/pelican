@@ -66,11 +66,11 @@ Pairing the two should fail at build time naming both, the way
 
 ## Stack
 
-- [x] **`spec-0054-redoc-html`** — `redocHtml`, `DocsUi` and the `ui` knob, the
+- [x] **`spec-0054-redoc-html`** ([#158](https://github.com/matthewjones372/pelican/pull/158)) — `redocHtml`, `DocsUi` and the `ui` knob, the
       OAuth refusal, the `.api` dump; tests in `pelican-openapi`.
       Done when: `redocHtml` passes the `</script>` escape test `swaggerUiHtml`
       passes, and `Redoc` with `docsOAuth` fails naming both. **Both hold.**
-- [x] **`spec-0054-redoc-route`** — `docsRoutes` serves the chosen renderer;
+- [x] **`spec-0054-redoc-route`** ([#159](https://github.com/matthewjones372/pelican/pull/159)) — `docsRoutes` serves the chosen renderer;
       `example` asserts it end to end; the `modules.md` and `reference.md` rows
       say there are two.
       Done when: `ui = Redoc` serves a Redoc page at `docsPath` and the same

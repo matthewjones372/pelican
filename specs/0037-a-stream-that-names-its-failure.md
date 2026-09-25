@@ -45,11 +45,10 @@ sees the library, and the library never learns what an endpoint is.
 
 ## Stack
 
-- [x] **`spec-0037-bridge`** — module, `toStream`, the `modules.md` row, a
+- [x] **`spec-0037-bridge`** ([#148](https://github.com/matthewjones372/pelican/pull/148)) — module, `toStream`, the `modules.md` row, a
       reference paragraph.
-      Done when: `./gradlew build` is green with the module included. Landed in
-      [#148](https://github.com/matthewjones372/pelican/pull/148).
-- [x] **`spec-0037-exit-to-outcome`** — a `toOutcome(failure)` on the
+      Done when: `./gradlew build` is green with the module included.
+- [x] **`spec-0037-exit-to-outcome`** ([#160](https://github.com/matthewjones372/pelican/pull/160)) — a `toOutcome(failure)` on the
       `CompletionStage<Exit<E, A>>` that `run` returns, in `pelican-streams`,
       and the two examples that currently hand-roll it rewritten onto it.
       Done when: a handler answering `Outcome<E, A>` converts without naming

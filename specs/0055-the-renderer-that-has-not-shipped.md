@@ -65,7 +65,7 @@ between two renderers that are otherwise interchangeable.
 
 0054's two entries, with a gate in front of them.
 
-- [x] **`spec-0055-redoc3-render`** — no production code. Serve a Redoc
+- [x] **`spec-0055-redoc3-render`** ([#161](https://github.com/matthewjones372/pelican/pull/161)) — no production code. Serve a Redoc
       `3.0.0-rc.0` page from a scratch file against `example`'s document, both
       with `spec-url` and with an inlined document.
       Done when: **Measured** says in a paragraph whether the inlined form

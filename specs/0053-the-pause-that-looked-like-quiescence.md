@@ -117,7 +117,7 @@ agreeing samples, typically ~100 ms; after this it cannot return in under
 
 ## Stack
 
-- [x] **`spec-0053-settle-as-long-as-the-stall`** — `settled(still:, within:)`
+- [x] **`spec-0053-settle-as-long-as-the-stall`** ([#145](https://github.com/matthewjones372/pelican/pull/145)) — `settled(still:, within:)`
       replacing `settled(within:)`, with the caller passing `STALL_MILLIS`.
       Done when: the settle cannot return while the counter has moved within
       the last `STALL_MILLIS`, `./gradlew build` is green on 21, 23 and 25, and
