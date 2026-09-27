@@ -359,6 +359,10 @@ still there, and the only new ones are the module's own.
 
 ### Added
 
+- **`pelican-arrow`: an `Either` with several declared failures (spec 0060).**
+  `either.toOutcome { left -> declared(...) }` names the declaration each
+  `Left` becomes, and a `Right` is `ok`. The lambda can only answer a failure.
+  It replaces the `fold` that spec 0036 had every such handler write.
 - **Pages served beside an API (spec 0059).** `pages = pages("ui")` in `api`'s
   block serves a classpath directory: `/` is `index.html`, `/x` is `x`, `x.html`
   or `x/index.html`, a directory without its slash is redirected to it, and no
