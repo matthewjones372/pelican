@@ -111,8 +111,10 @@ still there, and the only new ones are the module's own.
   `toRoute` and `routeWithDocs` take `handlers`, defaulting to
   `Handlers.onVirtualThreads`; `Handlers.onDispatcher` is the old behaviour and
   `Handlers.on(executor)` a service's own. `…By` handlers and streams are not
-  moved. `handlers` sits before `route`, so a `route` passed by position rather
-  than as a trailing lambda or by name has to move.
+  moved. The signatures from before stay in the bytecode, hidden, so a caller
+  compiled against RC2 still links; in source, `handlers` sits before `route`,
+  so a `route` passed by position rather than as a trailing lambda or by name
+  has to move.
 
 - **Either Scala cross-build of Pekko is now a gate, not an argument.**
   `pelican-pekko` gained a `scala3Test` source set: this module's compiled

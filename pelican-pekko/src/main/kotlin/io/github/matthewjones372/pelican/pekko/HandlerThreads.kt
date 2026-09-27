@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.pekko
 import io.github.matthewjones372.pelican.Params
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /**
  * Where a synchronous handler — `handledNow`, `handledOrFail`, `handledWith`, `handledOneOf` — runs, chosen when the
@@ -10,8 +11,11 @@ import java.util.concurrent.Executor
  */
 class Handlers private constructor(internal val executor: Executor?) {
     companion object {
-        /** A virtual thread per request, so a handler may block without holding a dispatcher thread. */
-        val onVirtualThreads: Handlers = Handlers { task -> Thread.ofVirtual().name("pelican-handler").start(task) }
+        /**
+         * A virtual thread per request, so a handler may block without holding a dispatcher thread. The JDK's own
+         * thread-per-task executor, which the OTel agent already carries a context across.
+         */
+        val onVirtualThreads: Handlers = Handlers(Executors.newVirtualThreadPerTaskExecutor())
 
         /** Where the route matched, as before 0058: only for handlers that never block. */
         val onDispatcher: Handlers = Handlers(null)

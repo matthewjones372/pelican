@@ -105,6 +105,10 @@ fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handler
     return routes.reduce { left, right -> Directives.concat(left, right) }
 }
 
+/** The route as it was built before spec 0058, kept so a caller compiled against RC2 still links. */
+@Deprecated("Binary compatibility only: call toRoute(system, handlers).", level = DeprecationLevel.HIDDEN)
+fun Api.toRoute(system: ClassicActorSystemProvider): Route = toRoute(system, Handlers.onVirtualThreads)
+
 /** [handler] on [threads]' executor, when [endpoint] was bound synchronously and there is one to move to. */
 private fun ((Params) -> CompletionStage<Any?>).on(
     threads: Handlers,

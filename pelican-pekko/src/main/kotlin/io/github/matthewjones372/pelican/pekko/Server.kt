@@ -138,6 +138,24 @@ fun Api.start(
     route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, handlers) },
 ): PelicanServer = bind(system, host, port, ownsSystem = false, route = route)
 
+/** [start] as it was before spec 0058, kept so a caller compiled against RC2 still links. */
+@Deprecated("Binary compatibility only: call start with handlers.", level = DeprecationLevel.HIDDEN)
+fun Api.start(
+    port: Int = 8080,
+    host: String = "127.0.0.1",
+    systemName: String = "pelican",
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, Handlers.onVirtualThreads) },
+): PelicanServer = start(port, host, systemName, Handlers.onVirtualThreads, route)
+
+/** The same, on a borrowed system. */
+@Deprecated("Binary compatibility only: call start with handlers.", level = DeprecationLevel.HIDDEN)
+fun Api.start(
+    system: ActorSystem<Void>,
+    port: Int = 8080,
+    host: String = "127.0.0.1",
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, Handlers.onVirtualThreads) },
+): PelicanServer = start(system, port, host, Handlers.onVirtualThreads, route)
+
 private fun Api.bind(
     system: ActorSystem<Void>,
     host: String,

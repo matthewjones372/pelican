@@ -108,6 +108,29 @@ fun Api.startWithDocs(
     routeWithDocs(on, docs, handlers)
 }
 
+/** [routeWithDocs] as it was before spec 0058, kept so a caller compiled against RC2 still links. */
+@Deprecated("Binary compatibility only: call routeWithDocs with handlers.", level = DeprecationLevel.HIDDEN)
+fun Api.routeWithDocs(system: ClassicActorSystemProvider, docs: Docs = docs()): Route =
+    routeWithDocs(system, docs, Handlers.onVirtualThreads)
+
+/** [startWithDocs] as it was before spec 0058. */
+@Deprecated("Binary compatibility only: call startWithDocs with handlers.", level = DeprecationLevel.HIDDEN)
+fun Api.startWithDocs(
+    port: Int = 8080,
+    host: String = "127.0.0.1",
+    systemName: String = "pelican",
+    docs: Docs = docs(),
+): PelicanServer = startWithDocs(port, host, systemName, docs, Handlers.onVirtualThreads)
+
+/** The same, on a borrowed system. */
+@Deprecated("Binary compatibility only: call startWithDocs with handlers.", level = DeprecationLevel.HIDDEN)
+fun Api.startWithDocs(
+    system: ActorSystem<Void>,
+    port: Int = 8080,
+    host: String = "127.0.0.1",
+    docs: Docs = docs(),
+): PelicanServer = startWithDocs(system, port, host, docs, Handlers.onVirtualThreads)
+
 /**
  * Matched against the request path directly rather than through a path matcher,
  * because these paths are configuration — `/api-docs/oauth2-redirect.html` is as
