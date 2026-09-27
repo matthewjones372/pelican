@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 
 /** A bound server, and the handle to shut it down again. */
@@ -106,15 +107,17 @@ private const val MAX_CAUSE_DEPTH = 8
 private val STOP_TIMEOUT: Duration = Duration.ofSeconds(30)
 
 /**
- * Binds this API on [host]:[port]; port 0 lets the OS choose. [route] is how a
- * module knowing more than this one — one serving an OpenAPI document, or a
- * service with routes of its own — adds to it.
+ * Binds this API on [host]:[port]; port 0 lets the OS choose. [handlers] is
+ * where the synchronous binders' handlers run. [route] is how a module knowing
+ * more than this one — one serving an OpenAPI document, or a service with
+ * routes of its own — adds to it.
  */
 fun Api.start(
     port: Int = 8080,
     host: String = "127.0.0.1",
     systemName: String = "pelican",
-    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it) },
+    handlers: Executor = Handlers.onVirtualThreads,
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, handlers) },
 ): PelicanServer {
     val system = ActorSystem.create(Behaviors.empty<Void>(), systemName)
     return try {
@@ -133,8 +136,25 @@ fun Api.start(
     system: ActorSystem<Void>,
     port: Int = 8080,
     host: String = "127.0.0.1",
-    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it) },
+    handlers: Executor = Handlers.onVirtualThreads,
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, handlers) },
 ): PelicanServer = bind(system, host, port, ownsSystem = false, route = route)
+
+@Deprecated("Binary compatibility with 1.0.0-RC3.", level = DeprecationLevel.HIDDEN)
+fun Api.start(
+    port: Int = 8080,
+    host: String = "127.0.0.1",
+    systemName: String = "pelican",
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it) },
+): PelicanServer = start(port, host, systemName, Handlers.onVirtualThreads, route)
+
+@Deprecated("Binary compatibility with 1.0.0-RC3.", level = DeprecationLevel.HIDDEN)
+fun Api.start(
+    system: ActorSystem<Void>,
+    port: Int = 8080,
+    host: String = "127.0.0.1",
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it) },
+): PelicanServer = start(system, port, host, Handlers.onVirtualThreads, route)
 
 private fun Api.bind(
     system: ActorSystem<Void>,

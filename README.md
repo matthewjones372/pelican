@@ -440,6 +440,26 @@ ordersApi().start(port = 8080) { system ->
 }
 ```
 
+### Where a handler runs
+
+`handledNow`, `handledWith`, `handledOrFail` and `handledOneOf` run their
+handler, filters included, on a virtual thread of its own. Such a handler
+usually blocks — on JDBC, an actor ask, a joined client — and Pekko's
+dispatcher has one thread per core, so blocking there would stall every request
+behind it. The `handledBy…` and streaming binders run where they are called:
+they already chose.
+
+```kotlin
+ordersApi().start(port = 8080) // a virtual thread per request
+ordersApi().start(port = 8080, handlers = Handlers.onDispatcher) // no hop, for handlers that never block
+ordersApi().start(port = 8080, handlers = Executors.newCachedThreadPool()) // platform threads, if a driver pins
+```
+
+Keep the default if any handler blocks at all. `Handlers.onDispatcher` saves a
+hop of a few microseconds, and is right only when every synchronous handler is
+pure computation. `startWithDocs` and `toRoute(system, handlers)` take the same
+setting.
+
 ## Filters
 
 A filter runs around every handler and sees the request with its inputs already

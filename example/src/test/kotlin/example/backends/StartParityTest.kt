@@ -26,10 +26,11 @@ class StartParityTest {
     /**
      * The entry point each backend publishes, ignoring Pekko's overload taking
      * an `ActorSystem`: `port` first is what identifies the one under test.
+     * Synthetic methods are the hidden signatures kept for binary compatibility.
      */
     private fun entryPoint(facade: String, name: String): KFunction<*> =
         Class.forName(facade).methods
-            .filter { it.name == name }
+            .filter { it.name == name && !it.isSynthetic }
             .mapNotNull { it.kotlinFunction }
             .single { it.parameters.getOrNull(1)?.name == "port" }
 

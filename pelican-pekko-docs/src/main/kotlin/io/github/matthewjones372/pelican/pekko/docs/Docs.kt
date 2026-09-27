@@ -10,6 +10,7 @@ import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.openapi.redocHtml
 import io.github.matthewjones372.pelican.openapi.swaggerUiHtml
+import io.github.matthewjones372.pelican.pekko.Handlers
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.pekko.toRoute
@@ -24,6 +25,7 @@ import org.apache.pekko.http.javadsl.model.StatusCodes
 import org.apache.pekko.http.javadsl.model.headers.RawHeader
 import org.apache.pekko.http.javadsl.server.Directives
 import org.apache.pekko.http.javadsl.server.Route
+import java.util.concurrent.Executor
 
 /**
  * Serving documentation is the same decision on either backend, so the setting
@@ -72,8 +74,12 @@ fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
 }
 
 /** The endpoints and the documentation, as one route. */
-fun Api.routeWithDocs(system: ClassicActorSystemProvider, docs: Docs = docs()): Route {
-    val routes = listOf(toRoute(system)) + docsRoutes(docs)
+fun Api.routeWithDocs(
+    system: ClassicActorSystemProvider,
+    docs: Docs = docs(),
+    handlers: Executor = Handlers.onVirtualThreads,
+): Route {
+    val routes = listOf(toRoute(system, handlers)) + docsRoutes(docs)
     return routes.reduce { left, right -> Directives.concat(left, right) }
 }
 
@@ -83,8 +89,9 @@ fun Api.startWithDocs(
     host: String = "127.0.0.1",
     systemName: String = "pelican",
     docs: Docs = docs(),
+    handlers: Executor = Handlers.onVirtualThreads,
 ): PelicanServer = start(port, host, systemName) { system: ActorSystem<Void> ->
-    routeWithDocs(system, docs)
+    routeWithDocs(system, docs, handlers)
 }
 
 /**
@@ -97,9 +104,30 @@ fun Api.startWithDocs(
     port: Int = 8080,
     host: String = "127.0.0.1",
     docs: Docs = docs(),
+    handlers: Executor = Handlers.onVirtualThreads,
 ): PelicanServer = start(system, port, host) { on: ActorSystem<Void> ->
-    routeWithDocs(on, docs)
+    routeWithDocs(on, docs, handlers)
 }
+
+@Deprecated("Binary compatibility with 1.0.0-RC3.", level = DeprecationLevel.HIDDEN)
+fun Api.routeWithDocs(system: ClassicActorSystemProvider, docs: Docs = docs()): Route =
+    routeWithDocs(system, docs, Handlers.onVirtualThreads)
+
+@Deprecated("Binary compatibility with 1.0.0-RC3.", level = DeprecationLevel.HIDDEN)
+fun Api.startWithDocs(
+    port: Int = 8080,
+    host: String = "127.0.0.1",
+    systemName: String = "pelican",
+    docs: Docs = docs(),
+): PelicanServer = startWithDocs(port, host, systemName, docs, Handlers.onVirtualThreads)
+
+@Deprecated("Binary compatibility with 1.0.0-RC3.", level = DeprecationLevel.HIDDEN)
+fun Api.startWithDocs(
+    system: ActorSystem<Void>,
+    port: Int = 8080,
+    host: String = "127.0.0.1",
+    docs: Docs = docs(),
+): PelicanServer = startWithDocs(system, port, host, docs, Handlers.onVirtualThreads)
 
 /**
  * Matched against the request path directly rather than through a path matcher,

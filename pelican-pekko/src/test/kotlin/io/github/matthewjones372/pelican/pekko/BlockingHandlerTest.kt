@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.orFail
 import io.kotest.assertions.withClue
 import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.apache.pekko.actor.testkit.typed.annotations.JUnit5TestKit
 import org.apache.pekko.actor.testkit.typed.javadsl.ActorTestKit
 import org.apache.pekko.actor.testkit.typed.javadsl.JUnit5TestKitBuilder
@@ -57,6 +58,11 @@ class BlockingHandlerTest {
         text() orFail errorJson<Problem>(409, "Never")
     }
 
+    private val thread = endpoint {
+        get("thread")
+        text()
+    }
+
     private val boom = endpoint {
         get("boom")
         text()
@@ -69,6 +75,7 @@ class BlockingHandlerTest {
                 "slept"
             },
             where handledOrFail { ok(Thread.currentThread().isVirtual.toString()) },
+            thread handledNow { Thread.currentThread().name },
             boom handledNow { error("a bug") },
         ),
         codecs = JacksonCodecs,
@@ -100,6 +107,14 @@ class BlockingHandlerTest {
     fun `a synchronous handler runs on a virtual thread`() {
         api.start(testKit.system(), port = 0).use { server ->
             get("${server.baseUrl}/where").join().body() shouldBe "true"
+        }
+    }
+
+    @Test
+    fun `a handler on the dispatcher runs on the thread that matched the route`() {
+        api.start(testKit.system(), port = 0, handlers = Handlers.onDispatcher).use { server ->
+            get("${server.baseUrl}/where").join().body() shouldBe "false"
+            get("${server.baseUrl}/thread").join().body() shouldContain "pekko.actor.default-dispatcher"
         }
     }
 

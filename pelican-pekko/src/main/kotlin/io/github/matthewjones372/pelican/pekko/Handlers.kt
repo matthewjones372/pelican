@@ -19,6 +19,8 @@ import org.apache.pekko.stream.javadsl.Source
 import org.apache.pekko.util.ByteString
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 /**
  * The typed bridge between a backend-agnostic [Endpoint] and Pekko. Core cannot
  * name `Source`, so streaming endpoints carry the phantom marker [StreamOf];
@@ -119,10 +121,20 @@ infix fun <I, E : Any> Endpoint<I, Outcome<E, ByteStream>>.bytesOrFail(
 
 // ------------------------------------------------------------- blocking
 
+/** Where the synchronous binders' handlers run: the `handlers` setting on `start` and `toRoute`. */
+object Handlers {
+    /** A virtual thread per request, the default, from the JDK's executor so the OTel agent carries context across. */
+    val onVirtualThreads: Executor =
+        Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("pelican-handler-", 0).factory())
+
+    /** The dispatcher thread that matched the route: no hop, for handlers that never block. */
+    val onDispatcher: Executor = Executor { it.run() }
+}
+
 /**
- * A synchronous handler, which `toRoute` runs off the dispatcher: the thread
- * that matched the route is Pekko's, and one waiting on JDBC or an ask stalls
- * every request behind it. Called directly, it runs where it is called.
+ * A synchronous handler, which `toRoute` runs on its `handlers` executor: the
+ * thread that matched the route is Pekko's, and one waiting on JDBC or an ask
+ * stalls every request behind it. Called directly, it runs where it is called.
  */
 internal class Blocking(private val f: (Params) -> Any?) : (Params) -> CompletionStage<Any?> {
     override fun invoke(p: Params): CompletionStage<Any?> = CompletableFuture.completedFuture(f(p))

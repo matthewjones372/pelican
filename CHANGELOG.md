@@ -109,8 +109,11 @@ still there, and the only new ones are the module's own.
   route, one of as many as there are cores, so a few handlers blocked on JDBC
   or an ask stalled every request on the server. Nothing changes at the call
   site. Filters run on the same thread as the handler, and the `…By` and
-  streaming binders are untouched: they already chose where they run. Spec
-  0058.
+  streaming binders are untouched: they already chose where they run.
+  `start`, `startWithDocs`, `routeWithDocs` and `toRoute` take a `handlers`
+  executor, and `Handlers.onDispatcher` keeps the old behaviour. The
+  signatures without it stay in the bytecode, so nothing compiled against RC3
+  stops linking. Spec 0058.
 
 - **Either Scala cross-build of Pekko is now a gate, not an argument.**
   `pelican-pekko` gained a `scala3Test` source set: this module's compiled

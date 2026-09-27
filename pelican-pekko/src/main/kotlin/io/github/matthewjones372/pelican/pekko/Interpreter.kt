@@ -52,7 +52,6 @@ import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.Executor
-import java.util.concurrent.Executors
 /**
  * Pekko's pool for work that blocks, separate from the fork-join pool running
  * actors and stream stages.
@@ -74,7 +73,7 @@ private const val DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
  * service can depend on this module without the generator. See
  * `pelican-pekko-docs`.
  */
-fun Api.toRoute(system: ClassicActorSystemProvider): Route {
+fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Executor = Handlers.onVirtualThreads): Route {
     // Once per endpoint, captured by the routes: KType -> JavaType reflection
     // is not free, and a broken codec becomes a startup failure.
     val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
@@ -85,8 +84,9 @@ fun Api.toRoute(system: ClassicActorSystemProvider): Route {
     // Folded around each handler once rather than per request, likewise. The
     // hop is outside the filters, so a filter that opens a span or a
     // transaction opens it on the thread the handler runs on.
-    val handlers = endpoints.associateWith { se ->
-        handlerFor(se).let { handler -> if (se.invoke is Blocking) handler.on(virtualThreads) else handler }
+    val hopped = handlers !== Handlers.onDispatcher
+    val chains = endpoints.associateWith { se ->
+        handlerFor(se).let { handler -> if (hopped && se.invoke is Blocking) handler.on(handlers) else handler }
     }
 
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
@@ -104,15 +104,14 @@ fun Api.toRoute(system: ClassicActorSystemProvider): Route {
     val routes = endpoints
         .map { it.endpoint.method }
         .distinct()
-        .map { method -> methodRoute(method, this, index, codecs, handlers, cors, system) } +
+        .map { method -> methodRoute(method, this, index, codecs, chains, cors, system) } +
         listOfNotNull(cors?.let { preflightRoute(it, this) })
 
     return routes.reduce { left, right -> Directives.concat(left, right) }
 }
 
-/** A virtual thread per handler, from the JDK's own executor so an agent propagating context already knows it. */
-private val virtualThreads: Executor =
-    Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("pelican-handler-", 0).factory())
+@Deprecated("Binary compatibility with 1.0.0-RC3.", level = DeprecationLevel.HIDDEN)
+fun Api.toRoute(system: ClassicActorSystemProvider): Route = toRoute(system, Handlers.onVirtualThreads)
 
 private fun ((Params) -> CompletionStage<Any?>).on(executor: Executor): (Params) -> CompletionStage<Any?> =
     { p -> CompletableFuture.supplyAsync({ this(p) }, executor).thenCompose { it } }

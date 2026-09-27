@@ -133,6 +133,9 @@ On Pekko that thread is a virtual thread of the handler's own, with its filters
 around it, and not the dispatcher thread that matched the route: a handler
 answering in place is usually one that blocks — on JDBC, an actor ask, a joined
 client — and a dispatcher thread that waits stalls every request behind it.
+`handlers` on `start`, `startWithDocs` and `toRoute` names another executor, and
+`Handlers.onDispatcher` names none: the handler runs where the route matched,
+which is right only for handlers that never block.
 The name does not vary per backend, because the description does not:
 `getUser handledNow { id -> Store.user(id) }` is one line whichever server ends
 up running it, and a binder renamed for the calling convention underneath it
