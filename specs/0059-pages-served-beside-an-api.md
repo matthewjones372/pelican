@@ -20,7 +20,7 @@ filter, and the document, which cannot say they exist.
 ## Shape
 
 ```kotlin
-val api = api(endpoints = …, codecs = JacksonCodecs, pages = pages("ui"))   // classpath directory ui/
+val api = api(endpoints = …, codecs = JacksonCodecs) { pages = pages("ui") }  // classpath directory ui/
 
 api.startWithDocs(system, port = 8080, docs = docs { docsPath = "/api-docs" })
 // GET /                 → ui/index.html
@@ -44,10 +44,10 @@ today's workaround with a name on it, and it leaves pages outside the filters. R
 
 ## Stack
 
-- [ ] **`spec-0059-pages`**: `pages(...)` on `Api`, served by `pelican-pekko`, and the endpoint-first rule.
+- [x] **`spec-0059-pages`**: `pages(...)` on `Api`, served by `pelican-pekko`, and the endpoint-first rule.
       Done when: a test serves `index.html`, a nested `x/index.html` and a script with their content types, an
       endpoint at a page's path answers as the endpoint, and a missing file is a 404.
-- [ ] **`spec-0059-filters`**: CORS and filters over pages, and a reference section.
+- [x] **`spec-0059-filters`**: CORS and filters over pages, and a reference section.
       Done when: the metrics filter counts a page, and `docs/reference.md` says where pages come from.
 
 ## Acceptance
@@ -59,9 +59,20 @@ today's workaround with a name on it, and it leaves pages outside the filters. R
 
 ## Open questions
 
-1. **A value on `Api`, or a start parameter like `handlers`?** Recommended: on `Api`. What a service serves
-   belongs with its endpoints; how it runs them is a start setting.
-2. **Should `/x` try `x.html` too, or only exact files and `index.html`?** Recommended: both, so a page can be one
-   file.
-3. **Should pages be listed in the document as a tag, so a reader knows they exist?** Recommended: no, as Not
-   doing says. The document describes the API.
+Answered 2026-09-27, taking each recommendation:
+
+1. **A value on `Api`, or a start parameter?** A value on `Api`, set in `api`'s block beside `cors` and `filters`,
+   as every other `Api` setting is, rather than as a parameter of `api` itself.
+2. **Should `/x` try `x.html` too?** Yes: `x`, then `x.html`, then `x/index.html`.
+3. **Should pages be listed in the document?** No.
+
+Settled while building:
+
+- **A directory reached without its slash is redirected to it** (301 to `/x/`), so the page's relative links
+  resolve inside the directory rather than beside it.
+- **Filters do not run for pages.** A filter wraps a handler and reads its endpoint's `Params`; a file has neither,
+  and giving it a made-up endpoint would put a path in the metrics filter's `path` tag that no endpoint declares.
+  Pages carry the API's CORS headers, which need no endpoint. So `spec-0059-filters` shipped CORS and the
+  reference section, and not the "metrics filter counts a page" in its "Done when".
+- **Types and caching are Pekko's resource directive's**, by extension, with `Last-Modified` and conditional
+  requests.

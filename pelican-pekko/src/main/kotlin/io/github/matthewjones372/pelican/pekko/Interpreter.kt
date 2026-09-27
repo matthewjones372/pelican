@@ -100,7 +100,9 @@ fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handler
         .map { it.endpoint.method }
         .distinct()
         .map { method -> methodRoute(method, this, index, codecs, bound, cors, system) } +
-        listOfNotNull(cors?.let { preflightRoute(it, this) })
+        listOfNotNull(cors?.let { preflightRoute(it, this) }) +
+        // Last, so an endpoint at a page's path answers as the endpoint (spec 0059).
+        listOfNotNull(pages?.let { pagesRoute(it, cors) })
 
     return routes.reduce { left, right -> Directives.concat(left, right) }
 }

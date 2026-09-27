@@ -10,6 +10,7 @@ public final class io/github/matthewjones372/pelican/Api {
 	public final fun getMaxFrameBytes ()J
 	public final fun getOnRefusal ()Lio/github/matthewjones372/pelican/RefusalObserver;
 	public final fun getOnServerError ()Lkotlin/jvm/functions/Function3;
+	public final fun getPages ()Lio/github/matthewjones372/pelican/Pages;
 	public final fun getRefusals ()Lio/github/matthewjones372/pelican/RefusalRenderer;
 	public final fun getSecurity ()Ljava/util/List;
 	public final fun getServers ()Ljava/util/List;
@@ -28,6 +29,7 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun getExposeInternalErrors ()Z
 	public final fun getMaxBodyBytes ()J
 	public final fun getMaxFrameBytes ()Ljava/lang/Long;
+	public final fun getPages ()Lio/github/matthewjones372/pelican/Pages;
 	public final fun getSecurity ()Ljava/util/List;
 	public final fun getServers ()Ljava/util/List;
 	public final fun getStrictBodyTimeoutMillis ()J
@@ -43,6 +45,7 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun setExposeInternalErrors (Z)V
 	public final fun setMaxBodyBytes (J)V
 	public final fun setMaxFrameBytes (Ljava/lang/Long;)V
+	public final fun setPages (Lio/github/matthewjones372/pelican/Pages;)V
 	public final fun setSecurity (Ljava/util/List;)V
 	public final fun setServers (Ljava/util/List;)V
 	public final fun setStrictBodyTimeoutMillis (J)V
@@ -1078,6 +1081,30 @@ public final class io/github/matthewjones372/pelican/OutputsKt {
 	public static final fun representations (Lio/github/matthewjones372/pelican/Output;)Ljava/util/List;
 	public static final fun text (I[Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/String;)Lio/github/matthewjones372/pelican/TextOutput;
 	public static synthetic fun text$default (I[Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/TextOutput;
+}
+
+public final class io/github/matthewjones372/pelican/Pages {
+	public final fun getAt ()Ljava/lang/String;
+	public final fun getResources ()Ljava/lang/String;
+	public final fun resolve (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/Pages$Resolved;
+}
+
+public final class io/github/matthewjones372/pelican/Pages$Resolved {
+	public fun <init> (Ljava/lang/String;Z)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun copy (Ljava/lang/String;Z)Lio/github/matthewjones372/pelican/Pages$Resolved;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/Pages$Resolved;Ljava/lang/String;ZILjava/lang/Object;)Lio/github/matthewjones372/pelican/Pages$Resolved;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRedirect ()Z
+	public final fun getResource ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/PagesKt {
+	public static final fun pages (Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/Pages;
+	public static synthetic fun pages$default (Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/Pages;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/ParamKey {

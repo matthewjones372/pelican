@@ -359,6 +359,12 @@ still there, and the only new ones are the module's own.
 
 ### Added
 
+- **Pages served beside an API (spec 0059).** `pages = pages("ui")` in `api`'s
+  block serves a classpath directory: `/` is `index.html`, `/x` is `x`, `x.html`
+  or `x/index.html`, a directory without its slash is redirected to it, and no
+  path leaves the directory. An endpoint at the same path always wins. Pages
+  carry the API's CORS headers; filters, which wrap a handler, do not run for
+  them.
 - **`pelican-test-wiremock`, a stub written in endpoints.** A WireMock server
   stubbed and verified in the endpoint values of the API a service *calls*:
   `stub(getUser, 1L) answers ok(user)`, `fails(Fault)`, `breaksWith(502)`,
