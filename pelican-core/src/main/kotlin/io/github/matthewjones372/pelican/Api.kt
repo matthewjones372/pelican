@@ -223,6 +223,9 @@ class Api internal constructor(
      * which one is certainly going out. Null observes nothing.
      */
     val onRefusal: RefusalObserver? = null,
+
+    /** Files served beside the endpoints (spec 0059); null serves none. An endpoint's path wins over a page. */
+    val pages: Pages? = null,
 ) {
     /**
      * The largest single frame of a streamed request body, over which the frame

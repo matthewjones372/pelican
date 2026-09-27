@@ -2668,6 +2668,30 @@ and `errorJson<T>(429, "...", retryAfter)` for one the handler returns. See
 where no endpoint description is to hand — which is what `unauthorized(challenge
 = ...)` and `tooManyRequests(retryAfterSeconds = ...)` use.
 
+## Pages beside the endpoints
+
+A service with a few pages of its own, a small UI or a status page, serves them from a classpath directory with
+`pages` in `api`'s block ([spec 0059](../specs/0059-pages-served-beside-an-api.md)):
+
+```kotlin
+val service = api(endpoints, JacksonCodecs) {
+    pages = pages("ui")                  // src/main/resources/ui/, served under /
+    cors = cors("https://bank.example")  // pages carry the same CORS headers as the endpoints
+}
+```
+
+- **An endpoint always wins.** The pages are the last route, so a page never hides an endpoint at the same path,
+  and a path no file answers is the 404 or 405 it was before.
+- **Which file answers.** `/` is `index.html`. `/x` is the file `x`, then `x.html`, then `x/index.html`. A
+  directory reached without its slash is redirected to it, so its page's relative links resolve inside it. A
+  path with a `..`, `.` or empty segment answers nothing, so no request reads outside the directory.
+- **Types and caching** are Pekko's, by extension: `text/html`, JavaScript, CSS, SVG and the rest, with
+  `Last-Modified` and conditional requests.
+- **`pages("ui", at = "/site")`** serves the directory under `/site` instead of the root.
+- **Pages are not endpoints.** The document does not list them, and filters do not run for them: a filter wraps a
+  handler and reads its endpoint's `Params`, which a file does not have. A check a page needs, such as a login, is
+  a route of the service's own in front of the server.
+
 ## Filters
 
 Something that runs around every handler: authentication, rate limiting, a

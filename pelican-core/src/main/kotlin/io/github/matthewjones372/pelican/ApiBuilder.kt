@@ -40,6 +40,9 @@ class ApiBuilder internal constructor() {
     var covers: List<Endpoint<*, *>> = emptyList()
     var webhooks: List<Webhook> = emptyList()
 
+    /** [Api.pages]: `pages = pages("ui")`. */
+    var pages: Pages? = null
+
     private val filters = mutableListOf<Filter>()
     private var onServerError: ((reference: String, endpoint: Endpoint<*, *>?, error: Throwable) -> Unit)? = null
     private var refusals: RefusalRenderer = ApiErrorEnvelope
@@ -84,6 +87,7 @@ class ApiBuilder internal constructor() {
         webhooks = webhooks,
         refusals = refusals,
         onRefusal = onRefusal,
+        pages = pages,
     )
 }
 
