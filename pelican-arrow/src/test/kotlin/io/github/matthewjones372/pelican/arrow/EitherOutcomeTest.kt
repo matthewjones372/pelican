@@ -52,4 +52,26 @@ class EitherOutcomeTest {
         missing(Problem("gone")).toEither() shouldBe Problem("gone").left()
         Widget(3).right().toOutcome().toEither() shouldBe Widget(3).right()
     }
+
+    private val gone = errorJson<Problem>(410, "That widget was retired")
+
+    private fun refused(problem: Problem) = when (problem.code) {
+        "missing" -> missing(problem)
+        else -> gone(problem)
+    }
+
+    @Test
+    fun `with several declared failures, each Left is the declaration it is named as`() {
+        val outcome = Problem("retired").left().toOutcome<Problem, Problem, Widget>(::refused)
+
+        outcome.shouldBeInstanceOf<Outcome.Err<Problem>>().declared shouldBeSameInstanceAs gone
+        Problem("missing").left().toOutcome<Problem, Problem, Widget>(::refused)
+            .shouldBeInstanceOf<Outcome.Err<Problem>>().declared shouldBeSameInstanceAs missing
+    }
+
+    @Test
+    fun `with several declared failures, a Right is the success and the refusal is never asked`() {
+        Widget(4).right().toOutcome<Problem, Problem, Widget> { error("a Right is not refused") }
+            .shouldBeInstanceOf<Outcome.Ok<Widget>>().value shouldBe Widget(4)
+    }
 }

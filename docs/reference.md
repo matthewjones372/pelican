@@ -19,7 +19,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-client-pekko` | core, pekko-http | where a generated client's requests go: `ClientTransport` over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the `Codecs`: Jackson reads bodies, swagger-core describes types |
-| `pelican-arrow` | core, arrow-core | Arrow's `Either` into Pelican's `Outcome` and back: `toOutcome()`, its naming overload, and `toEither()` |
+| `pelican-arrow` | core, arrow-core | Arrow's `Either` into Pelican's `Outcome` and back: `toOutcome()`, its naming overloads, and `toEither()` |
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and a page — Swagger UI or Redoc — over HTTP |
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
@@ -395,6 +395,7 @@ asserts — turns Arrow's `Either` into Pelican's `Outcome` and back, in
 ```kotlin
 getUser handledOrFail { id -> service.find(id).toOutcome() }             // Right → ok, Left → the single declared failure
 placeOrder handledOrFail { req -> desk.place(req).toOutcome(badOrder) }  // several failures: name the declaration
+subscribe handledOrFail { s -> billing.subscribe(s).toOutcome { e -> when (e) { is NoSuchPlan -> planMissing(e); is Taken -> taken(e) } } }  // each Left named
 val placed: Either<PlaceOrderFailure, Order> = client.placeOrder(order).toEither()  // and back, on the calling side
 ```
 

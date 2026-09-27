@@ -39,7 +39,6 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.orFail
@@ -59,7 +58,7 @@ import io.github.matthewjones372.pelican.pekko.handledOrFail
  * The three handlers are the three shapes an Arrow codebase actually meets:
  *
  *   one declared failure        `subscription(code).toOutcome()`
- *   several, chosen by the left `error.fold(...)` naming each declaration
+ *   several, chosen by the left `toOutcome { error -> ... }` naming each declaration
  *   several problems at once    accumulated, then named: `toOutcome(invalid)`
  *
  * `toOutcome()` with no argument means the endpoint's single declared failure
@@ -182,30 +181,27 @@ private val getPlanRoute = getPlan handledOrFail { code -> Billing.plan(code).to
 
 /**
  * Several declared failures, so which one a `Left` becomes is this service's
- * decision and it is written here. `fold` rather than a `mapLeft` into one
- * declaration: the status is part of what each error means.
+ * decision and it is written here. The refusal names a declaration per case
+ * rather than a `mapLeft` into one: the status is part of what each error means.
  */
 private val subscribeRoute = subscribe handledOrFail { signup ->
-    Billing.subscribe(signup).fold(
-        { error ->
-            when (error) {
-                is SubscribeError.NoSuchPlan ->
-                    planMissing(Problem("no_such_plan", "No plan called '${error.code}'"))
+    Billing.subscribe(signup).toOutcome { error ->
+        when (error) {
+            is SubscribeError.NoSuchPlan ->
+                planMissing(Problem("no_such_plan", "No plan called '${error.code}'"))
 
-                is SubscribeError.AlreadySubscribed ->
-                    alreadySubscribed(Problem("already_subscribed", "${error.email} already has a subscription"))
+            is SubscribeError.AlreadySubscribed ->
+                alreadySubscribed(Problem("already_subscribed", "${error.email} already has a subscription"))
 
-                is SubscribeError.SeatsExceedPlan ->
-                    seatsExceedPlan(
-                        Problem(
-                            "seats_exceed_plan",
-                            "Asked for ${error.asked} seats; the plan carries ${error.allowed}",
-                        ),
-                    )
-            }
-        },
-        { subscription -> ok(subscription) },
-    )
+            is SubscribeError.SeatsExceedPlan ->
+                seatsExceedPlan(
+                    Problem(
+                        "seats_exceed_plan",
+                        "Asked for ${error.asked} seats; the plan carries ${error.allowed}",
+                    ),
+                )
+        }
+    }
 }
 
 /**
