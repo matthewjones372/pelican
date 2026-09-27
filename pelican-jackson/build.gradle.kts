@@ -7,8 +7,8 @@ dependencies {
     // Not optional. Without it Kotlin data-class defaults and nullability are
     // invisible to Jackson: a missing field becomes an NPE deep inside a
     // constructor call rather than a clean 400.
-    api("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.2")
-    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2")
+    api("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.3")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.3")
 
     implementation("io.swagger.core.v3:swagger-core-jakarta:2.2.55")
 }

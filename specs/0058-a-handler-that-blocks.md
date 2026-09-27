@@ -67,13 +67,13 @@ default for the common case. The recommendation is to move the default.
 
 ## Stack
 
-- [x] **`spec-0058-dispatch`** — the synchronous binders produce a
+- [x] **`spec-0058-dispatch`** ([#187](https://github.com/matthewjones372/pelican/pull/187)) — the synchronous binders produce a
       `ServerEndpoint` marked synchronous, and the Pekko interpreter runs it on
       the start's `handlers` executor, a virtual thread per task by default.
       Done when: sixteen handlers each sleeping 0.5 s answer in under 2 s on a
       two-thread dispatcher (4.5 s before), and a test reads
       `Thread.currentThread().isVirtual` inside a handler as true.
-- [x] **`spec-0058-opt-out`** — `Handlers.onDispatcher` plus the `handlers`
+- [x] **`spec-0058-opt-out`** ([#187](https://github.com/matthewjones372/pelican/pull/187)) — `Handlers.onDispatcher` plus the `handlers`
       parameter on `start` and `startWithDocs`, and a reference section on
       choosing.
       Done when: a test on `onDispatcher` sees the handler on a dispatcher

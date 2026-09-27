@@ -12,7 +12,7 @@ plugins {
     id("com.vanniktech.maven.publish") version "0.37.0"
     // The same tag this repository's other build reads. An included build is
     // still the same working tree, so both land on the same version.
-    id("pl.allegro.tech.build.axion-release") version "1.21.3"
+    id("pl.allegro.tech.build.axion-release") version "1.21.4"
 }
 
 scmVersion {
@@ -42,7 +42,7 @@ dependencies {
     implementation(kotlin("stdlib"))
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
-    testImplementation("io.kotest:kotest-assertions-core:6.2.4")
+    testImplementation("io.kotest:kotest-assertions-core:6.2.5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
