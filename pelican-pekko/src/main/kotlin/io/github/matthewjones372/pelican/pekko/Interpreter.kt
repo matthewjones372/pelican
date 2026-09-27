@@ -51,6 +51,8 @@ import org.apache.pekko.util.ByteString
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 /**
  * Pekko's pool for work that blocks, separate from the fork-join pool running
  * actors and stream stages.
@@ -80,8 +82,12 @@ fun Api.toRoute(system: ClassicActorSystemProvider): Route {
     // Worked out once from the descriptions, as with the codecs above.
     val cors = corsPolicy()
 
-    // Folded around each handler once rather than per request, likewise.
-    val handlers = endpoints.associateWith { handlerFor(it) }
+    // Folded around each handler once rather than per request, likewise. The
+    // hop is outside the filters, so a filter that opens a span or a
+    // transaction opens it on the thread the handler runs on.
+    val handlers = endpoints.associateWith { se ->
+        handlerFor(se).let { handler -> if (se.invoke is Blocking) handler.on(virtualThreads) else handler }
+    }
 
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
 
@@ -103,6 +109,13 @@ fun Api.toRoute(system: ClassicActorSystemProvider): Route {
 
     return routes.reduce { left, right -> Directives.concat(left, right) }
 }
+
+/** A virtual thread per handler, from the JDK's own executor so an agent propagating context already knows it. */
+private val virtualThreads: Executor =
+    Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("pelican-handler-", 0).factory())
+
+private fun ((Params) -> CompletionStage<Any?>).on(executor: Executor): (Params) -> CompletionStage<Any?> =
+    { p -> CompletableFuture.supplyAsync({ this(p) }, executor).thenCompose { it } }
 
 /**
  * Everything this API answers under one method, dispatched by the index.

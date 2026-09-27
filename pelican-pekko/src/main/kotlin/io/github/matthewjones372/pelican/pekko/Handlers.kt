@@ -38,11 +38,11 @@ infix fun <I, T : Any> Endpoint<I, T>.handledBy(f: Params.(I) -> CompletionStage
 
 /** Binds an endpoint whose output is a single value, computed synchronously. */
 infix fun <I, T : Any> Endpoint<I, T>.handledNow(f: Params.(I) -> T): ServerEndpoint =
-    ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
+    ServerEndpoint(this, Blocking { p -> p.f(inputs.extract(p)) })
 
 /** Binds an endpoint that returns no body. */
 infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoint =
-    ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
+    ServerEndpoint(this, Blocking { p -> p.f(inputs.extract(p)) })
 
 // ------------------------------------------------------------- declared failures
 //
@@ -56,9 +56,7 @@ infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoi
 /** Binds an endpoint that either succeeds with [T] or returns a declared failure. */
 infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledOrFail(
     f: Params.(I) -> Outcome<E, T>,
-): ServerEndpoint = ServerEndpoint(this) { p ->
-    CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?)
-}
+): ServerEndpoint = ServerEndpoint(this, Blocking { p -> p.f(inputs.extract(p)) })
 
 /** As [handledOrFail], for a handler that answers asynchronously. */
 infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledByOrFail(
@@ -117,6 +115,17 @@ infix fun <I, E : Any> Endpoint<I, Outcome<E, ByteStream>>.bytesOrFail(
     f: Params.(I) -> Outcome<E, Source<ByteString, NotUsed>>,
 ): ServerEndpoint = ServerEndpoint(this) { p ->
     CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?)
+}
+
+// ------------------------------------------------------------- blocking
+
+/**
+ * A synchronous handler, which `toRoute` runs off the dispatcher: the thread
+ * that matched the route is Pekko's, and one waiting on JDBC or an ask stalls
+ * every request behind it. Called directly, it runs where it is called.
+ */
+internal class Blocking(private val f: (Params) -> Any?) : (Params) -> CompletionStage<Any?> {
+    override fun invoke(p: Params): CompletionStage<Any?> = CompletableFuture.completedFuture(f(p))
 }
 
 // ------------------------------------------------------------- accessors

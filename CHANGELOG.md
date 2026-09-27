@@ -103,6 +103,15 @@ still there, and the only new ones are the module's own.
 
 ### Changed — read this one
 
+- **A synchronous handler runs on a virtual thread of its own, not on Pekko's
+  dispatcher.** `handledNow`, `handledWith`, `handledOrFail` and
+  `handledOneOf` used to run the handler on the thread that matched the
+  route, one of as many as there are cores, so a few handlers blocked on JDBC
+  or an ask stalled every request on the server. Nothing changes at the call
+  site. Filters run on the same thread as the handler, and the `…By` and
+  streaming binders are untouched: they already chose where they run. Spec
+  0058.
+
 - **Either Scala cross-build of Pekko is now a gate, not an argument.**
   `pelican-pekko` gained a `scala3Test` source set: this module's compiled
   output, which is `_2.13`-compiled, on a classpath holding Pekko `_3` and no

@@ -129,6 +129,10 @@ is read the same way whoever bound it. See
 thread on Pekko. `-Now` is a claim about *when*, not about what the answer is
 carried on: the handler produces the value during the call rather than handing
 back something that completes later, which is `handledBy` and its `…By` family.
+On Pekko that thread is a virtual thread of the handler's own, with its filters
+around it, and not the dispatcher thread that matched the route: a handler
+answering in place is usually one that blocks — on JDBC, an actor ask, a joined
+client — and a dispatcher thread that waits stalls every request behind it.
 The name does not vary per backend, because the description does not:
 `getUser handledNow { id -> Store.user(id) }` is one line whichever server ends
 up running it, and a binder renamed for the calling convention underneath it
