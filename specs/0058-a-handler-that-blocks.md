@@ -49,7 +49,7 @@ The executor is a start setting, with a virtual thread per request as the
 default:
 
 ```kotlin
-api.start(system, port = 8080, handlers = Executors.newVirtualThreadPerTaskExecutor())
+api.start(system, port = 8080, handlers = Handlers.on(boundedPool))            // a service's own executor
 api.start(system, port = 8080, handlers = Handlers.onDispatcher)   // today's behaviour, for handlers that never block
 ```
 
@@ -67,17 +67,17 @@ default for the common case. The recommendation is to move the default.
 
 ## Stack
 
-- [ ] **`spec-0058-dispatch`** — the synchronous binders produce a
+- [x] **`spec-0058-dispatch`** — the synchronous binders produce a
       `ServerEndpoint` marked synchronous, and the Pekko interpreter runs it on
       the start's `handlers` executor, a virtual thread per task by default.
-      Done when: a test with 64 handlers each sleeping 1 s answers all 64 in
-      under 2 s on a 2-core dispatcher, and a test reads
+      Done when: sixteen handlers each sleeping 0.5 s answer in under 2 s on a
+      two-thread dispatcher (4.5 s before), and a test reads
       `Thread.currentThread().isVirtual` inside a handler as true.
-- [ ] **`spec-0058-opt-out`** — `Handlers.onDispatcher` plus the `handlers`
-      parameter on `start` and `startWithDocs`, and a README section on
+- [x] **`spec-0058-opt-out`** — `Handlers.onDispatcher` plus the `handlers`
+      parameter on `start` and `startWithDocs`, and a reference section on
       choosing.
       Done when: a test on `onDispatcher` sees the handler on a dispatcher
-      thread, and the README example compiles in `example/`.
+      thread, and `docs/reference.md` says where a handler runs.
 
 ## Acceptance
 

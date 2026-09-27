@@ -36,13 +36,13 @@ import java.util.concurrent.CompletionStage
 infix fun <I, T : Any> Endpoint<I, T>.handledBy(f: Params.(I) -> CompletionStage<T>): ServerEndpoint =
     ServerEndpoint(this) { p -> p.f(inputs.extract(p)).thenApply { it as Any? } }
 
-/** Binds an endpoint whose output is a single value, computed synchronously. */
+/** Binds an endpoint whose output is a single value, computed synchronously: see [Handlers] for where. */
 infix fun <I, T : Any> Endpoint<I, T>.handledNow(f: Params.(I) -> T): ServerEndpoint =
-    ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
+    ServerEndpoint(this, Synchronous { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) })
 
 /** Binds an endpoint that returns no body. */
 infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoint =
-    ServerEndpoint(this) { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) }
+    ServerEndpoint(this, Synchronous { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) })
 
 // ------------------------------------------------------------- declared failures
 //
@@ -56,9 +56,10 @@ infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoi
 /** Binds an endpoint that either succeeds with [T] or returns a declared failure. */
 infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledOrFail(
     f: Params.(I) -> Outcome<E, T>,
-): ServerEndpoint = ServerEndpoint(this) { p ->
-    CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?)
-}
+): ServerEndpoint = ServerEndpoint(
+    this,
+    Synchronous { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) },
+)
 
 /** As [handledOrFail], for a handler that answers asynchronously. */
 infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledByOrFail(

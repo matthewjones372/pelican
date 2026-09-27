@@ -72,7 +72,7 @@ private const val DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
  * service can depend on this module without the generator. See
  * `pelican-pekko-docs`.
  */
-fun Api.toRoute(system: ClassicActorSystemProvider): Route {
+fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handlers.onVirtualThreads): Route {
     // Once per endpoint, captured by the routes: KType -> JavaType reflection
     // is not free, and a broken codec becomes a startup failure.
     val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
@@ -80,8 +80,9 @@ fun Api.toRoute(system: ClassicActorSystemProvider): Route {
     // Worked out once from the descriptions, as with the codecs above.
     val cors = corsPolicy()
 
-    // Folded around each handler once rather than per request, likewise.
-    val handlers = endpoints.associateWith { handlerFor(it) }
+    // Folded around each handler once rather than per request, likewise. A synchronous handler moves off the
+    // dispatcher with its filters, so a filter that blocks does not hold a dispatcher thread either.
+    val bound = endpoints.associateWith { endpoint -> handlerFor(endpoint).on(handlers, endpoint) }
 
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
 
@@ -98,10 +99,23 @@ fun Api.toRoute(system: ClassicActorSystemProvider): Route {
     val routes = endpoints
         .map { it.endpoint.method }
         .distinct()
-        .map { method -> methodRoute(method, this, index, codecs, handlers, cors, system) } +
+        .map { method -> methodRoute(method, this, index, codecs, bound, cors, system) } +
         listOfNotNull(cors?.let { preflightRoute(it, this) })
 
     return routes.reduce { left, right -> Directives.concat(left, right) }
+}
+
+/** [handler] on [threads]' executor, when [endpoint] was bound synchronously and there is one to move to. */
+private fun ((Params) -> CompletionStage<Any?>).on(
+    threads: Handlers,
+    endpoint: ServerEndpoint,
+): (Params) -> CompletionStage<Any?> {
+    val executor = threads.executor
+    return if (executor == null || endpoint.invoke !is Synchronous) {
+        this
+    } else {
+        { params -> CompletableFuture.supplyAsync({ this(params) }, executor).thenCompose { it } }
+    }
 }
 
 /**

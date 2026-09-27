@@ -114,7 +114,8 @@ fun Api.start(
     port: Int = 8080,
     host: String = "127.0.0.1",
     systemName: String = "pelican",
-    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it) },
+    handlers: Handlers = Handlers.onVirtualThreads,
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, handlers) },
 ): PelicanServer {
     val system = ActorSystem.create(Behaviors.empty<Void>(), systemName)
     return try {
@@ -133,7 +134,8 @@ fun Api.start(
     system: ActorSystem<Void>,
     port: Int = 8080,
     host: String = "127.0.0.1",
-    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it) },
+    handlers: Handlers = Handlers.onVirtualThreads,
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, handlers) },
 ): PelicanServer = bind(system, host, port, ownsSystem = false, route = route)
 
 private fun Api.bind(
