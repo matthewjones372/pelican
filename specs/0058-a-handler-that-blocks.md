@@ -88,12 +88,19 @@ default for the common case. The recommendation is to move the default.
 
 ## Open questions
 
-1. **The default, or opt-in?** Recommend making it the default (above). Opt-in
-   means `start(handlers = virtualThreads)` once per server.
-2. **Should the executor be per endpoint?** Recommend no. A service that needs
-   a bulkhead per endpoint can use `handledBy*` with its own executor.
-3. **Should a `LarkLocal`/OTel context cross the hop?** The request's trace
-   context is on the dispatcher thread when the route matches. Recommend
-   capturing the current OTel `Context` and running the handler inside it,
-   since `pelican-metrics-otel` already depends on the API. Or leave it to
-   filters.
+Answered 2026-09-27, taking each recommendation:
+
+1. **The default, or opt-in?** The default. `Handlers.onDispatcher` is the
+   opt-out.
+2. **Should the executor be per endpoint?** No. One per route.
+3. **Should a `LarkLocal`/OTel context cross the hop?** Not by capturing it.
+   The hop is taken before the filter chain, so filters run on the handler's
+   thread too and whatever context a filter opens is the handler's. The
+   default executor is the JDK's thread-per-task executor, which the OTel
+   agent already propagates across, so `pelican-pekko` gains no OTel
+   dependency.
+
+Settled while building: `toRoute(system, handlers)` takes the executor too,
+since a route mounted by hand never passes through `start`; and the
+signatures `start` and `toRoute` had before stay in the bytecode, hidden, so a
+caller compiled against RC2 still links.
