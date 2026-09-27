@@ -126,8 +126,8 @@ is read the same way whoever bound it. See
 [Multipart uploads](#multipart-uploads).
 
 **`handledNow` means handled in place, on the request** — and *in place* is a
-thread on Pekko. `-Now` is a claim about *when*, not about what the answer is
-carried on: the handler produces the value during the call rather than handing
+virtual thread on Pekko: see [Where a handler runs](#where-a-handler-runs).
+`-Now` is a claim about *when*, not about what the answer is carried on: the handler produces the value during the call rather than handing
 back something that completes later, which is `handledBy` and its `…By` family.
 The name does not vary per backend, because the description does not:
 `getUser handledNow { id -> Store.user(id) }` is one line whichever server ends
@@ -223,6 +223,27 @@ server.stopAsync().awaitTerminated(Duration.ofMinutes(2))
 a latch, because the system may be a borrowed one that never terminates.
 `ServerShapeParityTest` pins the five members by reflection rather than by a
 supertype, so a returning backend is held to the shape by a row.
+
+### Where a handler runs
+
+A synchronous handler — `handledNow`, `handledOrFail`, `handledWith`,
+`handledOneOf` — runs on a virtual thread of its own, with the filters around
+it (spec 0058). It may block: a JDBC call, an actor's ask, a generated client
+joined. What it holds while it waits is that virtual thread, not one of the
+dispatcher's, which parse, route and write every other request and number as
+many as the machine has cores.
+
+```kotlin
+api.start(system, port = 8080)                                        // Handlers.onVirtualThreads
+api.start(system, port = 8080, handlers = Handlers.on(boundedPool))   // a service's own executor
+api.start(system, port = 8080, handlers = Handlers.onDispatcher)      // where the route matched
+```
+
+`Handlers.onDispatcher` saves the hop — a few microseconds — for an API whose
+handlers never block. A `…By` handler returns a stage and chose its own thread,
+so it is never moved, and neither is a stream's: building a `Source` is cheap
+and the work happens as it is read. `BlockingHandlerTest` holds sixteen
+half-second handlers to under two seconds on a two-thread dispatcher.
 
 ### What the request line says
 

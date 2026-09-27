@@ -29,7 +29,8 @@ class StartParityTest {
      */
     private fun entryPoint(facade: String, name: String): KFunction<*> =
         Class.forName(facade).methods
-            .filter { it.name == name }
+            // A signature kept for binary compatibility is hidden, and so synthetic: not one a caller can type.
+            .filter { it.name == name && !it.isSynthetic }
             .mapNotNull { it.kotlinFunction }
             .single { it.parameters.getOrNull(1)?.name == "port" }
 

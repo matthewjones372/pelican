@@ -1,3 +1,14 @@
+public final class io/github/matthewjones372/pelican/pekko/Handlers {
+	public static final field Companion Lio/github/matthewjones372/pelican/pekko/Handlers$Companion;
+	public synthetic fun <init> (Ljava/util/concurrent/Executor;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/matthewjones372/pelican/pekko/Handlers$Companion {
+	public final fun getOnDispatcher ()Lio/github/matthewjones372/pelican/pekko/Handlers;
+	public final fun getOnVirtualThreads ()Lio/github/matthewjones372/pelican/pekko/Handlers;
+	public final fun on (Ljava/util/concurrent/Executor;)Lio/github/matthewjones372/pelican/pekko/Handlers;
+}
+
 public final class io/github/matthewjones372/pelican/pekko/HandlersKt {
 	public static final fun bytesNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun bytesOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
@@ -19,7 +30,9 @@ public final class io/github/matthewjones372/pelican/pekko/HandlersKt {
 }
 
 public final class io/github/matthewjones372/pelican/pekko/InterpreterKt {
-	public static final fun toRoute (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/ClassicActorSystemProvider;)Lorg/apache/pekko/http/javadsl/server/Route;
+	public static final synthetic fun toRoute (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/ClassicActorSystemProvider;)Lorg/apache/pekko/http/javadsl/server/Route;
+	public static final fun toRoute (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/ClassicActorSystemProvider;Lio/github/matthewjones372/pelican/pekko/Handlers;)Lorg/apache/pekko/http/javadsl/server/Route;
+	public static synthetic fun toRoute$default (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/ClassicActorSystemProvider;Lio/github/matthewjones372/pelican/pekko/Handlers;ILjava/lang/Object;)Lorg/apache/pekko/http/javadsl/server/Route;
 }
 
 public final class io/github/matthewjones372/pelican/pekko/PelicanServer : java/lang/AutoCloseable {
@@ -38,9 +51,13 @@ public final class io/github/matthewjones372/pelican/pekko/PelicanServer : java/
 
 public final class io/github/matthewjones372/pelican/pekko/ServerKt {
 	public static final fun awaitTerminated (Ljava/util/concurrent/CompletionStage;Ljava/time/Duration;)V
-	public static final fun start (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
-	public static final fun start (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;ILjava/lang/String;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static final fun start (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/pekko/Handlers;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static final synthetic fun start (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static final fun start (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;ILjava/lang/String;Lio/github/matthewjones372/pelican/pekko/Handlers;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static final synthetic fun start (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;ILjava/lang/String;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static synthetic fun start$default (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/pekko/Handlers;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
 	public static synthetic fun start$default (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
+	public static synthetic fun start$default (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;ILjava/lang/String;Lio/github/matthewjones372/pelican/pekko/Handlers;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
 	public static synthetic fun start$default (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;ILjava/lang/String;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;
 }
 
