@@ -5,6 +5,7 @@ import org.gradle.api.Project
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.SourceSet
+import org.gradle.jvm.toolchain.JavaToolchainService
 import java.io.File
 
 /**
@@ -20,6 +21,10 @@ class PelicanPlugin : Plugin<Project> {
         val defaultClasspath = project.objects.fileCollection()
         project.plugins.withType(JavaPlugin::class.java).configureEach {
             defaultClasspath.from(project.mainSourceSet().runtimeClasspath)
+            // The classes to load are built for the project's toolchain, which can be newer than Gradle's JVM.
+            val toolchain = project.extensions.getByType(JavaPluginExtension::class.java).toolchain
+            val launcher = project.extensions.getByType(JavaToolchainService::class.java).launcherFor(toolchain)
+            project.tasks.withType(PelicanTask::class.java).configureEach { task -> task.launcher.convention(launcher) }
         }
 
         pelican.clients.configureEach { client ->

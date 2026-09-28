@@ -89,7 +89,6 @@ internal object Pelican {
             )
 
     /** Writes the client and returns the file, exactly as `writeKotlinClient` does. */
-    @Suppress("LongParameterList")
     fun writeClient(
         loader: ClassLoader,
         spec: Any,
@@ -118,7 +117,7 @@ internal object Pelican {
      * the test: the arities below are successive releases of one library, and
      * without it the older paths would run only on a consumer's machine.
      */
-    @Suppress("LongParameterList", "ReturnCount")
+    @Suppress("ReturnCount")
     fun writeClient(
         codegen: Class<*>,
         apiSpec: Class<*>,
@@ -230,7 +229,6 @@ internal object Pelican {
      * Generates endpoint descriptions from a document. Unlike everything else
      * here it loads no spec: the input is a file, not compiled code.
      */
-    @Suppress("LongParameterList")
     fun writeEndpoints(
         loader: ClassLoader,
         document: File,
@@ -258,7 +256,7 @@ internal object Pelican {
     )
 
     /** The same, against a `pelican-import` already resolved; see [writeClient]. */
-    @Suppress("LongParameterList", "ReturnCount")
+    @Suppress("ReturnCount")
     fun writeEndpoints(
         importer: Class<*>,
         document: File,
@@ -326,7 +324,6 @@ internal object Pelican {
      * Rewrites the lockfile of remote references, and returns the lines
      * describing what changed.
      */
-    @Suppress("LongParameterList")
     fun updateLock(
         loader: ClassLoader,
         document: File,
@@ -344,7 +341,6 @@ internal object Pelican {
     )
 
     /** The same, against a `pelican-import` already resolved; see [writeClient]. */
-    @Suppress("LongParameterList")
     fun updateLock(
         importer: Class<*>,
         document: File,

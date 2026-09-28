@@ -68,7 +68,7 @@ val benchmarkRuntimeClasspath = the<SourceSetContainer>()["main"].runtimeClasspa
  * load; the quieter failure is a number measured on a JDK nobody wrote down.
  */
 val toolchains = extensions.getByType<JavaToolchainService>()
-val benchmarkJdk = JavaLanguageVersion.of(21)
+val benchmarkJdk = JavaLanguageVersion.of(25)
 val toolchainLauncher = toolchains.launcherFor { languageVersion.set(benchmarkJdk) }
 
 /**

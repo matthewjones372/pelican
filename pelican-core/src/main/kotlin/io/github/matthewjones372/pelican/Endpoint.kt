@@ -23,7 +23,6 @@ class ErrorSpec @PublishedApi internal constructor(
  * library. Interpreters turn it into a route, an OpenAPI operation, or a
  * client call.
  */
-@Suppress("LongParameterList") // A description record: every parameter is a facet of the description.
 class Endpoint<I, R> internal constructor(
     val inputs: Inputs<I>,
     val method: Method,

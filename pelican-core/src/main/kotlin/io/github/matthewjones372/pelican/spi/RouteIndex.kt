@@ -133,7 +133,6 @@ class RouteIndex internal constructor(private val root: Node) {
     }
 
     /** The capture branch, with what it wrote unwound if it comes to nothing. */
-    @Suppress("LongParameterList") // One walk's state, threaded rather than held.
     private fun byCapture(
         capture: Node,
         method: Method,

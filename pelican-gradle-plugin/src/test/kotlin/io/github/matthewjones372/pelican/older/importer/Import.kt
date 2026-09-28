@@ -2,7 +2,6 @@ package io.github.matthewjones372.pelican.older.importer
 
 import java.io.File
 
-@Suppress("LongParameterList")
 fun importEndpoints(
     document: File,
     sourceRoot: File,

@@ -167,7 +167,9 @@ subprojects {
     version = scmVer
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
-        jvmToolchain(21)
+        // 25: the first LTS where a virtual thread blocked in `synchronized` no longer pins its carrier, which every
+        // handler here runs on. The Gradle plugin compiles for 21 in its own build file: it runs inside Gradle.
+        jvmToolchain(25)
 
         compilerOptions {
             // Without this, every interface with a method body also gets a
@@ -191,24 +193,26 @@ subprojects {
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 
+    // BCV 0.18.1 reads classes with ASM 9.6, which stops at class file 68 (JDK 24). 9.8 reads 25's.
+    configurations.matching { it.name.startsWith("bcv-rt-jvm-cp") }.configureEach {
+        resolutionStrategy.force("org.ow2.asm:asm:9.8", "org.ow2.asm:asm-tree:9.8")
+    }
+
     val toolchains = extensions.getByType<JavaToolchainService>()
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
 
-        // `jvmToolchain(21)` above sets the Java toolchain as well as the
+        // `jvmToolchain(25)` above sets the Java toolchain as well as the
         // Kotlin one, and a `Test` task with no launcher of its own takes it.
-        // So every job in the CI matrix compiled *and ran* on 21, and the
-        // matrix named three runtimes while exercising one. Compilation stays
-        // on 21 — that is the bytecode the release has to keep working — and
-        // the tests move to whichever JDK started the build.
-        javaLauncher.set(
-            toolchains.launcherFor {
-                languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
-            },
-        )
+        // So every job in the CI matrix would compile *and run* on the
+        // toolchain, and a matrix of runtimes would exercise one. The tests
+        // run on whichever JDK started the build instead, but never below 25,
+        // the bytecode they have to load.
+        val testJdk = maxOf(JavaVersion.current().majorVersion.toInt(), 25)
+        javaLauncher.set(toolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(testJdk)) })
 
-        systemProperty("pelican.launcherJavaVersion", JavaVersion.current().majorVersion)
+        systemProperty("pelican.launcherJavaVersion", testJdk.toString())
         // A backstop, not a budget: it exists so one wedged test cannot burn
         // the whole job, and it fires on nothing else. The slowest measured
         // method is `DoesNotCompileTest > a failure of the same payload type
