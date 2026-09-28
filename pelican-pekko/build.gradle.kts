@@ -1,4 +1,4 @@
-val slf4jVersion = "2.0.18"
+val slf4jVersion = "2.0.20"
 val pekkoVersion = "1.7.0"
 val pekkoHttpVersion = "1.4.0"
 val scalaBinary = "2.13"
