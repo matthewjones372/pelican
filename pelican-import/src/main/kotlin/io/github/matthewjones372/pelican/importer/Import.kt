@@ -45,7 +45,6 @@ object Import {
 /**
  * The one entry the Gradle plugin calls, in types the JDK already has.
  */
-@Suppress("LongParameterList") // Every parameter is one entry in the build file's `endpoints { }` block.
 fun importEndpoints(
     document: File,
     sourceRoot: File,
@@ -81,7 +80,7 @@ fun importEndpoints(
     sourceRoot,
 )
 
-@Suppress("LongParameterList") // The arity before `allowRemote`, kept for an older plugin to find.
+// The arity before `allowRemote`, kept for an older plugin to find.
 fun importEndpoints(
     document: File,
     sourceRoot: File,
@@ -104,7 +103,7 @@ fun importEndpoints(
     null,
 )
 
-@Suppress("LongParameterList") // The arity before `discriminators`, kept for an older plugin to find.
+// The arity before `discriminators`, kept for an older plugin to find.
 fun importEndpoints(
     document: File,
     sourceRoot: File,

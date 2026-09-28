@@ -208,7 +208,6 @@ fun HeaderParam<*>.decodeList(wire: List<String>): Any? =
 fun CookieParam<*>.decodeList(wire: List<String>): Any? =
     listValue(name, codec, listStyle, required, default, "cookie", wire)
 
-@Suppress("LongParameterList") // The declaration's facets, from three classes with no common supertype.
 private fun listValue(
     name: String,
     codec: PlainCodec<*>,

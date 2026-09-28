@@ -649,7 +649,6 @@ private fun reconnectionNote(out: SseOutput<*>): String =
  * everywhere it is used. Refinements ride along in the schema, so the document
  * states the constraint the server enforces.
  */
-@Suppress("LongParameterList") // One declaration's facets; they travel together.
 private fun parameter(
     name: String,
     location: String,

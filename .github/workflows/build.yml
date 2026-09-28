@@ -22,16 +22,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 21 is the toolchain the modules compile against, so it is what the
-        # published bytecode has to keep working on; 23 and 25 are what the repo
-        # is developed and run on. Each job compiles to 21 and runs the suites on
-        # its own JDK, so the three rows are three runtimes rather than three
-        # spellings of 21 — which is what they were until spec 0049.
+        # 25 is the toolchain and the floor: the first LTS where `synchronized` no longer pins a virtual
+        # thread's carrier. Each job compiles to 25 and runs the suites on its own JDK.
         include:
-          - java: "21"
-            gradleArgs: ""
-          - java: "23"
-            gradleArgs: ""
           - java: "25"
             gradleArgs: ""
 
@@ -70,7 +63,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
 
@@ -100,7 +93,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/dependency-submission@v6
 
@@ -119,7 +112,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
 

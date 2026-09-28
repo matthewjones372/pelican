@@ -6,7 +6,6 @@ import java.io.File
 // The parameter list is the point: this stands in for a signature the plugin
 // hunts for by name and by type, so it has to be exactly the one the library
 // publishes — the receiver of the real extension function included.
-@Suppress("LongParameterList")
 fun writeKotlinClient(
     spec: ApiSpec,
     sourceRoot: File,

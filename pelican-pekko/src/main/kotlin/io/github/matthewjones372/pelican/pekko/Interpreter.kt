@@ -131,7 +131,6 @@ private fun ((Params) -> CompletionStage<Any?>).on(
  * hand-written ones passes on what it does not describe — the property
  * `ConcatenatedRoutesTest` and `MountedAlongsideTest` are about.
  */
-@Suppress("LongParameterList") // The route's whole world, resolved once and captured.
 private fun methodRoute(
     method: Method,
     api: Api,

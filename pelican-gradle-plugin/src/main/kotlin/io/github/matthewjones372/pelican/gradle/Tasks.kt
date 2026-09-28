@@ -12,12 +12,14 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.UntrackedTask
 import org.gradle.api.tasks.options.Option
+import org.gradle.jvm.toolchain.JavaLauncher
 import org.gradle.work.DisableCachingByDefault
 import org.gradle.workers.WorkerExecutor
 import javax.inject.Inject
@@ -37,6 +39,11 @@ abstract class PelicanTask : DefaultTask() {
     @get:Inject
     abstract val workers: WorkerExecutor
 
+    /** The JDK the project compiles for, if it has a toolchain. */
+    @get:Nested
+    @get:Optional
+    abstract val launcher: Property<JavaLauncher>
+
     init {
         group = "pelican"
     }
@@ -46,8 +53,19 @@ abstract class PelicanTask : DefaultTask() {
      * reflective call, and a JVM per client would cost more than generating
      * does. Isolated from Gradle's own classpath, so their Jackson and
      * Gradle's cannot be the same Jackson.
+     *
+     * A project built for a newer JDK than Gradle runs on has classes Gradle's
+     * JVM cannot load, so there the work goes to a process on the project's JDK.
      */
-    protected fun queue() = workers.classLoaderIsolation { it.classpath.from(classpath) }
+    protected fun queue() = launcher.orNull
+        ?.takeIf { it.metadata.languageVersion.asInt() > Runtime.version().feature() }
+        ?.let { newer ->
+            workers.processIsolation {
+                it.forkOptions.executable = newer.executablePath.asFile.absolutePath
+                it.classpath.from(classpath)
+            }
+        }
+        ?: workers.classLoaderIsolation { it.classpath.from(classpath) }
 }
 
 /**

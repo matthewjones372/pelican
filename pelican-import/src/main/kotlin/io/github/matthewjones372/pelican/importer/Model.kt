@@ -8,7 +8,6 @@ import io.github.matthewjones372.pelican.ListStyle
  * What an imported document looks like once the OpenAPI-shaped noise is gone.
  */
 
-@Suppress("LongParameterList") // A document, field for field: every parameter is one of them.
 internal class IrApi(
     val title: String,
     val version: String,
@@ -29,7 +28,6 @@ internal class IrWebhook(val name: String, val operation: IrEndpoint) {
     override fun toString() = "webhook $name (${operation.method})"
 }
 
-@Suppress("LongParameterList") // A description record, as core's Endpoint is: every parameter is a facet.
 internal class IrEndpoint(
     val operationId: String,
     val method: String,

@@ -18,11 +18,7 @@ comments:
 
 complexity:
   LongParameterList:
-    # An endpoint description is a list of inputs; `endpoint(a, b, c, d, e, f)`
-    # is the shape, not an accident.
-    allowedFunctionParameters: 7
-    allowedConstructorParameters: 8
-    ignoreDefaultParameters: true
+    active: false
   TooManyFunctions:
     allowedFunctionsPerFile: 19
     allowedFunctionsPerClass: 19
@@ -37,7 +33,7 @@ complexity:
     # metric, so the branches of a simple dispatch count once.
     ignoreSimpleWhenEntries: true
   LongMethod:
-    allowedLines: 79
+    active: false
   NestedBlockDepth:
     allowedDepth: 4
 

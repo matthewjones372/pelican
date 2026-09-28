@@ -346,7 +346,6 @@ private fun ClientRequest.Body.stream(): InputStream = when (this) {
  * and a cookie disagree about, and that disagreement is already resolved by the
  * time this is called.
  */
-@Suppress("LongParameterList") // One declaration's facets, from three classes with no common supertype.
 private fun single(
     raw: String?,
     name: String,
