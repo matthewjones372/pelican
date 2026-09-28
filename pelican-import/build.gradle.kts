@@ -18,5 +18,5 @@
 // reached through the Gradle plugin's `generate<Name>Endpoints` task.
 dependencies {
     api(project(":pelican-codegen"))
-    implementation("org.snakeyaml:snakeyaml-engine:2.10")
+    implementation("org.snakeyaml:snakeyaml-engine:3.1.1")
 }
