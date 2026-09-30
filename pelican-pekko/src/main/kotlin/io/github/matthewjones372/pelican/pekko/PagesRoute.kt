@@ -27,7 +27,8 @@ internal fun pagesRoute(pages: Pages, cors: CorsPolicy?): Route = Directives.get
         val resolved = below?.let { pages.resolve(it, ::isFile) }
         // The query too: a page that is `account.html?id=acc-1` has to come back as that, not as account.html.
         val asked = request.uri.rawQueryString().map { "$path?$it" }.orElse(path)
-        val sendTo = resolved?.takeUnless { it.redirect }?.let { pages.guard?.redirectFor(asked, request.credentials()) }
+        val sendTo = resolved?.takeUnless { it.redirect }
+            ?.let { pages.guard?.redirectFor(asked, request.credentials()) }
         when {
             resolved == null -> Directives.reject()
 
