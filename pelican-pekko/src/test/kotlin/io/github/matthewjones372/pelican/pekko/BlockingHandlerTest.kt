@@ -7,7 +7,8 @@ import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.orFail
 import io.kotest.assertions.withClue
-import io.kotest.matchers.comparables.shouldBeLessThan
+import io.kotest.matchers.ints.shouldBeGreaterThan
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.actor.testkit.typed.annotations.JUnit5TestKit
 import org.apache.pekko.actor.testkit.typed.javadsl.ActorTestKit
@@ -20,8 +21,8 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.time.Duration
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicInteger
 
 data class BlockingRefusal(val reason: String)
 
@@ -75,7 +76,12 @@ class BlockingHandlerTest {
     private val api = api(
         endpoints = listOf(
             slow handledNow {
-                Thread.sleep(HALF_A_SECOND)
+                peak.accumulateAndGet(asleep.incrementAndGet(), ::maxOf)
+                try {
+                    Thread.sleep(HALF_A_SECOND)
+                } finally {
+                    asleep.decrementAndGet()
+                }
                 "done"
             },
             where handledNow { if (Thread.currentThread().isVirtual) "virtual" else "platform" },
@@ -85,6 +91,10 @@ class BlockingHandlerTest {
         ),
         codecs = JacksonCodecs,
     )
+
+    /** How many slow handlers are asleep at once, and the most there have been. */
+    private val asleep = AtomicInteger()
+    private val peak = AtomicInteger()
 
     private val client = HttpClient.newHttpClient()
 
@@ -100,17 +110,31 @@ class BlockingHandlerTest {
         }
     }
 
+    /**
+     * Counted rather than timed: a wall-clock bound failed on a loaded machine
+     * while the handlers were plainly running together. Two dispatcher threads
+     * can hold at most two sleeping handlers, so more than two asleep at once
+     * is the claim, and the dispatcher test below shows it can fail.
+     */
     @Test
     fun `handlers that block do not queue behind each other on the dispatcher`() = serving { base ->
-        val started = System.nanoTime()
+        peak.set(0)
         val answers = (1..CALLS).map { get("$base/slow") }.map { it.join() }
-        val took = Duration.ofNanos(System.nanoTime() - started)
 
         answers.map { it.body() }.distinct() shouldBe listOf("done")
-        withClue("$CALLS calls of half a second on two dispatcher threads took $took") {
-            took shouldBeLessThan Duration.ofSeconds(2)
+        withClue("the most slow handlers asleep at once, of $CALLS sent together") {
+            peak.get() shouldBeGreaterThan DISPATCHER_THREADS
         }
     }
+
+    @Test
+    fun `whereas on the dispatcher no more sleep at once than it has threads`() =
+        serving(Handlers.onDispatcher) { base ->
+            peak.set(0)
+            (1..DISPATCHER_CALLS).map { get("$base/slow") }.forEach { it.join() }
+
+            peak.get() shouldBeLessThanOrEqual DISPATCHER_THREADS
+        }
 
     @Test
     fun `a synchronous handler runs on a virtual thread`() = serving { base ->
@@ -136,6 +160,8 @@ class BlockingHandlerTest {
 
     private companion object {
         const val CALLS = 16
+        const val DISPATCHER_CALLS = 6
+        const val DISPATCHER_THREADS = 2
         const val HALF_A_SECOND = 500L
     }
 }
