@@ -111,13 +111,14 @@ Nothing in Pelican's current modules beyond pages (spec 0059) for the sign-in ro
 ./gradlew :pelican-core:check :pelican-oidc:check :example:build
 ```
 
-## Open questions
+## Decisions
 
-1. **Which JWT library?** Recommended: Nimbus JOSE + JWT, the de facto Java choice, in `pelican-oidc` only. Alternative:
-   verify with the JDK's own `java.security` and a small parser, which is less to depend on and more to get right.
-2. **Sessions for pages: cookie or server-side?** Recommended: an encrypted cookie, so nothing is shared between nodes.
-   Alternative: a session id and a store, which can be revoked at once.
-3. **Refresh tokens?** Recommended: not kept; a session lasts as long as the provider's token, then the person signs in
-   again (silently, if the provider's own session is still alive).
-4. **Where does acting-as start?** Recommended: Pelican verifies an `act` claim and hands it over; minting such a
-   session (after an approved grant) is the service's, through `oidc.actAs(subject, grant)`.
+Each open question in the draft took its recommendation.
+
+1. **JWT library:** Nimbus JOSE + JWT, in `pelican-oidc` only; pelican-core stays on the Kotlin standard library.
+2. **Sessions for pages:** an encrypted, signed cookie, so nothing is shared between nodes. Revoking one before it
+   ends is the provider's job: the session lasts no longer than its token.
+3. **Refresh tokens:** not kept. A session lasts as long as the provider's token, then the person signs in again,
+   silently if the provider's own session is still alive.
+4. **Acting-as:** Pelican verifies an `act` claim, or the session's own actor, and hands it over. Minting such a
+   session is the service's, through `oidc.actAs(subject, grant)`, after the service has decided the grant is good.
