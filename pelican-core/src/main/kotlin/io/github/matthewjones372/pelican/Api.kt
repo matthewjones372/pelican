@@ -227,7 +227,10 @@ class Api internal constructor(
     /** Files served beside the endpoints (spec 0059); null serves none. An endpoint's path wins over a page. */
     val pages: Pages? = null,
 
-    /** What verifies each scheme a caller is declared under; a scheme some endpoint needs and none verifies fails here. */
+    /**
+     * What verifies each scheme a caller is declared under. A scheme some
+     * endpoint needs and none verifies fails here, not on every request.
+     */
     val authenticators: Map<SecurityScheme, Authenticator> = emptyMap(),
 ) {
     /**

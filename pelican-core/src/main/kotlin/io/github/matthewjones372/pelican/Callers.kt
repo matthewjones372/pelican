@@ -61,7 +61,7 @@ class CallerInput<T> @PublishedApi internal constructor(
         } catch (e: Unauthenticated) {
             // A bad credential is refused even where anyone may call: the
             // caller meant to be someone, and answering as no one would hide it.
-            throw unauthorized(e.message ?: "The credential did not verify", error = "invalid_token")
+            throw unauthorized(e.message ?: "The credential did not verify", error = "invalid_token", cause = e)
         }
         return when {
             identity != null -> build(identity)
@@ -70,10 +70,11 @@ class CallerInput<T> @PublishedApi internal constructor(
         }
     }
 
-    private fun unauthorized(message: String, error: String?): ApiException = ApiException(
+    private fun unauthorized(message: String, error: String?, cause: Throwable? = null): ApiException = ApiException(
         401,
         message,
         headers = listOf("WWW-Authenticate" to challenge(error)),
+        cause = cause,
     )
 
     /** RFC 6750's challenge for a bearer scheme, and the scheme's own name otherwise. */
