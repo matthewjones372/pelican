@@ -5,7 +5,15 @@ package io.github.matthewjones372.pelican
  * [at]. An endpoint's path always wins over a page, so adding a page never hides a route. Pages are not endpoints:
  * the document does not list them, and filters, which wrap a handler, do not run for them.
  */
-class Pages internal constructor(val resources: String, val at: String) {
+class Pages internal constructor(
+    val resources: String,
+    val at: String,
+    /** Asked before a page is served; null serves every page to anyone. */
+    val guard: PageGuard? = null,
+) {
+
+    /** The same pages, served only where [guard] lets them be. */
+    fun guardedBy(guard: PageGuard): Pages = Pages(resources, at, guard)
 
     /**
      * Which file answers [path], the request's path below [at] without its leading slash, as a classpath resource
@@ -33,6 +41,15 @@ class Pages internal constructor(val resources: String, val at: String) {
 
     /** The resource that answers, and whether the request is sent to the same path with a trailing slash instead. */
     data class Resolved(val resource: String, val redirect: Boolean)
+}
+
+/**
+ * Whether a page is served to this request: null serves it, anything else is
+ * where the browser is sent instead, as a sign-in page sends someone who has
+ * not signed in.
+ */
+fun interface PageGuard {
+    fun redirectFor(path: String, credentials: Credentials): String?
 }
 
 /** The classpath directory [resources] served under [at]: `pages = pages("ui")` in `api`'s block. */

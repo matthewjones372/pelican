@@ -2626,6 +2626,35 @@ algorithm. An unknown key id fetches the keys again at most once a minute.
 not the caller's 401. That fetch runs on the thread deciding the request, which
 is rare but not free.
 
+**Signing people in to pages** is `signIn` on the same value: the
+authorization-code flow with PKCE, then a session in a cookie the service
+encrypts (AES-256-GCM, with its own 32-byte key), so nothing is stored on the
+server.
+
+```kotlin
+val signIn = pocketId.signIn(
+    clientId = "bank-pages",
+    callbackUrl = "https://bank.home.arpa/callback",
+    sessionKey = sessionKeyFromYourSecrets,
+)
+
+api(routes + signIn.endpoints, codecs = JacksonCodecs) {
+    authenticate(pocketId.scheme, signIn.authenticator)   // a bearer token, or the session
+    pages = pages("ui").guardedBy(signIn.guard)            // not signed in: to /login and back
+}
+```
+
+- `signIn.endpoints` are `/login`, `/callback` and `/logout`, hidden from the
+  document. `/login?return=/accounts` comes back to that path; anything but a
+  path on this site comes back to `/`, so sign-in is not an open redirect.
+- The session cookie is `HttpOnly`, `Secure` and `SameSite=Lax`, and lasts as
+  long as the provider's ID token. No refresh tokens: then the person signs in
+  again, silently if the provider's own session is alive.
+- A session cookie that no longer opens, or has expired, is nobody rather than
+  a 401, since browsers keep sending old cookies.
+- Guarded pages are sent with `Cache-Control: no-store`, so the browser does not
+  keep a copy that would still show after signing out.
+
 Tests call as anyone with `pelican-test`'s `TestCallers`, which reads
 `Authorization: Bearer <subject>`:
 

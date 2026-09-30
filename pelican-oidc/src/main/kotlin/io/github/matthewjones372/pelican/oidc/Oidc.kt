@@ -17,6 +17,7 @@ import io.github.matthewjones372.pelican.OpenIdConnectScheme
 import io.github.matthewjones372.pelican.Unauthenticated
 import io.github.matthewjones372.pelican.openIdConnect
 import java.net.URI
+import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -29,9 +30,16 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 
+/** The provider answered, and the answer was no: a 4xx or 5xx rather than no answer at all. */
+class ProviderRefused(val status: Int, message: String) : RuntimeException(message)
+
 /** A URL's body: the network in production, a map in a test. */
 fun interface Fetch {
     fun get(url: String): String
+
+    /** A form posted, as a token endpoint takes one. Only signing people in to pages needs it. */
+    fun post(url: String, form: Map<String, String>): String =
+        throw UnsupportedOperationException("This Fetch only reads; signing in posts to $url")
 }
 
 /**
@@ -137,12 +145,43 @@ class Oidc internal constructor(
 
     private fun load(): Keys = Keys(JWKSet.parse(fetchOrUnavailable(jwksUri())), clock.instant()).also(keys::set)
 
-    private fun jwksUri(): String {
-        val discovery = JSONObjectUtils.parse(fetchOrUnavailable(discoveryUrl(issuer)))
-        val published = discovery["issuer"] as? String
-        check(published == issuer) { "The provider at $issuer says it is $published" }
-        return discovery["jwks_uri"] as? String ?: error("The provider at $issuer publishes no jwks_uri")
+    private fun jwksUri(): String = endpoint("jwks_uri")
+
+    private val discovered = AtomicReference<Map<String, Any?>?>(null)
+
+    /** A URL the discovery document names, fetched once and kept. */
+    internal fun endpoint(name: String): String = optionalEndpoint(name)
+        ?: error("The provider at $issuer publishes no $name")
+
+    internal fun optionalEndpoint(name: String): String? {
+        val discovery = discovered.get() ?: JSONObjectUtils.parse(fetchOrUnavailable(discoveryUrl(issuer))).also {
+            val published = it["issuer"] as? String
+            check(published == issuer) { "The provider at $issuer says it is $published" }
+            discovered.set(it)
+        }
+        return discovery[name] as? String
     }
+
+    /** The same provider verifying tokens issued to [other]: a page's ID token is for its client, not the API. */
+    internal fun forAudience(other: String): Oidc = Oidc(
+        issuer, other, groupsClaim, nameClaim, algorithms, leeway, refetchAfter, clock, fetch, scheme.name,
+    )
+
+    /** A form posted to the provider, answered as JSON; unreachable is 503, as a fetch is. */
+    @Suppress("TooGenericExceptionCaught") // Whatever the post throws, the answer is the same 503.
+    internal fun post(url: String, form: Map<String, String>): Map<String, Any?> {
+        val body = try {
+            fetch.post(url, form)
+        } catch (e: ProviderRefused) {
+            // A code used twice, expired, or never issued: the sign-in is over, and the person starts again.
+            throw ApiException(400, "The identity provider refused this sign-in", cause = e)
+        } catch (e: Exception) {
+            throw ApiException(503, "The identity provider could not be reached", cause = e)
+        }
+        return JSONObjectUtils.parse(body)
+    }
+
+    internal val now: Instant get() = clock.instant()
 
     /** A provider that cannot be reached is this service's trouble, not the caller's: 503, not 401. */
     @Suppress("TooGenericExceptionCaught") // Whatever the fetch throws, the answer is the same 503.
@@ -195,6 +234,22 @@ class HttpFetch(private val timeout: Duration = 2.seconds) : Fetch {
         val request = HttpRequest.newBuilder(URI.create(url)).timeout(timeout.toJavaDuration()).GET().build()
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
         check(response.statusCode() in SUCCESS) { "$url answered ${response.statusCode()}" }
+        return response.body()
+    }
+
+    override fun post(url: String, form: Map<String, String>): String {
+        val encoded = form.entries.joinToString("&") { (k, v) ->
+            URLEncoder.encode(k, Charsets.UTF_8) + "=" + URLEncoder.encode(v, Charsets.UTF_8)
+        }
+        val request = HttpRequest.newBuilder(URI.create(url))
+            .timeout(timeout.toJavaDuration())
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(encoded))
+            .build()
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() !in
+            SUCCESS
+        ) throw ProviderRefused(response.statusCode(), "$url answered ${response.statusCode()}")
         return response.body()
     }
 }

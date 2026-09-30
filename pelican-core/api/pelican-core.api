@@ -1121,9 +1121,15 @@ public final class io/github/matthewjones372/pelican/OutputsKt {
 	public static synthetic fun text$default (I[Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/TextOutput;
 }
 
+public abstract interface class io/github/matthewjones372/pelican/PageGuard {
+	public abstract fun redirectFor (Ljava/lang/String;Lio/github/matthewjones372/pelican/Credentials;)Ljava/lang/String;
+}
+
 public final class io/github/matthewjones372/pelican/Pages {
 	public final fun getAt ()Ljava/lang/String;
+	public final fun getGuard ()Lio/github/matthewjones372/pelican/PageGuard;
 	public final fun getResources ()Ljava/lang/String;
+	public final fun guardedBy (Lio/github/matthewjones372/pelican/PageGuard;)Lio/github/matthewjones372/pelican/Pages;
 	public final fun resolve (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/Pages$Resolved;
 }
 

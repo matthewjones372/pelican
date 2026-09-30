@@ -25,17 +25,26 @@ internal fun pagesRoute(pages: Pages, cors: CorsPolicy?): Route = Directives.get
             else -> null
         }
         val resolved = below?.let { pages.resolve(it, ::isFile) }
+        val sendTo = resolved?.takeUnless { it.redirect }?.let { pages.guard?.redirectFor(path, request.credentials()) }
         when {
             resolved == null -> Directives.reject()
 
             resolved.redirect -> Directives.redirect(Uri.create("$path/"), StatusCodes.MOVED_PERMANENTLY)
 
-            cors == null -> Directives.getFromResource(resolved.resource)
+            // A guard's answer is a place to go now, not where the page lives: 302, not 301.
+            sendTo != null -> Directives.redirect(Uri.create(sendTo), StatusCodes.FOUND)
 
             else -> {
                 val origin = request.getHeader("Origin").orElse(null)?.value()
-                val headers = cors.actualResponseHeaders(origin).map { (name, value) -> RawHeader.create(name, value) }
-                Directives.respondWithHeaders(headers) { Directives.getFromResource(resolved.resource) }
+                val allowed = cors?.actualResponseHeaders(origin).orEmpty()
+                // A page behind a guard is someone's own: a copy kept by the browser would outlive signing out.
+                val private = if (pages.guard != null) listOf("Cache-Control" to "no-store") else emptyList()
+                val headers = (allowed + private).map { (name, value) -> RawHeader.create(name, value) }
+                if (headers.isEmpty()) {
+                    Directives.getFromResource(resolved.resource)
+                } else {
+                    Directives.respondWithHeaders(headers) { Directives.getFromResource(resolved.resource) }
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.pekko
 
 import com.typesafe.config.ConfigFactory
+import io.github.matthewjones372.pelican.PageGuard
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.cors
 import io.github.matthewjones372.pelican.div
@@ -44,12 +45,17 @@ class PagesServedTest {
         text()
     }
 
-    private fun served(block: (String) -> Unit) {
+    /** Admits a request carrying `Cookie: signed-in=yes`, and sends anyone else to sign in. */
+    private val signedIn = PageGuard { path, credentials ->
+        if (credentials.cookie("signed-in") == "yes") null else "/login?return=$path"
+    }
+
+    private fun served(guarded: Boolean = false, block: (String) -> Unit) {
         val server = api(
             endpoints = listOf(about handledNow { "the endpoint" }, opsStream handledNow { "a stream" }),
             codecs = JacksonCodecs,
         ) {
-            pages = pages("pages-test")
+            pages = pages("pages-test").let { if (guarded) it.guardedBy(signedIn) else it }
             cors = cors("https://bank.example")
         }.start(testKit.system(), port = 0)
         try {
@@ -109,5 +115,25 @@ class PagesServedTest {
     fun `a page carries the API's CORS headers for an allowed origin`() = served { base ->
         get("$base/app.js", "Origin", "https://bank.example")
             .headers().firstValue("Access-Control-Allow-Origin").orElse(null) shouldBe "https://bank.example"
+    }
+
+    @Test
+    fun `a guarded page sends a stranger where the guard says, and is kept by nobody's cache`() =
+        served(guarded = true) { base ->
+            val stranger = get("$base/ops")
+            stranger.statusCode() shouldBe 302
+            stranger.headers().firstValue("Location").get() shouldBe "/login?return=/ops"
+
+            val known = get("$base/ops", "Cookie", "signed-in=yes")
+            known.statusCode() shouldBe 200
+            known.headers().firstValue("Cache-Control").get() shouldBe "no-store"
+
+            // An endpoint is not a page: the guard is not asked, and its own caller rules apply.
+            get("$base/about").body() shouldBe "the endpoint"
+        }
+
+    @Test
+    fun `an unguarded page is cacheable as before`() = served { base ->
+        get("$base/ops").headers().firstValue("Cache-Control").isPresent shouldBe false
     }
 }

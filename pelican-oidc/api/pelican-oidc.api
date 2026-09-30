@@ -1,5 +1,6 @@
 public abstract interface class io/github/matthewjones372/pelican/oidc/Fetch {
 	public abstract fun get (Ljava/lang/String;)Ljava/lang/String;
+	public fun post (Ljava/lang/String;Ljava/util/Map;)Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/oidc/HttpFetch : io/github/matthewjones372/pelican/oidc/Fetch {
@@ -7,6 +8,7 @@ public final class io/github/matthewjones372/pelican/oidc/HttpFetch : io/github/
 	public synthetic fun <init> (JILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun get (Ljava/lang/String;)Ljava/lang/String;
+	public fun post (Ljava/lang/String;Ljava/util/Map;)Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/oidc/Oidc : io/github/matthewjones372/pelican/Authenticator {
@@ -20,5 +22,21 @@ public final class io/github/matthewjones372/pelican/oidc/Oidc : io/github/matth
 public final class io/github/matthewjones372/pelican/oidc/OidcKt {
 	public static final fun oidc-uu1qWtI (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;JJLjava/time/Clock;Lio/github/matthewjones372/pelican/oidc/Fetch;Ljava/lang/String;)Lio/github/matthewjones372/pelican/oidc/Oidc;
 	public static synthetic fun oidc-uu1qWtI$default (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;JJLjava/time/Clock;Lio/github/matthewjones372/pelican/oidc/Fetch;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/oidc/Oidc;
+}
+
+public final class io/github/matthewjones372/pelican/oidc/ProviderRefused : java/lang/RuntimeException {
+	public fun <init> (ILjava/lang/String;)V
+	public final fun getStatus ()I
+}
+
+public final class io/github/matthewjones372/pelican/oidc/SignIn {
+	public final fun getAuthenticator ()Lio/github/matthewjones372/pelican/Authenticator;
+	public final fun getEndpoints ()Ljava/util/List;
+	public final fun getGuard ()Lio/github/matthewjones372/pelican/PageGuard;
+}
+
+public final class io/github/matthewjones372/pelican/oidc/SignInKt {
+	public static final fun signIn (Lio/github/matthewjones372/pelican/oidc/Oidc;Ljava/lang/String;Ljava/lang/String;[BLjava/lang/String;Ljava/util/List;Ljava/lang/String;)Lio/github/matthewjones372/pelican/oidc/SignIn;
+	public static synthetic fun signIn$default (Lio/github/matthewjones372/pelican/oidc/Oidc;Ljava/lang/String;Ljava/lang/String;[BLjava/lang/String;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/oidc/SignIn;
 }
 

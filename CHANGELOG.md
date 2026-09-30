@@ -372,6 +372,13 @@ still there, and the only new ones are the module's own.
   first use, refetched on an unknown key id at most once a minute), issuer,
   audience, expiry with leeway, and an algorithm allow-list that never admits
   `none` or HMAC. Groups from a claim. An unreachable provider is a 503.
+- **Signing in to pages (spec 0061).** `oidc(...).signIn(clientId, callbackUrl,
+  sessionKey)` gives `/login`, `/callback` and `/logout` (authorization code
+  with PKCE, state and nonce), an encrypted `HttpOnly` session cookie, an
+  `authenticator` taking a bearer token or that session, and a `guard` for
+  pages. `pages(...).guardedBy(guard)` is new in core: a page asked for without
+  the guard's say-so is a 302 to where it points, and guarded pages are sent
+  `Cache-Control: no-store`.
 - **`pelican-arrow`: an `Either` with several declared failures (spec 0060).**
   `either.toOutcome { left -> declared(...) }` names the declaration each
   `Left` becomes, and a `Right` is `ok`. The lambda can only answer a failure.

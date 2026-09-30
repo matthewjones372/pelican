@@ -544,7 +544,7 @@ private fun invoke(
 }
 
 /** Cookies parsed by core, as [decodeCookies] does, so a session reads the same on every backend. */
-private fun HttpRequest.credentials(): Credentials = object : Credentials {
+internal fun HttpRequest.credentials(): Credentials = object : Credentials {
     override fun header(name: String): String? = getHeader(name).orElse(null)?.value()
 
     override fun cookie(name: String): String? = Cookies.parseAll(headerValues("Cookie"))[name]?.firstOrNull()

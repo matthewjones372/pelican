@@ -109,7 +109,7 @@ Nothing in Pelican's current modules beyond pages (spec 0059) for the sign-in ro
       checks, groups from a claim.
       Done when: tests against a local signing key refuse an expired token, a wrong audience, an unknown key id twice,
       `alg: none` and an HMAC token signed with the public key, and accept a valid one.
-- [ ] **`spec-0061-pages`** — `/login`, `/callback` and `/logout`, PKCE, the encrypted session cookie.
+- [x] **`spec-0061-pages`** — `/login`, `/callback` and `/logout`, PKCE, the encrypted session cookie.
       Done when: a Playwright test against a stub provider signs in, sees a page that shows the caller's name, signs
       out, and is sent back to `/login`.
 - [ ] **`spec-0061-actor`** — the actor claim, verified and handed over.
