@@ -221,4 +221,25 @@ class OidcTest {
         val unknownKey = signed(claims(expires = clock.at.plusSeconds(300)), key = rotated)
         client.signedInAs(unknownKey).response(whoAmI, Unit).status shouldBe 503
     }
+
+    private fun actedBy(actor: String) =
+        JWTClaimsSet.Builder(claims()).claim("act", mapOf("sub" to actor)).build()
+
+    @Test
+    fun `a token with act names who is really there, apart from whom it is about`() {
+        val acting = verify(signed(actedBy("bob")))!!
+
+        acting.subject shouldBe "ada"
+        acting.actor shouldBe "bob"
+    }
+
+    @Test
+    fun `a token without one is the subject acting as themselves`() {
+        verify(signed())!!.actor shouldBe null
+    }
+
+    @Test
+    fun `and an act naming the subject is no one else`() {
+        verify(signed(actedBy("ada")))!!.actor shouldBe null
+    }
 }

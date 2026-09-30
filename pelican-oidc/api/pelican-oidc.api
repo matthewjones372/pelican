@@ -30,9 +30,11 @@ public final class io/github/matthewjones372/pelican/oidc/ProviderRefused : java
 }
 
 public final class io/github/matthewjones372/pelican/oidc/SignIn {
+	public final fun actAs (Lio/github/matthewjones372/pelican/Credentials;Ljava/lang/String;Ljava/time/Instant;)Ljava/lang/String;
 	public final fun getAuthenticator ()Lio/github/matthewjones372/pelican/Authenticator;
 	public final fun getEndpoints ()Ljava/util/List;
 	public final fun getGuard ()Lio/github/matthewjones372/pelican/PageGuard;
+	public final fun stopActing (Lio/github/matthewjones372/pelican/Credentials;)Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/oidc/SignInKt {

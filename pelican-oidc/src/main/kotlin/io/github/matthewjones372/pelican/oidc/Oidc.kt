@@ -116,11 +116,18 @@ class Oidc internal constructor(
             subject = subject,
             name = claims.getClaim(nameClaim) as? String,
             groups = groupsOf(claims.getClaim(groupsClaim)),
+            actor = actorOf(claims.getClaim("act"))?.takeUnless { it == subject },
             claims = claims.claims,
         )
     }
 
     private fun refuse(reason: String): Nothing = throw Unauthenticated(reason)
+
+    /**
+     * RFC 8693's `act`: who is really there. Only the outermost is read; a
+     * chain of earlier actors is in [Identity.claims] for whoever wants it.
+     */
+    private fun actorOf(claim: Any?): String? = (claim as? Map<*, *>)?.get("sub") as? String
 
     /** A list, as most providers send it, or one group as a bare string. */
     private fun groupsOf(claim: Any?): Set<String> = when (claim) {

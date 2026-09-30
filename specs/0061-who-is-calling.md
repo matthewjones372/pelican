@@ -112,7 +112,7 @@ Nothing in Pelican's current modules beyond pages (spec 0059) for the sign-in ro
 - [x] **`spec-0061-pages`** — `/login`, `/callback` and `/logout`, PKCE, the encrypted session cookie.
       Done when: a Playwright test against a stub provider signs in, sees a page that shows the caller's name, signs
       out, and is sent back to `/login`.
-- [ ] **`spec-0061-actor`** — the actor claim, verified and handed over.
+- [x] **`spec-0061-actor`** — the actor claim, verified and handed over.
       Done when: a token with `act` gives an identity whose subject and actor differ, and one without gives the same.
 
 ## Acceptance
@@ -131,6 +131,7 @@ Each open question in the draft took its recommendation.
 3. **Refresh tokens:** not kept. A session lasts as long as the provider's token, then the person signs in again,
    silently if the provider's own session is still alive.
 4. **Acting-as:** Pelican verifies an `act` claim, or the session's own actor, and hands it over. Minting such a
-   session is the service's, through `oidc.actAs(subject, grant)`, after the service has decided the grant is good.
+   session is the service's, through `signIn.actAs(credentials, subject, until)`, after the service has decided the grant
+   is good (renamed while building: the grant never reaches Pelican, only the service's decision and when it ends).
 5. **Caller shape** (settled while building): declared with `authenticatedBy(caller)` and read as `this[caller]`,
    not a slot in the input tuple; verification bound on the Api with `authenticate(scheme, by)`.

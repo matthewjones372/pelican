@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.oidc
 import com.microsoft.playwright.BrowserType
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.Playwright
+import io.github.matthewjones372.pelican.Credentials
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.authenticated
@@ -25,6 +26,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Paths
+import java.time.Instant
 import java.util.concurrent.CompletableFuture
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -48,8 +50,17 @@ class SignInTest {
         text()
     }
 
+    private val whoIsThere = authenticated(pocketId.scheme) { "${it.subject} by ${it.actor ?: "themselves"}" }
+    private val acting = endpoint {
+        get("acting")
+        authenticatedBy(whoIsThere)
+        text()
+    }
+
     private val server: PelicanServer = api(
-        signIn.endpoints + ServerEndpoint(me) { p -> CompletableFuture.completedStage(p[caller] as Any?) },
+        signIn.endpoints +
+            ServerEndpoint(me) { p -> CompletableFuture.completedStage(p[caller] as Any?) } +
+            ServerEndpoint(acting) { p -> CompletableFuture.completedStage(p[whoIsThere] as Any?) },
         codecs = JacksonCodecs,
     ) {
         authenticate(pocketId.scheme, signIn.authenticator)
@@ -194,5 +205,39 @@ class SignInTest {
     @Test
     fun `the API still takes a bearer token instead`() {
         get("/me", "Authorization" to "Bearer not-a-token").statusCode() shouldBe 401
+    }
+
+    private fun holding(cookie: String) = object : Credentials {
+        override fun header(name: String): String? = null
+        override fun cookie(name: String): String? =
+            cookie.substringBefore(';').takeIf { it.startsWith("$name=") }?.substringAfter('=')
+    }
+
+    private fun signedIn(): String = signInWithoutABrowser("/").headers().firstValue("Set-Cookie").get()
+
+    private fun whoIs(cookie: String): String = get("/acting", "Cookie" to cookie.substringBefore(';')).body()
+
+    @Test
+    fun `a session acting as someone is them, with the person signed in as its actor`() {
+        val ada = signedIn()
+        whoIs(ada) shouldBe "ada by themselves"
+
+        val asCarol = signIn.actAs(holding(ada), "carol", Instant.now().plusSeconds(60))!!
+        asCarol shouldContain "HttpOnly"
+        whoIs(asCarol) shouldBe "carol by ada"
+
+        whoIs(signIn.stopActing(holding(asCarol))!!) shouldBe "ada by themselves"
+    }
+
+    @Test
+    fun `acting ends by itself, and the person underneath is still signed in`() {
+        val lapsed = signIn.actAs(holding(signedIn()), "carol", Instant.now().minusSeconds(1))!!
+
+        whoIs(lapsed) shouldBe "ada by themselves"
+    }
+
+    @Test
+    fun `nobody signed in cannot start acting`() {
+        signIn.actAs(holding("pelican_session=nothing"), "carol", Instant.now().plusSeconds(60)) shouldBe null
     }
 }

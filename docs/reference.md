@@ -2655,6 +2655,21 @@ api(routes + signIn.endpoints, codecs = JacksonCodecs) {
 - Guarded pages are sent with `Cache-Control: no-store`, so the browser does not
   keep a copy that would still show after signing out.
 
+**Acting as someone else.** A token carrying RFC 8693's `act` claim is an
+identity whose `subject` is who the request is about and whose `actor` is who is
+really there; without one, `actor` is null. A signed-in page session can act
+too, once the service has decided someone may:
+
+```kotlin
+// After the service's own check that the grant is good:
+val cookie = signIn.actAs(credentials, subject = "ada", until = grant.expires)
+```
+
+That `Set-Cookie` makes every later request's identity Ada, with the person
+signed in as its actor, until `until` or the end of their own sign-in, whichever
+is first; then it is them again, not nobody. `signIn.stopActing(credentials)`
+ends it sooner. Pelican never decides whether acting is allowed, or for what.
+
 Tests call as anyone with `pelican-test`'s `TestCallers`, which reads
 `Authorization: Bearer <subject>`:
 

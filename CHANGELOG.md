@@ -379,6 +379,10 @@ still there, and the only new ones are the module's own.
   pages. `pages(...).guardedBy(guard)` is new in core: a page asked for without
   the guard's say-so is a 302 to where it points, and guarded pages are sent
   `Cache-Control: no-store`.
+- **Acting as someone else (spec 0061).** `pelican-oidc` reads RFC 8693's
+  `act` claim into `Identity.actor`, and `signIn.actAs(credentials, subject,
+  until)` / `stopActing(credentials)` give the `Set-Cookie` for a page session
+  acting as someone, which lapses back to the person signed in.
 - **`pelican-arrow`: an `Either` with several declared failures (spec 0060).**
   `either.toOutcome { left -> declared(...) }` names the declaration each
   `Left` becomes, and a `Right` is `ok`. The lambda can only answer a failure.

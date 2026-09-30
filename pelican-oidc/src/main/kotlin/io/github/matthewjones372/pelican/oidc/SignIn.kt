@@ -21,11 +21,13 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.responseHeader
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.text.ParseException
 import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 
@@ -129,13 +131,56 @@ class SignIn internal constructor(
      * was signed in last week still sends.
      */
     private fun session(credentials: Credentials): Identity? {
-        val idToken = credentials.cookie(SESSION_COOKIE)?.let(::unseal) ?: return null
-        return try {
+        val held = held(credentials) ?: return null
+        val acting = held.acting ?: return held.person
+        // Acting ends by itself; the person underneath is still signed in.
+        if (!provider.now.isBefore(acting.until)) return held.person
+        return Identity(
+            subject = acting.subject,
+            actor = held.person.subject,
+            claims = mapOf("acting_until" to acting.until),
+        )
+    }
+
+    /** The session's own ID token and the person it names, and whoever they are acting as, if anyone. */
+    private fun held(credentials: Credentials): Held? {
+        val fields = credentials.cookie(SESSION_COOKIE)?.let(::unseal)?.split(' ') ?: return null
+        val idToken = fields.first()
+        val person = try {
             idTokens.authenticate(bearer(idToken))
         } catch (_: Unauthenticated) {
             null
+        } ?: return null
+        val acting = fields.takeIf { it.size == ACTING_FIELDS }?.let { (_, subject, until) ->
+            Acting(URLDecoder.decode(subject, Charsets.UTF_8), Instant.ofEpochSecond(until.toLong()))
         }
+        return Held(idToken, person, acting)
     }
+
+    /**
+     * The `Set-Cookie` that turns the signed-in person's session into one
+     * acting as [subject] until [until], or null when nobody is signed in.
+     * Whether they may is the service's decision, made before this is called:
+     * this records it, and every request after says who is really there.
+     */
+    fun actAs(credentials: Credentials, subject: String, until: Instant): String? {
+        val held = held(credentials) ?: return null
+        val sealed = seal("${held.idToken} ${URLEncoder.encode(subject, Charsets.UTF_8)} ${until.epochSecond}")
+        return cookie(SESSION_COOKIE, sealed, held.lifetime())
+    }
+
+    /** The `Set-Cookie` that ends acting and leaves the person signed in as themselves; null when nobody is. */
+    fun stopActing(credentials: Credentials): String? {
+        val held = held(credentials) ?: return null
+        return cookie(SESSION_COOKIE, seal(held.idToken), held.lifetime())
+    }
+
+    private fun Held.lifetime(): Duration =
+        Duration.between(provider.now, (person.claims["exp"] as java.util.Date).toInstant())
+
+    private class Held(val idToken: String, val person: Identity, val acting: Acting?)
+
+    private class Acting(val subject: String, val until: Instant)
 
     private fun exchange(code: String, flow: Flow): Pair<String, Identity> {
         val answer = provider.post(
@@ -242,6 +287,7 @@ private const val UNAUTHORIZED = 401
 private const val BAD_GATEWAY = 502
 private const val TOKEN_BYTES = 32
 private const val FLOW_FIELDS = 4
+private const val ACTING_FIELDS = 3
 private val LOGIN_LIFETIME: Duration = Duration.ofMinutes(10)
 
 /** Only a path on this site: `//evil.example` and `https://…` would make sign-in an open redirect. */
