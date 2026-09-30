@@ -123,6 +123,8 @@ class PagesServedTest {
             val stranger = get("$base/ops")
             stranger.statusCode() shouldBe 302
             stranger.headers().firstValue("Location").get() shouldBe "/login?return=/ops"
+            // The query is part of the page asked for, so the guard can send someone back to all of it.
+            get("$base/ops?tab=ledger").headers().firstValue("Location").get() shouldBe "/login?return=/ops?tab=ledger"
 
             val known = get("$base/ops", "Cookie", "signed-in=yes")
             known.statusCode() shouldBe 200

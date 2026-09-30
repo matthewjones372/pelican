@@ -49,6 +49,7 @@ class Pages internal constructor(
  * not signed in.
  */
 fun interface PageGuard {
+    /** [path] is the page as asked for, its query string included, so a guard can send someone back to it. */
     fun redirectFor(path: String, credentials: Credentials): String?
 }
 
