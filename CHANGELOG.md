@@ -367,6 +367,11 @@ still there, and the only new ones are the module's own.
   scheme is bound on the API with `authenticate(scheme, by)`, and an unbound one
   fails at startup. `pelican-test` adds `TestCallers`, `Api.inMemory()` and
   `ApiClient.signedInAs(subject)`.
+- **`pelican-oidc` (spec 0061).** `oidc(issuer, audience)` verifies a
+  provider's bearer tokens: signature against its published keys (fetched on
+  first use, refetched on an unknown key id at most once a minute), issuer,
+  audience, expiry with leeway, and an algorithm allow-list that never admits
+  `none` or HMAC. Groups from a claim. An unreachable provider is a 503.
 - **`pelican-arrow`: an `Either` with several declared failures (spec 0060).**
   `either.toOutcome { left -> declared(...) }` names the declaration each
   `Left` becomes, and a `Right` is `ok`. The lambda can only answer a failure.

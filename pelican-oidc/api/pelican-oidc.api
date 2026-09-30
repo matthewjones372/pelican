@@ -1,0 +1,24 @@
+public abstract interface class io/github/matthewjones372/pelican/oidc/Fetch {
+	public abstract fun get (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/oidc/HttpFetch : io/github/matthewjones372/pelican/oidc/Fetch {
+	public fun <init> ()V
+	public synthetic fun <init> (JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun get (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/oidc/Oidc : io/github/matthewjones372/pelican/Authenticator {
+	public fun authenticate (Lio/github/matthewjones372/pelican/Credentials;)Lio/github/matthewjones372/pelican/Identity;
+	public final fun getAudience ()Ljava/lang/String;
+	public final fun getIssuer ()Ljava/lang/String;
+	public final fun getScheme ()Lio/github/matthewjones372/pelican/OpenIdConnectScheme;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/oidc/OidcKt {
+	public static final fun oidc-uu1qWtI (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;JJLjava/time/Clock;Lio/github/matthewjones372/pelican/oidc/Fetch;Ljava/lang/String;)Lio/github/matthewjones372/pelican/oidc/Oidc;
+	public static synthetic fun oidc-uu1qWtI$default (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;JJLjava/time/Clock;Lio/github/matthewjones372/pelican/oidc/Fetch;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/oidc/Oidc;
+}
+

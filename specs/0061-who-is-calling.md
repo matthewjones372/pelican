@@ -56,11 +56,12 @@ api(routes) { authenticate(oidcScheme, by = bearerOrSession) }
 **Verifying tokens from an OpenID Connect provider**, in a module of its own, `pelican-oidc`:
 
 ```kotlin
-val bearerOrSession: Authenticator = oidc(
+val pocketId = oidc(
     issuer = "https://id.home.arpa",          // discovery, and its signing keys, fetched and cached
     audience = "lark-bank",
     groupsClaim = "groups",
 )
+val oidcScheme = pocketId.scheme              // the document's openIdConnect scheme, from the same value
 ```
 
 It checks the signature against the provider's published keys (refetched on an unknown key id, at most once a minute),
@@ -104,7 +105,7 @@ Nothing in Pelican's current modules beyond pages (spec 0059) for the sign-in ro
       and `signedInAs(...)` in pelican-test.
       Done when: an endpoint taking a caller refuses a request without one with 401 and its handler never runs, and the
       document requires the scheme on that endpoint only.
-- [ ] **`spec-0061-oidc`** — `pelican-oidc`: discovery, cached keys, signature, issuer, audience, expiry and algorithm
+- [x] **`spec-0061-oidc`** — `pelican-oidc`: discovery, cached keys, signature, issuer, audience, expiry and algorithm
       checks, groups from a claim.
       Done when: tests against a local signing key refuse an expired token, a wrong audience, an unknown key id twice,
       `alg: none` and an HMAC token signed with the public key, and accept a valid one.

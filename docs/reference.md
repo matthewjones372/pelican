@@ -25,6 +25,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
 | `pelican-metrics` | core, micrometer-core | descriptions → Micrometer meters, tagged from what the descriptions already say |
 | `pelican-metrics-otel` | core, opentelemetry-api | descriptions → OpenTelemetry server spans and the specified duration histogram |
+| `pelican-oidc` | core, nimbus-jose-jwt | verifies an OpenID Connect provider's tokens for a caller |
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
@@ -2608,6 +2609,22 @@ api(routes, codecs = JacksonCodecs) { authenticate(bearer, by = myVerifier) }
   no client has a value to put in that slot. Listing it there is refused.
 - An endpoint whose scheme nothing verifies fails when the `Api` is built.
 - `Identity.actor` is who is really there when the subject is someone they act as.
+
+**Verifying a provider's tokens** is `pelican-oidc`:
+
+```kotlin
+val pocketId = oidc(issuer = "https://id.home.arpa", audience = "lark-bank")
+val caller = authenticated(pocketId.scheme) { id -> Caller(id.subject, id.groups) }
+
+api(routes, codecs = JacksonCodecs) { authenticate(pocketId.scheme, pocketId) }
+```
+
+It fetches the discovery document and the keys on first use and caches them,
+and checks the signature, issuer, audience, expiry (30 seconds of leeway) and
+algorithm. An unknown key id fetches the keys again at most once a minute.
+`none` and HMAC are never accepted. A provider that cannot be reached is a 503,
+not the caller's 401. That fetch runs on the thread deciding the request, which
+is rare but not free.
 
 Tests call as anyone with `pelican-test`'s `TestCallers`, which reads
 `Authorization: Bearer <subject>`:

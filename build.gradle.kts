@@ -78,6 +78,7 @@ val moduleDescriptions = mapOf(
     "pelican-pekko-mcp" to "Serves the MCP tools over Streamable HTTP on Pekko HTTP.",
     "pelican-metrics" to "Micrometer meters for a Pelican service, dimensioned by the descriptions.",
     "pelican-metrics-otel" to "OpenTelemetry spans and metrics for a Pelican service, from the descriptions.",
+    "pelican-oidc" to "Verifies OpenID Connect tokens for a Pelican caller.",
     "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
     "pelican-streams" to "A streaming body as a lark Stream, whose failure is a value.",
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
