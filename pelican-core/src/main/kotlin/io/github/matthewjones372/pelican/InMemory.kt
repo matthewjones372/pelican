@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.acceptable
 import io.github.matthewjones372.pelican.spi.decode
+import io.github.matthewjones372.pelican.spi.decodeCaller
 import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.handlerFor
@@ -79,6 +80,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
         val resolved = codecs.getValue(matched)
 
         return try {
+            api.decodeCaller(endpoint, request.credentials(), values)
             negotiate(endpoint, request)
             decodeInputs(endpoint, request, query, values)
             decodeBody(endpoint, request, resolved, values)
@@ -123,6 +125,14 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
         if (produced.isEmpty()) return
         val accept = request.acceptLines()
         if (accept.isNotEmpty() && !acceptable(accept, produced)) throw NotAcceptable(produced)
+    }
+
+    private fun ClientRequest.credentials(): Credentials = object : Credentials {
+        override fun header(name: String): String? = this@credentials.header(name)
+
+        override fun cookie(name: String): String? = Cookies.parseAll(
+            headers.filter { it.first.equals("Cookie", ignoreCase = true) }.map { it.second },
+        )[name]?.firstOrNull()
     }
 
     /** Every `Accept` field line, since RFC 9110 says two lines are one field. */

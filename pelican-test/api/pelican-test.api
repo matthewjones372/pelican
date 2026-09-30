@@ -89,6 +89,21 @@ public final class io/github/matthewjones372/pelican/test/ResponseSpec {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/test/TestCallers : io/github/matthewjones372/pelican/Authenticator {
+	public static final field Companion Lio/github/matthewjones372/pelican/test/TestCallers$Companion;
+	public fun <init> (Ljava/util/Map;)V
+	public fun authenticate (Lio/github/matthewjones372/pelican/Credentials;)Lio/github/matthewjones372/pelican/Identity;
+}
+
+public final class io/github/matthewjones372/pelican/test/TestCallers$Companion {
+	public final fun of ([Lkotlin/Pair;)Lio/github/matthewjones372/pelican/test/TestCallers;
+}
+
+public final class io/github/matthewjones372/pelican/test/TestCallersKt {
+	public static final fun inMemory (Lio/github/matthewjones372/pelican/Api;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public static final fun signedInAs (Lio/github/matthewjones372/pelican/test/ApiClient;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ApiClient;
+}
+
 public final class io/github/matthewjones372/pelican/test/TextBody : io/github/matthewjones372/pelican/ByteStreamHandle {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun getText ()Ljava/lang/String;

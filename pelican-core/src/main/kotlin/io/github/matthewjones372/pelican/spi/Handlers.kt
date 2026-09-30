@@ -29,7 +29,7 @@ fun Api.handlerFor(se: ServerEndpoint): (Params) -> CompletionStage<Any?> =
  */
 fun Endpoint<*, *>.declaredInputCount(): Int {
     val declared = pathSpec.captures.size + queries.size + headerParams.size +
-        cookieParams.size + (if (bodyInput == null) 0 else 1)
+        cookieParams.size + (if (bodyInput == null) 0 else 1) + (if (caller == null) 0 else 1)
     return if (declared == 0) 1 else declared * INVERSE_LOAD_FACTOR_NUMERATOR / INVERSE_LOAD_FACTOR_DENOMINATOR + 1
 }
 

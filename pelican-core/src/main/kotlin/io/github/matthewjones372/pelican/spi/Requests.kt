@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.BodyDecodeFailure
 import io.github.matthewjones372.pelican.BodyInput
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.CookieParam
+import io.github.matthewjones372.pelican.Credentials
 import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FormBody
@@ -21,6 +22,7 @@ import io.github.matthewjones372.pelican.NegotiatedBody
 import io.github.matthewjones372.pelican.NegotiatedOutput
 import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
+import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.PlainCodec
 import io.github.matthewjones372.pelican.QueryParam
@@ -81,6 +83,15 @@ private const val STRICT_READ_BUFFER_BYTES = 4096
 
 /** Sixty-four kilobytes, the same overrun the multipart reader allows. */
 private const val STRICT_DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
+
+/**
+ * Who is calling, decoded ahead of every other input so that a request with no
+ * caller learns nothing else about the endpoint: the 401 is its only answer.
+ */
+fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: MutableMap<ParamKey<*>, Any?>) {
+    val caller = endpoint.caller ?: return
+    into[caller] = caller.decode(authenticators.getValue(caller.scheme), credentials)
+}
 
 /**
  * How a request body is read, once the request says what it is: one entry per

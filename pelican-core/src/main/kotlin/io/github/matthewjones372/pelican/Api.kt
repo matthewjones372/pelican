@@ -226,6 +226,9 @@ class Api internal constructor(
 
     /** Files served beside the endpoints (spec 0059); null serves none. An endpoint's path wins over a page. */
     val pages: Pages? = null,
+
+    /** What verifies each scheme a caller is declared under; a scheme some endpoint needs and none verifies fails here. */
+    val authenticators: Map<SecurityScheme, Authenticator> = emptyMap(),
 ) {
     /**
      * The largest single frame of a streamed request body, over which the frame
@@ -252,6 +255,13 @@ class Api internal constructor(
         require(clashes.isEmpty()) {
             "Two endpoints are bound to the same route, so the second can never be reached: " +
                 clashes.joinToString { (m, path) -> "$m $path" }
+        }
+
+        val unverified = bound.mapNotNull { it.caller }.map { it.scheme }.distinct().filter { it !in authenticators }
+        require(unverified.isEmpty()) {
+            "Endpoints declare callers under " + unverified.joinToString { "'${it.name}'" } + " and nothing " +
+                "verifies ${if (unverified.size == 1) "it" else "them"}, so every request would be refused. " +
+                "Bind one with authenticate(scheme, by = ...)."
         }
 
         val unbound = covers.filter { declared -> bound.none { it === declared } }

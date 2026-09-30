@@ -33,6 +33,7 @@ class SpiPackageTest {
         "failureNamedBy",
         "decodeList",
         "acceptable",
+        "decodeCaller",
         "CorsHeaders",
         // `MultipartBody.decode` moved with it, but `decode` is also every
         // codec's own method name, so the boundary is the name checked.

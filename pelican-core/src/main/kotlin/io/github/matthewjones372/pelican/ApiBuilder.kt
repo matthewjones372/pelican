@@ -47,6 +47,7 @@ class ApiBuilder internal constructor() {
     private var onServerError: ((reference: String, endpoint: Endpoint<*, *>?, error: Throwable) -> Unit)? = null
     private var refusals: RefusalRenderer = ApiErrorEnvelope
     private var onRefusal: RefusalObserver? = null
+    private val authenticators = LinkedHashMap<SecurityScheme, Authenticator>()
 
     /** Outermost first: a chain is written a line at a time, in the order it runs. */
     fun filter(filter: Filter) {
@@ -61,6 +62,11 @@ class ApiBuilder internal constructor() {
     /** [Api.refusals] — `refusals(ProblemDetails)` for RFC 9457. */
     fun refusals(renderer: RefusalRenderer) {
         refusals = renderer
+    }
+
+    /** [Api.authenticators]: what verifies a caller declared under [scheme]. */
+    fun authenticate(scheme: SecurityScheme, by: Authenticator) {
+        authenticators[scheme] = by
     }
 
     /** [Api.onRefusal] — `onRefusal(refusalCounter(registry))` for the meter. */
@@ -88,6 +94,7 @@ class ApiBuilder internal constructor() {
         refusals = refusals,
         onRefusal = onRefusal,
         pages = pages,
+        authenticators = authenticators.toMap(),
     )
 }
 

@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.Cookies
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.CorsPreflight
+import io.github.matthewjones372.pelican.Credentials
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonBody
@@ -30,6 +31,7 @@ import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex
 import io.github.matthewjones372.pelican.spi.acceptable
 import io.github.matthewjones372.pelican.spi.decode
+import io.github.matthewjones372.pelican.spi.decodeCaller
 import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.ndjsonFrames
@@ -507,6 +509,13 @@ private fun invoke(
     // header on the way out.
     val params = Params(values, req, ep, resumeFrom = req.resumePoint(ep))
 
+    // ---- who is calling ----------------------------------------------------
+    try {
+        api.decodeCaller(ep, req.credentials(), values)
+    } catch (t: Throwable) {
+        return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params))
+    }
+
     // ---- what the caller will take ----------------------------------------
     //
     // Before the inputs, and well before the handler: a caller who will not
@@ -532,6 +541,13 @@ private fun invoke(
         .thenApply { result -> buildResponse(ep.output, result, codecs, req.acceptLines()) }
         .exceptionally { t -> errorResponse(t, api, ep) }
         .thenApply { res -> res.withHeaders(params) }
+}
+
+/** Cookies parsed by core, as [decodeCookies] does, so a session reads the same on every backend. */
+private fun HttpRequest.credentials(): Credentials = object : Credentials {
+    override fun header(name: String): String? = getHeader(name).orElse(null)?.value()
+
+    override fun cookie(name: String): String? = Cookies.parseAll(headerValues("Cookie"))[name]?.firstOrNull()
 }
 
 /** What the handler asked for, on whatever response came back. */

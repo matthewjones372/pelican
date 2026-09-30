@@ -58,6 +58,9 @@ class Endpoint<I, R> internal constructor(
      * The name of the [Webhook] this describes, or null for a route.
      */
     val webhookName: String? = null,
+
+    /** Who is calling, verified before the handler runs; null for an endpoint anyone may call unnamed. */
+    val caller: CallerInput<*>? = null,
 ) {
     /**
      * Whether a request here can carry a resume point. Only an event stream is
@@ -101,6 +104,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     @PublishedApi
     internal val declaredFailures = mutableListOf<ErrorOutput<*>>()
     internal var securityRequirements: List<SecurityRequirement>? = null
+    internal var callerInput: CallerInput<*>? = null
 
     init {
         // Inputs listed on endpoint(...) register themselves, so each is
@@ -129,7 +133,16 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
                 // all known.
                 is MultipartPart<*> -> parts += key
 
-                is PathParam<*> -> Unit // matched positionally from the path
+                is PathParam<*> -> Unit
+
+                // matched positionally from the path
+
+                // The token belongs to the transport, so a client has nothing to
+                // put in a tuple slot for it.
+                is CallerInput<*> -> throw IllegalArgumentException(
+                    "$key is who is calling, not a value a client sends, so it is not listed on endpoint(...). " +
+                        "Declare it inside the block with authenticatedBy($key) and read it as this[$key].",
+                )
             }
         }
     }
@@ -219,6 +232,16 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     /** Overrides the API-wide requirement — the login route, a health check. */
     fun noSecurity() { securityRequirements = emptyList() }
+
+    /**
+     * Refuses a request without a verified [caller] with 401 before the handler
+     * runs, and requires its scheme in the document. The handler reads it as
+     * `this[caller]`.
+     */
+    fun authenticatedBy(caller: CallerInput<*>) {
+        require(callerInput == null) { "This endpoint already declares $callerInput; a request has one caller." }
+        callerInput = caller
+    }
 
     fun errorResponse(status: Int, description: String, vararg headers: ResponseHeader<*>) {
         errors += ErrorSpec(status, description, null, headers.toList())
@@ -475,10 +498,24 @@ private fun <I, R> build(
         tags = b.tagList.toList(),
         deprecated = b.deprecated,
         hidden = b.hidden,
-        security = b.securityRequirements?.toList(),
+        security = securityOf(b),
         servers = b.serverUrls.toList(),
         webhookName = webhookName,
+        caller = b.callerInput,
     ).also(::validate)
+}
+
+/**
+ * What the document requires. A caller's scheme is the requirement, written
+ * once; a second one stated by hand could only disagree with it.
+ */
+private fun securityOf(b: EndpointBuilder): List<SecurityRequirement>? {
+    val caller = b.callerInput ?: return b.securityRequirements?.toList()
+    require(b.securityRequirements == null) {
+        "This endpoint declares $caller and also security(...) or noSecurity(). The caller's scheme is " +
+            "already its requirement; drop the other."
+    }
+    return listOf(SecurityRequirement(caller.scheme, emptyList()))
 }
 
 /**

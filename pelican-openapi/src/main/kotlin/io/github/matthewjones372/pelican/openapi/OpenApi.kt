@@ -483,7 +483,11 @@ private fun operation(
 
     // Null inherits the document-wide requirement; an empty list is
     // deliberately public, which OpenAPI spells as `security: []`.
-    ep.security?.let { put("security", requirements(it)) }
+    ep.security?.let { reqs ->
+        // An optional caller is OpenAPI's empty requirement beside the scheme: anyone, or someone signed in.
+        val anyone = if (ep.caller?.required == false) listOf(jsonObj { }) else emptyList()
+        put("security", jsonArr(anyone + requirements(reqs).items))
+    }
 
     // Where this one operation is served from, in the same shape as the
     // document's own list and from the same function.

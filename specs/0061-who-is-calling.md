@@ -22,22 +22,26 @@ the same. Three services writing the same token verification is three chances to
 
 ## Shape
 
-**A caller is an input**, like a path parameter: declared on the endpoint, typed, and in the OpenAPI document.
+**A caller is declared on an endpoint**, typed, enforced and in the OpenAPI document from one declaration:
 
 ```kotlin
 // The service's own type, built from a verified identity.
 data class Caller(val subject: String, val name: String, val groups: Set<String>)
 
-val caller = authenticated(bearerOrSession) { identity -> Caller(identity.subject, identity.name, identity.groups) }
+val caller = authenticated(oidcScheme) { identity -> Caller(identity.subject, identity.name, identity.groups) }
 
-val getAccount = endpoint(caller, accountId) {
+val getAccount = endpoint(accountId) {
     get("accounts" / accountId)
+    authenticatedBy(caller)
     json<AccountView>().orFail(accountMissing, forbidden)
 }
 
-getAccount handledOrFail { (who, id) ->
+getAccount handledOrFail { id ->
+    val who = this[caller]
     if (!who.owns(id)) forbidden(...) else ok(...)
 }
+
+api(routes) { authenticate(oidcScheme, by = bearerOrSession) }
 ```
 
 - A request with no credential, or one that fails verification, is refused with 401 before the handler runs, in the
@@ -45,12 +49,14 @@ getAccount handledOrFail { (who, id) ->
 - `authenticated(...).optional()` hands over `Caller?` for endpoints open to anyone that answer more to someone signed
   in.
 - The document gets the scheme and the requirement from the same value: `openIdConnect` with the provider's discovery
-  URL, and each endpoint that takes `caller` requires it. They cannot disagree.
+  URL, and each endpoint that declares `caller` requires it. They cannot disagree.
+- The caller is declared, not an `endpoint(...)` input: the token belongs to the transport, so a generated client, the
+  test client and an MCP tool have no value to put in a tuple slot for it.
 
 **Verifying tokens from an OpenID Connect provider**, in a module of its own, `pelican-oidc`:
 
 ```kotlin
-val bearerOrSession = oidc(
+val bearerOrSession: Authenticator = oidc(
     issuer = "https://id.home.arpa",          // discovery, and its signing keys, fetched and cached
     audience = "lark-bank",
     groupsClaim = "groups",
@@ -73,14 +79,16 @@ whether acting-as is allowed, and for what, is the service's decision.
 **Tests** call an endpoint as anyone, without a provider:
 
 ```kotlin
-val app = bankApi().inMemory(callers = TestCallers.of("ada" to setOf("customer")))
-app.call(getAccount, "acc-1", as = "ada")
+val app = bankApi { authenticate(oidcScheme, TestCallers.of("ada" to setOf("customer"))) }.inMemory()
+app.signedInAs("ada").call(getAccount, "acc-1")
 ```
 
 ## Why this shape
 
-An input, rather than a filter, is what makes the caller typed in the handler and present in the document from one
-declaration. Pelican already treats everything a handler needs from a request that way. Verification in its own module
+A declaration, rather than a filter, is what makes the caller typed in the handler and present in the document from
+one declaration. It is not a slot in the input tuple, as first sketched, because every client reads that tuple and none
+of them could send a caller; the cost is that reading an undeclared caller fails on the first request rather than at
+compile time. Verification in its own module
 keeps pelican-core's runtime classpath the Kotlin standard library, which is a test. The alternative was a `Filter`
 that stores the caller in a request attribute: less new surface, but untyped, invisible to the document, and easy to
 forget on one endpoint.
@@ -91,8 +99,9 @@ Nothing in Pelican's current modules beyond pages (spec 0059) for the sign-in ro
 
 ## Stack
 
-- [ ] **`spec-0061-caller`** — `authenticated(...)`, the caller input, 401 before the handler, `optional()`, the
-      scheme and requirement in the document, and `inMemory(callers = ...)` for tests.
+- [x] **`spec-0061-caller`** — `authenticated(...)`, `authenticatedBy(...)`, 401 before the handler, `optional()`, the
+      scheme and requirement in the document, `authenticate(scheme, by)` on the Api, and `TestCallers`, `inMemory()`
+      and `signedInAs(...)` in pelican-test.
       Done when: an endpoint taking a caller refuses a request without one with 401 and its handler never runs, and the
       document requires the scheme on that endpoint only.
 - [ ] **`spec-0061-oidc`** — `pelican-oidc`: discovery, cached keys, signature, issuer, audience, expiry and algorithm
@@ -122,3 +131,5 @@ Each open question in the draft took its recommendation.
    silently if the provider's own session is still alive.
 4. **Acting-as:** Pelican verifies an `act` claim, or the session's own actor, and hands it over. Minting such a
    session is the service's, through `oidc.actAs(subject, grant)`, after the service has decided the grant is good.
+5. **Caller shape** (settled while building): declared with `authenticatedBy(caller)` and read as `this[caller]`,
+   not a slot in the input tuple; verification bound on the Api with `authenticate(scheme, by)`.

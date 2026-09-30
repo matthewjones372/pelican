@@ -359,6 +359,14 @@ still there, and the only new ones are the module's own.
 
 ### Added
 
+- **Who is calling (spec 0061).** `authenticated(scheme) { identity -> Caller(...) }`
+  declares a caller; `authenticatedBy(caller)` on an endpoint refuses a request
+  without a verified one with 401 and `WWW-Authenticate` before the handler
+  runs, requires the scheme in the document, and hands the handler
+  `this[caller]`. `optional()` for endpoints open to anyone. What verifies a
+  scheme is bound on the API with `authenticate(scheme, by)`, and an unbound one
+  fails at startup. `pelican-test` adds `TestCallers`, `Api.inMemory()` and
+  `ApiClient.signedInAs(subject)`.
 - **`pelican-arrow`: an `Either` with several declared failures (spec 0060).**
   `either.toOutcome { left -> declared(...) }` names the declaration each
   `Left` becomes, and a `Right` is `ok`. The lambda can only answer a failure.

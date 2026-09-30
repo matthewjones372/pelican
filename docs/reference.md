@@ -2575,6 +2575,51 @@ one name is an error rather than a document where half the padlocks lie.
 stays in the handler, or in a filter in front of the server. What this buys is a
 correct document and a working Authorize button.
 
+### Who is calling
+
+`security(...)` documents; a **caller** enforces. Declare who is calling under a
+scheme, with the service's own type built from the verified identity, and bind
+what verifies it on the `Api`:
+
+```kotlin
+data class Caller(val subject: String, val groups: Set<String>)
+
+val bearer = bearerAuth()
+val caller = authenticated(bearer) { id -> Caller(id.subject, id.groups) }
+
+val getAccount = endpoint(accountId) {
+    get("accounts" / accountId)
+    authenticatedBy(caller)          // 401 before the handler; the scheme required in the document
+    json<Account>()
+}
+
+getAccount handledNow { id -> accounts.of(this[caller], id) }
+
+api(routes, codecs = JacksonCodecs) { authenticate(bearer, by = myVerifier) }
+```
+
+- No credential, or one whose `Authenticator` throws `Unauthenticated`, is a 401
+  with `WWW-Authenticate`, in the API's refusal envelope, before any other input
+  is decoded and before the handler runs.
+- `caller.optional()` hands over `Caller?`: null for nobody, the caller for
+  someone. A credential that fails is still a 401. The document reads it as
+  `security: [{}, {bearerAuth: []}]`.
+- The caller is not an `endpoint(...)` input: the token rides the transport, so
+  no client has a value to put in that slot. Listing it there is refused.
+- An endpoint whose scheme nothing verifies fails when the `Api` is built.
+- `Identity.actor` is who is really there when the subject is someone they act as.
+
+Tests call as anyone with `pelican-test`'s `TestCallers`, which reads
+`Authorization: Bearer <subject>`:
+
+```kotlin
+val client = api(routes, codecs = JacksonCodecs) {
+    authenticate(bearer, TestCallers.of("ada" to setOf("customer")))
+}.inMemory()
+
+client.signedInAs("ada").call(getAccount, "acc-1")
+```
+
 ### Authorizing in Swagger UI
 
 Give the docs page an OAuth client of its own and "Try it out" sends a real
