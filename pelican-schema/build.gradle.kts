@@ -13,6 +13,12 @@ dependencies {
     // puts swagger-parser in front of the emitted document.
     testImplementation("com.networknt:json-schema-validator:3.0.7")
 
+    // The validator pins Jackson 3 at 3.2.1, which carries five advisories, and
+    // 3.0.8 pins the same. The BOM moves the whole `tools.jackson` cluster
+    // together rather than leaving a patched databind beside a 3.2.1 core.
+    // Drop this once the validator ships a release that pins 3.2.3 or later.
+    testImplementation(platform("tools.jackson:jackson-bom:3.2.3"))
+
     testImplementation(project(":pelican-jackson"))
 }
 

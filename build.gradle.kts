@@ -1,5 +1,24 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
+// Plugin classpaths carry advisories of their own: Dokka resolves
+// `jackson-databind` 2.15.3, and Kover's coverage reporter `freemarker` 2.3.32.
+// Dependabot can act on neither -- no manifest here names either coordinate, so
+// its security job ends `security_update_dependency_not_found` on every push --
+// and an `ignore` entry is the wrong answer for anything this build also ships:
+// `pelican-jackson` publishes jackson, so ignoring the coordinate would hide an
+// advisory that does reach a released artifact. Constraining databind alone
+// covers the jackson cluster, because it pulls the 2.22.3 BOM, which carries
+// `jackson-module-kotlin` and `jackson-dataformat-xml` with it. Dokka's worker
+// runs on a classpath this block does not reach, pinned separately below.
+buildscript {
+    dependencies {
+        constraints {
+            classpath("com.fasterxml.jackson.core:jackson-databind:2.22.3")
+            classpath("org.freemarker:freemarker:2.3.35")
+        }
+    }
+}
+
 plugins {
     kotlin("jvm") version "2.4.20" apply false
     kotlin("plugin.serialization") version "2.4.20" apply false
@@ -199,6 +218,17 @@ subprojects {
         resolutionStrategy.force("org.ow2.asm:asm:9.8", "org.ow2.asm:asm-tree:9.8")
     }
 
+    // The Kotlin plugin resolves Bouncy Castle 1.84 here, which has a critical
+    // name-constraints bypass. 1.86 is what the plugin classpath already picks.
+    configurations.matching { it.name == "kotlinBouncyCastleConfiguration" }.configureEach {
+        resolutionStrategy.force(
+            "org.bouncycastle:bcprov-jdk18on:1.86",
+            "org.bouncycastle:bcpg-jdk18on:1.86",
+            "org.bouncycastle:bcpkix-jdk18on:1.86",
+            "org.bouncycastle:bcutil-jdk18on:1.86",
+        )
+    }
+
     val toolchains = extensions.getByType<JavaToolchainService>()
 
     tasks.withType<Test>().configureEach {
@@ -271,6 +301,22 @@ subprojects {
     if (name in publishedModules) {
         apply(plugin = "com.vanniktech.maven.publish")
         apply(plugin = "org.jetbrains.dokka")
+
+        // The worker classpath named at the top of this file: the one GitHub's
+        // dependency graph reports, which the plugin classpath's constraints do
+        // not reach. `dokkaHtmlGeneratorRuntime` is the bucket its resolver
+        // extends. Dokka templates with freemarker and parses with jsoup, so
+        // both arrive here as well as on the classpath above.
+        dependencies {
+            add(
+                "dokkaHtmlGeneratorRuntime",
+                platform("com.fasterxml.jackson:jackson-bom:2.22.3"),
+            )
+            constraints {
+                add("dokkaHtmlGeneratorRuntime", "org.jsoup:jsoup:1.23.2")
+                add("dokkaHtmlGeneratorRuntime", "org.freemarker:freemarker:2.3.35")
+            }
+        }
 
         extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
             // Sources are not an optional extra for a library someone else has
