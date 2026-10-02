@@ -56,7 +56,7 @@ class TracedCallTest {
         try {
             val url = "http://127.0.0.1:${server.address.port}/orders/7"
             val caller = sdk.getTracer("test").spanBuilder("caller").startSpan()
-            val status = caller.makeCurrent().use {
+            val status = caller.makeCurrent().use { _ ->
                 PekkoHttpTransport().traced(sdk).send(ClientRequest(Method.GET, url)).toCompletableFuture().get()
                     .also { it.body.close() }.status
             }
