@@ -64,6 +64,9 @@ class FunctionalStyleTest {
             "component schemas are collected as the document is walked, then emitted once",
         "pelican-schema/src/main/kotlin/io/github/matthewjones372/pelican/schema/StandaloneSchemas.kt" to
             "SchemaComponents is written into as a type is walked, and the document freezes it into `\$defs`",
+        "pelican-test-wiremock/src/main/kotlin/io/github/matthewjones372/pelican/test/wiremock/StubFile.kt" to
+            "the stubFile DSL collects stubs as they are declared and freezes them into the mapping " +
+            "files writeTo renders, which is what a builder is",
         "pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/KotlinClient.kt" to
             "the emitter builds one client method's parameter list, keeping names unique as it goes",
         "pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/KotlinTypes.kt" to

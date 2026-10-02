@@ -6,6 +6,10 @@
 // `PelicanWireMockExtension` does, for a build that already has JUnit.
 dependencies {
     api(project(":pelican-core"))
+    // For `ApiClient.request`, which builds the request a call would send: a mapping file has to
+    // state its request declaratively, and deriving it a second time here is the duplication spec
+    // 0062 exists to remove. This module stays thin because `pelican-test` is core-only too.
+    api(project(":pelican-test"))
     // Shaded Jetty and Jackson, so the versions under test are the service's own.
     api("org.wiremock:wiremock-standalone:3.13.1")
     compileOnly("org.junit.jupiter:junit-jupiter-api:6.1.3")

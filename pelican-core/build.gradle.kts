@@ -35,6 +35,8 @@ val styledModules = listOf(
     "pelican-oidc",
     "pelican-client-pekko",
     "pelican-test", "pelican-test-pekko",
+    // Joined the gate with spec 0062's stubFile, the module's first accumulator.
+    "pelican-test-wiremock",
 )
 
 /**
