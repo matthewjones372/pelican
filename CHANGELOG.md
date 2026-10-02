@@ -372,6 +372,17 @@ still there, and the only new ones are the module's own.
   `pelican-test-wiremock` now takes `pelican-test`, for the request builder the
   export reuses rather than copies; it is core-only itself, and `DecouplingTest`
   allows it anchored to its version so `pelican-test-pekko` is still refused.
+- **Stubs that answer from their input, as response templates (spec 0062).**
+  `stub(endpoint) { input -> outcome }` in a `stubFile` exports as one mapping on
+  the endpoint's path pattern, with a `{{request.pathSegments.[n]}}` template
+  filling the path parameters the answer uses, so one file answers every pet with
+  its own chip. A fixed input is written at a higher priority and still wins the
+  request it names. Since a lambda cannot be read, the template is derived by
+  calling the endpoint twice with values built from each parameter's declared
+  type; an answer that moved for any other reason — a query parameter, a header,
+  the request body, or a status that changes with the input — is refused where it
+  is declared, naming the endpoint. An endpoint that refuses the probe value
+  itself is reported as that, not as an answer that cannot be templated.
 - **Who is calling (spec 0061).** `authenticated(scheme) { identity -> Caller(...) }`
   declares a caller; `authenticatedBy(caller)` on an endpoint refuses a request
   without a verified one with 401 and `WWW-Authenticate` before the handler

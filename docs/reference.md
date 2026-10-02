@@ -5357,8 +5357,34 @@ agrees with it, so a change that moves a demo's answer shows up in review
 instead of at demo time. Rewrite with `-Dpelican.golden.update=true`, the same
 switch the document goldens take.
 
-Stubs that answer from their input — `stub(lookupChip) { petId -> … }` — are not
-exported yet; that is spec 0062's second entry.
+A stub that answers from its input exports as **one** mapping, with a response
+template filling the path parameters the answer uses:
+
+```kotlin
+stubFile(JacksonCodecs) {
+    stub(lookupChip) { (petId, _, _) -> ok(Chip("98100000000000$petId", "Petshop")) }
+    stub(lookupChip, In3(3L, "eu", 1)) answers noSuchChip(Problem("never chipped"))
+}.writeTo(Path.of("demo/registry/mappings"))
+```
+
+That file answers every pet with its own chip, and pet 3 with the `404`: a fixed
+input is written at a higher priority than the template, so it wins the one
+request it names.
+
+A lambda cannot be read, so the template is derived by asking. The endpoint is
+called twice with values built from each parameter's declared type, and whatever
+moved with the path values becomes a `{{request.pathSegments.[n]}}` expression.
+Query and header parameters are varied too, so an answer that reads one is caught
+rather than exported with a single value baked in — and the mapping then matches
+on the path alone, since the answer was proved not to depend on the rest.
+
+What cannot become a template is refused where it is declared, naming the
+endpoint: an answer whose status moves with its input, one that reads a query
+parameter or a header, and one built out of the request body. Name those inputs
+with `stub(endpoint, input)` instead. A parameter that narrows its type beyond
+what it declares — a refinement the probe's value does not satisfy — is reported
+separately, because an endpoint refusing the probe and an answer that cannot be
+templated are different problems with different fixes.
 
 ### The comparison on its own
 

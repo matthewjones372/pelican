@@ -64,7 +64,7 @@ Recommended: export.
       Done when: the petshop's three demo stubs export as WireMock mappings
       that WireMock serves, and the shop's generated client reads pet 3's
       answer as `NotFound(Problem)`.
-- [ ] **`spec-0062-templated`** — stubs that answer from their input, as
+- [x] **`spec-0062-templated`** ([#204](https://github.com/matthewjones372/pelican/pull/204)) — stubs that answer from their input, as
       response templates.
       Done when: `stub(lookupChip) { petId -> … }` exports as one mapping that
       answers pet 7 with pet 7's chip, and a stub whose answer cannot be a

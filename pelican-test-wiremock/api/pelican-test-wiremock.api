@@ -27,6 +27,7 @@ public final class io/github/matthewjones372/pelican/test/wiremock/PelicanWireMo
 
 public final class io/github/matthewjones372/pelican/test/wiremock/StubFile {
 	public final fun stub (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/test/wiremock/StubFile$Stubbing;
+	public final fun stub (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function1;)V
 	public final fun writeTo (Ljava/nio/file/Path;)V
 }
 
