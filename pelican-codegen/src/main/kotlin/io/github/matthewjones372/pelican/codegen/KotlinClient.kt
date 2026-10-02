@@ -394,13 +394,20 @@ private class KotlinClientEmitter(
      * a blocking client has a use for, plus the coroutine bridge a suspending
      * one is written in.
      */
-    private fun imports(): List<String> = if (!suspending) IMPORTS.lines() else {
-        IMPORTS.lines().filterNot { it.contains("java.util.concurrent.CompletionException") } +
-            listOf(
-                "import kotlinx.coroutines.Dispatchers",
-                "import kotlinx.coroutines.future.await",
-                "import kotlinx.coroutines.withContext",
-            )
+    private fun imports(): List<String> {
+        val fixed = if (!suspending) IMPORTS.lines() else {
+            IMPORTS.lines().filterNot { it.contains("java.util.concurrent.CompletionException") } +
+                listOf(
+                    "import kotlinx.coroutines.Dispatchers",
+                    "import kotlinx.coroutines.future.await",
+                    "import kotlinx.coroutines.withContext",
+                )
+        }
+        // Only where something is tagged: an unused import is a warning in every
+        // file that is not, and a generated file nobody edits is the last place
+        // to leave one.
+        if (endpoints.none { ep -> declaredFailures(ep).any { it.tag != null } }) return fixed
+        return fixed.flatMap { if (it == FORM_CODEC_IMPORT) listOf(it, TAG_IMPORT) else listOf(it) }
     }
 
     /**
@@ -537,24 +544,22 @@ private class KotlinClientEmitter(
      * The declared failures, matched on status first: a declared failure is not
      * a failed call but one of the answers the endpoint said it gives, so it
      * reaches the caller on the `Err` side rather than as a throw.
+     *
+     * What each one becomes is this class's to say — the type, the member, the
+     * codec that reads the body — and the shape of the dispatch around them is
+     * [failureBranches]'s.
      */
     private fun declaredFailureBranches(
         ep: Endpoint<*, *>,
         failures: List<ErrorOutput<*>>,
         streamed: Boolean,
         at: CallSite,
-    ): String = buildString {
-        appendLine("when (response.status) {")
-        failures.forEach { failure ->
-            val payload =
-                decodeExpression(failure.type, if (streamed) "drain(response)" else "response.body", at)
-            val headers = failure.headers.joinToString("") { ", ${headerRead(it)}" }
-            appendLine(
-                "    ${failure.status} -> return Outcome.Err(" +
-                    "${failureType(ep, failures)}.${failureMember(failure.status)}($payload$headers))",
-            )
+    ): String {
+        val type = failureType(ep, failures)
+        return failureBranches(failures, streamed) { failure, from ->
+            "$type.${failureMember(failure)}(${decodeExpression(failure.type, from, at)}" +
+                failure.headers.joinToString("") { ", ${headerRead(it)}" } + ")"
         }
-        append("}")
     }
 
     /**
@@ -942,9 +947,13 @@ private class KotlinClientEmitter(
             declared.forEach { failure ->
                 appendLine()
                 appendLine(kdoc(failure.description, "    "))
-                val body = typeFor(failure.type)
+                val member = failureMember(failure)
+                // A tag often names the failure the way its payload type is named, and inside
+                // the sealed type the member wins that name — so the bare type would resolve to
+                // the member itself. The package says which is meant, and only where it has to.
+                val body = typeFor(failure.type).let { if (it == member) "$packageName.$it" else it }
                 val properties = listOf("val body: $body") + failure.headers.map(::headerProperty)
-                appendLine("    data class ${failureMember(failure.status)}(${properties.joinToString()}) : $name {")
+                appendLine("    data class $member(${properties.joinToString()}) : $name {")
                 appendLine("        override val status: Int get() = ${failure.status}")
                 appendLine("    }")
             }
@@ -1063,8 +1072,18 @@ private fun successMember(status: Int): String = when (status) {
     else -> "Status$status"
 }
 
-/** The member name for a declared failure's status: 404 -> `NotFound`. */
-private fun failureMember(status: Int): String = when (status) {
+/**
+ * What a declared failure is called: its tag where it has one, and its status
+ * otherwise — `404` -> `NotFound`.
+ *
+ * The tag wins because that is what it is for. Two failures sharing a status
+ * would otherwise mint the same member twice, and a tag is the name the author
+ * gave the failure in the first place, where a status is only where it lands.
+ */
+private fun failureMember(failure: ErrorOutput<*>): String =
+    failure.tag?.let(::typeName) ?: statusMember(failure.status)
+
+private fun statusMember(status: Int): String = when (status) {
     400 -> "BadRequest"
     401 -> "Unauthorized"
     402 -> "PaymentRequired"
@@ -1121,6 +1140,57 @@ private fun headerParse(type: String): String = when (type) {
     else -> ""
 }
 
+/**
+ * The `when` that picks a declared failure out of a response: on the status,
+ * and where a status has tagged declarations on the tag in the body as well.
+ *
+ * [built] supplies one failure as the caller's own type, read from wherever the
+ * body was found. A tag no declaration claims — or none at all — matches no
+ * branch, falls out of both `when`s and lands on the `failed(...)` the method
+ * already ends with, which is where an undeclared body has always gone.
+ */
+private fun failureBranches(
+    failures: List<ErrorOutput<*>>,
+    streamed: Boolean,
+    built: (ErrorOutput<*>, String) -> String,
+): String = buildString {
+    val read = if (streamed) "drain(response)" else "response.body"
+    appendLine("when (response.status) {")
+    failures.groupBy { it.status }.forEach { (status, under) ->
+        val tagged = under.mapNotNull { failure -> failure.tag?.let { it to failure } }
+        if (tagged.isEmpty()) {
+            appendLine("    $status -> return Outcome.Err(${built(under.first(), read)})")
+        } else {
+            appendLine(indent(taggedBranch(status, under.first().discriminator, tagged, streamed, built), "    "))
+        }
+    }
+    append("}")
+}
+
+/**
+ * One status whose failures are told apart by their tag. A streamed body is
+ * bound to a name first, because reading it is what consumes it and the tag and
+ * the payload both come out of the one read.
+ */
+private fun taggedBranch(
+    status: Int,
+    field: String,
+    tagged: List<Pair<String, ErrorOutput<*>>>,
+    streamed: Boolean,
+    built: (ErrorOutput<*>, String) -> String,
+): String = buildString {
+    val from = if (streamed) "failureBody" else "response.body"
+    appendLine("$status -> {")
+    if (streamed) appendLine("    val $from = drain(response)")
+    // They agree on the field by construction, so any of them names it.
+    appendLine("    when (tagIn($from, ${kotlinString(field)})) {")
+    tagged.forEach { (tag, failure) ->
+        appendLine("        ${kotlinString(tag)} -> return Outcome.Err(${built(failure, from)})")
+    }
+    appendLine("    }")
+    append("}")
+}
+
 /** A literal path segment inside a Kotlin string template. */
 private fun escapeTemplate(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$")
@@ -1153,6 +1223,12 @@ private val IMPORTS = """
     import java.util.concurrent.CompletionException
     import kotlin.reflect.typeOf
 """.trimIndent()
+
+/** Where the tag import goes, which is where it sorts. */
+private const val FORM_CODEC_IMPORT = "import io.github.matthewjones372.pelican.formCodec"
+
+/** The reader a client branching on a tag needs, shared with the server that writes it. */
+private const val TAG_IMPORT = "import io.github.matthewjones372.pelican.spi.tagIn"
 
 /** The column the generated banner comments rule out to. */
 private const val BANNER_WIDTH = 72

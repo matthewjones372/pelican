@@ -1722,6 +1722,7 @@ public final class io/github/matthewjones372/pelican/spi/ServerErrorsKt {
 }
 
 public final class io/github/matthewjones372/pelican/spi/TaggedBodiesKt {
+	public static final fun tagIn (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 	public static final fun taggedBody (Lio/github/matthewjones372/pelican/ErrorOutput;Ljava/lang/String;)Ljava/lang/String;
 }
 

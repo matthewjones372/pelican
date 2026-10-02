@@ -60,7 +60,7 @@ discriminator so clients outside Pelican get it too.
       Done when: an endpoint with two tagged `503`s builds, answers each with
       its tag in the body, and its document validates with both schemas under
       one `503`; two untagged ones are still refused.
-- [ ] **`spec-0063-client`** — Pelican's client and the generator read the tag.
+- [x] **`spec-0063-client`** ([#206](https://github.com/matthewjones372/pelican/pull/206)) — Pelican's client and the generator read the tag.
       Done when: a generated client answers `NotRecorded` and `RegistryDown`
       from two `503`s told apart only by their tag, and an untagged `503` body
       is `ApiCallFailed`.

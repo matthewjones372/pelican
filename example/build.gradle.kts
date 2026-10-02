@@ -281,6 +281,17 @@ pelican {
             packageName.set("example.generated.suspending")
             callStyle.set("suspending")
         }
+        // Spec 0063: two failures under one `503`. Its own little API rather
+        // than two more responses on the orders document, which is committed
+        // twice over — as a golden document and as a generated client — and
+        // would have both baselines rewritten for an example. Written into
+        // `build/` like the entry above, since what is under test is the client
+        // answering a call, not the file reading well.
+        create("adoption") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("adoptionSpec")
+            packageName.set("example.generated.adoption")
+        }
     }
     /**
      * The same document, read back the other way.
@@ -328,6 +339,9 @@ sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/im
 // directory the task defaults to, added to the source set that calls it.
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/ordersSuspending"))
 
+// Spec 0063's client, generated the same way and for the same reason.
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/adoption"))
+
 // Generated source compiled here but written by another module's tests. detekt
 // filters by the path *inside* the source root, so this is that path rather
 // than the `build/generated` one a reader would expect — a consumer pointing
@@ -337,6 +351,7 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     exclude("example/imported/**")
     exclude("example/imported32/**")
     exclude("example/generated/suspending/**")
+    exclude("example/generated/adoption/**")
 }
 
 tasks.named("compileTestKotlin") {
@@ -344,6 +359,7 @@ tasks.named("compileTestKotlin") {
         "generateImportedEndpoints",
         "generateImported32Endpoints",
         "generateOrdersSuspendingClient",
+        "generateAdoptionClient",
     )
 }
 

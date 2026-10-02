@@ -4236,6 +4236,25 @@ field in the body, and the same single schema in the document as before. The bod
 by the configured codec, as the declared type: the response is the one the
 document promised.
 
+Both of Pelican's clients read the tag back. `ApiClient.outcome` and a generated
+Kotlin client read the status, then the tag, and hand back the declaration
+carrying it — so `adoptPet` answers `AdoptPetFailure.NotRecorded` or
+`AdoptPetFailure.RegistryDown`, named after the tag rather than after the status
+they share. A body under that status carrying no tag, or a tag no declaration
+claims, is a *failed call* — `ApiCallFailed`, the same answer an undeclared body
+has always had, because decoding the nearest declaration would hand the caller a
+value of the wrong type with nothing to say so. `tagIn(body, field)` in
+`io.github.matthewjones372.pelican.spi` is the reader, beside the `taggedBody`
+writer the interpreters use, for a client of your own.
+
+Read back the other way, the shape has a second spelling. `pelican-import`
+already has a reading for a `oneOf` with a `discriminator`, so the document comes
+back as *one* failure under that status carrying a sealed payload type whose
+branches the tags name — `errorJson<AdoptPetFailure>(503, ...)` rather than two
+tagged declarations. That is the same contract on the wire: a sealed payload is
+something Pelican could always carry, and a tag is what lets the *document* say
+which branch is which rather than leaving it to the payload's own codec.
+
 `err(value)` is the shorthand, top-level in `io.github.matthewjones372.pelican`
 beside `ok`: the endpoint's *single* declared failure, for the handler that
 would rather not name it every time — `noSuchUser(ApiError(...))` above could be
