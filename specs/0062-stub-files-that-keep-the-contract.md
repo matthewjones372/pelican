@@ -59,7 +59,7 @@ Recommended: export.
 
 ## Stack
 
-- [ ] **`spec-0062-stub-file`** — `stubFile { }` and `writeTo` for stubs with
+- [x] **`spec-0062-stub-file`** ([#203](https://github.com/matthewjones372/pelican/pull/203)) — `stubFile { }` and `writeTo` for stubs with
       fixed inputs, with golden comparison.
       Done when: the petshop's three demo stubs export as WireMock mappings
       that WireMock serves, and the shop's generated client reads pet 3's

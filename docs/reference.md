@@ -29,7 +29,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
-| `pelican-test-wiremock` | core, WireMock | WireMock stubbed and verified in endpoint values, for testing a client of somebody else's API |
+| `pelican-test-wiremock` | test, WireMock | WireMock stubbed and verified in endpoint values, for testing a client of somebody else's API; and `stubFile`, which exports those stubs as mapping files |
 | `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
 | `example` | core, openapi, jackson, pekko | the orders, bookmarks, greetings and secured services |
 | `benchmarks` | core, jackson, pekko, JMH | the interpreter measured against hand-written Pekko routes. Not published, not run by `build`. |
@@ -5327,6 +5327,39 @@ and body are the ones the real service would send.
 `PelicanWireMock` is the same thing without JUnit, as an `AutoCloseable`;
 JUnit is `compileOnly` here, so a build without it never loads a JUnit type.
 
+#### Stub files a demo can stand on
+
+A demo, a local run, or somebody else's docker-compose stands WireMock up from
+mapping files rather than from a test. Written by hand, nothing checks those
+against the contract: a `404` carrying a bare body where the contract declares a
+`Problem` is a file that only breaks when the demo runs. `stubFile` writes them
+from the same stubs a test uses, so the answer exists once.
+
+```kotlin
+import io.github.matthewjones372.pelican.test.wiremock.stubFile
+
+stubFile(JacksonCodecs) {
+    stub(lookupChip, In3(3L, "eu", 1)) answers noSuchChip(Problem("never chipped"))
+    stub(lookupChip, In3(7L, "eu", 1)) answers ok(Chip("981000000000007", "Petshop"))
+}.writeTo(Path.of("demo/registry/mappings"))
+```
+
+Each answer is rendered by the code a server answers with, as a live stub's is,
+so the status, content type, declared headers and body are the real service's.
+Files are grouped by the endpoint's first literal path segment — both of a
+registry's chip endpoints land in `chips.json` — and the request is written
+declaratively, because a mapping file is read by WireMock rather than matched by
+Pelican.
+
+The files are golden. `writeTo` writes one that is not there, leaves an
+unchanged one alone, and fails naming the file when the contract no longer
+agrees with it, so a change that moves a demo's answer shows up in review
+instead of at demo time. Rewrite with `-Dpelican.golden.update=true`, the same
+switch the document goldens take.
+
+Stubs that answer from their input — `stub(lookupChip) { petId -> … }` — are not
+exported yet; that is spec 0062's second entry.
+
 ### The comparison on its own
 
 The classification above is not tied to the golden files or to the Gradle task.
@@ -5461,7 +5494,7 @@ could ban `mutableListOf` outright now that the stdlib resolves again, but that
 was never the claim: what matters is whether the mutation escapes. A builder
 that fills a local list and hands back a read-only view is the shape half of
 `Endpoint.kt` is written in, so the claim lives in a test that reads the
-sources. It is a ratchet, not a ban: nineteen files accumulate into a mutable
+sources. It is a ratchet, not a ban: twenty files accumulate into a mutable
 collection and hand back something immutable, which is what a builder is, and
 each is listed with why. What it stops is the next file quietly starting.
 
