@@ -1,3 +1,8 @@
+public final class io/github/matthewjones372/pelican/metrics/otel/ClientTracingKt {
+	public static final fun traced (Lio/github/matthewjones372/pelican/ClientTransport;Lio/opentelemetry/api/OpenTelemetry;Ljava/lang/String;)Lio/github/matthewjones372/pelican/ClientTransport;
+	public static synthetic fun traced$default (Lio/github/matthewjones372/pelican/ClientTransport;Lio/opentelemetry/api/OpenTelemetry;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/ClientTransport;
+}
+
 public final class io/github/matthewjones372/pelican/metrics/otel/TelemetryKt {
 	public static final field INSTRUMENTATION_SCOPE Ljava/lang/String;
 	public static final field UNMATCHED Ljava/lang/String;

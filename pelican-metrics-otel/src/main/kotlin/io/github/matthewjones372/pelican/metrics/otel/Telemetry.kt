@@ -263,9 +263,9 @@ private const val UNNAMED = "unnamed"
 const val UNMATCHED: String = "_unmatched"
 
 /** The status from which the conventions call a server span's outcome an error. */
-private const val LOWEST_SERVER_ERROR = 500
+internal const val LOWEST_SERVER_ERROR = 500
 
-private const val NANOS_PER_SECOND = 1_000_000_000.0
+internal const val NANOS_PER_SECOND = 1_000_000_000.0
 
 /**
  * The attribute keys, spelled as the current HTTP semantic conventions spell
@@ -283,10 +283,10 @@ private const val NANOS_PER_SECOND = 1_000_000_000.0
  * `http.response.status_code` rather than `http.status_code`. Anything still
  * emitting the old spellings is emitting deprecated attributes.
  */
-private val HTTP_REQUEST_METHOD = AttributeKey.stringKey("http.request.method")
+internal val HTTP_REQUEST_METHOD = AttributeKey.stringKey("http.request.method")
 private val HTTP_ROUTE = AttributeKey.stringKey("http.route")
-private val HTTP_RESPONSE_STATUS_CODE = AttributeKey.longKey("http.response.status_code")
-private val ERROR_TYPE = AttributeKey.stringKey("error.type")
+internal val HTTP_RESPONSE_STATUS_CODE = AttributeKey.longKey("http.response.status_code")
+internal val ERROR_TYPE = AttributeKey.stringKey("error.type")
 
 /** Pelican's own three, in a namespace of their own because the conventions have no key for any. */
 private val PELICAN_OPERATION_ID = AttributeKey.stringKey("pelican.operation_id")
@@ -299,7 +299,7 @@ private const val DURATION_METRIC = "http.server.request.duration"
 /** Not a name the conventions have. It is `pelican-metrics`'s, so the two publish one series. */
 private const val REFUSALS_METRIC = "http.server.refusals"
 
-private val DURATION_BUCKETS =
+internal val DURATION_BUCKETS =
     listOf(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0)
 
 /**
@@ -389,5 +389,5 @@ private class Described(val spanName: String, val attributes: Attributes) {
  * event: recording a `CompletionException` would put this module's own plumbing
  * at the top of the stack trace a reader opened the trace to see.
  */
-private fun Throwable.unwrapCompletion(): Throwable =
+internal fun Throwable.unwrapCompletion(): Throwable =
     if (this is CompletionException) cause?.unwrapCompletion() ?: this else this

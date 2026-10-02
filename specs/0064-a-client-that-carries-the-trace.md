@@ -16,11 +16,7 @@ has no child for the call (lark-bank spec 0024: the bank's screening call to ban
 
 ## Shape
 
-`pelican-core`'s `ClientRequest` gains the one thing a decorator outside it needs, a copy with headers added:
-
-```kotlin
-fun ClientRequest.withHeaders(vararg added: Pair<String, String>): ClientRequest
-```
+`pelican-core`'s `ClientRequest.withHeader` is all a decorator outside core needs, and is there already.
 
 `pelican-metrics-otel` gains a transport that wraps another, opens a client span (`http.client.request.duration`,
 attributed as the conventions say), and writes the current context's `traceparent` and `tracestate` with the
@@ -31,8 +27,8 @@ val transport = PekkoHttpTransport().traced(openTelemetry)
 val client = ScreeningClient(url, JacksonCodecs, transport, timeout)
 ```
 
-A failed call ends its span with an error status; a response is an error only when it is 5xx, as the conventions say
-for a client.
+A failed call ends its span with an error status, as does a 4xx or a 5xx: on a client span the conventions count both,
+since the call did not get what it asked for. The answer is handed back as it came either way.
 
 ## Why this shape
 
@@ -42,9 +38,13 @@ alternative, a header parameter the codegen adds to every operation, makes each 
 
 ## Stack
 
-- [ ] **`spec-0064-traced`** — `withHeaders`, `traced`, its client span and metric. Done when: a call made inside a
-      span arrives at a Pelican server with that span as the server span's parent, over both the JDK and Pekko
-      transports, and a call to a closed port ends its span as an error.
+- [x] **`spec-0064-traced`** — `traced`, its client span and metric. Done when: a call made inside a span arrives at
+      a server with that span's client span as the parent it continues from, over Pekko's transport, and a call that
+      gets no answer ends its span as an error.
+      Done: `ClientTracingTest` (the span, its parent, the headers a server extracts, 4xx and 5xx, a refused call, the
+      histogram) and the example's `TracedCallTest`, over a socket to the JDK's `HttpServer`; that one lives in the
+      example because this module's tests prove no transport or server is reachable from it. Pekko is the only
+      `ClientTransport` there is; pelican-test's JDK client is a test `Transport`, not one.
 
 ## Acceptance
 
@@ -56,5 +56,4 @@ alternative, a header parameter the codegen adds to every operation, makes each 
 
 1. **Span name**: `{method} {route}` needs the route, which the transport sees only as a URL. Recommend `{method}`
    alone, as the conventions say when the route is unknown, with `url.full` attributed.
-2. **Is `withHeaders` public API?** Recommend yes: it is what any decorator needs, and adding to a request is safe
-   where replacing one is not.
+2. ~~`withHeaders`~~: `withHeader` was already public. Settled.
