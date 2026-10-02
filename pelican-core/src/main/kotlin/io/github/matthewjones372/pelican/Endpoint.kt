@@ -12,6 +12,13 @@ class ErrorSpec @PublishedApi internal constructor(
     val type: KType?,
     /** Headers this failure carries — `Retry-After` on a 429, chiefly. */
     val headers: List<ResponseHeader<*>> = emptyList(),
+    /**
+     * Which of several failures under one status this is, or null where it is the only one. The
+     * document turns a tagged pair into a `oneOf` with a discriminator. See spec 0063.
+     */
+    val tag: String? = null,
+    /** The body field [tag] is written under. */
+    val discriminator: String = DEFAULT_DISCRIMINATOR,
 ) {
     init {
         if (status != null) checkStatus("error:$status", status, carriesBody = type != null)
@@ -566,21 +573,26 @@ private fun validate(ep: Endpoint<*, *>) {
         )
     }
 
-    // The numbered statuses are one key each in the same map, so an error
-    // sharing a status — with a success, or with another error — would
-    // silently replace it in the document while the server kept answering.
+    // The numbered statuses are one key each in the same map, so an error sharing a status — with a
+    // success, or with another error — would silently replace it in the document while the server
+    // kept answering. Tagged failures are the exception: the document gives that status one entry
+    // whose schema is a `oneOf` over them, discriminated by the tag. See spec 0063.
     val successStatuses = when (val out = ep.output) {
         is DeclaredResponses<*, *> -> out.successes.map { it.status }
         else -> listOf(out.status)
     }
     val errorStatuses = ep.errors.mapNotNull { it.status }
-    val statusClashes = errorStatuses.groupingBy { it }.eachCount().filterValues { it > 1 }.keys +
-        errorStatuses.filter { it in successStatuses }
+    val sharedByErrors = errorStatuses.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+    val statusClashes = sharedByErrors.filter { status ->
+        ep.errors.any { it.status == status && it.tag == null }
+    } + errorStatuses.filter { it in successStatuses }
     if (statusClashes.isNotEmpty()) {
         error(
             "$ep declares more than one response under status ${statusClashes.toSortedSet().joinToString()}, " +
                 "and the document has room for one per status: the second declaration would silently " +
-                "replace the first. Give them different statuses, or declare one.",
+                "replace the first. Two failures may share a status when every one of them is tagged, " +
+                "which the document writes as a `oneOf` discriminated by the tag. Otherwise give them " +
+                "different statuses, or declare one.",
         )
     }
 

@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican
 
 import io.github.matthewjones372.pelican.spi.successNamedBy
+import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
@@ -176,6 +177,15 @@ internal fun encodeDeclaredHeaders(
     }
 }
 
+/** The body field a tag is written under unless a declaration names another. */
+const val DEFAULT_DISCRIMINATOR: String = "kind"
+
+// Rendered as JSON scalars, so there is nowhere in the body to put a tag.
+private val SCALAR_PAYLOADS = setOf(
+    String::class, Char::class, Boolean::class,
+    Int::class, Long::class, Short::class, Byte::class, Double::class, Float::class,
+)
+
 /** One declared failure: a status, a payload type, and the headers it sends. */
 class ErrorOutput<E> @PublishedApi internal constructor(
     val status: Int,
@@ -186,6 +196,14 @@ class ErrorOutput<E> @PublishedApi internal constructor(
      * endpoint's list would be permitted on a success nobody meant to throttle.
      */
     val headers: List<ResponseHeader<*>> = emptyList(),
+    /**
+     * Which of several failures under one status this is, written into the body so a client can
+     * branch on it. Null for a failure that is the only one under its status, which is every
+     * failure until one is [tagged]. See spec 0063.
+     */
+    val tag: String? = null,
+    /** The body field [tag] is written under. */
+    val discriminator: String = DEFAULT_DISCRIMINATOR,
 ) {
     init {
         checkStatus("error:$status", status, carriesBody = true)
@@ -195,13 +213,47 @@ class ErrorOutput<E> @PublishedApi internal constructor(
     }
 
     /**
+     * The same failure, saying which of several under its status it is.
+     *
+     * Two failures may share a status only when both are tagged, because the tag is the only thing
+     * that tells them apart: the status names the response everywhere else. [field] is the body
+     * field the tag is written under, `"kind"` unless a payload already uses that name.
+     */
+    fun tagged(tag: String, field: String = DEFAULT_DISCRIMINATOR): ErrorOutput<E> {
+        require(tag.isNotBlank()) { "error:$status was tagged with a blank tag; a tag names the failure" }
+        require(field.isNotBlank()) { "error:$status was tagged under a blank field name" }
+        require(carriesAnObject()) {
+            "error:$status carries $type, and a tag is written into the body as a field, so only a " +
+                "JSON object can hold one. Declare a type with a field for the reason, or give the " +
+                "two failures different statuses."
+        }
+        return ErrorOutput(status, type, description, headers, tag, field)
+    }
+
+    /**
+     * Whether the payload is rendered as a JSON object rather than a scalar or a list. Judged from
+     * the declared type, because the alternative is finding out at response time, from a body that
+     * has nowhere to put the tag.
+     */
+    private fun carriesAnObject(): Boolean {
+        val classifier = type.classifier as? KClass<*> ?: return false
+        if (classifier in SCALAR_PAYLOADS) return false
+        // JDK reflection, not kotlin-reflect: core depends on the standard library and jackson-core,
+        // and `isSubclassOf` would add a jar `NoThirdPartyDependenciesTest` refuses.
+        val java = classifier.java
+        return !Collection::class.java.isAssignableFrom(java) &&
+            !Map::class.java.isAssignableFrom(java) &&
+            !java.isArray
+    }
+
+    /**
      * Produces this failure, with a value for each header it declared —
      * `throttled(ApiError(429, "Slow down"), retryAfter of 30L)`.
      */
     operator fun invoke(error: E, vararg values: HeaderValue): Outcome<E, Nothing> =
         Outcome.Err(this, error, encodeDeclaredHeaders(this, headers, values))
 
-    internal fun spec() = ErrorSpec(status, description, type, headers)
+    internal fun spec() = ErrorSpec(status, description, type, headers, tag, discriminator)
 
     override fun toString() = "error:$status"
 }
@@ -248,17 +300,37 @@ class DeclaredResponses<E, T> internal constructor(
         // between. Several *renderings* of one response share a status by
         // design, and are one declared response with its alternatives inside it
         // — a [NegotiatedOutput], which arrives here as the single entry it is.
-        val clashes = (successes.map { it.status } + failures.map { it.status })
+        // Two failures may share a status when every one under it is tagged: the tag is then what
+        // names them, written into the body, and spec 0063 is why. Anything else sharing a status —
+        // a success, or a failure with no tag — is still a pair nothing downstream can pick between.
+        val shared = (successes.map { it.status } + failures.map { it.status })
             .groupingBy { it }
             .eachCount()
             .filterValues { it > 1 }
             .keys
-        require(clashes.isEmpty()) {
-            "Two responses are declared for status ${clashes.joinToString()} on the same output. " +
-                "Naming a response is what produces it, and the status is what names it, so a second " +
-                "one under the same status could never be picked: give them different statuses, or " +
-                "declare one. Two media types for the same response are that one response declaring " +
-                "both — negotiated(json<T>(200), media<T>(\"text/csv\", 200)) — not two responses."
+        val unpickable = shared.filter { status ->
+            successes.any { it.status == status } || failures.any { it.status == status && it.tag == null }
+        }
+        require(unpickable.isEmpty()) {
+            "Two responses are declared for status ${unpickable.joinToString()} on the same output, and " +
+                "not every one of them is tagged. Naming a response is what produces it, and the status " +
+                "is what names it, so a second one under the same status could never be picked. Two " +
+                "failures may share a status when both are tagged — " +
+                "errorJson<T>($shared, \"...\").tagged(\"a_reason\") — which writes the reason into the " +
+                "body for a client to branch on. Otherwise give them different statuses, or declare " +
+                "one. Two media types for the same response are that one response declaring both — " +
+                "negotiated(json<T>(200), media<T>(\"text/csv\", 200)) — not two responses."
+        }
+
+        val repeatedTags = failures
+            .filter { it.tag != null }
+            .groupBy { it.status to it.tag }
+            .filterValues { it.size > 1 }
+            .keys
+        require(repeatedTags.isEmpty()) {
+            "The tag ${repeatedTags.joinToString { "\"${it.second}\"" }} is declared twice under one " +
+                "status on the same output. A tag is what tells two failures under one status apart, so " +
+                "each needs its own."
         }
 
         // Naming a response is what produces it, and producing a stream means

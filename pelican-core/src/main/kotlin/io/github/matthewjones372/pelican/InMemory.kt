@@ -6,6 +6,7 @@ import io.github.matthewjones372.pelican.spi.decode
 import io.github.matthewjones372.pelican.spi.decodeCaller
 import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.failureNamedBy
+import io.github.matthewjones372.pelican.spi.taggedBody
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.readStrictBody
 import io.github.matthewjones372.pelican.spi.renderError
@@ -222,7 +223,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
                 is Outcome.Err<*> -> {
                     val declared = out.failureNamedBy(outcome)
                     val codec = checkNotNull(resolved.alternatives[declared]) { "No codec for $declared" }
-                    body(declared.status, "application/json", codec.encodeToString(outcome.error))
+                    body(declared.status, "application/json", taggedBody(declared, codec.encodeToString(outcome.error)))
                         .plus(outcome.headers)
                 }
             }
