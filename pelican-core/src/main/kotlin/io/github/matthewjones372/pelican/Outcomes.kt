@@ -205,6 +205,20 @@ class ErrorOutput<E> @PublishedApi internal constructor(
     /** The body field [tag] is written under. */
     val discriminator: String = DEFAULT_DISCRIMINATOR,
 ) {
+    /**
+     * The shape before spec 0063 added the tag. `errorJson` is inline, so this constructor is in
+     * callers' bytecode: a service compiled against 1.0.0-RC3 calls it, and dropping it would be a
+     * NoSuchMethodError rather than a recompile.
+     */
+    @Deprecated("Binary compatibility with 1.0.0-RC3.", level = DeprecationLevel.HIDDEN)
+    @PublishedApi
+    internal constructor(
+        status: Int,
+        type: KType,
+        description: String,
+        headers: List<ResponseHeader<*>>,
+    ) : this(status, type, description, headers, null, DEFAULT_DISCRIMINATOR)
+
     init {
         checkStatus("error:$status", status, carriesBody = true)
 

@@ -372,6 +372,19 @@ still there, and the only new ones are the module's own.
   `pelican-test-wiremock` now takes `pelican-test`, for the request builder the
   export reuses rather than copies; it is core-only itself, and `DecouplingTest`
   allows it anchored to its version so `pelican-test-pekko` is still refused.
+- **Two failures under one status (spec 0063).**
+  `errorJson<T>(503, "...").tagged("not_recorded")` says which of several failures
+  under one status this is. Two may now share a status when every one under it is
+  tagged with its own tag; the tag is written into the body under `"kind"`,
+  settable per declaration, and the document declares that status once with a
+  `oneOf` of the tagged schemas and a `discriminator` mapping each tag to one, so
+  a client outside Pelican can branch on it. A handler still names the
+  declaration it answers. Untagged failures sharing a status are still refused,
+  and so are two with the same tag, a success sharing a status, and a tag on a
+  payload that is not a JSON object. Nothing changes for a failure that is the
+  only one under its status. `ErrorOutput` and `ErrorSpec` gained `tag` and
+  `discriminator`; the constructors they had in RC3 are kept hidden, so a service
+  compiled against RC3 still links.
 - **Stubs that answer from their input, as response templates (spec 0062).**
   `stub(endpoint) { input -> outcome }` in a `stubFile` exports as one mapping on
   the endpoint's path pattern, with a `{{request.pathSegments.[n]}}` template

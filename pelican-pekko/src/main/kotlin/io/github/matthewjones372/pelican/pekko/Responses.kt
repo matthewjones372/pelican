@@ -17,10 +17,10 @@ import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.TextOutput
 import io.github.matthewjones372.pelican.mediaType
 import io.github.matthewjones372.pelican.spi.failureNamedBy
-import io.github.matthewjones372.pelican.spi.taggedBody
 import io.github.matthewjones372.pelican.spi.renderError
 import io.github.matthewjones372.pelican.spi.selectedFor
 import io.github.matthewjones372.pelican.spi.successNamedBy
+import io.github.matthewjones372.pelican.spi.taggedBody
 import org.apache.pekko.NotUsed
 import org.apache.pekko.http.javadsl.common.EntityStreamingSupport
 import org.apache.pekko.http.javadsl.model.ContentType
