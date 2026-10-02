@@ -4221,12 +4221,15 @@ client outside Pelican can branch on it too. A handler still names the
 declaration it means — `registryDown(RegistryDown(30))` — so the server never
 has to infer which failure it is answering.
 
-Three rules keep the relaxation from being a hole. Every failure under a shared
+Four rules keep the relaxation from being a hole. Every failure under a shared
 status must be tagged, and with its own tag: a pair where one is untagged, or
 where both carry the same tag, is refused when the endpoint is built, because the
-tag is the only thing that could tell them apart. A success never shares a status
-with anything, tagged or not. And a tag needs somewhere to live, so it is refused
-on a payload rendered as a JSON scalar or a list rather than an object.
+tag is the only thing that could tell them apart. They must also agree on the
+field the tag is written under — the document declares one discriminator per
+status, so a client told to read `"kind"` would find nothing on a body that wrote
+`"reason"`. A success never shares a status with anything, tagged or not. And a
+tag needs somewhere to live, so it is refused on a payload rendered as a JSON
+scalar or a list rather than an object.
 
 Nothing changes for a failure that is the only one under its status: no tag, no
 field in the body, and the same single schema in the document as before. The body is written

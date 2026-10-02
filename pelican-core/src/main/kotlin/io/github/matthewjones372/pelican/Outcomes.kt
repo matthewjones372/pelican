@@ -347,6 +347,22 @@ class DeclaredResponses<E, T> internal constructor(
                 "each needs its own."
         }
 
+        // One status means one field. The document carries a single `propertyName` per status, and a
+        // reader told to look under one name finds nothing on a body that wrote the other.
+        val mixedFields = failures
+            .filter { it.tag != null }
+            .groupBy { it.status }
+            .filterValues { under -> under.map { it.discriminator }.distinct().size > 1 }
+        require(mixedFields.isEmpty()) {
+            mixedFields.entries.joinToString("; ") { (status, under) ->
+                "The failures under status $status write their tag under different fields — " +
+                    under.joinToString(" and ") { "\"${it.discriminator}\"" } +
+                    ". The document declares one discriminator field per status, so a client told to " +
+                    "read one would find nothing on a body carrying the other: tag them under the same " +
+                    "field."
+            }
+        }
+
         // Naming a response is what produces it, and producing a stream means
         // handing over the backend's own type — Source, Flow, Sequence — which
         // core cannot name. So a stream is a success, but the only one.

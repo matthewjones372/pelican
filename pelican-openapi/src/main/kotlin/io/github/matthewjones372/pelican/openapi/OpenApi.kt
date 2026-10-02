@@ -389,6 +389,8 @@ private fun discriminator(described: List<Pair<ErrorSpec, JsonObj>>): JsonObj? {
     }
     if (mapped.size != described.size) return null
     return jsonObj {
+        // Any of them: the endpoint refuses a status whose failures disagree on the field, so one
+        // status has one discriminator here by construction rather than by picking a winner.
         "propertyName" to described.first().first.discriminator
         put("mapping", JsonObj(mapped.toMap()))
     }

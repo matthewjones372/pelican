@@ -77,6 +77,23 @@ class TaggedFailuresTest {
     }
 
     @Test
+    fun `two failures sharing a status must agree on the field their tag is written under`() {
+        val message = shouldThrow<IllegalArgumentException> {
+            endpoint(petId) {
+                post("pets" / petId / "adoption")
+                json<String>().orFail(
+                    notRecorded,
+                    errorJson<RegistryDown>(503, "Registry down").tagged("registry_down", field = "reason"),
+                )
+            }
+        }.message.orEmpty()
+
+        message shouldContain "503"
+        message shouldContain "kind"
+        message shouldContain "reason"
+    }
+
+    @Test
     fun `a tag on a payload that is not an object is refused`() {
         shouldThrow<IllegalArgumentException> {
             errorJson<String>(503, "A bare message").tagged("not_recorded")

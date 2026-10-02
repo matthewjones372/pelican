@@ -380,8 +380,9 @@ still there, and the only new ones are the module's own.
   `oneOf` of the tagged schemas and a `discriminator` mapping each tag to one, so
   a client outside Pelican can branch on it. A handler still names the
   declaration it answers. Untagged failures sharing a status are still refused,
-  and so are two with the same tag, a success sharing a status, and a tag on a
-  payload that is not a JSON object. Nothing changes for a failure that is the
+  and so are two with the same tag, two that disagree on the field their tag is
+  written under, a success sharing a status, and a tag on a payload that is not a
+  JSON object. Nothing changes for a failure that is the
   only one under its status. `ErrorOutput` and `ErrorSpec` gained `tag` and
   `discriminator`; the constructors they had in RC3 are kept hidden, so a service
   compiled against RC3 still links.
