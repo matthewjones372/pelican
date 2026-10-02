@@ -5,6 +5,8 @@ import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.InMemoryClientTransport
 import io.github.matthewjones372.pelican.JsonObj
+import io.github.matthewjones372.pelican.JsonStr
+import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.PathSegment
 import io.github.matthewjones372.pelican.ServerEndpoint
@@ -134,15 +136,23 @@ class StubFile internal constructor(private val codecs: Codecs) {
             "status" to answer.status
             put(
                 "headers",
-                equalTo(answer.headers.filterNot { (name, _) -> FRAMING_HEADERS.any { it.equals(name, true) } }),
+                literal(answer.headers.filterNot { (name, _) -> FRAMING_HEADERS.any { it.equals(name, true) } }),
             )
             "body" to answer.body
         }
 
-        /** WireMock's own matcher shape, so the written file reads the way a hand-written one would. */
-        private fun equalTo(pairs: List<Pair<String, String>>): JsonObj? = pairs
-            .takeIf { it.isNotEmpty() }
-            ?.let { JsonObj(it.associate { (name, value) -> name to jsonObj { "equalTo" to value } }) }
+        /**
+         * WireMock's matcher shape, which is the request side only: a response header is the value
+         * itself, and wrapping one in a matcher reads back as a null header rather than as an error.
+         */
+        private fun equalTo(pairs: List<Pair<String, String>>): JsonObj? =
+            pairs.asJsonObj { value -> jsonObj { "equalTo" to value } }
+
+        private fun literal(pairs: List<Pair<String, String>>): JsonObj? =
+            pairs.asJsonObj { value -> JsonStr(value) }
+
+        private fun List<Pair<String, String>>.asJsonObj(value: (String) -> JsonValue): JsonObj? =
+            takeIf { it.isNotEmpty() }?.let { JsonObj(it.associate { (name, v) -> name to value(v) }) }
     }
 
     /** `request` never sends, and a transport that cannot is clearer than one that silently could. */
