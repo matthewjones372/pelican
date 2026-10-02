@@ -76,6 +76,10 @@ class FunctionalStyleTest {
         "pelican-jackson/src/main/kotlin/io/github/matthewjones372/pelican/jackson/KotlinAwareModelResolver.kt" to
             "swagger's Schema is a mutable Java bean; patching it is the integration",
 
+        "pelican-metrics-otel/src/main/kotlin/io/github/matthewjones372/pelican/metrics/otel/ClientTracing.kt" to
+            "OpenTelemetry's propagator injects into a carrier through a Setter, so the headers it " +
+            "writes have to be gathered somewhere mutable; they are folded into the request on the " +
+            "next line and the list is never seen again",
         "pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Interpreter.kt" to
             "the per-request value bag handed to Params",
         "pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Responses.kt" to
