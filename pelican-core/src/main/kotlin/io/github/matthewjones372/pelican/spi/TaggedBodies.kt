@@ -38,7 +38,12 @@ fun taggedBody(declared: ErrorOutput<*>, encoded: String): String {
  * cannot be sure of.
  */
 fun tagIn(encoded: String, field: String): String? {
-    val parsed = runCatching { parseJson(encoded) }.getOrNull()
+    val parsed = try {
+        parseJson(encoded)
+    } catch (_: IllegalArgumentException) {
+        // What [parseJson] refuses a body with, and the one thing it throws.
+        return null
+    }
     return ((parsed as? JsonObj)?.fields?.get(field) as? JsonStr)?.value
 }
 
