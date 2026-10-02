@@ -359,6 +359,7 @@ tasks.named("compileTestKotlin") {
         "generateImportedEndpoints",
         "generateImported32Endpoints",
         "generateOrdersSuspendingClient",
+        "generateAdoptionClient",
     )
 }
 
