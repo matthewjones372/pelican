@@ -55,7 +55,7 @@ discriminator so clients outside Pelican get it too.
 
 ## Stack
 
-- [ ] **`spec-0063-tagged-failures`** — `tagged`, the relaxed check, the
+- [x] **`spec-0063-tagged-failures`** ([#205](https://github.com/matthewjones372/pelican/pull/205)) — `tagged`, the relaxed check, the
       server's body and the document's `oneOf` with discriminator.
       Done when: an endpoint with two tagged `503`s builds, answers each with
       its tag in the body, and its document validates with both schemas under
