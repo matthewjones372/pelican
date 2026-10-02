@@ -8,11 +8,14 @@ import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.Outcome
+import io.github.matthewjones372.pelican.PathParam
 import io.github.matthewjones372.pelican.PathSegment
+import io.github.matthewjones372.pelican.PlainCodec
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jsonArr
 import io.github.matthewjones372.pelican.jsonObj
+import io.github.matthewjones372.pelican.jsonStrings
 import io.github.matthewjones372.pelican.renderPretty
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.RequestSpec
@@ -20,6 +23,7 @@ import io.github.matthewjones372.pelican.test.ResponseSpec
 import io.github.matthewjones372.pelican.test.Transport
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -37,6 +41,14 @@ const val STUB_FILE_UPDATE_PROPERTY: String = "pelican.golden.update"
 // Framing is WireMock's to decide once it knows the body it is sending, not Pelican's to record.
 private val FRAMING_HEADERS = listOf("Content-Length", "Transfer-Encoding", "Connection")
 
+// WireMock tries lower numbers first. A fixed input is the more specific stub, so it has to beat the
+// template for the one request it names; both sit on the default 5 otherwise and file order decides.
+private const val FIXED_PRIORITY = 1
+private const val TEMPLATED_PRIORITY = 5
+
+/** The transformer WireMock fills a template with; named per stub so nothing else is templated. */
+private const val TEMPLATE_TRANSFORMER = "response-template"
+
 /**
  * The stubs a demo needs, written in endpoints and exported as WireMock mapping files.
  *
@@ -46,6 +58,7 @@ private val FRAMING_HEADERS = listOf("Content-Length", "Transfer-Encoding", "Con
  *
  * ```kotlin
  * stubFile(JacksonCodecs) {
+ *     stub(lookupChip) { (petId, _, _) -> ok(Chip("98100000000000$petId", "Petshop")) }
  *     stub(lookupChip, In3(3L, "eu", 1)) answers noSuchChip(Problem("never chipped"))
  * }.writeTo(Path.of("demo/registry/mappings"))
  * ```
@@ -53,7 +66,7 @@ private val FRAMING_HEADERS = listOf("Content-Length", "Transfer-Encoding", "Con
 fun stubFile(codecs: Codecs, declare: StubFile.() -> Unit): StubFile =
     StubFile(codecs).apply(declare)
 
-/** A set of stubs with fixed inputs, ready to be written. Build one with [stubFile]. */
+/** A set of stubs, ready to be written. Build one with [stubFile]. */
 class StubFile internal constructor(private val codecs: Codecs) {
 
     // Accumulated as they are declared and frozen into the files writeTo renders; see
@@ -70,6 +83,56 @@ class StubFile internal constructor(private val codecs: Codecs) {
     fun <I, E : Any, T : Any> stub(endpoint: Endpoint<I, Outcome<E, T>>, input: I): Stubbing<I, E, T> =
         Stubbing(endpoint, input)
 
+    /**
+     * Every call to [endpoint], answered from its own decoded input, as one mapping with a response
+     * template filling the path parameters the answer uses.
+     *
+     * A lambda cannot be read, so the template is derived by asking: the endpoint is called twice
+     * with distinctive values, and the answer's dependence on the path is whatever moved with them.
+     * An answer that moved for any other reason — a query parameter, a header — cannot be written as
+     * a template and is refused here, naming the endpoint, rather than exported wrong.
+     */
+    fun <I, E : Any, T : Any> stub(endpoint: Endpoint<I, Outcome<E, T>>, answer: (I) -> Outcome<E, T>) {
+        val where = endpoint.pathSpec.template
+        require(endpoint.bodyInput == null) {
+            "$where answers from its input, and that input includes a request body. A mapping file " +
+                "templates from the path, so an answer built out of the body cannot be exported as " +
+                "one. Name the inputs you need with stub(endpoint, input) instead."
+        }
+        val captures = endpoint.pathSpec.segments.withIndex()
+            .mapNotNull { (at, segment) -> (segment as? PathSegment.Capture)?.let { at to it.param } }
+
+        val probes = listOf(0, 1).map { round -> probe(endpoint, answer, round) }
+        val templates = probes.map { it.templated(captures) }
+        val answers = probes.map { it.answer }
+
+        require(answers[0].status == answers[1].status) {
+            "$where answers from its input with a status that changes with it — " +
+                "${answers[0].status} and then ${answers[1].status}. One mapping carries one status, " +
+                "so name each input with stub(endpoint, input) instead."
+        }
+        require(templates[0] == templates[1]) {
+            "$where answers from something other than a path parameter — a query parameter, a " +
+                "header, or the clock. Only a path parameter can be filled into a template, so this " +
+                "stub cannot be exported as one. Name the inputs you need with " +
+                "stub(endpoint, input) instead."
+        }
+
+        declared += Declared(
+            root = endpoint.pathRoot(),
+            request = jsonObj {
+                "method" to endpoint.method.name
+                // The path only, and nothing about the query: the answer was proved not to depend on
+                // one, so constraining it here would stop the mapping answering a call that differs.
+                "urlPathPattern" to endpoint.pathPattern()
+            },
+            response = response(answers[0], templates[0]) + jsonObj {
+                "transformers" to jsonStrings(listOf(TEMPLATE_TRANSFORMER))
+            },
+            priority = TEMPLATED_PRIORITY,
+        )
+    }
+
     /** One stub, waiting to be told what it answers with. */
     inner class Stubbing<I, E : Any, T : Any> internal constructor(
         private val endpoint: Endpoint<I, Outcome<E, T>>,
@@ -78,7 +141,19 @@ class StubFile internal constructor(private val codecs: Codecs) {
         /** `ok(value)` or a failure the endpoint declares; nothing else compiles. */
         infix fun answers(outcome: Outcome<E, T>) {
             val request = requests.request(endpoint, input)
-            declared += Declared(endpoint.pathRoot(), request, render(endpoint, request, outcome))
+            val answer = served(endpoint) { outcome }.answer(request.asClientRequest())
+            declared += Declared(
+                root = endpoint.pathRoot(),
+                request = jsonObj {
+                    "method" to request.method.name
+                    "urlPath" to request.path
+                    put("queryParameters", equalTo(request.query))
+                    put("headers", equalTo(request.headers))
+                    request.body?.let { "bodyPatterns" to jsonArr(listOf(jsonObj { "equalToJson" to it })) }
+                },
+                response = response(answer, answer.body),
+                priority = FIXED_PRIORITY,
+            )
         }
     }
 
@@ -105,60 +180,108 @@ class StubFile internal constructor(private val codecs: Codecs) {
     }
 
     /**
-     * Rendered by the code a server answers with, so the status, content type and body are the ones
-     * the contract's own service would send.
+     * The endpoint served in memory, so an answer is rendered by the code a server answers with and
+     * its status, content type and body are the ones the contract's own service would send.
      */
-    private fun <I, E : Any, T : Any> render(
+    private fun <I, E : Any, T : Any> served(
         endpoint: Endpoint<I, Outcome<E, T>>,
-        request: RequestSpec,
-        outcome: Outcome<E, T>,
-    ): ResponseSpec {
-        val served = InMemoryClientTransport(
-            api(
-                listOf(ServerEndpoint(endpoint) { CompletableFuture.completedFuture(outcome) }),
-                codecs,
+        answer: (I) -> Outcome<E, T>,
+    ): InMemoryClientTransport = InMemoryClientTransport(
+        api(
+            listOf(
+                ServerEndpoint(endpoint) { p ->
+                    CompletableFuture.completedFuture(answer(endpoint.inputs.extract(p)))
+                },
             ),
-        )
-        val response = served.send(request.asClientRequest()).toCompletableFuture().get()
-        return ResponseSpec(response.status, response.headers, response.text())
+            codecs,
+        ),
+    )
+
+    /**
+     * Calls [endpoint] once with values distinctive enough to be found again in the answer.
+     *
+     * Whether the handler ran is checked rather than assumed. A probe value the endpoint refuses —
+     * an `int32` parameter handed an `int64`, a pattern a refinement rejects — is answered by
+     * Pelican before the handler is reached, and that refusal quotes the value, so it reads exactly
+     * like an answer that moved with its input. Saying which of the two happened is the difference
+     * between a fixable message and a wrong one.
+     */
+    private fun <I, E : Any, T : Any> probe(
+        endpoint: Endpoint<I, Outcome<E, T>>,
+        answer: (I) -> Outcome<E, T>,
+        round: Int,
+    ): Probe {
+        val salt = { at: Int -> round * SALT_STRIDE + at }
+        val sentinels = endpoint.pathSpec.segments.withIndex().associate { (at, segment) ->
+            at to (segment as? PathSegment.Capture)?.param?.let { sentinel(it.codec, salt(at)) }
+        }
+        val path = "/" + endpoint.pathSpec.segments.withIndex().joinToString("/") { (at, segment) ->
+            when (segment) {
+                is PathSegment.Literal -> segment.value
+                is PathSegment.Capture -> checkNotNull(sentinels[at])
+            }
+        }
+        // Supplied and varied per round, so an answer that reads one is caught rather than exported.
+        val query = endpoint.queries.withIndex()
+            .map { (at, q) -> q.name to sentinel(q.codec, salt(QUERY_SALT_BASE + at)) }
+        val headers = endpoint.headerParams.withIndex()
+            .map { (at, h) -> h.name to sentinel(h.codec, salt(HEADER_SALT_BASE + at)) }
+
+        val spec = RequestSpec(endpoint.method, path, query, headers, null)
+        val captured = sentinels.mapNotNull { (at, value) -> value?.let { at to it } }.toMap()
+        val reached = AtomicBoolean(false)
+        val response = served(endpoint) { input -> reached.set(true); answer(input) }
+            .answer(spec.asClientRequest())
+        require(reached.get()) {
+            "${endpoint.pathSpec.template} refused the values this export probes it with, answering " +
+                "${response.status} before the stub was asked: ${response.body.take(PROBE_BODY_SHOWN)}. " +
+                "The probe builds a value from each parameter's declared type, so a parameter that " +
+                "narrows its type further than that needs stub(endpoint, input) instead."
+        }
+        return Probe(captured, response)
     }
 
-    private class Declared(val root: String, val request: RequestSpec, val answer: ResponseSpec) {
+    private class Probe(private val sentinels: Map<Int, String>, val answer: ResponseSpec) {
+        /** The answer with every path value this round used replaced by the segment it came from. */
+        fun templated(captures: List<Pair<Int, PathParam<*>>>): String =
+            captures.fold(answer.body) { body, (at, _) ->
+                body.replace(sentinels.getValue(at), "{{request.pathSegments.[$at]}}")
+            }
+    }
 
+    /**
+     * WireMock's matcher shape, which is the request side only: a response header is the value
+     * itself, and wrapping one in a matcher reads back as a null header rather than as an error.
+     */
+    private fun equalTo(pairs: List<Pair<String, String>>): JsonObj? =
+        pairs.asJsonObj { value -> jsonObj { "equalTo" to value } }
+
+    private fun literal(pairs: List<Pair<String, String>>): JsonObj? =
+        pairs.asJsonObj { value -> JsonStr(value) }
+
+    private fun List<Pair<String, String>>.asJsonObj(value: (String) -> JsonValue): JsonObj? =
+        takeIf { it.isNotEmpty() }?.let { JsonObj(it.associate { (name, v) -> name to value(v) }) }
+
+    private fun response(answer: ResponseSpec, body: String): JsonObj = jsonObj {
+        "status" to answer.status
+        put(
+            "headers",
+            literal(answer.headers.filterNot { (name, _) -> FRAMING_HEADERS.any { it.equals(name, true) } }),
+        )
+        "body" to body
+    }
+
+    private class Declared(
+        val root: String,
+        private val request: JsonObj,
+        private val response: JsonObj,
+        private val priority: Int,
+    ) {
         fun mapping(): JsonObj = jsonObj {
-            "request" to request()
-            "response" to response()
+            "priority" to priority
+            "request" to request
+            "response" to response
         }
-
-        private fun request(): JsonObj = jsonObj {
-            "method" to request.method.name
-            "urlPath" to request.path
-            put("queryParameters", equalTo(request.query))
-            put("headers", equalTo(request.headers))
-            request.body?.let { "bodyPatterns" to jsonArr(listOf(jsonObj { "equalToJson" to it })) }
-        }
-
-        private fun response(): JsonObj = jsonObj {
-            "status" to answer.status
-            put(
-                "headers",
-                literal(answer.headers.filterNot { (name, _) -> FRAMING_HEADERS.any { it.equals(name, true) } }),
-            )
-            "body" to answer.body
-        }
-
-        /**
-         * WireMock's matcher shape, which is the request side only: a response header is the value
-         * itself, and wrapping one in a matcher reads back as a null header rather than as an error.
-         */
-        private fun equalTo(pairs: List<Pair<String, String>>): JsonObj? =
-            pairs.asJsonObj { value -> jsonObj { "equalTo" to value } }
-
-        private fun literal(pairs: List<Pair<String, String>>): JsonObj? =
-            pairs.asJsonObj { value -> JsonStr(value) }
-
-        private fun List<Pair<String, String>>.asJsonObj(value: (String) -> JsonValue): JsonObj? =
-            takeIf { it.isNotEmpty() }?.let { JsonObj(it.associate { (name, v) -> name to value(v) }) }
     }
 
     /** `request` never sends, and a transport that cannot is clearer than one that silently could. */
@@ -168,12 +291,59 @@ class StubFile internal constructor(private val codecs: Codecs) {
     }
 }
 
+// Round 1's values must not collide with round 0's, and a parameter's must not collide with its
+// neighbour's; one stride per round over one slot per parameter keeps every sentinel its own.
+private const val SALT_STRIDE = 1000
+private const val QUERY_SALT_BASE = 100
+private const val HEADER_SALT_BASE = 200
+
+/** Enough of a refused body to name the parameter, without pasting a page into an exception. */
+private const val PROBE_BODY_SHOWN = 300
+
+/**
+ * A value the declared codec accepts and the answer can be searched for afterwards.
+ *
+ * Taken from the codec's own OpenAPI type rather than guessed at, so an integer parameter is probed
+ * with a number and a string one with text. Deliberately unlikely shapes: a probe value that also
+ * occurred naturally in the answer would be templated where it should have been left alone.
+ */
+private fun sentinel(codec: PlainCodec<*>, salt: Int): String {
+    val enumerated = codec.enumValues
+    return when {
+        enumerated != null -> enumerated[salt % enumerated.size]
+        codec.openApiFormat == "uuid" -> "pe71ca40-0000-4000-8000-%012d".format(salt)
+        // Inside the declared width: an int32 parameter handed an int64 value is refused before the
+        // handler runs, and the refusal — which quotes the value — reads as an answer that moved.
+        codec.openApiType == "integer" && codec.openApiFormat == "int64" ->
+            (70000000000000000L + salt).toString()
+
+        codec.openApiType == "integer" -> (700000 + salt).toString()
+        codec.openApiType == "number" -> "${700000 + salt}.5"
+        codec.openApiType == "boolean" -> (salt % 2 == 0).toString()
+        else -> "PelicanProbe$salt"
+    }
+}
+
 /**
  * The first literal segment, which is the resource these stubs are about: both of a registry's
  * chip endpoints land in `chips.json`, the way a hand-written mapping directory is organised.
  */
 private fun Endpoint<*, *>.pathRoot(): String =
     pathSpec.segments.filterIsInstance<PathSegment.Literal>().firstOrNull()?.value ?: "root"
+
+private val REGEX_META = Regex("""[\\^$.|?*+()\[\]{}]""")
+
+/** The path as WireMock matches it: literals as themselves, a capture as one segment of anything. */
+private fun Endpoint<*, *>.pathPattern(): String =
+    "/" + pathSpec.segments.joinToString("/") { segment ->
+        when (segment) {
+            is PathSegment.Literal -> REGEX_META.replace(segment.value) { "\\" + it.value }
+            is PathSegment.Capture -> "[^/]+"
+        }
+    }
+
+private fun InMemoryClientTransport.answer(request: ClientRequest): ResponseSpec =
+    send(request).toCompletableFuture().get().let { ResponseSpec(it.status, it.headers, it.text()) }
 
 private fun RequestSpec.asClientRequest(): ClientRequest = ClientRequest(
     method = method,
