@@ -41,7 +41,7 @@ plugins {
     // What each published module's binary surface is, as a file somebody reads
     // in a diff. The golden-file argument, applied to the Kotlin API instead of
     // to the HTTP one.
-    id("org.jetbrains.kotlinx.binary-compatibility-validator") version "0.18.1"
+    id("org.jetbrains.kotlinx.binary-compatibility-validator") version "0.18.2"
 }
 
 scmVersion {
