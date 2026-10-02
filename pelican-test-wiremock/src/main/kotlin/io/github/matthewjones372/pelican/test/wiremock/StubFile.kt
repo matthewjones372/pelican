@@ -311,15 +311,20 @@ private fun sentinel(codec: PlainCodec<*>, salt: Int): String {
     val enumerated = codec.enumValues
     return when {
         enumerated != null -> enumerated[salt % enumerated.size]
+
         codec.openApiFormat == "uuid" -> "pe71ca40-0000-4000-8000-%012d".format(salt)
+
         // Inside the declared width: an int32 parameter handed an int64 value is refused before the
         // handler runs, and the refusal — which quotes the value — reads as an answer that moved.
         codec.openApiType == "integer" && codec.openApiFormat == "int64" ->
             (70000000000000000L + salt).toString()
 
         codec.openApiType == "integer" -> (700000 + salt).toString()
+
         codec.openApiType == "number" -> "${700000 + salt}.5"
+
         codec.openApiType == "boolean" -> (salt % 2 == 0).toString()
+
         else -> "PelicanProbe$salt"
     }
 }
