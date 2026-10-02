@@ -25,7 +25,13 @@ import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
-/** Rewrites every file instead of failing: `./gradlew test -Dpelican.golden.update=true`. */
+/**
+ * Rewrites every file instead of failing: `./gradlew test -Dpelican.golden.update=true`.
+ *
+ * The same property the document goldens read, so one switch rewrites everything a contract change
+ * touched. Declared again rather than shared, because `pelican-test-golden` carries the OpenAPI
+ * generator and this module is a WireMock consumer's whole classpath.
+ */
 const val STUB_FILE_UPDATE_PROPERTY: String = "pelican.golden.update"
 
 // Framing is WireMock's to decide once it knows the body it is sending, not Pelican's to record.

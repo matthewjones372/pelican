@@ -359,6 +359,19 @@ still there, and the only new ones are the module's own.
 
 ### Added
 
+- **Stub files that keep the contract (spec 0062).** `stubFile(codecs) { stub(endpoint, input)
+  answers outcome }.writeTo(dir)` exports the stubs a test is already written in as
+  WireMock mapping files, so a demo that stands WireMock up from JSON is not an
+  answer written a second time by hand. Each is rendered by the code a server
+  answers with, as a live stub's is, so a `404` carries the body its contract
+  declares with the content type the endpoint says. Files are grouped by the
+  endpoint's first literal path segment, and they are golden: `writeTo` leaves an
+  unchanged file alone and fails naming the file when the contract no longer
+  agrees, rewriting on `-Dpelican.golden.update=true`. Stubs that answer from
+  their input are the spec's second entry and are not exported yet.
+  `pelican-test-wiremock` now takes `pelican-test`, for the request builder the
+  export reuses rather than copies; it is core-only itself, and `DecouplingTest`
+  allows it anchored to its version so `pelican-test-pekko` is still refused.
 - **Who is calling (spec 0061).** `authenticated(scheme) { identity -> Caller(...) }`
   declares a caller; `authenticatedBy(caller)` on an endpoint refuses a request
   without a verified one with 401 and `WWW-Authenticate` before the handler

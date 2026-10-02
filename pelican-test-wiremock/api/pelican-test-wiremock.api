@@ -25,3 +25,17 @@ public final class io/github/matthewjones372/pelican/test/wiremock/PelicanWireMo
 	public fun beforeEach (Lorg/junit/jupiter/api/extension/ExtensionContext;)V
 }
 
+public final class io/github/matthewjones372/pelican/test/wiremock/StubFile {
+	public final fun stub (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/test/wiremock/StubFile$Stubbing;
+	public final fun writeTo (Ljava/nio/file/Path;)V
+}
+
+public final class io/github/matthewjones372/pelican/test/wiremock/StubFile$Stubbing {
+	public final fun answers (Lio/github/matthewjones372/pelican/Outcome;)V
+}
+
+public final class io/github/matthewjones372/pelican/test/wiremock/StubFileKt {
+	public static final field STUB_FILE_UPDATE_PROPERTY Ljava/lang/String;
+	public static final fun stubFile (Lio/github/matthewjones372/pelican/Codecs;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/test/wiremock/StubFile;
+}
+

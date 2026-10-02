@@ -35,7 +35,7 @@ branch and return after 1.0; the table below is what main ships today.
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-golden` | test + openapi | per-endpoint goldens; fails on a breaking change |
 | `pelican-test-pekko` | test + pekko | the typed test client's in-memory transport |
-| `pelican-test-wiremock` | core + WireMock | WireMock stubbed and verified in endpoint values |
+| `pelican-test-wiremock` | test + WireMock | WireMock stubbed and verified in endpoint values, and stub files exported from them |
 
 Every one of those dependency claims is a test:
 
@@ -72,8 +72,11 @@ Every one of those dependency claims is a test:
   pins `_2.13` as an `api` dependency of its own and shipping it would put that
   suffix back on a consumer's classpath through this module.
 - `pelican-test` asserts it drags in no server library and no matcher library.
-- `pelican-test-wiremock` asserts it is core plus WireMock: no server library,
-  and no JUnit, which it compiles against and does not ship.
+- `pelican-test-wiremock` asserts it is core, `pelican-test` and WireMock: no
+  server library, and no JUnit, which it compiles against and does not ship. It
+  takes `pelican-test` for the request builder `stubFile` exports from, and
+  anchors that allowance to the version so `pelican-test-pekko`, which would
+  bring a backend, is still refused.
 
 The full breakdown is in [docs/reference.md](reference.md#modules).
 
