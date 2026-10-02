@@ -1,7 +1,9 @@
 package io.github.matthewjones372.pelican
 
+import io.github.matthewjones372.pelican.spi.tagIn
 import io.github.matthewjones372.pelican.spi.taggedBody
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -124,6 +126,31 @@ class TaggedFailuresTest {
         taggedBody(notRecorded, """{"kind":"not_recorded","attempt":2}""") shouldContain "\"attempt\":2"
         taggedBody(notRecorded, """{"kind":"not_recorded","attempt":2}""")
             .removePrefix("""{"kind":"not_recorded",""") shouldNotContain "kind"
+    }
+
+    @Test
+    fun `the tag is read back out of the body it was written into`() {
+        tagIn(taggedBody(notRecorded, """{"attempt":2}"""), "kind") shouldBe "not_recorded"
+    }
+
+    /**
+     * Every way a body can fail to say which failure it is, answered the same
+     * way, because a caller has one thing to do about all of them.
+     */
+    @Test
+    fun `a body that names no tag reads as none`() {
+        tagIn("""{"attempt":2}""", "kind").shouldBeNull()
+        tagIn("""{"kind":7}""", "kind").shouldBeNull()
+        tagIn("""["not_recorded"]""", "kind").shouldBeNull()
+        tagIn(""""not_recorded"""", "kind").shouldBeNull()
+        tagIn("<html>503</html>", "kind").shouldBeNull()
+        tagIn("", "kind").shouldBeNull()
+    }
+
+    @Test
+    fun `the field is the one the declaration named`() {
+        tagIn("""{"reason":"not_recorded"}""", "reason") shouldBe "not_recorded"
+        tagIn("""{"reason":"not_recorded"}""", "kind").shouldBeNull()
     }
 
     /** One tagged failure answered through the in-memory interpreter, body and all. */

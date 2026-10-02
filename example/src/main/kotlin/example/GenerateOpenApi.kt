@@ -9,6 +9,7 @@ package example
  *     }
  */
 
+import example.adoption.adoptPet
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -34,4 +35,15 @@ fun ordersSpec(): ApiSpec = apiSpec(allEndpoints, schemas = JacksonCodecs) {
     // generated as senders on the client, and no interpreter ever sees them —
     // which is what `webhooks = ` being a setting of its own is for.
     webhooks = allWebhooks
+}
+
+/**
+ * Spec 0063's example, described the same way. Separate from [ordersSpec]
+ * because that document is committed twice over — as a golden document and as
+ * a generated client — and adding an example to it rewrites both baselines.
+ */
+fun adoptionSpec(): ApiSpec = apiSpec(listOf(adoptPet), schemas = JacksonCodecs) {
+    title = "Adoption"
+    version = "1.0.0"
+    description = "Two failures under one status, told apart by a tag."
 }

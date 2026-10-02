@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.Cookies
 import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.EmptyOutput
 import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.ErrorOutput
 import io.github.matthewjones372.pelican.FilePart
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonArrayOutput
@@ -35,6 +36,7 @@ import io.github.matthewjones372.pelican.encodeAll
 import io.github.matthewjones372.pelican.formCodec
 import io.github.matthewjones372.pelican.mediaType
 import io.github.matthewjones372.pelican.payloadType
+import io.github.matthewjones372.pelican.spi.tagIn
 import io.github.matthewjones372.pelican.text
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -276,7 +278,7 @@ class ApiClient(
         val res = transport.send(req)
         val out = endpoint.output as DeclaredResponses<E, T>
 
-        val declared = out.failures.firstOrNull { it.status == res.status }
+        val declared = declaredFailure(out, res)
         return when {
             declared != null -> Outcome.Err(
                 declared,
@@ -297,6 +299,28 @@ class ApiClient(
 
             else -> throw ApiCallFailed(endpoint, req, res)
         }
+    }
+
+    /**
+     * Which declared failure arrived: by status, and then by the tag in the body
+     * where the declarations under that status carry one.
+     *
+     * Reading the status alone was enough while one status meant one failure.
+     * It no longer is: two tagged failures sharing a status would both match,
+     * and the first would decode the other's payload into the wrong type
+     * without ever saying so. A body that names no tag, or one no declaration
+     * claims, is not a declared failure at all — the caller gets
+     * [ApiCallFailed], the same answer an undeclared body has always had.
+     */
+    private fun <E, T> declaredFailure(out: DeclaredResponses<E, T>, res: ResponseSpec): ErrorOutput<E>? {
+        val under = out.failures.filter { it.status == res.status }
+        val first = under.firstOrNull() ?: return null
+        // An untagged declaration is the only one its status can have, so the status settles it.
+        if (first.tag == null) return first
+        // They agree on the field by construction, so any of them names it. A body with no tag
+        // reads as null here and matches no declaration, since every one under this status has one.
+        val arrived = tagIn(res.body, first.discriminator)
+        return under.firstOrNull { it.tag == arrived }
     }
 
     private fun decodeSuccess(endpoint: Endpoint<*, *>, out: Output<*>, res: ResponseSpec): Any? =

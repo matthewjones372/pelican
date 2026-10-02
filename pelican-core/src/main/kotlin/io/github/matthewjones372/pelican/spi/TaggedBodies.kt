@@ -28,5 +28,19 @@ fun taggedBody(declared: ErrorOutput<*>, encoded: String): String {
     return JsonObj(fields).render()
 }
 
+/**
+ * The tag a failure's body carries under [field], or null where it carries none.
+ *
+ * The reading half of [taggedBody], here for the same reason: a client that guessed at the shape
+ * would disagree with the server the day either changed. Null covers every way a body can fail to
+ * say which failure it is — not JSON, not an object, the field absent, the field not a string —
+ * because a caller has one thing to do about all of them, and it is not to decode a payload it
+ * cannot be sure of.
+ */
+fun tagIn(encoded: String, field: String): String? {
+    val parsed = runCatching { parseJson(encoded) }.getOrNull()
+    return ((parsed as? JsonObj)?.fields?.get(field) as? JsonStr)?.value
+}
+
 /** Enough of a body to recognise it in a message, without pasting a page into an exception. */
 private const val TAG_BODY_SHOWN = 120
