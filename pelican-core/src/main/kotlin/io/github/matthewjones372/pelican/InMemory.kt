@@ -14,6 +14,7 @@ import io.github.matthewjones372.pelican.spi.responseCodecs
 import io.github.matthewjones372.pelican.spi.routeIndex
 import io.github.matthewjones372.pelican.spi.selectedFor
 import io.github.matthewjones372.pelican.spi.successNamedBy
+import io.github.matthewjones372.pelican.spi.taggedBody
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URLDecoder
@@ -222,7 +223,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
                 is Outcome.Err<*> -> {
                     val declared = out.failureNamedBy(outcome)
                     val codec = checkNotNull(resolved.alternatives[declared]) { "No codec for $declared" }
-                    body(declared.status, "application/json", codec.encodeToString(outcome.error))
+                    body(declared.status, "application/json", taggedBody(declared, codec.encodeToString(outcome.error)))
                         .plus(outcome.headers)
                 }
             }

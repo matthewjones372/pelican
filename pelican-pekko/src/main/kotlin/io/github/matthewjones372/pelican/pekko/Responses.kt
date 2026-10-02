@@ -20,6 +20,7 @@ import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.renderError
 import io.github.matthewjones372.pelican.spi.selectedFor
 import io.github.matthewjones372.pelican.spi.successNamedBy
+import io.github.matthewjones372.pelican.spi.taggedBody
 import org.apache.pekko.NotUsed
 import org.apache.pekko.http.javadsl.common.EntityStreamingSupport
 import org.apache.pekko.http.javadsl.model.ContentType
@@ -162,7 +163,9 @@ private fun failureResponse(
     val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
     return HttpResponse.create()
         .withStatus(statusOf(declared.status))
-        .withEntity(HttpEntities.create(ContentTypes.APPLICATION_JSON, codec.encodeToString(err.error)))
+        .withEntity(
+            HttpEntities.create(ContentTypes.APPLICATION_JSON, taggedBody(declared, codec.encodeToString(err.error))),
+        )
         // Encoded and checked against the declaration when the handler
         // produced the failure, so there is nothing left to decide here.
         .addHeaders(err.headers.map { (name, value) -> RawHeader.create(name, value) })

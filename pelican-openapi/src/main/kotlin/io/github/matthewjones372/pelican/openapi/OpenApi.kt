@@ -12,6 +12,7 @@ import io.github.matthewjones372.pelican.ByteStreamOutput
 import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.EmptyOutput
 import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.ErrorSpec
 import io.github.matthewjones372.pelican.FilePart
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.HttpScheme
@@ -309,22 +310,21 @@ private fun responses(
             successBody(out, version, schemas, components)?.let { put("content", it) }
         })
     }
-    ep.errors.forEach { err ->
+    // Grouped, because two tagged failures share one status and so one entry: the status has one
+    // slot in this map, and spec 0063's whole point is that the slot can hold both. Order is
+    // declaration order, which `groupBy` keeps.
+    ep.errors.groupBy { it.status }.forEach { (status, errs) ->
         // A null status is `default`: a key like any other, except that
         // nothing produces it and it stands for the statuses not enumerated.
-        put(err.status?.toString() ?: "default", jsonObj {
-            "description" to err.description
+        put(status?.toString() ?: "default", jsonObj {
+            "description" to errs.joinToString("; ") { it.description }
             // The endpoint's own headers ride on a failure too — `setHeader`
             // puts them on whatever response came back — but they are not
             // promised there: a filter that refuses never reaches the handler
             // that would have set one.
-            responseHeaders(err.headers, alsoSometimes = ep.responseHeaders)?.let { put("headers", it) }
-            val schema = err.type?.let { schemas.schema(it, components) }
-            if (schema != null) {
-                put("content", jsonObj {
-                    put("application/json", jsonObj { put("schema", schema) })
-                })
-            }
+            responseHeaders(errs.flatMap { it.headers }, alsoSometimes = ep.responseHeaders)
+                ?.let { put("headers", it) }
+            failureBody(errs, schemas, components)?.let { put("content", it) }
         })
     }
     if (ep.errors.none { it.status == null }) put("default", refusalResponse(refusals, components))
@@ -349,6 +349,50 @@ private fun refusalResponse(refusals: RefusalRenderer, components: SchemaCompone
         put("content", jsonObj {
             put(refusals.mediaType, jsonObj { put("schema", components.ref(refusals.componentName)) })
         })
+    }
+}
+
+/**
+ * The `content` of a failure response: one schema where the status has one failure, and a `oneOf`
+ * discriminated by the tag where it has several.
+ *
+ * The discriminator is what a client outside Pelican branches on — the whole reason for writing the
+ * tag into the body rather than keeping a sealed payload — so it is emitted whenever every schema
+ * under the status is a `$ref` it can name. An inline schema cannot be mapped to, so a `oneOf`
+ * without the mapping is emitted instead: still a document saying there are two shapes, which is
+ * better than one naming a target that is not there.
+ */
+private fun failureBody(
+    errs: List<ErrorSpec>,
+    schemas: SchemaSource,
+    components: SchemaComponents,
+): JsonObj? {
+    val described = errs.mapNotNull { err -> err.type?.let { err to schemas.schema(it, components) } }
+    if (described.isEmpty()) return null
+
+    val schema = when {
+        described.size == 1 -> described.single().second
+
+        else -> jsonObj {
+            put("oneOf", jsonArr(described.map { (_, schema) -> schema }))
+            discriminator(described)?.let { put("discriminator", it) }
+        }
+    }
+    return jsonObj { put("application/json", jsonObj { put("schema", schema) }) }
+}
+
+/** The tag field and which schema each tag means, or null where a schema cannot be referred to. */
+private fun discriminator(described: List<Pair<ErrorSpec, JsonObj>>): JsonObj? {
+    val mapped = described.mapNotNull { (err, schema) ->
+        val tag = err.tag ?: return@mapNotNull null
+        (schema["\$ref"] as? JsonStr)?.let { tag to it }
+    }
+    if (mapped.size != described.size) return null
+    return jsonObj {
+        // Any of them: the endpoint refuses a status whose failures disagree on the field, so one
+        // status has one discriminator here by construction rather than by picking a winner.
+        "propertyName" to described.first().first.discriminator
+        put("mapping", JsonObj(mapped.toMap()))
     }
 }
 

@@ -490,22 +490,30 @@ public final class io/github/matthewjones372/pelican/EnumCodec : io/github/matth
 }
 
 public final class io/github/matthewjones372/pelican/ErrorOutput {
-	public fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;)V
-	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;)V
+	public fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getDescription ()Ljava/lang/String;
+	public final fun getDiscriminator ()Ljava/lang/String;
 	public final fun getHeaders ()Ljava/util/List;
 	public final fun getStatus ()I
+	public final fun getTag ()Ljava/lang/String;
 	public final fun getType ()Lkotlin/reflect/KType;
 	public final fun invoke (Ljava/lang/Object;[Lio/github/matthewjones372/pelican/HeaderValue;)Lio/github/matthewjones372/pelican/Outcome;
+	public final fun tagged (Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/ErrorOutput;
+	public static synthetic fun tagged$default (Lio/github/matthewjones372/pelican/ErrorOutput;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/ErrorOutput;
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/ErrorSpec {
-	public fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;)V
-	public synthetic fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;)V
+	public fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getDescription ()Ljava/lang/String;
+	public final fun getDiscriminator ()Ljava/lang/String;
 	public final fun getHeaders ()Ljava/util/List;
 	public final fun getStatus ()Ljava/lang/Integer;
+	public final fun getTag ()Ljava/lang/String;
 	public final fun getType ()Lkotlin/reflect/KType;
 }
 
@@ -1086,6 +1094,7 @@ public final class io/github/matthewjones372/pelican/Outcome$Ok : io/github/matt
 }
 
 public final class io/github/matthewjones372/pelican/OutcomesKt {
+	public static final field DEFAULT_DISCRIMINATOR Ljava/lang/String;
 	public static final fun err (Lio/github/matthewjones372/pelican/ErrorOutput;)Ljava/lang/Void;
 	public static final fun err (Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
 	public static final fun of (Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/HeaderValue;
@@ -1710,5 +1719,9 @@ public final class io/github/matthewjones372/pelican/spi/ServerErrorsKt {
 	public static final fun classifyError (Ljava/lang/Throwable;Lio/github/matthewjones372/pelican/Api;)Lio/github/matthewjones372/pelican/spi/ClassifiedError;
 	public static final fun renderError (Ljava/lang/Throwable;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/Endpoint;)Lio/github/matthewjones372/pelican/spi/RenderedError;
 	public static synthetic fun renderError$default (Ljava/lang/Throwable;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/Endpoint;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/spi/RenderedError;
+}
+
+public final class io/github/matthewjones372/pelican/spi/TaggedBodiesKt {
+	public static final fun taggedBody (Lio/github/matthewjones372/pelican/ErrorOutput;Ljava/lang/String;)Ljava/lang/String;
 }
 

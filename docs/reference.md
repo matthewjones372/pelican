@@ -4193,7 +4193,46 @@ placeOrder handledOrFail { (id, key, req) ->
 
 Invoking the declaration is what produces the failure, so the status comes from
 the declaration rather than from the payload's type — which is why two failures
-can carry the same type, as `placeOrder`'s 401 and 404 do. The body is written
+can carry the same type, as `placeOrder`'s 401 and 404 do. Two failures may also
+share a *status*, when each is `tagged`:
+
+```kotlin
+val notRecorded = errorJson<NotRecorded>(503, "The sale could not be recorded").tagged("not_recorded")
+val registryDown = errorJson<RegistryDown>(503, "The registry could not be reached").tagged("registry_down")
+
+val adoptPet = endpoint(petId) {
+    post("pets" / petId / "adoption")
+    json<Pet>().orFail(notRecorded, registryDown)
+}
+```
+
+Two reasons for one status are ordinary HTTP, and without a tag the only thing
+telling them apart is the English in the message. The tag is written into the
+body as a field — `"kind"` unless a declaration names another, which is worth
+doing when a payload already uses that name:
+
+```json
+{ "kind": "registry_down", "retryIn": 30 }
+```
+
+The document declares that status once, with a schema that is a `oneOf` of the
+tagged schemas and a `discriminator` mapping each tag to one of them, so a
+client outside Pelican can branch on it too. A handler still names the
+declaration it means — `registryDown(RegistryDown(30))` — so the server never
+has to infer which failure it is answering.
+
+Four rules keep the relaxation from being a hole. Every failure under a shared
+status must be tagged, and with its own tag: a pair where one is untagged, or
+where both carry the same tag, is refused when the endpoint is built, because the
+tag is the only thing that could tell them apart. They must also agree on the
+field the tag is written under — the document declares one discriminator per
+status, so a client told to read `"kind"` would find nothing on a body that wrote
+`"reason"`. A success never shares a status with anything, tagged or not. And a
+tag needs somewhere to live, so it is refused on a payload rendered as a JSON
+scalar or a list rather than an object.
+
+Nothing changes for a failure that is the only one under its status: no tag, no
+field in the body, and the same single schema in the document as before. The body is written
 by the configured codec, as the declared type: the response is the one the
 document promised.
 

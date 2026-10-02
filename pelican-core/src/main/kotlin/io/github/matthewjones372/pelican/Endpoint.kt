@@ -12,10 +12,50 @@ class ErrorSpec @PublishedApi internal constructor(
     val type: KType?,
     /** Headers this failure carries — `Retry-After` on a 429, chiefly. */
     val headers: List<ResponseHeader<*>> = emptyList(),
+    /**
+     * Which of several failures under one status this is, or null where it is the only one. The
+     * document turns a tagged pair into a `oneOf` with a discriminator. See spec 0063.
+     */
+    val tag: String? = null,
+    /** The body field [tag] is written under. */
+    val discriminator: String = DEFAULT_DISCRIMINATOR,
 ) {
+    /**
+     * The shape before spec 0063 added the tag, kept for the same reason [ErrorOutput]'s is: the
+     * `errorJson` that builds one is inline, so this constructor sits in callers' bytecode.
+     */
+    @Deprecated("Binary compatibility with 1.0.0-RC3.", level = DeprecationLevel.HIDDEN)
+    @PublishedApi
+    internal constructor(
+        status: Int?,
+        description: String,
+        type: KType?,
+        headers: List<ResponseHeader<*>>,
+    ) : this(status, description, type, headers, null, DEFAULT_DISCRIMINATOR)
+
     init {
         if (status != null) checkStatus("error:$status", status, carriesBody = type != null)
     }
+}
+
+/**
+ * The statuses this endpoint declares twice over in a way nothing downstream could pick between.
+ *
+ * The numbered statuses are one key each in the document's responses map, so a second declaration
+ * under one status would silently replace the first there while the server kept answering. Tagged
+ * failures are the exception, and the only one: that status gets a single entry whose schema is a
+ * `oneOf` over them, discriminated by the tag, so both survive. See spec 0063. A success is never
+ * the exception, because a success carries no tag to be told apart by.
+ */
+private fun unpickableStatuses(ep: Endpoint<*, *>): List<Int> {
+    val successStatuses = when (val out = ep.output) {
+        is DeclaredResponses<*, *> -> out.successes.map { it.status }
+        else -> listOf(out.status)
+    }
+    val errorStatuses = ep.errors.mapNotNull { it.status }
+    val sharedByErrors = errorStatuses.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+    return sharedByErrors.filter { status -> ep.errors.any { it.status == status && it.tag == null } } +
+        errorStatuses.filter { it in successStatuses }
 }
 
 /**
@@ -566,21 +606,14 @@ private fun validate(ep: Endpoint<*, *>) {
         )
     }
 
-    // The numbered statuses are one key each in the same map, so an error
-    // sharing a status — with a success, or with another error — would
-    // silently replace it in the document while the server kept answering.
-    val successStatuses = when (val out = ep.output) {
-        is DeclaredResponses<*, *> -> out.successes.map { it.status }
-        else -> listOf(out.status)
-    }
-    val errorStatuses = ep.errors.mapNotNull { it.status }
-    val statusClashes = errorStatuses.groupingBy { it }.eachCount().filterValues { it > 1 }.keys +
-        errorStatuses.filter { it in successStatuses }
+    val statusClashes = unpickableStatuses(ep)
     if (statusClashes.isNotEmpty()) {
         error(
             "$ep declares more than one response under status ${statusClashes.toSortedSet().joinToString()}, " +
                 "and the document has room for one per status: the second declaration would silently " +
-                "replace the first. Give them different statuses, or declare one.",
+                "replace the first. Two failures may share a status when every one of them is tagged, " +
+                "which the document writes as a `oneOf` discriminated by the tag. Otherwise give them " +
+                "different statuses, or declare one.",
         )
     }
 
