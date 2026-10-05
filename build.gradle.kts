@@ -22,9 +22,9 @@ buildscript {
 plugins {
     kotlin("jvm") version "2.4.20" apply false
     kotlin("plugin.serialization") version "2.4.20" apply false
-    id("com.diffplug.spotless") version "8.10.2"
+    id("com.diffplug.spotless") version "8.10.3"
     id("dev.detekt") version "2.0.0-alpha.6" apply false
-    id("org.jetbrains.kotlinx.kover") version "0.9.9"
+    id("org.jetbrains.kotlinx.kover") version "0.9.11"
     // The version comes from the nearest `v` tag rather than a property, so
     // cutting a release is `git tag v0.1.0 && git push --tags` and nothing
     // else. An untagged commit is a -SNAPSHOT of the next one.
