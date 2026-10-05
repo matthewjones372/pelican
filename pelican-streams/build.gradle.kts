@@ -1,4 +1,4 @@
-val pekkoVersion = "1.7.0"
+val pekkoVersion = "1.7.1"
 val pekkoHttpVersion = "1.4.0"
 val scalaBinary = "2.13"
 val larkVersion = "0.4.0"
