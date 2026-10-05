@@ -4,7 +4,7 @@
 // service not running Arrow never sees it.
 dependencies {
     api(project(":pelican-core"))
-    api("io.arrow-kt:arrow-core:2.1.2")
+    api("io.arrow-kt:arrow-core:2.2.3")
 }
 
 tasks.test {
