@@ -1,7 +1,7 @@
 val pekkoVersion = "1.7.0"
 val pekkoHttpVersion = "1.4.0"
 val scalaBinary = "2.13"
-val larkVersion = "0.4.0"
+val larkVersion = "0.9.0"
 
 // The seam between a streaming body and lark's `Stream`, and nothing else: one
 // function, so that a service that never streams never sees the library and the
