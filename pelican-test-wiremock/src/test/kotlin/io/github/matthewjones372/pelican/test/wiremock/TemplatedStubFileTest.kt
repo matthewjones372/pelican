@@ -123,6 +123,37 @@ class TemplatedStubFileTest {
     }
 
     @Test
+    fun `an answer computed from a body field is refused, naming that field`() {
+        val failure = shouldThrow<IllegalArgumentException> {
+            stubFile(JacksonCodecs) {
+                stub(recordKeeper, example = In2("981", NewKeeper("Ada"))) { (number, keeper) ->
+                    ok(Chip(number, keeper.keeper.uppercase()))
+                }
+            }
+        }
+        failure.message shouldContain "computed from the body field(s) $.keeper"
+    }
+
+    @Test
+    fun `fields the endpoint will not take varied keep the example's value, and the rest are templated`(
+        @TempDir tmp: Path,
+    ) {
+        val mappings = tmp.resolve("mappings")
+        stubFile(JacksonCodecs) {
+            stub(rescan, example = In2("981", Rescan(Scan.Tattoo, attempts = 2, note = "smudged"))) { (_, asked) ->
+                if (asked.attempts > 3) tooManyAttempts(Problem("Three is enough")) else ok(asked)
+            }
+        }.writeTo(mappings)
+
+        serving(mappings) { client ->
+            // The enum's sentinel is refused by the codec and the count's by the handler, so both
+            // answer as the example said; the note is copied from each request.
+            client.outcome(rescan, In2("7", Rescan(Scan.Microchip, attempts = 1, note = "clear"))).shouldBeOk() shouldBe
+                Rescan(Scan.Tattoo, attempts = 2, note = "clear")
+        }
+    }
+
+    @Test
     fun `an answer that ignores the body exports without any body template`(@TempDir tmp: Path) {
         val mappings = tmp.resolve("mappings")
         stubFile(JacksonCodecs) {

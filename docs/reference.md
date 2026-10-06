@@ -5457,12 +5457,15 @@ stub(recordKeeper, example = In2("981000000000001", NewKeeper("Ada"))) { (number
 
 Each string and number field of the example is varied the same way, and one the
 answer copies becomes `{{jsonPath request.body '$.keeper'}}`. Values in arrays,
-and booleans, keep the example's value.
+and booleans, keep the example's value. So does a field whose varied value the endpoint will not
+take: an enum the codec refuses, or a number the handler answers with another
+status. Such a field is answered as the example has it, whatever a request
+sends.
 
 What cannot become a template is refused where it is declared, naming the
 endpoint: an answer whose status moves with its input, one that reads a query
 parameter or a header, and one that computes with a body value rather than
-copying it. Name those inputs with `stub(endpoint, input)` instead. A parameter that narrows its type beyond
+copying it, which names the field. Name those inputs with `stub(endpoint, input)` instead. A parameter that narrows its type beyond
 what it declares — a refinement the probe's value does not satisfy — is reported
 separately, because an endpoint refusing the probe and an answer that cannot be
 templated are different problems with different fixes.
