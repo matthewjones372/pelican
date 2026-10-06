@@ -386,6 +386,12 @@ still there, and the only new ones are the module's own.
   only one under its status. `ErrorOutput` and `ErrorSpec` gained `tag` and
   `discriminator`; the constructors they had in RC3 are kept hidden, so a service
   compiled against RC3 still links.
+- **Stub files templated from the request body (spec 0067).**
+  `stub(endpoint, example = input) { input -> ... }` exports an endpoint with a
+  JSON request body as one templated mapping. The example's string and number
+  fields are varied like path parameters, and one the answer copies becomes
+  `{{jsonPath request.body '$.field'}}`. Without an example, an endpoint with a
+  body is still refused, and the message now says to give one.
 - **A tagged failure's schema declares its tag (spec 0066).** The tag a
   tagged failure writes into its body is now in its component too, as a
   required `const` listed first, so the discriminator names a property every

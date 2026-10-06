@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.test.wiremock
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
+import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.In3
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
@@ -12,6 +13,7 @@ import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -92,14 +94,45 @@ class TemplatedStubFileTest {
     }
 
     @Test
-    fun `an answer read from the request body is refused, naming the endpoint`(@TempDir tmp: Path) {
+    fun `an endpoint with a body and no example is refused, saying to give one`(@TempDir tmp: Path) {
         val failure = shouldThrow<IllegalArgumentException> {
             stubFile(JacksonCodecs) {
                 stub(recordKeeper) { (number, keeper) -> ok(Chip(number, keeper.keeper)) }
             }
         }
         failure.message shouldContain recordKeeper.pathSpec.template
-        failure.message shouldContain "body"
+        failure.message shouldContain "example = input"
+    }
+
+    @Test
+    fun `an answer copied from the body is one mapping, filled from each request's own body`(@TempDir tmp: Path) {
+        val mappings = tmp.resolve("mappings")
+        stubFile(JacksonCodecs) {
+            stub(recordKeeper, example = In2("981000000000001", NewKeeper("Ada"))) { (number, keeper) ->
+                ok(Chip(number, keeper.keeper))
+            }
+        }.writeTo(mappings)
+
+        serving(mappings) { client ->
+            client.outcome(recordKeeper, In2("981000000000007", NewKeeper("Grace"))).shouldBeOk() shouldBe
+                Chip("981000000000007", keeper = "Grace")
+            client.outcome(recordKeeper, In2("42", NewKeeper("Linus"))).shouldBeOk() shouldBe
+                Chip("42", keeper = "Linus")
+        }
+        mappings.resolve("chips.json").readText() shouldContain "{{jsonPath request.body '\$.keeper'}}"
+    }
+
+    @Test
+    fun `an answer that ignores the body exports without any body template`(@TempDir tmp: Path) {
+        val mappings = tmp.resolve("mappings")
+        stubFile(JacksonCodecs) {
+            stub(recordKeeper, example = In2("981", NewKeeper("Ada"))) { (number, _) -> ok(Chip(number, "Petshop")) }
+        }.writeTo(mappings)
+
+        serving(mappings) { client ->
+            client.outcome(recordKeeper, In2("7", NewKeeper("Grace"))).shouldBeOk() shouldBe Chip("7", "Petshop")
+        }
+        mappings.resolve("chips.json").readText() shouldNotContain "jsonPath"
     }
 
     @Test

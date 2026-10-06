@@ -1,9 +1,11 @@
 package io.github.matthewjones372.pelican.test.wiremock
 
+import io.github.matthewjones372.pelican.BodyDecodeFailure
 import io.github.matthewjones372.pelican.ClientRequest
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.InMemoryClientTransport
+import io.github.matthewjones372.pelican.JsonNum
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.JsonValue
@@ -93,16 +95,48 @@ class StubFile internal constructor(private val codecs: Codecs) {
      * a template and is refused here, naming the endpoint, rather than exported wrong.
      */
     fun <I, E : Any, T : Any> stub(endpoint: Endpoint<I, Outcome<E, T>>, answer: (I) -> Outcome<E, T>) {
-        val where = endpoint.pathSpec.template
         require(endpoint.bodyInput == null) {
-            "$where answers from its input, and that input includes a request body. A mapping file " +
-                "templates from the path, so an answer built out of the body cannot be exported as " +
-                "one. Name the inputs you need with stub(endpoint, input) instead."
+            "${endpoint.pathSpec.template} answers from its input, and that input includes a request " +
+                "body. Pelican cannot build a body of an arbitrary type to probe it with, so give it one: " +
+                "stub(endpoint, example = input) { input -> ... }."
+        }
+        templated(endpoint, answer, example = null)
+    }
+
+    /**
+     * The same, for an endpoint with a JSON request body, whose answer may copy values out of it.
+     *
+     * [example] is a body the endpoint accepts. Each string and number in it is varied like a path
+     * parameter, and one the answer copies becomes `{{jsonPath request.body '$.field'}}`. Values in
+     * arrays, and booleans, keep the example's value. See spec 0067.
+     */
+    fun <I, E : Any, T : Any> stub(endpoint: Endpoint<I, Outcome<E, T>>, example: I, answer: (I) -> Outcome<E, T>) {
+        templated(endpoint, answer, requests.request(endpoint, example))
+    }
+
+    private fun <I, E : Any, T : Any> templated(
+        endpoint: Endpoint<I, Outcome<E, T>>,
+        answer: (I) -> Outcome<E, T>,
+        example: RequestSpec?,
+    ) {
+        val where = endpoint.pathSpec.template
+        val body = example?.body?.let { text ->
+            val parsed = try {
+                codecs.readTree(text)
+            } catch (_: BodyDecodeFailure) {
+                null
+            }
+            require(parsed is JsonObj) {
+                "$where's example body is not a JSON object, and only a JSON object's fields can be " +
+                    "found again in an answer and templated. Name the inputs you need with " +
+                    "stub(endpoint, input) instead."
+            }
+            ExampleBody(parsed, example.headers.filter { (name, _) -> name.equals(CONTENT_TYPE, true) })
         }
         val captures = endpoint.pathSpec.segments.withIndex()
             .mapNotNull { (at, segment) -> (segment as? PathSegment.Capture)?.let { at to it.param } }
 
-        val probes = listOf(0, 1).map { round -> probe(endpoint, answer, round) }
+        val probes = listOf(0, 1).map { round -> probe(endpoint, answer, round, body) }
         val templates = probes.map { it.templated(captures) }
         val answers = probes.map { it.answer }
 
@@ -112,10 +146,10 @@ class StubFile internal constructor(private val codecs: Codecs) {
                 "so name each input with stub(endpoint, input) instead."
         }
         require(templates[0] == templates[1]) {
-            "$where answers from something other than a path parameter — a query parameter, a " +
-                "header, or the clock. Only a path parameter can be filled into a template, so this " +
-                "stub cannot be exported as one. Name the inputs you need with " +
-                "stub(endpoint, input) instead."
+            "$where answers from something other than a path parameter or a value copied from the " +
+                "body — a query parameter, a header, the clock, or a body value it computed with. Only " +
+                "a value copied as it is can be filled into a template, so this stub cannot be exported " +
+                "as one. Name the inputs you need with stub(endpoint, input) instead."
         }
 
         declared += Declared(
@@ -210,6 +244,7 @@ class StubFile internal constructor(private val codecs: Codecs) {
         endpoint: Endpoint<I, Outcome<E, T>>,
         answer: (I) -> Outcome<E, T>,
         round: Int,
+        body: ExampleBody?,
     ): Probe {
         val salt = { at: Int -> round * SALT_STRIDE + at }
         val sentinels = endpoint.pathSpec.segments.withIndex().associate { (at, segment) ->
@@ -227,7 +262,14 @@ class StubFile internal constructor(private val codecs: Codecs) {
         val headers = endpoint.headerParams.withIndex()
             .map { (at, h) -> h.name to sentinel(h.codec, salt(HEADER_SALT_BASE + at)) }
 
-        val spec = RequestSpec(endpoint.method, path, query, headers, null)
+        val varied = body?.varied { at -> salt(BODY_SALT_BASE + at) }
+        val spec = RequestSpec(
+            endpoint.method,
+            path,
+            query,
+            headers + body?.headers.orEmpty(),
+            varied?.first?.render(),
+        )
         val captured = sentinels.mapNotNull { (at, value) -> value?.let { at to it } }.toMap()
         val reached = AtomicBoolean(false)
         val response = served(endpoint) { input -> reached.set(true); answer(input) }
@@ -238,15 +280,50 @@ class StubFile internal constructor(private val codecs: Codecs) {
                 "The probe builds a value from each parameter's declared type, so a parameter that " +
                 "narrows its type further than that needs stub(endpoint, input) instead."
         }
-        return Probe(captured, response)
+        return Probe(captured, varied?.second.orEmpty(), response)
     }
 
-    private class Probe(private val sentinels: Map<Int, String>, val answer: ResponseSpec) {
-        /** The answer with every path value this round used replaced by the segment it came from. */
-        fun templated(captures: List<Pair<Int, PathParam<*>>>): String =
-            captures.fold(answer.body) { body, (at, _) ->
-                body.replace(sentinels.getValue(at), "{{request.pathSegments.[$at]}}")
+    private class Probe(
+        private val sentinels: Map<Int, String>,
+        /** JSON path within the body -> the value this round put there. */
+        private val bodySentinels: Map<String, String>,
+        val answer: ResponseSpec,
+    ) {
+        /** The answer with every value this round sent replaced by where in the request it came from. */
+        fun templated(captures: List<Pair<Int, PathParam<*>>>): String {
+            val fills = captures.map { (at, _) -> sentinels.getValue(at) to "{{request.pathSegments.[$at]}}" } +
+                bodySentinels.map { (path, value) -> value to "{{jsonPath request.body '$path'}}" }
+            // Longest first: `PelicanProbe3` is a prefix of `PelicanProbe301`, and replacing it first
+            // would leave a template with `01` stuck to its end.
+            return fills.sortedByDescending { it.first.length }
+                .fold(answer.body) { text, (value, template) -> text.replace(value, template) }
+        }
+    }
+
+    /** The example's body, and the header that says how it is encoded. */
+    private class ExampleBody(private val json: JsonObj, val headers: List<Pair<String, String>>) {
+        /**
+         * The body with each string and number field replaced by a sentinel, and where each went.
+         * Only fields named so that `$.a.b` reaches them are varied; anything else keeps the
+         * example's value, and so is never templated.
+         */
+        fun varied(salt: (Int) -> Int): Pair<JsonValue, Map<String, String>> {
+            val placed = linkedMapOf<String, String>()
+            fun vary(value: JsonValue, path: String): JsonValue = when (value) {
+                is JsonObj -> JsonObj(
+                    value.fields.mapValues { (name, field) ->
+                        if (SIMPLE_NAME.matches(name)) vary(field, "$path.$name") else field
+                    },
+                )
+
+                is JsonStr -> JsonStr("PelicanProbe${salt(placed.size)}").also { placed[path] = it.value }
+
+                is JsonNum -> JsonNum(BODY_NUMBER_BASE + salt(placed.size)).also { placed[path] = it.value.toString() }
+
+                else -> value
             }
+            return vary(json, "$") to placed
+        }
     }
 
     /**
@@ -296,6 +373,15 @@ class StubFile internal constructor(private val codecs: Codecs) {
 private const val SALT_STRIDE = 1000
 private const val QUERY_SALT_BASE = 100
 private const val HEADER_SALT_BASE = 200
+private const val BODY_SALT_BASE = 300
+
+/** A body number sentinel: a whole number inside an `int32`, distinct from the path's `700000 + salt`. */
+private const val BODY_NUMBER_BASE = 800000L
+
+private const val CONTENT_TYPE = "Content-Type"
+
+/** A field `$.a.b` can name without quoting; others are left as the example has them. */
+private val SIMPLE_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
 /** Enough of a refused body to name the parameter, without pasting a page into an exception. */
 private const val PROBE_BODY_SHOWN = 300

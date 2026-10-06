@@ -76,12 +76,12 @@ Recommended: the field in the component.
 
 ## Stack
 
-- [ ] **`spec-0066-tag-in-schema`**: the tag as a required `const` in each
+- [x] **`spec-0066-tag-in-schema`** ([#220](https://github.com/matthewjones372/pelican/pull/220)): the tag as a required `const` in each
       tagged component, and a type used more than one way refused.
       Done when: the petshop-shaped document validates with a validator that
       checks discriminator properties, and a type used tagged and untagged is
       refused with a message naming both uses.
-- [ ] **`spec-0066-descriptions`**: each component carries its failure's
+- [x] **`spec-0066-descriptions`** ([#221](https://github.com/matthewjones372/pelican/pull/221)): each component carries its failure's
       description, and the status lists tag and description per line.
       Done when: the `503` above renders as shown, and a single failure's
       status description is unchanged.
