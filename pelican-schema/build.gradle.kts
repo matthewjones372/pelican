@@ -11,7 +11,7 @@ dependencies {
 
     // A validator that did not write the schema, on the principle that already
     // puts swagger-parser in front of the emitted document.
-    testImplementation("com.networknt:json-schema-validator:3.0.7")
+    testImplementation("com.networknt:json-schema-validator:3.0.8")
 
     // The validator pins Jackson 3 at 3.2.1, which carries five advisories, and
     // 3.0.8 pins the same. The BOM moves the whole `tools.jackson` cluster
