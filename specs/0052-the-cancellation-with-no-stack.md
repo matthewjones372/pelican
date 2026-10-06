@@ -107,8 +107,10 @@ the transport now.
 - [ ] **`spec-0052-the-fix`** — whatever entry one names. The standing
       hypothesis is that a `NonFailureCancellation` should not reach a caller
       as a thrown exception.
-      Done when: the reproduction stops failing and `main` is green on 21, 23
-      and 25 across consecutive runs.
+      Done when: a sighting's trace names what completes the exchange, that
+      cause is fixed, and `main` stays green on 25 across consecutive runs.
+      Written when the matrix ran 21, 23 and 25; #199 left only 25, and green
+      runs on their own settle nothing — see **Quiet is not evidence** below.
 
 ## Acceptance
 
@@ -272,6 +274,32 @@ was involved in the cancellation would be reading the plumbing.
 So the standing reading is unchanged and still a reading: something inside
 Pekko completes the exchange, and nothing local provokes it. What would move
 this is the next CI sighting, which now has 40 frames to name the origin with.
+
+### Quiet is not evidence, 2026-10-06
+
+Every `build` run since the frame cap was raised, swept: 234 runs — 180 green,
+30 cancelled by a newer push, and 24 failed. All 24 have a cause that is not
+this flake. Six failed identically on all three JDKs of the old matrix, which
+makes them deterministic by construction: two Kotlin bumps, two
+`json-schema-validator` bumps, two `lark-stream` bumps. Two died on
+`:pelican-core:detekt`. Two are the `lark-stream` 0.9.0 compile break
+(`Source<T, NotUsed>` where `Iterable<T>` was expected), with byte-identical
+report artifacts across both runs. Fourteen are in-flight work on specs 0062,
+0063 and 0064, each diagnosed when it happened. No second sighting, and no
+`0052-TRACE` in any of them.
+
+A hundred and eighty green runs is not a fix, and that is this entry's
+Done-when problem in one line: the flake is rare enough that quiet CI looks
+the same whether the cause is gone or simply did not fire. The old criterion
+leaned on the matrix for breadth — three JDKs meant three chances per run, as
+the table at the top of this spec says — and #199 took that away. So what
+settles this entry is naming the cause; the run count only confirms a fix that
+is already understood.
+
+Established by elimination rather than by searching every log for the marker:
+each failure was identified by the task that failed and by whether the suite
+ran at all, since a build that dies in lint or compilation uploads a ~10 KB
+test-report artifact against ~900 KB when the suite runs.
 
 ## Open questions
 
