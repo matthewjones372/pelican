@@ -215,7 +215,7 @@ subprojects {
 
     // BCV 0.18.1 reads classes with ASM 9.6, which stops at class file 68 (JDK 24). 9.8 reads 25's.
     configurations.matching { it.name.startsWith("bcv-rt-jvm-cp") }.configureEach {
-        resolutionStrategy.force("org.ow2.asm:asm:9.8", "org.ow2.asm:asm-tree:9.8")
+        resolutionStrategy.force("org.ow2.asm:asm:9.10.1", "org.ow2.asm:asm-tree:9.10.1")
     }
 
     // The Kotlin plugin resolves Bouncy Castle 1.84 here, which has a critical
