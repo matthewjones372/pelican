@@ -40,6 +40,16 @@ class TaggedFailuresTest {
     }
 
     @Test
+    fun `a failure declared and tagged inside the block is documented once, with its tag`() {
+        val ep = endpoint(petId) {
+            post("pets" / petId / "return")
+            json<String>().orFail(errorJson<NotRecorded>(503, "x").tagged("unrecorded"), registryDown)
+        }
+
+        ep.errors.filter { it.status == 503 }.map { it.tag } shouldBe listOf("unrecorded", "registry_down")
+    }
+
+    @Test
     fun `two untagged failures under one status are still refused, and the message says to tag them`() {
         val message = shouldThrow<IllegalArgumentException> {
             endpoint(petId) {
