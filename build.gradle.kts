@@ -213,7 +213,7 @@ subprojects {
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 
-    // BCV 0.18.1 reads classes with ASM 9.6, which stops at class file 68 (JDK 24). 9.8 reads 25's.
+    // BCV 0.18.1 reads classes with ASM 9.6, which stops at class file 68 (JDK 24). 9.10.1 reads 25's.
     configurations.matching { it.name.startsWith("bcv-rt-jvm-cp") }.configureEach {
         resolutionStrategy.force("org.ow2.asm:asm:9.10.1", "org.ow2.asm:asm-tree:9.10.1")
     }
