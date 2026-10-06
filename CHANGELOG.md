@@ -386,6 +386,13 @@ still there, and the only new ones are the module's own.
   only one under its status. `ErrorOutput` and `ErrorSpec` gained `tag` and
   `discriminator`; the constructors they had in RC3 are kept hidden, so a service
   compiled against RC3 still links.
+- **Golden checks read through `oneOf` (spec 0065).** A schema that became a
+  `oneOf`, as a status does when its failure is split into tagged ones, is
+  compared with each of its shapes, and a break is named with the shape it is
+  in. The split itself is reported as compatible, so splitting one failure into
+  two that both keep every field no longer reads as every field removed. A
+  request breaks only when no shape takes the old payload. A `oneOf` that
+  became one schema is compared the other way round.
 - **Stubs that answer from their input, as response templates (spec 0062).**
   `stub(endpoint) { input -> outcome }` in a `stubFile` exports as one mapping on
   the endpoint's path pattern, with a `{{request.pathSegments.[n]}}` template
