@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.openapi
 
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.ErrorOutput
 import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.JsonValue
@@ -38,6 +39,7 @@ import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
+import io.kotest.matchers.collections.shouldContain as shouldInclude
 
 /**
  * The rules, one test each, written as the mistake they are there to catch.
@@ -473,6 +475,99 @@ class CompatibilityTest {
 
         breaking(before, fewer).map { it.where } shouldContainExactly listOf("POST orderPlaced")
         breaking(before, more).shouldBeEmpty()
+    }
+
+    // ------------------------------------------------- one shape becomes several
+
+    data class Unavailable(val id: Long, val message: String)
+
+    data class RegistryDown(val id: Long, val message: String)
+
+    data class NotRecorded(val id: Long, val message: String)
+
+    private val problem = shape(Triple("id", true, string), Triple("message", true, string))
+
+    private fun adopt(vararg failures: ErrorOutput<*>) = endpoint {
+        post("adoptions")
+        operationId = "adopt"
+        json<Order>().orFail(*failures)
+    }
+
+    private val unavailable = errorJson<Unavailable>(503, "Try again")
+    private val registryDown = errorJson<RegistryDown>(503, "The registry is down").tagged("registry_down")
+    private val notRecorded = errorJson<NotRecorded>(503, "The sale was not recorded").tagged("not_recorded")
+
+    private fun adoptions(endpoint: Endpoint<*, *>, shapes: Map<String, JsonObj>) =
+        spec(endpoints = listOf(endpoint), shapes = shapes)
+
+    private val oneFailure = adoptions(adopt(unavailable), mapOf("Unavailable" to problem))
+
+    @Test
+    fun `one failure split into two tagged ones that both keep every field breaks nobody`() {
+        val split = adoptions(
+            adopt(registryDown, notRecorded),
+            mapOf("RegistryDown" to problem, "NotRecorded" to problem),
+        )
+
+        val found = changes(oneFailure, split)
+
+        breaking(oneFailure, split).shouldBeEmpty()
+        found.map { it.what } shouldInclude
+            "the 503 response (application/json) has 2 shapes now: `registry_down`, `not_recorded`"
+    }
+
+    @Test
+    fun `a field dropped from one of the new shapes is a break, named with that shape`() {
+        val split = adoptions(
+            adopt(registryDown, notRecorded),
+            mapOf("RegistryDown" to problem, "NotRecorded" to shape(Triple("message", true, string))),
+        )
+
+        val lost = onlyBreaking(oneFailure, split)
+
+        lost.what shouldContain "`id`"
+        lost.what shouldContain "`not_recorded`"
+        lost.what shouldContain "is gone"
+    }
+
+    @Test
+    fun `two shapes joined into one break a caller handling whichever lost a field`() {
+        val split = adoptions(
+            adopt(registryDown, notRecorded),
+            mapOf(
+                "RegistryDown" to problem,
+                "NotRecorded" to shape(
+                    Triple("id", true, string),
+                    Triple("message", true, string),
+                    Triple("retry", true, string),
+                ),
+            ),
+        )
+
+        val lost = onlyBreaking(split, oneFailure)
+
+        lost.what shouldContain "`retry`"
+        lost.what shouldContain "`not_recorded`"
+        val kept = adoptions(
+            adopt(registryDown, notRecorded),
+            mapOf("RegistryDown" to problem, "NotRecorded" to problem),
+        )
+        breaking(kept, oneFailure).shouldBeEmpty()
+    }
+
+    @Test
+    fun `a request that became several shapes breaks only when none of them takes the old payload`() {
+        val item = Triple("item", true, string)
+        val currency = Triple("currency", true, string)
+        val before = spec(shapes = mapOf("CreateOrder" to shape(item)))
+        fun either(vararg shapes: JsonObj) =
+            spec(shapes = mapOf("CreateOrder" to jsonObj { put("oneOf", jsonArr(shapes.toList())) }))
+
+        breaking(before, either(shape(item), shape(item, currency))).shouldBeEmpty()
+
+        val refused = breaking(before, either(shape(item, currency), shape(currency)))
+        withClue("expected the new required field in each shape, got $refused") { refused shouldHaveSize 3 }
+        refused.map { it.what }.forEach { it shouldContain "shape" }
     }
 
     // ------------------------------------------- holding the spec, not a file

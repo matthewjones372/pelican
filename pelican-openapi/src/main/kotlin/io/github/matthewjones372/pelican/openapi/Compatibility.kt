@@ -352,12 +352,83 @@ private class Comparison(private val published: JsonObj, private val proposed: J
         val now = resolve(after, proposed) ?: return emptyList()
         val visited = if (ref == null) seen else seen + ref
 
+        val oldShapes = shapes(was)
+        val newShapes = shapes(now)
+        if (oldShapes.isEmpty() && newShapes.isNotEmpty()) {
+            return split(where, what, before, now, newShapes, direction, visited)
+        }
+        if (oldShapes.isNotEmpty() && newShapes.isEmpty()) {
+            return joined(where, what, oldShapes, after, direction, visited)
+        }
+
         return types(where, what, was, now, direction) +
             enums(where, what, was, now, direction) +
             constraints(where, what, was, now, direction) +
             properties(where, what, was, now, direction, visited) +
             elements(where, what, was, now, direction, visited)
     }
+
+    /**
+     * One schema that became a `oneOf`, which is what spec 0063's tagged failures do to a status.
+     *
+     * Compared shape by shape, because that is how a caller meets it: whichever branch arrives, a
+     * field they read has to be in it. A request is the other way round. The caller still sends the
+     * old payload, and the receiver accepts it if any one branch does, so a request breaks only when
+     * no branch takes it.
+     */
+    private fun split(
+        where: String,
+        what: String,
+        before: JsonValue?,
+        after: JsonObj,
+        shapes: List<Pair<String, JsonValue>>,
+        direction: Direction,
+        seen: Set<String>,
+    ): List<ApiChange> {
+        val byShape = shapes.map { (label, branch) ->
+            schema(where, "$what as $label", before, branch, direction, seen)
+        }
+        val note = one(
+            Compatibility.COMPATIBLE,
+            where,
+            "$what has ${shapes.size} shapes now: ${shapes.joinToString { it.first }}",
+            discriminatorOf(after)?.let { "told apart by `$it`" }.orEmpty(),
+        )
+        val fits = byShape.firstOrNull { changes -> changes.none { it.compatibility == Compatibility.BREAKING } }
+        return note + if (direction == Direction.CALLER_SENDS && fits != null) fits else byShape.flatten()
+    }
+
+    /**
+     * A `oneOf` that became one schema. Every old shape is compared with the new one: a caller
+     * could have been sending, or handling, any of them.
+     */
+    private fun joined(
+        where: String,
+        what: String,
+        shapes: List<Pair<String, JsonValue>>,
+        after: JsonValue?,
+        direction: Direction,
+        seen: Set<String>,
+    ): List<ApiChange> =
+        one(Compatibility.COMPATIBLE, where, "$what has one shape now where it had ${shapes.size}") +
+            shapes.flatMap { (label, branch) -> schema(where, "$what as $label", branch, after, direction, seen) }
+
+    /**
+     * A `oneOf`'s branches, each named the way a reader of the document would: by its tag where the
+     * discriminator maps one to it, else by the component it refers to, else by position.
+     */
+    private fun shapes(schema: JsonObj): List<Pair<String, JsonValue>> {
+        val tags = schema["discriminator"].obj()?.get("mapping").obj()?.fields.orEmpty()
+            .mapNotNull { (tag, target) -> target.str()?.let { it to tag } }.toMap()
+        return schema["oneOf"].arr().mapIndexed { at, branch ->
+            val ref = branch.obj()?.get("\$ref").str()
+            val label = tags[ref]?.let { "`$it`" } ?: ref?.substringAfterLast('/') ?: "shape ${at + 1}"
+            label to branch
+        }
+    }
+
+    private fun discriminatorOf(schema: JsonObj): String? =
+        schema["discriminator"].obj()?.get("propertyName").str()
 
     private fun elements(
         where: String,

@@ -102,6 +102,11 @@ became optional, a new declared status, a new response field, a request type
 widened or a constraint loosened, a new media type, a deprecation, or a
 rewritten summary, description or tag.
 
+A schema that becomes a `oneOf`, as a status does when its failure is split
+into [tagged ones](reference.md#declared-failures), is compared with each shape in turn. A field
+every shape still has is not reported; a field one shape dropped is a break
+named with that shape.
+
 Rewriting the golden file on a harmless change is deliberate, not a shortcut.
 The file's job is to be the contract the *next* change is measured against.
 A check that goes red for changes nobody must act on trains its owner to
