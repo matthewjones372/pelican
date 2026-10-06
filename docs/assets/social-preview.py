@@ -2,7 +2,7 @@
 """
 Produces `social-preview.png`, the 1280x640 card GitHub renders when somebody
 shares a link to the repository. Committed because the PNG is a derived
-artifact and everything derived here has a producer beside it — otherwise the
+artifact and everything derived here has a producer beside it. Otherwise the
 next person wanting to change the tagline has to redraw the card by hand.
 
 Not wired into Gradle. It runs on a Mac, needs Pillow, and reads the brand mark
@@ -36,7 +36,7 @@ def mark(size):
     """The brand mark, as an alpha mask.
 
     `pelican-mark-light.svg` is dark ink on white, so inverted luminance is a
-    clean antialiased mask — which is how the mark lands on a dark card without
+    clean antialiased mask, which is how the mark lands on a dark card without
     the white box a naive paste would bring with it.
     """
     with tempfile.TemporaryDirectory() as tmp:
