@@ -4980,13 +4980,16 @@ and is the one case that has to create it first.
 Two things Pelican does not do. It owns no operators: `mapOrFail`, `catchAll`,
 `mapAsync` and the rest are lark's, and a service that never streams never sees
 them. And it ships neither dependency — Pekko is provided in every module that
-speaks it, and `lark-stream` pins `_2.13` as an `api` dependency of its own, so
-a consumer names both:
+speaks it, and `lark-stream-pekko` pins `_2.13` as an `api` dependency of its
+own, so a consumer names them all. lark splits the type from the backend:
+`lark-stream` carries `Stream` and its operators, `lark-stream-pekko` the Pekko
+backend that `Stream.from(source)` and `run` are part of.
 
 ```kotlin
 dependencies {
     implementation("io.github.matthewjones372:pelican-streams:$pelicanVersion")
-    implementation("io.github.matthewjones372:lark-stream:0.4.0")
+    implementation("io.github.matthewjones372:lark-stream:0.9.0")
+    implementation("io.github.matthewjones372:lark-stream-pekko:0.9.0")
     // plus the Pekko block from Versions, as for any Pekko module here.
 }
 ```

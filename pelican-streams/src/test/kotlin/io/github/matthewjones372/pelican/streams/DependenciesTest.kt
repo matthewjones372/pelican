@@ -15,10 +15,10 @@ import java.io.File
  * and an application on the Scala 3 build that received ours would run both
  * until Pekko's version check stopped it.
  *
- * `lark-stream` is provided for the same reason at one remove: it pins `_2.13`
- * as an `api` dependency of its own, so shipping it would put that suffix back
- * on a consumer's classpath through this module — undoing the decision rather
- * than merely not making it.
+ * The lark artifacts are provided for the same reason at one remove:
+ * `lark-stream-pekko` pins `_2.13` as an `api` dependency of its own, so
+ * shipping it would put that suffix back on a consumer's classpath through this
+ * module — undoing the decision rather than merely not making it.
  */
 class DependenciesTest {
 
