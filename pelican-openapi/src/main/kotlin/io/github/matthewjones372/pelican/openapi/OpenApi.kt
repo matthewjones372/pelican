@@ -326,7 +326,7 @@ private fun responses(
         // A null status is `default`: a key like any other, except that
         // nothing produces it and it stands for the statuses not enumerated.
         put(status?.toString() ?: "default", jsonObj {
-            "description" to errs.joinToString("; ") { it.description }
+            "description" to failureDescription(errs)
             // The endpoint's own headers ride on a failure too — `setHeader`
             // puts them on whatever response came back — but they are not
             // promised there: a filter that refuses never reaches the handler
@@ -360,6 +360,18 @@ private fun refusalResponse(refusals: RefusalRenderer, components: SchemaCompone
         })
     }
 }
+
+/**
+ * What a status's failures say. Several tagged ones are listed with the tag a reader branches on,
+ * since joined into one line they read as one garbled sentence; Markdown is what OpenAPI renders a
+ * description as.
+ */
+private fun failureDescription(errs: List<ErrorSpec>): String =
+    if (errs.size > 1 && errs.all { it.tag != null }) {
+        "One of:\n\n" + errs.joinToString("\n") { "- `${it.tag}`: ${it.description}" }
+    } else {
+        errs.joinToString("; ") { it.description }
+    }
 
 /**
  * The `content` of a failure response: one schema where the status has one failure, and a `oneOf`

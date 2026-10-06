@@ -393,6 +393,10 @@ still there, and the only new ones are the module's own.
   another, or under two tags, is refused when the document is built, since its
   one component cannot describe both; so is a payload that already has a field
   of the tag's name.
+  The status's description lists each tag with its failure's description, as a
+  Markdown list, where it was every description joined with `; `, and each
+  tagged schema carries its own failure's description unless the type gives it
+  one.
 - **Golden checks read through `oneOf` (spec 0065).** A schema that became a
   `oneOf`, as a status does when its failure is split into tagged ones, is
   compared with each of its shapes, and a break is named with the shape it is
