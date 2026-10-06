@@ -69,7 +69,7 @@ refinement it cannot satisfy. Recommended: the example.
       `jsonPath` templates in the exported mapping.
       Done when: `recordKeeper` exports one mapping that WireMock answers with
       the path's number and the body's keeper, for a body the probe never saw.
-- [ ] **`spec-0067-refusals`**: the refusal for computed answers, naming the
+- [x] **`spec-0067-refusals`** ([#224](https://github.com/matthewjones372/pelican/pull/224)): the refusal for computed answers, naming the
       leaf, and leaves the codec rejects kept at the example's value.
       Done when: an answer that uppercases the keeper is refused naming
       `$.keeper`, and a body with an enum or refined field exports with the
