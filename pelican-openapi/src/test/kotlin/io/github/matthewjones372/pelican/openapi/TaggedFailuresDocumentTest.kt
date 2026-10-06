@@ -90,9 +90,44 @@ class TaggedFailuresDocumentTest {
     }
 
     @Test
-    fun `the description keeps what each failure said`() {
+    fun `the status lists each tag with what its failure said`() {
         (unavailable() / "description").str() shouldBe
-            "The sale could not be recorded; The chip registry could not be reached"
+            "One of:\n\n" +
+            "- `not_recorded`: The sale could not be recorded\n" +
+            "- `registry_down`: The chip registry could not be reached"
+    }
+
+    @Test
+    fun `each tagged schema carries its own failure's description`() {
+        (doc() / "components" / "schemas" / "NotRecorded" / "description").str() shouldBe
+            "The sale could not be recorded"
+        (doc() / "components" / "schemas" / "RegistryDown" / "description").str() shouldBe
+            "The chip registry could not be reached"
+    }
+
+    @Test
+    fun `a description the type already gives its schema is kept`() {
+        val described = object : SchemaSource {
+            override fun schema(type: KType, components: SchemaComponents): JsonObj {
+                val name = (type.classifier as KClass<*>).simpleName!!
+                components.register(name, jsonObj { "type" to "object"; "description" to "The type's own words" })
+                return components.ref(name)
+            }
+        }
+
+        (apiSpec(listOf(adoptPet), described).openApi() / "components" / "schemas" / "NotRecorded" / "description")
+            .str() shouldBe "The type's own words"
+    }
+
+    @Test
+    fun `a single failure's status keeps its description as it was`() {
+        val only = endpoint(petId) {
+            post("pets" / petId / "adoption")
+            json<Pet>().orFail(errorJson<NotRecorded>(503, "The sale could not be recorded"))
+        }
+
+        (responsesOf(apiSpec(listOf(only), Schemas).openApi()) / "503" / "description").str() shouldBe
+            "The sale could not be recorded"
     }
 
     @Test

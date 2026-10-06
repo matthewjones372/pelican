@@ -4222,7 +4222,9 @@ its tag, as a required `const` listed first, because that is what the body
 carries and the property a discriminator names has to be in every schema it maps
 to. So a tagged type's component belongs to that tag: a type tagged in one place
 and used plainly in another, or under two tags, is refused when the document is
-built. Declare a second type for the second use. A handler still names the
+built. Declare a second type for the second use. The status's description lists
+each tag with what its failure said, and each schema carries its own failure's
+description. A handler still names the
 declaration it means — `registryDown(RegistryDown(30))` — so the server never
 has to infer which failure it is answering.
 

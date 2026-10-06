@@ -28,11 +28,12 @@ internal fun declareTags(
 ) {
     val tagged = failures.mapNotNull { err ->
         val type = err.type ?: return@mapNotNull null
-        val tag = err.tag ?: return@mapNotNull null
+        if (err.tag == null) return@mapNotNull null
         val ref = (schemas.schema(type, components)["\$ref"] as? JsonStr)?.value ?: return@mapNotNull null
-        ref.removePrefix(COMPONENT_PREFIX) to (tag to err.discriminator)
+        ref.removePrefix(COMPONENT_PREFIX) to err
     }
-    tagged.groupBy({ it.first }, { it.second }).forEach { (name, uses) ->
+    tagged.groupBy({ it.first }, { it.second }).forEach { (name, failuresOfIt) ->
+        val uses = failuresOfIt.map { it.tag to it.discriminator }
         val tags = uses.distinct()
         require(tags.size == 1) {
             "$name is tagged ${tags.joinToString(" and ") { (tag, field) -> "`$tag` under `$field`" }}. " +
@@ -45,13 +46,14 @@ internal fun declareTags(
                 "Its schema is one component, and a tag is written into it, so the untagged use would be " +
                 "documented as carrying a tag it never sends. Declare a second type for one of them."
         }
-        val (tag, field) = tags.single()
+        val (tag, field) = tags.single().let { (tag, field) -> checkNotNull(tag) to field }
         val schema = components.all()[name] as JsonObj
-        components.register(name, withTag(name, schema, tag, field))
+        // The first use's words, where the type says nothing of its own: one tag, so one failure.
+        components.register(name, withTag(name, schema, tag, field, failuresOfIt.first().description))
     }
 }
 
-private fun withTag(name: String, schema: JsonObj, tag: String, field: String): JsonObj {
+private fun withTag(name: String, schema: JsonObj, tag: String, field: String, description: String): JsonObj {
     val properties = (schema["properties"] as? JsonObj)?.fields.orEmpty()
     require(field !in properties) {
         "$name already has a field `$field`, and its tag is written under that name. Tag it under " +
@@ -64,6 +66,7 @@ private fun withTag(name: String, schema: JsonObj, tag: String, field: String): 
     }
     // First, so a reader of the schema meets the field the whole response is told apart by.
     return schema + jsonObj {
+        if (schema["description"] == null) "description" to description
         put("properties", JsonObj(mapOf(Pair(field, declared)) + properties))
         put("required", JsonArr(listOf(JsonStr(field)) + required))
     }
