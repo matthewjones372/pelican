@@ -5446,10 +5446,23 @@ Query and header parameters are varied too, so an answer that reads one is caugh
 rather than exported with a single value baked in — and the mapping then matches
 on the path alone, since the answer was proved not to depend on the rest.
 
+An endpoint with a JSON request body needs an example of one, since Pelican
+cannot build a value of an arbitrary type to probe with:
+
+```kotlin
+stub(recordKeeper, example = In2("981000000000001", NewKeeper("Ada"))) { (number, keeper) ->
+    ok(Chip(number, keeper.keeper))
+}
+```
+
+Each string and number field of the example is varied the same way, and one the
+answer copies becomes `{{jsonPath request.body '$.keeper'}}`. Values in arrays,
+and booleans, keep the example's value.
+
 What cannot become a template is refused where it is declared, naming the
 endpoint: an answer whose status moves with its input, one that reads a query
-parameter or a header, and one built out of the request body. Name those inputs
-with `stub(endpoint, input)` instead. A parameter that narrows its type beyond
+parameter or a header, and one that computes with a body value rather than
+copying it. Name those inputs with `stub(endpoint, input)` instead. A parameter that narrows its type beyond
 what it declares — a refinement the probe's value does not satisfy — is reported
 separately, because an endpoint refusing the probe and an answer that cannot be
 templated are different problems with different fixes.
