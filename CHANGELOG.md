@@ -392,6 +392,10 @@ still there, and the only new ones are the module's own.
   fields are varied like path parameters, and one the answer copies becomes
   `{{jsonPath request.body '$.field'}}`. Without an example, an endpoint with a
   body is still refused, and the message now says to give one.
+  A body field whose varied value the endpoint refuses, by its codec or with
+  another status from the handler, keeps the example's value rather than
+  failing the export. An answer computed from a body field, rather than
+  copied, is refused with the field named.
 - **A tagged failure's schema declares its tag (spec 0066).** The tag a
   tagged failure writes into its body is now in its component too, as a
   required `const` listed first, so the discriminator names a property every

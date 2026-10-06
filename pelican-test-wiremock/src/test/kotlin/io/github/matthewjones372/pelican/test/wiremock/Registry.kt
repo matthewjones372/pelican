@@ -31,3 +31,15 @@ val recordKeeper = endpoint(chipNumber, jsonBody<NewKeeper>()) {
     post("chips" / chipNumber / "keeper")
     json<Chip>() orFail noSuchChip
 }
+
+enum class Scan { Microchip, Tattoo }
+
+/** A body with fields a probe cannot always vary: a closed set, and a count the registry caps. */
+data class Rescan(val method: Scan, val attempts: Int, val note: String)
+
+val tooManyAttempts = errorJson<Problem>(422, "Too many attempts")
+
+val rescan = endpoint(chipNumber, jsonBody<Rescan>()) {
+    post("chips" / chipNumber / "rescan")
+    json<Rescan>().orFail(noSuchChip, tooManyAttempts)
+}

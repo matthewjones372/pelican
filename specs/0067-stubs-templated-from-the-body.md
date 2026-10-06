@@ -65,7 +65,7 @@ refinement it cannot satisfy. Recommended: the example.
 
 ## Stack
 
-- [ ] **`spec-0067-body-probe`**: `example`, the leaf-by-leaf probe, and the
+- [x] **`spec-0067-body-probe`** ([#223](https://github.com/matthewjones372/pelican/pull/223)): `example`, the leaf-by-leaf probe, and the
       `jsonPath` templates in the exported mapping.
       Done when: `recordKeeper` exports one mapping that WireMock answers with
       the path's number and the body's keeper, for a body the probe never saw.

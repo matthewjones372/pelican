@@ -136,7 +136,16 @@ class StubFile internal constructor(private val codecs: Codecs) {
         val captures = endpoint.pathSpec.segments.withIndex()
             .mapNotNull { (at, segment) -> (segment as? PathSegment.Capture)?.let { at to it.param } }
 
-        val probes = listOf(0, 1).map { round -> probe(endpoint, answer, round, body) }
+        val ask = { round: Int, fields: Map<String, Int> -> probe(endpoint, answer, round, body, fields) }
+        // A body field whose varied value the endpoint will not take, refused by the codec or answered
+        // with another status by the handler, keeps the example's value rather than sinking the stub.
+        val baseline = ask(0, emptyMap()).reached()
+        val kept = body?.fields.orEmpty().filterNot { field ->
+            ask(0, mapOf(field to 0)).let { it.handled && it.answer.status == baseline.answer.status }
+        }
+        val varied = body?.fields.orEmpty() - kept.toSet()
+
+        val probes = listOf(0, 1).map { round -> ask(round, varied.associateWith { round }).reached() }
         val templates = probes.map { it.templated(captures) }
         val answers = probes.map { it.answer }
 
@@ -145,11 +154,29 @@ class StubFile internal constructor(private val codecs: Codecs) {
                 "${answers[0].status} and then ${answers[1].status}. One mapping carries one status, " +
                 "so name each input with stub(endpoint, input) instead."
         }
-        require(templates[0] == templates[1]) {
-            "$where answers from something other than a path parameter or a value copied from the " +
-                "body — a query parameter, a header, the clock, or a body value it computed with. Only " +
-                "a value copied as it is can be filled into a template, so this stub cannot be exported " +
-                "as one. Name the inputs you need with stub(endpoint, input) instead."
+        if (templates[0] != templates[1]) {
+            // Moved one at a time, so the field the answer computed with can be named.
+            val computed = varied.filter { field ->
+                ask(0, varied.associateWith { 0 } + (field to 1)).reached().templated(captures) != templates[0]
+            }
+            val leftAlone = kept.takeIf { it.isNotEmpty() }?.let {
+                " The body field(s) ${it.joinToString()} kept the example's value, because the endpoint " +
+                    "refused a varied one; an answer that depends on them cannot be told apart from one " +
+                    "that does not."
+            }.orEmpty()
+            throw IllegalArgumentException(
+                if (computed.isNotEmpty()) {
+                    "$where answers with something computed from the body field(s) " +
+                        "${computed.joinToString()}, rather than copied from them. Only a value copied as " +
+                        "it is can be filled into a template, so this stub cannot be exported as one. " +
+                        "Name the inputs you need with stub(endpoint, input) instead.$leftAlone"
+                } else {
+                    "$where answers from something other than a path parameter or a value copied from " +
+                        "the body — a query parameter, a header, or the clock. Only a value copied as it is " +
+                        "can be filled into a template, so this stub cannot be exported as one. Name the " +
+                        "inputs you need with stub(endpoint, input) instead.$leftAlone"
+                },
+            )
         }
 
         declared += Declared(
@@ -245,6 +272,8 @@ class StubFile internal constructor(private val codecs: Codecs) {
         answer: (I) -> Outcome<E, T>,
         round: Int,
         body: ExampleBody?,
+        /** The body fields to vary, and the round each one's value is taken from. */
+        fields: Map<String, Int>,
     ): Probe {
         val salt = { at: Int -> round * SALT_STRIDE + at }
         val sentinels = endpoint.pathSpec.segments.withIndex().associate { (at, segment) ->
@@ -262,7 +291,7 @@ class StubFile internal constructor(private val codecs: Codecs) {
         val headers = endpoint.headerParams.withIndex()
             .map { (at, h) -> h.name to sentinel(h.codec, salt(HEADER_SALT_BASE + at)) }
 
-        val varied = body?.varied { at -> salt(BODY_SALT_BASE + at) }
+        val varied = body?.varied(fields) { fieldRound, at -> fieldRound * SALT_STRIDE + BODY_SALT_BASE + at }
         val spec = RequestSpec(
             endpoint.method,
             path,
@@ -274,21 +303,28 @@ class StubFile internal constructor(private val codecs: Codecs) {
         val reached = AtomicBoolean(false)
         val response = served(endpoint) { input -> reached.set(true); answer(input) }
             .answer(spec.asClientRequest())
-        require(reached.get()) {
-            "${endpoint.pathSpec.template} refused the values this export probes it with, answering " +
-                "${response.status} before the stub was asked: ${response.body.take(PROBE_BODY_SHOWN)}. " +
-                "The probe builds a value from each parameter's declared type, so a parameter that " +
-                "narrows its type further than that needs stub(endpoint, input) instead."
-        }
-        return Probe(captured, varied?.second.orEmpty(), response)
+        return Probe(endpoint.pathSpec.template, captured, varied?.second.orEmpty(), response, reached.get())
     }
 
     private class Probe(
+        private val where: String,
         private val sentinels: Map<Int, String>,
         /** JSON path within the body -> the value this round put there. */
         private val bodySentinels: Map<String, String>,
         val answer: ResponseSpec,
+        /** Whether the stub was asked at all, rather than the request refused before it. */
+        val handled: Boolean,
     ) {
+        /** This probe, once it is known the stub answered it. */
+        fun reached(): Probe = apply {
+            require(handled) {
+                "$where refused the values this export probes it with, answering ${answer.status} before " +
+                    "the stub was asked: ${answer.body.take(PROBE_BODY_SHOWN)}. The probe builds a value " +
+                    "from each parameter's declared type, so a parameter that narrows its type further " +
+                    "than that needs stub(endpoint, input) instead."
+            }
+        }
+
         /** The answer with every value this round sent replaced by where in the request it came from. */
         fun templated(captures: List<Pair<Int, PathParam<*>>>): String {
             val fills = captures.map { (at, _) -> sentinels.getValue(at) to "{{request.pathSegments.[$at]}}" } +
@@ -303,24 +339,41 @@ class StubFile internal constructor(private val codecs: Codecs) {
     /** The example's body, and the header that says how it is encoded. */
     private class ExampleBody(private val json: JsonObj, val headers: List<Pair<String, String>>) {
         /**
-         * The body with each string and number field replaced by a sentinel, and where each went.
-         * Only fields named so that `$.a.b` reaches them are varied; anything else keeps the
-         * example's value, and so is never templated.
+         * Every string and number field, as the `$.a.b` path a template reads it by. Fields in
+         * arrays, booleans, and names `$.a.b` cannot spell are not here, so they keep the
+         * example's value and are never templated.
          */
-        fun varied(salt: (Int) -> Int): Pair<JsonValue, Map<String, String>> {
+        val fields: List<String> = buildList {
+            fun walk(value: JsonValue, path: String) {
+                when (value) {
+                    is JsonObj -> value.fields.forEach { (name, field) ->
+                        if (SIMPLE_NAME.matches(name)) walk(field, "$path.$name")
+                    }
+
+                    is JsonStr, is JsonNum -> add(path)
+
+                    else -> Unit
+                }
+            }
+            walk(json, "$")
+        }
+
+        /**
+         * The body with each field in [rounds] replaced by a sentinel taken from its round, and
+         * where each went. [salt] makes a field's value from its round and its place in [fields].
+         */
+        fun varied(rounds: Map<String, Int>, salt: (Int, Int) -> Int): Pair<JsonValue, Map<String, String>> {
             val placed = linkedMapOf<String, String>()
-            fun vary(value: JsonValue, path: String): JsonValue = when (value) {
-                is JsonObj -> JsonObj(
-                    value.fields.mapValues { (name, field) ->
-                        if (SIMPLE_NAME.matches(name)) vary(field, "$path.$name") else field
-                    },
-                )
-
-                is JsonStr -> JsonStr("PelicanProbe${salt(placed.size)}").also { placed[path] = it.value }
-
-                is JsonNum -> JsonNum(BODY_NUMBER_BASE + salt(placed.size)).also { placed[path] = it.value.toString() }
-
-                else -> value
+            fun vary(value: JsonValue, path: String): JsonValue {
+                val round = rounds[path]
+                val at = fields.indexOf(path)
+                return when {
+                    value is JsonObj -> JsonObj(value.fields.mapValues { (name, field) -> vary(field, "$path.$name") })
+                    round == null -> value
+                    value is JsonStr -> JsonStr("PelicanProbe${salt(round, at)}")
+                    value is JsonNum -> JsonNum(BODY_NUMBER_BASE + salt(round, at))
+                    else -> value
+                }.also { if (round != null && it != value) placed[path] = (it as? JsonStr)?.value ?: it.render() }
             }
             return vary(json, "$") to placed
         }
