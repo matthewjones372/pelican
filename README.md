@@ -223,7 +223,7 @@ fun greetings() = api(
 
 fun main() {
     val server = greetings().startWithDocs(port = 8080, docs = docs { docsPath = "/api-docs" })
-    println("Listening on ${server.baseUrl}, docs at ${server.baseUrl}/api-docs")
+    println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
 }
 ```
 
@@ -526,7 +526,7 @@ private val golden = Golden()
 ```
 
 ```
-post-bookmarks.json: 1 change breaks callers.
+post-bookmarks.json — 1 change breaks callers.
 
   POST /bookmarks
     ✖ `folder` in the request body (application/json) is new and required
