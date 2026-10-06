@@ -92,6 +92,8 @@ contract stops working:
 | declared status removed | they are handling a response this service says it never sends |
 | response field removed, or made nullable | they read it and it is not there |
 | response enum value added | a generated client's `when` has never heard of it |
+| response `oneOf` shape added (a new tag), or the tag field renamed | a client switching on the tags meets one it does not know |
+| request `oneOf` shape removed | what they were sending is no longer accepted |
 | `operationId` renamed | every generated client renames a method |
 | security requirement added | 401 for everyone not sending the credential |
 | request constraint tightened (`minLength`, `maximum`, `pattern`, enum narrowed) | payloads that were accepted are refused |

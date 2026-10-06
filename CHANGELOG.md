@@ -393,6 +393,11 @@ still there, and the only new ones are the module's own.
   two that both keep every field no longer reads as every field removed. A
   request breaks only when no shape takes the old payload. A `oneOf` that
   became one schema is compared the other way round.
+  Between two `oneOf`s or `anyOf`s, shapes are paired by tag, then by
+  component, then by position. A shape added to a response is a break (a
+  client switching on the old tags has never heard of it) and one removed
+  from a request is a break; their mirror images are not. A renamed tag field
+  is a break both ways.
 - **Stubs that answer from their input, as response templates (spec 0062).**
   `stub(endpoint) { input -> outcome }` in a `stubFile` exports as one mapping on
   the endpoint's path pattern, with a `{{request.pathSegments.[n]}}` template

@@ -570,6 +570,68 @@ class CompatibilityTest {
         refused.map { it.what }.forEach { it shouldContain "shape" }
     }
 
+    // ------------------------------------------- several shapes on both sides
+
+    data class ShopClosed(val id: Long, val message: String)
+
+    private val shopClosed = errorJson<ShopClosed>(503, "The shop is closed").tagged("shop_closed")
+
+    private val twoFailures = adoptions(
+        adopt(registryDown, notRecorded),
+        mapOf("RegistryDown" to problem, "NotRecorded" to problem),
+    )
+
+    @Test
+    fun `a tag added to a response is one a client switching on the old ones has never heard of`() {
+        val three = adoptions(
+            adopt(registryDown, notRecorded, shopClosed),
+            mapOf("RegistryDown" to problem, "NotRecorded" to problem, "ShopClosed" to problem),
+        )
+
+        val surprise = onlyBreaking(twoFailures, three)
+
+        surprise.what shouldContain "a new shape, `shop_closed`"
+        breaking(three, twoFailures).shouldBeEmpty()
+    }
+
+    @Test
+    fun `a field dropped from a shape both sides have is named with that shape`() {
+        val thinner = adoptions(
+            adopt(registryDown, notRecorded),
+            mapOf("RegistryDown" to problem, "NotRecorded" to shape(Triple("id", true, string))),
+        )
+
+        val lost = onlyBreaking(twoFailures, thinner)
+
+        lost.what shouldContain "`message`"
+        lost.what shouldContain "`not_recorded`"
+    }
+
+    @Test
+    fun `a renamed tag field leaves a caller nothing to branch on`() {
+        val reason = adoptions(
+            adopt(
+                errorJson<RegistryDown>(503, "The registry is down").tagged("registry_down", field = "reason"),
+                errorJson<NotRecorded>(503, "The sale was not recorded").tagged("not_recorded", field = "reason"),
+            ),
+            mapOf("RegistryDown" to problem, "NotRecorded" to problem),
+        )
+
+        onlyBreaking(twoFailures, reason).what shouldContain "told apart by `reason` where it was `kind`"
+    }
+
+    @Test
+    fun `a shape dropped from a request refuses whoever was sending it, and a new one refuses nobody`() {
+        val item = shape(Triple("item", true, string))
+        val gift = shape(Triple("item", true, string), Triple("to", true, string))
+        val bulk = shape(Triple("items", true, string))
+        fun any(vararg shapes: JsonObj) =
+            spec(shapes = mapOf("CreateOrder" to jsonObj { put("anyOf", jsonArr(shapes.toList())) }))
+
+        onlyBreaking(any(item, gift), any(item)).what shouldContain "no longer accepts shape 2"
+        breaking(any(item, gift), any(item, gift, bulk)).shouldBeEmpty()
+    }
+
     // ------------------------------------------- holding the spec, not a file
 
     @Test

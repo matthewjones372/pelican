@@ -352,20 +352,34 @@ private class Comparison(private val published: JsonObj, private val proposed: J
         val now = resolve(after, proposed) ?: return emptyList()
         val visited = if (ref == null) seen else seen + ref
 
-        val oldShapes = shapes(was)
-        val newShapes = shapes(now)
-        if (oldShapes.isEmpty() && newShapes.isNotEmpty()) {
-            return split(where, what, before, now, newShapes, direction, visited)
-        }
-        if (oldShapes.isNotEmpty() && newShapes.isEmpty()) {
-            return joined(where, what, oldShapes, after, direction, visited)
-        }
+        composed(where, what, before, after, was, now, direction, visited)?.let { return it }
 
         return types(where, what, was, now, direction) +
             enums(where, what, was, now, direction) +
             constraints(where, what, was, now, direction) +
             properties(where, what, was, now, direction, visited) +
             elements(where, what, was, now, direction, visited)
+    }
+
+    /** Where either side is several shapes, the comparison those shapes call for; null where neither is. */
+    private fun composed(
+        where: String,
+        what: String,
+        before: JsonValue?,
+        after: JsonValue?,
+        was: JsonObj,
+        now: JsonObj,
+        direction: Direction,
+        seen: Set<String>,
+    ): List<ApiChange>? {
+        val oldShapes = shapes(was)
+        val newShapes = shapes(now)
+        return when {
+            oldShapes.isEmpty() && newShapes.isEmpty() -> null
+            oldShapes.isEmpty() -> split(where, what, before, now, newShapes, direction, seen)
+            newShapes.isEmpty() -> joined(where, what, oldShapes, after, direction, seen)
+            else -> reshaped(where, what, was, now, oldShapes, newShapes, direction, seen)
+        }
     }
 
     /**
@@ -414,13 +428,53 @@ private class Comparison(private val published: JsonObj, private val proposed: J
             shapes.flatMap { (label, branch) -> schema(where, "$what as $label", branch, after, direction, seen) }
 
     /**
-     * A `oneOf`'s branches, each named the way a reader of the document would: by its tag where the
-     * discriminator maps one to it, else by the component it refers to, else by position.
+     * Several shapes on both sides, paired by name. A shape the reader has never seen is a break for
+     * whoever reads it, a response's new tag reaching a client that switches on the old ones, and a
+     * shape that went away is a break for whoever was sending it: [widening] and [narrowing] are the
+     * same two rules a new or dropped enum value follows.
+     */
+    private fun reshaped(
+        where: String,
+        what: String,
+        before: JsonObj,
+        after: JsonObj,
+        oldShapes: List<Pair<String, JsonValue>>,
+        newShapes: List<Pair<String, JsonValue>>,
+        direction: Direction,
+        seen: Set<String>,
+    ): List<ApiChange> {
+        val old = oldShapes.toMap()
+        val new = newShapes.toMap()
+        val field = discriminatorOf(before)
+        val renamed = discriminatorOf(after)?.takeIf { field != null && it != field }?.let {
+            one(
+                Compatibility.BREAKING,
+                where,
+                "$what is told apart by `$it` where it was `$field`",
+                "a caller reading `$field` finds nothing to branch on",
+            )
+        }.orEmpty()
+
+        return renamed + (old.keys + new.keys).flatMap { label ->
+            when {
+                label !in old -> one(widening(direction), where, "$what ${verb(direction)} a new shape, $label")
+                label !in new -> one(narrowing(direction), where, "$what no longer ${verb(direction)} $label")
+                else -> schema(where, "$what as $label", old[label], new[label], direction, seen)
+            }
+        }
+    }
+
+    /**
+     * A `oneOf`'s or `anyOf`'s branches, each named the way a reader of the document would: by its
+     * tag where the discriminator maps one to it, else by the component it refers to, else by
+     * position. The name is also what pairs a shape with itself across two documents, so a shape
+     * named by position says so.
      */
     private fun shapes(schema: JsonObj): List<Pair<String, JsonValue>> {
         val tags = schema["discriminator"].obj()?.get("mapping").obj()?.fields.orEmpty()
             .mapNotNull { (tag, target) -> target.str()?.let { it to tag } }.toMap()
-        return schema["oneOf"].arr().mapIndexed { at, branch ->
+        val branches = schema["oneOf"].arr().ifEmpty { schema["anyOf"].arr() }
+        return branches.mapIndexed { at, branch ->
             val ref = branch.obj()?.get("\$ref").str()
             val label = tags[ref]?.let { "`$it`" } ?: ref?.substringAfterLast('/') ?: "shape ${at + 1}"
             label to branch
