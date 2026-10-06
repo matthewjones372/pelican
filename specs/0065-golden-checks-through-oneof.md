@@ -60,7 +60,7 @@ branch by branch.
 
 ## Stack
 
-- [ ] **`spec-0065-oneof-pairs`**: one schema to `oneOf` and back, compared
+- [x] **`spec-0065-oneof-pairs`** ([#218](https://github.com/matthewjones372/pelican/pull/218)): one schema to `oneOf` and back, compared
       branch by branch, with the branch named in each change.
       Done when: the petshop's `Unavailable` to `RegistryDown | NotRecorded`
       split reports no break, and the same split with `id` dropped from one
