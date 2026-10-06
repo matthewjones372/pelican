@@ -113,6 +113,15 @@ fun ApiSpec.openApi(version: OpenApiVersion = OpenApiVersion.V3_1_0): JsonObj {
             sent.flatMap { it.operation.security.orEmpty() },
     )
 
+    val pathItems = JsonObj(paths.mapValues { (_, ops) -> JsonObj(ops.toMap()) })
+    val webhookItems = webhookItems(sent, version, schemas, components, refusals)
+    declareTags(
+        documented.flatMap { it.errors } + sent.flatMap { it.operation.errors },
+        schemas,
+        components,
+        listOf(pathItems, webhookItems, components.all()),
+    )
+
     return jsonObj {
         "openapi" to version.field
         // `jsonSchemaDialect` is omitted: 2020-12 is what both revisions
@@ -122,10 +131,10 @@ fun ApiSpec.openApi(version: OpenApiVersion = OpenApiVersion.V3_1_0): JsonObj {
         // set of endpoint descriptions says where the document gets published.
         put("info", info())
         if (servers.isNotEmpty()) put("servers", serverList(servers))
-        put("paths", JsonObj(paths.mapValues { (_, ops) -> JsonObj(ops.toMap()) }))
+        put("paths", pathItems)
         // The order the specification lists the fields in; a document is read
         // by people too.
-        if (sent.isNotEmpty()) put("webhooks", webhookItems(sent, version, schemas, components, refusals))
+        if (sent.isNotEmpty()) put("webhooks", webhookItems)
         if (security.isNotEmpty()) put("security", requirements(security))
         put("components", jsonObj {
             put("schemas", components.all())

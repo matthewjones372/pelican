@@ -8,11 +8,14 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jsonObj
+import io.github.matthewjones372.pelican.jsonStrings
 import io.github.matthewjones372.pelican.openapi.div
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -90,6 +93,73 @@ class TaggedFailuresDocumentTest {
     fun `the description keeps what each failure said`() {
         (unavailable() / "description").str() shouldBe
             "The sale could not be recorded; The chip registry could not be reached"
+    }
+
+    @Test
+    fun `each tagged schema declares its tag, first and required, as the body carries it`() {
+        val notRecorded = doc() / "components" / "schemas" / "NotRecorded"
+
+        (notRecorded / "properties").keys().first() shouldBe "kind"
+        (notRecorded / "properties" / "kind" / "const").str() shouldBe "not_recorded"
+        (notRecorded / "required").arr().map { it.str() } shouldContainExactly listOf("kind")
+        (doc() / "components" / "schemas" / "RegistryDown" / "properties" / "kind" / "const").str() shouldBe
+            "registry_down"
+    }
+
+    @Test
+    fun `an untagged failure's schema is left as its type describes it`() {
+        val only = endpoint(petId) {
+            post("pets" / petId / "adoption")
+            json<Pet>().orFail(errorJson<NotRecorded>(503, "The sale could not be recorded"))
+        }
+
+        (apiSpec(listOf(only), Schemas).openApi() / "components" / "schemas" / "NotRecorded").keys() shouldBe
+            setOf("type")
+    }
+
+    @Test
+    fun `a type tagged in one place and plain in another is refused, since one schema cannot be both`() {
+        val lookUp = endpoint(petId) {
+            get("pets" / petId / "adoption")
+            json<NotRecorded>()
+        }
+
+        shouldThrow<IllegalArgumentException> { apiSpec(listOf(adoptPet, lookUp), Schemas).openApi() }
+            .message shouldContain "NotRecorded is tagged `not_recorded` as a failure, and also used where it is not"
+    }
+
+    @Test
+    fun `a type under two tags is refused, since its schema carries one`() {
+        // Declared outside the builder, whose own errorJson adds an untagged failure as it is called.
+        val unrecorded = errorJson<NotRecorded>(503, "Not recorded").tagged("unrecorded")
+        val returnPet = endpoint(petId) {
+            post("pets" / petId / "return")
+            json<Pet>().orFail(unrecorded, registryDown)
+        }
+
+        shouldThrow<IllegalArgumentException> { apiSpec(listOf(adoptPet, returnPet), Schemas).openApi() }
+            .message shouldContain "NotRecorded is tagged `not_recorded` under `kind` and `unrecorded` under `kind`"
+    }
+
+    @Test
+    fun `a payload with a field of the tag's name is refused rather than overwritten`() {
+        val withKind = object : SchemaSource {
+            override fun schema(type: KType, components: SchemaComponents): JsonObj {
+                val name = (type.classifier as KClass<*>).simpleName!!
+                components.register(
+                    name,
+                    jsonObj {
+                        "type" to "object"
+                        put("properties", jsonObj { put("kind", jsonObj { "type" to "string" }) })
+                        put("required", jsonStrings(listOf("kind")))
+                    },
+                )
+                return components.ref(name)
+            }
+        }
+
+        shouldThrow<IllegalArgumentException> { apiSpec(listOf(adoptPet), withKind).openApi() }
+            .message shouldContain "already has a field `kind`"
     }
 
     @Test

@@ -56,8 +56,8 @@ and each tagged component declares its tag:
 }
 ```
 
-- The tag field is added to the component as a required property, first. On
-  3.1 it is a `const`, and on 3.0 a one-value `enum`.
+- The tag field is added to the component as a required `const` property,
+  first. Pelican emits 3.1 and 3.2 only, so there is no 3.0 spelling to choose.
 - The component carries its failure's description.
 - The status's description lists each tag with its description, as a Markdown
   list, which OpenAPI allows in a description.
@@ -76,9 +76,8 @@ Recommended: the field in the component.
 
 ## Stack
 
-- [ ] **`spec-0066-tag-in-schema`**: the tag as a required `const` (or
-      one-value `enum` on 3.0) in each tagged component, and a type used more
-      than one way refused.
+- [ ] **`spec-0066-tag-in-schema`**: the tag as a required `const` in each
+      tagged component, and a type used more than one way refused.
       Done when: the petshop-shaped document validates with a validator that
       checks discriminator properties, and a type used tagged and untagged is
       refused with a message naming both uses.

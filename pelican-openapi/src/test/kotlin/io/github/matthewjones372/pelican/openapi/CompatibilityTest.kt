@@ -544,15 +544,12 @@ class CompatibilityTest {
             ),
         )
 
-        val lost = onlyBreaking(split, oneFailure)
-
-        lost.what shouldContain "`retry`"
-        lost.what shouldContain "`not_recorded`"
-        val kept = adoptions(
-            adopt(registryDown, notRecorded),
-            mapOf("RegistryDown" to problem, "NotRecorded" to problem),
+        // Each shape also loses the tag its schema declares (spec 0066), which a caller branching on it read.
+        breaking(split, oneFailure).map { it.what } shouldContainExactly listOf(
+            "`kind` in the 503 response (application/json) as `registry_down` is gone",
+            "`kind` in the 503 response (application/json) as `not_recorded` is gone",
+            "`retry` in the 503 response (application/json) as `not_recorded` is gone",
         )
-        breaking(kept, oneFailure).shouldBeEmpty()
     }
 
     @Test
@@ -617,7 +614,8 @@ class CompatibilityTest {
             mapOf("RegistryDown" to problem, "NotRecorded" to problem),
         )
 
-        onlyBreaking(twoFailures, reason).what shouldContain "told apart by `reason` where it was `kind`"
+        breaking(twoFailures, reason).map { it.what } shouldInclude
+            "the 503 response (application/json) is told apart by `reason` where it was `kind`"
     }
 
     @Test
