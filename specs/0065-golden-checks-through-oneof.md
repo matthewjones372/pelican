@@ -65,7 +65,7 @@ branch by branch.
       Done when: the petshop's `Unavailable` to `RegistryDown | NotRecorded`
       split reports no break, and the same split with `id` dropped from one
       branch reports exactly that field in that branch.
-- [ ] **`spec-0065-oneof-branches`**: `oneOf` to `oneOf`, paired by tag or
+- [x] **`spec-0065-oneof-branches`** ([#219](https://github.com/matthewjones372/pelican/pull/219)): `oneOf` to `oneOf`, paired by tag or
       `$ref`, with added and removed branches judged by direction, and `anyOf`.
       Done when: a tag added to a response and a branch removed from a request
       are each one break, their mirror images are safe, and a renamed

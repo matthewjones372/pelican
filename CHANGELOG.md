@@ -386,6 +386,13 @@ still there, and the only new ones are the module's own.
   only one under its status. `ErrorOutput` and `ErrorSpec` gained `tag` and
   `discriminator`; the constructors they had in RC3 are kept hidden, so a service
   compiled against RC3 still links.
+- **A tagged failure's schema declares its tag (spec 0066).** The tag a
+  tagged failure writes into its body is now in its component too, as a
+  required `const` listed first, so the discriminator names a property every
+  schema it maps to declares. A type tagged in one place and used plainly in
+  another, or under two tags, is refused when the document is built, since its
+  one component cannot describe both; so is a payload that already has a field
+  of the tag's name.
 - **Golden checks read through `oneOf` (spec 0065).** A schema that became a
   `oneOf`, as a status does when its failure is split into tagged ones, is
   compared with each of its shapes, and a break is named with the shape it is
