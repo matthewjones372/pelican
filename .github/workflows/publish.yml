@@ -2,7 +2,9 @@ name: publish
 
 on:
   push:
-    tags: ["v*"]
+    # A pre-release tag is not a release: a candidate is a snapshot, which
+    # snapshot.yml publishes, rather than a version on Central for good.
+    tags: ["v*", "!v*-*"]
   # A tag push publishes everything, which is the release. The inputs exist for
   # the other case: a registry that was skipped at the time — the Plugin Portal
   # step below skips itself when no key is configured — and has to be caught up
@@ -59,7 +61,11 @@ jobs:
       # branch rather than a tag would build a snapshot — which the Plugin
       # Portal refuses and Central should not be asked for. Fail here, before
       # either upload rather than between them.
-      - name: Refuse to publish a snapshot
+      #
+      # A candidate is refused for the same reason: it is a snapshot's job, and
+      # a version on Central is permanent and counts against the Portal's
+      # monthly limits.
+      - name: Refuse anything but a release
         run: |
           version=$(./gradlew -p pelican-gradle-plugin -q currentVersion \
             | sed -n 's/^Project version: //p')
@@ -67,6 +73,7 @@ jobs:
           case "$version" in
             "") echo "could not read the version"; exit 1 ;;
             *-SNAPSHOT) echo "refusing to publish a snapshot"; exit 1 ;;
+            *-*) echo "$version is not a release; snapshot.yml publishes candidates"; exit 1 ;;
           esac
 
       # The same gate a pull request goes through. A release that cannot build
