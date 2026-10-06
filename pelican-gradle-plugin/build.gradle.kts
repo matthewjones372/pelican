@@ -46,6 +46,20 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// The Kotlin plugin resolves Bouncy Castle 1.84 here, which has a critical
+// name-constraints bypass. The other build forces 1.86 across its subprojects,
+// and an included build is reached by no `subprojects` block of another one, so
+// it says the same thing for itself. Dependabot cannot act on either: no
+// manifest names the coordinate, and 1.86 is the newest release there is.
+configurations.matching { it.name == "kotlinBouncyCastleConfiguration" }.configureEach {
+    resolutionStrategy.force(
+        "org.bouncycastle:bcprov-jdk18on:1.86",
+        "org.bouncycastle:bcpg-jdk18on:1.86",
+        "org.bouncycastle:bcpkix-jdk18on:1.86",
+        "org.bouncycastle:bcutil-jdk18on:1.86",
+    )
+}
+
 spotless {
     kotlin {
         target("src/**/*.kt")
