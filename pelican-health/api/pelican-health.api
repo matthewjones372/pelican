@@ -56,6 +56,12 @@ public final class io/github/matthewjones372/pelican/health/HealthReport {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/health/JvmChecksKt {
+	public static final fun diskSpace (Ljava/lang/String;J)Lio/github/matthewjones372/pelican/health/Status;
+	public static final fun heapHeadroom (J)Lio/github/matthewjones372/pelican/health/Status;
+	public static final fun noDeadlockedThreads ()Lio/github/matthewjones372/pelican/health/Status;
+}
+
 public abstract interface class io/github/matthewjones372/pelican/health/Status {
 }
 

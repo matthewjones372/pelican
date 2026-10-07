@@ -365,8 +365,9 @@ still there, and the only new ones are the module's own.
   `health` and in the document. Checks run in parallel, each under its own
   timeout, and the body is `application/health+json`: 200 for `pass` or `warn`,
   503 for `fail`. A check marked `critical = false` that fails is a `warn`, and
-  a check's `output` reaches the body only with `detail = true`. The built-in
-  checks follow in the spec's later entries.
+  a check's `output` reaches the body only with `detail = true`. Built in, on
+  the JDK alone: `diskSpace(path, minFreeBytes)`, `heapHeadroom(minFreeBytes)`
+  and `noDeadlockedThreads()`.
 - **`+json` media types are JSON (spec 0068).** `media<T>("application/problem+json")`,
   or any other `+json` type, is written by the API's JSON codec with no
   `codec(type, mediaType)` override, as RFC 6839 says it is. The check also
