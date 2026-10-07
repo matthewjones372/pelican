@@ -35,6 +35,8 @@ public final class io/github/matthewjones372/pelican/openapi/Docs {
 	public final fun getDocsPath ()Ljava/lang/String;
 	public final fun getOauth ()Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
 	public final fun getOpenApiPath ()Ljava/lang/String;
+	public final fun getRedoc ()Lio/github/matthewjones372/pelican/openapi/RedocLook;
+	public final fun getReference ()Lio/github/matthewjones372/pelican/openapi/Reference;
 	public final fun getUi ()Lio/github/matthewjones372/pelican/openapi/DocsUi;
 	public final fun getVersion ()Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
 }
@@ -45,6 +47,9 @@ public final class io/github/matthewjones372/pelican/openapi/DocsBuilder {
 	public final fun getOpenApiPath ()Ljava/lang/String;
 	public final fun getUi ()Lio/github/matthewjones372/pelican/openapi/DocsUi;
 	public final fun getVersion ()Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+	public final fun redoc (Lkotlin/jvm/functions/Function1;)V
+	public final fun reference (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun reference$default (Lio/github/matthewjones372/pelican/openapi/DocsBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun setDocsPath (Ljava/lang/String;)V
 	public final fun setOauth (Lio/github/matthewjones372/pelican/openapi/DocsOAuth;)V
 	public final fun setOpenApiPath (Ljava/lang/String;)V
@@ -103,6 +108,32 @@ public final class io/github/matthewjones372/pelican/openapi/OpenApiVersion : ja
 
 public final class io/github/matthewjones372/pelican/openapi/RedocKt {
 	public static final fun redocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static final fun redocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/RedocLook;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/RedocLook {
+	public static final field Companion Lio/github/matthewjones372/pelican/openapi/RedocLook$Companion;
+	public fun <init> ()V
+	public final fun getLogo ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getOptions ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getStylesheets ()Ljava/util/List;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/RedocLook$Companion {
+	public final fun getPLAIN ()Lio/github/matthewjones372/pelican/openapi/RedocLook;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/RedocLookBuilder {
+	public final fun getOptions ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun logo (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun logo$default (Lio/github/matthewjones372/pelican/openapi/RedocLookBuilder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun setOptions (Lio/github/matthewjones372/pelican/JsonObj;)V
+	public final fun stylesheet (Ljava/lang/String;)V
+}
+
+public final class io/github/matthewjones372/pelican/openapi/Reference {
+	public final fun getLook ()Lio/github/matthewjones372/pelican/openapi/RedocLook;
+	public final fun getPath ()Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/openapi/ReportKt {

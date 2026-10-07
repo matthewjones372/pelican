@@ -62,6 +62,8 @@ class FunctionalStyleTest {
             "the response-to-codec table, keyed by identity because two responses can carry one payload " +
             "type and a negotiated one carries the same type under several encodings; built once per " +
             "endpoint and handed to the interpreter as a Map",
+        "pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/RedocLook.kt" to
+            "RedocLookBuilder collects stylesheets a call at a time, and the RedocLook it builds is handed a copy",
         "pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/OpenApi.kt" to
             "component schemas are collected as the document is walked, then emitted once",
         "pelican-schema/src/main/kotlin/io/github/matthewjones372/pelican/schema/StandaloneSchemas.kt" to
