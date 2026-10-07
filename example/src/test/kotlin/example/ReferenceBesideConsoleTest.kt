@@ -85,4 +85,18 @@ class ReferenceBesideConsoleTest {
             server.stop()
         }
     }
+
+    @Test
+    fun `the example's own docs serve the console and its themed reference`() {
+        val server = ordersApi().startWithDocs(testKit.system(), port = 0, docs = ordersDocs)
+        try {
+            get("${server.baseUrl}/api-docs").body() shouldContain "swagger-ui"
+            val reference = get("${server.baseUrl}/reference").body()
+            reference shouldContain """"main":"#0B7A75""""
+            reference shouldContain """"altText":"Orders""""
+            reference shouldContain "family=Inter"
+        } finally {
+            server.stop()
+        }
+    }
 }
