@@ -72,7 +72,7 @@ interface CodecFactory {
 /** The one encoding every [CodecFactory] has. The default [CodecFactory.codec] also answers `+json` types with it. */
 const val JSON_MEDIA_TYPE: String = "application/json"
 
-private fun isJson(mediaType: String): Boolean {
+internal fun isJson(mediaType: String): Boolean {
     val essence = mediaType.substringBefore(';').trim().lowercase()
     return essence == JSON_MEDIA_TYPE || essence.endsWith("+json")
 }

@@ -491,11 +491,12 @@ public final class io/github/matthewjones372/pelican/EnumCodec : io/github/matth
 
 public final class io/github/matthewjones372/pelican/ErrorOutput {
 	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;)V
-	public fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (ILkotlin/reflect/KType;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getDiscriminator ()Ljava/lang/String;
 	public final fun getHeaders ()Ljava/util/List;
+	public final fun getMediaType ()Ljava/lang/String;
 	public final fun getStatus ()I
 	public final fun getTag ()Ljava/lang/String;
 	public final fun getType ()Lkotlin/reflect/KType;
@@ -507,11 +508,12 @@ public final class io/github/matthewjones372/pelican/ErrorOutput {
 
 public final class io/github/matthewjones372/pelican/ErrorSpec {
 	public synthetic fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;)V
-	public fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/Integer;Ljava/lang/String;Lkotlin/reflect/KType;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getDiscriminator ()Ljava/lang/String;
 	public final fun getHeaders ()Ljava/util/List;
+	public final fun getMediaType ()Ljava/lang/String;
 	public final fun getStatus ()Ljava/lang/Integer;
 	public final fun getTag ()Ljava/lang/String;
 	public final fun getType ()Lkotlin/reflect/KType;

@@ -88,6 +88,15 @@ internal fun checkStatus(owner: String, status: Int, carriesBody: Boolean) {
     }
 }
 
+/** A response is written as one concrete type/subtype, success or failure. */
+internal fun checkMediaType(mediaType: String) {
+    val slash = mediaType.indexOf('/')
+    require(slash > 0 && slash < mediaType.length - 1 && '*' !in mediaType) {
+        "'$mediaType' is not a media type a response can be written as. It is one concrete " +
+            "type/subtype — \"text/csv\" — since what goes out has to be something in particular."
+    }
+}
+
 /** 1xx, 204 and 304 are defined to have no entity; everything else may have one. */
 internal fun statusAllowsBody(status: Int): Boolean =
     status > LAST_INFORMATIONAL && status != NO_CONTENT && status != NOT_MODIFIED
@@ -241,11 +250,7 @@ class MediaOutput<T> @PublishedApi internal constructor(
 
     init {
         checkStatus(toString(), status, carriesBody = true)
-        val slash = mediaType.indexOf('/')
-        require(slash > 0 && slash < mediaType.length - 1 && '*' !in mediaType) {
-            "'$mediaType' is not a media type a response can be written as. It is one concrete " +
-                "type/subtype — \"text/csv\" — since what goes out has to be something in particular."
-        }
+        checkMediaType(mediaType)
     }
 
     override fun toString() = "$mediaType:$status"

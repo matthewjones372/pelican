@@ -223,7 +223,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
                 is Outcome.Err<*> -> {
                     val declared = out.failureNamedBy(outcome)
                     val codec = checkNotNull(resolved.alternatives[declared]) { "No codec for $declared" }
-                    body(declared.status, "application/json", taggedBody(declared, codec.encodeToString(outcome.error)))
+                    body(declared.status, declared.mediaType, taggedBody(declared, codec.encodeToString(outcome.error)))
                         .plus(outcome.headers)
                 }
             }

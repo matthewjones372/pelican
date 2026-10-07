@@ -183,7 +183,7 @@ fun Codecs.responseCodecs(output: Output<*>): Map<Any, BodyCodec<Any?>> {
         out.payloadType?.let { out as Any to codec<Any?>(it, out.writtenAs()) }
     }
     val failures = (output as? DeclaredResponses<*, *>)?.failures.orEmpty()
-        .map { failure -> failure as Any to codec<Any?>(failure.type) }
+        .map { failure -> failure as Any to codec<Any?>(failure.type, failure.mediaType) }
 
     return (successes + failures).associateTo(IdentityHashMap<Any, BodyCodec<Any?>>()) { it }
 }
