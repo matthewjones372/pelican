@@ -3,7 +3,7 @@
 Linked from the [README](../README.md). What each module is for, and what it
 depends on — the list to read when deciding which ones a build actually needs.
 
-Twenty-two library modules and a Gradle plugin; a typical build takes four or
+Twenty-three library modules and a Gradle plugin; a typical build takes four or
 five. The layering is enforced by tests rather than convention.
 
 1.0 ships one server backend, one JSON library and one client transport. The
@@ -26,6 +26,7 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
 | `pelican-health` | core *only* | live and ready probes in `application/health+json`, and checks that need only the JDK. On `main` only |
+| `pelican-health-kafka` | health; kafka-clients *provided* | `kafka(admin)`, over the service's own Kafka client. On `main` only |
 | `pelican-oidc` | core + nimbus-jose-jwt | verifies an OpenID Connect provider's tokens and says who is calling. On `main` only; not in 1.0.0-RC3 |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
 | `pelican-schema` | core | one type → a JSON Schema 2020-12 document that resolves on its own |
@@ -65,7 +66,9 @@ rests on its build file for now:
   vendors are two modules.
 - `pelican-health` asserts it is core and nothing else: its checks use the
   JDK's own JDBC, HTTP client and management beans, and a check over a
-  third-party client goes in a module of its own.
+  third-party client goes in a module of its own. `pelican-health-kafka`
+  asserts it ships health and core and no Kafka client: the service names the
+  version it already runs.
 - `pelican-client-pekko` asserts it ships no Pekko at all, and not the
   matching *interpreter* either, since making calls and serving routes are
   separate decisions. Pekko is *provided* in every module that speaks it:

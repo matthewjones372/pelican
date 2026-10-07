@@ -370,6 +370,11 @@ still there, and the only new ones are the module's own.
   driver `isValid`, `http(url)`, which passes on a 2xx from another service,
   `diskSpace(path, minFreeBytes)`, `heapHeadroom(minFreeBytes)` and
   `noDeadlockedThreads()`.
+- **A health check over Kafka (spec 0069).** `pelican-health-kafka`:
+  `kafka(admin)` passes when the cluster behind the service's own `Admin` names a
+  controller and a broker within the timeout. `kafka-clients` is `compileOnly`,
+  so the service's version is the one that runs; it is tested on 4.3 and on the
+  oldest supported line, 3.9.
 - **`+json` media types are JSON (spec 0068).** `media<T>("application/problem+json")`,
   or any other `+json` type, is written by the API's JSON codec with no
   `codec(type, mediaType)` override, as RFC 6839 says it is. The check also
