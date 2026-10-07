@@ -100,7 +100,7 @@ declaring one would stop it starting.
       Done when: `outcome(health.ready, Unit)` is `Err(report)` with the
       failing check in it, and the 503's description in the document is the
       failure's.
-- [ ] **`spec-0070-refuse`**: a success declared at 400 or above is refused,
+- [x] **`spec-0070-refuse`** ([#239](https://github.com/matthewjones372/pelican/pull/239)): a success declared at 400 or above is refused,
       one check called from the eight success outputs;
       `ContentNegotiationTest`'s 419 becomes a declared failure.
       Done when: `json<Widget>(status = 419)` is refused with the message
