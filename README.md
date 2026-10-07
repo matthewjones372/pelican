@@ -135,10 +135,10 @@ dependencies {
     // The interpreter. Brings pelican-core; compiles against Pekko HTTP.
     implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.0")
     // The codec module: Jackson, and the schemas the document derives.
     implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
     // /openapi.json and Swagger UI beside the endpoints. startWithDocs lives here.
@@ -287,10 +287,10 @@ dependencies {
     implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
     implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC3")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.0")
 }
 ```
 

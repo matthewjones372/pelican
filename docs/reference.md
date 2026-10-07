@@ -1340,10 +1340,10 @@ the classpath without being told:
 dependencies {
     implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC3")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.0")
 }
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
