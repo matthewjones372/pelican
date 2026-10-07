@@ -56,6 +56,11 @@ public final class io/github/matthewjones372/pelican/health/HealthReport {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/health/HttpCheckKt {
+	public static final fun http-HG0u8IE (Ljava/lang/String;J)Lio/github/matthewjones372/pelican/health/Status;
+	public static synthetic fun http-HG0u8IE$default (Ljava/lang/String;JILjava/lang/Object;)Lio/github/matthewjones372/pelican/health/Status;
+}
+
 public final class io/github/matthewjones372/pelican/health/JdbcCheckKt {
 	public static final fun jdbc-HG0u8IE (Ljavax/sql/DataSource;J)Lio/github/matthewjones372/pelican/health/Status;
 	public static synthetic fun jdbc-HG0u8IE$default (Ljavax/sql/DataSource;JILjava/lang/Object;)Lio/github/matthewjones372/pelican/health/Status;
