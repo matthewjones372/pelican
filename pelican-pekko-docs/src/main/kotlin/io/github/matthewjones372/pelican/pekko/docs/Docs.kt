@@ -40,7 +40,7 @@ typealias Docs = io.github.matthewjones372.pelican.openapi.Docs
 fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }
     val uiPath = docs.docsPath?.takeIf { it.isNotBlank() }
-    if (specPath == null && uiPath == null) return emptyList()
+    if (specPath == null && uiPath == null && docs.reference == null) return emptyList()
 
     // Generated once and shared by the routes, rather than once per route.
     val document = spec().openApiJson(docs.version)
@@ -60,7 +60,7 @@ fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
             val redirectPath = docs.oauth?.let { oauth2RedirectPath(uiPath) }
             val page = when (docs.ui) {
                 DocsUi.SwaggerUi -> swaggerUiHtml(title, specPath.orEmpty(), document, docs.oauth, redirectPath)
-                DocsUi.Redoc -> redocHtml(title, specPath.orEmpty(), document)
+                DocsUi.Redoc -> redocHtml(title, specPath.orEmpty(), document, docs.redoc)
             }
             add(staticRoute(uiPath, ContentTypes.TEXT_HTML_UTF8, page, cors))
             // Next to the page, so the provider has one redirect URI to
@@ -68,6 +68,11 @@ fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
             if (redirectPath != null) {
                 add(staticRoute(redirectPath, ContentTypes.TEXT_HTML_UTF8, oauth2RedirectHtml(), cors))
             }
+        }
+        // Beside the page above, reading the same document: a reference for reading, a console for trying.
+        docs.reference?.let { reference ->
+            val page = redocHtml(title, specPath.orEmpty(), document, reference.look)
+            add(staticRoute(reference.path, ContentTypes.TEXT_HTML_UTF8, page, cors))
         }
     }
 }

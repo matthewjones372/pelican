@@ -27,6 +27,12 @@ class Docs internal constructor(
      * describes its cookies and its streams correctly.
      */
     val version: OpenApiVersion = OpenApiVersion.V3_1_0,
+
+    /** A Redoc reference served beside the page at [docsPath], reading the same document. See spec 0071. */
+    val reference: Reference? = null,
+
+    /** How the page at [docsPath] looks when [ui] is [DocsUi.Redoc]. */
+    val redoc: RedocLook = RedocLook.PLAIN,
 )
 
 /**
@@ -44,7 +50,34 @@ class DocsBuilder internal constructor() {
     var oauth: DocsOAuth? = null
     var version: OpenApiVersion = OpenApiVersion.V3_1_0
 
+    private var reference: Reference? = null
+    private var redoc: RedocLook = RedocLook.PLAIN
+
+    /** A Redoc reference at [path], beside the page [ui] serves at [docsPath], in the look [configure] gives it. */
+    fun reference(path: String, configure: RedocLookBuilder.() -> Unit = {}) {
+        require(path.isNotBlank()) { "docs { reference(...) } needs a path to serve the reference at." }
+        reference = Reference(path, RedocLookBuilder().apply(configure).build())
+    }
+
+    /** How the page at [docsPath] looks, when it is Redoc's: `docs { ui = DocsUi.Redoc; redoc { ... } }`. */
+    fun redoc(configure: RedocLookBuilder.() -> Unit) {
+        redoc = RedocLookBuilder().apply(configure).build()
+    }
+
     internal fun build(): Docs {
+        reference?.let { page ->
+            val taken = if (page.path == docsPath) "docsPath" else "openApiPath"
+            require(page.path != docsPath && page.path != openApiPath) {
+                "docs { reference(\"${page.path}\") } is already where $taken is served, and one path answers " +
+                    "with one page. Give the reference a path of its own."
+            }
+        }
+        // Refused rather than ignored, as an oauth under Redoc is: a look nothing renders is a setting that lies.
+        require(redoc.isPlain || ui == DocsUi.Redoc) {
+            "docs { redoc { ... } } dresses the page at docsPath when it is Redoc's, and ui is $ui. Set " +
+                "ui = DocsUi.Redoc, or give the look to reference(...) to serve Redoc beside it."
+        }
+
         // Refused rather than ignored: Redoc has no "Try it out", so a service
         // that configured a flow here would get a redirect page nothing opens
         // and a token nothing sends.
@@ -59,6 +92,8 @@ class DocsBuilder internal constructor() {
             ui = ui,
             oauth = oauth,
             version = version,
+            reference = reference,
+            redoc = redoc,
         )
     }
 }

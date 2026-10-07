@@ -400,6 +400,18 @@ still there, and the only new ones are the module's own.
   only one under its status. `ErrorOutput` and `ErrorSpec` gained `tag` and
   `discriminator`; the constructors they had in RC3 are kept hidden, so a service
   compiled against RC3 still links.
+- **A reference page beside the console, with its own look (spec 0071).**
+  `docs { reference("/reference") { ... } }` serves a Redoc reference beside
+  the page at `docsPath`, reading the same document, so a service can offer
+  Swagger's "Try it out" and a reference to read. Its look is Redoc's own:
+  `options` is passed to `Redoc.init` as it is (`theme`, `expandResponses` and
+  the rest), `logo(url, altText, backgroundColor)` sets `x-logo` on the page's
+  copy of the document while `/openapi.json` stays as it was, and
+  `stylesheet(url)` links the fonts a theme names. `redoc { }` gives the same
+  look to the page at `docsPath` when `ui = DocsUi.Redoc`. A reference on the
+  docs or document path is refused, and so is a `redoc { }` look with Swagger
+  UI as the page. `redocHtml` takes a `RedocLook`; without one it serves the
+  page it always has.
 - **A failure in a media type of its own (spec 0070).** `errorMedia<T>(mediaType,
   status, description)` declares a failure written as something other than JSON,
   as `media` does for a success; a health probe's 503 is
