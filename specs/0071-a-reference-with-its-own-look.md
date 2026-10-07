@@ -75,7 +75,7 @@ set of routes. Two `docs { }` would mean two documents to keep in step.
 
 ## Stack
 
-- [ ] **`spec-0071-reference`**: `reference(path) { }` in `DocsBuilder`,
+- [x] **`spec-0071-reference`** ([#240](https://github.com/matthewjones372/pelican/pull/240)): `reference(path) { }` in `DocsBuilder`,
       `redocHtml` taking options, logo and stylesheets, and `docsRoutes`
       serving the extra page; the refusals.
       Done when: one `docs { }` serves Swagger at `/api-docs` and Redoc at
