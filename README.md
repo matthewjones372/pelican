@@ -88,10 +88,11 @@ per endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
 **Descriptions are independent of the backend.** 1.0 ships one backend and one
 codec, Pekko HTTP and Jackson, to keep the first release small enough to
 support properly. The http4k and Ktor interpreters and the kotlinx and
-jsoniter codecs already exist, pass the same parity suites, and live on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch until they come back after 1.0. Your descriptions will not need to
-change when they do.
+jsoniter codecs were written and passed the same parity suites, then were taken
+off `main` before 1.0. They are in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e), the last commit before they were
+removed, and are meant to come back after 1.0. Your descriptions will not need
+to change when they do.
 
 **The overhead is measured.** The interpreter is benchmarked with JMH against
 the same routes written by hand, with baselines and error bars in
@@ -757,11 +758,10 @@ source, which you can then serve, call or stub. See
 The backend only affects handlers: bind the same endpoint values with another
 module's binders, and the only thing that changes is the type a streaming
 handler returns. 1.0 ships `pelican-pekko`. The http4k and Ktor interpreters
-are complete and passing on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch, where a parity suite runs the same descriptions against all three and
-checks that they respond identically, down to the generated OpenAPI document
-being the same string. `example/backends/` shows how this works: the
+were complete and passing when they were taken off `main` before 1.0; commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e) has them, with a parity suite that
+runs the same descriptions against all three and checks that they respond
+identically, down to the generated OpenAPI document being the same string. `example/backends/` shows how this works: the
 descriptions are in one file, with one binding file per backend.
 
 ---
@@ -861,9 +861,8 @@ sites against the published modules.
 
 Not covered: anything `internal`; the exact bytes of the emitted document (use
 [golden files](docs/golden-testing.md) to pin what your own callers depend
-on); and the modules on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch until they return to `main`. The full statement is in the reference
+on); and the http4k, Ktor and other modules taken off `main` before 1.0, until
+they return. The full statement is in the reference
 manual under [Stability](docs/reference.md#stability), and every breaking
 change is recorded in [the changelog](CHANGELOG.md).
 
