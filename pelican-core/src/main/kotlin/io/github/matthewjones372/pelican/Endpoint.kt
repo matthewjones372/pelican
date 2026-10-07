@@ -143,6 +143,9 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     /** The typed failures declared here, so [orFail] does not document them twice. */
     @PublishedApi
     internal val declaredFailures = mutableListOf<ErrorOutput<*>>()
+
+    /** The entry each of [declaredFailures] wrote into [errors], so a tagged copy can take its place. */
+    internal val declaredSpecs = mutableMapOf<ErrorOutput<*>, ErrorSpec>()
     internal var securityRequirements: List<SecurityRequirement>? = null
     internal var callerInput: CallerInput<*>? = null
 
@@ -320,8 +323,10 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
 
     @PublishedApi
     internal fun <T> addError(failure: ErrorOutput<T>): ErrorOutput<T> {
+        val spec = failure.spec()
         declaredFailures += failure
-        errors += failure.spec()
+        declaredSpecs[failure] = spec
+        errors += spec
         return failure
     }
 
@@ -497,6 +502,21 @@ internal fun <R> describeWebhook(
     return build(lensInputs, b, out, webhookName = name)
 }
 
+/**
+ * `errorJson(...).tagged(...)` inside the block registers the untagged original before `tagged`
+ * copies it, so the copy replaces that entry rather than sitting beside it under the same status.
+ */
+private fun document(b: EndpointBuilder, out: DeclaredResponses<*, *>, failure: ErrorOutput<*>) {
+    val original = b.declaredSpecs.keys.firstOrNull { it !in out.failures && failure.isTaggedCopyOf(it) }
+    val replaced = original?.let { b.declaredSpecs.remove(it) }
+    val at = b.errors.indexOfFirst { it === replaced }
+    if (at >= 0) b.errors[at] = failure.spec() else b.errors += failure.spec()
+}
+
+private fun ErrorOutput<*>.isTaggedCopyOf(original: ErrorOutput<*>) =
+    tag != null && original.tag == null && status == original.status && type == original.type &&
+        description == original.description && headers == original.headers
+
 private fun <I, R> build(
     inputs: Inputs<I>,
     b: EndpointBuilder,
@@ -507,8 +527,8 @@ private fun <I, R> build(
     // with errorJson(...) inside it is already recorded.
     if (out is DeclaredResponses<*, *>) {
         out.failures
-            .filterNot { declared -> b.declaredFailures.any { it === declared } }
-            .forEach { b.errors += it.spec() }
+            .filterNot { it in b.declaredFailures }
+            .forEach { failure -> document(b, out, failure) }
     }
 
     // The parts an endpoint declares are its body, so the envelope is built
