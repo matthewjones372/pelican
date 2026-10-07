@@ -414,6 +414,10 @@ still there, and the only new ones are the module's own.
   reads a failing probe back as `Err(report)` instead of throwing, and the
   document describes the 503 as a check failing rather than as "Success.". The
   probes are `Endpoint<Unit, Outcome<HealthReport, HealthReport>>`.
+  **Breaking:** a success declared at 400 or above is now refused where it is
+  declared, since every client reads a 4xx or 5xx as a failure whatever the
+  document says; the message says to declare it with `orFail errorJson<T>(…)`,
+  or `errorMedia` for a body that is not JSON. 3xx successes are unchanged.
 - **Stub files templated from the request body (spec 0067).**
   `stub(endpoint, example = input) { input -> ... }` exports an endpoint with a
   JSON request body as one templated mapping. The example's string and number

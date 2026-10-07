@@ -5,8 +5,10 @@ import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.negotiated
+import io.github.matthewjones372.pelican.orFail
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -18,6 +20,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlin.reflect.KType
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
+import io.github.matthewjones372.pelican.pekko.handledOrFail as handledOrFailOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
 /**
@@ -34,8 +37,13 @@ class ContentNegotiationTest {
 
     private val widget = endpoint { get("widget"); json<Widget>() }
 
-    /** Legal, unregistered, and the one Pekko used to answer 500 for. */
-    private val odd = endpoint { get("odd"); json<Widget>(status = 419) }
+    /**
+     * Legal, unregistered, and the one Pekko used to answer 500 for. A failure, since a success at 419 is refused
+     * (spec 0070), and declared outside the block, whose own `errorJson` would register it as it was called.
+     */
+    private val teapotish = errorJson<Widget>(419, "A legal status nobody registered")
+
+    private val odd = endpoint { get("odd"); json<Widget>() orFail teapotish }
 
     /** No representation at all, so there is nothing for a caller to refuse. */
     private val nothing = endpoint { get("nothing"); empty(status = 204) }
@@ -155,7 +163,7 @@ class ContentNegotiationTest {
         val server = api(
             listOf(
                 widget handledNowOnPekko { Widget(1) },
-                odd handledNowOnPekko { Widget(2) },
+                odd handledOrFailOnPekko { teapotish(Widget(2)) },
                 nothing handledNowOnPekko { },
                 export handledNowOnPekko { Widget(7) },
             ),

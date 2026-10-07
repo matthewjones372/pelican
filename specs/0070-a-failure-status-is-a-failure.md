@@ -95,7 +95,7 @@ declaring one would stop it starting.
       Done when: an `errorMedia<T>("application/health+json", 503, …)`
       failure is answered with that content type, documented under it, and
       comes back from `outcome` as `Err`.
-- [ ] **`spec-0070-health`**: `pelican-health` declares its 503 with
+- [x] **`spec-0070-health`** ([#238](https://github.com/matthewjones372/pelican/pull/238)): `pelican-health` declares its 503 with
       `errorMedia`; its golden, docs and example move with it.
       Done when: `outcome(health.ready, Unit)` is `Err(report)` with the
       failing check in it, and the 503's description in the document is the
