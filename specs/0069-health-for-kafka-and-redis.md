@@ -28,9 +28,9 @@ val health = health {
 }
 ```
 
-- `pelican-health-kafka`: `kafka(Admin)` is up when `describeCluster()` returns
+- `pelican-health-kafka`: `kafka(Admin)` passes when `describeCluster()` returns
   a controller and at least one node within the check's timeout.
-- `pelican-health-redis`: `redis(StatefulRedisConnection)` (Lettuce) is up
+- `pelican-health-redis`: `redis(StatefulRedisConnection)` (Lettuce) passes
   when `PING` answers `PONG`.
 - Each depends on `pelican-health` and its one client library, `compileOnly`,
   and its `NoOtherDependenciesTest` asserts that and no second stack.
@@ -49,7 +49,7 @@ Spec 0068, `spec-0068-health`.
 ## Stack
 
 - [ ] **`spec-0069-kafka`** — `pelican-health-kafka`.
-      Done when: against a Testcontainers broker, up while running and down
+      Done when: against a Testcontainers broker, `Pass` while running and `Fail`
       within the timeout after the container stops.
 - [ ] **`spec-0069-redis`** — `pelican-health-redis`.
       Done when: the same, against a Testcontainers Redis.
