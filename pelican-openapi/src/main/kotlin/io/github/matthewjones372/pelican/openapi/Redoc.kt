@@ -76,7 +76,12 @@ private fun page(title: String, head: String, body: String): String = """
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>$title — API reference</title>
-  <style>body { margin: 0; }</style>
+  <style>
+    /* Redoc draws in light only and leaves its middle panel transparent, so a reader in dark mode saw dark
+       text on the browser's dark canvas. Light, on white, whatever the reader's setting. */
+    :root { color-scheme: light; }
+    body { margin: 0; background: #fff; }
+  </style>
   $head
 </head>
 <body>
