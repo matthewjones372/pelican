@@ -81,17 +81,30 @@ fix. Recommended: the second.
 
 ## Stack
 
-- [ ] **`spec-0070-error-media`**: `errorMedia`, and the refusal of a success
-      at 400 or above; `ContentNegotiationTest`'s 419 becomes a declared
-      failure.
-      Done when: `json<Widget>(status = 419)` is refused with the message
-      above, and `errorMedia<T>("application/health+json", 503, …)` answers
-      and decodes as a failure.
+In this order: refusing a success at 503 before `pelican-health` stops
+declaring one would stop it starting.
+
+- [ ] **`spec-0070-error-media`**: `errorMedia<T>(mediaType, status,
+      description)`, and a failure carrying its media type through
+      `ErrorOutput` and `ErrorSpec` (with the binary-compatible constructor
+      kept), the Pekko, in-memory and MCP servers, the server's codec lookup,
+      the OpenAPI writer and `ApiClient`. A tagged failure is limited to a
+      `+json` media type, since its tag is written into a JSON body. The
+      generated client decodes failures with the JSON codec from the endpoint
+      values, so a `+json` failure needs nothing there.
+      Done when: an `errorMedia<T>("application/health+json", 503, …)`
+      failure is answered with that content type, documented under it, and
+      comes back from `outcome` as `Err`.
 - [ ] **`spec-0070-health`**: `pelican-health` declares its 503 with
       `errorMedia`; its golden, docs and example move with it.
       Done when: `outcome(health.ready, Unit)` is `Err(report)` with the
       failing check in it, and the 503's description in the document is the
       failure's.
+- [ ] **`spec-0070-refuse`**: a success declared at 400 or above is refused,
+      one check called from the eight success outputs;
+      `ContentNegotiationTest`'s 419 becomes a declared failure.
+      Done when: `json<Widget>(status = 419)` is refused with the message
+      above.
 
 ## Acceptance
 
