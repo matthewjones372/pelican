@@ -32,11 +32,12 @@ either left out or stated as the weaker thing that could be supported.
 
 ## http4k's contracts and lenses
 
-Checked against http4k 6.58.0.0, which is the version `pelican-http4k` builds
-against on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch.
+Checked against http4k 6.58.0.0, which is the version `pelican-http4k` built
+against before it was taken off `main` for 1.0. It is in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/pelican-http4k).
 
 This is the closest neighbour by a distance, and http4k is also a backend
-Pelican interprets onto — on that branch, and after 1.0 on main — which makes
+Pelican interpreted onto before 1.0, and is meant to again after it, which makes
 the comparison an awkward one to write. If you are
 already on http4k, http4k's own contract module is sitting in the same
 repository you are already pulling from, and it needs no new concept and no new
@@ -104,7 +105,9 @@ and http4k's answer to it is a perfectly reasonable one.
 ## Ktor's OpenAPI and Resources plugins
 
 Checked against Ktor 3.5.2, released 4 August 2026, which is the version
-`pelican-ktor` builds against on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch.
+`pelican-ktor` built against before it was taken off `main` for 1.0. It is in
+the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/pelican-ktor).
 
 Ktor's OpenAPI story changed shape recently and a lot of material written about
 it is now wrong, so it is worth stating what is there today. The Ktor Gradle
@@ -170,7 +173,7 @@ Swagger UI 5.x.
 
 **Unlike the two sections above, none of these three is a backend Pelican
 interprets onto.** There is no `pelican-spring`, `pelican-micronaut` or
-`pelican-quarkus` — not on main, and not on the `multi-backend` branch either.
+`pelican-quarkus`, not on main and not among the modules taken off it for 1.0.
 So this section compares two ways of describing an HTTP API, and acting on it
 means moving the web layer to Pekko HTTP rather than adding a module to the
 stack you already run. See [One backend at 1.0](#when-pelican-is-the-wrong-choice)
@@ -271,10 +274,10 @@ you bind with.
 It is mature and it is much larger. Roughly a dozen server interpreters are
 documented — among them http4s, Netty in four variants, Pekko HTTP, Play,
 Vert.x, Armeria, ZIO HTTP, Helidon Níma and AWS Lambda — against the one
-backend Pelican ships at 1.0 (three are written; two sit on the
-`multi-backend` branch), and four client interpreters against Pelican's one
+backend Pelican ships at 1.0 (three were written; two were taken off `main`
+to keep 1.0 small), and four client interpreters against Pelican's one
 generated file. Eight JSON libraries are supported where Pelican ships one,
-with two more on that branch.
+with two more written and taken off `main` the same way.
 
 It describes more. Besides OpenAPI it generates AsyncAPI, through
 `tapir-asyncapi-docs` against the AsyncAPI 2.0.0 specification, and standalone
@@ -398,14 +401,17 @@ Vert.x, Helidon, Armeria, Netty directly, Jakarta REST, Javalin or Spring MVC,
 there is no module for you, and writing one is a real piece of work even though
 the reference manual puts the last one at about five hundred lines.
 
-The interpreter is not shaped by Pekko, and that is provable rather than
-asserted: http4k and Ktor interpreters exist, complete and green, on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch, where one parity suite runs the same descriptions
-against all three and asserts they answer byte for byte. What narrowed for 1.0
-is the *promise*, not the design — a first release's stability guarantee covers
-the pair the maintainer can stand behind, and the other two return after it as
-restores. Until they do, "the backend is a choice" is a claim about the code you
-can read on a branch, not about a module you can depend on today.
+The interpreter is not shaped by Pekko, and that can be checked rather than
+taken on trust: http4k and Ktor interpreters were complete before 1.0, and one
+parity suite ran the same descriptions against all three and asserted they
+answered byte for byte. They were taken off `main` to keep 1.0 small, and are in
+the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e).
+What narrowed for 1.0 is the *promise*, not the design: a first release's
+stability guarantee covers the pair the maintainer can stand behind, and the
+other two are meant to return after it as restores. Until they do, "the backend
+is a choice" is a claim about the code you can read at that commit, not about a
+module you can depend on today.
 
 **The refusals are deliberate and they will not be argued away.** Each of these
 is a documented decision with reasoning in the reference manual, not a gap
@@ -450,10 +456,13 @@ sealed failure types, streamed responses, a per-request timeout, and a
 That is more than a toy. But there is no published client artifact — the file is
 generated into your build, and you own it. One transport ships:
 `pelican-client-pekko` over Pekko HTTP's client, which takes the `ActorSystem`
-a Pekko service already has. The JDK, OkHttp and Ktor adapters —
-`pelican-client-java`, `pelican-client-okhttp` (the one that runs on Android)
-and `pelican-client-ktor` — are written and green on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch and not published at 1.0. A build carrying more
+a Pekko service already has. The JDK, OkHttp and Ktor adapters
+(`pelican-client-java`, `pelican-client-okhttp`, which is the one that runs on
+Android, and `pelican-client-ktor`) were written and passing before 1.0, were
+taken off `main` to keep it small, and are not published at 1.0. They are in the
+history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
+and are meant to come back after 1.0. A build carrying more
 than one transport has to name the
 transport at each client it constructs, since nothing can choose between two
 providers on one classpath. The generated methods block by default, joining the
@@ -499,9 +508,10 @@ inline functions, so what you compile against is source, and the suite compiles
 pinned call sites against the published modules.
 
 What is outside it: anything `internal`, the emitted document's byte-for-byte
-shape, and the http4k, Ktor, jsoniter and kotlinx modules on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch, which are not covered until they return to `main`.
+shape, and the http4k, Ktor, jsoniter and kotlinx modules taken off `main`
+for 1.0 (in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)),
+which are not covered until they return to `main`.
 
 Pin an exact version anyway, and upgrade deliberately — not a range, not a `+`,
 and not a version resolved by a plugin you do not control. If you use the Gradle

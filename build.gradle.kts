@@ -83,7 +83,7 @@ spotless {
 
 /** One line per module, so a Maven search result says what the artifact is. */
 val moduleDescriptions = mapOf(
-    "pelican-core" to "Endpoint descriptions as values. No dependencies.",
+    "pelican-core" to "Endpoint descriptions as values. Depends only on jackson-core.",
     "pelican-openapi" to "Endpoint descriptions to an OpenAPI 3.1.0 or 3.2.0 document.",
     "pelican-schema" to "A type to a self-contained JSON Schema 2020-12 document.",
     "pelican-mcp" to "Endpoint descriptions to MCP tool descriptions.",
@@ -103,6 +103,7 @@ val moduleDescriptions = mapOf(
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
     "pelican-test-golden" to "Golden files per endpoint that fail on a change breaking existing callers.",
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",
+    "pelican-test-wiremock" to "WireMock stubbed and verified in endpoint values, and stub files exported from them.",
 )
 
 // Coverage, aggregated across the modules rather than per-module: a line in

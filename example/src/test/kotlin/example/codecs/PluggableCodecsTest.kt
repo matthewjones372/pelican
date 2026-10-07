@@ -20,7 +20,7 @@ import kotlin.reflect.typeOf
  * 1.0 ships one, so [libraries] holds one and every claim below is a claim
  * about a singleton — true, and asserting less than it used to. The shape is
  * kept because a returning codec module is a row added here and nothing else;
- * the `multi-backend` branch is where the same file runs three.
+ * at commit a6c20b2, as `ThreeCodecsTest`, it ran three.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PluggableCodecsTest {

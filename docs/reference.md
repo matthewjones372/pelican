@@ -38,16 +38,20 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 and Ktor interpreters and their `-docs` and `-mcp` modules, the http4k
 in-memory transport, the JDK, OkHttp and Ktor client transports
 (`pelican-client-java`, `pelican-client-okhttp`, `pelican-client-ktor`),
-`pelican-jsoniter` and `pelican-kotlinx` are complete and
-green on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch, and return after 1.0. Where the reasoning below is easier to read with
-one of them beside it, the branch is named.
+`pelican-jsoniter` and `pelican-kotlinx` were complete and passing before
+1.0, and were taken off `main` to keep 1.0 small. They are in the history at
+commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e),
+the last commit before they were removed, and are meant to come back after
+1.0. Where the reasoning below is easier to read with one of them beside it,
+that commit is named.
 
 The layering is load-bearing, not decorative, and each edge is a test:
 
 - `pelican-core` has a test asserting its runtime classpath holds nothing but
-  the Kotlin standard library.
+  the Kotlin standard library and `jackson-core`, the streaming parser (spec
+  0045), and another asserting that Jackson databind, kotlinx serialization and
+  Pekko are absent.
 - `pelican-openapi` asserts `org.apache.pekko` is absent from its classpath, so
   documentation can be generated in a build task with no server present. Its own
   tests supply a hand-written `SchemaSource` rather than depending on a codec.
@@ -141,10 +145,10 @@ already have.
 
 Core's handler type is `(Params) -> CompletionStage<Any?>`, being the most it
 can say without picking a concurrency library. A backend whose calling
-convention is something else bridges that in its own interpreter: on the
-`multi-backend` branch, `pelican-ktor` runs the handler as a child coroutine of
-the call and completes a future the interpreter awaits, in one private
-function.
+convention is something else bridges that in its own interpreter:
+`pelican-ktor`, at commit `a6c20b2` before it was taken off `main`, ran the
+handler as a child coroutine of the call and completed a future the
+interpreter awaited, in one private function.
 
 A disconnect is where that bridge shows, and it is worth knowing what Pekko
 does. A handler here is a `CompletionStage` nobody holds a cancel for, so it
@@ -281,10 +285,10 @@ and in the query of one typed call comes back as itself, and a request line
 ### Bringing your own ActorSystem
 
 `Api` is a `pelican-core` type and holds no `ActorSystem`. It cannot: core's
-runtime classpath is asserted to be the Kotlin standard library and nothing
-else, and one description has to be servable by an interpreter core has never
-heard of. The system belongs to the binding, so it is a parameter of the Pekko
-`start`:
+runtime classpath is asserted to be the Kotlin standard library and
+`jackson-core` and nothing else, and one description has to be servable by an
+interpreter core has never heard of. The system belongs to the binding, so it is
+a parameter of the Pekko `start`:
 
 ```kotlin
 val system = ActorSystem.create(Behaviors.empty<Void>(), "orders")   // yours: cluster, persistence, streams
@@ -347,7 +351,8 @@ an `Api` per codec module differing in the `codecs` argument alone, and
 Its `libraries` list holds the modules main ships, which is one, so every row
 it asserts is a row about a singleton; a returning module is a line added there
 and no new assertions. The cross-library comparisons that make the matrix say
-something are on the `multi-backend` branch, where the same file runs three.
+something were made before 1.0, when the same file ran three, as
+[`ThreeCodecsTest` at commit `a6c20b2`](https://github.com/matthewjones372/pelican/blob/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/example/src/test/kotlin/example/codecs/ThreeCodecsTest.kt).
 `./gradlew :example:runCodecs` serves one.
 
 A sealed hierarchy is the one payload type a JSON library cannot read off the
@@ -801,12 +806,12 @@ picks it, as a `const`, required, and the `discriminator` is dropped: it now
 says nothing the branches do not.
 
 The property and the value are read rather than derived, which is what lets one
-pass cover schema sources that agree on almost nothing else — Jackson takes
-them from `@JsonTypeInfo` and `@JsonSubTypes`, and a source on the
-`multi-backend` branch takes them from somewhere else again. `SchemaAgreementTest`
-is parameterised over the sources main ships: it builds each branch's smallest
-acceptable payload out of the schema alone and decodes it through the codec
-that wrote the schema.
+pass cover schema sources that agree on almost nothing else — Jackson takes them
+from `@JsonTypeInfo` and `@JsonSubTypes`, and a source taken off `main` for 1.0
+(at commit `a6c20b2`) takes them from somewhere else again.
+`SchemaAgreementTest` is parameterised over the sources main ships: it builds
+each branch's smallest acceptable payload out of the schema alone and decodes it
+through the codec that wrote the schema.
 
 Two things are refused rather than half-described. A polymorphic hierarchy
 whose subclasses are registered at run time, as kotlinx.serialization's open
@@ -1230,8 +1235,8 @@ hierarchy.
 `pelican-codegen`'s `KotlinClientTest` is what stands behind that: it generates
 a client both ways and reads the annotations off the file, including that
 nothing generated for one library reaches for the other. Decoding such a
-payload with the real `KotlinxCodecs` is asserted on the `multi-backend`
-branch, which is where that module lives.
+payload with the real `KotlinxCodecs` was asserted before that module was
+taken off `main`; the test is at commit `a6c20b2`.
 
 ### Whether its methods block or suspend
 
@@ -1311,7 +1316,8 @@ the order the client wrote them, an optional per-request timeout, and a body
 that is `Empty`, `Text` or `Streaming`. `ClientResponse` is a status, headers,
 and a body that has not been read yet. Both are core's own types: no
 `java.net.http`, no OkHttp, no Pekko, and nothing on core's runtime classpath
-but the Kotlin standard library, which is still the test it was.
+but the Kotlin standard library and `jackson-core`, which is still the test it
+was.
 
 The reason there is an interface here at all is the reason there is an
 interpreter seam on the other side. A service that has already tuned one HTTP
@@ -1323,11 +1329,12 @@ an interpreter it does not name; this is the same answer facing the other way.
 
 One adapter ships: `pelican-client-pekko`, over Pekko HTTP's client, for the
 service that already runs Pekko and would rather not start a second HTTP stack
-to call out of. The JDK, OkHttp and Ktor adapters — `pelican-client-java`,
-`pelican-client-okhttp` and `pelican-client-ktor` — are on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch and return after 1.0. A generated client finds the adapter on the
-classpath without being told:
+to call out of. The JDK, OkHttp and Ktor adapters (`pelican-client-java`,
+`pelican-client-okhttp` and `pelican-client-ktor`) were taken off `main` for
+1.0. They are in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
+and are meant to come back after 1.0. A generated client finds the adapter on
+the classpath without being told:
 
 ```kotlin
 dependencies {
@@ -1440,11 +1447,11 @@ wants, from the same descriptions, and a repository that genuinely wants both
 generates two entries into two packages. This one does exactly that, so that
 both are compiled and run against a real server by its own suite.
 
-**Where the coroutines live.** Not in `pelican-core`, which has the Kotlin
-standard library on its runtime classpath and nothing else, and not in a module
-of their own either. `suspend` is a language feature rather than a dependency,
-and the only thing the generated file needs from the library is the bridge from
-a `CompletionStage`, which is one function:
+***Where the coroutines live.** Not in `pelican-core`, which has the Kotlin
+*standard library and `jackson-core` on its runtime classpath and nothing else,
+*and not in a module of their own either. `suspend` is a language feature rather
+*than a dependency, and the only thing the generated file needs from the library
+*is the bridge from a `CompletionStage`, which is one function:
 
 ```kotlin
 private suspend fun exchange(request: ClientRequest): ClientResponse =
@@ -1509,11 +1516,12 @@ than per-request ones. The table in
 short form.
 
 An adapter whose deadline *is* the whole exchange is not hypothetical: Ktor's
-`requestTimeoutMillis`, on the `multi-backend` branch, ends the reading of the
-body too. That has no consequence for a call read whole, and one consequence
-for a call that is not: an `sse` subscription inheriting a 30-second deadline
-would die at 30 seconds there and run on for hours here — the same description,
-the same client, two behaviours, and nothing in either to say so.
+`requestTimeoutMillis`, used by `pelican-client-ktor` at commit `a6c20b2`, ends
+the reading of the body too. That has no consequence for a call read whole, and
+one consequence for a call that is not: an `sse` subscription inheriting a
+30-second deadline would die at 30 seconds there and run on for hours here — the
+same description, the same client, two behaviours, and nothing in either to say
+so.
 
 So a generated streamed call sends no deadline. `ndjson`, `sse`, `jsonArray`
 and `bytes` build their request with `deadline = null` and everything else
@@ -1541,7 +1549,7 @@ It is in `pelican-core` because everything it needs is already there. `Api` and
 and routing, input decoding, error rendering and response framing are core's
 own — so the bridge is a reading of the same values rather than another
 backend, and it adds nothing to a runtime classpath that is still the Kotlin
-standard library.
+standard library and `jackson-core`.
 
 What crosses is the server. The trie matches the path, the declared inputs are
 decoded by their own codecs, the `Api`'s filters run in the order they were
@@ -1559,8 +1567,8 @@ Two things cannot cross, and both are refused by name rather than by the
   accessor. Core has no value to hand over, and says so naming the endpoint.
 - **A streamed response that is not a `Sequence`.** A `Sequence` crosses whole,
   because core can walk one. Pekko's binders hand back a `Source`, which core
-  cannot read without becoming a dependent of that library; a `Flow` on the
-  `multi-backend` branch is the same refusal for the same reason.
+  cannot read without becoming a dependent of that library; a `Flow` from
+  `pelican-ktor`, at commit `a6c20b2`, was the same refusal for the same reason.
 
 Both are `UnsupportedInMemoryCall`, and both mean the same thing: that call
 belongs against a bound server. `example` runs `GeneratedKotlinClientTest` this
@@ -1708,8 +1716,10 @@ constructor.
 
 ### On Ktor
 
-`pelican-client-ktor` is on the `multi-backend` branch, not in 1.0. It is the
-same seam over Ktor's `HttpClient` — a suspending client bridged to a
+`pelican-client-ktor` is not in 1.0. It was taken off `main` to keep 1.0
+small, and is in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/pelican-client-ktor).
+It is the same seam over Ktor's `HttpClient` — a suspending client bridged to a
 `CompletionStage`, a `ByteReadChannel` handed to the SPI as an `InputStream`,
 and `requestTimeoutMillis` as the one deadline here that bounds a whole
 exchange rather than the arrival of a head.
@@ -2121,7 +2131,8 @@ rejects.
 
 Some libraries hand it over: a kotlinx descriptor carries the serial name of
 every branch, `@SerialName("card")` right there in the metadata, so
-`KotlinxCodecs` on the `multi-backend` branch has always written it.
+`KotlinxCodecs` wrote it from the start. That module was taken off `main` for
+1.0 and is at commit `a6c20b2`.
 
 `JacksonCodecs` describes types with swagger-core, which writes the 3.0 spelling
 above and no `mapping` at all — the names in `@JsonSubTypes` never reach its
@@ -2458,11 +2469,12 @@ throws the moment a request reaches something unwritten, which is the honest
 state of a service nobody has written yet.
 
 `http4k` and `ktor` are still named by the setting and are **refused** rather
-than generated for: their interpreters are on the `multi-backend` branch, so the
-stub's first import would name a package this release does not ship, and a file
-that cannot compile is worse than a build that stops. The two values stay in the
-enum because those interpreters return after 1.0 and deleting them would be the
-larger break. Restore the module and generate from that branch, or generate for
+than generated for: their interpreters were taken off `main` for 1.0 and are
+in the history at commit `a6c20b2`, so the stub's first import would name a
+package this release does not ship, and a file that cannot compile is worse than
+a build that stops. The two values stay in the enum because those interpreters
+are meant to return after 1.0 and deleting them would be the larger break.
+Restore the module from that commit and generate there, or generate for
 `pekko`.
 
 It is written once and never overwritten. After the first run it is not
@@ -3180,10 +3192,10 @@ that never calls `setPropagators` extracts nothing however good its getter is.
 
 What was deliberately **not** done:
 
-- **Nothing is injected on the way out.** Pelican does not add `traceparent` to
-  a response, and it has no client side to add one to a request it makes.
-  Outbound propagation belongs to whichever HTTP client the service calls with,
-  and every one of them already has an instrumentation for it.
+- **Nothing is injected into a response.** Pelican does not add `traceparent`
+  to what it answers. A call the service makes through a generated client can
+  carry the trace with `traced`, below; a call made through any other HTTP
+  client is that client's instrumentation to carry.
 - **Baggage is extracted but not read.** Whatever propagators the SDK is
   configured with run, so `baggage` arrives in the context if a service
   registered that propagator; nothing here turns any of it into span
@@ -3194,6 +3206,34 @@ What was deliberately **not** done:
   handler returning a `CompletionStage` completes wherever its own executor
   decides. A handler that wants to nest a span reads `params[otelContext]` and
   passes it to `setParent`, which is one line and is reliable.
+
+#### Carrying the trace on a call out
+
+`traced` is the other half: a `ClientTransport` that wraps another and traces
+every call a generated client sends through it. It is on `main`, from spec
+0064, and is not in 1.0.0-RC3.
+
+```kotlin
+import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
+import io.github.matthewjones372.pelican.metrics.otel.traced
+
+val transport = PekkoHttpTransport().traced(sdk)
+val client = OrdersClient("https://orders.internal", JacksonCodecs, transport)
+```
+
+Each call is a `CLIENT` span, a child of `Context.current()` on the thread
+that sends it, named by the method alone (`GET`), since a transport sees a URL
+and not the route template. The span's context is written onto the request as
+`traceparent` and `tracestate` by the propagators the `OpenTelemetry` holds, so
+the server that answers continues the caller's trace. The call is also recorded
+in the `http.client.request.duration` histogram. A 4xx, a 5xx and a call that
+got no answer all end the span with an error status, as the conventions ask of
+a client span; the answer itself is handed back unchanged.
+
+Wrapped outside `retrying`, one span covers every attempt; inside it, each
+attempt has its own. `ClientTracingTest` holds the span, its parent, the headers
+and the histogram, and the example's `TracedCallTest` sends a call over a
+socket and checks the server reads the call's span as its parent.
 
 #### Refusals, and the blind spot that remains
 
@@ -4068,8 +4108,7 @@ A backend supplies an `InputStream` and nothing else: Pekko's comes from
 `StreamConverters.asInputStream` and is read on the system's dispatcher rather
 than on the routing thread. That is the honest cost of one parser rather than
 one per backend — on a backend whose calling convention is suspending, as
-`pelican-ktor` is on the `multi-backend` branch, reading an upload blocks a
-thread.
+`pelican-ktor` was at commit `a6c20b2`, reading an upload blocks a thread.
 
 ### Two files, one of them streamed
 
@@ -4861,7 +4900,7 @@ and the backend cashes it in for its own type:
 // pelican-pekko
 infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedNow(f: (I) -> Source<T, NotUsed>): ServerEndpoint
 
-// pelican-ktor, on the multi-backend branch
+// pelican-ktor, at commit a6c20b2
 infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedNow(f: suspend (I) -> Flow<T>): ServerEndpoint
 ```
 
@@ -4904,7 +4943,7 @@ the backend hands over its own stream:
 // pelican-pekko
 fun <T> StreamIn<T>.toSource(): Source<T, NotUsed>
 
-// pelican-ktor, on the multi-backend branch
+// pelican-ktor, at commit a6c20b2
 fun <T> StreamIn<T>.toFlow(): Flow<T>
 ```
 
@@ -5744,8 +5783,8 @@ open  localhost:8080/api-docs                                 # Swagger UI
   that the interpreter seam is not shaped by any one server library, and three
   proved it: the binders above, a request-to-`Params` step and a response
   writer, in about 500 lines each including the comments, with no change to
-  core. That proof is on the `multi-backend` branch, where `pelican-http4k` and
-  `pelican-ktor` are; a fourth would restate it.
+  core. That proof is in the history at commit `a6c20b2`, where
+  `pelican-http4k` and `pelican-ktor` are; a fourth would restate it.
 - **A second wiring of the *orders* example.** The small `example/backends/`
   service runs through the `Backend` seam; the larger orders service is bound
   on Pekko, and `ClientContractTest` runs against that.
@@ -5763,14 +5802,18 @@ open  localhost:8080/api-docs                                 # Swagger UI
 - **Per-endpoint CORS, and the newer preflight extensions.** The policy is one
   value on the `Api`; `Access-Control-Allow-Private-Network` and friends are not
   emitted.
-- **Validation of a credential.** Pelican has no idea what your token means, so
-  nothing here checks one. What it does supply is the requirement as a value on
-  the endpoint, and a `Filter` slot to enforce it from — see the security
-  chapter above, and `example/secured/SecuredReports.kt` for a filter that
-  reads `endpoint.security` and needs no second list.
-- **Two shapes where two schema sources genuinely disagree.** Both are on the
-  `multi-backend` branch, where there is a second source to disagree with, and
-  neither is about nullability:
+- **Validation of a credential, in 1.0.0-RC3.** That release has no idea what
+  your token means, so nothing in it checks one. What it does supply is the
+  requirement as a value on the endpoint, and a `Filter` slot to enforce it
+  from: see the security chapter above, and
+  `example/secured/SecuredReports.kt` for a filter that reads
+  `endpoint.security` and needs no second list. On `main` this has changed:
+  `authenticatedBy` and `pelican-oidc` (spec 0061) verify a caller's token;
+  see [Who is calling](#who-is-calling).
+- **Two shapes where two schema sources genuinely disagree.** Both need a
+  second source to disagree with, which `main` does not have at 1.0; they were
+  found with `pelican-kotlinx`, which is at commit `a6c20b2`. Neither is about
+  nullability:
   - **`Set<T>`.** swagger-core knows it is a set and emits `uniqueItems: true`;
     kotlinx's descriptor walker sees `StructureKind.LIST` and emits a plain
     array. The Jackson side is the more informative of the two.
@@ -5843,27 +5886,43 @@ Outside the promise:
 - **The emitted document's byte-for-byte shape.** Adding a field that OpenAPI
   permits is not a break in this sense, and pinning what your own callers hold
   is what [golden files](golden-testing.md) are for.
-- **The modules on the
-  [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-  branch** — the http4k and Ktor interpreters, the Ktor client transport, and
-  the jsoniter and kotlinx codecs. They are complete and green there, and not
-  covered by anything here until they return to `main`.
+- **The modules taken off `main` for 1.0**: the http4k and Ktor interpreters,
+  the Ktor client transport, and the jsoniter and kotlinx codecs. They are in
+  the history at commit
+  [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
+  and are not covered by anything here until they return to `main`.
 
 Every break is recorded in [the changelog](../CHANGELOG.md), which is the only
 place they are recorded.
 
 ## Versions
 
-Kotlin 2.4.10 · Pekko 1.2.1 · Pekko HTTP 1.3.0 · Jackson 2.22.2 ·
-swagger-core 2.2.54 · slf4j-api 2.0.18 · snakeyaml-engine 2.10 ·
-Micrometer 1.17.1 · OpenTelemetry 1.65.0 · arrow-core 2.1.2 · JDK 21 ·
-Gradle 9.7.1
+What `main` builds with, and what the released 1.0.0-RC3 was built with where
+that differs:
 
-These are floors, not pins — Gradle resolves upwards, so a service already on
-a newer Jackson keeps its own. Every module compiles to JDK 21 bytecode, which
-is the floor the published artifacts promise. The suites run on whichever JDK
-started the build, so CI runs them on 21, 23 and 25 rather than three times on
-21 — `TestRuntimeIsTheBuildRuntimeTest` is what holds that.
+| | `main` | 1.0.0-RC3 |
+|---|---|---|
+| Kotlin | 2.4.20 | 2.4.10 |
+| Bytecode | JDK 25 | JDK 21 |
+| Gradle | 9.8.0 | 9.7.1 |
+| Pekko | 1.7.1 | 1.7.0 |
+| Pekko HTTP | 1.4.0 | 1.4.0 |
+| Jackson | 2.22.3 | 2.22.2 |
+| swagger-core | 2.2.55 | 2.2.55 |
+| slf4j-api | 2.0.20 | 2.0.18 |
+| snakeyaml-engine | 3.1.1 | 2.10 |
+| Micrometer | 1.17.1 | 1.17.1 |
+| OpenTelemetry | 1.66.0 | 1.66.0 |
+| arrow-core | 2.2.3 | 2.1.2 |
+| WireMock | 3.13.1 | 3.13.1 |
+| nimbus-jose-jwt | 10.10 | not in RC3 (`pelican-oidc` is on `main` only) |
+
+The libraries Pelican ships are floors, not pins: Gradle resolves upwards, so a
+service already on a newer Jackson keeps its own. The modules on `main` compile
+to JDK 25 bytecode, so a build of `main` needs JDK 25 or newer to run; 1.0.0-RC3
+compiled to JDK 21. The suites run on whichever JDK started the build, never
+below the bytecode they load, and `TestRuntimeIsTheBuildRuntimeTest` is what
+holds that. CI on `main` runs them on 25.
 
 Pekko is the exception: Pelican ships none of it. Every module that speaks
 Pekko declares it `compileOnly`, so no `org.apache.pekko` dependency reaches
@@ -5876,16 +5935,21 @@ dependencies {
 
     // _2.13 or _3 — Pelican compiles against `javadsl` and four names that are
     // identical in both, so it has no opinion.
-    implementation(platform("org.apache.pekko:pekko-bom_3:1.2.1"))
+    implementation(platform("org.apache.pekko:pekko-bom_3:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_3")
     implementation("org.apache.pekko:pekko-stream_3")
-    implementation("org.apache.pekko:pekko-http_3:1.3.0")
+    implementation("org.apache.pekko:pekko-http_3:1.4.0")
     runtimeOnly("org.apache.pekko:pekko-slf4j_3")
 }
 ```
 
-The versions listed above are what this repository builds and tests at, on
-`_2.13`. Anything at or above them works.
+The Pekko and Pekko HTTP versions in the table are what this repository
+builds and tests at, on `_2.13`. They are not a tested floor. An earlier change
+set the build to Pekko 1.2.1 and Pekko HTTP 1.3.0 and ran every suite there,
+so that an app on any version at or above those kept its own; the build has
+since moved up to the versions in the table, and nothing runs the suites at
+1.2.1 and 1.3.0 any more. Because Pelican ships no Pekko, an app on an older
+Pekko still keeps its own, but only the versions in the table are tested.
 
 That `_3` works too is a gate rather than a claim: `pelican-pekko` has a
 `scala3Test` source set whose classpath is this module's compiled output — the
@@ -5924,5 +5988,6 @@ implementation("some.library:that-ships-pekko:1.0") {
 This is the only copy of that list. The README carried a second one until the
 two disagreed about half of it, and now points here instead.
 
-The Gradle plugin is built against the Gradle 9.7.1 API as Java 21 bytecode, so
-the build applying it runs on Java 21 or newer.
+The Gradle plugin is built against the Gradle API of the version in the
+table (9.8.0 on `main`, 9.7.1 for 1.0.0-RC3) as Java 21 bytecode, so the build
+applying it runs on Java 21 or newer.

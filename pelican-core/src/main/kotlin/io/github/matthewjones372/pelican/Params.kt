@@ -37,7 +37,7 @@ class Params(
      *
      * `internal` since spec 0010. It was public, and its own doc offered it to
      * "interpreters that need to walk it" — an audience that never arrived. No
-     * interpreter on `main` called it, none on the `multi-backend` branch did
+     * interpreter on `main` called it, none of those taken off it for 1.0 did
      * either, and a promise kept for nobody is still a promise. An interpreter
      * that wants the bag can ask for it back, with a caller to point at.
      */

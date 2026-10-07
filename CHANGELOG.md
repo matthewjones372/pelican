@@ -18,9 +18,10 @@ that covers, and they are checked on every build rather than promised here:
 
 What is *not* covered: anything `internal`, the emitted OpenAPI document's
 byte-for-byte shape (`pelican-test-golden` is how you pin the part your callers
-hold), and the modules on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch, which are outside the promise until they return to `main`.
+hold), and the modules taken off `main` before 1.0, which are in the history
+at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
+and are outside the promise until they return to `main`.
 
 Breaks are still recorded here, and this file is the only place they are.
 
@@ -61,9 +62,9 @@ still there, and the only new ones are the module's own.
   release.
 
   They are not abandoned and they are not deleted. All twelve live, complete
-  and green, on the
-  [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-  branch — cut from `main` immediately before this change, built by the same
+  and green, on the `multi-backend` branch (since removed; the same code is
+  commit [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e))
+  — cut from `main` immediately before this change, built by the same
   specs and passing the same parity suites — and each returns after 1.0 as a
   restore rather than a rewrite. Nothing about the interpreter, the codec seam
   or the client SPI changed to make this possible: the point of a first
@@ -80,8 +81,8 @@ still there, and the only new ones are the module's own.
   to "interpreters that need to walk it rather than read known keys" — an
   audience that never arrived. Its only caller in the tree is `lensInputs`,
   inside `pelican-core`; no interpreter on `main` called it, and none on the
-  [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-  branch did either. One line leaves `pelican-core`'s dump. An interpreter that
+  `multi-backend` branch (commit [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e))
+  did either. One line leaves `pelican-core`'s dump. An interpreter that
   wants the bag can ask for it back with a caller to point at; freezing it at
   1.0 for nobody is the promise this release is trying not to make. See spec
   0010.

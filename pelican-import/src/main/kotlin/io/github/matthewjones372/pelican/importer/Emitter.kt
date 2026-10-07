@@ -191,8 +191,8 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
     /**
      * The two backends this release does not ship keep their [Backend] entries,
-     * because their interpreters return from the multi-backend branch and
-     * deleting an enum value is the larger break. What they do not keep is the
+     * because their interpreters are meant to return after 1.0 and deleting an
+     * enum value is the larger break. What they do not keep is the
      * right to be generated for: the stub's first import would name a package
      * nothing on the classpath provides, and refusing beats handing someone a
      * file that cannot compile.
@@ -202,8 +202,8 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
 
         Backend.HTTP4K, Backend.KTOR -> throw ImportFailure(
             "Handler stubs for $backend would import ${backend.packageName}.*, which this release " +
-                "does not ship: the $backend interpreter lives on the multi-backend branch. Generate " +
-                "for PEKKO, or restore the module and generate from that branch.",
+                "does not ship: the $backend interpreter is in the history at commit a6c20b2. Generate " +
+                "for PEKKO, or restore the module from that commit and generate there.",
         )
     }
 

@@ -17,11 +17,11 @@ Facts worth having before anything else:
   what only real use finds can still change. The `.api` dump beside each module
   is the binary contract, checked by `apiCheck`; `StillCompilesTest` is the
   contract for the reified inline DSL, which a dump cannot see. `internal`, the
-  emitted document's exact bytes, and the `multi-backend` branch are outside
-  it.
-- `pelican-core` depends on nothing but the Kotlin standard library, and a test
-  enforces it. Every JSON library, server library and HTTP client lives in a
-  separate module.
+  emitted document's exact bytes, and the modules taken off `main` for 1.0
+  (in the history at commit a6c20b2) are outside it.
+- `pelican-core` depends on nothing but the Kotlin standard library and
+  `jackson-core` (the streaming parser, not databind), and a test enforces it.
+  Every JSON library, server library and HTTP client lives in a separate module.
 - Server backend: `pelican-pekko`. JSON: `pelican-jackson`. Client transport:
   `pelican-client-pekko`. New since 0.2.0, shipping from 1.0.0-RC1:
   `pelican-mcp-server`, `pelican-pekko-mcp` and `pelican-arrow` (Arrow's
@@ -35,8 +35,9 @@ Facts worth having before anything else:
   two cross-builds on a classpath.
 - 1.0 ships one backend, one JSON library and one client transport. The http4k
   and Ktor backends, the JDK, OkHttp and Ktor client transports,
-  `pelican-jsoniter` and `pelican-kotlinx` are complete and green on the
-  `multi-backend` branch and return after 1.0. Do not recommend them as
+  `pelican-jsoniter` and `pelican-kotlinx` were complete before 1.0 and were
+  taken off `main` to keep 1.0 small. They are in the history at commit
+  a6c20b2 and are meant to come back after 1.0. Do not recommend them as
   available today.
 - Errors a caller was promised are values in the return type — `orFail`,
   `handledOrFail` — not exceptions.

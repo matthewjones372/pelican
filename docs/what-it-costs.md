@@ -53,13 +53,17 @@ Everything below is in-memory. No socket, no connection handling, no OS
 scheduling. That flatters both sides equally and isolates the layer under test.
 
 Some of the tables below hold http4k rows, taken while `pelican-http4k` was on
-main. That module and its benchmark now live on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch
-and return after 1.0; the numbers are left in because they were really measured
-and because what they show is a claim about the interpreter rather than about
-one server. Each such table says so. Running them again means running
-`:benchmarks:jmh` on that branch.
+main. That module and
+[its benchmark](https://github.com/matthewjones372/pelican/blob/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/benchmarks/src/main/kotlin/io/github/matthewjones372/pelican/benchmarks/Http4kOverheadBenchmark.kt)
+were taken off `main` for 1.0, and are in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e);
+they are meant to come back after 1.0. The numbers are left in because they
+were really measured, before the modules were removed, and because what they
+show is a claim about the interpreter rather than about one server. Each such
+table says so. Running them again means checking out `a6c20b2` and running
+`:benchmarks:jmh` there.
 
-## http4k — measured on the `multi-backend` branch
+## http4k, measured before the module was removed (at `a6c20b2`)
 
 One endpoint, `GET /items/{itemId}?limit=`, answering JSON.
 
@@ -95,9 +99,10 @@ last — the worst case a scan has, and the one a service acquires by adding
 endpoints over time.
 
 `./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"` — a class of its
-own, so the six-minute run above is unchanged. The two http4k columns are the
-branch's, as above; `RoutingScaleBenchmark` on main runs the Pekko column and
-its hand-written control.
+own, so the six-minute run above is unchanged. The two http4k columns were
+measured before the module was removed, at `a6c20b2`, as above;
+`RoutingScaleBenchmark` on main runs the Pekko column and its hand-written
+control.
 
 | endpoints | **Pelican on http4k** | http4k routes, by hand | **Pelican on Pekko** |
 |---|---|---|---|
@@ -127,7 +132,7 @@ Ktor dispatches through the same index — `Route.pelican` installs one route pe
 method the descriptions use and the trie decides which endpoint answers — and is
 not measured here either.
 
-## An endpoint with nothing to decode — on the `multi-backend` branch
+## An endpoint with nothing to decode, measured before http4k was removed (at `a6c20b2`)
 
 `GET /ping`, answering text.
 

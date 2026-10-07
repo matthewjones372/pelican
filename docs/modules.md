@@ -3,15 +3,17 @@
 Linked from the [README](../README.md). What each module is for, and what it
 depends on — the list to read when deciding which ones a build actually needs.
 
-Twenty library modules and a Gradle plugin; a typical build takes four or
+Twenty-one library modules and a Gradle plugin; a typical build takes four or
 five. The layering is enforced by tests rather than convention.
 
 1.0 ships one server backend, one JSON library and one client transport. The
 http4k and Ktor backends, the JDK, OkHttp and Ktor client transports
 (`pelican-client-java`, `pelican-client-okhttp`, `pelican-client-ktor`),
-`pelican-jsoniter` and `pelican-kotlinx`
-are complete and green on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch and return after 1.0; the table below is what main ships today.
+`pelican-jsoniter` and `pelican-kotlinx` were complete and passing before 1.0,
+and were taken off `main` to keep 1.0 small. They are in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e),
+the last commit before they were removed, and are meant to come back after
+1.0. The table below is what `main` has today.
 
 | Module | Depends on | Contains |
 |---|---|---|
@@ -23,6 +25,7 @@ branch and return after 1.0; the table below is what main ships today.
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
+| `pelican-oidc` | core + nimbus-jose-jwt | verifies an OpenID Connect provider's tokens and says who is calling. On `main` only; not in 1.0.0-RC3 |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
 | `pelican-schema` | core | one type → a JSON Schema 2020-12 document that resolves on its own |
 | `pelican-mcp` | core + schema | descriptions → MCP tool descriptions, and a dispatch that runs them. Values only, so deriving a tool list needs no server |
@@ -37,7 +40,8 @@ branch and return after 1.0; the table below is what main ships today.
 | `pelican-test-pekko` | test + pekko | the typed test client's in-memory transport |
 | `pelican-test-wiremock` | test + WireMock | WireMock stubbed and verified in endpoint values, and stub files exported from them |
 
-Every one of those dependency claims is a test:
+Every one of those dependency claims is a test, except `pelican-oidc`'s, which
+rests on its build file for now:
 
 - `pelican-core` asserts its runtime classpath holds nothing but the Kotlin
   standard library and `jackson-core`, and separately that databind, kotlinx

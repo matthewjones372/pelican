@@ -1,6 +1,6 @@
 // Verifies an OpenID Connect provider's tokens for a Pelican caller (spec
 // 0061). Nimbus does the JOSE work, here and nowhere else, so pelican-core's
-// runtime classpath stays the Kotlin standard library.
+// runtime classpath stays the Kotlin standard library and jackson-core.
 //
 // Nimbus arrives as `implementation`: no Nimbus type is in this module's public
 // signatures, so a consumer never has to name it.
