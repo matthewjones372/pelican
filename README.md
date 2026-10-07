@@ -253,6 +253,13 @@ says so; those additions are not released yet, and
   request and a duration histogram. On `main`: `traced`, a client transport
   that opens a client span and sends `traceparent`.
 
+**Health**
+
+- `pelican-health`: `/health/live` and `/health/ready` from one `health { }`
+  block, answered in `application/health+json`, with checks for a JDBC pool, a
+  downstream HTTP service, disk, heap and deadlocked threads. Only on `main`;
+  not on Maven Central.
+
 **Security**
 
 - `pelican-oidc`: verifies an OpenID Connect provider's tokens for a caller, and
