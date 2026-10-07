@@ -4,6 +4,8 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.inMemory
+import io.github.matthewjones372.pelican.test.shouldBeError
+import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -78,6 +80,28 @@ class HealthTest {
         val body = report(response.body)
         body.status shouldBe "warn"
         body.checks.getValue("disk:responseTime").single().status shouldBe "warn"
+    }
+
+    @Test
+    fun `a failing probe is the declared failure, so a client reads the report back as Err`() {
+        val health = health { ready("db") { Status.Fail("no connection") } }
+
+        val failing = clientFor(health).outcome(health.ready, Unit).shouldBeError()
+
+        failing.status shouldBe "fail"
+        failing.checks.getValue("db:responseTime").single().status shouldBe "fail"
+        clientFor(health).outcome(health.live, Unit).shouldBeOk().status shouldBe "pass"
+    }
+
+    @Test
+    fun `and the document says the 503 is a failure, in health+json`() {
+        val health = health { ready("db") { Status.Pass } }
+
+        health.ready.errors.single().let { declared ->
+            declared.status shouldBe 503
+            declared.mediaType shouldBe HEALTH_JSON
+            declared.description shouldBe "A check failed; take this out of rotation"
+        }
     }
 
     @Test
