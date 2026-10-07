@@ -32,6 +32,15 @@ class RedocPageTest {
         page shouldNotContain "spec-url"
     }
 
+    /** Redoc has no dark theme, so the page cannot let a dark-mode browser's canvas show through its panels. */
+    @Test
+    fun `the page is light on white whatever the reader's colour scheme`() {
+        val page = redocHtml("Orders", "/openapi.json", spec)
+
+        page shouldContain "color-scheme: light"
+        page shouldContain "background: #fff"
+    }
+
     @Test
     fun `the page names the API, as the Swagger UI page does`() {
         redocHtml("Orders", "/openapi.json", spec) shouldContain "<title>Orders — API reference</title>"
