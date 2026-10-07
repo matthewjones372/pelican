@@ -41,6 +41,12 @@ jobs:
       - name: Build and test
         run: ./gradlew build ${{ matrix.gradleArgs }} --stacktrace
 
+      # Tests against real brokers in Docker, tagged `containers` and kept out
+      # of `build` so a build on a laptop needs no Docker. The runner has it.
+      # Each name runs in every module that registers it.
+      - name: Container tests
+        run: ./gradlew containerTests containerTestsOldestKafka --stacktrace
+
       # The suites bind real sockets and assert on delivery timing, so a
       # failure is worth reading rather than guessing at.
       - name: Upload test reports

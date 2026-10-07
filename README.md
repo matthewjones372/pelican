@@ -259,6 +259,8 @@ says so; those additions are not released yet, and
   block, answered in `application/health+json`, with checks for a JDBC pool, a
   downstream HTTP service, disk, heap and deadlocked threads. Only on `main`;
   not on Maven Central.
+- `pelican-health-kafka`: `kafka(admin)`, over the Kafka `Admin` client the
+  service already holds. Only on `main`.
 
 **Security**
 
