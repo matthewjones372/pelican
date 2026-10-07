@@ -167,4 +167,21 @@ class ContentNegotiationTest {
             server.stop()
         }
     }
+
+    /** Plain Jackson, with no override: a `+json` type is JSON already (RFC 6839). */
+    @Test
+    fun `pekko writes a +json media type with the JSON codec and names it on the wire`() {
+        val problem = endpoint { get("problem"); media<Widget>("application/problem+json") }
+        val server = api(endpoints = listOf(problem handledNowOnPekko { Widget(3) }), codecs = JacksonCodecs)
+            .startOnPekko(port = 0, systemName = "json-suffix")
+
+        try {
+            val response = get(server.baseUrl, "/problem", accept = "application/problem+json")
+            response.statusCode() shouldBe 200
+            response.body() shouldBe """{"id":3}"""
+            contentTypeOf(response) shouldStartWith "application/problem+json"
+        } finally {
+            server.stop()
+        }
+    }
 }

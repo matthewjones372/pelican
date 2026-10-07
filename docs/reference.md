@@ -4812,7 +4812,8 @@ object ReportCodecs : Codecs by JacksonCodecs {
 ```
 
 `codec(type, mediaType)` defaults to `codec(type)` for `application/json` and
-refuses anything else by name, so a media type nothing can write is a startup
+any `+json` type (`application/problem+json`, RFC 6839), and refuses anything
+else by name, so a media type nothing can write is a startup
 failure rather than a 500 for whoever asked for it. The whole of one is in
 `example/secured/SecuredReports.kt`.
 

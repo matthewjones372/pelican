@@ -36,9 +36,10 @@ interface CodecFactory {
      * How a value is written as [mediaType]. A JSON library supplies the one
      * encoding it knows; a service answering `text/csv` as well overrides this
      * and answers that media type with a writer of its own. See [MediaOutput].
+     * A `+json` suffix (`application/problem+json`) is JSON, per RFC 6839.
      */
     fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
-        if (mediaType.substringBefore(';').trim() == JSON_MEDIA_TYPE) codec(type)
+        if (isJson(mediaType)) codec(type)
         else error(
             "Nothing writes $type as $mediaType. A Codecs answers one encoding per type — the JSON one — " +
                 "so a response declared as $mediaType needs a writer for it: override " +
@@ -68,8 +69,13 @@ interface CodecFactory {
         }
 }
 
-/** The one encoding every [CodecFactory] has, and all the default [CodecFactory.codec] answers. */
+/** The one encoding every [CodecFactory] has. The default [CodecFactory.codec] also answers `+json` types with it. */
 const val JSON_MEDIA_TYPE: String = "application/json"
+
+private fun isJson(mediaType: String): Boolean {
+    val essence = mediaType.substringBefore(';').trim().lowercase()
+    return essence == JSON_MEDIA_TYPE || essence.endsWith("+json")
+}
 
 /**
  * Where named schemas accumulate while a document is being built. Schema

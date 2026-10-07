@@ -360,6 +360,10 @@ still there, and the only new ones are the module's own.
 
 ### Added
 
+- **`+json` media types are JSON (spec 0068).** `media<T>("application/problem+json")`,
+  or any other `+json` type, is written by the API's JSON codec with no
+  `codec(type, mediaType)` override, as RFC 6839 says it is. The check also
+  ignores case now, so `Application/JSON` is JSON too.
 - **Stub files that keep the contract (spec 0062).** `stubFile(codecs) { stub(endpoint, input)
   answers outcome }.writeTo(dir)` exports the stubs a test is already written in as
   WireMock mapping files, so a demo that stands WireMock up from JSON is not an
