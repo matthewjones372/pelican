@@ -204,6 +204,11 @@ class ErrorOutput<E> @PublishedApi internal constructor(
     val tag: String? = null,
     /** The body field [tag] is written under. */
     val discriminator: String = DEFAULT_DISCRIMINATOR,
+    /**
+     * What the body is written as: JSON unless declared with [errorMedia], such as a health probe's
+     * `application/health+json`. See spec 0070.
+     */
+    val mediaType: String = JSON_MEDIA_TYPE,
 ) {
     /**
      * The shape before spec 0063 added the tag. `errorJson` is inline, so this constructor is in
@@ -221,6 +226,7 @@ class ErrorOutput<E> @PublishedApi internal constructor(
 
     init {
         checkStatus("error:$status", status, carriesBody = true)
+        checkMediaType(mediaType)
 
         val clashes = headers.groupBy { it.name.lowercase() }.filterValues { it.size > 1 }.keys
         require(clashes.isEmpty()) { "error:$status declares the header(s) $clashes more than once" }
@@ -241,7 +247,11 @@ class ErrorOutput<E> @PublishedApi internal constructor(
                 "JSON object can hold one. Declare a type with a field for the reason, or give the " +
                 "two failures different statuses."
         }
-        return ErrorOutput(status, type, description, headers, tag, field)
+        require(isJson(mediaType)) {
+            "error:$status is written as $mediaType, and a tag is written into a JSON body, so only a " +
+                "failure in JSON or a +json type can carry one."
+        }
+        return ErrorOutput(status, type, description, headers, tag, field, mediaType)
     }
 
     /**
@@ -267,7 +277,7 @@ class ErrorOutput<E> @PublishedApi internal constructor(
     operator fun invoke(error: E, vararg values: HeaderValue): Outcome<E, Nothing> =
         Outcome.Err(this, error, encodeDeclaredHeaders(this, headers, values))
 
-    internal fun spec() = ErrorSpec(status, description, type, headers, tag, discriminator)
+    internal fun spec() = ErrorSpec(status, description, type, headers, tag, discriminator, mediaType)
 
     override fun toString() = "error:$status"
 }
@@ -281,6 +291,18 @@ inline fun <reified E> errorJson(
     description: String,
     vararg headers: ResponseHeader<*>,
 ): ErrorOutput<E> = ErrorOutput(status, typeOf<E>(), description, headers.toList())
+
+/**
+ * Declares a failure carrying [E] written as [mediaType] rather than JSON, as [media] does for a
+ * success: a health probe's 503 is `application/health+json`. What writes and reads it comes from
+ * [CodecFactory.codec] for that media type, which answers any `+json` type as JSON. See spec 0070.
+ */
+inline fun <reified E> errorMedia(
+    mediaType: String,
+    status: Int,
+    description: String,
+    vararg headers: ResponseHeader<*>,
+): ErrorOutput<E> = ErrorOutput(status, typeOf<E>(), description, headers.toList(), mediaType = mediaType)
 
 /**
  * The responses one endpoint declares: at least one success, and the failures a

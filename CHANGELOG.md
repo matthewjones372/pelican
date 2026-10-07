@@ -400,6 +400,15 @@ still there, and the only new ones are the module's own.
   only one under its status. `ErrorOutput` and `ErrorSpec` gained `tag` and
   `discriminator`; the constructors they had in RC3 are kept hidden, so a service
   compiled against RC3 still links.
+- **A failure in a media type of its own (spec 0070).** `errorMedia<T>(mediaType,
+  status, description)` declares a failure written as something other than JSON,
+  as `media` does for a success; a health probe's 503 is
+  `application/health+json`. The server sends it with that Content-Type, the
+  document lists it under that media type, and `ApiClient.outcome` reads it back
+  as the declared failure through the codec for that media type, which answers
+  any `+json` type as JSON. `ErrorOutput` and `ErrorSpec` gained `mediaType`,
+  `application/json` unless declared otherwise. A tagged failure must be JSON or
+  a `+json` type, since its tag is written into a JSON body.
 - **Stub files templated from the request body (spec 0067).**
   `stub(endpoint, example = input) { input -> ... }` exports an endpoint with a
   JSON request body as one templated mapping. The example's string and number

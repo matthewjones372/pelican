@@ -19,6 +19,8 @@ class ErrorSpec @PublishedApi internal constructor(
     val tag: String? = null,
     /** The body field [tag] is written under. */
     val discriminator: String = DEFAULT_DISCRIMINATOR,
+    /** What the body is written as; JSON unless the failure was declared with [errorMedia]. */
+    val mediaType: String = JSON_MEDIA_TYPE,
 ) {
     /**
      * The shape before spec 0063 added the tag, kept for the same reason [ErrorOutput]'s is: the

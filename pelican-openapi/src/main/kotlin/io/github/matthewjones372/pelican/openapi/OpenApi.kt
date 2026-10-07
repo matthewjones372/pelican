@@ -391,15 +391,22 @@ private fun failureBody(
     val described = errs.mapNotNull { err -> err.type?.let { err to schemas.schema(it, components) } }
     if (described.isEmpty()) return null
 
-    val schema = when {
-        described.size == 1 -> described.single().second
+    // Under the media type each is written as (spec 0070): JSON unless declared with errorMedia.
+    return JsonObj(
+        described.groupBy { (err, _) -> err.mediaType }.mapValues { (_, under) ->
+            jsonObj { put("schema", schemaOf(under)) }
+        },
+    )
+}
 
-        else -> jsonObj {
-            put("oneOf", jsonArr(described.map { (_, schema) -> schema }))
-            discriminator(described)?.let { put("discriminator", it) }
-        }
+/** One schema where one failure is written as a media type, and a `oneOf` discriminated by tag where several are. */
+private fun schemaOf(described: List<Pair<ErrorSpec, JsonObj>>): JsonObj = when {
+    described.size == 1 -> described.single().second
+
+    else -> jsonObj {
+        put("oneOf", jsonArr(described.map { (_, schema) -> schema }))
+        discriminator(described)?.let { put("discriminator", it) }
     }
-    return jsonObj { put("application/json", jsonObj { put("schema", schema) }) }
 }
 
 /** The tag field and which schema each tag means, or null where a schema cannot be referred to. */

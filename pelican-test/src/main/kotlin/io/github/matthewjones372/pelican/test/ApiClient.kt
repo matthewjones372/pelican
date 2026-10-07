@@ -282,7 +282,7 @@ class ApiClient(
         return when {
             declared != null -> Outcome.Err(
                 declared,
-                codecs.codec<Any?>(declared.type).decodeFromString(res.body) as E,
+                codecs.codec<Any?>(declared.type, declared.mediaType).decodeFromString(res.body) as E,
                 declared.headers.mapNotNull { h -> res.header(h.name)?.let { h.name to it } },
             )
 

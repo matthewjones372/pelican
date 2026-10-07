@@ -4230,6 +4230,16 @@ placeOrder handledOrFail { (id, key, req) ->
 }
 ```
 
+A failure written as something other than JSON is declared with `errorMedia`,
+as a success is with `media`:
+
+```kotlin
+val unavailable = errorMedia<HealthReport>("application/health+json", 503, "A check failed")
+```
+
+It goes out with that Content-Type, is documented under it, and a client reads
+it back as the declared failure. Any `+json` type is written and read as JSON.
+
 Invoking the declaration is what produces the failure, so the status comes from
 the declaration rather than from the payload's type — which is why two failures
 can carry the same type, as `placeOrder`'s 401 and 404 do. Two failures may also

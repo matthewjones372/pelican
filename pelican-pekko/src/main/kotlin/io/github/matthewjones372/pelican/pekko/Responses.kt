@@ -6,6 +6,8 @@ import io.github.matthewjones372.pelican.ByteStreamOutput
 import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.EmptyOutput
 import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.ErrorOutput
+import io.github.matthewjones372.pelican.JSON_MEDIA_TYPE
 import io.github.matthewjones372.pelican.JsonArrayOutput
 import io.github.matthewjones372.pelican.JsonOutput
 import io.github.matthewjones372.pelican.MediaOutput
@@ -154,6 +156,15 @@ private fun successResponse(
  * Renders one declared failure. The status comes from the declaration rather
  * than the payload's type, so two failures sharing a type stay distinct.
  */
+
+/** JSON as every failure was before spec 0070, and the declared media type for one made with `errorMedia`. */
+private fun failureEntity(declared: ErrorOutput<*>, body: String): ResponseEntity =
+    if (declared.mediaType == JSON_MEDIA_TYPE) {
+        HttpEntities.create(ContentTypes.APPLICATION_JSON, body)
+    } else {
+        HttpEntities.create(contentTypeOf(declared.mediaType), ByteString.fromString(body))
+    }
+
 private fun failureResponse(
     out: DeclaredResponses<*, *>,
     err: Outcome.Err<*>,
@@ -163,9 +174,7 @@ private fun failureResponse(
     val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
     return HttpResponse.create()
         .withStatus(statusOf(declared.status))
-        .withEntity(
-            HttpEntities.create(ContentTypes.APPLICATION_JSON, taggedBody(declared, codec.encodeToString(err.error))),
-        )
+        .withEntity(failureEntity(declared, taggedBody(declared, codec.encodeToString(err.error))))
         // Encoded and checked against the declaration when the handler
         // produced the failure, so there is nothing left to decide here.
         .addHeaders(err.headers.map { (name, value) -> RawHeader.create(name, value) })
