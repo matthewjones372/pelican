@@ -84,7 +84,7 @@ fix. Recommended: the second.
 In this order: refusing a success at 503 before `pelican-health` stops
 declaring one would stop it starting.
 
-- [ ] **`spec-0070-error-media`**: `errorMedia<T>(mediaType, status,
+- [x] **`spec-0070-error-media`** ([#237](https://github.com/matthewjones372/pelican/pull/237)): `errorMedia<T>(mediaType, status,
       description)`, and a failure carrying its media type through
       `ErrorOutput` and `ErrorSpec` (with the binary-compatible constructor
       kept), the Pekko, in-memory and MCP servers, the server's codec lookup,

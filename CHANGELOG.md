@@ -409,6 +409,11 @@ still there, and the only new ones are the module's own.
   any `+json` type as JSON. `ErrorOutput` and `ErrorSpec` gained `mediaType`,
   `application/json` unless declared otherwise. A tagged failure must be JSON or
   a `+json` type, since its tag is written into a JSON body.
+  `pelican-health`'s ready and live probes now declare their 503 that way, as a
+  failure carrying the `HealthReport`, where it was a second success: a client
+  reads a failing probe back as `Err(report)` instead of throwing, and the
+  document describes the 503 as a check failing rather than as "Success.". The
+  probes are `Endpoint<Unit, Outcome<HealthReport, HealthReport>>`.
 - **Stub files templated from the request body (spec 0067).**
   `stub(endpoint, example = input) { input -> ... }` exports an endpoint with a
   JSON request body as one templated mapping. The example's string and number

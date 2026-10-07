@@ -1,12 +1,14 @@
 package io.github.matthewjones372.pelican.health
 
 import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.ErrorOutput
 import io.github.matthewjones372.pelican.MediaOutput
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.errorMedia
 import io.github.matthewjones372.pelican.media
-import io.github.matthewjones372.pelican.or
+import io.github.matthewjones372.pelican.orFail
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -104,8 +106,8 @@ class Health internal constructor(
     // Not alive is never ready, so ready runs the live checks as well.
     private val readyAndLive = liveChecks + readyChecks
 
-    val live: Endpoint<Unit, Outcome<Nothing, HealthReport>> = liveProbe.endpoint
-    val ready: Endpoint<Unit, Outcome<Nothing, HealthReport>> = readyProbe.endpoint
+    val live: Endpoint<Unit, Outcome<HealthReport, HealthReport>> = liveProbe.endpoint
+    val ready: Endpoint<Unit, Outcome<HealthReport, HealthReport>> = readyProbe.endpoint
 
     val endpoints: List<ServerEndpoint> = listOf(
         ServerEndpoint(live) { _ -> liveProbe.answer(liveChecks) },
@@ -185,12 +187,17 @@ private fun attempt(check: Check): Status =
 
 private class Probe(prefix: String?, name: String) {
     val passing: MediaOutput<HealthReport> = media(HEALTH_JSON, status = 200)
-    val unavailable: MediaOutput<HealthReport> = media(HEALTH_JSON, status = 503)
 
-    val endpoint: Endpoint<Unit, Outcome<Nothing, HealthReport>> = endpoint {
+    // A failure, not a second success: every client, gateway and load balancer reads a 503 as one, so a
+    // Pelican client hands it back as `Err(report)` rather than throwing. Declared here rather than in the
+    // endpoint block, whose own `errorJson` would register it as it was called. See spec 0070.
+    val unavailable: ErrorOutput<HealthReport> =
+        errorMedia(HEALTH_JSON, 503, "A check failed; take this out of rotation")
+
+    val endpoint: Endpoint<Unit, Outcome<HealthReport, HealthReport>> = endpoint {
         get(listOfNotNull(prefix, "health", name).joinToString("/"))
         noSecurity()
         tag("health")
-        passing or unavailable
+        passing orFail unavailable
     }
 }
