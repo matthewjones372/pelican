@@ -1,0 +1,90 @@
+public abstract interface class io/github/matthewjones372/pelican/health/Check {
+	public abstract fun check ()Lio/github/matthewjones372/pelican/health/Status;
+}
+
+public final class io/github/matthewjones372/pelican/health/CheckResult {
+	public fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()J
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/health/CheckResult;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/health/CheckResult;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/health/CheckResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getComponentType ()Ljava/lang/String;
+	public final fun getObservedUnit ()Ljava/lang/String;
+	public final fun getObservedValue ()J
+	public final fun getOutput ()Ljava/lang/String;
+	public final fun getStatus ()Ljava/lang/String;
+	public final fun getTime ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/health/Health {
+	public final fun getEndpoints ()Ljava/util/List;
+	public final fun getLive ()Lio/github/matthewjones372/pelican/Endpoint;
+	public final fun getReady ()Lio/github/matthewjones372/pelican/Endpoint;
+}
+
+public final class io/github/matthewjones372/pelican/health/HealthBuilder {
+	public final fun live-WPwdCS8 (Ljava/lang/String;JZLjava/lang/String;Lio/github/matthewjones372/pelican/health/Check;)V
+	public static synthetic fun live-WPwdCS8$default (Lio/github/matthewjones372/pelican/health/HealthBuilder;Ljava/lang/String;JZLjava/lang/String;Lio/github/matthewjones372/pelican/health/Check;ILjava/lang/Object;)V
+	public final fun ready-WPwdCS8 (Ljava/lang/String;JZLjava/lang/String;Lio/github/matthewjones372/pelican/health/Check;)V
+	public static synthetic fun ready-WPwdCS8$default (Lio/github/matthewjones372/pelican/health/HealthBuilder;Ljava/lang/String;JZLjava/lang/String;Lio/github/matthewjones372/pelican/health/Check;ILjava/lang/Object;)V
+}
+
+public final class io/github/matthewjones372/pelican/health/HealthKt {
+	public static final field HEALTH_JSON Ljava/lang/String;
+	public static final fun health (Ljava/lang/String;ZLkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/health/Health;
+	public static synthetic fun health$default (Ljava/lang/String;ZLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/health/Health;
+}
+
+public final class io/github/matthewjones372/pelican/health/HealthReport {
+	public fun <init> (Ljava/lang/String;Ljava/util/Map;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Ljava/util/Map;)Lio/github/matthewjones372/pelican/health/HealthReport;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/health/HealthReport;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/health/HealthReport;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChecks ()Ljava/util/Map;
+	public final fun getStatus ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/health/Status {
+}
+
+public final class io/github/matthewjones372/pelican/health/Status$Fail : io/github/matthewjones372/pelican/health/Status {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lio/github/matthewjones372/pelican/health/Status$Fail;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/health/Status$Fail;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/health/Status$Fail;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOutput ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/health/Status$Pass : io/github/matthewjones372/pelican/health/Status {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/health/Status$Pass;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/health/Status$Warn : io/github/matthewjones372/pelican/health/Status {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lio/github/matthewjones372/pelican/health/Status$Warn;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/health/Status$Warn;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/health/Status$Warn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOutput ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+

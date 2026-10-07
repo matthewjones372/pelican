@@ -28,6 +28,7 @@ include(
     "pelican-pekko-mcp",
     "pelican-metrics",
     "pelican-metrics-otel",
+    "pelican-health",
     "pelican-oidc",
     "pelican-client-pekko",
     "pelican-streams",
