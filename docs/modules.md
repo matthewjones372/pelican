@@ -3,7 +3,7 @@
 Linked from the [README](../README.md). What each module is for, and what it
 depends on — the list to read when deciding which ones a build actually needs.
 
-Twenty-one library modules and a Gradle plugin; a typical build takes four or
+Twenty-two library modules and a Gradle plugin; a typical build takes four or
 five. The layering is enforced by tests rather than convention.
 
 1.0 ships one server backend, one JSON library and one client transport. The
@@ -25,6 +25,7 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
+| `pelican-health` | core *only* | live and ready probes in `application/health+json`, and checks that need only the JDK. On `main` only |
 | `pelican-oidc` | core + nimbus-jose-jwt | verifies an OpenID Connect provider's tokens and says who is calling. On `main` only; not in 1.0.0-RC3 |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
 | `pelican-schema` | core | one type → a JSON Schema 2020-12 document that resolves on its own |
@@ -62,6 +63,9 @@ rests on its build file for now:
   `pelican-metrics-otel` asserts the mirror image — core plus the OpenTelemetry
   API, and no Micrometer. That separation is the whole reason the two telemetry
   vendors are two modules.
+- `pelican-health` asserts it is core and nothing else: its checks use the
+  JDK's own JDBC, HTTP client and management beans, and a check over a
+  third-party client goes in a module of its own.
 - `pelican-client-pekko` asserts it ships no Pekko at all, and not the
   matching *interpreter* either, since making calls and serving routes are
   separate decisions. Pekko is *provided* in every module that speaks it:

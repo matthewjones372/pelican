@@ -25,6 +25,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
 | `pelican-metrics` | core, micrometer-core | descriptions → Micrometer meters, tagged from what the descriptions already say |
 | `pelican-metrics-otel` | core, opentelemetry-api | descriptions → OpenTelemetry server spans and the specified duration histogram |
+| `pelican-health` | **core** | live and ready probes in `application/health+json`, and checks on a JDBC pool, a downstream service, disk, heap and threads, on the JDK alone |
 | `pelican-oidc` | core, nimbus-jose-jwt | verifies an OpenID Connect provider's tokens for a caller |
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
@@ -71,6 +72,10 @@ The layering is load-bearing, not decorative, and each edge is a test:
   OpenTelemetry in the same breath. The two vendors' APIs are the same size as
   each other and neither audience asked for the other's, so a service that
   wanted meters does not ship a tracer to get them.
+- `pelican-health` asserts it is core and nothing else. Its checks reach a
+  database through `java.sql`, a downstream service through `java.net.http` and
+  the JVM through its management beans, so a service that wanted probes does
+  not take on a client library to get them.
 - `pelican-client-pekko` asserts the same shape on the caller's side: core,
   Pekko HTTP's own closure, and nothing else — an adapter a caller adds in
   order to *choose* a client library would be worth very little if it brought a
@@ -3285,6 +3290,97 @@ working deployment into a `NoClassDefFoundError`. Two modules, a
 this way, with `/admin/traces` rendering the spans it produced and a deliberate
 500 to show what a span says that a response body does not. Run it with
 `./gradlew :example:runTelemetry`.
+
+## Health checks
+
+`pelican-health` turns a list of checks into two endpoints:
+
+```kotlin
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.health.health
+import io.github.matthewjones372.pelican.health.http
+import io.github.matthewjones372.pelican.health.jdbc
+import io.github.matthewjones372.pelican.health.noDeadlockedThreads
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import kotlin.time.Duration.Companion.milliseconds
+
+val health = health {
+    live("threads") { noDeadlockedThreads() }
+    ready("orders-db", componentType = "datastore") { jdbc(dataSource) }
+    ready("payments", timeout = 500.milliseconds) { http("https://payments.internal/health/ready") }
+}
+
+val service = api(endpoints = health.endpoints + routes, codecs = JacksonCodecs)
+```
+
+| Endpoint | Runs | Answers |
+|---|---|---|
+| `GET /health/live` | the `live` checks | 200 unless one fails, then 503 |
+| `GET /health/ready` | the `live` checks and the `ready` ones | the same |
+
+`live` is for what the process answers for itself: a failure there gets it
+restarted. `ready` is for what it needs to take traffic: a failure there takes
+it out of rotation and leaves it running. A database blip belongs under
+`ready`, and is the reason the two are separate.
+
+Both are ordinary endpoints. They are public (`noSecurity()`), tagged `health`,
+in the document, and called from a test like any other route. `health(prefix =
+"api")` mounts them under `/api`.
+
+**Checks.** A check is `fun interface Check { fun check(): Status }`, and
+`Status` is `Pass`, `Warn(output)` or `Fail(output)`, so any lambda is one.
+Built in, on the JDK alone:
+
+| Check | Fails when |
+|---|---|
+| `jdbc(dataSource, timeout = 1.seconds)` | the pool hands out no connection, or the driver says it is not valid |
+| `http(url, timeout = 1.seconds)` | a `GET` answers anything but 2xx, is refused, or times out. Redirects are not followed |
+| `diskSpace(path, minFreeBytes)` | the file store under `path` has less than that usable, or `path` is not there |
+| `heapHeadroom(minFreeBytes)` | the heap has less than that before its maximum |
+| `noDeadlockedThreads()` | threads are deadlocked on monitors or locks; it names them. Virtual threads are not seen |
+
+Checks over Kafka and Redis are modules of their own, so that a service using
+one does not take on the other's client.
+
+**When a check runs.** Every check runs when a probe is asked, all of them at
+once, each on its own virtual thread and under its own timeout, 2 seconds unless
+given. A check still running at its timeout is a `fail` reading "timed out after
+2s", and its thread is interrupted, so a hung dependency never hangs the probe.
+A check that throws is a `fail` with the exception's class name. Nothing is
+cached: a probe answers what is true now.
+
+**The body** is `application/health+json`, from the IETF draft
+[draft-inadarei-api-health-check](https://datatracker.ietf.org/doc/draft-inadarei-api-health-check/):
+
+```json
+{
+  "status": "pass",
+  "checks": {
+    "orders-db:responseTime": [
+      { "status": "pass", "observedValue": 3, "observedUnit": "ms",
+        "time": "2026-10-07T09:12:03Z", "componentType": "datastore" }
+    ]
+  }
+}
+```
+
+The overall status is the worst check's. `pass` and `warn` answer 200; `fail`
+answers 503. A check given `critical = false` that fails is reported as `warn`,
+so a full log disk shows up without taking the service out of rotation.
+`observedValue` is how long the check took, measured.
+
+A check's `output`, the text saying what went wrong, is left out unless the
+probes are built with `health(detail = true)`. A driver's error names hosts and
+ports, and the probes are public.
+
+**Names** are lower-case letters, digits and hyphens, and each is used once
+across both probes. Anything else is refused when `health { }` runs, since the
+body is keyed by name.
+
+**In a test.** `client.call(health.ready, Unit)` decodes a 200. A 503 is not a
+success, so `call` throws on it; read it with `client.response(health.ready,
+Unit)` instead. `example/src/main/kotlin/example/health/Warehouse.kt` is a
+service wired this way, and its test takes a dependency down.
 
 ## Errors, and what a caller is told
 
