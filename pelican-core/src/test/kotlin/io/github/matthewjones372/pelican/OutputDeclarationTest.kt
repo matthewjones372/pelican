@@ -18,14 +18,27 @@ class OutputDeclarationTest {
     }
 
     /**
-     * 419 is legal and in nobody's registry, which is the pair Pekko's
+     * 218 and 419 are legal and in nobody's registry, which is the pair Pekko's
      * `StatusCodes.get` throws for. The status is fine; the backend is where
-     * that is handled, so a declaration carrying one is allowed here.
+     * that is handled, so a declaration carrying one is allowed here: a success
+     * at 218, and a failure at 419.
      */
     @Test
     fun `a legal but unregistered status is allowed`() {
-        json<Widget>(status = 419).status shouldBe 419
         json<Widget>(status = 218).status shouldBe 218
+        errorJson<Widget>(419, "Unregistered").status shouldBe 419
+    }
+
+    /** A client reads a 4xx or 5xx as a failure whatever the document says, so it is declared as one. See spec 0070. */
+    @Test
+    fun `a success at a failure status is refused, saying to declare a failure`() {
+        listOf(419, 400, 503).forEach { status ->
+            shouldThrow<IllegalArgumentException> { json<Widget>(status = status) }
+                .message shouldContain "declares a success at $status"
+        }
+        shouldThrow<IllegalArgumentException> { media<Widget>("text/csv", status = 503) }
+            .message shouldContain "orFail errorJson<T>(503"
+        json<Widget>(status = 399).status shouldBe 399
     }
 
     @Test

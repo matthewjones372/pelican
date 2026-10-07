@@ -88,6 +88,21 @@ internal fun checkStatus(owner: String, status: Int, carriesBody: Boolean) {
     }
 }
 
+/**
+ * [checkStatus], and below 400: a success at a failure status is one every client, generated or not, reads as a
+ * failure, so it is declared as one instead (spec 0070).
+ */
+internal fun checkSuccess(owner: String, status: Int, carriesBody: Boolean) {
+    checkStatus(owner, status, carriesBody)
+    require(status < FIRST_FAILURE) {
+        "$owner declares a success at $status, and a client reads anything at $FIRST_FAILURE or above as a " +
+            "failure. Declare it as one: `orFail errorJson<T>($status, \"...\")`, or `errorMedia` for a body " +
+            "that is not JSON."
+    }
+}
+
+private const val FIRST_FAILURE = 400
+
 /** A response is written as one concrete type/subtype, success or failure. */
 internal fun checkMediaType(mediaType: String) {
     val slash = mediaType.indexOf('/')
@@ -110,7 +125,7 @@ class JsonOutput<T> @PublishedApi internal constructor(
     override val mediaType = "application/json"
     override val payloadType get() = type
 
-    init { checkStatus(toString(), status, carriesBody = true) }
+    init { checkSuccess(toString(), status, carriesBody = true) }
 }
 
 class TextOutput @PublishedApi internal constructor(
@@ -120,7 +135,7 @@ class TextOutput @PublishedApi internal constructor(
 ) : Output<String>() {
     override val mediaType = "text/plain"
 
-    init { checkStatus(toString(), status, carriesBody = true) }
+    init { checkSuccess(toString(), status, carriesBody = true) }
 }
 
 class EmptyOutput @PublishedApi internal constructor(
@@ -130,7 +145,7 @@ class EmptyOutput @PublishedApi internal constructor(
 ) : Output<Unit>() {
     override val mediaType: String? = null
 
-    init { checkStatus(toString(), status, carriesBody = false) }
+    init { checkSuccess(toString(), status, carriesBody = false) }
 }
 
 /** Newline-delimited JSON: one document per line, flushed as produced. */
@@ -144,7 +159,7 @@ class NdjsonOutput<T> @PublishedApi internal constructor(
 
     fun frame(codec: BodyCodec<T>, value: T): String = codec.encodeToString(value) + "\n"
 
-    init { checkStatus(toString(), status, carriesBody = true) }
+    init { checkSuccess(toString(), status, carriesBody = true) }
 }
 
 /** Server-sent events. */
@@ -191,7 +206,7 @@ class SseOutput<T> @PublishedApi internal constructor(
     fun prelude(): String? = retry?.let { "retry: ${it.inWholeMilliseconds}\n\n" }
 
     init {
-        checkStatus(toString(), status, carriesBody = true)
+        checkSuccess(toString(), status, carriesBody = true)
         require(keepAlive == null || keepAlive > Duration.ZERO) {
             "keepAlive is how long the stream may be idle, so it is a positive duration or null; got $keepAlive"
         }
@@ -222,7 +237,7 @@ class JsonArrayOutput<T> @PublishedApi internal constructor(
     override val mediaType = "application/json"
     override val payloadType get() = type
 
-    init { checkStatus(toString(), status, carriesBody = true) }
+    init { checkSuccess(toString(), status, carriesBody = true) }
 }
 
 class ByteStreamOutput @PublishedApi internal constructor(
@@ -230,7 +245,7 @@ class ByteStreamOutput @PublishedApi internal constructor(
     override val mediaType: String,
     override val description: String? = null,
 ) : Output<ByteStream>() {
-    init { checkStatus(toString(), status, carriesBody = true) }
+    init { checkSuccess(toString(), status, carriesBody = true) }
 }
 
 /**
@@ -249,7 +264,7 @@ class MediaOutput<T> @PublishedApi internal constructor(
     override val payloadType get() = type
 
     init {
-        checkStatus(toString(), status, carriesBody = true)
+        checkSuccess(toString(), status, carriesBody = true)
         checkMediaType(mediaType)
     }
 
