@@ -23,6 +23,7 @@ import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.lastEventId
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
@@ -184,6 +185,31 @@ fun ordersApi(): Api = api(
 /**
  * Where this service publishes itself. Separate from the `Api` on purpose:
  * serving docs is opt-in, and `start()` alone serves the endpoints and nothing
- * else. `startWithDocs(docs = ordersDocs)` is what adds the two pages.
+ * else. `startWithDocs(docs = ordersDocs)` is what adds the pages: Swagger UI
+ * at /api-docs to try a call, and a Redoc reference at /reference to read, in
+ * the shop's own look (spec 0071).
  */
-val ordersDocs = docs { docsPath = "/api-docs" }
+val ordersDocs = docs {
+    docsPath = "/api-docs"
+    reference("/reference") {
+        logo(ORDERS_LOGO, altText = "Orders", backgroundColor = "#F2FBFA")
+        stylesheet("https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap")
+        options = jsonObj {
+            put(
+                "theme",
+                jsonObj {
+                    put("colors", jsonObj { put("primary", jsonObj { "main" to "#0B7A75" }) })
+                    put("typography", jsonObj { "fontFamily" to "Inter, sans-serif" })
+                    put("sidebar", jsonObj { "backgroundColor" to "#F2FBFA" })
+                },
+            )
+            "expandResponses" to "200,201"
+        }
+    }
+}
+
+/** A box with a tick, small enough to ride in the page as a `data:` URI rather than be served from somewhere. */
+private const val ORDERS_LOGO =
+    "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E" +
+        "%3Cpath fill='%230B7A75' d='M3 7l9-4 9 4v10l-9 4-9-4z'/%3E" +
+        "%3Cpath fill='none' stroke='white' stroke-width='2' d='M8 12l3 3 5-6'/%3E%3C/svg%3E"
