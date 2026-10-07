@@ -100,9 +100,10 @@ cover sources that agree on almost nothing else:
 A payload written to satisfy a branch schema decodes through the codec that
 described it, and the test asserts that per source by building the payload
 from the schema alone: a property the schema forgets is a property the payload
-lacks. `pelican-kotlinx` and `pelican-jsoniter` are two more rows, on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch until they return after 1.0.
+lacks. `pelican-kotlinx` and `pelican-jsoniter` were two more rows before
+they were taken off `main` for 1.0. They are in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
+and are meant to come back after 1.0.
 
 ## What is refused
 

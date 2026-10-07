@@ -219,7 +219,9 @@ line the client tries to parse as a message.
 api.routeWithMcp(system, toolOptions)
 ```
 
-`pelican-pekko-mcp` and the mountings on the [`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend) branch are the same
+`pelican-pekko-mcp`, like the http4k and Ktor mountings that were taken off
+`main` for 1.0 (in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)), is the same
 split the `-docs` modules make, for the same reason: a service that serves
 endpoints alone never compiles the protocol in. `example.mcp` is the Orders
 service with both on one port — `./gradlew :example:runMcp`, then:

@@ -86,10 +86,11 @@ javadoc.io from the Dokka javadoc jar, which needs no site.
 
 ## Servers
 
-Three interpreters exist — Pekko on `main`, http4k and Ktor on the
-`multi-backend` branch. The roadmap is right that a fourth proves nothing
-further about the abstraction; this list is about audience, which is a separate
-argument.
+Three interpreters were written: Pekko, on `main`, and http4k and Ktor, which
+were taken off `main` for 1.0 and are in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e).
+The roadmap is right that a fourth proves nothing further about the
+abstraction; this list is about audience, which is a separate argument.
 
 Cost of one, measured against the three that exist: roughly 1,000 lines across
 `Interpreter.kt`, `Handlers.kt`, `Responses.kt` and `Server.kt`, plus a `-docs`
@@ -113,8 +114,8 @@ interpreter half-covers it), raw Netty.
 
 - [ ] **Hoist the shared pipeline into core before backend four.**
       `decodePlainInputs`, `refuseIfOversize`, `orderedEndpoints`,
-      `EndpointCodecs` and the CORS folding are private per interpreter, so on
-      the `multi-backend` branch a decode fix lands three times. Hoisting is
+      `EndpointCodecs` and the CORS folding are private per interpreter, so
+      with all three back a decode fix lands three times. Hoisting is
       core-side only and turns each new backend into roughly 300 lines of
       genuinely backend-specific work: route registration, body reading,
       response writing, streaming, async model.
@@ -122,19 +123,20 @@ interpreter half-covers it), raw Netty.
 ## Clients
 
 `ClientTransport` has landed, with the `suspend` surface and the retry policy.
-All four adapters were written; 1.0 ships one of them, `pelican-client-pekko`
-— the client a Pekko stack already runs — and the rest wait on the
-`multi-backend` branch.
+All four adapters were written; 1.0 ships one of them, `pelican-client-pekko`,
+the client a Pekko stack already runs. The rest were taken off `main` for
+1.0, are in the history at commit `a6c20b2`, and are meant to come back after
+1.0.
 
 - [x] **`pelican-client-pekko`**, the transport 1.0 ships.
-- [x] **`pelican-client-java`** over the JDK's own `HttpClient`. Written; on
-      the `multi-backend` branch until it returns after 1.0.
+- [x] **`pelican-client-java`** over the JDK's own `HttpClient`. Written; at
+      commit `a6c20b2` until it returns after 1.0.
 - [x] **`pelican-client-okhttp`.** `java.net.http` does not exist on Android,
-      so OkHttp is what reaches every Android caller. Written; on the
-      `multi-backend` branch until it returns after 1.0 — the largest reach
-      gain among the waiting restores.
-- [ ] **`pelican-client-ktor`.** Written, on the `multi-backend` branch with
-      the Ktor server stack; returns after 1.0. Also the route to Kotlin
+      so OkHttp is what reaches every Android caller. Written; at commit
+      `a6c20b2` until it returns after 1.0. The largest reach gain among the
+      waiting restores.
+- [ ] **`pelican-client-ktor`.** Written, and at commit `a6c20b2` with the
+      Ktor server stack; meant to return after 1.0. Also the route to Kotlin
       Multiplatform, and so to iOS and JS callers.
 
 A server interpreter wins a backend team. A client adapter wins an

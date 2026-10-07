@@ -48,8 +48,10 @@ worth keeping next to the result of following it.
     HTTP's client as the adapter that ships — the client a Pekko service is
     running already. The others written are `pelican-client-java` over the
     JDK's own `HttpClient`, `pelican-client-okhttp` over OkHttp's, and
-    `pelican-client-ktor` over Ktor's — all three on the `multi-backend`
-    branch with the http4k and Ktor stacks, returning after 1.0.
+    `pelican-client-ktor` over Ktor's. All three were taken off `main` for
+    1.0 with the http4k and Ktor stacks; they are in the history at commit
+    [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
+    and are meant to come back after 1.0.
     Writing the second of them made the classpath question real rather than
     hypothetical: `ClientTransport.default()` refuses to choose between two
     providers, so a build carrying more than one names the transport at each
@@ -151,10 +153,11 @@ generated code. `request()` returns an `HttpRequest`, bodies are
 runtime preamble the generator emits, not a swapped field.
 
 - **`ClientTransport` lives in core.** An interface and two holders, no library
-  types, which keeps `NoThirdPartyDependenciesTest` true. Adapters —
-  `pelican-client-pekko` on main; `pelican-client-java`,
-  `pelican-client-okhttp` and `pelican-client-ktor` on the `multi-backend`
-  branch — carry their own dependencies, exactly as a server module does.
+  types, which keeps `NoThirdPartyDependenciesTest` true. Adapters carry their
+  own dependencies, exactly as a server module does: `pelican-client-pekko` on
+  main, and `pelican-client-java`, `pelican-client-okhttp` and
+  `pelican-client-ktor` at commit `a6c20b2`, before they were taken off
+  `main`.
 - **Not `pelican-test`'s `Transport`.** That one is blocking and carries a
   `String` body deliberately, which is precisely why the test client cannot
   upload binary. A real client needs a streamed request body for a file part
@@ -255,8 +258,9 @@ six against twenty-one rather than six against no limit at all.
 Separately: the greetings example runs through the `Backend` seam and the
 fuller orders service is wired directly. "The backend is just a choice" is a
 claim the examples should demonstrate rather than assert, so every backend main
-ships wants a wiring in `example/backends`, and the ones on the
-`multi-backend` branch have theirs there.
+ships wants a wiring in `example/backends`. The http4k and Ktor ones had
+theirs there before they were taken off `main`; they are in
+[`example/backends` at `a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/example/src/main/kotlin/example/backends).
 
 ## 8. OpenAPI 3.2.0 — done, and what the survey found
 
@@ -347,12 +351,14 @@ on. Nothing in `pelican-core`.
 The 1.0 release narrows the shipped surface to one backend and one codec —
 Pekko and Jackson — so the stability promise covers the pair a first release
 can actually stand behind. The http4k and Ktor interpreters, the Ktor client
-transport, and the jsoniter and kotlinx codec modules are not abandoned: they
-live, complete and green, on the `multi-backend` branch, built by the same
-specs and passing the same parity suites. Re-adding each after 1.0 is a
-restore, not a rewrite — the parity harness and the codec agreement matrix
-keep their shape on `main` with a single entry precisely so a returning
-module plugs back into a live socket.
+transport, and the jsoniter and kotlinx codec modules are not abandoned. They
+were complete before 1.0, built by the same specs and passing the same parity
+suites, and were taken off `main` to keep 1.0 small. They are in the history at
+commit [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e),
+the last commit before they were removed, and are meant to come back after
+1.0. Re-adding each is meant to be a restore, not a rewrite: the parity
+harness and the codec agreement matrix keep their shape on `main` with a single
+entry so that a returning module plugs back into a live socket.
 
 ## Not on this list
 
@@ -361,9 +367,9 @@ Things that look like gaps and are not, with the reasoning in
 credentials, `callbacks`, `anyOf`/`not`, a lenient importer, nested objects in
 form bodies, more than one streamed file part. A *fourth* backend belongs here
 too. The claim a backend count buys is that the interpreter is not shaped by any
-one of them, and three of them is proof enough of that — the proof exists, on
-the `multi-backend` branch, where the same descriptions and the same parity
-suite run against Pekko, http4k and Ktor. Narrowing what 1.0 ships does not
+one of them, and three of them is proof enough of that. The proof is in the
+history at commit `a6c20b2`, where the same descriptions and the same parity
+suite ran against Pekko, http4k and Ktor. Narrowing what 1.0 ships does not
 un-prove it, and it is not an argument for a fourth.
 
 ## Stability
@@ -376,7 +382,7 @@ the DSL — `json<T>()`, `pathParam<T>()`, `errorJson<T>()` — which a bytecode
 dump cannot see.
 
 Outside it: anything `internal`, the emitted document's byte-for-byte shape, and
-the modules on the `multi-backend` branch, which are not covered until they
-return to `main`. The golden-file tests in `pelican-test-golden` exist so that a
-break in *your* API is loud; they still say nothing about breaks in Pelican's
-own, which are recorded in the changelog.
+the modules taken off `main` for 1.0 (at commit `a6c20b2`), which are not
+covered until they return to `main`. The golden-file tests in
+`pelican-test-golden` exist so that a break in *your* API is loud; they still
+say nothing about breaks in Pelican's own, which are recorded in the changelog.

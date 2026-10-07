@@ -529,9 +529,11 @@ name no server library, and `OnPekko.kt` is the whole of binding them:
 
 Switching is one import and the binders for streamed endpoints; everything else
 — the descriptions, the document, the tests through the typed client — is
-unchanged. The http4k and Ktor interpreters are complete and green on the
-[`multi-backend`](https://github.com/matthewjones372/pelican/tree/multi-backend)
-branch, where that suite runs against all three, and return after 1.0.
+unchanged. The http4k and Ktor interpreters were complete, and that suite ran
+against all three, before they were taken off `main` to keep 1.0 small. They
+are in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
+and are meant to come back after 1.0.
 
 ---
 

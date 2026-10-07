@@ -76,6 +76,6 @@ interface Running : AutoCloseable {
  *
  * 1.0 ships one, so the list holds one. It stays a list, and every suite below
  * stays parameterised over it, because that is the socket a returning
- * interpreter plugs into — see the `multi-backend` branch, where it holds three.
+ * interpreter plugs into. At commit a6c20b2 it held three.
  */
 val allBackends: List<Backend> = listOf(OnPekko)

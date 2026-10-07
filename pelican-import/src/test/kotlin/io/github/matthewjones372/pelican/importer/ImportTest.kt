@@ -368,7 +368,7 @@ class ImportTest {
 
         refusal shouldContain "Handler stubs for $backend"
         refusal shouldContain "which this release does not ship"
-        refusal shouldContain "lives on the multi-backend branch"
+        refusal shouldContain "is in the history at commit a6c20b2"
         refusal shouldContain "Generate for PEKKO"
     }
 }

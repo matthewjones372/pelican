@@ -9,8 +9,8 @@ package example.compiler
  *
  * Only the modules main ships appear below: core, schema, openapi, import,
  * jackson, mcp, the Pekko trio, `pelican-client-pekko` and the test modules.
- * The surfaces on the `multi-backend` branch are frozen there, in this file's
- * counterpart, and return with the modules.
+ * The modules taken off main for 1.0 have no call sites here; theirs come
+ * back with the modules.
  *
  * Every public reified-inline function in those modules has a line here, since
  * those are the ones no `.api` dump lists. The rest is what a user types around
