@@ -11,6 +11,8 @@ dependencies {
     // and call the probes in memory through the typed test client.
     testImplementation(project(":pelican-jackson"))
     testImplementation(project(":pelican-test"))
+    // An in-memory database with a pool that can be closed under the check.
+    testImplementation("com.h2database:h2:2.3.232")
 }
 
 tasks.test {
