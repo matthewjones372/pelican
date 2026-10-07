@@ -807,6 +807,13 @@ takes a port with `--args=8081`. The two generator tasks come from the
 repository's own Gradle plugin and do not start a server. `pelican-openapi` and
 `pelican-codegen` depend only on core, so neither needs an HTTP library.
 
+Two larger projects use Pelican outside this repository.
+[petshop](https://github.com/matthewjones372/petshop) is a small service written
+to judge it alongside Lark and Proofload, and its README says where each one
+helped and where it did not. [tweet-street](https://github.com/matthewjones372/tweet-street)
+is a bank in four services; the bank and its approvals service serve their APIs
+and pages through Pelican on Pekko HTTP.
+
 ## On main, not yet released
 
 These landed on `main` after the 1.0.0-RC3 tag and are not on Maven Central
