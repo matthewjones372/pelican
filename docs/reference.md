@@ -476,9 +476,44 @@ ordersApi().startWithDocs(port = 8080, docs = docs { ui = DocsUi.Redoc; docsPath
 Swagger UI is a console: one operation expanded at a time, with the request form
 at the centre and *Try it out* sending real calls. Redoc is a read-only
 three-panel reference, which is the better of the two for a surface people read
-rather than poke. Both render the same document at the same path, and neither is
-configured beyond the title the API already carries — no logo, no CSS hook, no
-`x-tagGroups`.
+rather than poke. Both render the same document, and Swagger UI is configured no
+further than the title the API already carries.
+
+#### A reference beside the console, in your own look
+
+Redoc can be served beside the page at `docsPath` rather than in place of it, so
+readers get a reference and callers keep their console, both over the same
+document:
+
+```kotlin
+docs {
+    docsPath = "/api-docs"                    // Swagger UI, to try a call
+    reference("/reference") {                 // Redoc, to read
+        logo("/logo.svg", altText = "Orders", backgroundColor = "#F2FBFA")
+        stylesheet("https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap")
+        options = jsonObj {
+            put("theme", jsonObj {
+                put("colors", jsonObj { put("primary", jsonObj { "main" to "#0B7A75" }) })
+                put("typography", jsonObj { "fontFamily" to "Inter, sans-serif" })
+            })
+            "expandResponses" to "200,201"
+        }
+    }
+}
+```
+
+`options` is passed to `Redoc.init` as it is, so every key Redoc documents works,
+`theme` above all; it is Redoc's JSON rather than a Pelican type because Redoc's
+options are many and change between its majors. `logo` sets `x-logo` on the
+page's own copy of the document, so `/openapi.json` stays as it was for every
+client that reads it. `stylesheet` links the fonts a theme names. The same look
+dresses the page at `docsPath` when it is Redoc's: `docs { ui = DocsUi.Redoc;
+redoc { ... } }`. A reference on `docsPath` or `openApiPath` is refused, and so is
+a `redoc { }` look while Swagger UI is the page. The example's `ordersDocs` serves
+both pages this way.
+
+Redoc draws in light only, so its page is light on white whatever the reader's
+colour scheme.
 
 The one pairing that is refused rather than ignored is `ui = DocsUi.Redoc` with
 `oauth`: Redoc sends no requests, so a flow configured there would register a
