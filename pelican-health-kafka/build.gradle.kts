@@ -12,6 +12,13 @@ dependencies {
     compileOnly("org.apache.kafka:kafka-clients:$oldestKafka")
 
     testImplementation("org.apache.kafka:kafka-clients:$currentKafka")
+    // Both clients resolve lz4-java 1.10.x, which has open advisories (native
+    // library extraction, unvalidated length allocations). 1.11.4 is the first
+    // with all of them fixed. `oldestKafkaRuntime` extends this classpath, so
+    // the constraint reaches it too.
+    constraints {
+        testImplementation("at.yawk.lz4:lz4-java:1.11.4")
+    }
     // A real broker for the tests tagged `containers`. They need Docker, so
     // `build` leaves them out and CI runs them in a step of their own.
     testImplementation("org.testcontainers:testcontainers-kafka:2.0.5")
