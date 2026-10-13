@@ -9,6 +9,7 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import kotlin.time.Duration.Companion.seconds
 
 class HttpCheckTest {
 
@@ -26,7 +27,8 @@ class HttpCheckTest {
 
     @Test
     fun `a downstream answering 200 passes`() {
-        http(answering(200)) shouldBe Status.Pass
+        // A first request to a fresh WireMock on a busy runner has taken past the 1s default.
+        http(answering(200), timeout = 10.seconds) shouldBe Status.Pass
     }
 
     @Test
