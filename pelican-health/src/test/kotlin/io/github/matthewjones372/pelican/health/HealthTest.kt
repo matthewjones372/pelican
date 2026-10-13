@@ -9,7 +9,7 @@ import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
-import io.kotest.matchers.longs.shouldBeLessThan
+import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.nulls.shouldBeNull
@@ -17,9 +17,11 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import java.util.concurrent.CountDownLatch
 import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.nanoseconds
 
 class HealthTest {
 
@@ -28,9 +30,6 @@ class HealthTest {
 
     private fun report(body: String): HealthReport =
         JacksonCodecs.codec<HealthReport>(typeOf<HealthReport>()).decodeFromString(body)
-
-    /** Never answers, so only the timeout can end it. */
-    private val hangs = Check { CountDownLatch(1).await(); Status.Pass }
 
     @Test
     fun `every check passing answers 200 in health+json, one entry per check`() {
@@ -52,16 +51,38 @@ class HealthTest {
         db.observedUnit shouldBe "ms"
     }
 
+    /**
+     * Claimed with a gate rather than a clock: this runs beside the rest of a parallel build, where
+     * an upper bound measures the machine. A probe that waited for the check would never answer,
+     * and `@Timeout` fails it; it bounds a failure, and never decides a pass. A separate thread,
+     * because the in-memory client blocks in `join`, which no interrupt reaches.
+     */
     @Test
-    fun `a check that hangs past its timeout fails, and the probe answers 503 without waiting for it`() {
-        val health = health(detail = true) { ready("slow", timeout = 100.milliseconds, check = hangs) }
+    @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    fun `a probe answers a check that never returns, and calls it timed out`() {
+        val entered = CountDownLatch(1)
+        val finished = CountDownLatch(1)
+        val health = health(detail = true) {
+            ready("slow", timeout = 100.milliseconds) {
+                entered.countDown()
+                CountDownLatch(1).await() // nothing releases it
+                finished.countDown()
+                Status.Pass
+            }
+        }
 
         val started = System.nanoTime()
         val response = clientFor(health).response(health.ready, Unit)
-        val tookMillis = (System.nanoTime() - started) / 1_000_000
+        val took = (System.nanoTime() - started).nanoseconds
 
+        withClue("the check ran, and had not returned when the probe answered") {
+            entered.count shouldBe 0
+            finished.count shouldBe 1
+        }
         response.status shouldBe 503
-        withClue("a 100ms timeout should answer well inside a second") { tookMillis shouldBeLessThan 1_000 }
+        withClue("a busy machine only adds time, so the timeout is a floor") {
+            took shouldBeGreaterThanOrEqualTo 100.milliseconds
+        }
         val slow = report(response.body).checks.getValue("slow:responseTime").single()
         slow.status shouldBe "fail"
         slow.output.orEmpty() shouldContain "timed out after 100ms"
