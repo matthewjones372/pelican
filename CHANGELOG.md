@@ -367,8 +367,9 @@ still there, and the only new ones are the module's own.
   503 for `fail`. A check marked `critical = false` that fails is a `warn`, and
   a check's `output` reaches the body only with `detail = true`. Built in, on
   the JDK alone: `jdbc(dataSource)`, which borrows a connection and asks the
-  driver `isValid`, `diskSpace(path, minFreeBytes)`, `heapHeadroom(minFreeBytes)`
-  and `noDeadlockedThreads()`.
+  driver `isValid`, `http(url)`, which passes on a 2xx from another service,
+  `diskSpace(path, minFreeBytes)`, `heapHeadroom(minFreeBytes)` and
+  `noDeadlockedThreads()`.
 - **`+json` media types are JSON (spec 0068).** `media<T>("application/problem+json")`,
   or any other `+json` type, is written by the API's JSON codec with no
   `codec(type, mediaType)` override, as RFC 6839 says it is. The check also

@@ -13,6 +13,8 @@ dependencies {
     testImplementation(project(":pelican-test"))
     // An in-memory database with a pool that can be closed under the check.
     testImplementation("com.h2database:h2:2.3.232")
+    // A downstream service that answers what each test needs, and then is not there.
+    testImplementation("org.wiremock:wiremock-standalone:3.13.1")
 }
 
 tasks.test {
