@@ -10,6 +10,11 @@ val currentLettuce = "7.8.0.RELEASE"
 dependencies {
     api(project(":pelican-health"))
     compileOnly("io.lettuce:lettuce-core:$oldestLettuce")
+    // Lettuce 6.8.2 brings Netty 4.1.125, which has open advisories (SNI
+    // bypass, DNS cache poisoning, decoder resource exhaustion). Nothing here
+    // ships it, but GitHub's dependency graph reports it all the same, and
+    // 4.1.139 is the same API. The tests run on the 4.2 line 7.x brings.
+    compileOnly(platform("io.netty:netty-bom:4.1.139.Final"))
 
     testImplementation("io.lettuce:lettuce-core:$currentLettuce")
     // A real Redis for the tests tagged `containers`. They need Docker, so
