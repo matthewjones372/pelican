@@ -29,6 +29,7 @@ include(
     "pelican-metrics",
     "pelican-metrics-otel",
     "pelican-health",
+    "pelican-health-kafka",
     "pelican-oidc",
     "pelican-client-pekko",
     "pelican-streams",
