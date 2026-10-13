@@ -27,6 +27,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-metrics-otel` | core, opentelemetry-api | descriptions → OpenTelemetry server spans and the specified duration histogram |
 | `pelican-health` | **core** | live and ready probes in `application/health+json`, and checks on a JDBC pool, a downstream service, disk, heap and threads, on the JDK alone |
 | `pelican-health-kafka` | health, kafka-clients *provided* | `kafka(admin)`: a cluster check over the service's own `Admin` client |
+| `pelican-health-redis` | health, lettuce-core *provided* | `redis(connection)`: `PING` over the service's own Lettuce connection |
 | `pelican-oidc` | core, nimbus-jose-jwt | verifies an OpenID Connect provider's tokens for a caller |
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
@@ -3382,10 +3383,13 @@ already built, and never creates or closes one:
 | Module | Check | Fails when |
 |---|---|---|
 | `pelican-health-kafka` | `kafka(admin, timeout = 1.seconds)` | the cluster names no controller or no broker within the timeout |
+| `pelican-health-redis` | `redis(connection, timeout = 1.seconds)` | `PING` does not answer `PONG` within the timeout, or the connection is closed |
 
-`kafka-clients` is `compileOnly` there, so the version that runs is the
-service's. It is compiled against the oldest supported line, 3.9, and tested
-on that and on 4.3.
+The client is `compileOnly` in each, so the version that runs is the
+service's. `kafka-clients` is compiled against the oldest supported line, 3.9,
+and tested on that and on 4.3. `lettuce-core` is compiled against 6.8 and
+tested on 7.8. While Lettuce reconnects it holds a `PING` rather than refusing
+it, so a Redis that has gone away fails at the timeout, not at once.
 
 **When a check runs.** Every check runs when a probe is asked, all of them at
 once, each on its own virtual thread and under its own timeout, 2 seconds unless

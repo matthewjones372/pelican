@@ -1,0 +1,5 @@
+public final class io/github/matthewjones372/pelican/health/redis/RedisCheckKt {
+	public static final fun redis-HG0u8IE (Lio/lettuce/core/api/StatefulRedisConnection;J)Lio/github/matthewjones372/pelican/health/Status;
+	public static synthetic fun redis-HG0u8IE$default (Lio/lettuce/core/api/StatefulRedisConnection;JILjava/lang/Object;)Lio/github/matthewjones372/pelican/health/Status;
+}
+

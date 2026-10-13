@@ -99,6 +99,7 @@ val moduleDescriptions = mapOf(
     "pelican-metrics-otel" to "OpenTelemetry spans and metrics for a Pelican service, from the descriptions.",
     "pelican-health" to "Live and ready probes for a Pelican service, answered in application/health+json.",
     "pelican-health-kafka" to "A Pelican health check over the Kafka Admin client a service already holds.",
+    "pelican-health-redis" to "A Pelican health check over the Lettuce connection a service already holds.",
     "pelican-oidc" to "Verifies OpenID Connect tokens for a Pelican caller.",
     "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
     "pelican-streams" to "A streaming body as a lark Stream, whose failure is a value.",

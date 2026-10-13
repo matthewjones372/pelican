@@ -370,6 +370,10 @@ still there, and the only new ones are the module's own.
   driver `isValid`, `http(url)`, which passes on a 2xx from another service,
   `diskSpace(path, minFreeBytes)`, `heapHeadroom(minFreeBytes)` and
   `noDeadlockedThreads()`.
+- **A health check over Redis (spec 0069).** `pelican-health-redis`:
+  `redis(connection)` passes when `PING` on the service's own Lettuce
+  `StatefulRedisConnection` answers `PONG` within the timeout. `lettuce-core` is
+  `compileOnly` and compiled against 6.8, so a service on 6.x or 7.x runs its own.
 - **A health check over Kafka (spec 0069).** `pelican-health-kafka`:
   `kafka(admin)` passes when the cluster behind the service's own `Admin` names a
   controller and a broker within the timeout. `kafka-clients` is `compileOnly`,
