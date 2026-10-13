@@ -30,6 +30,7 @@ include(
     "pelican-metrics-otel",
     "pelican-health",
     "pelican-health-kafka",
+    "pelican-health-redis",
     "pelican-oidc",
     "pelican-client-pekko",
     "pelican-streams",

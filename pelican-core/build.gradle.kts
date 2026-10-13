@@ -34,6 +34,7 @@ val styledModules = listOf(
     "pelican-metrics-otel",
     "pelican-health",
     "pelican-health-kafka",
+    "pelican-health-redis",
     "pelican-oidc",
     "pelican-client-pekko",
     "pelican-test", "pelican-test-pekko",

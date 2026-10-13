@@ -385,6 +385,7 @@ val namedModules = listOf(
     "pelican-jackson", "pelican-arrow",
     "pelican-pekko", "pelican-pekko-docs", "pelican-pekko-mcp",
     "pelican-metrics", "pelican-metrics-otel", "pelican-health", "pelican-health-kafka",
+    "pelican-health-redis",
     "pelican-client-pekko",
     "pelican-test", "pelican-test-golden", "pelican-test-pekko",
     "example",

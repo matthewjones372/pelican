@@ -261,6 +261,8 @@ says so; those additions are not released yet, and
   not on Maven Central.
 - `pelican-health-kafka`: `kafka(admin)`, over the Kafka `Admin` client the
   service already holds. Only on `main`.
+- `pelican-health-redis`: `redis(connection)`, over the Lettuce connection the
+  service already holds. Only on `main`.
 
 **Security**
 
