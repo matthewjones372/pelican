@@ -31,7 +31,7 @@ val health = health {
     live("threads") { noDeadlockedThreads() }
     ready("orders-db") { jdbc(dataSource) }
     ready("payments", timeout = 500.milliseconds) { http("https://payments.internal/health/ready") }
-    ready("disk", critical = false) { diskSpace("/var/data", minFree = 1.gigabytes) }
+    ready("disk", critical = false) { diskSpace("/var/data", minFreeBytes = 1L shl 30) }
 }
 
 val api = api(endpoints = health.endpoints + routes, codecs = JacksonCodecs)
@@ -67,7 +67,7 @@ val api = api(endpoints = health.endpoints + routes, codecs = JacksonCodecs)
 ## Why this shape
 
 Plain endpoints, not a new interpreter hook, so one `health { }` means the same
-on Pekko, Ktor and http4k, and the typed test client calls it like any route.
+on every backend, and the typed test client calls it like any route.
 Live and ready are separate so a dependency outage drains traffic without
 restarting the process. A check that throws is `Fail` with the exception's
 class name: catching `Exception` at that one boundary is the point of a health
@@ -82,22 +82,23 @@ a new output rather than a break.
 
 ## Stack
 
-- [ ] **`spec-0068-json-suffix`** — pelican-core reads any `application/*+json`
+- [x] **`spec-0068-json-suffix`** ([#229](https://github.com/matthewjones372/pelican/pull/229)) — pelican-core reads any `application/*+json`
       media type as JSON (RFC 6839), so a codec writes it without an override.
       Done when: an endpoint declaring `application/problem+json` answers
-      through `JacksonCodecs` with that content type, on all three backends.
-- [ ] **`spec-0068-health`** — module, `Check`, `Status`, `health { }`, the two
+      through `JacksonCodecs` with that content type, on Pekko, the one backend
+      1.0 ships (corrected after the draft, which said all three).
+- [x] **`spec-0068-health`** ([#230](https://github.com/matthewjones372/pelican/pull/230)) — module, `Check`, `Status`, `health { }`, the two
       endpoints, parallel bounded run, `health+json` body, 200/503, `critical`,
       `detail`.
       Done when: a check that sleeps past its timeout answers 503 within
       timeout + margin, and a failing non-critical check still answers 200.
-- [ ] **`spec-0068-jvm`** — `diskSpace`, `heapHeadroom`, `noDeadlockedThreads`.
+- [x] **`spec-0068-jvm`** ([#231](https://github.com/matthewjones372/pelican/pull/231)) — `diskSpace`, `heapHeadroom`, `noDeadlockedThreads`.
       Done when: a test that deadlocks two threads gets `Fail` naming them.
-- [ ] **`spec-0068-jdbc`** — `jdbc(dataSource, timeout)`.
+- [x] **`spec-0068-jdbc`** ([#232](https://github.com/matthewjones372/pelican/pull/232)) — `jdbc(dataSource, timeout)`.
       Done when: against H2, `Pass` while open and `Fail` after the pool closes.
-- [ ] **`spec-0068-http`** — `http(url)` for a downstream dependency.
+- [x] **`spec-0068-http`** ([#233](https://github.com/matthewjones372/pelican/pull/233)) — `http(url)` for a downstream dependency.
       Done when: against WireMock, 200 passes, 503 and connect-refused fail.
-- [ ] **`spec-0068-docs`** — reference, cookbook, `example/health`, README row.
+- [x] **`spec-0068-docs`** ([#234](https://github.com/matthewjones372/pelican/pull/234)) — reference, cookbook, `example/health`, README row.
       Done when: the example's test calls both probes through the typed client.
 
 ## Acceptance
@@ -119,3 +120,11 @@ Each open question in the draft took its recommendation.
    with `Pass`, `Warn` and `Fail` replacing `Up` and `Down`.
 5. **Check names:** `[a-z0-9-]+` and unique, checked when `health { }` is
    built, so a duplicate is an error rather than a silently dropped key.
+6. **The 503** (settled while building): declared as a second
+   `application/health+json` response rather than a declared failure, since a
+   declared failure is always `application/json`. The document and the server
+   are right; the typed test client's `outcome()` throws on it, so a test reads
+   a 503 with `response()`.
+7. **Sizes** (settled while building): `minFreeBytes: Long`, where the sketch
+   had `1.gigabytes`. Kotlin has no byte-size unit, and adding one was more API
+   than the checks needed.

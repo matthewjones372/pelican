@@ -48,17 +48,17 @@ Spec 0068, `spec-0068-health`.
 
 ## Stack
 
-- [ ] **`spec-0069-kafka`** — `pelican-health-kafka`.
+- [x] **`spec-0069-kafka`** ([#235](https://github.com/matthewjones372/pelican/pull/235)) — `pelican-health-kafka`.
       Done when: against a Testcontainers broker, `Pass` while running and `Fail`
       within the timeout after the container stops.
-- [ ] **`spec-0069-redis`** — `pelican-health-redis`.
+- [x] **`spec-0069-redis`** ([#243](https://github.com/matthewjones372/pelican/pull/243)) — `pelican-health-redis`.
       Done when: the same, against a Testcontainers Redis.
 
 ## Acceptance
 
 ```bash
 ./gradlew :pelican-health-kafka:check :pelican-health-redis:check
-./gradlew :pelican-health-kafka:containerTests :pelican-health-redis:containerTests
+./gradlew containerTests containerTestsOldestKafka
 ```
 
 ## Decisions
@@ -70,3 +70,6 @@ Each open question in the draft took its recommendation.
    `check`, in a CI step of their own, so the build needs no Docker.
 3. **Client versions:** `compileOnly`, so the service's version wins, with a
    test against the oldest supported Kafka 3.x.
+4. **Lettuce's version** (settled while building): compiled against 6.8, the
+   line Spring Boot 3 ships, and tested on 7.8. Redis has no oldest-client test
+   task; decision 3 asked for one on Kafka only.
