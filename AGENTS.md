@@ -217,6 +217,14 @@ Work out which of these a change can break:
 - **The round trip.** `ImportedOrdersTest` imports the published document back
   into descriptions and compiles them.
 
+**No upper bound on elapsed time in `build`.** `org.gradle.parallel=true` runs
+every module's tests at once, so a bound there measures the machine as well as
+the code. Claim ordering with a gate instead, a latch the code under test has
+to get past, or a lower bound, which a busy machine only adds to. A bound that
+is itself the claim, as the container tests' are, runs in a task of its own,
+and CI runs those with `--no-parallel`. `HealthTest`'s hung-check case is the
+shape (spec 0072).
+
 ### Pekko tests go through the testkit, registered as a JUnit 5 extension
 
 An actor system belongs to the test class and is started and stopped by JUnit,
