@@ -1,12 +1,10 @@
 package example.health
 
-import io.github.matthewjones372.pelican.health.HealthReport
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.inMemory
+import io.github.matthewjones372.pelican.test.shouldBeError
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.Test
-import kotlin.reflect.typeOf
 
 class WarehouseHealthTest {
 
@@ -27,11 +25,12 @@ class WarehouseHealthTest {
 
         client.call(health.live, Unit).status shouldBe "pass"
 
-        // A 503 is not a success, so the typed client's `call` would throw: read the response instead.
         val ready = client.response(health.ready, Unit)
         ready.status shouldBe 503
         ready.contentType.orEmpty() shouldStartWith "application/health+json"
-        val report = JacksonCodecs.codec<HealthReport>(typeOf<HealthReport>()).decodeFromString(ready.body)
+
+        // The 503 is a declared failure, so the report comes back typed, as an Err.
+        val report = client.outcome(health.ready, Unit).shouldBeError()
         report.status shouldBe "fail"
         report.checks.getValue("warehouse:responseTime").single().status shouldBe "fail"
     }

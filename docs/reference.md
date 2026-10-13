@@ -3426,9 +3426,10 @@ ports, and the probes are public.
 across both probes. Anything else is refused when `health { }` runs, since the
 body is keyed by name.
 
-**In a test.** `client.call(health.ready, Unit)` decodes a 200. A 503 is not a
-success, so `call` throws on it; read it with `client.response(health.ready,
-Unit)` instead. `example/src/main/kotlin/example/health/Warehouse.kt` is a
+**In a test.** `client.call(health.ready, Unit)` decodes a 200. The 503 is a
+declared failure in `application/health+json` (spec 0070), so
+`client.outcome(health.ready, Unit)` reads a failing report back as `Err`,
+typed as a `HealthReport`, and `call` throws on it as on any declared failure. `example/src/main/kotlin/example/health/Warehouse.kt` is a
 service wired this way, and its test takes a dependency down.
 
 ## Errors, and what a caller is told

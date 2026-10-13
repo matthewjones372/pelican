@@ -120,11 +120,11 @@ Each open question in the draft took its recommendation.
    with `Pass`, `Warn` and `Fail` replacing `Up` and `Down`.
 5. **Check names:** `[a-z0-9-]+` and unique, checked when `health { }` is
    built, so a duplicate is an error rather than a silently dropped key.
-6. **The 503** (settled while building): declared as a second
-   `application/health+json` response rather than a declared failure, since a
-   declared failure is always `application/json`. The document and the server
-   are right; the typed test client's `outcome()` throws on it, so a test reads
-   a 503 with `response()`.
+6. **The 503** (settled while building, then changed by spec 0070): first
+   declared as a second `application/health+json` success, because a declared
+   failure was always `application/json`. Spec 0070 added `errorMedia`, and the
+   503 is now a declared failure: the document calls it one, and a typed client
+   reads a failing report back as `Err`.
 7. **Sizes** (settled while building): `minFreeBytes: Long`, where the sketch
    had `1.gigabytes`. Kotlin has no byte-size unit, and adding one was more API
    than the checks needed.
