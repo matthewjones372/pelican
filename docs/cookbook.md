@@ -471,6 +471,25 @@ fileReport handledNow { req -> Reports.file(this[caller].subject, req) }
 
 ---
 
+## Health checks
+
+```kotlin
+val health = health {
+    live("threads") { noDeadlockedThreads() }
+    ready("orders-db") { jdbc(dataSource) }
+    ready("disk", critical = false) { diskSpace("/var/data", minFreeBytes = 1L shl 30) }
+}
+
+api(endpoints = health.endpoints + routes, codecs = JacksonCodecs)
+```
+
+`/health/live` runs the `live` checks and `/health/ready` runs both, each check
+under its own timeout. The body is `application/health+json`: 200 for `pass` or
+`warn`, 503 for `fail`. A non-critical check that fails is a `warn`. Any
+`() -> Status` lambda is a check. See [Health checks](reference.md#health-checks).
+
+---
+
 ## Testing, in three layers
 
 ```kotlin

@@ -41,6 +41,8 @@ dependencies {
     // a service runs — or whether it runs one at all — is the service's choice
     // and not the library's.
     implementation(project(":pelican-metrics-otel"))
+    // Live and ready probes: `example.health` is what they look like.
+    implementation(project(":pelican-health"))
     implementation("io.opentelemetry:opentelemetry-sdk:1.66.0")
     runtimeOnly("ch.qos.logback:logback-classic:1.6.4")
     // `example.logging` claims a level per status and a template rather than a
