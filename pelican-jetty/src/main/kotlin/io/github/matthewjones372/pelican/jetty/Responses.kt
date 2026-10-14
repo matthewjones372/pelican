@@ -19,6 +19,7 @@ import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.TextOutput
 import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.renderError
+import io.github.matthewjones372.pelican.spi.selectedFor
 import io.github.matthewjones372.pelican.spi.successNamedBy
 import io.github.matthewjones372.pelican.spi.taggedBody
 import org.eclipse.jetty.http.HttpHeader
@@ -216,7 +217,7 @@ internal fun methodNotAllowed(declared: List<String>): Strict {
 }
 
 /** Turns a described [Output] plus a handler's result into a response. */
-internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs): Reply {
+internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs, accept: List<String>): Reply {
     // Resolved when the handler was built, so a null is a bug in that resolution.
     fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
 
@@ -259,13 +260,14 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
         }
 
         is DeclaredResponses<*, *> -> when (val outcome = value as Outcome<*, *>) {
-            is Outcome.Ok<*> -> buildResponse(out.successNamedBy(outcome), outcome.value, codecs)
+            is Outcome.Ok<*> -> buildResponse(out.successNamedBy(outcome), outcome.value, codecs, accept)
                 .withHeaders(outcome.headers)
 
             is Outcome.Err<*> -> failureResponse(out.failureNamedBy(outcome), outcome, codecs)
         }
 
-        is NegotiatedOutput<*> -> throw UnsupportedOperationException("Not yet served on Jetty: $out")
+        // Which rendering goes out is core's answer, from the same scoring the 406 was decided with.
+        is NegotiatedOutput<*> -> buildResponse(out.selectedFor(accept), value, codecs, accept)
     }
 }
 
@@ -277,9 +279,8 @@ private fun failureResponse(declared: ErrorOutput<*>, err: Outcome.Err<*>, codec
     return Strict(declared.status, contentType, body, err.headers)
 }
 
-/** As Pekko writes it: a text type carries its charset, anything else is sent as declared. */
-private fun contentTypeOf(mediaType: String): String =
-    if (mediaType.startsWith("text/") && !mediaType.contains("charset")) "$mediaType; charset=UTF-8" else mediaType
+/** As Pekko writes a declared media type: its parameters dropped, and a text type's fixed UTF-8 left implied. */
+private fun contentTypeOf(mediaType: String): String = mediaType.substringBefore(';').trim()
 
 private val log: Logger = LoggerFactory.getLogger("io.github.matthewjones372.pelican.jetty")
 
