@@ -67,7 +67,7 @@ jobs:
       # monthly limits.
       - name: Refuse anything but a release
         run: |
-          version=$(./gradlew -p pelican-gradle-plugin -q currentVersion \
+          version=$(./gradlew -p tooling/pelican-gradle-plugin -q currentVersion \
             | sed -n 's/^Project version: //p')
           echo "version: $version"
           case "$version" in
@@ -94,7 +94,7 @@ jobs:
       - name: Publish the Gradle plugin to Maven Central
         if: inputs.targets != 'portal'
         run: >
-          ./gradlew -p pelican-gradle-plugin publishToMavenCentral
+          ./gradlew -p tooling/pelican-gradle-plugin publishToMavenCentral
           --no-configuration-cache
 
       # The Plugin Portal is where `plugins { id(...) }` resolves from without
@@ -104,5 +104,5 @@ jobs:
       - name: Publish the Gradle plugin to the Gradle Plugin Portal
         if: env.GRADLE_PUBLISH_KEY != '' && inputs.targets != 'central'
         run: >
-          ./gradlew -p pelican-gradle-plugin publishPlugins
+          ./gradlew -p tooling/pelican-gradle-plugin publishPlugins
           --no-configuration-cache

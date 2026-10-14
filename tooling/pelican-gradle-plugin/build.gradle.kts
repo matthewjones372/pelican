@@ -20,7 +20,7 @@ scmVersion {
     // axion answers with its default version rather than failing when it finds
     // none — which would have published the plugin as 0.1.0-SNAPSHOT off a
     // release tag. Point it at the repository both builds actually live in.
-    repository { directory.set(file("..").absolutePath) }
+    repository { directory.set(file("../..").absolutePath) }
     tag { prefix.set("v") }
     // Plain `0.1.0-SNAPSHOT` off a tag rather than axion's default, which
     // decorates it with the branch name. The README tells a contributor to
@@ -72,7 +72,7 @@ spotless {
 }
 
 detekt {
-    config.setFrom(file("../config/detekt/detekt.yml"))
+    config.setFrom(file("../../config/detekt/detekt.yml"))
     buildUponDefaultConfig = true
 }
 
@@ -98,12 +98,12 @@ tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 publishing {
     repositories {
-        // `./gradlew -p pelican-gradle-plugin publishToMavenLocal` for a local
+        // `./gradlew -p tooling/pelican-gradle-plugin publishToMavenLocal` for a local
         // try-out, and `publishAllPublicationsToLocalRepository` for something
         // to inspect without installing it.
         maven {
             name = "local"
-            url = file("../build/repo").toURI()
+            url = file("../../build/repo").toURI()
         }
     }
 }

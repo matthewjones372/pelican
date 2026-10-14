@@ -51,7 +51,8 @@ val styledModules = listOf(
  * reach it. Letting the test find the sources for itself — it resolved the
  * repository root from the working directory — is how the two came apart.
  */
-val styledSources = styledModules.map { rootDir.resolve("$it/src/main/kotlin") }
+// By project rather than by directory: settings decides where a module lives (spec 0078).
+val styledSources = styledModules.map { project(":$it").projectDir.resolve("src/main/kotlin") }
 
 /**
  * A gate in this module's tests that judges fourteen modules is a wart, kept because
@@ -69,10 +70,10 @@ tasks.test {
     inputs.files(styledSources)
         .withPropertyName("functionalStyleSources")
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    // The module names as well as their contents. Relative paths are the same
-    // whichever directory they hang under, so renaming a module would leave the
-    // snapshot identical while changing every key the test compares against.
-    inputs.property("functionalStyleModules", styledModules)
+    // The module directories as well as their contents. Relative paths are the
+    // same whichever directory they hang under, so moving a module would leave
+    // the snapshot identical while changing every key the test compares against.
+    inputs.property("functionalStyleModules", styledSources.map { it.relativeTo(rootDir).invariantSeparatorsPath })
 
     val repoRootPath = rootDir.path
     val styledSourcePaths = styledSources.joinToString(File.pathSeparator) { it.path }

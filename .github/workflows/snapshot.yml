@@ -57,4 +57,4 @@ jobs:
       # The Gradle plugin is a build of its own, so the root build's publish
       # tasks do not reach it. It goes to Central's snapshot repository only:
       # the Plugin Portal does not take snapshots.
-      - run: ./gradlew -p pelican-gradle-plugin publishToMavenCentral --no-configuration-cache
+      - run: ./gradlew -p tooling/pelican-gradle-plugin publishToMavenCentral --no-configuration-cache

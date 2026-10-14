@@ -135,6 +135,26 @@ that grows an import grows a line in its block.
 
 ## Layout
 
+Module directories are grouped by kind, and a backend's modules sit together
+(spec 0078). Project names do not carry the directory: `:pelican-jetty` lives
+in `backends/jetty/pelican-jetty`, and `settings.gradle.kts` is the map.
+
+```
+core/            pelican-core, -schema, -openapi
+codecs/          pelican-jackson, -kotlinx
+backends/pekko/  pelican-pekko, -pekko-docs, -pekko-mcp, -test-pekko, -client-pekko, -streams
+backends/jetty/  pelican-jetty, -jetty-docs, -jetty-mcp, -test-jetty, -client-jetty, -streams-jetty
+testing/         pelican-test, -test-golden, -test-wiremock
+integrations/    pelican-health, -health-kafka, -health-redis, -metrics, -metrics-otel,
+                 -oidc, -arrow, -mcp, -mcp-server
+tooling/         pelican-codegen, -import, pelican-gradle-plugin (an included build)
+example/  benchmarks/
+```
+
+A new module goes in the group it belongs to, through `group(...)` in
+`settings.gradle.kts`. A build script that needs another module's directory
+asks for `project(":name").projectDir` rather than building the path.
+
 `pelican-core` depends on the Kotlin standard library and `jackson-core` —
 the streaming parser, not databind — and nothing else.
 Everything with a third-party type in it is a leaf module: a JSON library, a

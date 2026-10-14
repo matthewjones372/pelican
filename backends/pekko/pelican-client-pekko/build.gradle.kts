@@ -12,7 +12,7 @@ val scalaBinary = "2.13"
 dependencies {
     api(project(":pelican-core"))
 
-    // Provided, for the reason `pelican-pekko/build.gradle.kts` gives: the
+    // Provided, for the reason `backends/pekko/pelican-pekko/build.gradle.kts` gives: the
     // Scala suffix belongs to the application, not to us.
     compileOnly(platform("org.apache.pekko:pekko-bom_$scalaBinary:$pekkoVersion"))
     compileOnly("org.apache.pekko:pekko-actor-typed_$scalaBinary")
