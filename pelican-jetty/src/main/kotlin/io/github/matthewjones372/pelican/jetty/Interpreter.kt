@@ -18,9 +18,11 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex
 import io.github.matthewjones372.pelican.spi.handlerFor
+import io.github.matthewjones372.pelican.spi.ndjsonFrames
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.responseCodecs
 import io.github.matthewjones372.pelican.spi.routeIndex
+import org.eclipse.jetty.http.HttpHeader
 import org.eclipse.jetty.server.Handler
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.server.Response
@@ -128,7 +130,7 @@ internal class PelicanHandler(
             .thenApply { reply -> reply.withHeaders(params.responseHeaders()) }
     }
 
-    /** The body, read the way its declaration says to. NDJSON is not yet read on Jetty. */
+    /** The body, read the way its declaration says to. */
     private fun readBody(
         ep: Endpoint<*, *>,
         request: Request,
@@ -150,8 +152,12 @@ internal class PelicanHandler(
             readStrictBody(request, api, codec).thenApply { values[body] = it }
         }
 
-        is NdjsonBody<*> ->
-            CompletableFuture.failedStage(UnsupportedOperationException("Not yet read on Jetty: $body"))
+        // Framed by core as the handler reads, so nothing is held but the frame being read.
+        is NdjsonBody<*> -> {
+            val frames = api.ndjsonFrames(ep, codecs.body, request.headers.get(HttpHeader.CONTENT_TYPE))
+            values[body] = JettyFrames<Any?>(request, frames)
+            CompletableFuture.completedStage(Unit)
+        }
     }
 }
 

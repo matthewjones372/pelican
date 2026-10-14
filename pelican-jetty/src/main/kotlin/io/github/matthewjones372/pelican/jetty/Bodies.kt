@@ -88,7 +88,7 @@ internal fun readMultipart(
     {
         body.decode(
             contentType = request.headers.get(HttpHeader.CONTENT_TYPE),
-            input = Content.Source.asInputStream(request),
+            input = TimedInput(request, READ_TIMEOUT_MILLIS),
             maxInMemoryBytes = api.maxBodyBytes,
             into = into,
         )
