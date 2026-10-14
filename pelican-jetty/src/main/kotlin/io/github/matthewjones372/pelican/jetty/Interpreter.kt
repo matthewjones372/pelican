@@ -128,7 +128,7 @@ internal class PelicanHandler(
             .thenApply { reply -> reply.withHeaders(params.responseHeaders()) }
     }
 
-    /** The body, read the way its declaration says to. Forms, multipart and NDJSON are not yet read on Jetty. */
+    /** The body, read the way its declaration says to. NDJSON is not yet read on Jetty. */
     private fun readBody(
         ep: Endpoint<*, *>,
         request: Request,
@@ -143,12 +143,14 @@ internal class PelicanHandler(
             CompletableFuture.completedStage(Unit)
         }
 
-        is JsonBody<*>, is NegotiatedBody<*> -> {
+        is MultipartBody -> readMultipart(request, api, body, values)
+
+        is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
             val codec = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
             readStrictBody(request, api, codec).thenApply { values[body] = it }
         }
 
-        is FormBody<*>, is NdjsonBody<*>, is MultipartBody ->
+        is NdjsonBody<*> ->
             CompletableFuture.failedStage(UnsupportedOperationException("Not yet read on Jetty: $body"))
     }
 }
