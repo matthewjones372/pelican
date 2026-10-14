@@ -121,19 +121,35 @@ internal class PelicanHandler(
             return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params.responseHeaders()))
         }
 
-        return readBody(ep)
+        return readBody(ep, request, values, codecs.getValue(se))
             .thenCompose { handlers.getValue(se)(params) }
             .thenApply { result -> buildResponse(ep.output, result, codecs.getValue(se)) }
             .exceptionally { t -> errorResponse(t, api, ep) }
             .thenApply { reply -> reply.withHeaders(params.responseHeaders()) }
     }
 
-    /** The body, read the way its declaration says to. Only an endpoint taking none is served so far. */
-    private fun readBody(ep: Endpoint<*, *>): CompletionStage<Unit> = when (ep.bodyInput) {
+    /** The body, read the way its declaration says to. Forms, multipart and NDJSON are not yet read on Jetty. */
+    private fun readBody(
+        ep: Endpoint<*, *>,
+        request: Request,
+        values: MutableMap<ParamKey<*>, Any?>,
+        codecs: EndpointCodecs,
+    ): CompletionStage<Unit> = when (val body = ep.bodyInput) {
         null -> CompletableFuture.completedStage(Unit)
 
-        is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*>, is RawBody, is NdjsonBody<*>, is MultipartBody ->
-            CompletableFuture.failedStage(UnsupportedOperationException("Request bodies are not yet read on Jetty"))
+        // Handed over unconsumed, and exempt from the limit as on Pekko: nothing here holds it whole.
+        is RawBody -> {
+            values[body] = JettyByteStream(request)
+            CompletableFuture.completedStage(Unit)
+        }
+
+        is JsonBody<*>, is NegotiatedBody<*> -> {
+            val codec = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
+            readStrictBody(request, api, codec).thenApply { values[body] = it }
+        }
+
+        is FormBody<*>, is NdjsonBody<*>, is MultipartBody ->
+            CompletableFuture.failedStage(UnsupportedOperationException("Not yet read on Jetty: $body"))
     }
 }
 

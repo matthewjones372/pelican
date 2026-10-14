@@ -1,6 +1,8 @@
 package io.github.matthewjones372.pelican.jetty
 
+import io.github.matthewjones372.pelican.ByteStream
 import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.ServerEndpoint
 import org.eclipse.jetty.server.Request
@@ -22,3 +24,13 @@ infix fun <I> Endpoint<I, Unit>.handledWith(f: Params.(I) -> Unit): ServerEndpoi
 /** Escape hatch: the raw Jetty request behind this call. */
 val Params.request: Request
     get() = underlying as Request
+
+/** Binds an endpoint that streams opaque bytes, one write per element. Synchronous: see [Handlers] for where. */
+infix fun <I> Endpoint<I, ByteStream>.bytesNow(f: Params.(I) -> Sequence<ByteArray>): ServerEndpoint =
+    ServerEndpoint(this, Synchronous { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) })
+
+/** Binds an endpoint streaming opaque bytes that may fail before the first one. */
+infix fun <I, E : Any> Endpoint<I, Outcome<E, ByteStream>>.bytesOrFail(
+    f: Params.(I) -> Outcome<E, Sequence<ByteArray>>,
+): ServerEndpoint =
+    ServerEndpoint(this, Synchronous { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) })

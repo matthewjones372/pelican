@@ -1,3 +1,8 @@
+public final class io/github/matthewjones372/pelican/jetty/BodiesKt {
+	public static final fun toSequence (Lio/github/matthewjones372/pelican/ByteStreamHandle;)Lkotlin/sequences/Sequence;
+	public static final fun toSource (Lio/github/matthewjones372/pelican/ByteStreamHandle;)Lorg/eclipse/jetty/io/Content$Source;
+}
+
 public final class io/github/matthewjones372/pelican/jetty/Handlers {
 	public static final field Companion Lio/github/matthewjones372/pelican/jetty/Handlers$Companion;
 	public synthetic fun <init> (Ljava/util/concurrent/Executor;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -10,6 +15,8 @@ public final class io/github/matthewjones372/pelican/jetty/Handlers$Companion {
 }
 
 public final class io/github/matthewjones372/pelican/jetty/HandlersKt {
+	public static final fun bytesNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun bytesOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun getRequest (Lio/github/matthewjones372/pelican/Params;)Lorg/eclipse/jetty/server/Request;
 	public static final fun handledBy (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun handledNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
