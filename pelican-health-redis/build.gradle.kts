@@ -4,7 +4,7 @@
 // its classpath. It compiles against the 6.x line, which Spring Boot 3 still
 // ships, so nothing only 7.x has can be called by accident; the container
 // tests run on the current client.
-val oldestLettuce = "6.8.2.RELEASE"
+val oldestLettuce = "7.8.0.RELEASE"
 val currentLettuce = "7.8.0.RELEASE"
 
 dependencies {
