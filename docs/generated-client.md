@@ -158,9 +158,9 @@ its own:
 val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTransport(system))
 ```
 
-The JDK adapter (`pelican-client-java`), the OkHttp adapter
-(`pelican-client-okhttp`) — the one that runs on Android — and the Ktor one
-(`pelican-client-ktor`) were written and passing before 1.0, and were taken
+`pelican-client-jetty` is the other transport that ships, over Jetty's
+`HttpClient`. The OkHttp adapter (`pelican-client-okhttp`), the one that runs
+on Android, and the Ktor one (`pelican-client-ktor`) were written and passing before 1.0, and were taken
 off `main` to keep 1.0 small. They are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
 and are meant to come back after 1.0.

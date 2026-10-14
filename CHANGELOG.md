@@ -31,6 +31,12 @@ one.
 
 ## Unreleased
 
+### Added
+
+- **`pelican-client-jetty`**: `JettyHttpTransport`, a generated client's
+  transport over Jetty's `HttpClient`, the release `pelican-jetty` serves with.
+  A service on Jetty calls out with no Pekko on its classpath (spec 0075).
+
 ### Changed
 
 - **`pelican-core` no longer puts `jackson-core` on a caller's compile

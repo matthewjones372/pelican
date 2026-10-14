@@ -16,7 +16,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-schema` | **core** | one type → a self-contained JSON Schema 2020-12 document: pointers under `$defs`, a union's branches carrying the property that picks them. No document generator, no codec |
 | `pelican-mcp` | core, schema | descriptions → MCP tool descriptions, and a dispatch that decodes a tool call into the handler the route already has. Values only: no MCP SDK and no transport, so a tool list can be derived with no server on the classpath |
 | `pelican-mcp-server` | core, mcp | those tools served: JSON-RPC 2.0 — `initialize`, `tools/list`, `tools/call`, `ping` — over stdio with `mcpServe(api)`, and the request/response half of Streamable HTTP for a backend to mount. Protocol revision `2025-11-25`. Still no MCP SDK |
-| `pelican-client-java` | **core** | where a generated client's requests go: `ClientTransport` over the JDK's own `HttpClient`, for a service that runs no other HTTP stack |
+| `pelican-client-jetty` | core, jetty-client | where a generated client's requests go: `ClientTransport` over Jetty's `HttpClient`, for a service on `pelican-jetty` or one that runs no Pekko |
 | `pelican-client-pekko` | core, pekko-http | where a generated client's requests go: `ClientTransport` over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the `Codecs`: Jackson reads bodies, swagger-core describes types |
@@ -1380,8 +1380,10 @@ an interpreter it does not name; this is the same answer facing the other way.
 
 ### Choosing one
 
-Two adapters ship. `pelican-client-java` is over the JDK's own `HttpClient`
-and brings no dependency at all. `pelican-client-pekko` is over Pekko HTTP's
+Two adapters ship. `pelican-client-jetty` is over Jetty's `HttpClient`, the
+release `pelican-jetty` serves with. `JettyHttpTransport()` owns a client and
+stops it on `close`; `JettyHttpTransport(httpClient)` borrows one its owner
+started, so a service can share the server's threads. `pelican-client-pekko` is over Pekko HTTP's
 client, for the service that already runs Pekko and would rather not start a
 second HTTP stack to call out of. The OkHttp and Ktor adapters
 (`pelican-client-okhttp` and `pelican-client-ktor`) were taken off `main` for
@@ -1788,9 +1790,9 @@ An adapter is small — a few hundred lines including the comments — and nearl
 all of what takes thought is the stream bridge and the cancellation rather
 than the mapping. Another — Apache, something a house already runs — starts by
 reading `PekkoHttpTransport` for how a streaming client's laziness survives
-the crossing into an `InputStream`, or the branch's `pelican-client-java`,
-the plainest of them, since the JDK's `sendAsync` is already the shape `send`
-wants.
+the crossing into an `InputStream`, or `JettyHttpTransport`, the plainest of
+them, since Jetty's `InputStreamResponseListener` already hands over the head
+before the body.
 
 ## Importing an OpenAPI document
 

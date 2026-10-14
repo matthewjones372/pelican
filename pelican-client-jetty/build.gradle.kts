@@ -1,11 +1,10 @@
-// Core's `ClientTransport` over the JDK's own `HttpClient`. Core and the JDK,
-// and nothing else, which is what `DependenciesTest` asserts.
-//
-// The package is `io.github.matthewjones372.pelican.client` rather than
-// `...client.java`: inside a package whose last segment is `java`, Kotlin
-// resolves a bare `java.` reference against the current package first.
+val jettyVersion = "12.1.13"
+
+// Core's `ClientTransport` over Jetty's client, the same release `pelican-jetty`
+// serves with, so a service runs one HTTP stack in both directions.
 dependencies {
     api(project(":pelican-core"))
+    api("org.eclipse.jetty:jetty-client:$jettyVersion")
 }
 
 tasks.test {
@@ -16,7 +15,7 @@ tasks.test {
     jvmArgumentProviders.add(
         CommandLineArgumentProvider {
             listOf(
-                "-Dpelican.client.java.runtimeClasspath=" +
+                "-Dpelican.client.jetty.runtimeClasspath=" +
                     mainRuntime.get().joinToString(File.pathSeparator) { it.name },
             )
         },

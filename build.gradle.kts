@@ -105,7 +105,7 @@ val moduleDescriptions = mapOf(
     "pelican-health-kafka" to "A Pelican health check over the Kafka Admin client a service already holds.",
     "pelican-health-redis" to "A Pelican health check over the Lettuce connection a service already holds.",
     "pelican-oidc" to "Verifies OpenID Connect tokens for a Pelican caller.",
-    "pelican-client-java" to "A generated client's transport, over the JDK's own HttpClient.",
+    "pelican-client-jetty" to "A generated client's transport, over Jetty's HttpClient.",
     "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
     "pelican-streams" to "A streaming body as a lark Stream, whose failure is a value.",
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",

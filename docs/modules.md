@@ -36,7 +36,7 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-mcp` | core + schema | descriptions → MCP tool descriptions, and a dispatch that runs them. Values only, so deriving a tool list needs no server |
 | `pelican-mcp-server` | core + mcp | those tools **served**: JSON-RPC 2.0 over stdio, and the request/response half of Streamable HTTP. No MCP SDK |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
-| `pelican-client-java` | **core** | where a generated client's requests go, over the JDK's own `HttpClient`. No dependency of its own |
+| `pelican-client-jetty` | core + jetty-client | where a generated client's requests go, over Jetty's `HttpClient`, the release `pelican-jetty` serves with. No server |
 | `pelican-client-pekko` | core, pekko-http *provided* | where a generated client's requests go, over Pekko HTTP's client |
 | `pelican-streams` | pekko, Pekko and lark *both provided* | one function: a streaming body as a lark `Stream`, whose failure is a value |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
@@ -74,6 +74,8 @@ rests on its build file for now:
   asserts it ships health and core and no Kafka client, and
   `pelican-health-redis` the same of Lettuce: the service names the version it
   already runs.
+- `pelican-client-jetty` asserts it is core plus Jetty's client half: no
+  `jetty-server`, and no other HTTP library.
 - `pelican-client-pekko` asserts it ships no Pekko at all, and not the
   matching *interpreter* either, since making calls and serving routes are
   separate decisions. Pekko is *provided* in every module that speaks it:
