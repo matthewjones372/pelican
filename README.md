@@ -87,9 +87,9 @@ per endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
 
 **Descriptions are independent of the backend.** 1.0 ships one backend and one
 codec, Pekko HTTP and Jackson, to keep the first release small enough to
-support properly. The http4k and Ktor interpreters and the kotlinx and
-jsoniter codecs were written and passed the same parity suites, then were taken
-off `main` before 1.0. They are in the history at commit
+support properly. kotlinx has since come back as a second codec module. The
+http4k and Ktor interpreters and the jsoniter codec were written and passed
+the same parity suites, then were taken off `main` before 1.0. They are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e), the last commit before they were
 removed, and are meant to come back after 1.0. Your descriptions will not need
 to change when they do.
@@ -646,7 +646,8 @@ answers preflight requests from what the endpoints already declare. See
 
 Descriptions carry a `KType` and no serializer, so the JSON library is a single
 argument: `api(routes, codecs = JacksonCodecs)`, or
-`JacksonCodecs(myObjectMapper)` to use your own mapper. See
+`JacksonCodecs(myObjectMapper)` to use your own mapper. For `@Serializable`
+payloads, `pelican-kotlinx` ships too: `api(routes, codecs = KotlinxCodecs)`. See
 [Choosing a JSON library](docs/reference.md#choosing-a-json-library).
 
 ## Testing

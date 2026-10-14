@@ -80,7 +80,9 @@ internal class DescriptorSchemas(
             put("additionalProperties", schemaFor(desc.getElementDescriptor(1)))
         }
 
-        StructureKind.OBJECT -> jsonObj { "type" to "object" }
+        // Hoisted, as swagger-core hoists it: a union's mapping and a tagged
+        // failure's `const` can only point at a component.
+        StructureKind.OBJECT -> named(desc) { jsonObj { "type" to "object" } }
 
         StructureKind.CLASS -> named(desc) { classSchema(desc) }
 

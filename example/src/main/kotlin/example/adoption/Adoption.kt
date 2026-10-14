@@ -8,6 +8,8 @@ package example.adoption
  *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
  *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
+ *         // @Serializable on the payloads, which PluggableCodecsTest serves over kotlinx too
+ *         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
  *     }
  */
 
@@ -19,6 +21,7 @@ package example.adoption
  * from and the point is to call the result.
  */
 
+import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
@@ -28,13 +31,17 @@ import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.pekko.handledOrFail
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class Pet(val id: Long, val name: String)
 
 /** The shop could not write the sale down. Which attempt it was, so a caller can stop retrying. */
+@Serializable
 data class NotRecorded(val attempt: Int)
 
 /** The chip registry could not be reached. How long until it is worth asking again. */
+@Serializable
 data class RegistryDown(val retryIn: Int)
 
 val petId = pathParam<Long>("petId", description = "Which pet is being adopted")
@@ -62,7 +69,7 @@ val adoptPet = endpoint(petId) {
  * chip registry to ask. Three answers so each branch of the generated client's
  * `when` is reached by a call rather than by a stub.
  */
-fun adoptionApi() = api(
+fun adoptionApi(codecs: Codecs = JacksonCodecs) = api(
     endpoints = listOf(
         adoptPet handledOrFail { id ->
             when (id) {
@@ -72,7 +79,7 @@ fun adoptionApi() = api(
             }
         },
     ),
-    codecs = JacksonCodecs,
+    codecs = codecs,
 ) {
     title = "Adoption"
     version = "1.0.0"

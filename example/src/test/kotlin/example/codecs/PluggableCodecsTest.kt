@@ -1,12 +1,25 @@
 package example.codecs
 
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
+import example.adoption.adoptPet
+import example.adoption.adoptionApi
 import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.JsonObj
+import io.github.matthewjones372.pelican.JsonStr
+import io.github.matthewjones372.pelican.apiSpec
+import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
+import io.github.matthewjones372.pelican.openapi.openApi
 import io.github.matthewjones372.pelican.openapi.openApiJson
+import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -16,28 +29,29 @@ import kotlin.reflect.typeOf
 
 /**
  * The agreement matrix for the codec modules, run over the ones main ships.
- *
- * 1.0 ships one, so [libraries] holds one and every claim below is a claim
- * about a singleton — true, and asserting less than it used to. The shape is
- * kept because a returning codec module is a row added here and nothing else;
- * at commit a6c20b2, as `ThreeCodecsTest`, it ran three.
+ * A returning codec module is a row added to [libraries] and nothing else.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PluggableCodecsTest {
 
     private val libraries: List<Pair<String, Codecs>> = listOf(
         "jackson" to JacksonCodecs,
+        "kotlinx" to KotlinxCodecs,
     )
 
     private lateinit var apps: Map<String, ApiClient>
 
+    /** Spec 0063's two tagged failures under one `503`, served over each library. */
+    private lateinit var adoptions: Map<String, ApiClient>
+
     @BeforeAll
     fun setUp() {
         apps = libraries.associate { (name, codecs) -> name to notesApi(codecs).inMemory("notes-$name") }
+        adoptions = libraries.associate { (name, codecs) -> name to adoptionApi(codecs).inMemory("adoption-$name") }
     }
 
     @AfterAll
-    fun tearDown() = apps.values.forEach { it.close() }
+    fun tearDown() = (apps.values + adoptions.values).forEach { it.close() }
 
     @Test
     fun `every library reads and writes the same payloads`() {
@@ -107,6 +121,7 @@ class PluggableCodecsTest {
         }
     }
 
+    @Serializable
     data class Reading(val missing: String?, val samples: List<Long?>, val tagged: Map<String, String?>)
 
     @Test
@@ -139,5 +154,107 @@ class PluggableCodecsTest {
         }
 
         documents.values.distinct() shouldBe listOf(documents.getValue("jackson"))
+    }
+
+    @Test
+    fun `a tagged failure carries its tag whichever library wrote it`() {
+        val bodies = listOf(2L, 3L).map { id -> adoptions.mapValues { (_, app) -> app.response(adoptPet, id).body } }
+
+        bodies.map { it.values.distinct() } shouldBe listOf(
+            listOf("""{"kind":"not_recorded","attempt":2}"""),
+            listOf("""{"kind":"registry_down","retryIn":30}"""),
+        )
+    }
+
+    @Test
+    fun `every library publishes the same tagged failures`() {
+        // The tag as a required const in each component and the status as a
+        // oneOf over them (specs 0063 and 0066), which only holds if each
+        // library hoists the payload to a component the document can reach.
+        val documents = libraries.associate { (library, codecs) ->
+            val spec = apiSpec(listOf(adoptPet), codecs) {
+                title = "Adoption"
+                version = "1.0.0"
+            }
+            library to Json.parseToJsonElement(spec.openApiJson())
+        }
+
+        documents.values.distinct() shouldBe listOf(documents.getValue("jackson"))
+    }
+
+    /**
+     * Two differences kotlinx cannot avoid, lined up here rather than matched:
+     * it names a component by its `@SerialName`, which a descriptor carries in
+     * place of the class name, and it lists a union's branches sorted by name
+     * where Jackson follows `@JsonSubTypes`. Golden checks pair branches by tag
+     * (spec 0065), so the order moves no check.
+     */
+    @Serializable
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+    @JsonSubTypes(
+        JsonSubTypes.Type(value = Barter::class, name = "Barter"),
+        JsonSubTypes.Type(value = Voucher::class, name = "Voucher"),
+    )
+    sealed interface Tender
+
+    @Serializable
+    @SerialName("Voucher")
+    data class Voucher(val number: String) : Tender
+
+    @Serializable
+    @SerialName("Barter")
+    data object Barter : Tender
+
+    @Serializable
+    data class Paid(val by: Tender)
+
+    @Serializable
+    data object Declined
+
+    @Serializable
+    data class OnHold(val until: String)
+
+    private val pay = endpoint {
+        post("payments")
+        json<Paid>().orFail(
+            errorJson<Declined>(402, "The card was declined").tagged("declined"),
+            errorJson<OnHold>(402, "The payment is held for review").tagged("held"),
+        )
+    }
+
+    @Test
+    fun `an object with no fields is a component, as a union branch and as a tagged failure`() {
+        val documents = libraries.associate { (library, codecs) ->
+            library to apiSpec(listOf(pay), codecs) {
+                title = "Payments"
+                version = "1.0.0"
+            }.openApi()
+        }
+
+        // swagger-core describes a Kotlin `object` as `{}`, which any value
+        // satisfies, and kotlinx as the object it is. The one difference, so
+        // it is asserted and then set aside rather than matched.
+        documents.mapValues { (_, doc) -> doc.declined()["type"] } shouldBe
+            mapOf("jackson" to null, "kotlinx" to JsonStr("object"))
+        val compared = documents.mapValues { (_, doc) -> doc.withDeclined(JsonObj(doc.declined().fields - "type")) }
+        compared.values.distinct() shouldBe listOf(compared.getValue("jackson"))
+    }
+
+    @Test
+    fun `an object with no fields travels as its tag alone`() {
+        val written = libraries.associate { (library, codecs) ->
+            library to codecs.codec<Paid>(typeOf<Paid>()).encodeToString(Paid(Barter))
+        }
+
+        written.values.distinct() shouldBe listOf("""{"by":{"type":"Barter"}}""")
+    }
+
+    private fun JsonObj.schemas() = (this["components"] as JsonObj)["schemas"] as JsonObj
+
+    private fun JsonObj.declined() = schemas()["Declined"] as JsonObj
+
+    private fun JsonObj.withDeclined(schema: JsonObj): JsonObj {
+        val schemas = schemas() + JsonObj(mapOf("Declined" to schema))
+        return this + JsonObj(mapOf("components" to JsonObj(mapOf("schemas" to schemas))))
     }
 }

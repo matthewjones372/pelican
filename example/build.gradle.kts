@@ -2,6 +2,8 @@ import io.github.matthewjones372.pelican.gradle.DocumentFormat
 
 plugins {
     application
+    // The codecs example's payloads are @Serializable, so kotlinx is a row of its matrix.
+    kotlin("plugin.serialization")
     // The build's own plugin, included from pluginManagement in settings.gradle.kts.
     // The example applies it by id exactly as a consumer would, which is what
     // keeps the plugin honest: if generation breaks, this build breaks.
@@ -29,6 +31,8 @@ dependencies {
     // through it, which is why neither is declared here.
     implementation(project(":pelican-pekko-mcp"))
     implementation(project(":pelican-jackson"))
+    // The second codec module, which the codecs and adoption examples are also served over.
+    implementation(project(":pelican-kotlinx"))
     // Arrow's Either at the edge of a Pelican handler: `example.arrow` is what
     // it looks like, and the module is the whole of what it takes.
     implementation(project(":pelican-arrow"))
@@ -385,7 +389,7 @@ tasks.withType<Test>().configureEach { maxHeapSize = "2g" }
 val namedModules = listOf(
     "pelican-core", "pelican-openapi", "pelican-schema", "pelican-mcp", "pelican-mcp-server",
     "pelican-codegen", "pelican-import",
-    "pelican-jackson", "pelican-arrow",
+    "pelican-jackson", "pelican-kotlinx", "pelican-arrow",
     "pelican-pekko", "pelican-pekko-docs", "pelican-pekko-mcp",
     "pelican-metrics", "pelican-metrics-otel", "pelican-health", "pelican-health-kafka",
     "pelican-health-redis",

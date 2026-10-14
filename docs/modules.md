@@ -3,13 +3,14 @@
 Linked from the [README](../README.md). What each module is for, and what it
 depends on — the list to read when deciding which ones a build actually needs.
 
-Twenty-five library modules and a Gradle plugin; a typical build takes four or
+Twenty-six library modules and a Gradle plugin; a typical build takes four or
 five. The layering is enforced by tests rather than convention.
 
-1.0 ships one server backend, one JSON library and two client transports. The
+1.0 ships one server backend, one JSON library and two client transports, and
+`main` has since brought back a second JSON library, `pelican-kotlinx`. The
 http4k and Ktor backends, the OkHttp and Ktor client transports
-(`pelican-client-okhttp`, `pelican-client-ktor`),
-`pelican-jsoniter` and `pelican-kotlinx` were complete and passing before 1.0,
+(`pelican-client-okhttp`, `pelican-client-ktor`) and
+`pelican-jsoniter` were complete and passing before 1.0,
 and were taken off `main` to keep 1.0 small. They are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e),
 the last commit before they were removed, and are meant to come back after
@@ -19,6 +20,7 @@ the last commit before they were removed, and are meant to come back after
 |---|---|---|
 | `pelican-core` | `jackson-core` *only* | endpoint descriptions, plain codecs, a minimal JSON tree and the parser under it, the client SPI and its in-memory implementation |
 | `pelican-jackson` | core + Jackson | your `Codecs` |
+| `pelican-kotlinx` | core + kotlinx.serialization | your `Codecs`, for `@Serializable` payloads |
 | `pelican-arrow` | core + arrow-core | Arrow's `Either` into Pelican's `Outcome` and back |
 | `pelican-pekko` | core, Pekko HTTP *provided* | descriptions → that server's routes |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and a page — Swagger UI or Redoc |
