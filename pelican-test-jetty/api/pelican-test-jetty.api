@@ -1,0 +1,16 @@
+public final class io/github/matthewjones372/pelican/test/jetty/InMemoryKt {
+	public static final fun client (Lio/github/matthewjones372/pelican/jetty/PelicanServer;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public static final fun inMemory (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/jetty/Handlers;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public static synthetic fun inMemory$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/jetty/Handlers;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/test/ApiClient;
+}
+
+public final class io/github/matthewjones372/pelican/test/jetty/InMemoryTransport : io/github/matthewjones372/pelican/test/Transport, java/lang/AutoCloseable {
+	public fun <init> (Lorg/eclipse/jetty/server/Handler;)V
+	public fun close ()V
+	public final fun exchange (Lorg/eclipse/jetty/http/HttpTester$Request;)Lorg/eclipse/jetty/http/HttpTester$Response;
+	public final fun getResponseTimeoutSeconds ()J
+	public final fun getServer ()Lorg/eclipse/jetty/server/Server;
+	public fun send (Lio/github/matthewjones372/pelican/test/RequestSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+	public final fun setResponseTimeoutSeconds (J)V
+}
+

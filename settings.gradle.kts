@@ -42,6 +42,7 @@ include(
     "pelican-test",
     "pelican-test-golden",
     "pelican-test-pekko",
+    "pelican-test-jetty",
     "pelican-test-wiremock",
     "example",
     // Not a library and not an example: a JMH harness, run only when asked
