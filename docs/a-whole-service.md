@@ -11,14 +11,10 @@ so it compiles on every build. Run it with `./gradlew :example:runReadmeExample`
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
-    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
-    implementation("org.apache.pekko:pekko-actor-typed_2.13")
-    implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
+    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
+    implementation("io.github.matthewjones372:pelican-jetty")
+    implementation("io.github.matthewjones372:pelican-jackson")
+    implementation("io.github.matthewjones372:pelican-jetty-docs")
 }
 ```
 
@@ -35,6 +31,9 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import io.github.matthewjones372.pelican.jetty.handledOrFail
+import io.github.matthewjones372.pelican.jetty.streamedNow
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.map
 import io.github.matthewjones372.pelican.matching
@@ -44,11 +43,7 @@ import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledOrFail
-import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.github.matthewjones372.pelican.queryParam
-import org.apache.pekko.stream.javadsl.Source
 
 // ---------------------------------------------------------------- 1. models
 
@@ -80,7 +75,7 @@ val badKey          = errorJson<ApiError>(401, "Missing or bad API key")
 
 // ------------------------------------------------------------- 3. endpoints
 //
-// This section imports `io.github.matthewjones372.pelican` and nothing else. No Pekko, no Jackson.
+// This section imports `io.github.matthewjones372.pelican` and nothing else. No server library, no Jackson.
 // These are descriptions: they do no work and hold no handler.
 
 val getBookmark = endpoint(bookmarkId) {
@@ -117,7 +112,7 @@ object Bookmarks {
 
 // -------------------------------------------------------------- 5. handlers
 //
-// The only place that knows a stream is a `Source`. Every parameter arrives
+// The only place that knows a stream is a `Sequence`. Every parameter arrives
 // decoded and typed, in the order the endpoint declared it.
 
 val routes = listOf(
@@ -127,7 +122,7 @@ val routes = listOf(
     },
 
     listBookmarks streamedNow { (max, tag) ->               // max: Int, tag: Slug?
-        Source.from(Bookmarks.list(max, tag))
+        Bookmarks.list(max, tag).asSequence()
     },
 
     createBookmark handledOrFail { (key, req) ->            // key: String, req: CreateBookmark

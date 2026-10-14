@@ -13,7 +13,7 @@ pelican {
         create("orders") {
             document.set(layout.projectDirectory.file("orders.yaml"))
             packageName.set("com.example.orders")
-            handlers.set("pekko")            // optional: a stub per operation, "pekko" or "jetty"
+            handlers.set("jetty")            // optional: a stub per operation, "jetty" or "pekko"
         }
     }
 }
@@ -46,11 +46,11 @@ it, and generating a client for it is a path with no codec on it at all. Point
 API, or bind the endpoints to handlers and serve it. `ordersSpec(JacksonCodecs)`
 is the same descriptions with the payload types described from the generated
 Kotlin classes instead, which is what a service that has since edited them
-wants. `handlers.set("pekko")` writes the second
+wants. `handlers.set("jetty")` writes the second
 file — one `TODO()` per operation, in the right binder for each output kind —
 and never overwrites it again, because after the first run it is your service
-rather than generated code. `handlers.set("jetty")` writes the same file
-against `pelican-jetty`'s binders instead.
+rather than generated code. `handlers.set("pekko")` writes the same file
+against `pelican-pekko`'s binders instead.
 
 JSON or YAML, and 3.2, 3.1, 3.0 and Swagger 2.0 alike: a 2.0 document and its 3.0
 twin generate the same descriptions, which is the claim `VersionsTest` makes.

@@ -175,7 +175,7 @@ Swagger UI 5.x.
 interprets onto.** There is no `pelican-spring`, `pelican-micronaut` or
 `pelican-quarkus`, not on main and not among the modules taken off it for 1.0.
 So this section compares two ways of describing an HTTP API, and acting on it
-means moving the web layer to Pekko HTTP or Jetty rather than adding a module
+means moving the web layer to Jetty or Pekko HTTP rather than adding a module
 to the stack you already run. See [Two backends](#when-pelican-is-the-wrong-choice)
 for what that costs, and [Not on this list](roadmap.md#not-on-this-list), which
 says a fourth backend is not planned rather than pending.
@@ -274,7 +274,7 @@ you bind with.
 It is mature and it is much larger. Roughly a dozen server interpreters are
 documented — among them http4s, Netty in four variants, Pekko HTTP, Play,
 Vert.x, Armeria, ZIO HTTP, Helidon Níma and AWS Lambda — against the one
-backend Pelican shipped at 1.0 and the two it ships now, Pekko HTTP and Jetty
+backend Pelican shipped at 1.0 and the two it ships now, Jetty and Pekko HTTP
 (http4k and Ktor were also written, and taken off `main` to keep 1.0 small),
 and four client interpreters against Pelican's one
 generated file. Eight JSON libraries are supported where Pelican ships one,
@@ -397,8 +397,9 @@ record behind it, and 1.0 is the version with the fewest people having tried it
 rather than the most. A service that will be maintained for years by people who
 did not choose this is taking on a risk that a Spring or Ktor service is not.
 
-**Two backends.** Pekko HTTP, and Jetty 12, added after 1.0, which needs no
-Pekko or Scala on the classpath. If you are on Vert.x, Helidon, Armeria, Netty directly,
+**Two backends.** Jetty 12, which needs no Pekko or Scala on the classpath and
+is where a new service starts, and Pekko HTTP, for a service that already runs
+Pekko or Akka. If you are on Vert.x, Helidon, Armeria, Netty directly,
 Jakarta REST, Javalin or Spring MVC, there is no module for you, and writing one
 is a real piece of work even though the reference manual puts the last one at
 about five hundred lines. The Jetty module is a Jetty core `Handler`, not a
@@ -413,8 +414,9 @@ the same suite ran against all three then. They were taken off `main` to keep
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e).
 What narrowed for 1.0 is the *promise*, not the design: a first release's
 stability guarantee covers the pair the maintainer can stand behind, and the
-other two are meant to return after it as restores. Jetty is the choice you
-can depend on today for a service that does not run Pekko.
+other two are meant to return after it as restores. Jetty, added after 1.0, is
+the one to start on; Pekko HTTP is fully supported and is the one to choose
+when the service already has an actor system.
 
 **The refusals are deliberate and they will not be argued away.** Each of these
 is a documented decision with reasoning in the reference manual, not a gap
@@ -452,33 +454,32 @@ waiting on a release:
   or XML module here.
 - **CORS is one policy on the `Api`**, not per endpoint.
 
-**There is no production client story yet, only most of one.** `pelican-codegen`
-generates a real Kotlin client from the descriptions: one method per operation,
-sealed failure types, streamed responses, a per-request timeout, and a
-`ClientTransport` it sends through rather than an HTTP library it is welded to.
-That is more than a toy. But there is no published client artifact — the file is
-generated into your build, and you own it. Two transports ship:
-`pelican-client-pekko` over Pekko HTTP's client, which takes the `ActorSystem`
-a Pekko service already has, and `pelican-client-jetty` over Jetty's, the same
-release `pelican-jetty` serves with. The OkHttp and Ktor adapters
-(`pelican-client-okhttp`, which is the one that runs on Android, and
-`pelican-client-ktor`) were written and passing before 1.0, were
-taken off `main` to keep it small, and are not published at 1.0. They are in the
-history at commit
+**There is no production client story yet, only most of one.**
+`pelican-codegen` generates a real Kotlin client from the descriptions: one
+method per operation, sealed failure types, streamed responses, a per-request
+timeout, and a `ClientTransport` it sends through rather than an HTTP library
+it is welded to. That is more than a toy. But there is no published client
+artifact — the file is generated into your build, and you own it. Two
+transports ship: `pelican-client-jetty` over Jetty's `HttpClient`, the same
+release `pelican-jetty` serves with, and `pelican-client-pekko` over Pekko
+HTTP's client, which takes the `ActorSystem` a Pekko service already has. The
+OkHttp and Ktor adapters (`pelican-client-okhttp`, which is the one that runs
+on Android, and `pelican-client-ktor`) were written and passing before 1.0,
+were taken off `main` to keep it small, and are not published at 1.0. They are
+in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
-and are meant to come back after 1.0. A build carrying more
-than one transport has to name the
-transport at each client it constructs, since nothing can choose between two
-providers on one classpath. The generated methods block by default, joining the
-stage the transport answers with; a `suspend` surface is generated instead when
-the client entry asks for one, and the choice belongs to whoever generates the
-file. Retries are a decorator over a transport rather than generated code, and
-are off unless somebody wraps one — but nothing here does circuit breaking or
-per-call metrics, and those you still write around the transport yourself. The
-client that `pelican-test` derives is explicitly narrower still,
-scoped at testing, blocking, with no retries and no pooling worth the name, and
-it cannot upload a binary file part because its `RequestSpec` carries a `String`
-body.
+and are meant to come back after 1.0. A build carrying more than one transport
+has to name the transport at each client it constructs, since nothing can
+choose between two providers on one classpath. The generated methods block by
+default, joining the stage the transport answers with; a `suspend` surface is
+generated instead when the client entry asks for one, and the choice belongs to
+whoever generates the file. Retries are a decorator over a transport rather
+than generated code, and are off unless somebody wraps one — but nothing here
+does circuit breaking or per-call metrics, and those you still write around the
+transport yourself. The client that `pelican-test` derives is explicitly
+narrower still, scoped at testing, blocking, with no retries and no pooling
+worth the name, and it cannot upload a binary file part because its
+`RequestSpec` carries a `String` body.
 
 **Some checks are startup checks, not compile-time ones.** This is worth saying
 because the front page leads with what the compiler catches. It does not catch a

@@ -35,7 +35,8 @@ The endpoint description is the only description of the HTTP contract. There is
 no annotation scanning and no hand-maintained YAML to keep in step with it.
 
 It is a library, not a framework. It does not own your `main`, and it serves
-through a web stack you already run, which for 1.0 is Pekko HTTP. If you know
+through a web server you can mount beside your own handlers: Jetty 12, which
+these docs use, or Pekko HTTP for a service that already runs it. If you know
 tapir from Scala, this is the same idea, limited to what Kotlin's type system
 can express without implicits.
 
@@ -85,10 +86,11 @@ to endpoint values, so a rename stops them compiling instead of making them
 404. The URLs your callers depend on are pinned in a separate test, one line
 per endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
 
-**Descriptions are independent of the backend.** 1.0 shipped one backend and
-one codec, Pekko HTTP and Jackson, to keep the first release small enough to
-support properly. Jetty now ships beside Pekko, with no Pekko or Scala on its
-classpath, and kotlinx has come back as a second codec module. The http4k and
+**Descriptions are independent of the backend.** Two servers ship, at parity:
+Jetty 12, with no Pekko or Scala on its classpath, and Pekko HTTP. 1.0 shipped
+Pekko and Jackson alone, to keep the first release small enough to support
+properly; Jetty has joined since, and kotlinx has come back as a second codec
+module. The http4k and
 Ktor interpreters and the jsoniter codec were written and passed the same
 parity suites, then were taken off `main` before 1.0. They are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e), the last commit before they were
@@ -129,39 +131,29 @@ The current release is **1.0.0**, on Maven Central under
 `io.github.matthewjones372`, and it needs Java 25. The stability promise
 applies to it (see [Stability](#stability)).
 
+`pelican-bom` lines every module up at one version, so a build names it once
+and leaves the modules without one:
+
 ```kotlin
 dependencies {
-    // The interpreter. Brings pelican-core; compiles against Pekko HTTP.
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
-    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
-    implementation("org.apache.pekko:pekko-actor-typed_2.13")
-    implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
+    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
+    // The interpreter. Brings pelican-core and Jetty 12's server.
+    implementation("io.github.matthewjones372:pelican-jetty")
     // The codec module: Jackson, and the schemas the document derives.
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
-    // /openapi.json and Swagger UI beside the endpoints. startWithDocs lives here.
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
-    // The typed test client.
-    testImplementation("io.github.matthewjones372:pelican-test:1.0.0")
-    // inMemory() and server.client(): the test client run against a Pekko Api.
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0")
-}
-```
-
-After 1.0.0, `pelican-bom` lines every module up at one version, so a build
-names it once and leaves the modules without one:
-
-```kotlin
-dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:$version"))
-    implementation("io.github.matthewjones372:pelican-pekko")
     implementation("io.github.matthewjones372:pelican-jackson")
-    implementation("io.github.matthewjones372:pelican-pekko-docs")
+    // /openapi.json and Swagger UI beside the endpoints. startWithDocs lives here.
+    implementation("io.github.matthewjones372:pelican-jetty-docs")
+    // The typed test client.
     testImplementation("io.github.matthewjones372:pelican-test")
-    testImplementation("io.github.matthewjones372:pelican-test-pekko")
+    // inMemory(handlers) and server.client(): the test client run against a Jetty Api.
+    testImplementation("io.github.matthewjones372:pelican-test-jetty")
 }
 ```
+
+The Jetty modules and `pelican-bom` are new since 1.0.0 and arrive with the
+next release; until then, build them as described at the end of this section.
+1.0.0 itself serves on Pekko HTTP, and [On Pekko](docs/cookbook.md#on-pekko)
+has the dependencies for that.
 
 Those modules are the standard stack. The examples on this page use them,
 except where a section names another module. [Modules](#modules) below lists
@@ -221,37 +213,35 @@ on Maven Central at 1.0.0.
 
 **Server**
 
-- `pelican-pekko`: descriptions to a Pekko HTTP `Route`, and `start` to serve
-  them. Synchronous handlers run on virtual threads (`Handlers`), and `pages`
-  serves a classpath directory beside the endpoints.
-- `pelican-pekko-docs`: `/openapi.json` and a Swagger UI or Redoc page beside
+- `pelican-jetty`: descriptions to a Jetty 12 `Handler`, and `start` to serve
+  them, with no Pekko or Scala on the classpath. Synchronous handlers run on
+  virtual threads (`Handlers`), `pages` serves a classpath directory beside the
+  endpoints, and `toHandler` passes on what it does not answer, so it sits in a
+  `Handler.Sequence` beside handlers of your own.
+- `pelican-jetty-docs`: `/openapi.json` and a Swagger UI or Redoc page beside
   the endpoints (`startWithDocs`).
-- `pelican-streams`: a streamed request body as a lark `Stream`, whose failure
-  is a value, and the result back as the declared `Outcome`.
-- `pelican-jetty`: the same descriptions as a Jetty 12 `Handler`, and `start`
-  to serve them, with no Pekko or Scala on the classpath. Handlers run on
-  virtual threads, and `toHandler` passes on what it does not answer, so it
-  sits in a `Handler.Sequence` beside handlers of your own.
-- `pelican-jetty-docs`, `pelican-jetty-mcp` and `pelican-streams-jetty`: the
-  document, the MCP tools and lark streams, on Jetty.
+- `pelican-streams-jetty`: a streamed request body as a lark `Stream`, whose
+  failure is a value, and the result back as the declared `Outcome`.
+- `pelican-pekko`, `pelican-pekko-docs` and `pelican-streams`: the same on
+  Pekko HTTP, where the descriptions become a Pekko `Route`. See
+  [On Pekko](docs/cookbook.md#on-pekko).
 
 **Client**
 
-- `pelican-client-pekko`: `PekkoHttpTransport`, which sends a generated
-  client's requests through Pekko HTTP's client.
-- `pelican-client-jetty`: `JettyHttpTransport`, which sends them through
-  Jetty's `HttpClient`, for a service with no Pekko.
+- `pelican-client-jetty`: `JettyHttpTransport`, which sends a generated
+  client's requests through Jetty's `HttpClient`.
+- `pelican-client-pekko`: `PekkoHttpTransport`, which sends them through Pekko
+  HTTP's client, for a service that already runs one.
 
 **Testing**
 
 - `pelican-test`: the typed test client, outcome assertions and URL pins, with
   no server library and no matcher library. It also has `TestCallers`,
   `signedInAs`, and an `inMemory()` that needs no backend module.
-- `pelican-test-pekko`: `inMemory()` and `server.client()`, which run the
-  typed test client against a Pekko `Api` without a socket or against a
-  running server.
-- `pelican-test-jetty`: the same on Jetty, `inMemory(handlers)` through Jetty's
-  `LocalConnector`.
+- `pelican-test-jetty`: `inMemory(handlers)` and `server.client()`, which run
+  the typed test client against a Jetty `Api` without a socket, through Jetty's
+  `LocalConnector`, or against a running server.
+- `pelican-test-pekko`: the same on Pekko, `inMemory()`.
 - `pelican-test-golden`: one golden file per endpoint, failing when a change
   would break existing callers.
 - `pelican-test-wiremock`: a WireMock server stubbed and verified with endpoint
@@ -264,8 +254,8 @@ on Maven Central at 1.0.0.
   runs a tool call through the handler. Values only, with no transport.
 - `pelican-mcp-server`: serves those tools over stdio (`mcpServe`), and the
   request/response half of Streamable HTTP for a backend to mount. No MCP SDK.
-- `pelican-pekko-mcp`: mounts the tools on `/mcp` beside the endpoints, and
-  `pelican-jetty-mcp` does the same on Jetty.
+- `pelican-jetty-mcp`: mounts the tools on `/mcp` beside the endpoints, and
+  `pelican-pekko-mcp` does the same on Pekko.
 
 **Metrics**
 
@@ -307,7 +297,7 @@ on Maven Central at 1.0.0.
 `example` and `benchmarks` are part of the build and are not published.
 
 In the repository the modules sit in directories by kind: `core/`, `codecs/`,
-`backends/pekko/`, `backends/jetty/`, `testing/`, `integrations/` and
+`backends/jetty/`, `backends/pekko/`, `testing/`, `integrations/` and
 `tooling/`. The directory is not part of a module's name or coordinates.
 
 ## Your first endpoint
@@ -320,14 +310,10 @@ the example module.
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
-    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
-    implementation("org.apache.pekko:pekko-actor-typed_2.13")
-    implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
+    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
+    implementation("io.github.matthewjones372:pelican-jetty")
+    implementation("io.github.matthewjones372:pelican-jackson")
+    implementation("io.github.matthewjones372:pelican-jetty-docs")
 }
 ```
 
@@ -336,10 +322,10 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import io.github.matthewjones372.pelican.jetty.handledNow
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledNow
 
 data class Greeting(val message: String)
 
@@ -378,7 +364,7 @@ separately. These are two different promises: one to your own code, and one
 to your callers.
 
 ```kotlin
-private val app = greetings().inMemory("first-endpoint")
+private val app = greetings().inMemory(Handlers.onVirtualThreads)   // pelican-test-jetty
 
 app.call(greet, "world") shouldBe Greeting("Hello, world!")
 app.request(greet, "world") shouldBuild "GET /hello/world"
@@ -396,8 +382,8 @@ Each of these errors is real compiler output for the mistake shown:
 +(getUser handledNow { id: String -> ... })
   e: Argument type mismatch: actual type is 'Params.(String) -> User', but 'Params.(Long) -> User' was expected.
 
-+(watchOrders streamedNow { (_, max) -> Source.single("not a tick") })
-  e: Return type mismatch: expected 'Source<Tick, NotUsed>', actual 'Source<String!, NotUsed!>!'.
++(watchOrders streamedNow { (_, max) -> sequenceOf("not a tick") })
+  e: Return type mismatch: expected 'Sequence<Tick>', actual 'Sequence<String>'.
 
 +(getBookmark handledOrFail { id -> Bookmarks.find(id)!! })
   e: Return type mismatch: expected 'Outcome<NoSuchBookmark, Bookmark>', actual 'Bookmark'.
@@ -512,7 +498,7 @@ jsonArray<Order>()          // `[{...},{...}]`, flushed as produced
 bytes()                     // opaque, never buffered
 ```
 
-Handlers return the backend's own stream type (a `Source`, on Pekko), and
+Handlers return the backend's own stream type (a `Sequence`, on Jetty), and
 back-pressure runs from the socket to the source. The test suite throttles a
 source and fails if the first frame does not arrive well before the last, so a
 response that buffers by mistake is caught. SSE streams can carry event ids and
@@ -520,12 +506,12 @@ a retry directive, so a caller can resume where it left off. A request body can
 also be a typed stream, with `ndjsonIn<T>()`. See
 [Streaming](docs/reference.md#how-streaming-stays-backend-agnostic).
 
-`pelican-streams` hands a streamed request body to
+`pelican-streams-jetty` hands a streamed request body to
 [lark's](https://github.com/matthewjones372/lark) `Stream`, which carries a
 failure as a value, and turns the result back into the `Outcome` the endpoint
 declared. A row the handler cannot read then becomes the declared failure
 rather than a 500. See
-[A stream that names its failure](docs/reference.md#a-stream-that-names-its-failure).
+[A stream that names its failure, on Jetty](docs/reference.md#a-stream-that-names-its-failure-on-jetty).
 
 ## Cookies, forms and uploads
 
@@ -564,7 +550,7 @@ knows its name, its arguments, their constraints and the shape of its result,
 which is what a tool description needs. Arguments are decoded with the same
 codecs an HTTP request uses, calls go through the handler the route already
 has, and declared failures come back as results the model can act on.
-`mcpServe(api)` speaks the protocol over stdio, and `pelican-pekko-mcp` mounts
+`mcpServe(api)` speaks the protocol over stdio, and `pelican-jetty-mcp` mounts
 it on `/mcp`. Neither needs an MCP SDK on the classpath. See
 [Tools a model can call](docs/mcp.md).
 
@@ -582,33 +568,30 @@ ordersApi().startWithDocs(port = 8080, docs = ordersDocs)       // plus /openapi
 
 The server listens on loopback by default; listening on the network has to be
 asked for explicitly. The handle is `AutoCloseable` with `block()`, `stop()`
-and `stopAsync()`. A service that already has an `ActorSystem` can pass it in
-with `start(system, port = 8080)`, and whoever created a system is responsible
-for shutting it down.
+and `stopAsync()`.
 
-Pelican does not have to own the port. `toRoute(system)` returns a Pekko
-`Route` and binds nothing, so described endpoints can sit beside routes you
-already have. This is how you would adopt Pelican one endpoint at a time:
+Pelican does not have to own the port. `toHandler()` returns a Jetty `Handler`
+and binds nothing, and it passes on any request it does not answer, so
+described endpoints can sit in a `Handler.Sequence` beside handlers you already
+have. This is how you would adopt Pelican one endpoint at a time:
 
 ```kotlin
-ordersApi().start(port = 8080) { system ->
-    Directives.concat(health, toRoute(system))
-}
+ordersApi().start(port = 8080) { Handler.Sequence(health, toHandler()) }
 ```
 
 A synchronous handler (`handledNow`, `handledOrFail` and the rest) runs on a
-virtual thread of its own, so it can block on a database call without holding
-one of Pekko's dispatcher threads; `handlers = Handlers.onDispatcher` runs it
-on Pekko's dispatcher instead, as 1.0.0-RC3 did. And `pages = pages("ui")` in
-`api`'s block serves a classpath directory beside the endpoints, with an
-endpoint always winning over a page at the same path. See
+virtual thread of its own, so it can block on a database call;
+`handlers = Handlers.onDispatcher` runs it on Jetty's own threads instead. And
+`pages = pages("ui")` in `api`'s block serves a classpath directory beside the
+endpoints, with an endpoint always winning over a page at the same path. See
 [Where a handler runs](docs/reference.md#where-a-handler-runs) and
 [Pages beside the endpoints](docs/reference.md#pages-beside-the-endpoints).
 
-On Jetty the same calls come from `io.github.matthewjones372.pelican.jetty`,
-and `toHandler()` is the Jetty `Handler` to mount in a server you already run.
-It passes on any request it does not answer, so it goes in a
-`Handler.Sequence` with your own; see [On Jetty](docs/reference.md#on-jetty).
+These calls come from `io.github.matthewjones372.pelican.jetty`; see
+[On Jetty](docs/reference.md#on-jetty). On Pekko the same calls come from
+`io.github.matthewjones372.pelican.pekko`, `toRoute(system)` is the Pekko
+`Route` to concatenate with your own, and `start(system, port = 8080)` serves
+on an `ActorSystem` the service already has.
 
 ## Filters
 
@@ -690,10 +673,10 @@ payloads, `pelican-kotlinx` ships too: `api(routes, codecs = KotlinxCodecs)`. Se
 ## Testing
 
 `pelican-test` uses the same descriptions to build a typed client, and
-`pelican-test-pekko` runs it against a Pekko `Api`, in memory or over a socket:
+`pelican-test-jetty` runs it against a Jetty `Api`, in memory or over a socket:
 
 ```kotlin
-val app = bookmarksApi().inMemory()          // no socket; or .start().client() for a real one
+val app = bookmarksApi().inMemory(Handlers.onVirtualThreads)   // no socket; or .start().client() for a real one
 
 val bookmark: Bookmark = app.call(getBookmark, 1L)
 app.outcome(getBookmark, 9_999L) shouldBeError NoSuchBookmark(9_999L, "No bookmark 9999")
@@ -753,7 +736,7 @@ This test, from the example module, points the generated client at it:
 @RegisterExtension
 val orders = PelicanWireMockExtension(JacksonCodecs)
 
-private val client by lazy { OrdersClient(orders.baseUrl, JacksonCodecs, PekkoHttpTransport()) }
+private val client by lazy { OrdersClient(orders.baseUrl, JacksonCodecs, JettyHttpTransport()) }
 
 @Test
 fun `a stubbed declared failure reaches the client as the failure it declares`() {
@@ -776,11 +759,11 @@ agrees with a committed file. See
 Callers who cannot depend on your descriptions get a generated Kotlin client
 instead. The Gradle plugin's `clients` entry runs `pelican-codegen` over the
 same descriptions the server uses. The client sends through a
-`ClientTransport`: `PekkoHttpTransport` from `pelican-client-pekko`, or
-`JettyHttpTransport` from `pelican-client-jetty` for a service with no Pekko:
+`ClientTransport`, here `JettyHttpTransport` from `pelican-client-jetty`
+(`PekkoHttpTransport` from `pelican-client-pekko` sends through a Pekko
+`ActorSystem` the service already runs):
 
 ```kotlin
-val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTransport(system))
 val client = OrdersClient("https://orders.internal", JacksonCodecs, JettyHttpTransport())
 ```
 
@@ -798,9 +781,12 @@ source, which you can then serve, call or stub. See
 
 The backend only affects handlers: bind the same endpoint values with another
 module's binders, and the only thing that changes is the type a streaming
-handler returns. Two ship: `pelican-pekko`, where a stream is a Pekko
-`Source`, and `pelican-jetty`, where it is a `Sequence` pulled on a virtual
-thread:
+handler returns. Two ship, and both are fully supported. `pelican-jetty`, which
+every example here uses, is where to start: a stream is a `Sequence` pulled on
+a virtual thread, and nothing on the classpath is Scala. `pelican-pekko`, where
+a stream is a Pekko `Source`, is the choice for a team already running Pekko or
+Akka, whose actor system Pelican can share. [On Pekko](docs/cookbook.md#on-pekko)
+is the first endpoint served that way, with the dependencies it needs.
 
 ```kotlin
 import io.github.matthewjones372.pelican.jetty.handledNow
