@@ -3,12 +3,14 @@
 Linked from the [README](../README.md). What each module is for, and what it
 depends on — the list to read when deciding which ones a build actually needs.
 
-Twenty-six library modules and a Gradle plugin; a typical build takes four or
+Thirty-one library modules and a Gradle plugin; a typical build takes four or
 five. The layering is enforced by tests rather than convention.
 
-1.0 ships one server backend, one JSON library and two client transports, and
-`main` has since brought back a second JSON library, `pelican-kotlinx`. The
-http4k and Ktor backends, the OkHttp and Ktor client transports
+1.0 shipped one server backend and one JSON library.
+`main` has since added a second server, Jetty, with its own docs, MCP, test,
+streams and client modules, and brought back a second JSON library,
+`pelican-kotlinx`. A service picks Pekko or Jetty; the descriptions do not
+change. The http4k and Ktor backends, the OkHttp and Ktor client transports
 (`pelican-client-okhttp`, `pelican-client-ktor`) and
 `pelican-jsoniter` were complete and passing before 1.0,
 and were taken off `main` to keep 1.0 small. They are in the history at commit
@@ -25,6 +27,9 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-pekko` | core, Pekko HTTP *provided* | descriptions → that server's routes |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and a page — Swagger UI or Redoc |
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
+| `pelican-jetty` | core + jetty-server | descriptions → a Jetty 12 core `Handler`, and `start` to serve it. No Pekko, no Scala, no servlet API |
+| `pelican-jetty-docs` | jetty, openapi | the same document and page as `pelican-pekko-docs`, as a Jetty `Handler` |
+| `pelican-jetty-mcp` | jetty, mcp-server | the same tools as `pelican-pekko-mcp`, on `/mcp`, as a Jetty `Handler` |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
 | `pelican-health` | core *only* | live and ready probes in `application/health+json`, and checks that need only the JDK |
@@ -45,6 +50,7 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-golden` | test + openapi | per-endpoint goldens; fails on a breaking change |
 | `pelican-test-pekko` | test + pekko | the typed test client's in-memory transport |
+| `pelican-test-jetty` | test + jetty | the same on Jetty, through a `LocalConnector`: no socket, but Jetty's own HTTP parsing |
 | `pelican-test-wiremock` | test + WireMock | WireMock stubbed and verified in endpoint values, and stub files exported from them |
 
 Every one of those dependency claims is a test, except `pelican-oidc`'s, which
@@ -92,6 +98,12 @@ rests on its build file for now:
   suffix back on a consumer's classpath through this module.
 - `pelican-streams-jetty` asserts it ships Jetty and Pelican and no lark or
   Pekko: the consumer names `lark-stream` and the backend it runs on.
+- The Jetty family is asserted as a whole, in `example`'s
+  `JettyServiceClasspathTest`: a service built from `pelican-jetty`, its docs,
+  MCP, test, streams and client modules, both codecs and the health, metrics
+  and OIDC modules has no Pekko and no Scala at runtime, and adding `pelican-pekko` to that set is what brings them.
+  Jetty is shipped rather than *provided*, because it has no Scala
+  cross-build for a service to choose.
 - `pelican-test` asserts it drags in no server library and no matcher library.
 - `pelican-test-wiremock` asserts it is core, `pelican-test` and WireMock: no
   server library, and no JUnit, which it compiles against and does not ship. It

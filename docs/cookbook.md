@@ -538,9 +538,10 @@ the test working — read the diff and decide whether the break was intended.
 
 ## Switching backend
 
-1.0 ships one: `pelican-pekko`. The seam it plugs into is still there, and
-`example/backends` is what it looks like — the descriptions in `Greetings.kt`
-name no server library, and `OnPekko.kt` is the whole of binding them:
+Two ship: `pelican-pekko` and `pelican-jetty`. `example/backends` is what the
+seam looks like. The descriptions in `Greetings.kt` name no server library,
+and `OnPekko.kt` and `OnJetty.kt` are the whole of binding them, one with
+Pekko `Source`s and one with `Sequence`s:
 
 ```bash
 ./gradlew :example:runBackends
@@ -548,8 +549,9 @@ name no server library, and `OnPekko.kt` is the whole of binding them:
 
 Switching is one import and the binders for streamed endpoints; everything else
 — the descriptions, the document, the tests through the typed client — is
-unchanged. The http4k and Ktor interpreters were complete, and that suite ran
-against all three, before they were taken off `main` to keep 1.0 small. They
+unchanged, and `AllBackendsTest` runs one suite against both. The http4k and
+Ktor interpreters were complete, and that suite ran against all three, before
+they were taken off `main` to keep 1.0 small. They
 are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
 and are meant to come back after 1.0.

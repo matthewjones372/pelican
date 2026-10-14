@@ -25,6 +25,11 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and a page — Swagger UI or Redoc — over HTTP |
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
+| `pelican-jetty` | core, jetty-server | descriptions → a Jetty 12 core `Handler`, and `start` to serve it. See [On Jetty](#on-jetty) |
+| `pelican-jetty-docs` | jetty, openapi | the document and a page, as a `Handler` beside the endpoints: `handlerWithDocs`, `docsHandler`, `startWithDocs` |
+| `pelican-jetty-mcp` | jetty, mcp-server | the tools on `/mcp`, as a `Handler` beside the endpoints: `handlerWithMcp`, `mcpHandler` |
+| `pelican-streams` | pekko; Pekko and lark *provided* | a streamed upload as a lark `Stream` on Pekko, and the run's end as the declared `Outcome` |
+| `pelican-streams-jetty` | jetty, lark-stream *provided* | the same on Jetty, over `Stream.blocking`, on any lark backend |
 | `pelican-metrics` | core, micrometer-core | descriptions → Micrometer meters, tagged from what the descriptions already say |
 | `pelican-metrics-otel` | core, opentelemetry-api | descriptions → OpenTelemetry server spans and the specified duration histogram |
 | `pelican-health` | **core** | live and ready probes in `application/health+json`, and checks on a JDBC pool, a downstream service, disk, heap and threads, on the JDK alone |
@@ -34,13 +39,16 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-test` | **core** | descriptions → a typed client and assertions. Backend-agnostic; no matcher library. |
 | `pelican-test-golden` | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
+| `pelican-test-jetty` | test, jetty | the in-memory transport on Jetty, through a `LocalConnector`, and `PelicanServer.client()` |
 | `pelican-test-wiremock` | test, WireMock | WireMock stubbed and verified in endpoint values, for testing a client of somebody else's API; and `stubFile`, which exports those stubs as mapping files |
 | `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
-| `example` | core, openapi, jackson, kotlinx, pekko | the orders, bookmarks, greetings and secured services |
+| `example` | core, openapi, jackson, kotlinx, pekko, jetty | the orders, bookmarks, greetings and secured services |
 | `benchmarks` | core, jackson, pekko, JMH | the interpreter measured against hand-written Pekko routes. Not published, not run by `build`. |
 
-1.0 ships one backend, one codec module and two client transports, and
-`pelican-kotlinx` has come back since as a second codec module. The http4k
+1.0 shipped one backend and one codec module. Since
+then Jetty has joined Pekko as a second server, with its own docs, MCP, test,
+streams and client modules, and `pelican-kotlinx` has come back as a second
+codec module. The http4k
 and Ktor interpreters and their `-docs` and `-mcp` modules, the http4k
 in-memory transport, the OkHttp and Ktor client transports
 (`pelican-client-okhttp`, `pelican-client-ktor`) and
@@ -121,17 +129,18 @@ read the endpoint values, not the server.
 What a binding decides is the type a streaming handler returns, and the type a
 raw body arrives as:
 
-| | `pelican-pekko` |
-|---|---|
-| entry point | `Api.toRoute(system)` / `Api.start(...)` |
-| a handler | `(I) -> T` |
-| a stream | `Source<T, NotUsed>` |
-| raw body | `handle.toSource()` |
-| an uploaded file | `file.stream()` |
-| raw output | `Source<ByteString, NotUsed>` |
-| escape hatch | `params.request: HttpRequest` |
-| in-memory testing | `pelican-test`'s `InMemoryTransport` |
-| wrong method on a known path | 405, or 404 when another endpoint declares that method |
+| | `pelican-pekko` | `pelican-jetty` |
+|---|---|---|
+| entry point | `Api.toRoute(system)` / `Api.start(...)` | `Api.toHandler()` / `Api.start(...)` |
+| a handler | `(I) -> T` | `(I) -> T` |
+| a stream | `Source<T, NotUsed>` | `Sequence<T>` |
+| a streamed upload | `rows.toSource()`, `rows.runWith(sink)` | `rows.toSequence()`, `rows.reader()` |
+| raw body | `handle.toSource()` | `handle.toSequence()`, `handle.toSource()` |
+| an uploaded file | `file.stream()` | `file.stream()` |
+| raw output | `Source<ByteString, NotUsed>` | `Sequence<ByteArray>` |
+| escape hatch | `params.request: HttpRequest` | `params.request: Request`, Jetty's |
+| in-memory testing | `pelican-test-pekko`'s `inMemory()` | `pelican-test-jetty`'s `inMemory(handlers)` |
+| wrong method on a known path | 405, or 404 when another endpoint declares that method | the same |
 
 One row is not the backend's at all. A raw body is the request's entity, which
 a server library already has a name for, so a handler asks that backend for it.
@@ -141,7 +150,7 @@ is read the same way whoever bound it. See
 [Multipart uploads](#multipart-uploads).
 
 **`handledNow` means handled in place, on the request** — and *in place* is a
-virtual thread on Pekko: see [Where a handler runs](#where-a-handler-runs).
+virtual thread on both servers: see [Where a handler runs](#where-a-handler-runs).
 `-Now` is a claim about *when*, not about what the answer is carried on: the handler produces the value during the call rather than handing
 back something that completes later, which is `handledBy` and its `…By` family.
 The name does not vary per backend, because the description does not:
@@ -168,10 +177,12 @@ the exception — a consumer that stops reading closes the handler's stream,
 which `SlowConsumerTest` asserts through the backend's own signal.
 
 `example/backends/` is the smallest version of this: `Greetings.kt` describes
-the endpoints, `OnPekko.kt` binds them, and `AllBackendsTest` runs one
-parameterised suite over `allBackends` — one entry on main, three on the branch
-— asserting that every wiring answers identically and generates the same
-OpenAPI document, byte for byte.
+the endpoints, `OnPekko.kt` and `OnJetty.kt` bind them, and `AllBackendsTest`
+runs one parameterised suite over `allBackends`, Pekko and Jetty, asserting
+that every wiring answers identically and generates the same OpenAPI document,
+byte for byte. Where the two servers do differ, and why that is accepted, is
+`JettyDifference` in that package's `Dialects.kt`; see
+[What differs on Jetty](#what-differs-on-jetty).
 
 The binding sits behind a deliberately thin `Backend` interface — `api()`,
 `start(port)`, `stop()` — which is what lets that one suite run without naming
@@ -205,7 +216,7 @@ server.use { it.block() }        // AutoCloseable everywhere; block() returns wh
 decision, and a `start()` that took it silently is one an engine chose rather
 than a service. `host` is the second parameter, after `port`, on `start` and on
 `startWithDocs`, and everything after it is the backend's own — `systemName`
-and `route` on Pekko.
+and `route` on Pekko, `handlers` (and `handler` on `start`) on Jetty.
 
 `PelicanServer.host` reports what was bound. `StartParityTest` pins both the
 parameter order and the default, and holds a returning backend to them by a
@@ -326,6 +337,146 @@ calls `Http.get(system).newServerAt(...)` itself. `start(system)` is that,
 minus the binding boilerplate, plus the `PelicanServer` handle that
 `client()` and `stop()` hang off. `BorrowedSystemTest` holds the ownership
 rule and `BorrowedSystemDocsTest` holds it for the documented form.
+
+### On Jetty
+
+`pelican-jetty` interprets the same descriptions as a Jetty 12 core `Handler`:
+not a servlet, and no Pekko or Scala anywhere on the classpath. Jetty is an
+`api` dependency rather than *provided*, because it has no Scala cross-build
+for a service to choose. The binders are Pekko's, by name, with `Sequence`
+where Pekko takes a `Source`.
+
+```kotlin
+dependencies {
+    implementation("io.github.matthewjones372:pelican-jetty:$pelicanVersion")
+}
+```
+
+```kotlin
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jetty.start
+import io.github.matthewjones372.pelican.jetty.streamedNow
+
+val routes = listOf(
+    getOrder handledNow { id -> store.order(id) },
+    streamOrders streamedNow { store.orders().asSequence() },   // pulled one element per write
+)
+
+val server = api(routes, JacksonCodecs).start(port = 8080)        // binds 127.0.0.1
+server.use { it.block() }
+```
+
+`start` returns a `PelicanServer` with the same five members as Pekko's, and
+`StartParityTest` and `ServerShapeParityTest` hold both to them. Its last
+parameter is the handler to serve, so mounting described endpoints beside a
+hand-written handler is `Handler.Sequence`:
+
+```kotlin
+api.start(port = 8080) { Handler.Sequence(health, toHandler()) }
+```
+
+**`toHandler` passes on where Pekko's route rejects.** A request for a path no
+endpoint declares, or a method no endpoint at that path takes, returns `false`,
+so the next handler in a `Handler.Sequence` is asked, exactly as Pekko's
+`concat` asks the next route. Why each handler passed is recorded on the
+request, and `Unanswered`, the server's default handler, turns the record into
+Pekko's answer: a 404, or a 405 whose `Allow` lists every method any handler in
+the sequence would have taken. `Handler.onlyFor(Method.GET)` wraps a
+hand-written handler the way Pekko's `get` directive wraps a route, so it joins
+that merged `Allow`. The docs and MCP handlers are wrapped that way, which is
+why a `PUT /mcp` answers 405 listing `GET, POST` on both servers.
+
+**A server built by hand needs two settings `start` makes for you:**
+
+```kotlin
+val server = Server().apply {
+    val http = HttpConfiguration().apply { uriCompliance = PELICAN_URI_COMPLIANCE }
+    addConnector(ServerConnector(this, HttpConnectionFactory(http)))
+    handler = api.toHandler()
+    defaultHandler = Unanswered()
+}
+```
+
+Without `Unanswered` Jetty writes its own 404 and a refused method is never a
+405. Without `PELICAN_URI_COMPLIANCE`, Jetty's default refuses four things
+Pekko accepts, with an HTML 400 before any handler runs. Each is safe to accept
+because Pelican routes on the encoded path, resolves dot segments first, and
+then splits and decodes each segment once:
+
+| relaxed | example | why it is safe |
+|---|---|---|
+| `AMBIGUOUS_PATH_SEGMENT` | `%2E%2E` | resolved as `..` before routing, so it never reaches a handler as one |
+| `AMBIGUOUS_PATH_SEPARATOR` | `%2F` | decoded after the split, so it is a character inside one value |
+| `AMBIGUOUS_PATH_ENCODING` | `%25` | decoded once, so `%2561` arrives as the text `%61` |
+| `SUSPICIOUS_PATH_CHARACTERS` | `%5C` | a character inside one value; nothing here reads it as a separator |
+
+A path value can therefore hold `/` or `\`, as it can on Pekko, and a handler
+using one as a file name must check it. A handler mounted beside `toHandler` on
+the same server sees the relaxed paths too, so one that reads the path itself
+should do the same.
+
+**Where a handler runs** follows the same `Handlers` choice as on Pekko, and
+`start` makes the default cost nothing. Under `Handlers.onVirtualThreads`,
+`start` gives Jetty a thread pool that calls every handler on a virtual thread,
+so a synchronous handler starts on one rather than hopping to one, and may
+block. `Handlers.onDispatcher` keeps Jetty's platform threads and runs the
+handler on the one that matched the request; `Handlers.on(executor)` moves it
+to a service's own. Mounted by hand on a server whose pool is platform threads,
+`toHandler()` still moves a synchronous handler to a virtual thread. A `…By`
+handler returns a stage and is never moved, so under `start` it begins on a
+virtual thread too.
+
+**Pages are part of `toHandler`.** With `pages` set in `api`'s block, the
+handler is the endpoints followed by the pages, asked only for `GET`, so an
+endpoint always wins, as on Pekko. The OpenAPI document and the MCP tools are
+handlers of their own, in `pelican-jetty-docs` and `pelican-jetty-mcp`, put
+after `toHandler` by `handlerWithDocs` and `handlerWithMcp`.
+
+**Streams, both ways, are blocking `Sequence`s**, which is what a virtual
+thread is for. A streamed response is written one element per
+`Response.write`, waiting for each write to complete, so a consumer that stops
+reading stops the producer; when the write fails because the client has gone,
+the thread pulling the sequence is interrupted, which is how a sequence
+sleeping or blocked between elements finds out. An `sse` keep-alive is
+scheduled on Jetty's own scheduler and fills any gap that long between
+elements.
+
+A streamed upload is read as it arrives. `rows.toSequence()` is the frames,
+decoded one at a time and iterable once; `rows.reader()` is the same as an
+`Iterator` that can be closed early, and woken from another thread with
+`wake()`, which fails a read blocked on the upload so it throws rather than
+waits. A frame that will not decode, or is longer than `maxFrameBytes`, throws
+from `next()`, and the refusal is the same 400 or 413 Pekko gives. A read waits
+at most five seconds for the next bytes, as Pekko's `asInputStream` does, and
+then fails the request.
+
+```kotlin
+tally handledNow { rows -> Tally(rows.toSequence().count()) }
+```
+
+#### What differs on Jetty
+
+Every suite in `example/backends/` runs on both servers. Where the answers
+differ, the difference is recorded in `JettyDifference`, in that package's
+`Dialects.kt`, with its reason, and `RecordedDifferencesTest` holds the first
+two on the wire:
+
+- **A path that climbs above the root**, raw (`/../x`) or escaped
+  (`/%2E%2E/x`), and one starting with an empty segment (`//x`), is Jetty's own
+  HTML 400; Pekko answers 404. Jetty's URI parser refuses these before any
+  handler runs and no compliance setting lifts it. Both refuse, and nothing is
+  served from outside.
+- **A `…By` handler starts on a virtual thread** under `start`; on Pekko it
+  starts on the dispatcher. Jetty's pool calls every handler on a virtual
+  thread, so there is no platform thread to start it on. A handler returning a
+  stage blocks neither way.
+- **A stalled NDJSON upload fails after five seconds** on Jetty; Pekko reads
+  NDJSON as a `Source` and waits for its idle timeout. Jetty reads frames with
+  a blocking reader, which needs a read timeout of its own, and takes the one
+  Pekko applies to multipart.
+- **A page asked for with `Range` is the whole file, 200**, on Jetty; Pekko
+  answers 206 with the range. Pages are small static assets, and a client that
+  asks for a range and gets 200 takes the whole body, as RFC 9110 allows.
 
 ## Choosing a JSON library
 
@@ -1696,6 +1847,47 @@ or a reset as `StreamTcpException`, a `RuntimeException`, which the default
 with Pekko's own exception as the cause, so a wrapped transport's default
 policy retries a dead node here exactly as it would anywhere else.
 
+### On Jetty
+
+`JettyHttpTransport` from `pelican-client-jetty` is the transport for a
+service with no Pekko, and the one a service on `pelican-jetty` calls out
+with, since it is the same Jetty release:
+
+```kotlin
+val owned = OrdersClient("https://orders.internal", JacksonCodecs, JettyHttpTransport())
+val borrowed = OrdersClient("https://orders.internal", JacksonCodecs, JettyHttpTransport(httpClient))
+```
+
+**Owned or borrowed decides who stops the client.** `JettyHttpTransport()`
+creates a `HttpClient` of its own, starts it on the first request, runs it on
+daemon threads so that a transport found through `ServiceLoader`, which nobody
+holds to close, cannot keep a finished process alive, and stops it on
+`close()`. `JettyHttpTransport(httpClient)` uses one its owner configured and
+started, and `close()` leaves it running: two transports sharing a client must
+not be able to stop each other's.
+
+**An owned client follows no redirects and handles no authentication.** Jetty
+installs protocol handlers that act on a 401 or a 407 themselves, and fail a
+401 that carries no `WWW-Authenticate` challenge rather than handing it over.
+An endpoint that declares a 401 failure expects to receive it, so the owned
+client removes both handlers. A borrowed client is used as its owner
+configured it, so a service lending its own client to a generated one that
+declares a 401 removes the `www-authenticate` handler itself, or uses the
+owned constructor:
+
+```kotlin
+httpClient.protocolHandlers.remove(WWWAuthenticationProtocolHandler.NAME)
+```
+
+Bodies cross without buffering: a `Body.Streaming` is read as the socket is
+ready to write, sized when the caller gave a length and chunked when it did
+not, and the response completes when its head arrives, with the body left on
+the socket as an `InputStream`. The per-request timeout bounds the arrival of
+the head, as it does on Pekko, so a long `sse` response is not cut off by it;
+it expires as a `TimeoutException`, which the default `RetryPolicy` does not
+resend. An exchange cancelled by anything but the caller crosses as an
+`IOException`, which it does.
+
 ### Retrying, and what is safe to retry
 
 Nothing retries unless somebody wrapped a transport in something that does:
@@ -2862,7 +3054,8 @@ val service = api(endpoints, JacksonCodecs) {
   directory reached without its slash is redirected to it, so its page's relative links resolve inside it. A
   path with a `..`, `.` or empty segment answers nothing, so no request reads outside the directory.
 - **Types and caching** are Pekko's, by extension: `text/html`, JavaScript, CSS, SVG and the rest, with
-  `Last-Modified` and conditional requests.
+  `Last-Modified` and conditional requests. Jetty serves them with the same types and validators, and answers
+  a `Range` with the whole file rather than a 206 (see [What differs on Jetty](#what-differs-on-jetty)).
 - **`pages("ui", at = "/site")`** serves the directory under `/site` instead of the root.
 - **Pages are not endpoints.** The document does not list them, and filters do not run for them: a filter wraps a
   handler and reads its endpoint's `Params`, which a file does not have. A check a page needs, such as a login, is
@@ -5218,6 +5411,50 @@ missing value and a failure are different things — so `ndjsonIn<T>` with a
 nullable `T` does not convert, and says so at compile time rather than at the
 first null frame.
 
+### A stream that names its failure, on Jetty
+
+`pelican-streams-jetty` is the same two functions for a service on
+`pelican-jetty`, under `io.github.matthewjones372.pelican.streams.jetty`.
+`toStream` builds the lark `Stream` on lark's own `Stream.blocking` over the
+upload's [`reader()`](#on-jetty), so it needs no lark backend that knows about
+Jetty and no Pekko: the run pulls one frame at a time on whatever lark backend
+the service runs, `lark-stream-forks` for one with no Pekko at all.
+
+```kotlin
+import io.github.matthewjones372.lark.stream.Forks
+import io.github.matthewjones372.lark.stream.mapOrFail
+import io.github.matthewjones372.lark.stream.run
+import io.github.matthewjones372.lark.stream.runFold
+import io.github.matthewjones372.pelican.streams.jetty.toOutcome
+import io.github.matthewjones372.pelican.streams.jetty.toStream
+
+tally handledByOrFail { rows ->
+    rows.toStream()
+        .mapOrFail { it.customer ?: raise(NoCustomer(it.id)) }
+        .runFold(Tally(0)) { seen, _ -> Tally(seen.counted + 1) }
+        .run(Forks())
+        .toOutcome(badRows)
+}
+```
+
+`toOutcome` decides `Done`, `Failed` and `Died` exactly as the Pekko module's
+does. What is particular to Jetty is the stop: a run stopped while its read is
+blocked on an upload the client is still holding open wakes that read, and
+however the run ends the upload is closed, so a stopped run never leaves a
+virtual thread parked on a socket. `StoppedRunTest` holds that with a reader
+actually blocked mid-read.
+
+The module ships Jetty and Pelican and neither lark nor Pekko; the consumer
+names `lark-stream` and its backend:
+
+```kotlin
+dependencies {
+    implementation("io.github.matthewjones372:pelican-streams-jetty:$pelicanVersion")
+    implementation("io.github.matthewjones372:lark-stream:0.9.0")
+    implementation("io.github.matthewjones372:lark-stream-forks:0.9.0")
+}
+```
+
 ### What a bad frame is told
 
 Two refusals, both classified in core and rendered through the service's
@@ -5379,7 +5616,8 @@ and `InMemoryClientTransport`'s own `jsonArrayFrames` is that shape in core.
 
 - `ndjson` / `sse` / `jsonArray` map the source element-by-element into
   `HttpEntities.createChunked`. Back-pressure runs from the socket through Pekko
-  Streams to your source. Tests throttle a source and fail if the first frame
+  Streams to your source. On Jetty the source is a `Sequence`, pulled one
+  element per completed write; see [On Jetty](#on-jetty). Tests throttle a source and fail if the first frame
   does not arrive well before the last — for SSE and for the JSON array, whose
   whole risk is looking streamed while quietly being assembled first.
 - `rawBody()` hands the handler the request body unconsumed, as a
@@ -5453,9 +5691,13 @@ class OverHttpContractTest : ClientContractTest() {
 which depends on `pelican-core` and nothing else — a socket transport is the
 JDK's own `HttpClient`, and a request built from a description is not a
 backend-shaped thing. The *in-memory* transport is, so it lives in a module
-named for its backend: `inMemory()` comes from `pelican-test-pekko`. A service
-on a backend with no in-memory transport of its own takes none of them and
-still gets the typed client.
+named for its backend: `inMemory()` comes from `pelican-test-pekko`, and
+`inMemory(handlers)` from `pelican-test-jetty`, which sends each request
+through Jetty's `LocalConnector`, so no port is bound but Jetty's own HTTP
+parsing, `PELICAN_URI_COMPLIANCE` and `Unanswered` all run. A bare `inMemory()`
+on a Jetty service resolves to core's backend-free one, so pass an argument to
+ask for Jetty's. A service on a backend with no in-memory transport of its own
+takes none of them and still gets the typed client.
 
 `ApiClient(HttpClientTransport(url), codecs)` points the same suite at a
 deployed service — every call in it, including one whose endpoint declares a

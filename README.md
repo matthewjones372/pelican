@@ -85,11 +85,12 @@ to endpoint values, so a rename stops them compiling instead of making them
 404. The URLs your callers depend on are pinned in a separate test, one line
 per endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
 
-**Descriptions are independent of the backend.** 1.0 ships one backend and one
-codec, Pekko HTTP and Jackson, to keep the first release small enough to
-support properly. kotlinx has since come back as a second codec module. The
-http4k and Ktor interpreters and the jsoniter codec were written and passed
-the same parity suites, then were taken off `main` before 1.0. They are in the history at commit
+**Descriptions are independent of the backend.** 1.0 shipped one backend and
+one codec, Pekko HTTP and Jackson, to keep the first release small enough to
+support properly. Jetty now ships beside Pekko, with no Pekko or Scala on its
+classpath, and kotlinx has come back as a second codec module. The http4k and
+Ktor interpreters and the jsoniter codec were written and passed the same
+parity suites, then were taken off `main` before 1.0. They are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e), the last commit before they were
 removed, and are meant to come back after 1.0. Your descriptions will not need
 to change when they do.
@@ -198,6 +199,8 @@ on Maven Central at 1.0.0.
 
 - `pelican-jackson`: the `Codecs`. Jackson reads and writes bodies, and
   swagger-core describes the types for the document.
+- `pelican-kotlinx`: the `Codecs` for `@Serializable` payloads. kotlinx reads
+  and writes bodies, and the same `SerialDescriptor`s describe the types.
 - `pelican-arrow`: Arrow's `Either` to an `Outcome` (`toOutcome`) and back
   (`toEither`), and a `toOutcome { }` that names which of several declared
   failures a `Left` becomes.
@@ -211,11 +214,19 @@ on Maven Central at 1.0.0.
   the endpoints (`startWithDocs`).
 - `pelican-streams`: a streamed request body as a lark `Stream`, whose failure
   is a value, and the result back as the declared `Outcome`.
+- `pelican-jetty`: the same descriptions as a Jetty 12 `Handler`, and `start`
+  to serve them, with no Pekko or Scala on the classpath. Handlers run on
+  virtual threads, and `toHandler` passes on what it does not answer, so it
+  sits in a `Handler.Sequence` beside handlers of your own.
+- `pelican-jetty-docs`, `pelican-jetty-mcp` and `pelican-streams-jetty`: the
+  document, the MCP tools and lark streams, on Jetty.
 
 **Client**
 
 - `pelican-client-pekko`: `PekkoHttpTransport`, which sends a generated
   client's requests through Pekko HTTP's client.
+- `pelican-client-jetty`: `JettyHttpTransport`, which sends them through
+  Jetty's `HttpClient`, for a service with no Pekko.
 
 **Testing**
 
@@ -225,6 +236,8 @@ on Maven Central at 1.0.0.
 - `pelican-test-pekko`: `inMemory()` and `server.client()`, which run the
   typed test client against a Pekko `Api` without a socket or against a
   running server.
+- `pelican-test-jetty`: the same on Jetty, `inMemory(handlers)` through Jetty's
+  `LocalConnector`.
 - `pelican-test-golden`: one golden file per endpoint, failing when a change
   would break existing callers.
 - `pelican-test-wiremock`: a WireMock server stubbed and verified with endpoint
@@ -237,7 +250,8 @@ on Maven Central at 1.0.0.
   runs a tool call through the handler. Values only, with no transport.
 - `pelican-mcp-server`: serves those tools over stdio (`mcpServe`), and the
   request/response half of Streamable HTTP for a backend to mount. No MCP SDK.
-- `pelican-pekko-mcp`: mounts the tools on `/mcp` beside the endpoints.
+- `pelican-pekko-mcp`: mounts the tools on `/mcp` beside the endpoints, and
+  `pelican-jetty-mcp` does the same on Jetty.
 
 **Metrics**
 
@@ -573,6 +587,11 @@ endpoint always winning over a page at the same path. See
 [Where a handler runs](docs/reference.md#where-a-handler-runs) and
 [Pages beside the endpoints](docs/reference.md#pages-beside-the-endpoints).
 
+On Jetty the same calls come from `io.github.matthewjones372.pelican.jetty`,
+and `toHandler()` is the Jetty `Handler` to mount in a server you already run.
+It passes on any request it does not answer, so it goes in a
+`Handler.Sequence` with your own; see [On Jetty](docs/reference.md#on-jetty).
+
 ## Filters
 
 A filter runs around every handler and sees the request with its inputs
@@ -739,11 +758,12 @@ agrees with a committed file. See
 Callers who cannot depend on your descriptions get a generated Kotlin client
 instead. The Gradle plugin's `clients` entry runs `pelican-codegen` over the
 same descriptions the server uses. The client sends through a
-`ClientTransport`, and the one that ships is `PekkoHttpTransport` from
-`pelican-client-pekko`:
+`ClientTransport`: `PekkoHttpTransport` from `pelican-client-pekko`, or
+`JettyHttpTransport` from `pelican-client-jetty` for a service with no Pekko:
 
 ```kotlin
 val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTransport(system))
+val client = OrdersClient("https://orders.internal", JacksonCodecs, JettyHttpTransport())
 ```
 
 Each declared response becomes a member of a sealed type the caller can match
@@ -760,12 +780,27 @@ source, which you can then serve, call or stub. See
 
 The backend only affects handlers: bind the same endpoint values with another
 module's binders, and the only thing that changes is the type a streaming
-handler returns. 1.0 ships `pelican-pekko`. The http4k and Ktor interpreters
-were complete and passing when they were taken off `main` before 1.0; commit
-[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e) has them, with a parity suite that
-runs the same descriptions against all three and checks that they respond
-identically, down to the generated OpenAPI document being the same string. `example/backends/` shows how this works: the
-descriptions are in one file, with one binding file per backend.
+handler returns. Two ship: `pelican-pekko`, where a stream is a Pekko
+`Source`, and `pelican-jetty`, where it is a `Sequence` pulled on a virtual
+thread:
+
+```kotlin
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jetty.start
+
+api(listOf(getOrder handledNow { id -> store.order(id) }), JacksonCodecs).start(port = 8080)
+```
+
+A parity suite runs the same descriptions against both and checks that they
+respond identically, down to the generated OpenAPI document being the same
+string. The few places they differ, such as Jetty refusing a path that climbs
+above the root with its own 400, are recorded with a reason in
+[On Jetty](docs/reference.md#on-jetty). `example/backends/` shows how this
+works: the descriptions are in one file, with one binding file per backend.
+The http4k and Ktor interpreters were complete and passing when they were
+taken off `main` before 1.0; commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
+has them.
 
 ---
 

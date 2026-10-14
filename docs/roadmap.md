@@ -357,17 +357,20 @@ suites, and were taken off `main` to keep 1.0 small. They are in the history at
 commit [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e),
 the last commit before they were removed, and are meant to come back after
 1.0. Re-adding each is meant to be a restore, not a rewrite: the parity
-harness and the codec agreement matrix keep their shape on `main` with a single
-entry so that a returning module plugs back into a live socket.
+harness and the codec agreement matrix keep their shape on `main` so that a
+returning module plugs back into a live socket. `pelican-kotlinx` has come back
+that way (spec 0076). Jetty joined the harness as a second entry beside Pekko
+(specs 0073 to 0075), for a service that runs no Pekko.
 
 ## Not on this list
 
 Things that look like gaps and are not, with the reasoning in
 [What isn't here](reference.md#what-isnt-here): writing OpenAPI 3.0, validating
 credentials, `callbacks`, `anyOf`/`not`, a lenient importer, nested objects in
-form bodies, more than one streamed file part. A *fourth* backend belongs here
-too. The claim a backend count buys is that the interpreter is not shaped by any
-one of them, and three of them is proof enough of that. The proof is in the
+form bodies, more than one streamed file part. Another backend *as proof*
+belongs here too. The claim a backend count buys is that the interpreter is not
+shaped by any one of them, and three of them is proof enough of that. Jetty
+was added for a different reason, a service with no Pekko on its classpath. The proof is in the
 history at commit `a6c20b2`, where the same descriptions and the same parity
 suite ran against Pekko, http4k and Ktor. Narrowing what 1.0 ships does not
 un-prove it, and it is not an argument for a fourth.
