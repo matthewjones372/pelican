@@ -173,7 +173,7 @@ plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
 ```
 
 To build against unreleased changes, `./gradlew publishToMavenLocal` installs
-the modules and `./gradlew -p pelican-gradle-plugin publishToMavenLocal`
+the modules and `./gradlew -p tooling/pelican-gradle-plugin publishToMavenLocal`
 installs the plugin. Between releases the version comes from the nearest git
 tag: an untagged commit gets a `-SNAPSHOT` of the next version.
 
@@ -291,6 +291,10 @@ on Maven Central at 1.0.0.
   endpoints, and the checks against committed copies.
 
 `example` and `benchmarks` are part of the build and are not published.
+
+In the repository the modules sit in directories by kind: `core/`, `codecs/`,
+`backends/pekko/`, `backends/jetty/`, `testing/`, `integrations/` and
+`tooling/`. The directory is not part of a module's name or coordinates.
 
 ## Your first endpoint
 

@@ -12,7 +12,7 @@ updates:
   - package-ecosystem: "gradle"
     directories:
       - "/"
-      - "/pelican-gradle-plugin"
+      - "/tooling/pelican-gradle-plugin"
     # One batch a week, before the working week rather than during it.
     schedule:
       interval: "weekly"

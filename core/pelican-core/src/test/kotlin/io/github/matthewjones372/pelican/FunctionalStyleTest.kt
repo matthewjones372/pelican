@@ -29,66 +29,68 @@ import java.io.File
  * declares the same directories as inputs of the task that runs this test. A
  * test that resolved them itself would read files Gradle knows nothing about,
  * and a violation would ride green builds until `--rerun-tasks`. See
- * `pelican-core/build.gradle.kts`.
+ * `core/pelican-core/build.gradle.kts`.
  */
 class FunctionalStyleTest {
 
     private val builders = mapOf(
-        "pelican-health/src/main/kotlin/io/github/matthewjones372/pelican/health/Health.kt" to
+        "integrations/pelican-health/src/main/kotlin/io/github/matthewjones372/pelican/health/Health.kt" to
             "health { } collects its checks a call at a time, and the Health it returns is handed a copy",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/ApiBuilder.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/ApiBuilder.kt" to
             "the filter chain accumulates a line at a time, and the Api it returns is handed a copy",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Endpoint.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Endpoint.kt" to
             "EndpointBuilder collects declarations as they are made and freezes them into an Endpoint",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/JsonValue.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/JsonValue.kt" to
             "the jsonObj/jsonArr DSL, which is an accumulate-then-render builder by definition",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Cors.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Cors.kt" to
             "the allowed-headers set is built once per Api and read from every request after",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Forms.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Forms.kt" to
             "form decoding gathers repeated keys before deciding what the value is",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Security.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Security.kt" to
             "scheme registration accumulates, then the document reads it",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Params.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Params.kt" to
             "the attribute bag a filter writes into: mutable for the length of one request, by design",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/spi/RouteIndex.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/spi/RouteIndex.kt" to
             "the walk collects captured segments as it descends and unwinds them when a branch " +
             "fails, which is what lets a literal be tried before a capture without matching twice",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/BodyCodec.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/BodyCodec.kt" to
             "codecs are resolved once per type and cached against it, and SchemaNames remembers which " +
             "type claimed each component name while one is being described",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/InMemory.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/InMemory.kt" to
             "the per-request value bag handed to Params, as in each interpreter",
-        "pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/spi/Requests.kt" to
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/spi/Requests.kt" to
             "the response-to-codec table, keyed by identity because two responses can carry one payload " +
             "type and a negotiated one carries the same type under several encodings; built once per " +
             "endpoint and handed to the interpreter as a Map",
-        "pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/RedocLook.kt" to
+        "core/pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/RedocLook.kt" to
             "RedocLookBuilder collects stylesheets a call at a time, and the RedocLook it builds is handed a copy",
-        "pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/OpenApi.kt" to
+        "core/pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/OpenApi.kt" to
             "component schemas are collected as the document is walked, then emitted once",
-        "pelican-schema/src/main/kotlin/io/github/matthewjones372/pelican/schema/StandaloneSchemas.kt" to
+        "core/pelican-schema/src/main/kotlin/io/github/matthewjones372/pelican/schema/StandaloneSchemas.kt" to
             "SchemaComponents is written into as a type is walked, and the document freezes it into `\$defs`",
-        "pelican-test-wiremock/src/main/kotlin/io/github/matthewjones372/pelican/test/wiremock/StubFile.kt" to
+        "testing/pelican-test-wiremock/src/main/kotlin/io/github/matthewjones372/pelican/test/wiremock/StubFile.kt" to
             "the stubFile DSL collects stubs as they are declared and freezes them into the mapping " +
             "files writeTo renders, which is what a builder is",
-        "pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/KotlinClient.kt" to
+        "tooling/pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/KotlinClient.kt" to
             "the emitter builds one client method's parameter list, keeping names unique as it goes",
-        "pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/KotlinTypes.kt" to
+        "tooling/pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/KotlinTypes.kt" to
             "generated type names are registered as they are minted, so a second use finds the first",
-        "pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/Unions.kt" to
+        "tooling/pelican-codegen/src/main/kotlin/io/github/matthewjones372/pelican/codegen/Unions.kt" to
             "merging an `allOf` gathers the properties its branches declare, then freezes them into one schema",
-        "pelican-jackson/src/main/kotlin/io/github/matthewjones372/pelican/jackson/KotlinAwareModelResolver.kt" to
+        "codecs/pelican-jackson/src/main/kotlin/" +
+            "io/github/matthewjones372/pelican/jackson/KotlinAwareModelResolver.kt" to
             "swagger's Schema is a mutable Java bean; patching it is the integration",
 
-        "pelican-metrics-otel/src/main/kotlin/io/github/matthewjones372/pelican/metrics/otel/ClientTracing.kt" to
+        "integrations/pelican-metrics-otel/src/main/kotlin/" +
+            "io/github/matthewjones372/pelican/metrics/otel/ClientTracing.kt" to
             "OpenTelemetry's propagator injects into a carrier through a Setter, so the headers it " +
             "writes have to be gathered somewhere mutable; they are folded into the request on the " +
             "next line and the list is never seen again",
-        "pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Interpreter.kt" to
+        "backends/pekko/pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Interpreter.kt" to
             "the per-request value bag handed to Params",
-        "pelican-jetty/src/main/kotlin/io/github/matthewjones372/pelican/jetty/Interpreter.kt" to
+        "backends/jetty/pelican-jetty/src/main/kotlin/io/github/matthewjones372/pelican/jetty/Interpreter.kt" to
             "the per-request value bag handed to Params, as on Pekko",
-        "pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Responses.kt" to
+        "backends/pekko/pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Responses.kt" to
             "the empty parameter map Pekko's customWithFixedCharset takes, and the cache of the content " +
             "types built from it — one entry per declared media type, none of them from a request",
     )
@@ -101,7 +103,7 @@ class FunctionalStyleTest {
     /** Absent means the build's wiring is gone, which is the failure this test cannot survive. */
     private fun handedOver(name: String): String {
         val value = System.getProperty(name)
-        withClue("the build must pass -D$name; see pelican-core/build.gradle.kts") { value.shouldNotBeNull() }
+        withClue("the build must pass -D$name; see core/pelican-core/build.gradle.kts") { value.shouldNotBeNull() }
         return value!!
     }
 

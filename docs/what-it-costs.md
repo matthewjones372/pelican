@@ -182,7 +182,7 @@ actually turn, because `toStrict` materialises.
 Two orders of magnitude more than the routing above, and the interpreter is
 2.8µs and 6.8KB *under* the hand-written route, because it asks Pekko for the
 cheaper of two reads when the request declared its length. See
-[`ChunkedBodyLimitTest`](../pelican-pekko/src/test/kotlin/io/github/matthewjones372/pelican/pekko/ChunkedBodyLimitTest.kt)
+[`ChunkedBodyLimitTest`](../backends/pekko/pelican-pekko/src/test/kotlin/io/github/matthewjones372/pelican/pekko/ChunkedBodyLimitTest.kt)
 for why the other read still exists.
 
 ## Jetty

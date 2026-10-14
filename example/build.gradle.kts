@@ -405,11 +405,12 @@ val namedModules = listOf(
     "example",
 )
 
-// One list, read twice, for the reason `pelican-core/build.gradle.kts` gives:
+// One list, read twice, for the reason `core/pelican-core/build.gradle.kts` gives:
 // Gradle snapshots these to decide whether the answer still holds, and the test
 // walks these same directories to reach it.
 val namedSources = namedModules.flatMap {
-    listOf(rootDir.resolve("$it/src/main/kotlin"), rootDir.resolve("$it/src/test/kotlin"))
+    val dir = project(":$it").projectDir
+    listOf(dir.resolve("src/main/kotlin"), dir.resolve("src/test/kotlin"))
 }
 
 tasks.test {

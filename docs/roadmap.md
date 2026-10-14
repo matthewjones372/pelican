@@ -103,7 +103,7 @@ This is first because it is the cheapest item on the list and the one that most
 changes what Pelican is for. Every competitor makes you name the operation
 twice — once in the route, once in the metric. Here the name already exists.
 
-**Touches** `pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Filter.kt`,
+**Touches** `core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Filter.kt`,
 the interpreters, a new `pelican-metrics` module.
 **Done when** one line in an `api { }` block produces a request counter and a latency
 timer dimensioned by method, path template, operation and status; the example
@@ -171,7 +171,7 @@ runtime preamble the generator emits, not a swapped field.
   by tying up a thread per call, which is most of what a Ktor or Pekko client
   was for. `CompletionStage` is also what core already uses for the same job on
   the server side, at
-  [Api.kt:109](../pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Api.kt),
+  [Api.kt:109](../core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Api.kt),
   and it is a JDK type, so core keeps its stdlib-only classpath. `suspend`
   cannot live in core for that last reason alone.
 
@@ -242,7 +242,7 @@ deciding how the handler learns which one was picked.
 
 `api { covers = ... }` catches an endpoint that was described and never bound, but
 it catches it when the `Api` is constructed —
-[Api.kt:254](../pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Api.kt).
+[Api.kt:254](../core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Api.kt).
 That is a test away from useless and a KSP processor away from being a compile
 error. Worth doing, worth doing after the items above.
 
