@@ -10,14 +10,16 @@
 // spec 0045. It has no transitive dependencies of its own, and every service
 // using `pelican-jackson` already has it, so the shipped configuration gains
 // no jar. `NoThirdPartyDependenciesTest` permits exactly this one artifact and
-// still asserts databind, kotlinx and Pekko are absent.
+// still asserts databind, kotlinx and Pekko are absent. `implementation`, not
+// `api`: no public signature names a Jackson type, so a caller never compiles
+// against it.
 //
 // If this file ever grows a `pekko` dependency, the layering has been broken.
 
 dependencies {
     // Pinned to match `pelican-jackson`, so a service running both resolves one
     // version; an application's own BOM still wins.
-    api("com.fasterxml.jackson.core:jackson-core:2.22.3")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.22.3")
 }
 
 /**
