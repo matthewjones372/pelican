@@ -28,6 +28,7 @@ include(
     "pelican-pekko-docs",
     "pelican-pekko-mcp",
     "pelican-jetty",
+    "pelican-jetty-docs",
     "pelican-jetty-mcp",
     "pelican-metrics",
     "pelican-metrics-otel",

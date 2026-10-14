@@ -97,6 +97,7 @@ val moduleDescriptions = mapOf(
     "pelican-pekko-docs" to "Serves the OpenAPI document and Swagger UI on Pekko HTTP.",
     "pelican-pekko-mcp" to "Serves the MCP tools over Streamable HTTP on Pekko HTTP.",
     "pelican-jetty" to "Endpoint descriptions to a Jetty 12 handler.",
+    "pelican-jetty-docs" to "Serves the OpenAPI document and Swagger UI on Jetty.",
     "pelican-jetty-mcp" to "Serves the MCP tools over Streamable HTTP on Jetty.",
     "pelican-metrics" to "Micrometer meters for a Pelican service, dimensioned by the descriptions.",
     "pelican-metrics-otel" to "OpenTelemetry spans and metrics for a Pelican service, from the descriptions.",
