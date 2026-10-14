@@ -1,7 +1,13 @@
 package io.github.matthewjones372.pelican.jetty
 
 import io.github.matthewjones372.pelican.Api
+import org.eclipse.jetty.http.UriCompliance
+import org.eclipse.jetty.http.UriCompliance.Violation.AMBIGUOUS_PATH_ENCODING
+import org.eclipse.jetty.http.UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR
+import org.eclipse.jetty.http.UriCompliance.Violation.SUSPICIOUS_PATH_CHARACTERS
 import org.eclipse.jetty.server.Handler
+import org.eclipse.jetty.server.HttpConfiguration
+import org.eclipse.jetty.server.HttpConnectionFactory
 import org.eclipse.jetty.server.NetworkConnector
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
@@ -45,6 +51,17 @@ class PelicanServer internal constructor(
 private val STOP_TIMEOUT: Duration = Duration.ofSeconds(30)
 
 /**
+ * Jetty's default refuses `%2F`, `%25` and `%5C` in a path as ambiguous. Pelican routes on the encoded path and
+ * decodes each segment once after splitting, so none is ambiguous to it, and Pekko accepts all three.
+ */
+val PELICAN_URI_COMPLIANCE: UriCompliance = UriCompliance.DEFAULT.with(
+    "pelican",
+    AMBIGUOUS_PATH_SEPARATOR,
+    AMBIGUOUS_PATH_ENCODING,
+    SUSPICIOUS_PATH_CHARACTERS,
+)
+
+/**
  * Binds this API on [host]:[port]; port 0 lets the OS choose. [handler] is how a module knowing more than this
  * one, such as one serving an OpenAPI document, adds to it.
  */
@@ -55,8 +72,9 @@ fun Api.start(
     handler: Api.() -> Handler = { toHandler(handlers) },
 ): PelicanServer {
     val server = Server()
+    val http = HttpConfiguration().apply { uriCompliance = PELICAN_URI_COMPLIANCE }
     server.addConnector(
-        ServerConnector(server).apply {
+        ServerConnector(server, HttpConnectionFactory(http)).apply {
             this.host = host
             this.port = port
         },

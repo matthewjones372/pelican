@@ -31,6 +31,9 @@ import java.util.concurrent.CompletionStage
 /**
  * Interprets an [Api] as a Jetty handler that answers every request it is given, a path it does not describe
  * included. Endpoints only: nothing here generates an OpenAPI document.
+ *
+ * A server built by hand should set its `HttpConfiguration.uriCompliance` to [PELICAN_URI_COMPLIANCE], or Jetty
+ * answers a `%2F` in a path parameter with its own 400 before this handler sees it.
  */
 fun Api.toHandler(handlers: Handlers = Handlers.onVirtualThreads): Handler {
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
@@ -84,7 +87,7 @@ internal class PelicanHandler(
     private fun route(request: Request): CompletionStage<Reply> {
         val method = methods.firstOrNull { it.name == request.method }
             ?: return CompletableFuture.completedStage(notAllowed)
-        val path = Request.getPathInContext(request)
+        val path = request.encodedPathInContext()
         val values = LinkedHashMap<ParamKey<*>, Any?>()
 
         val matched = try {
@@ -108,10 +111,15 @@ internal class PelicanHandler(
         values: MutableMap<ParamKey<*>, Any?>,
     ): CompletionStage<Reply> {
         val ep = se.endpoint
+        // Built before decoding, so a filter or a failing decode can still put a header on the way out.
         val params = Params(values, request, ep)
 
-        // Path captures are already in [values]: the index decoded them as it matched. The caller check,
-        // negotiation, and query, header and cookie params go here, in Pekko's order.
+        // The caller check, then negotiation, go here, ahead of the inputs as Pekko orders them.
+        try {
+            decodePlainInputs(ep, request, values)
+        } catch (t: Throwable) {
+            return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params.responseHeaders()))
+        }
 
         return readBody(ep)
             .thenCompose { handlers.getValue(se)(params) }
