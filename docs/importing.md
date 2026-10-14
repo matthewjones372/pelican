@@ -13,7 +13,7 @@ pelican {
         create("orders") {
             document.set(layout.projectDirectory.file("orders.yaml"))
             packageName.set("com.example.orders")
-            handlers.set("pekko")            // optional: a stub per operation
+            handlers.set("pekko")            // optional: a stub per operation, "pekko" or "jetty"
         }
     }
 }
@@ -49,7 +49,8 @@ Kotlin classes instead, which is what a service that has since edited them
 wants. `handlers.set("pekko")` writes the second
 file — one `TODO()` per operation, in the right binder for each output kind —
 and never overwrites it again, because after the first run it is your service
-rather than generated code.
+rather than generated code. `handlers.set("jetty")` writes the same file
+against `pelican-jetty`'s binders instead.
 
 JSON or YAML, and 3.2, 3.1, 3.0 and Swagger 2.0 alike: a 2.0 document and its 3.0
 twin generate the same descriptions, which is the claim `VersionsTest` makes.

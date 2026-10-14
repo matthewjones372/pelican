@@ -2506,7 +2506,9 @@ chosen:
 ### Handler stubs
 
 `handlers.set("pekko")` writes a second file with one `TODO()` per operation,
-bound with the right binder for each output kind: `handledOrFail` where
+importing `pelican.pekko`, and `handlers.set("jetty")` writes the same file
+importing `pelican.jetty`. Each operation is bound with the right binder for
+its output kind: `handledOrFail` where
 failures are declared, `streamedNow` for NDJSON and SSE, `bytesNow` for a byte
 stream, `handledWith` where there is no body. It compiles immediately and
 throws the moment a request reaches something unwritten, which is the honest
@@ -2519,7 +2521,7 @@ package this release does not ship, and a file that cannot compile is worse than
 a build that stops. The two values stay in the enum because those interpreters
 are meant to return after 1.0 and deleting them would be the larger break.
 Restore the module from that commit and generate there, or generate for
-`pekko`.
+`pekko` or `jetty`.
 
 It is written once and never overwritten. After the first run it is not
 generated code any more. Inside `build/` the whole directory belongs to the

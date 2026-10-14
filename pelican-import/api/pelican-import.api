@@ -1,5 +1,6 @@
 public final class io/github/matthewjones372/pelican/importer/Backend : java/lang/Enum {
 	public static final field HTTP4K Lio/github/matthewjones372/pelican/importer/Backend;
+	public static final field JETTY Lio/github/matthewjones372/pelican/importer/Backend;
 	public static final field KTOR Lio/github/matthewjones372/pelican/importer/Backend;
 	public static final field PEKKO Lio/github/matthewjones372/pelican/importer/Backend;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;

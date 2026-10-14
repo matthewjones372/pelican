@@ -233,6 +233,7 @@ enum class Backend(internal val packageName: String) {
     PEKKO("io.github.matthewjones372.pelican.pekko"),
     HTTP4K("io.github.matthewjones372.pelican.http4k"),
     KTOR("io.github.matthewjones372.pelican.ktor"),
+    JETTY("io.github.matthewjones372.pelican.jetty"),
 }
 
 /**
