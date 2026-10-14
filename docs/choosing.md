@@ -175,8 +175,8 @@ Swagger UI 5.x.
 interprets onto.** There is no `pelican-spring`, `pelican-micronaut` or
 `pelican-quarkus`, not on main and not among the modules taken off it for 1.0.
 So this section compares two ways of describing an HTTP API, and acting on it
-means moving the web layer to Pekko HTTP rather than adding a module to the
-stack you already run. See [One backend at 1.0](#when-pelican-is-the-wrong-choice)
+means moving the web layer to Pekko HTTP or Jetty rather than adding a module
+to the stack you already run. See [Two backends](#when-pelican-is-the-wrong-choice)
 for what that costs, and [Not on this list](roadmap.md#not-on-this-list), which
 says a fourth backend is not planned rather than pending.
 
@@ -274,8 +274,9 @@ you bind with.
 It is mature and it is much larger. Roughly a dozen server interpreters are
 documented — among them http4s, Netty in four variants, Pekko HTTP, Play,
 Vert.x, Armeria, ZIO HTTP, Helidon Níma and AWS Lambda — against the one
-backend Pelican ships at 1.0 (three were written; two were taken off `main`
-to keep 1.0 small), and four client interpreters against Pelican's one
+backend Pelican shipped at 1.0 and the two it ships now, Pekko HTTP and Jetty
+(http4k and Ktor were also written, and taken off `main` to keep 1.0 small),
+and four client interpreters against Pelican's one
 generated file. Eight JSON libraries are supported where Pelican ships one,
 with two more written and taken off `main` the same way.
 
@@ -396,22 +397,24 @@ record behind it, and 1.0 is the version with the fewest people having tried it
 rather than the most. A service that will be maintained for years by people who
 did not choose this is taking on a risk that a Spring or Ktor service is not.
 
-**One backend at 1.0.** Pekko HTTP, and nothing else on main. If you are on
-Vert.x, Helidon, Armeria, Netty directly, Jakarta REST, Javalin or Spring MVC,
-there is no module for you, and writing one is a real piece of work even though
-the reference manual puts the last one at about five hundred lines.
+**Two backends.** Pekko HTTP, and Jetty 12, added after 1.0, which needs no
+Pekko or Scala on the classpath. If you are on Vert.x, Helidon, Armeria, Netty directly,
+Jakarta REST, Javalin or Spring MVC, there is no module for you, and writing one
+is a real piece of work even though the reference manual puts the last one at
+about five hundred lines. The Jetty module is a Jetty core `Handler`, not a
+servlet.
 
 The interpreter is not shaped by Pekko, and that can be checked rather than
-taken on trust: http4k and Ktor interpreters were complete before 1.0, and one
-parity suite ran the same descriptions against all three and asserted they
-answered byte for byte. They were taken off `main` to keep 1.0 small, and are in
-the history at commit
+taken on trust: the parity suite on `main` runs the same descriptions against
+Pekko and Jetty and asserts they answer identically, and records the few
+places they do not. http4k and Ktor interpreters were complete before 1.0, and
+the same suite ran against all three then. They were taken off `main` to keep
+1.0 small, and are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e).
 What narrowed for 1.0 is the *promise*, not the design: a first release's
 stability guarantee covers the pair the maintainer can stand behind, and the
-other two are meant to return after it as restores. Until they do, "the backend
-is a choice" is a claim about the code you can read at that commit, not about a
-module you can depend on today.
+other two are meant to return after it as restores. Jetty is the choice you
+can depend on today for a service that does not run Pekko.
 
 **The refusals are deliberate and they will not be argued away.** Each of these
 is a documented decision with reasoning in the reference manual, not a gap

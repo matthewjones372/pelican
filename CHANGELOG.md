@@ -33,9 +33,37 @@ one.
 
 ### Added
 
+- **`pelican-jetty`**: the descriptions served by Jetty 12, as a core
+  `Handler` (`toHandler`) or a bound server (`start`), with no Pekko or Scala
+  on the classpath (spec 0073). Every binder `pelican-pekko` has, under the
+  same name, with `Sequence` where Pekko takes a `Source`. Synchronous handlers
+  start on a virtual thread under `Handlers.onVirtualThreads`. `toHandler`
+  passes on what Pekko's route would reject, so it composes in a
+  `Handler.Sequence`; `Unanswered` writes Pekko's 404 or merged-`Allow` 405,
+  and `Handler.onlyFor` lets a hand-written handler join that 405.
+  `PELICAN_URI_COMPLIANCE` is the URI compliance a server built by hand needs.
+  Pages are served by `toHandler`. A streamed upload is read with
+  `StreamIn.toSequence()` or `reader()`. The `example/backends` parity suite
+  runs on Jetty and Pekko and generates one document; the differences that
+  remain are listed under "What differs on Jetty" in the reference manual.
+- **`pelican-jetty-docs`**: the OpenAPI document and a Swagger UI or Redoc
+  page on Jetty: `handlerWithDocs`, `docsHandler` and `startWithDocs`
+  (spec 0074).
+- **`pelican-jetty-mcp`**: the MCP tools on `/mcp` on Jetty: `handlerWithMcp`
+  and `mcpHandler` (spec 0074).
+- **`pelican-test-jetty`**: `inMemory(handlers)`, the typed test client
+  against a Jetty `Api` through a `LocalConnector`, and `server.client()`
+  (spec 0074).
+- **`pelican-streams-jetty`**: a streamed upload on Jetty as a lark `Stream`,
+  over `Stream.blocking`, and `toOutcome`. A stopped run wakes a blocked read
+  and closes the upload. Runs on any lark backend (spec 0074).
 - **`pelican-client-jetty`**: `JettyHttpTransport`, a generated client's
   transport over Jetty's `HttpClient`, the release `pelican-jetty` serves with.
   A service on Jetty calls out with no Pekko on its classpath (spec 0075).
+- **`pelican-kotlinx` is back**, restored from before 1.0: `KotlinxCodecs`
+  reads trees with the configured `Json` and bodies from bytes, writes the
+  same schemas as Jackson for tagged failures and `oneOf`, and is in the codec
+  agreement matrix (spec 0076).
 
 ### Changed
 
