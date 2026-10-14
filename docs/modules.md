@@ -3,12 +3,12 @@
 Linked from the [README](../README.md). What each module is for, and what it
 depends on — the list to read when deciding which ones a build actually needs.
 
-Twenty-four library modules and a Gradle plugin; a typical build takes four or
+Twenty-five library modules and a Gradle plugin; a typical build takes four or
 five. The layering is enforced by tests rather than convention.
 
-1.0 ships one server backend, one JSON library and one client transport. The
-http4k and Ktor backends, the JDK, OkHttp and Ktor client transports
-(`pelican-client-java`, `pelican-client-okhttp`, `pelican-client-ktor`),
+1.0 ships one server backend, one JSON library and two client transports. The
+http4k and Ktor backends, the OkHttp and Ktor client transports
+(`pelican-client-okhttp`, `pelican-client-ktor`),
 `pelican-jsoniter` and `pelican-kotlinx` were complete and passing before 1.0,
 and were taken off `main` to keep 1.0 small. They are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e),
@@ -34,6 +34,7 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-mcp` | core + schema | descriptions → MCP tool descriptions, and a dispatch that runs them. Values only, so deriving a tool list needs no server |
 | `pelican-mcp-server` | core + mcp | those tools **served**: JSON-RPC 2.0 over stdio, and the request/response half of Streamable HTTP. No MCP SDK |
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
+| `pelican-client-java` | **core** | where a generated client's requests go, over the JDK's own `HttpClient`. No dependency of its own |
 | `pelican-client-pekko` | core, pekko-http *provided* | where a generated client's requests go, over Pekko HTTP's client |
 | `pelican-streams` | pekko, Pekko and lark *both provided* | one function: a streaming body as a lark `Stream`, whose failure is a value |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |

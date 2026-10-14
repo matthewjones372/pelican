@@ -32,6 +32,7 @@ include(
     "pelican-health-kafka",
     "pelican-health-redis",
     "pelican-oidc",
+    "pelican-client-java",
     "pelican-client-pekko",
     "pelican-streams",
     "pelican-test",

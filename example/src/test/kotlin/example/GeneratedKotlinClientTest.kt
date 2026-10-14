@@ -14,7 +14,9 @@ import example.generated.StreamOrdersFailure
 import example.generated.SubmitOrderFailure
 import example.generated.SubmitOrderResult
 import example.trace.CancellationTrace
+import io.github.matthewjones372.pelican.ClientTransport
 import io.github.matthewjones372.pelican.UploadedFile
+import io.github.matthewjones372.pelican.client.JavaHttpTransport
 import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
 import io.github.matthewjones372.pelican.codegen.kotlinClient
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -38,8 +40,11 @@ import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayInputStream
 import java.io.File
 
+/** The generated client's suite, run once per transport by the classes at the foot of this file. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class GeneratedKotlinClientTest {
+abstract class GeneratedKotlinClientTest {
+
+    protected abstract fun transport(): ClientTransport
 
     /**
      * The one thing a generated client's caller has to get right: a property
@@ -52,11 +57,9 @@ class GeneratedKotlinClientTest {
     )
 
     /**
-     * The service on a socket, over `pelican-client-pekko` — the transport a
-     * generated client picks when nobody names one, now that it is the one
-     * adapter shipped. `PekkoTransportClientTest` keeps the calls that need a
-     * backend stream type — `bytes`, `ndjsonIn` — and the handed-over-system
-     * case.
+     * The service on a socket. `PekkoTransportClientTest` keeps the calls that
+     * need a backend stream type — `bytes`, `ndjsonIn` — and the
+     * handed-over-system case.
      *
      * Bound rather than in memory because half the endpoints below answer with
      * a stream, and a Pekko `Source` is the backend's own type: `InMemory`
@@ -67,10 +70,10 @@ class GeneratedKotlinClientTest {
 
     @BeforeAll
     fun setUp() {
-        server = ordersApi().start(port = 0, systemName = "orders-generated-client")
+        server = ordersApi().start(port = 0, systemName = "orders-generated-client-${javaClass.simpleName}")
         // Spec 0052 entry one: this suite is where the cancellation shows, so
         // it is where the stack of whoever observes one gets recorded.
-        client = OrdersClient(server.baseUrl, codecs, CancellationTrace(PekkoHttpTransport()))
+        client = OrdersClient(server.baseUrl, codecs, CancellationTrace(transport()))
     }
 
     @AfterAll
@@ -320,4 +323,12 @@ class GeneratedKotlinClientTest {
         ordersSpec().kotlinClient("x", includeHidden = true) shouldContain "reindex"
         reindex.shouldNotBeNull()
     }
+}
+
+class PekkoGeneratedClientTest : GeneratedKotlinClientTest() {
+    override fun transport(): ClientTransport = PekkoHttpTransport()
+}
+
+class JavaGeneratedClientTest : GeneratedKotlinClientTest() {
+    override fun transport(): ClientTransport = JavaHttpTransport()
 }
