@@ -29,6 +29,17 @@ A version is cut by tagging — `git tag v1.0.0 && git push --tags`. The build
 reads the nearest `v` tag, so an untagged commit is a `-SNAPSHOT` of the next
 one.
 
+## Unreleased
+
+### Changed
+
+- **`pelican-core` no longer puts `jackson-core` on a caller's compile
+  classpath.** It was an `api` dependency and is now `implementation`: no
+  public signature in core names a Jackson type, and the parser stays where it
+  was at runtime. A build that imports `com.fasterxml.jackson.core` and only
+  had it through `pelican-core` declares it itself. Anyone using
+  `pelican-jackson` already has it.
+
 ## [1.0.0] — 2026-10-14
 
 **`1.0.0-RC1` is the first candidate cut from this section.** The surface below
