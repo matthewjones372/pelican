@@ -43,7 +43,7 @@ dependencies {
     implementation(project(":pelican-metrics-otel"))
     // Live and ready probes: `example.health` is what they look like.
     implementation(project(":pelican-health"))
-    implementation("io.opentelemetry:opentelemetry-sdk:1.66.0")
+    implementation("io.opentelemetry:opentelemetry-sdk:1.67.0")
     runtimeOnly("ch.qos.logback:logback-classic:1.6.4")
     // `example.logging` claims a level per status and a template rather than a
     // path; RequestLogTest reads the lines back through logback's own appender
@@ -85,7 +85,7 @@ dependencies {
     // through. The in-memory *span* exporter lives in the same artifact, but
     // the example writes its own so that the runnable service does not have to
     // ship a testing library to render `/admin/traces`.
-    testImplementation("io.opentelemetry:opentelemetry-sdk-testing:1.66.0")
+    testImplementation("io.opentelemetry:opentelemetry-sdk-testing:1.67.0")
 
     testImplementation(project(":pelican-test"))
     // The in-memory transports are per-backend, so a suite asks for the one it
