@@ -426,3 +426,45 @@ tasks.test {
         },
     )
 }
+
+/**
+ * Spec 0075: what a Jetty service resolves at runtime, as a consumer resolves it.
+ * Configurations of their own, so nothing `example` itself depends on can hide or add a jar.
+ */
+val jettyModules = listOf(
+    "pelican-jetty", "pelican-jetty-docs", "pelican-jetty-mcp", "pelican-test-jetty",
+    "pelican-streams-jetty", "pelican-client-jetty", "pelican-jackson", "pelican-kotlinx",
+    "pelican-health", "pelican-metrics", "pelican-metrics-otel", "pelican-oidc",
+)
+
+fun runtimeOf(name: String, modules: List<String>): NamedDomainObjectProvider<out Configuration> {
+    val declared = configurations.dependencyScope("${name}Dependencies")
+    dependencies { modules.forEach { add(declared.name, project(":$it")) } }
+    return configurations.resolvable(name) {
+        extendsFrom(declared.get())
+        attributes.addAllLater(configurations.runtimeClasspath.get().attributes)
+    }
+}
+
+/** The set, and the set with `pelican-pekko` added, which the test expects to be refused. */
+val jettyService = runtimeOf("jettyService", jettyModules)
+val jettyServiceWithPekko = runtimeOf("jettyServiceWithPekko", jettyModules + "pelican-pekko")
+
+tasks.test {
+    listOf(
+        "pelican.jetty.service.runtimeClasspath" to jettyService,
+        "pelican.jetty.service.withPekko.runtimeClasspath" to jettyServiceWithPekko,
+    ).forEach { (property, configuration) ->
+        val artifacts = configuration.flatMap { it.incoming.artifacts.resolvedArtifacts }
+        inputs.files(configuration).withPropertyName(property)
+        jvmArgumentProviders.add(
+            CommandLineArgumentProvider {
+                listOf(
+                    "-D$property=" + artifacts.get().joinToString(File.pathSeparator) {
+                        "${it.file.name} ${it.id.componentIdentifier.displayName}"
+                    },
+                )
+            },
+        )
+    }
+}
