@@ -30,6 +30,7 @@ val styledModules = listOf(
     "pelican-jackson",
     "pelican-arrow",
     "pelican-pekko",
+    "pelican-jetty",
     "pelican-metrics",
     "pelican-metrics-otel",
     "pelican-health",
