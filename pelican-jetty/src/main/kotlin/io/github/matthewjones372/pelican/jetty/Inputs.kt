@@ -9,13 +9,33 @@ import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.util.Fields
 
 /**
- * The path as the request line spelled it, below any context the handler is mounted under. Every escape is
- * still there, so `%2F` stays inside its segment until the index splits and then decodes, once.
+ * The path as the request line spelled it, below any context the handler is mounted under and with its dot
+ * segments resolved. Every other escape is still there, so `%2F` stays inside its segment until the index
+ * splits and then decodes, once.
  */
 internal fun Request.encodedPathInContext(): String {
     val raw = httpURI.path
     val context = Request.getContextPath(this)
-    return if (context.isNullOrEmpty() || context == "/") raw else raw.removePrefix(context)
+    return withoutDotSegments(if (context.isNullOrEmpty() || context == "/") raw else raw.removePrefix(context))
+}
+
+/**
+ * RFC 3986's remove_dot_segments, reading `%2E` as the `.` it spells as Pekko does, so no `.` or `..` reaches
+ * the index as a value: a handler using a path param as a name is never handed one.
+ */
+internal fun withoutDotSegments(path: String): String {
+    if (!path.startsWith('/')) return path
+    val segments = path.split('/').drop(1)
+    val kept = segments.foldIndexed(emptyList<String>()) { i, acc, segment ->
+        // A dot segment last leaves the path ending in a slash, as RFC 3986 resolves `/a/b/..` to `/a/`.
+        val trailing = if (i == segments.lastIndex) listOf("") else emptyList()
+        when (segment.replace("%2e", ".", ignoreCase = true)) {
+            "." -> acc + trailing
+            ".." -> acc.dropLast(1) + trailing
+            else -> acc + segment
+        }
+    }
+    return "/" + kept.joinToString("/")
 }
 
 /** Query, header and cookie inputs, read as `pelican-pekko` reads them. Path captures are already in [into]. */

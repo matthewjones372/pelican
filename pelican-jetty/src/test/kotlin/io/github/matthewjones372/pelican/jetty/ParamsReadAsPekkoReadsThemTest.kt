@@ -140,6 +140,21 @@ class ParamsReadAsPekkoReadsThemTest {
             arrayOf("/items/x?Q=upper", none),
             arrayOf("/items/%2561", none),
             arrayOf("/items/x/", none),
+            arrayOf("/items/./x", none),
+            arrayOf("/items/../items/x", none),
+            arrayOf("/items/x/..", none),
+            arrayOf("/items/x/.", none),
+            arrayOf("/items/..", none),
+            arrayOf("/items/.", none),
+            arrayOf("/items/%2E%2E", none),
+            arrayOf("/items/%2e", none),
+            arrayOf("/items/.%2E", none),
+            arrayOf("/items/%2E%2E/x", none),
+            arrayOf("/items/%5C..", none),
+            arrayOf("/items/..%5C", none),
+            arrayOf("/items/..%2Fx", none),
+            arrayOf("/items/a/../../items/x", none),
+            arrayOf("/items/x?q=..", none),
             arrayOf("/items/x?q=a+b", none),
             arrayOf("/items/x?q=a%2Bb", none),
             arrayOf("/items/x?q", none),
@@ -157,6 +172,10 @@ class ParamsReadAsPekkoReadsThemTest {
             arrayOf("/strict?term=t", listOf("Cookie" to "jar=j")),
             arrayOf("/strict?term=t", listOf("X-Key" to "k")),
         )
+
+        @JvmStatic
+        fun traversals(): List<String> =
+            listOf(".", "..", "%2E", "%2e%2e", ".%2E", "%2E.", "%2E%2E/", "x/..", "x/%2E%2E").map { "/items/$it" }
 
         @JvmStatic
         fun malformed(): List<String> = listOf("/items/ada%zz", "/items/x?q=%zz")
@@ -232,6 +251,23 @@ class ParamsReadAsPekkoReadsThemTest {
     private fun escaped(segment: String): String = segment.toByteArray().joinToString("") { byte ->
         val c = byte.toInt().toChar()
         if (byte >= 0 && (c.isLetterOrDigit() || c in "-._~")) c.toString() else "%%%02X".format(byte)
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("traversals")
+    fun `no spelling of a dot segment reaches a handler as a value`(target: String) {
+        val body = ask(jetty.baseUrl, target, emptyList()).body
+
+        withClue("GET $target answered $body") {
+            (body == """{"fromPath":".."}""" || body == """{"fromPath":"."}""") shouldBe false
+        }
+    }
+
+    @Test
+    fun `a path climbing above the root is jetty's own 400, before any handler`() {
+        // Pekko clamps at the root and routes `/items/x`; Jetty refuses the request line, whatever its compliance.
+        statusOf(jetty.baseUrl, "/../items/x") shouldBe 400
+        statusOf(jetty.baseUrl, "/..") shouldBe 400
     }
 
     @ParameterizedTest(name = "{0}")
