@@ -9,17 +9,22 @@ import io.github.matthewjones372.pelican.UploadedFile
 import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
-import io.github.matthewjones372.pelican.pekko.PelicanServer
-import io.github.matthewjones372.pelican.pekko.start
+import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.start
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import org.apache.pekko.actor.testkit.typed.annotations.JUnit5TestKit
+import org.apache.pekko.actor.testkit.typed.javadsl.ActorTestKit
+import org.apache.pekko.actor.testkit.typed.javadsl.JUnit5TestKitBuilder
+import org.apache.pekko.actor.testkit.typed.javadsl.TestKitJUnit5Extension
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.extension.ExtendWith
 import java.io.ByteArrayInputStream
 
 /**
@@ -30,8 +35,14 @@ import java.io.ByteArrayInputStream
  * adapters. What is asserted here needs a Pekko stream type or a handed-over
  * system: a streamed upload, a streamed response, and a failure read off the wire.
  */
+@ExtendWith(TestKitJUnit5Extension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PekkoTransportClientTest {
+
+    /** Found by reflection, so the field has to be a real one: `@JvmField`. */
+    @JUnit5TestKit
+    @JvmField
+    val testKit: ActorTestKit = JUnit5TestKitBuilder().withName("orders-pekko-transport").build()
 
     private val codecs = JacksonCodecs(
         defaultMapper().setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL),
@@ -42,11 +53,11 @@ class PekkoTransportClientTest {
 
     @BeforeAll
     fun setUp() {
-        server = ordersApi().start(port = 0, systemName = "orders-pekko-transport")
-        // The system the service is already running, handed to the transport
-        // rather than a second one started beside it. This is the reason the
-        // adapter takes one at all.
-        client = OrdersClient(server.baseUrl, codecs, PekkoHttpTransport(server.system))
+        server = ordersApi().start(port = 0)
+        // A system the caller already runs, handed to the transport rather
+        // than a second one started beside it. This is the reason the adapter
+        // takes one at all.
+        client = OrdersClient(server.baseUrl, codecs, PekkoHttpTransport(testKit.system()))
     }
 
     @AfterAll

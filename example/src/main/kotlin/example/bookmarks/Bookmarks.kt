@@ -4,17 +4,12 @@ package example.bookmarks
  * To run this in a project of your own:
  *
  *     dependencies {
- *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
- *         // Pekko itself: Pelican ships no Scala cross-build, so name yours
- *         implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
- *         implementation("org.apache.pekko:pekko-actor-typed_2.13")
- *         implementation("org.apache.pekko:pekko-stream_2.13")
- *         implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+ *         // the interpreter; brings pelican-core and Jetty's server
+ *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
  *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
  *         // startWithDocs, /openapi.json and Swagger UI
- *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
+ *         implementation("io.github.matthewjones372:pelican-jetty-docs:1.0.0")
  *     }
  */
 
@@ -35,6 +30,10 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import io.github.matthewjones372.pelican.jetty.handledOrFail
+import io.github.matthewjones372.pelican.jetty.handledWith
+import io.github.matthewjones372.pelican.jetty.streamedNow
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.map
 import io.github.matthewjones372.pelican.matching
@@ -45,13 +44,8 @@ import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledOrFail
-import io.github.matthewjones372.pelican.pekko.handledWith
-import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.unauthorized
-import org.apache.pekko.stream.javadsl.Source
 
 // ============================================================ 1. the models
 //
@@ -182,7 +176,7 @@ object Bookmarks {
 
 // ============================================================= 5. the server
 //
-// The only place that knows a stream is a `Source`. Each handler's parameters
+// The only place that knows a stream is a `Sequence`. Each handler's parameters
 // come from the inputs its endpoint lists, already decoded and typed — add an
 // input to a description and this file stops compiling until it is accounted
 // for.
@@ -195,7 +189,7 @@ val bookmarkRoutes: List<ServerEndpoint> = listOf(
     },
 
     listBookmarks streamedNow { (max, tag) ->         // max: Int, tag: Slug?
-        Source.from(Bookmarks.list(max, tag))
+        Bookmarks.list(max, tag).asSequence()
     },
 
     createBookmark handledOrFail { (key, req) ->      // key: String, req: CreateBookmark

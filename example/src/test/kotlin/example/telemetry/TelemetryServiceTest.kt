@@ -1,8 +1,9 @@
 package example.telemetry
 
 import io.github.matthewjones372.pelican.In2
+import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.test.shouldBeFailure
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
@@ -33,7 +34,7 @@ class TelemetryServiceTest {
     @BeforeAll
     fun setUp() {
         app = telemetryService(registry, telemetry) { report(registry, recorded) }
-            .inMemory("telemetry-orders")
+            .inMemory(Handlers.onVirtualThreads)
     }
 
     @AfterAll

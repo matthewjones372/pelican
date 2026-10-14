@@ -12,16 +12,16 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.Handlers
+import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.handledOrFail
+import io.github.matthewjones372.pelican.jetty.start
 import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.pekko.PelicanServer
-import io.github.matthewjones372.pelican.pekko.handledOrFail
-import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.test.ApiCallFailed
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.decodeBody
-import io.github.matthewjones372.pelican.test.pekko.InMemoryTransport
-import io.github.matthewjones372.pelican.test.pekko.client
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.jetty.client
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.test.rawText
 import io.github.matthewjones372.pelican.test.shouldBeFailure
 import io.github.matthewjones372.pelican.test.shouldBeOk
@@ -35,13 +35,15 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
-import org.apache.pekko.http.javadsl.model.HttpRequest
-import org.apache.pekko.stream.Materializer
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayInputStream
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 
 /**
  * One suite, two transports.
@@ -329,39 +331,7 @@ abstract class ClientContractTest {
 
 /** No socket, no port: requests go straight through the interpreted route. */
 class InMemoryContractTest : ClientContractTest() {
-    override fun open(): ApiClient = ordersApi().inMemory("orders-in-memory")
-
-    @Test
-    fun `elements are delivered as produced, not buffered until the end`() {
-        val transport = app.transport as InMemoryTransport
-        val materializer = Materializer.createMaterializer(transport.system)
-
-        val res = transport.exchange(HttpRequest.GET("/users/1/orders/watch?limit=8"))
-        res.status().intValue() shouldBe 200
-
-        val start = System.nanoTime()
-        var firstAt = -1L
-        var chunks = 0
-        res.entity().dataBytes
-            .runForeach(
-                {
-                    if (firstAt < 0) firstAt = System.nanoTime()
-                    chunks++
-                },
-                materializer,
-            )
-            .toCompletableFuture()
-            .join()
-
-        val totalMs = (System.nanoTime() - start) / 1_000_000
-        val firstMs = (firstAt - start) / 1_000_000
-
-        chunks shouldBe 8
-        withClue("stream finished suspiciously fast: ${totalMs}ms") { totalMs shouldBeGreaterThanOrEqualTo 600 }
-        withClue("first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
-            firstMs shouldBeLessThan totalMs / 2
-        }
-    }
+    override fun open(): ApiClient = ordersApi().inMemory(Handlers.onVirtualThreads)
 }
 
 /** The same assertions, over a real connection to a bound server. */
@@ -369,13 +339,39 @@ class OverHttpContractTest : ClientContractTest() {
     private lateinit var server: PelicanServer
 
     override fun open(): ApiClient {
-        server = ordersApi().start(port = 0, systemName = "orders-over-http")
+        server = ordersApi().start(port = 0)
         return server.client()
     }
 
     override fun shutDown() {
         app.close()
         server.stop()
+    }
+
+    /** Over a socket, because Jetty's in-memory transport hands back a response only once it is complete. */
+    @Test
+    fun `elements are delivered as produced, not buffered until the end`() {
+        val request = HttpRequest.newBuilder(URI("${server.baseUrl}/users/1/orders/watch?limit=8")).build()
+        val start = System.nanoTime()
+        var firstAt = -1L
+        val events = HttpClient.newHttpClient().use { http ->
+            val res = http.send(request, HttpResponse.BodyHandlers.ofLines())
+            res.statusCode() shouldBe 200
+            res.body().use { lines ->
+                lines.filter { it.startsWith("data:") }
+                    .peek { if (firstAt < 0) firstAt = System.nanoTime() }
+                    .count()
+            }
+        }
+
+        val totalMs = (System.nanoTime() - start) / 1_000_000
+        val firstMs = (firstAt - start) / 1_000_000
+
+        events shouldBe 8
+        withClue("stream finished suspiciously fast: ${totalMs}ms") { totalMs shouldBeGreaterThanOrEqualTo 600 }
+        withClue("first element at ${firstMs}ms of ${totalMs}ms — looks buffered, not streamed") {
+            firstMs shouldBeLessThan totalMs / 2
+        }
     }
 }
 
@@ -401,14 +397,14 @@ class UndeclaredFailureTest {
 
     @Test
     fun `returning a failure this endpoint never declared is a 500, not a 410`() {
-        apiThatReturnsAStrayFailure().inMemory().use {
+        apiThatReturnsAStrayFailure().inMemory(Handlers.onVirtualThreads).use {
             it.response(fetchUser, 1L).status shouldBe 500
         }
     }
 
     @Test
     fun `the 500 body says nothing about what went wrong inside`() {
-        apiThatReturnsAStrayFailure().inMemory().use {
+        apiThatReturnsAStrayFailure().inMemory(Handlers.onVirtualThreads).use {
             val body = it.response(fetchUser, 1L).body
             // The internal message — the one naming the endpoint and the stray
             // declaration — is what a caller must not be handed.
@@ -429,7 +425,7 @@ class UndeclaredFailureTest {
             onServerError = { ref, ep, t -> logged += Triple(ref, ep?.toString(), t.message.orEmpty()) },
         )
 
-        api.inMemory().use {
+        api.inMemory(Handlers.onVirtualThreads).use {
             val body = it.response(fetchUser, 1L).body
             val reference = Regex("""Reference: ([0-9a-f]+)""").find(body)?.groupValues?.get(1)
             withClue("no reference in $body") { reference.shouldNotBeNull() }
@@ -444,7 +440,7 @@ class UndeclaredFailureTest {
 
     @Test
     fun `a local run can ask for the detail back`() {
-        apiThatReturnsAStrayFailure(exposeInternalErrors = true).inMemory().use {
+        apiThatReturnsAStrayFailure(exposeInternalErrors = true).inMemory(Handlers.onVirtualThreads).use {
             val body = it.response(fetchUser, 1L).body
             body shouldContain "never declared"
         }

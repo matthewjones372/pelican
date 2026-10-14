@@ -7,6 +7,11 @@ import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jetty.handledOrFail
+import io.github.matthewjones372.pelican.jetty.start
 import io.github.matthewjones372.pelican.map
 import io.github.matthewjones372.pelican.oauth2AuthorizationCode
 import io.github.matthewjones372.pelican.ok
@@ -15,11 +20,6 @@ import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.docsOAuth
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.PelicanServer
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledNow
-import io.github.matthewjones372.pelican.pekko.handledOrFail
-import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.queryParam
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
@@ -61,7 +61,6 @@ class OrdersApiTest {
         fun boot() {
             server = ordersApi().startWithDocs(
                 port = 0,
-                systemName = "orders-test",
                 docs = ordersDocs,
             )
         }
@@ -470,7 +469,6 @@ class SwaggerUiOAuthTest {
             title = "Orders"
         }.startWithDocs(
             port = 0,
-            systemName = "swagger-oauth-test",
             docs = docs { docsPath = "/api-docs"; oauth = docsOAuth },
         )
         try {
@@ -534,7 +532,6 @@ class SwaggerUiTest {
             title = "Orders"
         }.startWithDocs(
             port = 0,
-            systemName = "swagger-ui-test",
             docs = docs { openApiPath = openApi; docsPath = docs },
         )
         try {
@@ -590,7 +587,6 @@ class SwaggerUiTest {
             title = "Hazard"
         }.startWithDocs(
             port = 0,
-            systemName = "swagger-escape-test",
             docs = docs { openApiPath = null; docsPath = "/api-docs" },
         )
         try {
@@ -608,7 +604,7 @@ class RouteSpecificityTest {
 
     @Test
     fun `a literal segment beats a capture regardless of declaration order`() {
-        val server = ordersApi().start(port = 0, systemName = "specificity-test")
+        val server = ordersApi().start(port = 0)
         try {
             val client = HttpClient.newHttpClient()
 
@@ -638,7 +634,7 @@ class TypedInputsTest {
 
     @Test
     fun `the lens-style endpoint still works alongside the typed ones`() {
-        val server = ordersApi().start(port = 0, systemName = "lens-test")
+        val server = ordersApi().start(port = 0)
         try {
             val res = HttpClient.newHttpClient().send(
                 HttpRequest.newBuilder(URI.create("${server.baseUrl}/search?limit=3&status=SHIPPED")).GET().build(),
@@ -722,7 +718,7 @@ class WrapperCodecTest {
         ) {
             title = "Accounts"
         }
-        val server = api.start(port = 0, systemName = "wrapper-test")
+        val server = api.start(port = 0)
         try {
             val res = HttpClient.newHttpClient().send(
                 HttpRequest.newBuilder(URI.create("${server.baseUrl}/accounts/77")).GET().build(),

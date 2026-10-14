@@ -4,8 +4,8 @@ package example.adoption
  * To run this in a project of your own:
  *
  *     dependencies {
- *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
+ *         // the interpreter; brings pelican-core and Jetty's server
+ *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
  *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
  *         // @Serializable on the payloads, which PluggableCodecsTest serves over kotlinx too
@@ -27,10 +27,10 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.handledOrFail
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.handledOrFail
 import kotlinx.serialization.Serializable
 
 @Serializable

@@ -29,7 +29,7 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 fun ordersSpec(): ApiSpec = apiSpec(allEndpoints, schemas = JacksonCodecs) {
     title = "Orders"
     version = "1.0.0"
-    description = "A Kotlin-first Pekko HTTP service, described as values."
+    description = "A Kotlin-first Jetty service, described as values."
     servers = listOf("http://localhost:8080")
     // The calls the service sends. They are published under `webhooks` and
     // generated as senders on the client, and no interpreter ever sees them —

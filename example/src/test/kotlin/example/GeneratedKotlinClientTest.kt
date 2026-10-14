@@ -21,8 +21,8 @@ import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
 import io.github.matthewjones372.pelican.codegen.kotlinClient
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
-import io.github.matthewjones372.pelican.pekko.PelicanServer
-import io.github.matthewjones372.pelican.pekko.start
+import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.start
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
@@ -61,16 +61,15 @@ abstract class GeneratedKotlinClientTest {
      * need a backend stream type — `bytes`, `ndjsonIn` — and the
      * handed-over-system case.
      *
-     * Bound rather than in memory because half the endpoints below answer with
-     * a stream, and a Pekko `Source` is the backend's own type: `InMemory`
-     * refuses one out loud rather than pretending to frame it.
+     * Bound rather than in memory because the generated client takes a base
+     * URL and a transport, which is a socket.
      */
     private lateinit var server: PelicanServer
     private lateinit var client: OrdersClient
 
     @BeforeAll
     fun setUp() {
-        server = ordersApi().start(port = 0, systemName = "orders-generated-client-${javaClass.simpleName}")
+        server = ordersApi().start(port = 0)
         // Spec 0052 entry one: this suite is where the cancellation shows, so
         // it is where the stack of whoever observes one gets recorded.
         client = OrdersClient(server.baseUrl, codecs, CancellationTrace(transport()))

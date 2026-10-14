@@ -198,7 +198,7 @@ demands. Anything more would start hiding the differences the example exists to
 show, which is why `MethodMismatchTest` reaches for the backend's own module
 directly.
 
-At scale, `example/OrdersApi.kt` binds the orders endpoint list on Pekko, and
+At scale, `example/OrdersApi.kt` binds the orders endpoint list on Jetty, and
 `ClientContractTest` — written entirely against descriptions — runs against it,
 so any divergence is a failing test.
 
@@ -6146,7 +6146,7 @@ runs it; see [What it costs](what-it-costs.md).
 
 ```bash
 ./gradlew build                     # every module and the plugin: tests and every gate above
-./gradlew :example:run              # the orders server on :8080, on Pekko
+./gradlew :example:run              # the orders server on :8080, on Jetty
 ./gradlew :example:runBackends      # the small example, through the backend seam
 ./gradlew :example:runCodecs        # one service, over the codec module it does not name
 ./gradlew :example:generateOrdersDocument  # spec, no server

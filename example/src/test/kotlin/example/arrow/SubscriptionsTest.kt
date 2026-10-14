@@ -1,8 +1,9 @@
 package example.arrow
 
 import io.github.matthewjones372.pelican.arrow.toEither
+import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeFailure
 import io.github.matthewjones372.pelican.test.shouldBeOk
@@ -25,7 +26,7 @@ class SubscriptionsTest {
 
     private lateinit var app: ApiClient
 
-    @BeforeAll fun setUp() { app = subscriptionsApi().inMemory("pelican-arrow-example") }
+    @BeforeAll fun setUp() { app = subscriptionsApi().inMemory(Handlers.onVirtualThreads) }
 
     @AfterAll fun tearDown() = app.close()
 

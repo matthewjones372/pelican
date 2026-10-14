@@ -3,7 +3,7 @@
   "info": {
     "title": "Orders",
     "version": "1.0.0",
-    "description": "A Kotlin-first Pekko HTTP service, described as values."
+    "description": "A Kotlin-first Jetty service, described as values."
   },
   "servers": [
     {

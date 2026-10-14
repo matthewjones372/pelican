@@ -5,14 +5,9 @@ package example.logging
  *
  *     dependencies {
  *         // startWithDocs, /openapi.json and Swagger UI
- *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
- *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
- *         // Pekko itself: Pelican ships no Scala cross-build, so name yours
- *         implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
- *         implementation("org.apache.pekko:pekko-actor-typed_2.13")
- *         implementation("org.apache.pekko:pekko-stream_2.13")
- *         implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+ *         implementation("io.github.matthewjones372:pelican-jetty-docs:1.0.0")
+ *         // the interpreter; brings pelican-core and Jetty's server
+ *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
  *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
  *         // any SLF4J binding; Pelican logs through the API only
@@ -36,16 +31,16 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.err
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jetty.handledOrFail
+import io.github.matthewjones372.pelican.jetty.request
 import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
 import io.github.matthewjones372.pelican.metrics.otel.refusalCounter
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledNow
-import io.github.matthewjones372.pelican.pekko.handledOrFail
-import io.github.matthewjones372.pelican.pekko.request
 import io.github.matthewjones372.pelican.unauthorized
 import io.opentelemetry.api.OpenTelemetry
 import org.slf4j.Logger
@@ -55,7 +50,7 @@ import org.slf4j.LoggerFactory
  * Logging a Pelican service: what the library already writes, and how to add an
  * access log of your own.
  *
- * `pelican-pekko` declares `org.slf4j:slf4j-api` and no binding, deliberately:
+ * `pelican-jetty` declares `org.slf4j:slf4j-api` and no binding, deliberately:
  * which logger a service runs is the service's decision, and a library that
  * picked one would put a second on the classpath of everyone who had already
  * chosen. With no binding at all SLF4J prints a warning and discards
@@ -69,10 +64,10 @@ import org.slf4j.LoggerFactory
 /*
  * One thing, and it is the one a service must not lose: an exception nobody
  * declared. The caller gets an opaque reference and the log gets the stack
- * trace under `io.github.matthewjones372.pelican.pekko`, with the same
+ * trace under `io.github.matthewjones372.pelican.jetty`, with the same
  * reference in both so they join up:
  *
- *     ERROR io.github.matthewjones372.pelican.pekko - Unhandled failure in GET /widgets/9 [ref f3ef2be]
+ *     ERROR io.github.matthewjones372.pelican.jetty - Unhandled failure in GET /widgets/9 [ref f3ef2be]
  *     java.lang.IllegalStateException: the widget shelf fell over
  *
  * Everything else — which requests arrived, how long they took, what statuses
@@ -168,8 +163,7 @@ private val requireToken = before { p ->
     // header no endpoint declared. Declaring `Authorization` as an input
     // instead would put the credential in the document as a parameter and make
     // every handler take it — see `:example:runSecured`.
-    val presented = p.request.getHeader("Authorization").orElse(null)
-        ?.value()
+    val presented = p.request.headers.get("Authorization")
         ?.removePrefix("Bearer ")
     p[caller] = presented?.takeIf { it == "let-me-in" }
         ?: unauthorized("Present a bearer token")

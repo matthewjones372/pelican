@@ -10,11 +10,11 @@ import example.generated.suspending.PlaceOrderFailure
 import example.generated.suspending.User
 import io.github.matthewjones372.pelican.ClientResponse
 import io.github.matthewjones372.pelican.ClientTransport
-import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
+import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
-import io.github.matthewjones372.pelican.pekko.PelicanServer
-import io.github.matthewjones372.pelican.pekko.start
+import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -55,14 +55,17 @@ class SuspendingClientTest {
     private lateinit var server: PelicanServer
     private lateinit var client: OrdersClient
 
+    private val transport = JettyHttpTransport()
+
     @BeforeAll
     fun setUp() {
-        server = ordersApi().start(port = 0, systemName = "orders-suspending-client")
-        client = OrdersClient(server.baseUrl, codecs, PekkoHttpTransport())
+        server = ordersApi().start(port = 0)
+        client = OrdersClient(server.baseUrl, codecs, transport)
     }
 
     @AfterAll
     fun tearDown() {
+        transport.close()
         server.stop()
     }
 
@@ -128,8 +131,8 @@ class SuspendingClientTest {
      *
      * The transport here answers nothing at all, which is the only reliable way
      * to still be waiting when the cancellation arrives; that a cancelled call
-     * then has its late-arriving response discarded is `pelican-client-pekko`'s
-     * own test. What this asserts is the half the generated file is
+     * then has its late-arriving response discarded is the transport
+     * module's own test. What this asserts is the half the generated file is
      * responsible for — that the cancellation reaches the stage rather than
      * being lost between the coroutine and the transport.
      */
