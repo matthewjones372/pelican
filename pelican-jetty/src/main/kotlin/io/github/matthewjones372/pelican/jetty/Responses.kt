@@ -6,16 +6,22 @@ import io.github.matthewjones372.pelican.ByteStreamOutput
 import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.EmptyOutput
 import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.ErrorOutput
+import io.github.matthewjones372.pelican.JSON_MEDIA_TYPE
 import io.github.matthewjones372.pelican.JsonArrayOutput
 import io.github.matthewjones372.pelican.JsonOutput
 import io.github.matthewjones372.pelican.MediaOutput
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.NdjsonOutput
 import io.github.matthewjones372.pelican.NegotiatedOutput
+import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.TextOutput
+import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.renderError
+import io.github.matthewjones372.pelican.spi.successNamedBy
+import io.github.matthewjones372.pelican.spi.taggedBody
 import org.eclipse.jetty.http.HttpHeader
 import org.eclipse.jetty.server.Response
 import org.eclipse.jetty.util.BufferUtil
@@ -122,10 +128,25 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
             Streamed(out.status, contentTypeOf(out.mediaType), value as Sequence<ByteArray>)
         }
 
-        is DeclaredResponses<*, *>, is NegotiatedOutput<*>,
+        is DeclaredResponses<*, *> -> when (val outcome = value as Outcome<*, *>) {
+            is Outcome.Ok<*> -> buildResponse(out.successNamedBy(outcome), outcome.value, codecs)
+                .withHeaders(outcome.headers)
+
+            is Outcome.Err<*> -> failureResponse(out.failureNamedBy(outcome), outcome, codecs)
+        }
+
+        is NegotiatedOutput<*>,
         is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*>,
         -> throw UnsupportedOperationException("Not yet served on Jetty: $out")
     }
+}
+
+/** Its status from the declaration rather than the payload's type, so two failures sharing a type stay distinct. */
+private fun failureResponse(declared: ErrorOutput<*>, err: Outcome.Err<*>, codecs: EndpointCodecs): Reply {
+    val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
+    val body = taggedBody(declared, codec.encodeToString(err.error)).toByteArray()
+    val contentType = if (declared.mediaType == JSON_MEDIA_TYPE) JSON else contentTypeOf(declared.mediaType)
+    return Strict(declared.status, contentType, body, err.headers)
 }
 
 /** As Pekko writes it: a text type carries its charset, anything else is sent as declared. */
