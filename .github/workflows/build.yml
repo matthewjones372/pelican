@@ -43,9 +43,11 @@ jobs:
 
       # Tests against real brokers in Docker, tagged `containers` and kept out
       # of `build` so a build on a laptop needs no Docker. The runner has it.
-      # Each name runs in every module that registers it.
+      # Each name runs in every module that registers it, one module at a time:
+      # these tests bound elapsed time, and a parallel run would share the
+      # machine they are measuring (spec 0072).
       - name: Container tests
-        run: ./gradlew containerTests containerTestsOldestKafka --stacktrace
+        run: ./gradlew containerTests containerTestsOldestKafka --no-parallel --stacktrace
 
       # The suites bind real sockets and assert on delivery timing, so a
       # failure is worth reading rather than guessing at.
