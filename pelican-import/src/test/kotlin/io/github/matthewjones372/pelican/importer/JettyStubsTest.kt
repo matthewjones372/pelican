@@ -15,8 +15,8 @@ import java.io.File
 
 /**
  * The document is limited to the shapes `pelican-jetty` has binders for today,
- * `handledNow`, `handledWith`, `bytesNow`, `handledOrFail` and `handledOneOf`; the rest arrive with spec
- * 0073's other entries.
+ * `handledNow`, `handledWith`, `bytesNow`, `handledOrFail`, `handledOneOf`, `streamedNow` and `streamedOrFail`;
+ * the rest arrive with spec 0073's other entries.
  */
 class JettyStubsTest {
 
@@ -68,6 +68,31 @@ class JettyStubsTest {
                     content:
                       image/png:
                         schema: { type: string, format: binary }
+            /pets/feed:
+              get:
+                operationId: petFeed
+                responses:
+                  "200":
+                    description: One pet per line
+                    content:
+                      application/x-ndjson:
+                        schema: { type: object, required: [name], properties: { name: { type: string } } }
+            /pets/{petId}/feed:
+              parameters:
+                - { name: petId, in: path, required: true, schema: { type: integer, format: int64 } }
+              get:
+                operationId: petFeedFor
+                responses:
+                  "200":
+                    description: One pet per line
+                    content:
+                      application/x-ndjson:
+                        schema: { type: object, required: [name], properties: { name: { type: string } } }
+                  "404":
+                    description: No pet with that id
+                    content:
+                      application/json:
+                        schema: { type: object, required: [message], properties: { message: { type: string } } }
             """,
         ),
     )
@@ -82,6 +107,8 @@ class JettyStubsTest {
         stubs shouldContain """putPet handledOneOf { petId -> TODO("putPet") }"""
         stubs shouldContain """deletePet handledWith { petId -> TODO("deletePet") }"""
         stubs shouldContain """getPhoto bytesNow { petId -> TODO("getPhoto") }"""
+        stubs shouldContain """petFeed streamedNow { TODO("petFeed") }"""
+        stubs shouldContain """petFeedFor streamedOrFail { petId -> TODO("petFeedFor") }"""
     }
 
     @Test

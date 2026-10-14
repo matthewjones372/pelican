@@ -15,6 +15,7 @@ import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex
 import io.github.matthewjones372.pelican.spi.handlerFor
@@ -114,7 +115,7 @@ internal class PelicanHandler(
     ): CompletionStage<Reply> {
         val ep = se.endpoint
         // Built before decoding, so a filter or a failing decode can still put a header on the way out.
-        val params = Params(values, request, ep)
+        val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep))
 
         // The caller check, then negotiation, go here, ahead of the inputs as Pekko orders them.
         try {
@@ -160,6 +161,10 @@ internal class PelicanHandler(
         }
     }
 }
+
+/** The `Last-Event-ID` of a reconnect, read only where core says the endpoint's stream can be resumed. */
+private fun Request.resumePoint(ep: Endpoint<*, *>): String? =
+    if (ep.resumable) headers.get(SseOutput.LAST_EVENT_ID) else null
 
 /** The codecs one endpoint needs, resolved ahead of any request. */
 internal class EndpointCodecs(

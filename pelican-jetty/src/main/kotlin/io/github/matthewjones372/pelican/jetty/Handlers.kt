@@ -5,6 +5,7 @@ import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.StreamOf
 import org.eclipse.jetty.server.Request
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -41,6 +42,25 @@ infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledOneOf(
 infix fun <I, E : Any, T : Any> Endpoint<I, Outcome<E, T>>.handledByOneOf(
     f: Params.(I) -> CompletionStage<Outcome<E, T>>,
 ): ServerEndpoint = handledByOrFail(f)
+
+/** Binds a streaming endpoint, one frame per element. Synchronous: see [Handlers] for where. */
+infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedNow(f: Params.(I) -> Sequence<T>): ServerEndpoint =
+    ServerEndpoint(this, Synchronous { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) })
+
+/** Binds a streaming endpoint where deciding what to stream is itself asynchronous. */
+infix fun <I, T> Endpoint<I, StreamOf<T>>.streamedBy(f: Params.(I) -> CompletionStage<Sequence<T>>): ServerEndpoint =
+    ServerEndpoint(this) { p -> p.f(inputs.extract(p)).thenApply { it as Any? } }
+
+/** Binds a streaming endpoint that may fail before the first element. Synchronous: see [Handlers]. */
+infix fun <I, E : Any, T> Endpoint<I, Outcome<E, StreamOf<T>>>.streamedOrFail(
+    f: Params.(I) -> Outcome<E, Sequence<T>>,
+): ServerEndpoint =
+    ServerEndpoint(this, Synchronous { p -> CompletableFuture.completedFuture(p.f(inputs.extract(p)) as Any?) })
+
+/** As [streamedOrFail], for a handler that decides asynchronously. */
+infix fun <I, E : Any, T> Endpoint<I, Outcome<E, StreamOf<T>>>.streamedByOrFail(
+    f: Params.(I) -> CompletionStage<Outcome<E, Sequence<T>>>,
+): ServerEndpoint = ServerEndpoint(this) { p -> p.f(inputs.extract(p)).thenApply { it as Any? } }
 
 /** Escape hatch: the raw Jetty request behind this call. */
 val Params.request: Request

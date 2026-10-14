@@ -6,8 +6,8 @@ import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
 /**
- * Where a synchronous handler (`handledNow`, `handledWith`) runs, chosen when the API is started. An asynchronous
- * handler already chose, and is never moved.
+ * Where a synchronous handler (`handledNow`, `handledWith`, `streamedNow`) runs, chosen when the API is started.
+ * An asynchronous handler already chose, and is never moved.
  */
 class Handlers private constructor(internal val executor: Executor?) {
     companion object {
