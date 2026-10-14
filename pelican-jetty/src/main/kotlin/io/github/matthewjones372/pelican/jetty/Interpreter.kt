@@ -13,6 +13,7 @@ import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.MultipartBody
 import io.github.matthewjones372.pelican.NdjsonBody
 import io.github.matthewjones372.pelican.NegotiatedBody
+import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.Params
@@ -23,6 +24,7 @@ import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.spi.CorsHeaders
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex
+import io.github.matthewjones372.pelican.spi.acceptable
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.ndjsonFrames
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
@@ -155,8 +157,11 @@ internal class PelicanHandler(
         // Built before decoding, so a filter or a failing decode can still put a header on the way out.
         val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep))
 
-        // The caller check, then negotiation, go here, ahead of the inputs as Pekko orders them.
+        val accept = request.headers.getValuesList(HttpHeader.ACCEPT)
+
+        // The caller check goes here, ahead of negotiation and the inputs as Pekko orders them.
         try {
+            negotiate(ep, accept)
             decodePlainInputs(ep, request, values)
         } catch (t: Throwable) {
             return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params.responseHeaders()))
@@ -164,7 +169,7 @@ internal class PelicanHandler(
 
         return readBody(ep, request, values, codecs.getValue(se))
             .thenCompose { handlers.getValue(se)(params) }
-            .thenApply { result -> buildResponse(ep.output, result, codecs.getValue(se)) }
+            .thenApply { result -> buildResponse(ep.output, result, codecs.getValue(se), accept) }
             .exceptionally { t -> errorResponse(t, api, ep) }
             .thenApply { reply -> reply.withHeaders(params.responseHeaders()) }
     }
@@ -203,6 +208,13 @@ internal class PelicanHandler(
 /** The `Last-Event-ID` of a reconnect, read only where core says the endpoint's stream can be resumed. */
 private fun Request.resumePoint(ep: Endpoint<*, *>): String? =
     if (ep.resumable) headers.get(SseOutput.LAST_EVENT_ID) else null
+
+/** Refuses an `Accept` taking nothing this endpoint sends, before any input is read; core decides, as on Pekko. */
+private fun negotiate(ep: Endpoint<*, *>, accept: List<String>) {
+    val produced = ep.output.produces
+    if (produced.isEmpty() || accept.isEmpty()) return
+    if (!acceptable(accept, produced)) throw NotAcceptable(produced)
+}
 
 /** The codecs one endpoint needs, resolved ahead of any request. */
 internal class EndpointCodecs(
