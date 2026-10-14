@@ -111,6 +111,7 @@ val moduleDescriptions = mapOf(
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
     "pelican-test-golden" to "Golden files per endpoint that fail on a change breaking existing callers.",
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",
+    "pelican-test-jetty" to "The in-memory transport for pelican-test, on Jetty.",
     "pelican-test-wiremock" to "WireMock stubbed and verified in endpoint values, and stub files exported from them.",
 )
 
