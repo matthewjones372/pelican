@@ -9,10 +9,10 @@ import example.generated.adoption.AdoptionClient
 import example.generated.adoption.ApiCallFailed
 import example.generated.adoption.Outcome
 import example.generated.adoption.Pet
-import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
+import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.pekko.PelicanServer
-import io.github.matthewjones372.pelican.pekko.start
+import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.start
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
@@ -40,18 +40,23 @@ class TaggedFailuresClientTest {
     private lateinit var server: PelicanServer
     private lateinit var client: AdoptionClient
 
+    private val transport = JettyHttpTransport()
+
     @JvmField
     @RegisterExtension
     val untagged = PelicanWireMockExtension(JacksonCodecs)
 
     @BeforeAll
     fun setUp() {
-        server = adoptionApi().start(port = 0, systemName = "adoption-tagged-failures")
-        client = AdoptionClient(server.baseUrl, JacksonCodecs, PekkoHttpTransport())
+        server = adoptionApi().start(port = 0)
+        client = AdoptionClient(server.baseUrl, JacksonCodecs, transport)
     }
 
     @AfterAll
-    fun tearDown() = server.stop()
+    fun tearDown() {
+        transport.close()
+        server.stop()
+    }
 
     @Test
     fun `the success is still the success`() {
@@ -93,6 +98,6 @@ class TaggedFailuresClientTest {
                 aResponse().withStatus(503).withHeader("Content-Type", "application/json").withBody(body),
             ),
         )
-        return AdoptionClient(untagged.baseUrl, JacksonCodecs, PekkoHttpTransport())
+        return AdoptionClient(untagged.baseUrl, JacksonCodecs, transport)
     }
 }

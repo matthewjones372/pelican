@@ -1,5 +1,6 @@
 package example
 
+import example.backends.pekkoApi
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -44,14 +45,14 @@ class BorrowedSystemDocsTest {
 
     @Test
     fun `the endpoints and the document are both served on a borrowed system`() {
-        val server = ordersApi().startWithDocs(system, port = 0, docs = ordersDocs)
+        val server = pekkoApi().startWithDocs(system, port = 0, docs = ordersDocs)
 
         try {
             server.ownsSystem shouldBe false
 
             val spec = get("${server.baseUrl}/openapi.json")
             spec.statusCode() shouldBe 200
-            spec.body() shouldContain "\"/users/{userId}\""
+            spec.body() shouldContain "\"/hello/{name}\""
 
             get("${server.baseUrl}/api-docs").statusCode() shouldBe 200
         } finally {

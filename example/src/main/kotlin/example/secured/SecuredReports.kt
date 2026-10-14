@@ -4,17 +4,12 @@ package example.secured
  * To run this in a project of your own:
  *
  *     dependencies {
- *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
- *         // Pekko itself: Pelican ships no Scala cross-build, so name yours
- *         implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
- *         implementation("org.apache.pekko:pekko-actor-typed_2.13")
- *         implementation("org.apache.pekko:pekko-stream_2.13")
- *         implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+ *         // the interpreter; brings pelican-core and Jetty's server
+ *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
  *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
  *         // startWithDocs, /openapi.json and Swagger UI
- *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
+ *         implementation("io.github.matthewjones372:pelican-jetty-docs:1.0.0")
  *     }
  */
 
@@ -41,6 +36,12 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.forbidden
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jetty.handledOrFail
+import io.github.matthewjones372.pelican.jetty.handledWith
+import io.github.matthewjones372.pelican.jetty.request
+import io.github.matthewjones372.pelican.jetty.streamedNow
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.lensInputs
 import io.github.matthewjones372.pelican.negotiated
@@ -53,18 +54,11 @@ import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledNow
-import io.github.matthewjones372.pelican.pekko.handledOrFail
-import io.github.matthewjones372.pelican.pekko.handledWith
-import io.github.matthewjones372.pelican.pekko.request
-import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.requires
 import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.text
 import io.github.matthewjones372.pelican.unauthorized
-import org.apache.pekko.stream.javadsl.Source
 import java.util.Base64
 import kotlin.reflect.KType
 
@@ -319,12 +313,12 @@ val caller = attribute<Caller>("caller")
  * The credential on this request, whichever kind it is, or null if it is absent
  * or does not check out.
  *
- * `Params.request` is the Pekko escape hatch — the raw request behind the call.
+ * `Params.request` is the Jetty escape hatch — the raw request behind the call.
  * Each backend module offers the same accessor for its own request type, so
  * this is the one function that would change if the backend did.
  */
 private fun callerOf(p: Params): Caller? {
-    val header = p.request.getHeader("Authorization").orElse(null)?.value() ?: return null
+    val header = p.request.headers.get("Authorization") ?: return null
     val (kind, credential) = header.split(' ', limit = 2).takeIf { it.size == 2 } ?: return null
     return when (kind.lowercase()) {
         "bearer" -> Introspection.introspect(credential)
@@ -390,7 +384,7 @@ val securedRoutes: List<ServerEndpoint> = listOf(
 
     health handledNow { "ok" },
 
-    listReports streamedNow { p -> Source.from(Reports.list(p[limit])) },
+    listReports streamedNow { p -> Reports.list(p[limit]).asSequence() },
 
     getReport handledOrFail { id ->
         Reports.find(id)?.let { ok(it) } ?: reportMissing(NoSuchReport(id, "No report $id"))

@@ -4,30 +4,25 @@ package example.mcp
  * To run this in a project of your own:
  *
  *     dependencies {
- *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
- *         // Pekko itself: Pelican ships no Scala cross-build, so name yours
- *         implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
- *         implementation("org.apache.pekko:pekko-actor-typed_2.13")
- *         implementation("org.apache.pekko:pekko-stream_2.13")
- *         implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+ *         // the interpreter; brings pelican-core and Jetty's server
+ *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
  *         // the descriptions as MCP tools
  *         implementation("io.github.matthewjones372:pelican-mcp:1.0.0")
  *         // serves the MCP tools on /mcp
- *         implementation("io.github.matthewjones372:pelican-pekko-mcp:1.0.0")
+ *         implementation("io.github.matthewjones372:pelican-jetty-mcp:1.0.0")
  *     }
  */
 
 import example.ordersApi
+import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.mcp.handlerWithMcp
+import io.github.matthewjones372.pelican.jetty.start
 import io.github.matthewjones372.pelican.mcp.McpOptions
 import io.github.matthewjones372.pelican.mcp.mcpOptions
-import io.github.matthewjones372.pelican.pekko.PelicanServer
-import io.github.matthewjones372.pelican.pekko.mcp.routeWithMcp
-import io.github.matthewjones372.pelican.pekko.start
 
 /**
  * The Orders service with its tools served beside its endpoints: the same
- * descriptions, the same handlers, one more route.
+ * descriptions, the same handlers, one more handler.
  *
  * `./gradlew :example:runMcp`, then point a client at `http://127.0.0.1:8080/mcp`.
  */
@@ -54,8 +49,8 @@ fun main(args: Array<String>) {
 }
 
 /** The service and its tools on one port. Written once, run by `main` and by the test. */
-fun ordersWithTools(port: Int): PelicanServer = ordersApi().start(port = port) { system ->
-    routeWithMcp(system, ordersTools)
+fun ordersWithTools(port: Int): PelicanServer = ordersApi().start(port = port) {
+    handlerWithMcp(options = ordersTools)
 }
 
 /**

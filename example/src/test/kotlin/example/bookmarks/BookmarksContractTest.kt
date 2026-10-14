@@ -1,12 +1,13 @@
 package example.bookmarks
 
 import io.github.matthewjones372.pelican.In2
+import io.github.matthewjones372.pelican.jetty.Handlers
+import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.start
 import io.github.matthewjones372.pelican.openapi.openApiJson
-import io.github.matthewjones372.pelican.pekko.PelicanServer
-import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.pekko.client
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.jetty.client
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.test.shouldBeApiError
 import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBuild
@@ -299,7 +300,7 @@ abstract class BookmarksContractTest {
 
 /** No socket, no port: straight through the interpreted route. */
 class InMemoryBookmarksTest : BookmarksContractTest() {
-    override fun open(): ApiClient = bookmarksApi().inMemory("bookmarks-in-memory")
+    override fun open(): ApiClient = bookmarksApi().inMemory(Handlers.onVirtualThreads)
 }
 
 /** The same assertions, over a real connection to a bound server. */
@@ -307,7 +308,7 @@ class OverHttpBookmarksTest : BookmarksContractTest() {
     private lateinit var server: PelicanServer
 
     override fun open(): ApiClient {
-        server = bookmarksApi().start(port = 0, systemName = "bookmarks-over-http")
+        server = bookmarksApi().start(port = 0)
         return server.client()
     }
 

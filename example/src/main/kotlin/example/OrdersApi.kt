@@ -4,17 +4,12 @@ package example
  * To run this in a project of your own:
  *
  *     dependencies {
- *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
- *         // Pekko itself: Pelican ships no Scala cross-build, so name yours
- *         implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
- *         implementation("org.apache.pekko:pekko-actor-typed_2.13")
- *         implementation("org.apache.pekko:pekko-stream_2.13")
- *         implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+ *         // the interpreter; brings pelican-core and Jetty's server
+ *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
  *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
  *         // startWithDocs, /openapi.json and Swagger UI
- *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
+ *         implementation("io.github.matthewjones372:pelican-jetty-docs:1.0.0")
  *     }
  */
 
@@ -23,28 +18,26 @@ import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.bytesNow
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jetty.handledOneOf
+import io.github.matthewjones372.pelican.jetty.handledOrFail
+import io.github.matthewjones372.pelican.jetty.handledWith
+import io.github.matthewjones372.pelican.jetty.streamedNow
+import io.github.matthewjones372.pelican.jetty.streamedOrFail
+import io.github.matthewjones372.pelican.jetty.toSequence
 import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.lastEventId
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pekko.bytesNow
-import io.github.matthewjones372.pelican.pekko.handledNow
-import io.github.matthewjones372.pelican.pekko.handledOneOf
-import io.github.matthewjones372.pelican.pekko.handledOrFail
-import io.github.matthewjones372.pelican.pekko.handledWith
-import io.github.matthewjones372.pelican.pekko.streamedNow
-import io.github.matthewjones372.pelican.pekko.streamedOrFail
-import io.github.matthewjones372.pelican.pekko.toSource
 import io.github.matthewjones372.pelican.unauthorized
-import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.javadsl.Source
-import java.time.Duration
 
 /**
- * The Pekko wiring: every description from Endpoints.kt paired with its
+ * The Jetty wiring: every description from Endpoints.kt paired with its
  * implementation. This is the only file in the example that knows a stream is a
- * `Source` — the descriptions don't, and neither does the OpenAPI generator.
+ * `Sequence`, pulled one element per write; the descriptions don't, and neither
+ * does the OpenAPI generator.
  */
 val ordersRoutes: List<ServerEndpoint> = listOf(
     // Declared failures are returned, not thrown: the endpoint's type says
@@ -57,23 +50,22 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     streamOrders streamedOrFail { (id, max, status, _) ->
         // id: Long, max: Int, status: OrderStatus?, trace: String?
         if (Store.user(id) == null) noSuchUser(ApiError(404, "No user $id"))
-        else ok(Source.from(Store.orders(id, max, status)))
+        else ok(Store.orders(id, max, status).asSequence())
     },
 
     watchOrders streamedNow { (_, max) ->
         // A reconnect says where it got to, so the run starts after that
         // rather than replaying what the caller already has.
         val from = lastEventId()?.toIntOrNull() ?: 0
-        Source.range(from + 1, from + max)
-            .throttle(1, Duration.ofMillis(100))
+        (from + 1..from + max).asSequence()
+            .spaced(WATCH_MILLIS)
             .map { seq -> Tick(seq, "order-event-$seq") }
     },
 
     listOrders streamedNow { (id, max) ->
         // Throttled so the example demonstrates what the type promises: the
         // array is framed and flushed as elements arrive, not assembled first.
-        Source.from(Store.orders(id, max, status = null))
-            .throttle(1, Duration.ofMillis(50))
+        Store.orders(id, max, status = null).asSequence().spaced(LIST_MILLIS)
     },
 
     placeOrder handledOrFail { (id, key, req) ->
@@ -120,11 +112,10 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
         )
     },
 
-    // Both directions at once, and no materializer in sight: the answer is the
-    // upload's own graph with a `map` on it, so back-pressure runs from the
-    // downloading socket through the store to the uploading one.
+    // Both directions at once: each row is read off the upload only when the
+    // download asks for the next answer, so neither side is held in memory.
     ingestOrders streamedNow { (id, rows) ->
-        rows.toSource().map { req -> Store.create(id, req) }
+        rows.toSequence().map { req -> Store.create(id, req) }
     },
 
     // The body arrives already decoded into whichever branch the `method`
@@ -147,8 +138,8 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     },
 
     echo bytesNow { body ->
-        // The request body source is handed over unconsumed.
-        body.toSource().mapMaterializedValue { NotUsed.getInstance() }
+        // The request body is handed over unconsumed.
+        body.toSequence()
     },
 
     // The lens-style endpoint reads its inputs from the bag by key — including
@@ -156,10 +147,17 @@ val ordersRoutes: List<ServerEndpoint> = listOf(
     // declared as rather than as a string somebody has to split.
     searchOrders streamedNow { p ->
         val items = p[itemFilter].orEmpty().toSet()
-        Source.from(Store.orders(userId = 1, limit = p[limit], status = p[statusFilter]))
+        Store.orders(userId = 1, limit = p[limit], status = p[statusFilter]).asSequence()
             .filter { order -> items.isEmpty() || order.item in items }
     },
 )
+
+/** A pause before every element but the first; on a virtual thread a sleep holds no platform thread. */
+private fun <T> Sequence<T>.spaced(millis: Long): Sequence<T> =
+    mapIndexed { i, element -> element.also { if (i > 0) Thread.sleep(millis) } }
+
+private const val WATCH_MILLIS = 100L
+private const val LIST_MILLIS = 50L
 
 fun ordersApi(): Api = api(
     endpoints = ordersRoutes,
@@ -169,7 +167,7 @@ fun ordersApi(): Api = api(
 ) {
     title = "Orders"
     version = "1.0.0"
-    description = "A Kotlin-first Pekko HTTP service, described as values."
+    description = "A Kotlin-first Jetty service, described as values."
     // Declared on the served API as well as on the spec, because it is a fact
     // about the service rather than about the document: this is a call it
     // makes. Nothing here routes it — see `WebhooksTest` in pelican-core.

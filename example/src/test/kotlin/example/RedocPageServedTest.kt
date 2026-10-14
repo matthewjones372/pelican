@@ -1,19 +1,14 @@
 package example
 
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
 import io.github.matthewjones372.pelican.openapi.DocsUi
 import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldStartWith
-import org.apache.pekko.actor.testkit.typed.annotations.JUnit5TestKit
-import org.apache.pekko.actor.testkit.typed.javadsl.ActorTestKit
-import org.apache.pekko.actor.testkit.typed.javadsl.JUnit5TestKitBuilder
-import org.apache.pekko.actor.testkit.typed.javadsl.TestKitJUnit5Extension
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import org.junit.jupiter.api.extension.ExtendWith
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -27,16 +22,8 @@ import java.net.http.HttpResponse
  * choosing one gets that one and nothing of the other, and that the document
  * route is untouched by the choice.
  */
-@ExtendWith(TestKitJUnit5Extension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RedocPageServedTest {
-
-    /** Found by reflection, so the field has to be a real one: `@JvmField`. */
-    @JUnit5TestKit
-    @JvmField
-    val testKit: ActorTestKit = JUnit5TestKitBuilder().withName("redoc-page-test").build()
-
-    private val system get() = testKit.system()
 
     private fun get(url: String): HttpResponse<String> =
         HttpClient.newHttpClient().send(
@@ -51,7 +38,6 @@ class RedocPageServedTest {
         check: (String) -> T,
     ): T {
         val server = ordersApi().startWithDocs(
-            system,
             port = 0,
             docs = docs {
                 this.docsPath = docsPath

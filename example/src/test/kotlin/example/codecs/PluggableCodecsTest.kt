@@ -10,12 +10,13 @@ import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.openapi.openApi
 import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.SerialName
@@ -46,8 +47,9 @@ class PluggableCodecsTest {
 
     @BeforeAll
     fun setUp() {
-        apps = libraries.associate { (name, codecs) -> name to notesApi(codecs).inMemory("notes-$name") }
-        adoptions = libraries.associate { (name, codecs) -> name to adoptionApi(codecs).inMemory("adoption-$name") }
+        apps = libraries.associate { (name, codecs) -> name to notesApi(codecs).inMemory(Handlers.onVirtualThreads) }
+        adoptions =
+            libraries.associate { (name, codecs) -> name to adoptionApi(codecs).inMemory(Handlers.onVirtualThreads) }
     }
 
     @AfterAll

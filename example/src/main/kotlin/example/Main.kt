@@ -5,11 +5,11 @@ package example
  *
  *     dependencies {
  *         // startWithDocs, /openapi.json and Swagger UI
- *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
+ *         implementation("io.github.matthewjones372:pelican-jetty-docs:1.0.0")
  *     }
  */
 
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
 
 fun main(args: Array<String>) {
     // `./gradlew :example:run --args=8081` when 8080 is taken.

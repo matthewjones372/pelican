@@ -14,9 +14,10 @@ dependencies {
     implementation(project(":pelican-core"))
     implementation(project(":pelican-openapi"))
     implementation(project(":pelican-codegen"))
-    implementation(project(":pelican-pekko"))
-    // The second server, which every suite in `example.backends` also runs against.
+    // The server every runnable example is served by.
     implementation(project(":pelican-jetty"))
+    // The second server: `OnPekko`, the parity suites in `example.backends`, and the cookbook's one Pekko example.
+    implementation(project(":pelican-pekko"))
     // Pelican compiles against Pekko and ships none of it, so a service names
     // the version and the Scala cross-build it runs. Either cross-build works;
     // this repository builds and tests at `_2.13`.
@@ -27,13 +28,13 @@ dependencies {
     // Pekko's own logging at the slf4j API `pelican-pekko` writes to.
     runtimeOnly("org.apache.pekko:pekko-slf4j_2.13")
     // Serving the docs is opt-in: this is the module that adds them to a server.
-    implementation(project(":pelican-pekko-docs"))
-    // And on Jetty, which the README's examples are served by.
     implementation(project(":pelican-jetty-docs"))
+    // And on Pekko, for `FirstEndpointOnPekko`.
+    implementation(project(":pelican-pekko-docs"))
     // And serving the tools is opt-in in exactly the same way: `example.mcp` is
     // what that looks like. `pelican-mcp` and `pelican-mcp-server` arrive
     // through it, which is why neither is declared here.
-    implementation(project(":pelican-pekko-mcp"))
+    implementation(project(":pelican-jetty-mcp"))
     implementation(project(":pelican-jackson"))
     // The second codec module, which the codecs and adoption examples are also served over.
     implementation(project(":pelican-kotlinx"))
@@ -103,8 +104,8 @@ dependencies {
     // needs. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
     testImplementation(project(":pelican-test-jetty"))
-    // And `StillCompilesTest` compiles the Jetty MCP twin's call sites beside Pekko's.
-    testImplementation(project(":pelican-jetty-mcp"))
+    // And `StillCompilesTest` compiles the Pekko MCP twin's call sites beside Jetty's.
+    testImplementation(project(":pelican-pekko-mcp"))
     // The generated client against a stubbed service, stubbed in the same descriptions. Spec 0056.
     testImplementation(project(":pelican-test-wiremock"))
 
@@ -184,7 +185,7 @@ tasks.register<JavaExec>("runSecured") {
     mainClass.set("example.secured.SecuredReportsKt")
 }
 
-/** The endpoints that never name a server library, bound to the one 1.0 ships. */
+/** The endpoints that never name a server library, bound to Jetty. */
 tasks.register<JavaExec>("runBackends") {
     group = "application"
     description = "Runs the greetings example through the backend seam"
@@ -328,7 +329,7 @@ pelican {
             // Stubs as well, so that the third thing this proves is that a
             // handler bound to an imported endpoint type-checks — against a
             // real backend, for every output kind the example describes.
-            handlers.set("pekko")
+            handlers.set("jetty")
         }
         /**
          * The same descriptions, read back out of the 3.2 rendering.

@@ -3,7 +3,7 @@ package example.telemetry
 import com.sun.net.httpserver.HttpServer
 import io.github.matthewjones372.pelican.ClientRequest
 import io.github.matthewjones372.pelican.Method
-import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
+import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.metrics.otel.traced
 import io.kotest.matchers.shouldBe
 import io.opentelemetry.api.trace.Span
@@ -39,7 +39,7 @@ class TracedCallTest {
     }
 
     @Test
-    fun `a call made inside a span reaches the server as that span's child, over Pekko's client`() {
+    fun `a call made inside a span reaches the server as that span's child, over Jetty's client`() {
         val received = CompletableFuture<Map<String, String>>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
             createContext("/orders/7") { exchange ->
@@ -57,8 +57,10 @@ class TracedCallTest {
             val url = "http://127.0.0.1:${server.address.port}/orders/7"
             val caller = sdk.getTracer("test").spanBuilder("caller").startSpan()
             val status = caller.makeCurrent().use { _ ->
-                PekkoHttpTransport().traced(sdk).send(ClientRequest(Method.GET, url)).toCompletableFuture().get()
-                    .also { it.body.close() }.status
+                JettyHttpTransport().use { transport ->
+                    transport.traced(sdk).send(ClientRequest(Method.GET, url)).toCompletableFuture().get()
+                        .also { it.body.close() }.status
+                }
             }
             caller.end()
             status shouldBe 200

@@ -6,13 +6,14 @@ import example.generated.OrdersClient
 import example.generated.PlaceOrderFailure
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.In3
-import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
+import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import example.generated.ApiError as GeneratedApiError
@@ -27,7 +28,12 @@ class WireMockedClientTest {
     @RegisterExtension
     val orders = PelicanWireMockExtension(JacksonCodecs)
 
-    private val client by lazy { OrdersClient(orders.baseUrl, JacksonCodecs, PekkoHttpTransport()) }
+    private val transport = JettyHttpTransport()
+
+    private val client by lazy { OrdersClient(orders.baseUrl, JacksonCodecs, transport) }
+
+    @AfterEach
+    fun closeTransport() = transport.close()
 
     @Test
     fun `a stubbed success reaches the client as its own type`() {

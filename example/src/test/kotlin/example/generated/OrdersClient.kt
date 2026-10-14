@@ -579,7 +579,7 @@ sealed interface PayOrderFailure {
 
 private const val DEFAULT_BASE_URL = "http://localhost:8080"
 
-/** A Kotlin-first Pekko HTTP service, described as values. */
+/** A Kotlin-first Jetty service, described as values. */
 class OrdersClient(
     baseUrl: String = DEFAULT_BASE_URL,
     private val codecs: Codecs,

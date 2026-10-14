@@ -4,17 +4,12 @@ package example.telemetry
  * To run this in a project of your own:
  *
  *     dependencies {
- *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
- *         // Pekko itself: Pelican ships no Scala cross-build, so name yours
- *         implementation(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
- *         implementation("org.apache.pekko:pekko-actor-typed_2.13")
- *         implementation("org.apache.pekko:pekko-stream_2.13")
- *         implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
+ *         // the interpreter; brings pelican-core and Jetty's server
+ *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
  *     }
  */
 
-import io.github.matthewjones372.pelican.pekko.start
+import io.github.matthewjones372.pelican.jetty.start
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.config.MeterFilter
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
@@ -51,7 +46,7 @@ fun main() {
     val telemetry = recordingTelemetry(recorded)
 
     val server = telemetryService(registry, telemetry) { report(registry, recorded) }
-        .start(port = 8080, systemName = "telemetry-orders")
+        .start(port = 8080)
 
     println("Listening on ${server.baseUrl}")
     println("  curl ${server.baseUrl}/orders/1                     # a 200")
