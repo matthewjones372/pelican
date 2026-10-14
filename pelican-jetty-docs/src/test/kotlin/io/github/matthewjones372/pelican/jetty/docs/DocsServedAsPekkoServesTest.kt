@@ -32,7 +32,13 @@ data class Widget(val id: Long, val name: String)
 /** One API and its docs on both servers, asked the same questions over a socket. */
 class DocsServedAsPekkoServesTest {
 
-    data class Seen(val status: Int, val contentType: String?, val allowOrigin: String?, val body: String)
+    data class Seen(
+        val status: Int,
+        val contentType: String?,
+        val allowOrigin: String?,
+        val allow: String?,
+        val body: String,
+    )
 
     companion object {
         private const val ORIGIN = "https://tools.example.com"
@@ -87,12 +93,20 @@ class DocsServedAsPekkoServesTest {
         }
     }
 
-    private fun ask(baseUrl: String, path: String, origin: String? = ORIGIN): Seen {
-        val builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).GET()
-        val request = (origin?.let { builder.header("Origin", it) } ?: builder).build()
+    private fun ask(baseUrl: String, path: String, method: String = "GET"): Seen {
+        val request = HttpRequest.newBuilder(URI.create(baseUrl + path))
+            .method(method, HttpRequest.BodyPublishers.noBody())
+            .header("Origin", ORIGIN)
+            .build()
         val res = client.send(request, HttpResponse.BodyHandlers.ofString())
         val header = { name: String -> res.headers().firstValue(name).orElse(null) }
-        return Seen(res.statusCode(), header("Content-Type"), header("Access-Control-Allow-Origin"), res.body())
+        return Seen(
+            res.statusCode(),
+            header("Content-Type"),
+            header("Access-Control-Allow-Origin"),
+            header("Allow"),
+            res.body(),
+        )
     }
 
     @ParameterizedTest(name = "{0}")
@@ -121,12 +135,22 @@ class DocsServedAsPekkoServesTest {
         withClue(path) { ask(jettyOff.baseUrl, path) shouldBe ask(pekkoOff.baseUrl, path) }
     }
 
-    /** Asked with no Origin: the docs carry the API's CORS on both servers, and Jetty's endpoints do not yet. */
     @Test
     fun `the endpoints still answer beside the docs, as on pekko`() {
         for ((jettyUrl, pekkoUrl) in listOf(jetty.baseUrl to pekko.baseUrl, jettyOff.baseUrl to pekkoOff.baseUrl)) {
-            ask(jettyUrl, "/widgets/3", origin = null) shouldBe ask(pekkoUrl, "/widgets/3", origin = null)
+            ask(jettyUrl, "/widgets/3") shouldBe ask(pekkoUrl, "/widgets/3")
         }
+    }
+
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource("PUT, /openapi.json", "POST, /api-docs", "DELETE, /reference", "PUT, /widgets/3", "OPTIONS, /api-docs")
+    fun `a verb the docs do not take is refused as on pekko, naming every route's`(method: String, path: String) {
+        withClue("$method $path") { ask(jetty.baseUrl, path, method) shouldBe ask(pekko.baseUrl, path, method) }
+    }
+
+    @Test
+    fun `a verb nobody takes lists the api's and the docs' methods`() {
+        ask(jetty.baseUrl, "/openapi.json", "PUT").allow shouldBe "GET, OPTIONS"
     }
 
     @Test

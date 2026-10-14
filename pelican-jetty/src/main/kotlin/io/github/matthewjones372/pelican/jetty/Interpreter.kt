@@ -1,8 +1,11 @@
 package io.github.matthewjones372.pelican.jetty
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.CorsPolicy
+import io.github.matthewjones372.pelican.CorsPreflight
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonBody
@@ -16,6 +19,8 @@ import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.SseOutput
+import io.github.matthewjones372.pelican.corsPolicy
+import io.github.matthewjones372.pelican.spi.CorsHeaders
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex
 import io.github.matthewjones372.pelican.spi.handlerFor
@@ -32,11 +37,13 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
 /**
- * Interprets an [Api] as a Jetty handler that answers every request it is given, a path it does not describe
- * included. Endpoints only: nothing here generates an OpenAPI document.
+ * Interprets an [Api] as a Jetty handler. Endpoints only: nothing here generates an OpenAPI document.
  *
- * A server built by hand should set its `HttpConfiguration.uriCompliance` to [PELICAN_URI_COMPLIANCE], or Jetty
- * answers a `%2F` in a path parameter with its own 400 before this handler sees it.
+ * It passes on (returns false) wherever Pekko's route rejects, so a handler after it in a `Handler.Sequence` is
+ * asked next. The 404 or 405 for a request nobody took comes from [Unanswered], which [start] installs and a
+ * server built by hand should set as its `defaultHandler`. Such a server should also set its
+ * `HttpConfiguration.uriCompliance` to [PELICAN_URI_COMPLIANCE], or Jetty answers a `%2F` in a path parameter
+ * with its own 400 before this handler sees it.
  */
 fun Api.toHandler(handlers: Handlers = Handlers.onVirtualThreads): Handler {
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
@@ -45,7 +52,7 @@ fun Api.toHandler(handlers: Handlers = Handlers.onVirtualThreads): Handler {
     val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
     val bound = endpoints.associateWith { endpoint -> handlerFor(endpoint).on(handlers, endpoint) }
 
-    return PelicanHandler(this, endpoints.routeIndex(), codecs, bound)
+    return PelicanHandler(this, endpoints.routeIndex(), codecs, bound, corsPolicy())
 }
 
 /** [handler] on [threads]' executor, when [endpoint] was bound synchronously and there is one to move to. */
@@ -66,31 +73,34 @@ internal class PelicanHandler(
     private val index: RouteIndex,
     private val codecs: Map<ServerEndpoint, EndpointCodecs>,
     private val handlers: Map<ServerEndpoint, (Params) -> CompletionStage<Any?>>,
+    private val cors: CorsPolicy?,
 ) : Handler.Abstract() {
 
     /** In declaration order, which is the order Pekko's per-method routes name them in a 405. */
     private val methods: List<Method> = api.endpoints.map { it.endpoint.method }.distinct()
-
-    private val notAllowed = methodNotAllowed(methods)
 
     override fun handle(request: Request, response: Response, callback: Callback): Boolean {
         val answered = try {
             route(request)
         } catch (t: Throwable) {
             CompletableFuture.completedStage(errorResponse(t, api))
-        }
+        } ?: return false
         answered.whenComplete { reply, failure -> (reply ?: errorResponse(failure, api)).writeTo(response, callback) }
         return true
     }
 
     /**
-     * Pekko's routing, answered from the index: a verb no endpoint declares is a 405 whatever the path, and a
-     * declared verb at a path nothing under it describes is a 404, even where another verb describes that path.
+     * Pekko's routing, answered from the index: one route per declared verb, then the CORS preflight. A verb no
+     * endpoint declares is passed on naming the ones that are; a declared verb at a path nothing under it
+     * describes is passed on as a 404, even where another verb describes that path.
      */
-    private fun route(request: Request): CompletionStage<Reply> {
+    private fun route(request: Request): CompletionStage<Reply>? {
         val method = methods.firstOrNull { it.name == request.method }
-            ?: return CompletableFuture.completedStage(notAllowed)
         val path = request.encodedPathInContext()
+        if (method == null) {
+            request.declineMethods(methods.map { it.name })
+            return preflight(request, path)
+        }
         val values = LinkedHashMap<ParamKey<*>, Any?>()
 
         val matched = try {
@@ -101,10 +111,38 @@ internal class PelicanHandler(
             return CompletableFuture.completedStage(errorResponse(t, api, refused))
         }
 
-        return if (matched == null) {
-            CompletableFuture.completedStage(NOT_FOUND)
-        } else {
-            invoke(matched, request, values)
+        if (matched == null) {
+            request.declinePath()
+            return preflight(request, path)
+        }
+        val answered = invoke(matched, request, values)
+        return if (cors == null) answered
+        else answered.thenApply { it.withHeaders(cors.actualResponseHeaders(request.headers.get(CorsHeaders.ORIGIN))) }
+    }
+
+    /** Last, as on Pekko, so an endpoint declaring `OPTIONS` itself is tried first. */
+    private fun preflight(request: Request, path: String): CompletionStage<Reply>? {
+        if (cors == null) return null
+        if (request.method != Method.OPTIONS.name) {
+            request.declineMethods(listOf(Method.OPTIONS.name))
+            return null
+        }
+        val decision = cors.preflight(
+            origin = request.headers.get(CorsHeaders.ORIGIN),
+            requestMethod = request.headers.get(CorsHeaders.REQUEST_METHOD),
+            path = path,
+        )
+        return when (decision) {
+            is CorsPreflight.NotPreflight -> {
+                request.declinePath()
+                null
+            }
+
+            is CorsPreflight.Refused ->
+                CompletableFuture.completedStage(errorResponse(ApiException(403, "Forbidden", decision.reason), api))
+
+            is CorsPreflight.Allowed ->
+                CompletableFuture.completedStage(Strict(204, null, ByteArray(0), decision.headers))
         }
     }
 
