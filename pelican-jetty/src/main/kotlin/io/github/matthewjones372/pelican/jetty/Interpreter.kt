@@ -15,6 +15,7 @@ import io.github.matthewjones372.pelican.NdjsonBody
 import io.github.matthewjones372.pelican.NegotiatedBody
 import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
+import io.github.matthewjones372.pelican.Pages
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.RawBody
@@ -25,6 +26,7 @@ import io.github.matthewjones372.pelican.spi.CorsHeaders
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex
 import io.github.matthewjones372.pelican.spi.acceptable
+import io.github.matthewjones372.pelican.spi.decodeCaller
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.ndjsonFrames
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
@@ -54,7 +56,12 @@ fun Api.toHandler(handlers: Handlers = Handlers.onVirtualThreads): Handler {
     val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
     val bound = endpoints.associateWith { endpoint -> handlerFor(endpoint).on(handlers, endpoint) }
 
-    return PelicanHandler(this, endpoints.routeIndex(), codecs, bound, corsPolicy())
+    val cors = corsPolicy()
+    val answered = PelicanHandler(this, endpoints.routeIndex(), codecs, bound, cors)
+    val files = pages ?: return answered
+    // The loader that built the handler, as a thread Jetty runs a request on may carry no useful one.
+    val loader = Thread.currentThread().contextClassLoader ?: Pages::class.java.classLoader
+    return Handler.Sequence(answered, PagesHandler(files, cors, loader).onlyFor(Method.GET))
 }
 
 /** [handler] on [threads]' executor, when [endpoint] was bound synchronously and there is one to move to. */
@@ -63,10 +70,15 @@ private fun ((Params) -> CompletionStage<Any?>).on(
     endpoint: ServerEndpoint,
 ): (Params) -> CompletionStage<Any?> {
     val executor = threads.executor
-    return if (executor == null || endpoint.invoke !is Synchronous) {
-        this
-    } else {
-        { params -> CompletableFuture.supplyAsync({ this(params) }, executor).thenCompose { it } }
+    return when {
+        executor == null || endpoint.invoke !is Synchronous -> this
+
+        threads.virtual -> { params ->
+            if (Thread.currentThread().isVirtual) this(params)
+            else CompletableFuture.supplyAsync({ this(params) }, executor).thenCompose { it }
+        }
+
+        else -> { params -> CompletableFuture.supplyAsync({ this(params) }, executor).thenCompose { it } }
     }
 }
 
@@ -159,8 +171,9 @@ internal class PelicanHandler(
 
         val accept = request.headers.getValuesList(HttpHeader.ACCEPT)
 
-        // The caller check goes here, ahead of negotiation and the inputs as Pekko orders them.
+        // Who is calling first, then what they will take, then the inputs: Pekko's order, so a 401 tells nothing else.
         try {
+            api.decodeCaller(ep, request.credentials(), values)
             negotiate(ep, accept)
             decodePlainInputs(ep, request, values)
         } catch (t: Throwable) {

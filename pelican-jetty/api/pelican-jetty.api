@@ -17,7 +17,6 @@ public final class io/github/matthewjones372/pelican/jetty/FrameReader : java/la
 
 public final class io/github/matthewjones372/pelican/jetty/Handlers {
 	public static final field Companion Lio/github/matthewjones372/pelican/jetty/Handlers$Companion;
-	public synthetic fun <init> (Ljava/util/concurrent/Executor;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 }
 
 public final class io/github/matthewjones372/pelican/jetty/Handlers$Companion {

@@ -12,6 +12,8 @@ import org.eclipse.jetty.server.HttpConnectionFactory
 import org.eclipse.jetty.server.NetworkConnector
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
+import org.eclipse.jetty.util.VirtualThreads
+import org.eclipse.jetty.util.thread.QueuedThreadPool
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -80,7 +82,7 @@ fun Api.start(
     handlers: Handlers = Handlers.onVirtualThreads,
     handler: Api.() -> Handler = { toHandler(handlers) },
 ): PelicanServer {
-    val server = Server()
+    val server = Server(pelicanThreads(handlers))
     val http = HttpConfiguration().apply { uriCompliance = PELICAN_URI_COMPLIANCE }
     server.addConnector(
         ServerConnector(server, HttpConnectionFactory(http)).apply {
@@ -98,3 +100,16 @@ fun Api.start(
     }
     return PelicanServer(this, server, host)
 }
+
+/**
+ * Jetty's own pool, calling handlers on virtual threads when [handlers] runs them on one anyway, so a synchronous
+ * handler starts on a virtual thread rather than hopping to one. Any other choice keeps Jetty's platform threads,
+ * which is where [Handlers.onDispatcher] promises a handler runs.
+ */
+internal fun pelicanThreads(handlers: Handlers, maxThreads: Int = DEFAULT_MAX_THREADS): QueuedThreadPool =
+    QueuedThreadPool(maxThreads).apply {
+        if (handlers.virtual) virtualThreadsExecutor = VirtualThreads.getNamedVirtualThreadsExecutor("pelican-")
+    }
+
+/** Jetty's own default. */
+private const val DEFAULT_MAX_THREADS = 200

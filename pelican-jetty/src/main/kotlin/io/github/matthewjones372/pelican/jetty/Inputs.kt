@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.jetty
 
 import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.Cookies
+import io.github.matthewjones372.pelican.Credentials
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.spi.decodeList
@@ -36,6 +37,13 @@ internal fun withoutDotSegments(path: String): String {
         }
     }
     return "/" + kept.joinToString("/")
+}
+
+/** Cookies parsed by core, as [decodePlainInputs] parses them, so a session reads the same on every backend. */
+internal fun Request.credentials(): Credentials = object : Credentials {
+    override fun header(name: String): String? = headers.get(name)
+
+    override fun cookie(name: String): String? = Cookies.parseAll(headers.getValuesList("Cookie"))[name]?.firstOrNull()
 }
 
 /** Query, header and cookie inputs, read as `pelican-pekko` reads them. Path captures are already in [into]. */
