@@ -476,3 +476,48 @@ tasks.test {
         )
     }
 }
+
+/**
+ * Every library named the way a consumer names it, with no version, beside
+ * `pelican-bom`. One module depending on another would version it without the
+ * BOM, so `checkBom` reads the BOM's own constraints as well as the result.
+ */
+val throughTheBom = configurations.create("throughTheBom") {
+    isCanBeConsumed = false
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+val libraryModules = rootProject.extra["libraryModules"] as List<String>
+
+dependencies {
+    throughTheBom(platform(project(":pelican-bom")))
+    libraryModules.forEach { throughTheBom("io.github.matthewjones372:$it") }
+}
+
+val checkBom = tasks.register("checkBom") {
+    description = "Resolves every library through pelican-bom with no version of its own."
+    val graph = throughTheBom.incoming.resolutionResult.rootComponent
+    val expected = libraryModules.associateWith { project.version.toString() }
+    doLast {
+        val root = graph.get()
+        val unresolved = root.dependencies.filterIsInstance<UnresolvedDependencyResult>()
+        check(unresolved.isEmpty()) { "Did not resolve through pelican-bom: ${unresolved.map { it.requested }}" }
+        fun versions(edges: Collection<DependencyResult>) = edges.filterIsInstance<ResolvedDependencyResult>()
+            .mapNotNull { it.selected.moduleVersion }
+            .filter { it.name != "pelican-bom" }
+            .associate { it.name to it.version }
+        val bom = root.dependencies.filterIsInstance<ResolvedDependencyResult>()
+            .single { it.selected.moduleVersion?.name == "pelican-bom" }.selected
+        val constrained = versions(bom.dependencies.filter { it.isConstraint })
+        check(constrained == expected) {
+            "pelican-bom leaves out ${expected.keys - constrained.keys}; at ${constrained.values.toSet()}"
+        }
+        check(versions(root.dependencies) == expected) { "Resolved ${versions(root.dependencies)}, expected $expected" }
+    }
+}
+
+tasks.named("check") { dependsOn(checkBom) }

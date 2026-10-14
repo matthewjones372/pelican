@@ -41,6 +41,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
 | `pelican-test-jetty` | test, jetty | the in-memory transport on Jetty, through a `LocalConnector`, and `PelicanServer.client()` |
 | `pelican-test-wiremock` | test, WireMock | WireMock stubbed and verified in endpoint values, for testing a client of somebody else's API; and `stubFile`, which exports those stubs as mapping files |
+| `pelican-bom` | **nothing** | a `java-platform` constraining every library module to the build's version, so a consumer names one version |
 | `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
 | `example` | core, openapi, jackson, kotlinx, pekko, jetty | the orders, bookmarks, greetings and secured services |
 | `benchmarks` | core, jackson, pekko, JMH | the interpreter measured against hand-written Pekko routes. Not published, not run by `build`. |

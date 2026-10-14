@@ -33,6 +33,10 @@ one.
 
 ### Added
 
+- **`pelican-bom`**: a platform pinning every library module to one version,
+  so a build writes `implementation(platform("io.github.matthewjones372:pelican-bom:$version"))`
+  and names the modules without one (spec 0078). Generated from the set of
+  published modules, so a new module is in it without an edit.
 - **`pelican-jetty`**: the descriptions served by Jetty 12, as a core
   `Handler` (`toHandler`) or a bound server (`start`), with no Pekko or Scala
   on the classpath (spec 0073). Every binder `pelican-pekko` has, under the

@@ -148,6 +148,7 @@ testing/         pelican-test, -test-golden, -test-wiremock
 integrations/    pelican-health, -health-kafka, -health-redis, -metrics, -metrics-otel,
                  -oidc, -arrow, -mcp, -mcp-server
 tooling/         pelican-codegen, -import, pelican-gradle-plugin (an included build)
+bom/             pelican-bom
 example/  benchmarks/
 ```
 
