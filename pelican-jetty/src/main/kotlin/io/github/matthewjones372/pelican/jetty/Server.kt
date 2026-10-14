@@ -72,7 +72,7 @@ val PELICAN_URI_COMPLIANCE: UriCompliance = UriCompliance.DEFAULT.with(
 
 /**
  * Binds this API on [host]:[port]; port 0 lets the OS choose. [handler] is how a module knowing more than this
- * one, such as one serving an OpenAPI document, adds to it.
+ * one, such as one serving an OpenAPI document, adds to it; a request it passes on is answered by [Unanswered].
  */
 fun Api.start(
     port: Int = 8080,
@@ -89,6 +89,7 @@ fun Api.start(
         },
     )
     server.handler = handler()
+    server.defaultHandler = Unanswered()
     try {
         server.start()
     } catch (t: Throwable) {

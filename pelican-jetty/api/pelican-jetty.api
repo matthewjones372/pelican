@@ -3,6 +3,10 @@ public final class io/github/matthewjones372/pelican/jetty/BodiesKt {
 	public static final fun toSource (Lio/github/matthewjones372/pelican/ByteStreamHandle;)Lorg/eclipse/jetty/io/Content$Source;
 }
 
+public final class io/github/matthewjones372/pelican/jetty/DeclinesKt {
+	public static final fun onlyFor (Lorg/eclipse/jetty/server/Handler;Lio/github/matthewjones372/pelican/Method;)Lorg/eclipse/jetty/server/Handler;
+}
+
 public final class io/github/matthewjones372/pelican/jetty/FrameReader : java/lang/AutoCloseable, java/util/Iterator, kotlin/jvm/internal/markers/KMappedMarker {
 	public fun close ()V
 	public fun hasNext ()Z
@@ -65,5 +69,10 @@ public final class io/github/matthewjones372/pelican/jetty/ServerKt {
 public final class io/github/matthewjones372/pelican/jetty/StreamedUploadsKt {
 	public static final fun reader (Lio/github/matthewjones372/pelican/StreamIn;)Lio/github/matthewjones372/pelican/jetty/FrameReader;
 	public static final fun toSequence (Lio/github/matthewjones372/pelican/StreamIn;)Lkotlin/sequences/Sequence;
+}
+
+public final class io/github/matthewjones372/pelican/jetty/Unanswered : org/eclipse/jetty/server/Handler$Abstract$NonBlocking {
+	public fun <init> ()V
+	public fun handle (Lorg/eclipse/jetty/server/Request;Lorg/eclipse/jetty/server/Response;Lorg/eclipse/jetty/util/Callback;)Z
 }
 

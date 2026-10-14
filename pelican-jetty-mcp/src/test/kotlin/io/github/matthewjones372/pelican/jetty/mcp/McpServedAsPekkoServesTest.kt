@@ -33,7 +33,7 @@ data class Widget(val id: Long, val name: String)
 /** One API and its tools on both servers, asked the same questions over a socket. */
 class McpServedAsPekkoServesTest {
 
-    data class Seen(val status: Int, val contentType: String?, val body: String)
+    data class Seen(val status: Int, val contentType: String?, val allow: String?, val body: String)
 
     companion object {
         private val widgetId = pathParam<Long>("widgetId")
@@ -76,7 +76,8 @@ class McpServedAsPekkoServesTest {
         val publisher = body?.let { HttpRequest.BodyPublishers.ofString(it) } ?: HttpRequest.BodyPublishers.noBody()
         val request = HttpRequest.newBuilder(URI.create(baseUrl + path)).method(method, publisher).build()
         val res = client.send(request, HttpResponse.BodyHandlers.ofString())
-        return Seen(res.statusCode(), res.headers().firstValue("Content-Type").orElse(null), res.body())
+        val header = { name: String -> res.headers().firstValue(name).orElse(null) }
+        return Seen(res.statusCode(), header("Content-Type"), header("Allow"), res.body())
     }
 
     private fun Seen.result(): JsonObj = (parseJson(body) as JsonObj)["result"] as JsonObj
@@ -95,6 +96,9 @@ class McpServedAsPekkoServesTest {
         "GET, /mcp",
         "GET, /widgets/3",
         "GET, /nobody/described/this",
+        "PUT, /mcp",
+        "DELETE, /widgets/3",
+        "POST, /widgets/3",
     )
     fun `jetty answers as pekko does`(method: String, path: String) {
         withClue("$method $path") {
@@ -121,6 +125,11 @@ class McpServedAsPekkoServesTest {
 
         seen.status shouldBe 405
         (((parseJson(seen.body) as JsonObj)["error"] as JsonObj)["message"] as JsonStr).value shouldContain "POST"
+    }
+
+    @Test
+    fun `a verb nobody takes lists the api's and the tools' methods`() {
+        ask(jetty.baseUrl, "PUT", "/mcp").allow shouldBe "GET, POST"
     }
 
     @Test

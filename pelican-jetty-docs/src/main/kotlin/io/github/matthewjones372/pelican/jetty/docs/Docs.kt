@@ -2,9 +2,11 @@ package io.github.matthewjones372.pelican.jetty.docs
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.CorsPolicy
+import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.onlyFor
 import io.github.matthewjones372.pelican.jetty.start
 import io.github.matthewjones372.pelican.jetty.toHandler
 import io.github.matthewjones372.pelican.openapi.DocsUi
@@ -29,7 +31,7 @@ typealias Docs = io.github.matthewjones372.pelican.openapi.Docs
 private const val HTML = "text/html; charset=UTF-8"
 private const val JSON = "application/json"
 
-/** The document and the pages as a handler, and nothing else: it declines every request but a GET of one of them. */
+/** The document and the pages as a handler, and nothing else: it passes on every request but a GET of one of them. */
 fun Api.docsHandler(docs: Docs = docs()): Handler {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }
     val uiPath = docs.docsPath?.takeIf { it.isNotBlank() }
@@ -56,15 +58,15 @@ fun Api.docsHandler(docs: Docs = docs()): Handler {
         }
     }
     // The API's own CORS setting covers the document as well; reading it is a plain GET, so nothing to preflight.
-    return DocsHandler(pages, corsPolicy())
+    return DocsHandler(pages, corsPolicy()).onlyFor(Method.GET)
 }
 
 /**
- * The endpoints and the documentation as one handler, the documentation asked first since [toHandler] answers
- * every request. Served with `api.start(handler = { handlerWithDocs() })`.
+ * The endpoints and the documentation as one handler, the endpoints asked first as on Pekko, so an endpoint at a
+ * docs path wins. Served with `api.start(handler = { handlerWithDocs() })`.
  */
 fun Api.handlerWithDocs(handlers: Handlers = Handlers.onVirtualThreads, docs: Docs = docs()): Handler =
-    Handler.Sequence(docsHandler(docs), toHandler(handlers))
+    Handler.Sequence(toHandler(handlers), docsHandler(docs))
 
 /** [start], with the document and the documentation page served alongside. */
 fun Api.startWithDocs(
@@ -82,7 +84,6 @@ private class Page(val contentType: String, body: String) {
 private class DocsHandler(private val pages: Map<String, Page>, private val cors: CorsPolicy?) : Handler.Abstract() {
 
     override fun handle(request: Request, response: Response, callback: Callback): Boolean {
-        if (request.method != "GET") return false
         val page = pages[Request.getPathInContext(request).trim('/')] ?: return false
         response.status = 200
         response.headers.put(HttpHeader.CONTENT_TYPE, page.contentType)

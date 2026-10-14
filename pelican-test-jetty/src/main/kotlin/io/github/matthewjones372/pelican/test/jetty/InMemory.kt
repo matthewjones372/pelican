@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.jetty.PELICAN_URI_COMPLIANCE
 import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.Unanswered
 import io.github.matthewjones372.pelican.jetty.toHandler
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.RequestSpec
@@ -37,6 +38,7 @@ class InMemoryTransport(handler: Handler) : Transport, AutoCloseable {
     init {
         server.addConnector(connector)
         server.handler = handler
+        server.defaultHandler = Unanswered()
         var started = false
         try {
             server.start()

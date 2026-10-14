@@ -11,7 +11,6 @@ import io.github.matthewjones372.pelican.JSON_MEDIA_TYPE
 import io.github.matthewjones372.pelican.JsonArrayOutput
 import io.github.matthewjones372.pelican.JsonOutput
 import io.github.matthewjones372.pelican.MediaOutput
-import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.NdjsonOutput
 import io.github.matthewjones372.pelican.NegotiatedOutput
 import io.github.matthewjones372.pelican.Outcome
@@ -205,9 +204,9 @@ private fun jsonArrayFrames(elements: Sequence<Any?>, codec: BodyCodec<Any?>): S
 /** Pekko's own answer to a path no endpoint describes, so the two backends cannot be told apart by it. */
 internal val NOT_FOUND = Strict(404, TEXT, "The requested resource could not be found.".toByteArray())
 
-/** Pekko's own answer to a verb no endpoint declares, naming the ones that are. */
-internal fun methodNotAllowed(declared: List<Method>): Strict {
-    val names = declared.joinToString(", ") { it.name }
+/** Pekko's own answer to a verb no route takes, naming the ones that are, each once, in the order routes named them. */
+internal fun methodNotAllowed(declared: List<String>): Strict {
+    val names = declared.distinct().joinToString(", ")
     return Strict(
         405,
         TEXT,
