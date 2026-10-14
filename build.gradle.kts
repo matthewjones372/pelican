@@ -22,7 +22,7 @@ buildscript {
 plugins {
     kotlin("jvm") version "2.4.20" apply false
     kotlin("plugin.serialization") version "2.4.20" apply false
-    id("com.diffplug.spotless") version "8.10.3"
+    id("com.diffplug.spotless") version "8.10.4"
     id("dev.detekt") version "2.0.0-alpha.6" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.11"
     // The version comes from the nearest `v` tag rather than a property, so
