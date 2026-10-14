@@ -8,13 +8,13 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.net.http.HttpTimeoutException
 import java.time.Duration
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 private const val CONTENT_LENGTH = "Content-Length"
 
@@ -75,11 +75,12 @@ class JavaHttpTransport @JvmOverloads constructor(
      * The deadline bounds the arrival of the head and not the reading of the
      * body, as Pekko's does: `HttpRequest.timeout` would also close a body
      * still streaming, and an `sse` response that outlives it is the endpoint
-     * working.
+     * working. A `TimeoutException`, not an `IOException`, so the default
+     * retry policy does not resend a request the server may already have.
      */
     private fun deadline(request: ClientRequest, answer: CompletableFuture<ClientResponse>, timeout: Duration) {
         CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS).execute {
-            answer.completeExceptionally(HttpTimeoutException("$request timed out after $timeout"))
+            answer.completeExceptionally(TimeoutException("$request timed out after $timeout"))
         }
     }
 

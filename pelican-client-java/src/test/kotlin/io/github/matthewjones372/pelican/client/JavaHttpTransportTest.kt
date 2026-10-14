@@ -3,7 +3,9 @@ package io.github.matthewjones372.pelican.client
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import io.github.matthewjones372.pelican.ClientRequest
+import io.github.matthewjones372.pelican.ClientTransport
 import io.github.matthewjones372.pelican.Method
+import io.github.matthewjones372.pelican.retrying
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactly
@@ -17,13 +19,14 @@ import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.ServerSocket
-import java.net.http.HttpTimeoutException
 import java.time.Duration
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
 
 /** The adapter over a socket, served by the JDK's own `HttpServer`. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -155,10 +158,25 @@ class JavaHttpTransportTest {
             send(ClientRequest(Method.GET, "$base/slow").withTimeout(Duration.ofMillis(TIMEOUT_MILLIS)))
         }
 
-        // `is`, not an exact type: a budget this short can be spent before the
-        // connection is up, and the JDK then throws a subclass.
-        failure.cause.shouldBeInstanceOf<HttpTimeoutException>()
-        failure.message.orEmpty() shouldContain "timed out"
+        failure.cause!!::class shouldBe TimeoutException::class
+        failure.cause!!.message.orEmpty() shouldContain "GET $base/slow timed out"
+    }
+
+    @Test
+    fun `a timed-out request is not retried by the default policy`() {
+        val attempts = AtomicInteger()
+        val counting = ClientTransport { request ->
+            attempts.incrementAndGet()
+            transport.send(request)
+        }
+
+        shouldThrow<CompletionException> {
+            counting.retrying().send(
+                ClientRequest(Method.GET, "$base/slow").withTimeout(Duration.ofMillis(TIMEOUT_MILLIS)),
+            ).toCompletableFuture().join()
+        }
+
+        attempts.get() shouldBe 1
     }
 
     /** The server holds the second chunk until well past the deadline. */
