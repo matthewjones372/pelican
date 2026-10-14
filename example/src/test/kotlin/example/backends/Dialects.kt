@@ -50,3 +50,36 @@ val allDialects: List<Dialect> = listOf(
     Dialect("envelope", ApiErrorEnvelope, "application/json", statusField = "status", reasonField = "error"),
     Dialect("problem", ProblemDetails, "application/problem+json", statusField = "status", reasonField = "title"),
 )
+
+/**
+ * Where Jetty answers otherwise than Pekko, and why that is accepted rather than closed. Everything not listed
+ * here is held identical by the suites in this package; `RecordedDifferencesTest` holds the first two true on
+ * the wire, so a change on either server fails there before it reaches a reader.
+ */
+enum class JettyDifference(val reason: String) {
+    /**
+     * `/%2E%2E/x`, `/hello/%2E%2E/%2e%2e/x`, `//x` and a raw `/../x` are Jetty's own HTML 400; Pekko answers 404.
+     */
+    ESCAPING_PATHS(
+        "Jetty's URI parser refuses a path that climbs above the root, or starts with an empty segment, before any " +
+            "handler runs, and no UriCompliance setting lifts it. Both refuse: nothing is served from outside.",
+    ),
+
+    /** `handledBy` and its `CompletionStage` siblings start on a virtual thread; on Pekko, on the dispatcher. */
+    STAGED_HANDLERS_START_VIRTUAL(
+        "Under Handlers.onVirtualThreads Jetty's own pool calls every handler on a virtual thread, so there is no " +
+            "platform thread to start a staged handler on. A handler returning a stage does not block either way.",
+    ),
+
+    /** A stalled NDJSON upload is a 500 after five seconds on Jetty; Pekko waits for its idle timeout. */
+    STALLED_NDJSON_UPLOAD(
+        "Jetty reads frames with a blocking reader, which needs a read timeout of its own; it uses the five " +
+            "seconds Pekko's asInputStream applies to multipart. Pekko reads NDJSON as a Source, which has none.",
+    ),
+
+    /** A page asked for with `Range` is the whole file, 200, on Jetty; Pekko answers 206 with the range. */
+    NO_RANGES_ON_PAGES(
+        "Pages are small static assets; serving a slice of one is a resume feature nobody asked of Pelican. " +
+            "A client that asks for a range and gets 200 takes the whole body, as RFC 9110 allows.",
+    ),
+}

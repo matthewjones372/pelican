@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 import kotlin.reflect.jvm.kotlinFunction
+import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
 /**
@@ -39,6 +40,7 @@ class StartParityTest {
 
     private val backends = listOf(
         "pekko" to "io.github.matthewjones372.pelican.pekko",
+        "jetty" to "io.github.matthewjones372.pelican.jetty",
     )
 
     @Test
@@ -74,12 +76,13 @@ class StartParityTest {
     @Test
     fun `a bare start binds loopback, and answers there`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "start-parity-pekko")
+        val jetty = jettyApi().startOnJetty(port = 0)
 
         try {
-            val bound = mapOf("pekko" to pekko.host)
+            val bound = mapOf("pekko" to pekko.host, "jetty" to jetty.host)
             withClue("bound: $bound") { bound.values.toSet() shouldBe setOf("127.0.0.1") }
 
-            listOf("pekko" to pekko.baseUrl)
+            listOf("pekko" to pekko.baseUrl, "jetty" to jetty.baseUrl)
                 .forEach { (name, baseUrl) ->
                     withClue(name) {
                         baseUrl shouldStartWith "http://127.0.0.1:"
@@ -88,6 +91,7 @@ class StartParityTest {
                 }
         } finally {
             pekko.stop()
+            jetty.stop()
         }
     }
 }

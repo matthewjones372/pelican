@@ -8,6 +8,8 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletionStage
 import kotlin.concurrent.thread
+import io.github.matthewjones372.pelican.jetty.PelicanServer as JettyServer
+import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.PelicanServer as PekkoServer
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
@@ -25,6 +27,7 @@ class ServerShapeParityTest {
 
     private val handles = listOf(
         "pekko" to PekkoServer::class.java,
+        "jetty" to JettyServer::class.java,
     )
 
     @Test
@@ -55,12 +58,23 @@ class ServerShapeParityTest {
     }
 
     @Test
+    fun `jetty serves inside a use block, and closing releases block`() {
+        val parked = jettyApi().startOnJetty(port = 0).use { server ->
+            answersOn(server.baseUrl)
+            parkedIn(server::block)
+        }
+
+        parked.releasedWithin()
+    }
+
+    @Test
     fun `and stopAsync completes once the server is down, on every backend`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "shape-parity-async")
+        val jetty = jettyApi().startOnJetty(port = 0)
 
-        val parked = listOf("pekko" to parkedIn(pekko::block))
+        val parked = listOf("pekko" to parkedIn(pekko::block), "jetty" to parkedIn(jetty::block))
 
-        listOf(pekko::stopAsync).forEach { it().toCompletableFuture().join() }
+        listOf(pekko::stopAsync, jetty::stopAsync).forEach { it().toCompletableFuture().join() }
 
         parked.forEach { (name, thread) -> withClue(name) { thread.releasedWithin() } }
     }

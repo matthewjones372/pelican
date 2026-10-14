@@ -41,7 +41,7 @@ class BinderNameParityTest {
         "handledBy", "handledByOrFail", "handledByOneOf", "streamedBy", "streamedByOrFail",
     )
 
-    private val backends = listOf(PEKKO)
+    private val backends = listOf(PEKKO, JETTY)
 
     @Test
     fun `every backend binds in place under the same names`() {
@@ -51,8 +51,8 @@ class BinderNameParityTest {
     }
 
     @Test
-    fun `and the CompletionStage family is on the one that answers on a thread`() {
-        bindersOf(PEKKO) shouldBe inPlace + staged
+    fun `and the CompletionStage family is on every one that answers on a thread`() {
+        backends.forEach { pkg -> withClue(pkg) { bindersOf(pkg) shouldBe inPlace + staged } }
     }
 
     @Test
@@ -60,10 +60,11 @@ class BinderNameParityTest {
         // A `suspend Params.(I) -> T` erases to one parameter more than a
         // `Params.(I) -> T` does, which is what "in place is a coroutine here"
         // would look like from outside.
-        lambdaTakenBy(PEKKO, "handledNow") shouldBe Function2::class.java
+        backends.forEach { pkg -> withClue(pkg) { lambdaTakenBy(pkg, "handledNow") shouldBe Function2::class.java } }
     }
 
     private companion object {
         const val PEKKO = "io.github.matthewjones372.pelican.pekko"
+        const val JETTY = "io.github.matthewjones372.pelican.jetty"
     }
 }

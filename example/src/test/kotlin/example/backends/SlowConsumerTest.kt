@@ -15,6 +15,8 @@ import java.net.URI
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
+import io.github.matthewjones372.pelican.jetty.start as startOnJetty
+import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 
@@ -80,6 +82,33 @@ class SlowConsumerTest {
         try {
             readOneFrameThenVanish(server.baseUrl)
             closed.shouldFireWithinTheTimeout("the source")
+        } finally {
+            server.stop()
+        }
+    }
+
+    /** Jetty interrupts the thread pulling the sequence when a write fails, which ends the sleep below. */
+    @Test
+    @Suppress("SleepInsteadOfDelay") // The next element, which never comes.
+    fun `jetty stops pulling the sequence when the consumer disappears`() {
+        val closed = CountDownLatch(1)
+        val server = api(
+            drip streamedNowOnJetty {
+                sequence {
+                    try {
+                        yield(Tick(1))
+                        Thread.sleep(NEXT_ELEMENT_MILLIS)
+                        yield(Tick(2))
+                    } finally {
+                        closed.countDown()
+                    }
+                }
+            },
+        ).startOnJetty(port = 0)
+
+        try {
+            readOneFrameThenVanish(server.baseUrl)
+            closed.shouldFireWithinTheTimeout("the sequence")
         } finally {
             server.stop()
         }

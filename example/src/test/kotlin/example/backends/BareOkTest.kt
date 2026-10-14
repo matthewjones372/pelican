@@ -11,6 +11,8 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import io.github.matthewjones372.pelican.jetty.handledOneOf as handledOneOfOnJetty
+import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledOneOf as handledOneOfOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
@@ -34,6 +36,19 @@ class BareOkTest {
         val server = brokenApi(
             remember handledOneOfOnPekko { (_, note) -> ok(Greeting(note.text, language = "en")) },
         ).startOnPekko(port = 0, systemName = "greetings-bare-ok")
+
+        try {
+            asking(server.baseUrl).shouldBeRefused()
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `and so does jetty`() {
+        val server = brokenApi(
+            remember handledOneOfOnJetty { (_, note) -> ok(Greeting(note.text, language = "en")) },
+        ).startOnJetty(port = 0)
 
         try {
             asking(server.baseUrl).shouldBeRefused()

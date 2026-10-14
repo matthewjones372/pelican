@@ -7,11 +7,19 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.http.javadsl.server.Directives
+import org.eclipse.jetty.io.Content
+import org.eclipse.jetty.server.Handler
+import org.eclipse.jetty.server.Request
+import org.eclipse.jetty.server.Response
+import org.eclipse.jetty.util.Callback
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import io.github.matthewjones372.pelican.jetty.handledNow as handledNowOnJetty
+import io.github.matthewjones372.pelican.jetty.start as startOnJetty
+import io.github.matthewjones372.pelican.jetty.toHandler as toJettyHandler
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.toRoute as toPekkoRoute
@@ -49,6 +57,26 @@ class MountedAlongsideTest {
             .startOnPekko(port = 0, systemName = "mounted-alongside") { system ->
                 Directives.concat(handWritten, toPekkoRoute(system))
             }
+
+        try {
+            bothAnswer(server.baseUrl)
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `jetty sequences a described handler with a hand-written one`() {
+        val handWritten = object : Handler.Abstract.NonBlocking() {
+            override fun handle(request: Request, response: Response, callback: Callback): Boolean {
+                if (Request.getPathInContext(request) != "/health") return false
+                Content.Sink.write(response, true, "ok", callback)
+                return true
+            }
+        }
+
+        val server = api(widget handledNowOnJetty { Widget(1) })
+            .startOnJetty(port = 0) { Handler.Sequence(handWritten, toJettyHandler()) }
 
         try {
             bothAnswer(server.baseUrl)

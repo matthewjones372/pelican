@@ -15,6 +15,8 @@ dependencies {
     implementation(project(":pelican-openapi"))
     implementation(project(":pelican-codegen"))
     implementation(project(":pelican-pekko"))
+    // The second server, which every suite in `example.backends` also runs against.
+    implementation(project(":pelican-jetty"))
     // Pelican compiles against Pekko and ships none of it, so a service names
     // the version and the Scala cross-build it runs. Either cross-build works;
     // this repository builds and tests at `_2.13`.
@@ -98,6 +100,11 @@ dependencies {
     // The in-memory transports are per-backend, so a suite asks for the one it
     // needs. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
+    testImplementation(project(":pelican-test-jetty"))
+    // `StartParityTest` holds Jetty's `startWithDocs` to the shape of Pekko's.
+    testImplementation(project(":pelican-jetty-docs"))
+    // And `StillCompilesTest` compiles the Jetty MCP twin's call sites beside Pekko's.
+    testImplementation(project(":pelican-jetty-mcp"))
     // The generated client against a stubbed service, stubbed in the same descriptions. Spec 0056.
     testImplementation(project(":pelican-test-wiremock"))
 

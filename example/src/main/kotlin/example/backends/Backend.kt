@@ -23,7 +23,7 @@ import io.github.matthewjones372.pelican.RefusalRenderer
  * This is the seam that makes one test suite run against an interpreter without
  * naming it. The descriptions in `Greetings.kt` are already backend-agnostic;
  * what is not agnostic is the *binding* — the stream type a handler returns is
- * `Source` on Pekko — and that difference lives behind this interface and
+ * `Source` on Pekko and `Sequence` on Jetty — and that difference lives behind this interface and
  * nowhere else in the example. The server handle is not one of them: a started
  * server is `AutoCloseable` with the same `block`, `stop` and `stopAsync`
  * whoever bound it, which `ServerShapeParityTest` holds.
@@ -74,8 +74,8 @@ interface Running : AutoCloseable {
 /**
  * Every backend the example can run, in one list.
  *
- * 1.0 ships one, so the list holds one. It stays a list, and every suite below
- * stays parameterised over it, because that is the socket a returning
- * interpreter plugs into. At commit a6c20b2 it held three.
+ * Pekko and Jetty, and every suite below is parameterised over the list, so a
+ * returning interpreter is one more entry. At commit a6c20b2 it held Pekko,
+ * http4k and Ktor.
  */
-val allBackends: List<Backend> = listOf(OnPekko)
+val allBackends: List<Backend> = listOf(OnPekko, OnJetty)
