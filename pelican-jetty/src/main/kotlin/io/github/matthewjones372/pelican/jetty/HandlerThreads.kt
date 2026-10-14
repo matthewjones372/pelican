@@ -9,10 +9,17 @@ import java.util.concurrent.Executors
  * Where a synchronous handler (`handledNow`, `handledWith`, `streamedNow`) runs, chosen when the API is started.
  * An asynchronous handler already chose, and is never moved.
  */
-class Handlers private constructor(internal val executor: Executor?) {
+class Handlers private constructor(
+    internal val executor: Executor?,
+    /** Whether any virtual thread will do, so a handler Jetty already called on one stays there. */
+    internal val virtual: Boolean = false,
+) {
     companion object {
-        /** A virtual thread per request, so a handler may block without holding one of Jetty's pool threads. */
-        val onVirtualThreads: Handlers = Handlers(Executors.newVirtualThreadPerTaskExecutor())
+        /**
+         * A virtual thread per request, so a handler may block without holding one of Jetty's pool threads. [start]
+         * has Jetty call handlers on virtual threads already, so this costs no hop there.
+         */
+        val onVirtualThreads: Handlers = Handlers(Executors.newVirtualThreadPerTaskExecutor(), virtual = true)
 
         /** On the Jetty thread that matched the request: only for handlers that never block. */
         val onDispatcher: Handlers = Handlers(null)
