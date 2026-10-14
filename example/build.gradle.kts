@@ -23,7 +23,7 @@ dependencies {
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.2")
     // Pekko's own logging at the slf4j API `pelican-pekko` writes to.
     runtimeOnly("org.apache.pekko:pekko-slf4j_2.13")
     // Serving the docs is opt-in: this is the module that adds them to a server.
