@@ -156,7 +156,7 @@ fun interface ClientTransport {
                 1 -> found.single()
 
                 0 -> error(
-                    "No ClientTransport is on the classpath. Add pelican-client-java to send with the JDK's " +
+                    "No ClientTransport is on the classpath. Add pelican-client-jetty to send with Jetty's " +
                         "HttpClient, pelican-client-pekko to send with Pekko HTTP's, or pass a transport of your own.",
                 )
 

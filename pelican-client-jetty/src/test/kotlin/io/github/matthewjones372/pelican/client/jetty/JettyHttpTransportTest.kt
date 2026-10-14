@@ -1,4 +1,4 @@
-package io.github.matthewjones372.pelican.client
+package io.github.matthewjones372.pelican.client.jetty
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
@@ -12,6 +12,8 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import org.eclipse.jetty.client.HttpClient
+import org.eclipse.jetty.client.Request
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -20,17 +22,20 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.time.Duration
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 
-/** The adapter over a socket, served by the JDK's own `HttpServer`. */
+/** The adapter over a socket, served by the JDK's own `HttpServer` so the server is not Jetty's other half. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class JavaHttpTransportTest {
+class JettyHttpTransportTest {
 
     private val seen = ConcurrentHashMap<String, List<String>>()
 
@@ -59,10 +64,11 @@ class JavaHttpTransportTest {
     }
 
     private val base = "http://localhost:${server.address.port}"
-    private val transport = JavaHttpTransport()
+    private val transport = JettyHttpTransport()
 
     @AfterAll
     fun tearDown() {
+        transport.close()
         server.stop(0)
         later.shutdownNow()
     }
@@ -209,6 +215,63 @@ class JavaHttpTransportTest {
         abandoned.cancel(true) shouldBe true
 
         send(ClientRequest(Method.GET, "$base/echo")).text() shouldBe "ok"
+    }
+
+    @Test
+    fun `cancelling the stage aborts the exchange it was derived from`() {
+        val (client, sent) = capturing()
+        val answer = JettyHttpTransport(client).send(ClientRequest(Method.GET, "$base/slow")).toCompletableFuture()
+
+        answer.cancel(true) shouldBe true
+
+        sent.single().abortCause.shouldBeInstanceOf<CancellationException>()
+        client.stop()
+    }
+
+    @Test
+    fun `an exchange aborted by anyone but the caller crosses as an IOException`() {
+        val (client, sent) = capturing()
+        val answer = JettyHttpTransport(client).send(ClientRequest(Method.GET, "$base/slow")).toCompletableFuture()
+
+        sent.single().abort(CancellationException("someone else"))
+
+        val failure = shouldThrow<ExecutionException> { answer.get() }
+        failure.cause.shouldBeInstanceOf<IOException>().cause.shouldBeInstanceOf<CancellationException>()
+        client.stop()
+    }
+
+    @Test
+    fun `closing a transport leaves a client it borrowed running`() {
+        val (client, _) = capturing()
+        val borrowing = JettyHttpTransport(client)
+
+        borrowing.send(ClientRequest(Method.GET, "$base/echo")).toCompletableFuture().join().text() shouldBe "ok"
+        borrowing.close()
+
+        client.isRunning shouldBe true
+        client.stop()
+    }
+
+    @Test
+    fun `closing a transport stops the client it owns`() {
+        val owning = JettyHttpTransport()
+        owning.send(ClientRequest(Method.GET, "$base/echo")).toCompletableFuture().join().text() shouldBe "ok"
+
+        owning.close()
+
+        shouldThrow<CompletionException> {
+            owning.send(ClientRequest(Method.GET, "$base/echo")).toCompletableFuture().join()
+        }
+    }
+
+    /** A started client that hands each request it builds to the test. */
+    private fun capturing(): Pair<HttpClient, List<Request>> {
+        val sent = CopyOnWriteArrayList<Request>()
+        val client = object : HttpClient() {
+            override fun newRequest(uri: String): Request = super.newRequest(uri).also { sent.add(it) }
+        }
+        client.start()
+        return client to sent
     }
 
     private companion object {

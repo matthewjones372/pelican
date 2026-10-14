@@ -46,9 +46,9 @@ worth keeping next to the result of following it.
 - **Item 3** is done. It shipped in three parts:
   - `ClientTransport` lives in core, with `pelican-client-pekko` over Pekko
     HTTP's client as the adapter that ships — the client a Pekko service is
-    running already. The others written are `pelican-client-java` over the
-    JDK's own `HttpClient`, `pelican-client-okhttp` over OkHttp's, and
-    `pelican-client-ktor` over Ktor's. All three were taken off `main` for
+    running already. `pelican-client-jetty` over Jetty's `HttpClient` joined it
+    in spec 0075. The others written are `pelican-client-okhttp` over
+    OkHttp's and `pelican-client-ktor` over Ktor's. Both were taken off `main` for
     1.0 with the http4k and Ktor stacks; they are in the history at commit
     [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
     and are meant to come back after 1.0.
@@ -154,8 +154,8 @@ runtime preamble the generator emits, not a swapped field.
 
 - **`ClientTransport` lives in core.** An interface and two holders, no library
   types, which keeps `NoThirdPartyDependenciesTest` true. Adapters carry their
-  own dependencies, exactly as a server module does: `pelican-client-pekko` on
-  main, and `pelican-client-java`, `pelican-client-okhttp` and
+  own dependencies, exactly as a server module does: `pelican-client-pekko` and
+  `pelican-client-jetty` on main, and `pelican-client-okhttp` and
   `pelican-client-ktor` at commit `a6c20b2`, before they were taken off
   `main`.
 - **Not `pelican-test`'s `Transport`.** That one is blocking and carries a

@@ -16,7 +16,7 @@ import example.generated.SubmitOrderResult
 import example.trace.CancellationTrace
 import io.github.matthewjones372.pelican.ClientTransport
 import io.github.matthewjones372.pelican.UploadedFile
-import io.github.matthewjones372.pelican.client.JavaHttpTransport
+import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
 import io.github.matthewjones372.pelican.codegen.kotlinClient
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -329,6 +329,6 @@ class PekkoGeneratedClientTest : GeneratedKotlinClientTest() {
     override fun transport(): ClientTransport = PekkoHttpTransport()
 }
 
-class JavaGeneratedClientTest : GeneratedKotlinClientTest() {
-    override fun transport(): ClientTransport = JavaHttpTransport()
+class JettyGeneratedClientTest : GeneratedKotlinClientTest() {
+    override fun transport(): ClientTransport = JettyHttpTransport()
 }

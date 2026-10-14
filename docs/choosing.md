@@ -454,11 +454,12 @@ generates a real Kotlin client from the descriptions: one method per operation,
 sealed failure types, streamed responses, a per-request timeout, and a
 `ClientTransport` it sends through rather than an HTTP library it is welded to.
 That is more than a toy. But there is no published client artifact — the file is
-generated into your build, and you own it. One transport ships:
+generated into your build, and you own it. Two transports ship:
 `pelican-client-pekko` over Pekko HTTP's client, which takes the `ActorSystem`
-a Pekko service already has. The JDK, OkHttp and Ktor adapters
-(`pelican-client-java`, `pelican-client-okhttp`, which is the one that runs on
-Android, and `pelican-client-ktor`) were written and passing before 1.0, were
+a Pekko service already has, and `pelican-client-jetty` over Jetty's, the same
+release `pelican-jetty` serves with. The OkHttp and Ktor adapters
+(`pelican-client-okhttp`, which is the one that runs on Android, and
+`pelican-client-ktor`) were written and passing before 1.0, were
 taken off `main` to keep it small, and are not published at 1.0. They are in the
 history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)

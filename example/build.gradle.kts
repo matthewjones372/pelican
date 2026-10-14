@@ -74,7 +74,7 @@ dependencies {
     // client needs a transport. Both adapters, so GeneratedKotlinClientTest
     // runs over each; with two providers `ClientTransport.default()` refuses
     // to choose, so every client built here names its transport.
-    testImplementation(project(":pelican-client-java"))
+    testImplementation(project(":pelican-client-jetty"))
     testImplementation(project(":pelican-client-pekko"))
 
     // What the suspending client generated below is written against.

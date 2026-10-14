@@ -129,8 +129,8 @@ the client a Pekko stack already runs. The rest were taken off `main` for
 1.0.
 
 - [x] **`pelican-client-pekko`**, the transport 1.0 ships.
-- [x] **`pelican-client-java`** over the JDK's own `HttpClient`. Written; at
-      commit `a6c20b2` until it returns after 1.0.
+- [x] **`pelican-client-jetty`** over Jetty's `HttpClient`, the one non-Pekko
+      transport (spec 0075). The JDK's own client is not coming back.
 - [x] **`pelican-client-okhttp`.** `java.net.http` does not exist on Android,
       so OkHttp is what reaches every Android caller. Written; at commit
       `a6c20b2` until it returns after 1.0. The largest reach gain among the
