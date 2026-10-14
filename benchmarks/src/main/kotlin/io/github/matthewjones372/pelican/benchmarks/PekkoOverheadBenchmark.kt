@@ -10,6 +10,7 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.pathParam
+import io.github.matthewjones372.pelican.pekko.Handlers
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.toRoute
 import io.github.matthewjones372.pelican.queryParam
@@ -90,10 +91,16 @@ open class PekkoOverheadBenchmark {
         json<Item>()
     }
 
-    private val described: SealedRoute = api(
+    private val getApi = api(
         endpoints = listOf(getItem handledNow { (id, lim) -> Item(id, "item-$lim") }),
         codecs = JacksonCodecs,
-    ).toRoute(system).function(system)
+    )
+
+    // Pelican twice, as in `JettyOverheadBenchmark`: on Pekko's dispatcher, which is where every hand-written route
+    // below answers, and on the virtual thread per request that `toRoute` uses unless told otherwise.
+    private val described: SealedRoute = getApi.toRoute(system, Handlers.onDispatcher).function(system)
+    private val describedOnVirtualThreads: SealedRoute =
+        getApi.toRoute(system, Handlers.onVirtualThreads).function(system)
 
     /** The same behaviour, written the way a Pekko HTTP service would write it. */
     private val handWritten: SealedRoute = run {
@@ -198,10 +205,14 @@ open class PekkoOverheadBenchmark {
         json<Item>(status = 201)
     }
 
-    private val describedPost: SealedRoute = api(
+    private val postApi = api(
         endpoints = listOf(createItem handledNow { body -> Item(1, body.name) }),
         codecs = JacksonCodecs,
-    ).toRoute(system).function(system)
+    )
+
+    private val describedPost: SealedRoute = postApi.toRoute(system, Handlers.onDispatcher).function(system)
+    private val describedPostOnVirtualThreads: SealedRoute =
+        postApi.toRoute(system, Handlers.onVirtualThreads).function(system)
 
     private val handWrittenPost: SealedRoute = run {
         val mapper = ObjectMapper().registerKotlinModule()
@@ -232,10 +243,7 @@ open class PekkoOverheadBenchmark {
     private val postRequest = HttpRequest.POST("/items")
         .withEntity(HttpEntities.create(ContentTypes.APPLICATION_JSON, """{"name":"anvil"}"""))
 
-    /**
-     * `join` on a stage that is already complete, which is what a sealed route
-     * over a strict entity returns.
-     */
+    /** `join`: already complete on the dispatcher rows, and the wait for the hop back on the virtual-thread ones. */
     private fun answer(route: SealedRoute, request: HttpRequest): HttpResponse =
         route.apply(request).toCompletableFuture().join()
 
@@ -248,12 +256,18 @@ open class PekkoOverheadBenchmark {
      */
     @Setup
     fun verify() {
-        val answers = listOf(described, handWritten, handWrittenMatcherOnly, handWrittenTuned)
-            .map { answer(it, request) }
+        val answers = listOf(
+            described,
+            describedOnVirtualThreads,
+            handWritten,
+            handWrittenMatcherOnly,
+            handWrittenTuned,
+        ).map { answer(it, request) }
         check(answers.all { it.status() == StatusCodes.OK }) {
             "a route did not answer 200: ${answers.map { it.status() }}"
         }
         check(answer(describedPost, postRequest).status() == StatusCodes.CREATED)
+        check(answer(describedPostOnVirtualThreads, postRequest).status() == StatusCodes.CREATED)
         check(answer(handWrittenPost, postRequest).status() == StatusCodes.CREATED)
     }
 
@@ -269,6 +283,9 @@ open class PekkoOverheadBenchmark {
     fun pelican(): HttpResponse = answer(described, request)
 
     @Benchmark
+    fun pelicanOnVirtualThreads(): HttpResponse = answer(describedOnVirtualThreads, request)
+
+    @Benchmark
     fun pekkoIdiomatic(): HttpResponse = answer(handWritten, request)
 
     @Benchmark
@@ -279,6 +296,9 @@ open class PekkoOverheadBenchmark {
 
     @Benchmark
     fun pelicanPostBody(): HttpResponse = answer(describedPost, postRequest)
+
+    @Benchmark
+    fun pelicanPostBodyOnVirtualThreads(): HttpResponse = answer(describedPostOnVirtualThreads, postRequest)
 
     @Benchmark
     fun pekkoPostBody(): HttpResponse = answer(handWrittenPost, postRequest)

@@ -159,6 +159,12 @@ same choice the in-memory transport in `pelican-test-pekko` makes.
 | Pekko, `PathMatchers` with the query read off the request | 723 ± 38ns | 3880B |
 | Pekko, one directive and both read off the request | 612 ± 12ns | 2472B |
 
+<!-- PLACEHOLDER (spec 0077, 2/2): this table predates spec 0058, when
+`toRoute` ran synchronous handlers on Pekko's dispatcher. The Pelican rows
+are now taken with `toRoute(system, Handlers.onDispatcher)`, like-for-like with
+the hand-written routes, and `pelicanOnVirtualThreads` and
+`pelicanPostBodyOnVirtualThreads` add the default. Retake both Pekko tables. -->
+
 Pelican beating an idiomatic Pekko route by 211ns and 1.5KB is not a claim that
 the library is faster than the server it runs on. It is a claim about
 `parameterOptional`, which the second and third rows price at 230ns and a
@@ -236,6 +242,38 @@ synchronous handler onto a virtual thread, which `toHandler` does unless given
 `Handlers.onDispatcher`, costs about **9.7KB** a request on top, and on the GET
 it is the one row whose time is clear of the others' error. A handler that never
 blocks can opt out of it.
+
+## Pekko and Jetty over a socket
+
+The tables above are in process, and the Jetty ones parse HTTP where the Pekko
+ones do not, so neither says which server is faster. `:benchmarks:wire` does:
+it starts Pelican on Pekko and Pelican on Jetty, each with its own `start()`
+and its defaults (synchronous handlers on a virtual thread per request; Jetty's
+`QueuedThreadPool` of 200 with virtual threads for handlers, Pekko's default
+dispatcher), each in a JVM of its own with a 1GB heap, and drives them in turn
+over loopback with the same GET and JSON POST as the tables above, alternating.
+
+The driver is open-model: requests leave on a fixed schedule whether or not
+earlier ones have answered, and each one's latency runs from when it should
+have left, so a stall shows in every request queued behind it. It runs on
+Jetty's `HttpClient` with at most 256 requests in flight, because the JDK's
+client fell behind its own schedule at 20,000 to 40,000 requests a second and
+above that was measuring itself. Each server is warmed for 30 seconds at 5,000
+requests a second, then each rate runs 5 seconds unrecorded and 15 recorded. A
+server stops keeping up at the first rate whose p99 reaches 100ms, that loses
+more than 0.1% of its requests, or whose senders fall two seconds behind.
+
+```bash
+./gradlew :benchmarks:wire              # about eight minutes; the table also lands in benchmarks/build/wire-result.md
+./gradlew :benchmarks:wire -PwireSmoke  # one short step per server, to check the setup
+```
+
+<!-- PLACEHOLDER (spec 0077, 2/2): the wire table, the machine, JDK, Pekko,
+Pekko HTTP and Jetty versions, the load average at the start and end of each
+server's run, and a short reading of the results go here, once measured on a
+quiet machine. -->
+
+**Not yet measured.** The table goes here.
 
 ## Reading a body: Jackson and kotlinx
 
