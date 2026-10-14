@@ -26,18 +26,22 @@ import kotlin.reflect.full.primaryConstructor
  */
 internal class KotlinAwareModelResolver(mapper: ObjectMapper) : ModelResolver(mapper) {
 
-    /** Component name -> the class swagger-core described under it. See [remember]. */
+    /** Component name -> the class swagger-core described under it in this pass. See [remember]. */
     val described = LinkedHashMap<String, KClass<*>>()
 
-    /**
-     * The names claimed while describing one payload type. Reset per call
-     * rather than kept beside [described], which outlives the pass: two
-     * documents built through the same codec are allowed a class name each.
-     */
+    /** The names claimed while describing one payload type. */
     private var names = SchemaNames()
 
-    /** Starts describing one payload type, which is the scope a collision is refused in. */
-    fun freshPass() { names = SchemaNames() }
+    /**
+     * Starts describing one payload type. Both maps are reset, not only [names]:
+     * a [described] that outlived the pass bound `Card` to the first document's
+     * class for the life of `JacksonCodecs.Default`, and refused another
+     * document's hierarchy whose branch was a different `Card`.
+     */
+    fun freshPass() {
+        names = SchemaNames()
+        described.clear()
+    }
 
     override fun resolve(
         annotatedType: AnnotatedType,
