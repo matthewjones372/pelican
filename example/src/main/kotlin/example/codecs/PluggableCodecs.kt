@@ -13,6 +13,9 @@ package example.codecs
  *         implementation("org.apache.pekko:pekko-http_2.13:1.3.0")
  *         // JacksonCodecs, and the schemas the document derives
  *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
+ *         // @Serializable, so the same payloads can be read by pelican-kotlinx
+ *         // (with the kotlin("plugin.serialization") Gradle plugin applied)
+ *         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
  *         // startWithDocs, /openapi.json and Swagger UI
  *         implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
  *     }
@@ -35,9 +38,12 @@ import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.github.matthewjones372.pelican.pekko.handledNow
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 // =========================================================== 1. the payloads
 
+@Serializable
 data class Note(
     val id: Long,
     val text: String,
@@ -51,8 +57,10 @@ enum class Level { INFO, WARN }
  * The branch names are written out rather than left to a library's default,
  * because the default is what a second codec module would have to be persuaded
  * to match: a discriminator carrying a package-qualified class name is a
- * property of the writer, not of the contract.
+ * property of the writer, not of the contract. Without the `@SerialName`s,
+ * kotlinx would send the package-qualified name.
  */
+@Serializable
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes(
     JsonSubTypes.Type(value = Email::class, name = "Email"),
@@ -60,10 +68,15 @@ enum class Level { INFO, WARN }
 )
 sealed interface Channel
 
+@Serializable
+@SerialName("Email")
 data class Email(val address: String) : Channel
 
+@Serializable
+@SerialName("Sms")
 data class Sms(val number: String) : Channel
 
+@Serializable
 data class Delivery(val note: Note, val to: Channel)
 
 // ========================================================= 2. the endpoints

@@ -20,6 +20,7 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-client-pekko` | core, pekko-http | where a generated client's requests go: `ClientTransport` over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-import` | codegen, snakeyaml-engine | an OpenAPI document → descriptions, as source. The only module that reads a document; the only one with a parser. |
 | `pelican-jackson` | core, Jackson, swagger-core | the `Codecs`: Jackson reads bodies, swagger-core describes types |
+| `pelican-kotlinx` | core, kotlinx.serialization | the `Codecs` for `@Serializable` payloads: kotlinx reads bodies, and the same `SerialDescriptor`s describe types |
 | `pelican-arrow` | core, arrow-core | Arrow's `Either` into Pelican's `Outcome` and back: `toOutcome()`, its naming overloads, and `toEither()` |
 | `pelican-pekko` | core | descriptions → Pekko HTTP `Route` |
 | `pelican-pekko-docs` | pekko, openapi | serves the document and a page — Swagger UI or Redoc — over HTTP |
@@ -35,14 +36,15 @@ OpenAPI document — 3.1.0 or 3.2.0, whichever the people reading it can use.
 | `pelican-test-pekko` | test, pekko | the in-memory transport, on Pekko, and `PelicanServer.client()` |
 | `pelican-test-wiremock` | test, WireMock | WireMock stubbed and verified in endpoint values, for testing a client of somebody else's API; and `stubFile`, which exports those stubs as mapping files |
 | `pelican-gradle-plugin` | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
-| `example` | core, openapi, jackson, pekko | the orders, bookmarks, greetings and secured services |
+| `example` | core, openapi, jackson, kotlinx, pekko | the orders, bookmarks, greetings and secured services |
 | `benchmarks` | core, jackson, pekko, JMH | the interpreter measured against hand-written Pekko routes. Not published, not run by `build`. |
 
-1.0 ships one backend, one codec module and two client transports. The http4k
+1.0 ships one backend, one codec module and two client transports, and
+`pelican-kotlinx` has come back since as a second codec module. The http4k
 and Ktor interpreters and their `-docs` and `-mcp` modules, the http4k
 in-memory transport, the OkHttp and Ktor client transports
-(`pelican-client-okhttp`, `pelican-client-ktor`),
-`pelican-jsoniter` and `pelican-kotlinx` were complete and passing before
+(`pelican-client-okhttp`, `pelican-client-ktor`) and
+`pelican-jsoniter` were complete and passing before
 1.0, and were taken off `main` to keep 1.0 small. They are in the history at
 commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e),
@@ -333,8 +335,13 @@ libraries is one line in one file and touches no endpoint:
 
 ```kotlin
 api(routes, codecs = JacksonCodecs)              // the codec module 1.0 ships
+api(routes, codecs = KotlinxCodecs)              // or kotlinx, for @Serializable payloads
 apiSpec(endpoints, schemas = JacksonCodecs)      // docs need only the schema half
 ```
+
+`KotlinxCodecs(json)` takes a `Json` of your own; one that sets something the
+schema cannot describe, a naming strategy for instance, is refused at
+construction.
 
 Three interfaces carry it, all in `core/BodyCodec.kt`:
 
@@ -356,11 +363,14 @@ Whether the codec modules agree is asked as a test rather than asserted here.
 `example.codecs` is one set of endpoints and handlers in `PluggableCodecs.kt`,
 an `Api` per codec module differing in the `codecs` argument alone, and
 `PluggableCodecsTest` comparing the bytes and the document each one produces.
-Its `libraries` list holds the modules main ships, which is one, so every row
-it asserts is a row about a singleton; a returning module is a line added there
-and no new assertions. The cross-library comparisons that make the matrix say
-something were made before 1.0, when the same file ran three, as
-[`ThreeCodecsTest` at commit `a6c20b2`](https://github.com/matthewjones372/pelican/blob/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/example/src/test/kotlin/example/codecs/ThreeCodecsTest.kt).
+Its `libraries` list holds the modules main ships, Jackson and kotlinx; a
+returning module is a line added there and no new assertions. It covers a
+union, tagged failures (spec 0063) and an object with no fields, and records
+the one difference it allows: swagger-core describes a Kotlin `object` as `{}`
+where kotlinx says `"type": "object"`. Two more are lined up in the payloads
+rather than matched, because a descriptor cannot say otherwise: kotlinx names
+a component by the type's `@SerialName` rather than its class name, and lists
+a union's branches sorted by name rather than in `@JsonSubTypes` order.
 `./gradlew :example:runCodecs` serves one.
 
 A sealed hierarchy is the one payload type a JSON library cannot read off the
@@ -373,7 +383,7 @@ reads with; see [The publishing direction](#the-publishing-direction).
 **A null property is left out.** The schema marks a nullable property optional,
 so an absent one is what the document already describes, and an absent property
 reads back as null. Writing `"author": null` would be a second spelling of one
-fact, and it is a spelling not every library can read: on the branch,
+fact, and it is a spelling not every library can read:
 `defaultJson()` sets kotlinx.serialization's `explicitNulls = false`, without
 which it refuses a payload that omits a nullable property with no default. That
 flag governs writing too, which is why `defaultMapper()` uses Jackson's
@@ -858,7 +868,7 @@ through the codec that wrote the schema.
 
 Two things are refused rather than half-described. A polymorphic hierarchy
 whose subclasses are registered at run time, as kotlinx.serialization's open
-polymorphism does on the branch, has no honest closed schema; make the
+polymorphism allows, has no honest closed schema; make the
 hierarchy `sealed`, or describe the property as one branch. And a class that is
 a branch of two hierarchies picking it differently would need both properties
 at once, which is a payload no codec writes.
@@ -1278,8 +1288,8 @@ hierarchy.
 `pelican-codegen`'s `KotlinClientTest` is what stands behind that: it generates
 a client both ways and reads the annotations off the file, including that
 nothing generated for one library reaches for the other. Decoding such a
-payload with the real `KotlinxCodecs` was asserted before that module was
-taken off `main`; the test is at commit `a6c20b2`.
+payload with the real `KotlinxCodecs` is asserted by `pelican-kotlinx`'s
+`GeneratedClientUnionTest`.
 
 ### Whether its methods block or suspend
 
@@ -2175,8 +2185,7 @@ rejects.
 
 Some libraries hand it over: a kotlinx descriptor carries the serial name of
 every branch, `@SerialName("card")` right there in the metadata, so
-`KotlinxCodecs` wrote it from the start. That module was taken off `main` for
-1.0 and is at commit `a6c20b2`.
+`KotlinxCodecs` writes it from there.
 
 `JacksonCodecs` describes types with swagger-core, which writes the 3.0 spelling
 above and no `mapping` at all — the names in `@JsonSubTypes` never reach its
