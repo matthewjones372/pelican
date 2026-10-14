@@ -18,15 +18,18 @@ import io.github.matthewjones372.pelican.TextOutput
 import io.github.matthewjones372.pelican.spi.renderError
 import org.eclipse.jetty.http.HttpHeader
 import org.eclipse.jetty.server.Response
+import org.eclipse.jetty.util.BufferUtil
 import org.eclipse.jetty.util.Callback
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 private const val JSON = "application/json"
 private const val TEXT = "text/plain; charset=UTF-8"
 
-/** A response decided before a byte of it is written. A streamed one joins this as a second case. */
+/** A response whose status and headers are decided before a byte of its body is written. */
 internal sealed interface Reply
 
 internal class Strict(
@@ -36,8 +39,17 @@ internal class Strict(
     val headers: List<Pair<String, String>> = emptyList(),
 ) : Reply
 
+/** A body written a chunk at a time as [chunks] yields them, never held whole. */
+internal class Streamed(
+    val status: Int,
+    val contentType: String,
+    val chunks: Sequence<ByteArray>,
+    val headers: List<Pair<String, String>> = emptyList(),
+) : Reply
+
 internal fun Reply.withHeaders(extra: List<Pair<String, String>>): Reply = when (this) {
     is Strict -> if (extra.isEmpty()) this else Strict(status, contentType, body, headers + extra)
+    is Streamed -> if (extra.isEmpty()) this else Streamed(status, contentType, chunks, headers + extra)
 }
 
 internal fun Reply.writeTo(response: Response, callback: Callback) {
@@ -49,6 +61,30 @@ internal fun Reply.writeTo(response: Response, callback: Callback) {
             if (body.isNotEmpty()) response.headers.put(HttpHeader.CONTENT_LENGTH, body.size.toLong())
             response.write(true, ByteBuffer.wrap(body), callback)
         }
+
+        is Streamed -> {
+            response.status = status
+            headers.forEach { (name, value) -> response.headers.add(name, value) }
+            response.headers.put(HttpHeader.CONTENT_TYPE, contentType)
+            // Iterating may block, on the request body for one, so never on a Jetty thread.
+            STREAM_WRITERS.execute { writeChunks(response, callback) }
+        }
+    }
+}
+
+private val STREAM_WRITERS: Executor = Executors.newVirtualThreadPerTaskExecutor()
+
+/** One write per chunk, each waited on before the next is pulled, so a slow reader holds the producer. */
+private fun Streamed.writeChunks(response: Response, callback: Callback) {
+    try {
+        chunks.filter { it.isNotEmpty() }.forEach { chunk ->
+            val written = Callback.Completable()
+            response.write(false, ByteBuffer.wrap(chunk), written)
+            written.get()
+        }
+        response.write(true, BufferUtil.EMPTY_BUFFER, callback)
+    } catch (t: Throwable) {
+        callback.failed(t)
     }
 }
 
@@ -81,8 +117,13 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs):
 
         is EmptyOutput -> Strict(out.status, null, ByteArray(0))
 
+        is ByteStreamOutput -> {
+            @Suppress("UNCHECKED_CAST")
+            Streamed(out.status, contentTypeOf(out.mediaType), value as Sequence<ByteArray>)
+        }
+
         is DeclaredResponses<*, *>, is NegotiatedOutput<*>,
-        is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*>, is ByteStreamOutput,
+        is NdjsonOutput<*>, is SseOutput<*>, is JsonArrayOutput<*>,
         -> throw UnsupportedOperationException("Not yet served on Jetty: $out")
     }
 }

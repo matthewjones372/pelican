@@ -15,7 +15,7 @@ import java.io.File
 
 /**
  * The document is limited to the shapes `pelican-jetty` has binders for today,
- * `handledNow` and `handledWith`; the rest arrive with spec 0074's other entries.
+ * `handledNow`, `handledWith` and `bytesNow`; the rest arrive with spec 0073's other entries.
  */
 class JettyStubsTest {
 
@@ -38,6 +38,17 @@ class JettyStubsTest {
                 responses:
                   "204":
                     description: Gone
+            /pets/{petId}/photo:
+              parameters:
+                - { name: petId, in: path, required: true, schema: { type: integer, format: int64 } }
+              get:
+                operationId: getPhoto
+                responses:
+                  "200":
+                    description: The photo
+                    content:
+                      image/png:
+                        schema: { type: string, format: binary }
             """,
         ),
     )
@@ -50,6 +61,7 @@ class JettyStubsTest {
         stubs shouldContain "import io.github.matthewjones372.pelican.jetty.*"
         stubs shouldContain """getPet handledNow { petId -> TODO("getPet") }"""
         stubs shouldContain """deletePet handledWith { petId -> TODO("deletePet") }"""
+        stubs shouldContain """getPhoto bytesNow { petId -> TODO("getPhoto") }"""
     }
 
     @Test
