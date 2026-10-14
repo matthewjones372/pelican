@@ -19,7 +19,11 @@ public final class io/github/matthewjones372/pelican/jetty/HandlersKt {
 	public static final fun bytesOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun getRequest (Lio/github/matthewjones372/pelican/Params;)Lorg/eclipse/jetty/server/Request;
 	public static final fun handledBy (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledByOneOf (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledByOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun handledNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledOneOf (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun handledWith (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 }
 

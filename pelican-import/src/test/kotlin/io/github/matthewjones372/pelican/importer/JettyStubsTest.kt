@@ -15,7 +15,8 @@ import java.io.File
 
 /**
  * The document is limited to the shapes `pelican-jetty` has binders for today,
- * `handledNow`, `handledWith` and `bytesNow`; the rest arrive with spec 0073's other entries.
+ * `handledNow`, `handledWith`, `bytesNow`, `handledOrFail` and `handledOneOf`; the rest arrive with spec
+ * 0073's other entries.
  */
 class JettyStubsTest {
 
@@ -30,6 +31,24 @@ class JettyStubsTest {
                 responses:
                   "200":
                     description: The pet
+                    content:
+                      application/json:
+                        schema: { type: object, required: [name], properties: { name: { type: string } } }
+                  "404":
+                    description: No pet with that id
+                    content:
+                      application/json:
+                        schema: { type: object, required: [message], properties: { message: { type: string } } }
+              put:
+                operationId: putPet
+                responses:
+                  "200":
+                    description: Replaced
+                    content:
+                      application/json:
+                        schema: { type: object, required: [name], properties: { name: { type: string } } }
+                  "201":
+                    description: Created
                     content:
                       application/json:
                         schema: { type: object, required: [name], properties: { name: { type: string } } }
@@ -59,7 +78,8 @@ class JettyStubsTest {
     fun `jetty stubs import the jetty binders`() {
         val stubs = generated.getValue("PetsHandlers.kt")
         stubs shouldContain "import io.github.matthewjones372.pelican.jetty.*"
-        stubs shouldContain """getPet handledNow { petId -> TODO("getPet") }"""
+        stubs shouldContain """getPet handledOrFail { petId -> TODO("getPet") }"""
+        stubs shouldContain """putPet handledOneOf { petId -> TODO("putPet") }"""
         stubs shouldContain """deletePet handledWith { petId -> TODO("deletePet") }"""
         stubs shouldContain """getPhoto bytesNow { petId -> TODO("getPhoto") }"""
     }
