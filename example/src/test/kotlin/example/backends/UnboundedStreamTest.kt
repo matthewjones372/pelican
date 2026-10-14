@@ -1,7 +1,9 @@
 package example.backends
 
 import io.github.matthewjones372.pelican.Api
+import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.StreamOf
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -10,7 +12,8 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.stream.javadsl.Source
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.io.BufferedReader
 import java.io.InputStream
 import java.net.Socket
@@ -19,6 +22,8 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import io.github.matthewjones372.pelican.jetty.start as startOnJetty
+import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 
@@ -105,17 +110,41 @@ class UnboundedStreamTest {
 
     private fun api(route: ServerEndpoint): Api = api(endpoints = listOf(route), codecs = JacksonCodecs)
 
-    /** Unbounded and unthrottled: as fast as the socket will take it. */
-    private fun ticks(produced: AtomicLong) =
-        Source.fromIterator { generateSequence(0L) { it + 1 }.iterator() }
+    /** Unbounded and unthrottled: as fast as the socket will take it, and [limit] long. */
+    private fun ticks(produced: AtomicLong, limit: Long) =
+        generateSequence(0L) { it + 1 }.takeWhile { it < limit }
             .map { n -> produced.incrementAndGet(); Tick(n) }
 
-    @Test
+    /** [route] serving [ticks] on [backend], each in its own stream type. */
+    private fun serve(
+        backend: String,
+        route: Endpoint<Unit, StreamOf<Tick>>,
+        produced: AtomicLong,
+        limit: Long,
+    ): Running =
+        when (backend) {
+            "pekko" -> api(route streamedNowOnPekko { Source.fromIterator { ticks(produced, limit).iterator() } })
+                .startOnPekko(port = 0, systemName = "unbounded-streams")
+                .let { server -> running(server.baseUrl, server::stop) }
+
+            "jetty" -> api(route streamedNowOnJetty { ticks(produced, limit) })
+                .startOnJetty(port = 0)
+                .let { server -> running(server.baseUrl, server::stop) }
+
+            else -> error("no such backend: $backend")
+        }
+
+    private fun running(baseUrl: String, stop: () -> Unit): Running = object : Running {
+        override val baseUrl = baseUrl
+        override fun stop() = stop()
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = ["pekko", "jetty"])
     @Suppress("SleepInsteadOfDelay") // The point is a reader that stopped, measured in wall clock.
-    fun `a consumer that stops reading stops the producer`() {
+    fun `a consumer that stops reading stops the producer`(backend: String) {
         val produced = AtomicLong()
-        val server = api(firehose streamedNowOnPekko { ticks(produced) })
-            .startOnPekko(port = 0, systemName = "unbounded-stalls")
+        val server = serve(backend, firehose, produced, limit = Long.MAX_VALUE)
 
         try {
             val uri = URI.create(server.baseUrl)
@@ -141,11 +170,11 @@ class UnboundedStreamTest {
         }
     }
 
-    @Test
-    fun `a consumer that keeps up gets every element, in order`() {
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = ["pekko", "jetty"])
+    fun `a consumer that keeps up gets every element, in order`(backend: String) {
         val produced = AtomicLong()
-        val server = api(counted streamedNowOnPekko { ticks(produced).take(ELEMENTS) })
-            .startOnPekko(port = 0, systemName = "unbounded-drains")
+        val server = serve(backend, counted, produced, limit = ELEMENTS)
 
         try {
             val uri = URI.create(server.baseUrl)

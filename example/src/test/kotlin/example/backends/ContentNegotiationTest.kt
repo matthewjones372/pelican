@@ -19,6 +19,9 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlin.reflect.KType
+import io.github.matthewjones372.pelican.jetty.handledNow as handledNowOnJetty
+import io.github.matthewjones372.pelican.jetty.handledOrFail as handledOrFailOnJetty
+import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.handledOrFail as handledOrFailOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
@@ -176,12 +179,46 @@ class ContentNegotiationTest {
         }
     }
 
+    @Test
+    fun `jetty negotiates, and sends an unregistered status`() {
+        val server = api(
+            listOf(
+                widget handledNowOnJetty { Widget(1) },
+                odd handledOrFailOnJetty { teapotish(Widget(2)) },
+                nothing handledNowOnJetty { },
+                export handledNowOnJetty { Widget(7) },
+            ),
+        ).startOnJetty(port = 0)
+
+        try {
+            probe(server.baseUrl)
+        } finally {
+            server.stop()
+        }
+    }
+
     /** Plain Jackson, with no override: a `+json` type is JSON already (RFC 6839). */
     @Test
     fun `pekko writes a +json media type with the JSON codec and names it on the wire`() {
         val problem = endpoint { get("problem"); media<Widget>("application/problem+json") }
         val server = api(endpoints = listOf(problem handledNowOnPekko { Widget(3) }), codecs = JacksonCodecs)
             .startOnPekko(port = 0, systemName = "json-suffix")
+
+        try {
+            val response = get(server.baseUrl, "/problem", accept = "application/problem+json")
+            response.statusCode() shouldBe 200
+            response.body() shouldBe """{"id":3}"""
+            contentTypeOf(response) shouldStartWith "application/problem+json"
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `jetty writes a +json media type with the JSON codec and names it on the wire`() {
+        val problem = endpoint { get("problem"); media<Widget>("application/problem+json") }
+        val server = api(endpoints = listOf(problem handledNowOnJetty { Widget(3) }), codecs = JacksonCodecs)
+            .startOnJetty(port = 0)
 
         try {
             val response = get(server.baseUrl, "/problem", accept = "application/problem+json")

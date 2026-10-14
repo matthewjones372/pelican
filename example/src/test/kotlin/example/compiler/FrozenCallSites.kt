@@ -8,7 +8,8 @@ package example.compiler
  * two of them may declare the same `Order`.
  *
  * Only the modules main ships appear below: core, schema, openapi, import,
- * jackson, mcp, the Pekko trio, `pelican-client-pekko` and the test modules.
+ * jackson, mcp, the Pekko trio and its Jetty twin, both clients and the test
+ * modules.
  * The modules taken off main for 1.0 have no call sites here; theirs come
  * back with the modules.
  *
@@ -417,6 +418,110 @@ internal val frozenCallSites: Map<String, String> = mapOf(
             val method = request.method()
             Source.single(Order(from?.length?.toLong() ?: method.value().length.toLong()))
         }
+    """,
+
+    // ---------------------------------------------------------------- jetty
+
+    "jetty" to """
+        import io.github.matthewjones372.pelican.*
+        import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
+        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+        import io.github.matthewjones372.pelican.jetty.*
+        import io.github.matthewjones372.pelican.jetty.docs.docsHandler
+        import io.github.matthewjones372.pelican.jetty.docs.handlerWithDocs
+        import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+        import io.github.matthewjones372.pelican.jetty.mcp.handlerWithMcp
+        import io.github.matthewjones372.pelican.jetty.mcp.mcpHandler
+        import io.github.matthewjones372.pelican.mcp.mcpOptions
+        import io.github.matthewjones372.pelican.openapi.docs
+        import io.github.matthewjones372.pelican.test.ApiClient
+        import io.github.matthewjones372.pelican.test.jetty.client
+        import io.github.matthewjones372.pelican.test.jetty.inMemory
+        import org.eclipse.jetty.client.HttpClient
+        import org.eclipse.jetty.io.Content
+        import org.eclipse.jetty.server.Handler
+        import org.eclipse.jetty.server.HttpConfiguration
+        import org.eclipse.jetty.server.HttpConnectionFactory
+        import org.eclipse.jetty.server.Server
+        import org.eclipse.jetty.server.ServerConnector
+        import java.util.concurrent.CompletableFuture
+        import java.util.concurrent.Executors
+
+        data class Order(val id: Long)
+        data class Problem(val why: String)
+
+        val orderId = pathParam<Long>("orderId")
+        val missing = errorJson<Problem>(404, "No order with that id")
+        val uploaded = ndjsonIn<Order>()
+
+        val getOrder = endpoint(orderId) { get("orders" / orderId); json<Order>() }
+        val dropOrder = endpoint(orderId) { delete("orders" / orderId); empty() }
+        val findOrder = endpoint(orderId) { get("find" / orderId); json<Order>() orFail missing }
+        val twoWays = endpoint(orderId) {
+            get("two" / orderId)
+            (json<Order>(200) or empty(202)) orFail missing
+        }
+        val streamOrders = endpoint { get("orders" / "stream"); ndjson<Order>() }
+        val streamOrFail = endpoint(orderId) { get("stream" / orderId); ndjson<Order>() orFail missing }
+        val download = endpoint { get("orders" / "export"); bytes() }
+        val downloadOrFail = endpoint(orderId) { get("export" / orderId); bytes() orFail missing }
+        val echo = endpoint(rawBody()) { post("orders" / "raw"); bytes() }
+        val bulkCount = endpoint(uploaded) { post("orders" / "bulk"); json<Order>(202) }
+        val bulkEcho = endpoint(uploaded) { post("orders" / "echo"); ndjson<Order>(202) }
+
+        val bound: List<ServerEndpoint> = listOf(
+            getOrder handledNow { id -> Order(id) },
+            getOrder handledBy { id -> CompletableFuture.completedFuture(Order(id)) },
+            dropOrder handledWith { },
+            findOrder handledOrFail { id -> ok(Order(id)) },
+            findOrder handledByOrFail { id -> CompletableFuture.completedFuture(ok(Order(id))) },
+            twoWays handledOneOf { id -> ok(Order(id)) },
+            twoWays handledByOneOf { id -> CompletableFuture.completedFuture(ok(Order(id))) },
+            streamOrders streamedNow { sequenceOf(Order(1)) },
+            streamOrders streamedBy { CompletableFuture.completedFuture(sequenceOf(Order(1))) },
+            streamOrFail streamedOrFail { id -> ok(sequenceOf(Order(id))) },
+            streamOrFail streamedByOrFail { id -> CompletableFuture.completedFuture(ok(sequenceOf(Order(id)))) },
+            download bytesNow { sequenceOf("a".toByteArray()) },
+            downloadOrFail bytesOrFail { ok(sequenceOf("a".toByteArray())) },
+            echo bytesNow { body -> body.toSequence() },
+            bulkCount handledNow { frames -> Order(frames.toSequence().count().toLong()) },
+            bulkCount handledNow { frames -> frames.reader().use { rows -> rows.wake(); Order(0) } },
+            bulkEcho streamedNow { frames -> frames.toSequence() },
+            getOrder handledNow { id -> Order(request.method.length + id) },
+        )
+
+        val service = api(bound, JacksonCodecs)
+
+        fun asSource(body: ByteStreamHandle): Content.Source = body.toSource()
+
+        val onPlatformThreads: Handlers = Handlers.onDispatcher
+        val onOwnPool: Handlers = Handlers.on(Executors.newFixedThreadPool(2))
+
+        fun handler(): Handler = service.toHandler(Handlers.onVirtualThreads)
+        fun getsOnly(): Handler = handler().onlyFor(Method.GET)
+        fun withDocs(): Handler = service.handlerWithDocs(docs = docs())
+        fun docsOnly(): Handler = service.docsHandler(docs())
+        fun withMcp(): Handler = service.handlerWithMcp(options = mcpOptions())
+        fun mcpOnly(): Handler = service.mcpHandler(mcpOptions(), path = "/mcp")
+
+        fun run(): PelicanServer = service.start(port = 0)
+        fun runBeside(other: Handler): PelicanServer =
+            service.start(port = 0, host = "127.0.0.1") { Handler.Sequence(toHandler(), other) }
+        fun runWithDocs(): PelicanServer = service.startWithDocs(port = 0, docs = docs())
+
+        // A Server built by hand needs what start() sets on its own.
+        fun mounted(): Server = Server().apply {
+            val http = HttpConfiguration().apply { uriCompliance = PELICAN_URI_COMPLIANCE }
+            addConnector(ServerConnector(this, HttpConnectionFactory(http)))
+            handler = service.toHandler()
+            defaultHandler = Unanswered()
+        }
+
+        fun inProcess(): ApiClient = service.inMemory(Handlers.onVirtualThreads)
+        fun overSocket(server: PelicanServer): ApiClient = server.client()
+
+        val owned: ClientTransport = JettyHttpTransport()
+        val borrowed: ClientTransport = JettyHttpTransport(HttpClient())
     """,
 
     // -------------------------------------------------------------- clients

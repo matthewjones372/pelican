@@ -2,12 +2,16 @@ package example.backends
 
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.RequestSpec
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import io.github.matthewjones372.pelican.jetty.handledNow as handledOnJetty
+import io.github.matthewjones372.pelican.jetty.handledWith as handledWithOnJetty
 import io.github.matthewjones372.pelican.pekko.handledNow as handledOnPekko
 import io.github.matthewjones372.pelican.pekko.handledWith as handledWithOnPekko
+import io.github.matthewjones372.pelican.test.jetty.inMemory as inMemoryOnJetty
 
 /**
  * Where an interpreter's answer is its router's and not Pelican's, made
@@ -45,6 +49,20 @@ class MethodMismatchTest {
             // the service being complete.
             covers = emptyList(),
         ).inMemory("greetings-method-mismatch").use {
+            it.transport.send(postToHello).status shouldBe 404
+        }
+    }
+
+    /** Jetty's `toHandler` passes on where Pekko's route rejects, and `Unanswered` merges the same way. */
+    @Test
+    fun `jetty answers 404 for the same reason`() {
+        greetingsApi(
+            listOf(
+                greet handledOnJetty { (who, shout) -> greetingOf(who, shout) },
+                outbox handledWithOnJetty { },
+            ),
+            covers = emptyList(),
+        ).inMemoryOnJetty(Handlers.onVirtualThreads).use {
             it.transport.send(postToHello).status shouldBe 404
         }
     }

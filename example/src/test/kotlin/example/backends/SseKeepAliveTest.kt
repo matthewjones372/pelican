@@ -14,6 +14,8 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlin.time.Duration.Companion.milliseconds
+import io.github.matthewjones372.pelican.jetty.start as startOnJetty
+import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 
@@ -74,6 +76,26 @@ class SseKeepAliveTest {
                     .throttle(1, java.time.Duration.ofMillis(QUIET_MILLIS))
             },
         ).startOnPekko(port = 0, systemName = "sse-keep-alive")
+
+        try {
+            body(server.baseUrl).shouldCarryKeepAlives()
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    @Suppress("SleepInsteadOfDelay") // The quiet stretch, on the virtual thread pulling the sequence.
+    fun `jetty fills the silence`() {
+        val server = api(
+            quiet streamedNowOnJetty {
+                sequence {
+                    yield(Tick(1))
+                    Thread.sleep(QUIET_MILLIS)
+                    yield(Tick(2))
+                }
+            },
+        ).startOnJetty(port = 0)
 
         try {
             body(server.baseUrl).shouldCarryKeepAlives()

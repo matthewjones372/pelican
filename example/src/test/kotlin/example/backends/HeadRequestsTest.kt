@@ -80,8 +80,13 @@ class HeadRequestsTest {
      * route matches on method and rejects on path, and that rejection swallows
      * the other routes' method rejections — the mechanism [MethodMismatchTest]
      * documents.
+     *
+     * Jetty agrees for its own reason: `toHandler` routes HEAD as a method of
+     * its own and never answers it from a GET, so `/motd` passes on and
+     * `Unanswered` says 404, the HEAD route's path rejection winning as above.
      */
     private val pinned = mapOf(
         "pekko" to 404,
+        "jetty" to 404,
     )
 }

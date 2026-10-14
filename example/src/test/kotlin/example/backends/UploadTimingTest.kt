@@ -14,6 +14,9 @@ import java.io.OutputStream
 import java.net.Socket
 import java.net.URI
 import java.nio.charset.StandardCharsets
+import io.github.matthewjones372.pelican.jetty.start as startOnJetty
+import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
+import io.github.matthewjones372.pelican.jetty.toSequence as toSequenceOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 import io.github.matthewjones372.pelican.pekko.toSource as toSourceOnPekko
@@ -51,6 +54,17 @@ class UploadTimingTest {
     fun `pekko answers the first frame before the last one is sent`() {
         val server = api(relay streamedNowOnPekko { rows -> rows.toSourceOnPekko() })
             .startOnPekko(port = 0, systemName = "upload-timing")
+
+        try {
+            server.baseUrl.shouldAnswerBeforeTheUploadEnds()
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `jetty answers the first frame before the last one is sent`() {
+        val server = api(relay streamedNowOnJetty { rows -> rows.toSequenceOnJetty() }).startOnJetty(port = 0)
 
         try {
             server.baseUrl.shouldAnswerBeforeTheUploadEnds()
