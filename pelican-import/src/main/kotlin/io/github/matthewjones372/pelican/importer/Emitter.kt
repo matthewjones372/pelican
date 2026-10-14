@@ -198,12 +198,12 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
      * file that cannot compile.
      */
     private fun shippedPackage(backend: Backend): String = when (backend) {
-        Backend.PEKKO -> backend.packageName
+        Backend.PEKKO, Backend.JETTY -> backend.packageName
 
         Backend.HTTP4K, Backend.KTOR -> throw ImportFailure(
             "Handler stubs for $backend would import ${backend.packageName}.*, which this release " +
                 "does not ship: the $backend interpreter is in the history at commit a6c20b2. Generate " +
-                "for PEKKO, or restore the module from that commit and generate there.",
+                "for PEKKO or JETTY, or restore the module from that commit and generate there.",
         )
     }
 

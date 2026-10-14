@@ -19,4 +19,8 @@
 dependencies {
     api(project(":pelican-codegen"))
     implementation("org.snakeyaml:snakeyaml-engine:3.1.1")
+
+    // A generated Jetty stub is compiled against the module it imports, by the compiler itself.
+    testImplementation(project(":pelican-jetty"))
+    testImplementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21")
 }

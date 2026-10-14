@@ -185,9 +185,9 @@ abstract class EndpointsSpec @Inject constructor(private val name: String) : org
     abstract val lockfile: RegularFileProperty
 
     /**
-     * The backend to generate handler stubs against, or unset for none. Stubs
-     * are written once and never overwritten: after the first run they are the
-     * service, not generated code.
+     * The backend to generate handler stubs against, `pekko` or `jetty`, or
+     * unset for none. Stubs are written once and never overwritten: after the
+     * first run they are the service, not generated code.
      */
     abstract val handlers: Property<String>
 
