@@ -26,9 +26,9 @@ import java.io.ByteArrayInputStream
  * The generated client over `pelican-client-pekko`, against the orders service
  * on a socket.
  *
- * `GeneratedKotlinClientTest` is the exhaustive suite and runs over the JDK
- * adapter. What is asserted here is only what a change of transport can break:
- * a streamed upload, a streamed response, and a failure read off the wire.
+ * `GeneratedKotlinClientTest` is the exhaustive suite and runs over both
+ * adapters. What is asserted here needs a Pekko stream type or a handed-over
+ * system: a streamed upload, a streamed response, and a failure read off the wire.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PekkoTransportClientTest {

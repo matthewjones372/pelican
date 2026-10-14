@@ -67,7 +67,10 @@ dependencies {
     testImplementation(project(":pelican-import"))
 
     // The generated client is compiled in this source set, and a generated
-    // client needs a transport.
+    // client needs a transport. Both adapters, so GeneratedKotlinClientTest
+    // runs over each; with two providers `ClientTransport.default()` refuses
+    // to choose, so every client built here names its transport.
+    testImplementation(project(":pelican-client-java"))
     testImplementation(project(":pelican-client-pekko"))
 
     // What the suspending client generated below is written against.

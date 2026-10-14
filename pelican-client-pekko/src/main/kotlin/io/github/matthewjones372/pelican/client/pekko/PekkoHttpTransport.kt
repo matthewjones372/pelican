@@ -100,7 +100,7 @@ class PekkoHttpTransport @JvmOverloads constructor(
      * connection pool settings, and passing per-request settings to
      * `singleRequest` keys a new pool per distinct value. So the deadline is
      * imposed here, on the stage, which bounds exactly what the JDK adapter's
-     * `HttpRequest.timeout` bounds — a streamed body is still governed by the
+     * own deadline bounds — a streamed body is still governed by the
      * pool's own idle timeout, since an `sse` response that outlives its
      * deadline is the endpoint working rather than failing.
      */
