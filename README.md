@@ -113,7 +113,6 @@ metrics, who is calling, the typed test client, golden files, stubbing another
 service, and clients for your callers.
 
 **[Appendix](#appendix)**: the longer documents, the runnable examples,
-[what is on main and not yet released](#on-main-not-yet-released),
 [stability](#stability) and [versions](#versions).
 
 The reference manual, which explains the reasoning behind each design
@@ -125,28 +124,27 @@ decision, is [docs/reference.md](docs/reference.md).
 
 ## Install
 
-The current release is **1.0.0-RC3**, on Maven Central under
-`io.github.matthewjones372`. It is a release candidate: the API below is what
-1.0 will ship, but the stability promise only applies from 1.0 (see
-[Stability](#stability)).
+The current release is **1.0.0**, on Maven Central under
+`io.github.matthewjones372`, and it needs Java 25. The stability promise
+applies to it (see [Stability](#stability)).
 
 ```kotlin
 dependencies {
     // The interpreter. Brings pelican-core; compiles against Pekko HTTP.
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.0")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
     // The codec module: Jackson, and the schemas the document derives.
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
     // /openapi.json and Swagger UI beside the endpoints. startWithDocs lives here.
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
     // The typed test client.
-    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
+    testImplementation("io.github.matthewjones372:pelican-test:1.0.0")
     // inMemory() and server.client(): the test client run against a Pekko Api.
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0-RC3")
+    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0")
 }
 ```
 
@@ -170,7 +168,7 @@ pluginManagement {
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC3" }
+plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
 ```
 
 To build against unreleased changes, `./gradlew publishToMavenLocal` installs
@@ -180,21 +178,18 @@ tag: an untagged commit gets a `-SNAPSHOT` of the next version.
 
 ## Modules
 
-Every module uses the group `io.github.matthewjones372`. All of them are on
-Maven Central at 1.0.0-RC3 except `pelican-oidc`, which is only on `main`.
-Where a released module has gained something on `main` since RC3, its line
-says so; those additions are not released yet, and
-[On main, not yet released](#on-main-not-yet-released) lists them together.
+Every module uses the group `io.github.matthewjones372`, and all of them are
+on Maven Central at 1.0.0.
 
 **Core and documents**
 
 - `pelican-core`: endpoint descriptions, plain codecs, a small JSON tree and
   parser, and the client SPI with an in-memory transport. It depends on the
-  Kotlin standard library and `jackson-core` only. On `main`: callers
+  Kotlin standard library and `jackson-core` only. It also holds callers
   (`authenticated`), `pages`, and tagged failures.
 - `pelican-openapi`: descriptions to an OpenAPI 3.1.0 or 3.2.0 document, in
   JSON or YAML, and a comparison of two documents that reports what would break
-  callers. On `main`: tagged failures as a `oneOf`, and a comparison that reads
+  callers. Tagged failures are written as a `oneOf`, and the comparison reads
   through `oneOf` and `anyOf`.
 - `pelican-schema`: one type as a JSON Schema 2020-12 document that resolves on
   its own, for tools that do not read the OpenAPI document.
@@ -204,14 +199,14 @@ says so; those additions are not released yet, and
 - `pelican-jackson`: the `Codecs`. Jackson reads and writes bodies, and
   swagger-core describes the types for the document.
 - `pelican-arrow`: Arrow's `Either` to an `Outcome` (`toOutcome`) and back
-  (`toEither`). On `main`: a `toOutcome { }` that names which of several
-  declared failures a `Left` becomes.
+  (`toEither`), and a `toOutcome { }` that names which of several declared
+  failures a `Left` becomes.
 
 **Server**
 
 - `pelican-pekko`: descriptions to a Pekko HTTP `Route`, and `start` to serve
-  them. On `main`: synchronous handlers run on virtual threads (`Handlers`), and
-  `pages` serves a classpath directory beside the endpoints.
+  them. Synchronous handlers run on virtual threads (`Handlers`), and `pages`
+  serves a classpath directory beside the endpoints.
 - `pelican-pekko-docs`: `/openapi.json` and a Swagger UI or Redoc page beside
   the endpoints (`startWithDocs`).
 - `pelican-streams`: a streamed request body as a lark `Stream`, whose failure
@@ -225,7 +220,7 @@ says so; those additions are not released yet, and
 **Testing**
 
 - `pelican-test`: the typed test client, outcome assertions and URL pins, with
-  no server library and no matcher library. On `main`: `TestCallers`,
+  no server library and no matcher library. It also has `TestCallers`,
   `signedInAs`, and an `inMemory()` that needs no backend module.
 - `pelican-test-pekko`: `inMemory()` and `server.client()`, which run the
   typed test client against a Pekko `Api` without a socket or against a
@@ -233,8 +228,8 @@ says so; those additions are not released yet, and
 - `pelican-test-golden`: one golden file per endpoint, failing when a change
   would break existing callers.
 - `pelican-test-wiremock`: a WireMock server stubbed and verified with endpoint
-  values, for testing a client of somebody else's API. On `main`: `stubFile`,
-  which writes those stubs out as WireMock mapping files.
+  values, for testing a client of somebody else's API, and `stubFile`, which
+  writes those stubs out as WireMock mapping files.
 
 **MCP**
 
@@ -250,29 +245,28 @@ says so; those additions are not released yet, and
   template and status, and a counter for requests refused before any filter
   runs.
 - `pelican-metrics-otel`: the same for OpenTelemetry, with a `SERVER` span per
-  request and a duration histogram. On `main`: `traced`, a client transport
-  that opens a client span and sends `traceparent`.
+  request and a duration histogram, and `traced`, a client transport that
+  opens a client span and sends `traceparent`.
 
 **Health**
 
 - `pelican-health`: `/health/live` and `/health/ready` from one `health { }`
   block, answered in `application/health+json`, with checks for a JDBC pool, a
-  downstream HTTP service, disk, heap and deadlocked threads. Only on `main`;
-  not on Maven Central.
+  downstream HTTP service, disk, heap and deadlocked threads.
 - `pelican-health-kafka`: `kafka(admin)`, over the Kafka `Admin` client the
-  service already holds. Only on `main`.
+  service already holds.
 - `pelican-health-redis`: `redis(connection)`, over the Lettuce connection the
-  service already holds. Only on `main`.
+  service already holds.
 
 **Security**
 
 - `pelican-oidc`: verifies an OpenID Connect provider's tokens for a caller, and
-  signs people in to pages. Only on `main`; not on Maven Central.
+  signs people in to pages.
 
 **Code generation and import**
 
-- `pelican-codegen`: descriptions to a Kotlin client, as source. On `main`: the
-  generated client reads the tag of a tagged failure.
+- `pelican-codegen`: descriptions to a Kotlin client, as source. The generated
+  client reads the tag of a tagged failure.
 - `pelican-import`: an OpenAPI document, in JSON or YAML, to descriptions, as
   source.
 
@@ -294,14 +288,14 @@ the example module.
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
+    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.0")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
 }
 ```
 
@@ -455,12 +449,12 @@ can convert at the edge instead: `service.find(id).toOutcome()`, from
 `toOutcome(failure)` names the declaration when there are several. See
 [Declared failures](docs/reference.md#declared-failures).
 
-On `main` and not yet released: two failures can share a status when each is
-`tagged`, for example two different 503s. The tag is written into the body,
-the document describes that status as a `oneOf` with a discriminator, and the
-generated client reads the tag. `pelican-arrow` also gains
-`toOutcome { e -> ... }`, which names one of several declared failures for each
-`Left`. See specs [0063](specs/0063-two-failures-under-one-status.md) and
+Two failures can share a status when each is `tagged`, for example two
+different 503s. The tag is written into the body, the document describes that
+status as a `oneOf` with a discriminator, and the generated client reads the
+tag. `pelican-arrow` also has `toOutcome { e -> ... }`, which names one of
+several declared failures for each `Left`. See specs
+[0063](specs/0063-two-failures-under-one-status.md) and
 [0060](specs/0060-an-either-with-several-failures.md).
 
 ## More than one successful response
@@ -570,14 +564,14 @@ ordersApi().start(port = 8080) { system ->
 }
 ```
 
-Two changes are on `main` and not yet released. A synchronous handler
-(`handledNow`, `handledOrFail` and the rest) runs on a virtual thread of its
-own, so it can block on a database call without holding one of Pekko's
-dispatcher threads; `handlers = Handlers.onDispatcher` keeps the RC3
-behaviour. And `pages = pages("ui")` in `api`'s block serves a classpath
-directory beside the endpoints, with an endpoint always winning over a page at
-the same path. See [Where a handler runs](docs/reference.md#where-a-handler-runs)
-and [Pages beside the endpoints](docs/reference.md#pages-beside-the-endpoints).
+A synchronous handler (`handledNow`, `handledOrFail` and the rest) runs on a
+virtual thread of its own, so it can block on a database call without holding
+one of Pekko's dispatcher threads; `handlers = Handlers.onDispatcher` runs it
+on Pekko's dispatcher instead, as 1.0.0-RC3 did. And `pages = pages("ui")` in
+`api`'s block serves a classpath directory beside the endpoints, with an
+endpoint always winning over a page at the same path. See
+[Where a handler runs](docs/reference.md#where-a-handler-runs) and
+[Pages beside the endpoints](docs/reference.md#pages-beside-the-endpoints).
 
 ## Filters
 
@@ -607,8 +601,6 @@ by `onRefusal(refusalCounter(...))`, since no filter sees them. See
 [Filters](docs/reference.md#filters) and [Metrics](docs/reference.md#metrics).
 
 ## Who is calling
-
-This section is on `main` and not yet released.
 
 An endpoint can declare who is calling it, under a security scheme, as a typed
 value built from the verified identity. A request with no credential, or one
@@ -736,9 +728,9 @@ fun `a stubbed declared failure reaches the client as the failure it declares`()
 
 A request matches a stub when Pelican's own routing and decoding turn it into
 the stubbed input, so query order and encoding do not matter. `verify` and
-`calls` check what was sent. On `main` and not yet released, `stubFile` writes
-the same stubs out as WireMock mapping files for a demo or a local run, and
-fails when the contract no longer agrees with a committed file. See
+`calls` check what was sent. `stubFile` writes the same stubs out as WireMock
+mapping files for a demo or a local run, and fails when the contract no longer
+agrees with a committed file. See
 [Stubbing somebody else's service](docs/reference.md#stubbing-somebody-elses-service).
 
 ## Clients for your callers
@@ -754,9 +746,8 @@ val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTra
 ```
 
 Each declared response becomes a member of a sealed type the caller can match
-on. On `main` and not yet released, `pelican-metrics-otel` adds
-`transport.traced(sdk)`, which opens a client span for each call and sends the
-current `traceparent`.
+on. `pelican-metrics-otel` adds `transport.traced(sdk)`, which opens a client
+span for each call and sends the current `traceparent`.
 
 The other direction is `pelican-import`: the plugin's `endpoints` entry reads
 an OpenAPI document somebody else wrote into endpoint descriptions, as Kotlin
@@ -825,49 +816,11 @@ helped and where it did not. [tweet-street](https://github.com/matthewjones372/t
 is a bank in four services; the bank and its approvals service serve their APIs
 and pages through Pelican on Pekko HTTP.
 
-## On main, not yet released
-
-These landed on `main` after the 1.0.0-RC3 tag and are not on Maven Central
-yet. To try them, build from `main` with `./gradlew publishToMavenLocal` (see
-[Install](#install)).
-
-- `pelican-oidc`, a module of its own, and callers in core: an endpoint
-  declares who is calling, verified before the handler
-  ([0061](specs/0061-who-is-calling.md)).
-- Synchronous handlers run on virtual threads
-  ([0058](specs/0058-a-handler-that-blocks.md)).
-- `pages`, a classpath directory served beside the endpoints
-  ([0059](specs/0059-pages-served-beside-an-api.md)).
-- `toOutcome { }` in `pelican-arrow`, for an `Either` with several declared
-  failures ([0060](specs/0060-an-either-with-several-failures.md)).
-- Two failures under one status, told apart by a tag, in the server, the
-  document and the generated client
-  ([0063](specs/0063-two-failures-under-one-status.md),
-  [0066](specs/0066-tagged-failures-in-the-document.md)).
-- Golden checks that compare a `oneOf` or `anyOf` branch by branch
-  ([0065](specs/0065-golden-checks-through-oneof.md)).
-- `stubFile` in `pelican-test-wiremock`, including stubs templated from the
-  path and the request body
-  ([0062](specs/0062-stub-files-that-keep-the-contract.md),
-  [0067](specs/0067-stubs-templated-from-the-body.md)).
-- `traced`, a client transport that carries the trace, in
-  `pelican-metrics-otel` ([0064](specs/0064-a-client-that-carries-the-trace.md)).
-- `RetryScheduler`, so a test can control the waits between client retries
-  ([0057](specs/0057-the-wait-a-test-can-hold.md)).
-- `TestCallers`, `signedInAs` and a backend-free `inMemory()` in
-  `pelican-test`.
-- The library modules on `main` are compiled for Java 25, where RC3 was
-  compiled for Java 21. The Gradle plugin is still compiled for Java 21.
-
-[The changelog](CHANGELOG.md) records the breaking changes among these.
-
 ## Stability
 
-The current release is 1.0.0-RC3, a candidate for 1.0. Its API is frozen and
-checked by the build. From 1.0, the public API of the shipped modules is
-stable, and breaking changes will wait for a major release. Until then, a
-release candidate can still change if real use turns up problems, and any
-breaking change before 1.0 is recorded in [the changelog](CHANGELOG.md).
+The current release is 1.0.0. The public API of the shipped modules is stable
+and checked by the build, and breaking changes wait for a major release.
+[The changelog](CHANGELOG.md) records the breaking changes made before 1.0.
 
 Two things in the repository define what is covered, and both are enforced by
 the build. The `.api` dump beside each module is the binary contract: if a

@@ -1080,7 +1080,7 @@ The document and the client are both readings of the same values, and both are
 build tasks:
 
 ```kotlin
-plugins { id("io.github.matthewjones372.pelican") version "1.0.0-RC3" }
+plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
 
 pelican {
     documents {
@@ -1177,7 +1177,7 @@ importer:
 
 ```kotlin
 val pelicanImport: Configuration by configurations.creating
-dependencies { pelicanImport("io.github.matthewjones372:pelican-import:1.0.0-RC3") }
+dependencies { pelicanImport("io.github.matthewjones372:pelican-import:1.0.0") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
@@ -1380,12 +1380,12 @@ the classpath without being told:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0")
     // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.0")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
 }
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
@@ -3252,8 +3252,8 @@ What was deliberately **not** done:
 #### Carrying the trace on a call out
 
 `traced` is the other half: a `ClientTransport` that wraps another and traces
-every call a generated client sends through it. It is on `main`, from spec
-0064, and is not in 1.0.0-RC3.
+every call a generated client sends through it. It came in 1.0.0, from spec
+0064.
 
 ```kotlin
 import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
@@ -5556,7 +5556,7 @@ its OpenAPI document by the plugin's `endpoints` entry:
 
 ```kotlin
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0")
 }
 ```
 
@@ -5964,7 +5964,7 @@ open  localhost:8080/api-docs                                 # Swagger UI
   requirement as a value on the endpoint, and a `Filter` slot to enforce it
   from: see the security chapter above, and
   `example/secured/SecuredReports.kt` for a filter that reads
-  `endpoint.security` and needs no second list. On `main` this has changed:
+  `endpoint.security` and needs no second list. Since 1.0.0 this has changed:
   `authenticatedBy` and `pelican-oidc` (spec 0061) verify a caller's token;
   see [Who is calling](#who-is-calling).
 - **Two shapes where two schema sources genuinely disagree.** Both need a
@@ -6054,32 +6054,32 @@ place they are recorded.
 
 ## Versions
 
-What `main` builds with, and what the released 1.0.0-RC3 was built with where
-that differs:
+What 1.0.0 is built with, and what 1.0.0-RC3 was built with where that
+differs:
 
-| | `main` | 1.0.0-RC3 |
+| | 1.0.0 | 1.0.0-RC3 |
 |---|---|---|
 | Kotlin | 2.4.20 | 2.4.10 |
 | Bytecode | JDK 25 | JDK 21 |
 | Gradle | 9.8.0 | 9.7.1 |
 | Pekko | 1.7.1 | 1.7.0 |
-| Pekko HTTP | 1.4.0 | 1.4.0 |
+| Pekko HTTP | 1.4.1 | 1.4.0 |
 | Jackson | 2.22.3 | 2.22.2 |
 | swagger-core | 2.2.55 | 2.2.55 |
 | slf4j-api | 2.0.20 | 2.0.18 |
 | snakeyaml-engine | 3.1.1 | 2.10 |
 | Micrometer | 1.17.1 | 1.17.1 |
-| OpenTelemetry | 1.66.0 | 1.66.0 |
+| OpenTelemetry | 1.67.0 | 1.66.0 |
 | arrow-core | 2.2.3 | 2.1.2 |
 | WireMock | 3.13.1 | 3.13.1 |
-| nimbus-jose-jwt | 10.10 | not in RC3 (`pelican-oidc` is on `main` only) |
+| nimbus-jose-jwt | 10.10 | not in RC3 (`pelican-oidc` came in 1.0.0) |
 
 The libraries Pelican ships are floors, not pins: Gradle resolves upwards, so a
-service already on a newer Jackson keeps its own. The modules on `main` compile
-to JDK 25 bytecode, so a build of `main` needs JDK 25 or newer to run; 1.0.0-RC3
-compiled to JDK 21. The suites run on whichever JDK started the build, never
-below the bytecode they load, and `TestRuntimeIsTheBuildRuntimeTest` is what
-holds that. CI on `main` runs them on 25.
+service already on a newer Jackson keeps its own. The library modules compile
+to JDK 25 bytecode, so a service on 1.0.0 needs JDK 25 or newer to run;
+1.0.0-RC3 compiled to JDK 21. The suites run on whichever JDK started the
+build, never below the bytecode they load, and
+`TestRuntimeIsTheBuildRuntimeTest` is what holds that. CI on `main` runs them on 25.
 
 Pekko is the exception: Pelican ships none of it. Every module that speaks
 Pekko declares it `compileOnly`, so no `org.apache.pekko` dependency reaches
@@ -6088,14 +6088,14 @@ already runs:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
 
     // _2.13 or _3 — Pelican compiles against `javadsl` and four names that are
     // identical in both, so it has no opinion.
     implementation(platform("org.apache.pekko:pekko-bom_3:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_3")
     implementation("org.apache.pekko:pekko-stream_3")
-    implementation("org.apache.pekko:pekko-http_3:1.4.0")
+    implementation("org.apache.pekko:pekko-http_3:1.4.1")
     runtimeOnly("org.apache.pekko:pekko-slf4j_3")
 }
 ```
@@ -6146,5 +6146,5 @@ This is the only copy of that list. The README carried a second one until the
 two disagreed about half of it, and now points here instead.
 
 The Gradle plugin is built against the Gradle API of the version in the
-table (9.8.0 on `main`, 9.7.1 for 1.0.0-RC3) as Java 21 bytecode, so the build
+table (9.8.0 for 1.0.0, 9.7.1 for 1.0.0-RC3) as Java 21 bytecode, so the build
 applying it runs on Java 21 or newer.
