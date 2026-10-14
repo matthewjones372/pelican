@@ -1,6 +1,6 @@
 val slf4jVersion = "2.0.20"
 val pekkoVersion = "1.7.1"
-val pekkoHttpVersion = "1.4.0"
+val pekkoHttpVersion = "1.4.1"
 val scalaBinary = "2.13"
 
 // The only module that knows Pekko exists — and it still knows nothing about

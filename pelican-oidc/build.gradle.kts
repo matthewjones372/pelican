@@ -17,6 +17,6 @@ dependencies {
     testImplementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     testImplementation("org.apache.pekko:pekko-actor-typed_2.13")
     testImplementation("org.apache.pekko:pekko-stream_2.13")
-    testImplementation("org.apache.pekko:pekko-http_2.13:1.4.0")
+    testImplementation("org.apache.pekko:pekko-http_2.13:1.4.1")
     testImplementation("com.microsoft.playwright:playwright:1.59.0")
 }
