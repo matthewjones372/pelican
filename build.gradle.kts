@@ -37,7 +37,7 @@ plugins {
     // here directly.
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
     // Renders the KDoc into the javadoc jar the published modules ship.
-    id("org.jetbrains.dokka") version "2.1.0" apply false
+    id("org.jetbrains.dokka") version "2.2.0" apply false
     // What each published module's binary surface is, as a file somebody reads
     // in a diff. The golden-file argument, applied to the Kotlin API instead of
     // to the HTTP one.
