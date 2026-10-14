@@ -1,15 +1,30 @@
 package io.github.matthewjones372.pelican.kotlinx
 
 import io.github.matthewjones372.pelican.BodyCodec
+import io.github.matthewjones372.pelican.BodyDecodeFailure
 import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.JsonArr
+import io.github.matthewjones372.pelican.JsonBool
+import io.github.matthewjones372.pelican.JsonNull
+import io.github.matthewjones372.pelican.JsonNum
 import io.github.matthewjones372.pelican.JsonObj
+import io.github.matthewjones372.pelican.JsonStr
+import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.SchemaComponents
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonConfiguration
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.serializer
+import java.io.ByteArrayInputStream
 import kotlin.reflect.KType
+import kotlinx.serialization.json.JsonNull as KotlinxNull
 
 /**
  * Reads and writes bodies with kotlinx.serialization, deriving schemas from the
@@ -29,8 +44,23 @@ class KotlinxCodecs(private val json: Json) : Codecs {
         return object : BodyCodec<T> {
             override fun encodeToString(value: T): String = json.encodeToString(serializer, value)
             override fun decodeFromString(text: String): T = json.decodeFromString(serializer, text)
+
+            /** kotlinx's UTF-8 stream reader on the bytes as they arrived, rather than a String copy of them. */
+            @OptIn(ExperimentalSerializationApi::class)
+            override fun decodeFrom(bytes: ByteArray): T =
+                json.decodeFromStream(serializer, ByteArrayInputStream(bytes))
         }
     }
+
+    /** Parsed by the configured [Json], held to the depth and number limits Jackson's `readTree` has by default. */
+    override fun readTree(text: String): JsonValue =
+        try {
+            requireDepthWithin(text, MAX_DEPTH)
+            json.parseToJsonElement(text).toJsonValue()
+        } catch (e: IllegalArgumentException) {
+            // SerializationException is an IllegalArgumentException, as is JsonNum refusing a non-finite number.
+            throw BodyDecodeFailure(e.message ?: "The text is not JSON", e)
+        }
 
     override fun schema(type: KType, components: SchemaComponents): JsonObj =
         DescriptorSchemas(components, json.configuration.classDiscriminator)
@@ -38,6 +68,47 @@ class KotlinxCodecs(private val json: Json) : Codecs {
 
     companion object Default : Codecs by KotlinxCodecs(defaultJson())
 }
+
+/**
+ * Measured before kotlinx parses, because its tree reader recurses on arrays
+ * with no limit and a deep enough one is a `StackOverflowError`, the failure
+ * spec 0045 exists to keep off the network path.
+ */
+private fun requireDepthWithin(text: String, limit: Int) {
+    var depth = 0
+    var inString = false
+    var escaped = false
+    for (c in text) {
+        when {
+            escaped -> escaped = false
+            inString && c == '\\' -> escaped = true
+            c == '"' -> inString = !inString
+            inString -> Unit
+            c == '[' || c == '{' -> require(++depth <= limit) { "The document nests deeper than $limit" }
+            c == ']' || c == '}' -> depth--
+        }
+    }
+}
+
+private fun JsonElement.toJsonValue(): JsonValue = when (this) {
+    is JsonObject -> JsonObj(mapValues { (_, value) -> value.toJsonValue() })
+    is JsonArray -> JsonArr(map { it.toJsonValue() })
+    is JsonPrimitive -> toJsonValue()
+}
+
+/** kotlinx keeps a number as its digits, and a `BigInteger` from a million of them is CPU worth refusing. */
+private fun JsonPrimitive.toJsonValue(): JsonValue {
+    if (isString) return JsonStr(content)
+    if (this == KotlinxNull) return JsonNull
+    booleanOrNull?.let { return JsonBool(it) }
+    require(content.length <= MAX_NUMBER_LENGTH) { "A number is longer than $MAX_NUMBER_LENGTH characters" }
+    // Whole numbers stay whole, past Long too, as core's own reader keeps them.
+    return JsonNum(content.toLongOrNull() ?: content.toBigIntegerOrNull() ?: content.toDouble())
+}
+
+/** Jackson's `StreamReadConstraints` defaults, which is what `JacksonCodecs.readTree` is held to. */
+private const val MAX_DEPTH = 1000
+private const val MAX_NUMBER_LENGTH = 1000
 
 /**
  * The `Json` used when none is supplied, configured to behave as the Jackson

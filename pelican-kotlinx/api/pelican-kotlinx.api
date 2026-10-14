@@ -2,6 +2,7 @@ public final class io/github/matthewjones372/pelican/kotlinx/KotlinxCodecs : io/
 	public static final field Default Lio/github/matthewjones372/pelican/kotlinx/KotlinxCodecs$Default;
 	public fun <init> (Lkotlinx/serialization/json/Json;)V
 	public fun codec (Lkotlin/reflect/KType;)Lio/github/matthewjones372/pelican/BodyCodec;
+	public fun readTree (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonValue;
 	public fun schema (Lkotlin/reflect/KType;Lio/github/matthewjones372/pelican/SchemaComponents;)Lio/github/matthewjones372/pelican/JsonObj;
 }
 
