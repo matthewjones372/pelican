@@ -1,0 +1,7 @@
+public final class io/github/matthewjones372/pelican/jetty/mcp/McpKt {
+	public static final fun handlerWithMcp (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/jetty/Handlers;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;)Lorg/eclipse/jetty/server/Handler;
+	public static synthetic fun handlerWithMcp$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/jetty/Handlers;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
+	public static final fun mcpHandler (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;)Lorg/eclipse/jetty/server/Handler;
+	public static synthetic fun mcpHandler$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
+}
+
