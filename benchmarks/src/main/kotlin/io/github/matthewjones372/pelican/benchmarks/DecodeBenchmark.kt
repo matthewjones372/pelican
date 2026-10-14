@@ -3,6 +3,8 @@ package io.github.matthewjones372.pelican.benchmarks
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jackson.defaultMapper
+import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
+import kotlinx.serialization.Serializable
 import org.apache.pekko.util.ByteString
 import org.openjdk.jmh.annotations.Benchmark
 import org.openjdk.jmh.annotations.BenchmarkMode
@@ -33,6 +35,9 @@ import kotlin.reflect.typeOf
  * `JacksonCodecs` does. Measuring a cached reader against an uncached one
  * would be measuring the entry before this one a second time.
  *
+ * The kotlinx rows are the same two reads through `KotlinxCodecs`, so the
+ * JSON library is the only thing that differs from the Jackson pair.
+ *
  * No socket and no route, so the difference is not hidden inside Pekko. Run
  * with `-prof gc` (the `jmh` task passes it): `gc.alloc.rate.norm` is half the
  * answer, and on the encode side it was the half that moved.
@@ -45,6 +50,7 @@ import kotlin.reflect.typeOf
 @Measurement(iterations = 5, time = 1)
 open class DecodeBenchmark {
 
+    @Serializable
     data class Payload(val seq: Long, val body: String)
 
     /** The sizes 0039 used, so the two specs can be read against each other. */
@@ -52,6 +58,7 @@ open class DecodeBenchmark {
     var size: Int = 0
 
     private lateinit var codec: BodyCodec<Payload>
+    private lateinit var kotlinx: BodyCodec<Payload>
     private lateinit var body: ByteString
     private val mapper = defaultMapper()
     private lateinit var javaType: com.fasterxml.jackson.databind.JavaType
@@ -60,6 +67,7 @@ open class DecodeBenchmark {
     @Setup
     fun setUp() {
         codec = JacksonCodecs.codec(typeOf<Payload>())
+        kotlinx = KotlinxCodecs.codec(typeOf<Payload>())
         body = ByteString.fromString(codec.encodeToString(Payload(seq = 1, body = "x".repeat(size))))
         javaType = mapper.constructType(Payload::class.java)
         reader = mapper.readerFor(javaType)
@@ -79,4 +87,11 @@ open class DecodeBenchmark {
      */
     @Benchmark
     fun viaBytes(): Payload = reader.readValue(body.toArrayUnsafe())
+
+    @Benchmark
+    fun kotlinxViaString(): Payload = kotlinx.decodeFromString(body.utf8String())
+
+    /** As [viaBytes], through `KotlinxCodecs.decodeFrom`, which reads the bytes as a UTF-8 stream. */
+    @Benchmark
+    fun kotlinxViaBytes(): Payload = kotlinx.decodeFrom(body.toArrayUnsafe())
 }

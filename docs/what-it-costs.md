@@ -185,6 +185,85 @@ cheaper of two reads when the request declared its length. See
 [`ChunkedBodyLimitTest`](../pelican-pekko/src/test/kotlin/io/github/matthewjones372/pelican/pekko/ChunkedBodyLimitTest.kt)
 for why the other read still exists.
 
+## Jetty
+
+The same GET and the same JSON POST, served by `toHandler` and by a
+`Handler.Abstract` written against Jetty 12 core that matches the path, reads
+the query with `Request.extractQueryParameters`, reads the body with
+`Content.Source.asByteArrayAsync` and writes the same Jackson bytes. Each runs
+on its own started `Server` with `PELICAN_URI_COMPLIANCE`, and every request
+goes through a `LocalConnector`.
+
+**These numbers are not comparable with the Pekko tables above, column to
+column.** A `LocalConnector` has no socket, but it is a real connector: each
+request arrives as bytes, is parsed as HTTP/1.1 by Jetty's parser on Jetty's
+thread pool, and its response is generated back into bytes that the caller
+waits for. Pekko's `Route.function` does none of that; it takes an
+`HttpRequest` that is already an object and returns one. The Jetty rows include
+a parse, a generate and two thread handoffs per request, so they say what
+Pelican costs on Jetty against Jetty by hand, and nothing about which server is
+faster. That comparison needs a socket under both.
+
+`./gradlew :benchmarks:jmh -PbenchmarkArgs="JettyOverhead DecodeBenchmark"`,
+with the settings above: three forks, five and five one-second iterations.
+Jetty 12.1.13, on Temurin 25.0.4.1, which is the toolchain
+`benchmarks/build.gradle.kts` names, on the same Apple M3 and macOS 26.5.2. The
+run took 11m 56s.
+
+| | per request | allocated |
+|---|---|---|
+| **Pelican on Jetty, handler on the Jetty thread** | **162 ± 39µs** | **17335 ± 60B** |
+| Pelican on Jetty, handler on a virtual thread (the default) | 288 ± 114µs | 27052 ± 136B |
+| Jetty core, hand-written | 143 ± 54µs | 16055 ± 123B |
+| **Pelican, `POST /items`, on the Jetty thread** | **196 ± 108µs** | **18235 ± 209B** |
+| Pelican, `POST /items`, on a virtual thread | 263 ± 152µs | 27912 ± 172B |
+| Jetty core, hand-written `POST /items` | 155 ± 45µs | 17138 ± 94B |
+
+The timings were taken on a machine that was not idle: a virtual machine was
+using six cores throughout, and the load average was between 19 and 97. Read
+them as the caution at the end of this page describes: a later run on the same
+machine put the single-directive Pekko route at 987ns against the 612ns above,
+and the per-request numbers here are mostly the connector's thread handoffs
+waiting for a core. Pelican and the hand-written handler overlap inside their
+error on both requests, and the timings are to be taken again on an idle
+machine.
+
+The allocation is the steady half, and it was the same to within 4% over three
+runs on that machine. Against Jetty by hand, Pelican on the Jetty thread
+allocates **1280 bytes** more on the GET and **1097 bytes** more on the POST.
+Moving a
+synchronous handler onto a virtual thread, which `toHandler` does unless given
+`Handlers.onDispatcher`, costs about **9.7KB** a request on top, and on the GET
+it is the one row whose time is clear of the others' error. A handler that never
+blocks can opt out of it.
+
+## Reading a body: Jackson and kotlinx
+
+`DecodeBenchmark` reads one JSON body of each size with no route and no
+server, so only the codec is measured. "via String" decodes the bytes to a
+`String` first, which is what a codec's `decodeFromString` takes; "via bytes"
+hands the codec the bytes, which is `JacksonCodecs`' `UTF8StreamJsonParser` and
+`KotlinxCodecs.decodeFrom`'s stream reader.
+
+`./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 5 JettyOverhead DecodeBenchmark PekkoOverhead"`,
+five forks rather than three because the machine was the same contended one
+(load average 24 to 42 across the run), Temurin 25.0.4.1. The run took 26m 49s.
+
+| body | Jackson, via String | Jackson, via bytes | kotlinx, via String | kotlinx, via bytes |
+|---|---|---|---|---|
+| 100B | 743 ± 208ns, 1618B | 875 ± 841ns, 1541B | 956 ± 229ns, 936B | 499 ± 111ns, 1152B |
+| 1KB | 1280 ± 230ns, 3466B | 1303 ± 376ns, 2461B | 2183 ± 235ns, 2784B | 1204 ± 258ns, 2062B |
+| 64KB | 160 ± 37µs, 132550B | 92 ± 20µs, 263718B | 186 ± 51µs, 131809B | 366 ± 203µs, 312515B |
+
+Allocation is within 15 bytes either side on every cell. The times are not
+quiet enough to rank the two libraries on small bodies: every pair at 100 bytes
+and 1KB overlaps except kotlinx via String at 1KB, which is the slowest. What
+the allocation says without needing a quiet machine: kotlinx allocates less
+than Jackson on small bodies by either route, and at 64KB the byte readers of
+both libraries allocate about twice what the String route does, kotlinx's
+stream reader the most at 312KB for a 64KB body. Jackson's byte reader is the
+fastest row at 64KB and the only one there clear of the others' error.
+
 ## What the old harness got wrong
 
 These numbers replace a set taken by a JUnit test that looped and timed in one
