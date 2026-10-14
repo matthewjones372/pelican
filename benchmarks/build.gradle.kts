@@ -7,6 +7,9 @@
  * the only thing hand-written here is the wiring that runs it.
  */
 
+// For `DecodeBenchmark`'s payload, which kotlinx reads only if it is `@Serializable`.
+plugins { kotlin("plugin.serialization") }
+
 // One version, shared by the runtime the benchmarks compile against and the
 // generator that reads them. They are the same release or the generated stubs
 // do not match the core they call.
@@ -16,6 +19,8 @@ dependencies {
     implementation(project(":pelican-core"))
     implementation(project(":pelican-pekko"))
     implementation(project(":pelican-jackson"))
+    implementation(project(":pelican-jetty"))
+    implementation(project(":pelican-kotlinx"))
 
     // Pekko is declared here for the reason a consumer declares it: it is
     // `compileOnly` in `pelican-pekko`, which ships no Scala cross-build.
