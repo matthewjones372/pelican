@@ -458,8 +458,8 @@ tally handledNow { rows -> Tally(rows.toSequence().count()) }
 
 Every suite in `example/backends/` runs on both servers. Where the answers
 differ, the difference is recorded in `JettyDifference`, in that package's
-`Dialects.kt`, with its reason, and `RecordedDifferencesTest` holds the first
-two on the wire:
+`Dialects.kt`, with its reason, and `RecordedDifferencesTest` observes all but
+the stalled upload on the wire:
 
 - **A path that climbs above the root**, raw (`/../x`) or escaped
   (`/%2E%2E/x`), and one starting with an empty segment (`//x`), is Jetty's own
@@ -475,7 +475,7 @@ two on the wire:
   a blocking reader, which needs a read timeout of its own, and takes the one
   Pekko applies to multipart.
 - **A page asked for with `Range` is the whole file, 200**, on Jetty; Pekko
-  answers 206 with the range. Pages are small static assets, and a client that
+  answers 206 with `Content-Range` and only those bytes. Pages are small static assets, and a client that
   asks for a range and gets 200 takes the whole body, as RFC 9110 allows.
 
 ## Choosing a JSON library
