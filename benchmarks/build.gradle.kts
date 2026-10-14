@@ -34,6 +34,10 @@ dependencies {
     // these modules already has, which is the point: a baseline reaching for a
     // dependency Pelican does not would be measuring a different thing.
     implementation("org.openjdk.jmh:jmh-core:$jmhVersion")
+
+    // `:benchmarks:wire`'s percentiles, and the client it drives both servers with: the release `pelican-jetty` serves.
+    implementation("org.hdrhistogram:HdrHistogram:2.2.2")
+    implementation("org.eclipse.jetty:jetty-client:12.1.13")
 }
 
 /**
@@ -140,4 +144,20 @@ val jmh = tasks.register<JavaExec>("jmh") {
     val results = layout.buildDirectory.file("jmh-result.json").get().asFile
     args("-prof", "gc", "-rf", "json", "-rff", results.path)
     args(providers.gradleProperty("benchmarkArgs").getOrElse("").split(" ").filter { it.isNotBlank() })
+}
+
+/**
+ * `./gradlew :benchmarks:wire`: Pelican on Pekko and on Jetty over a loopback socket, driven at fixed rates (about
+ * eight minutes; nothing else depends on it). The table lands in `build/wire-result.md` as well as on stdout.
+ * `-PwireSmoke` runs one few-second step per server, to check the setup rather than measure.
+ */
+tasks.register<JavaExec>("wire") {
+    group = "verification"
+    description = "Drives Pelican on Pekko and on Jetty over loopback at fixed rates and reports latency"
+    mainClass.set("io.github.matthewjones372.pelican.benchmarks.wire.WireDriverKt")
+    classpath(benchmarkRuntimeClasspath)
+    javaLauncher.set(toolchainLauncher)
+    jvmArgs("-Xms1g", "-Xmx1g")
+    args(layout.buildDirectory.file("wire-result.md").get().asFile.path)
+    if (providers.gradleProperty("wireSmoke").isPresent) args("--smoke")
 }
