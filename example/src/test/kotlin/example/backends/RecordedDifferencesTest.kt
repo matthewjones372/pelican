@@ -1,10 +1,13 @@
 package example.backends
 
+import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.pages
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -60,15 +63,45 @@ class RecordedDifferencesTest {
         }
     }
 
+    @Test
+    fun `a page asked for a range is a 206 on pekko, and the whole file on jetty`() {
+        val where = endpoint { get("where"); text() }
+        fun withPages(route: ServerEndpoint) =
+            api(listOf(route), JacksonCodecs) { pages = pages("recorded-pages") }
+        val pekko = withPages(where handledByOnPekko { CompletableFuture.completedFuture("") })
+            .startOnPekko(port = 0, systemName = "recorded-ranges")
+        val jetty = withPages(where handledByOnJetty { CompletableFuture.completedFuture("") }).startOnJetty(port = 0)
+
+        try {
+            val ranged = "Range: bytes=0-3"
+            val answers = mapOf(
+                "pekko" to exchange(pekko.baseUrl, "/notes.txt", ranged),
+                "jetty" to exchange(jetty.baseUrl, "/notes.txt", ranged),
+            )
+            withClue(JettyDifference.NO_RANGES_ON_PAGES.reason + "\n" + answers) {
+                answers.mapValues { (_, raw) -> raw.substringAfter(' ').substringBefore(' ').toInt() } shouldBe
+                    mapOf("pekko" to 206, "jetty" to 200)
+                answers.getValue("pekko").lowercase() shouldContain "content-range: bytes 0-3/10"
+                answers.getValue("pekko").substringAfter("\r\n\r\n") shouldBe "abcd"
+                answers.getValue("jetty").substringAfter("\r\n\r\n") shouldBe "abcdefghij"
+            }
+        } finally {
+            pekko.stop()
+            jetty.stop()
+        }
+    }
+
     /** A raw socket, because every client normalises a dot segment away before it is sent. */
-    private fun exchange(baseUrl: String, path: String): String {
+    private fun exchange(baseUrl: String, path: String, header: String? = null): String {
         val uri = URI.create(baseUrl)
         return Socket(uri.host, uri.port).use { socket ->
             socket.soTimeout = SOCKET_TIMEOUT_MILLIS
             socket.getOutputStream().apply {
                 write(
-                    "GET $path HTTP/1.1\r\nHost: ${uri.host}\r\nConnection: close\r\n\r\n"
-                        .toByteArray(StandardCharsets.US_ASCII),
+                    (
+                        "GET $path HTTP/1.1\r\nHost: ${uri.host}\r\n${header?.let { "$it\r\n" }.orEmpty()}" +
+                            "Connection: close\r\n\r\n"
+                        ).toByteArray(StandardCharsets.US_ASCII),
                 )
                 flush()
             }

@@ -53,8 +53,8 @@ val allDialects: List<Dialect> = listOf(
 
 /**
  * Where Jetty answers otherwise than Pekko, and why that is accepted rather than closed. Everything not listed
- * here is held identical by the suites in this package; `RecordedDifferencesTest` holds the first two true on
- * the wire, so a change on either server fails there before it reaches a reader.
+ * here is held identical by the suites in this package; `RecordedDifferencesTest` holds all but the stalled
+ * upload true on the wire, so a change on either server fails there before it reaches a reader.
  */
 enum class JettyDifference(val reason: String) {
     /**
