@@ -3,13 +3,17 @@ package io.github.matthewjones372.pelican.jetty
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.ByteStreamHandle
+import io.github.matthewjones372.pelican.MultipartBody
+import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
+import io.github.matthewjones372.pelican.spi.decode
 import org.eclipse.jetty.http.HttpHeader
 import org.eclipse.jetty.io.Content
 import org.eclipse.jetty.server.Request
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -67,5 +71,29 @@ internal fun readStrictBody(request: Request, api: Api, codec: RequestBodyCodecs
             codec.decode(request.headers.get(HttpHeader.CONTENT_TYPE), bytes)
         }
 }
+
+/** Core's multipart reader blocks on the body as it arrives, so it reads on a thread that may block. */
+private val MULTIPART_READERS = Executors.newVirtualThreadPerTaskExecutor()
+
+/**
+ * An envelope parsed by core as it arrives, a streamed file part handed over unread. Exempt from the limit as on
+ * Pekko: the parts held in memory are bounded by it, and the streamed one is never held.
+ */
+internal fun readMultipart(
+    request: Request,
+    api: Api,
+    body: MultipartBody,
+    into: MutableMap<ParamKey<*>, Any?>,
+): CompletionStage<Unit> = CompletableFuture.supplyAsync(
+    {
+        body.decode(
+            contentType = request.headers.get(HttpHeader.CONTENT_TYPE),
+            input = Content.Source.asInputStream(request),
+            maxInMemoryBytes = api.maxBodyBytes,
+            into = into,
+        )
+    },
+    MULTIPART_READERS,
+)
 
 private fun Throwable.causes(): Sequence<Throwable> = generateSequence(this) { it.cause }
