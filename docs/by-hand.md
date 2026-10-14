@@ -201,7 +201,7 @@ val routes = listOf(
     },
 
     listBookmarks streamedNow { (max, tag) ->                  // max: Int, tag: Slug?
-        Source.from(Bookmarks.list(max, tag))
+        Bookmarks.list(max, tag).asSequence()
     },
 )
 
@@ -258,7 +258,7 @@ and the document's parameter `required: false`, from one call.
 but the *shape* of what comes out is then restated as an `ArraySchema` in the
 annotation, and a handler that starts streaming something else stays green.
 `jsonArray<Bookmark>()` is the framing and the schema, and the binder will not
-accept a `Source` of anything but `Bookmark`.
+accept a stream of anything but `Bookmark`.
 
 **The 404 is a status in one place and a payload in another.** The annotation
 promises a `NoSuchBookmark`; the route is free to complete with anything at all,
@@ -276,11 +276,13 @@ same problem.
 The second version has one list — the routes you pass to `Api` — and it is the
 list both the server and the document are built from.
 
-None of this is an argument against Pekko HTTP. Pelican runs on it, and the
-route the interpreter builds is the route above with the repetition removed
-rather than replaced. It is an argument about how many copies of one endpoint a
-service keeps, and which of them a compiler is allowed to check.
+None of this is an argument against Pekko HTTP. Pelican runs on it as well as
+on Jetty, and the route its Pekko interpreter builds is the route above with
+the repetition removed rather than replaced. It is an argument about how many
+copies of one endpoint a service keeps, and which of them a compiler is allowed
+to check.
 
 The Pekko block is illustrative and not part of the build, unlike
 [`ReadmeExample.kt`](../example/src/main/kotlin/example/readme/ReadmeExample.kt).
-The Pelican half is that file, two endpoints of it.
+The Pelican half is that file, two endpoints of it, served by Jetty; bound
+with `pelican-pekko`'s binders instead, the stream would be a `Source`.

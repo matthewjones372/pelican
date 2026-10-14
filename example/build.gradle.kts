@@ -28,6 +28,8 @@ dependencies {
     runtimeOnly("org.apache.pekko:pekko-slf4j_2.13")
     // Serving the docs is opt-in: this is the module that adds them to a server.
     implementation(project(":pelican-pekko-docs"))
+    // And on Jetty, which the README's examples are served by.
+    implementation(project(":pelican-jetty-docs"))
     // And serving the tools is opt-in in exactly the same way: `example.mcp` is
     // what that looks like. `pelican-mcp` and `pelican-mcp-server` arrive
     // through it, which is why neither is declared here.
@@ -101,8 +103,6 @@ dependencies {
     // needs. `pelican-test` itself stays backend-agnostic.
     testImplementation(project(":pelican-test-pekko"))
     testImplementation(project(":pelican-test-jetty"))
-    // `StartParityTest` holds Jetty's `startWithDocs` to the shape of Pekko's.
-    testImplementation(project(":pelican-jetty-docs"))
     // And `StillCompilesTest` compiles the Jetty MCP twin's call sites beside Pekko's.
     testImplementation(project(":pelican-jetty-mcp"))
     // The generated client against a stubbed service, stubbed in the same descriptions. Spec 0056.
@@ -223,6 +223,14 @@ tasks.register<JavaExec>("runFirstEndpoint") {
     description = "Runs the one-endpoint example from the README"
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("example.hello.FirstEndpointKt")
+}
+
+/** The same endpoint on Pekko HTTP: the cookbook's "On Pekko" recipe. */
+tasks.register<JavaExec>("runFirstEndpointOnPekko") {
+    group = "application"
+    description = "Runs the one-endpoint example on Pekko HTTP"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("example.hello.FirstEndpointOnPekkoKt")
 }
 
 /** The README's example, kept runnable so the front page cannot drift. */

@@ -13,17 +13,17 @@ The recipes share one set of Gradle dependencies, written once here:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")       // brings pelican-core; compiles against Pekko
-    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
-    implementation("org.apache.pekko:pekko-actor-typed_2.13")
-    implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")     // JacksonCodecs
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")  // startWithDocs and Swagger UI
-    testImplementation("io.github.matthewjones372:pelican-test:1.0.0")    // the typed test client
+    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
+    implementation("io.github.matthewjones372:pelican-jetty")         // brings pelican-core and Jetty's server
+    implementation("io.github.matthewjones372:pelican-jackson")       // JacksonCodecs
+    implementation("io.github.matthewjones372:pelican-jetty-docs")    // startWithDocs and Swagger UI
+    testImplementation("io.github.matthewjones372:pelican-test")      // the typed test client
 }
 ```
+
+The recipes are served by Jetty. A service on Pekko HTTP binds the same
+descriptions with Pekko's binders; [On Pekko](#on-pekko) shows the
+difference.
 
 A recipe needing a module beyond these carries its own `dependencies` block.
 Each recipe carries its own imports so it can be pasted whole, and every
@@ -44,10 +44,10 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import io.github.matthewjones372.pelican.jetty.handledNow
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledNow
 
 data class Greeting(val message: String)
 
@@ -73,24 +73,24 @@ fun main() {
 }
 ```
 
-And its test, in full:
+And its test:
 
 ```kotlin
 // build.gradle.kts
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0")
-    // Pekko itself comes from the shared block at the top of this page.
+    testImplementation("io.github.matthewjones372:pelican-test-jetty")
 }
 ```
 
 ```kotlin
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.jetty.Handlers
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 class FirstEndpointTest {
-    private val app = greetings().inMemory("first-endpoint")
+    private val app = greetings().inMemory(Handlers.onVirtualThreads)
 
     @Test
     fun `answers the greeting, by endpoint value`() {
@@ -120,9 +120,9 @@ import io.github.matthewjones372.pelican.default
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.headerParam
+import io.github.matthewjones372.pelican.jetty.handledNow
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.queryParam
 
 val userId = pathParam<Long>("userId")
@@ -187,9 +187,9 @@ import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
+import io.github.matthewjones372.pelican.jetty.handledOrFail
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.pekko.handledOrFail
 
 val noSuchUser = errorJson<ApiError>(404, "No user with that id")
 val badApiKey  = errorJson<ApiError>(401, "Missing or bad API key")
@@ -236,11 +236,11 @@ exists to show the shape that goes wrong.
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jetty.handledOneOf
 import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.of
 import io.github.matthewjones372.pelican.or
 import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.pekko.handledOneOf
 import io.github.matthewjones372.pelican.responseHeader
 
 val orderAt = responseHeader<String>("Location", "Where the placed order lives")
@@ -273,8 +273,8 @@ Declared on the endpoint, set from the handler, published in the document:
 
 ```kotlin
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jetty.handledNow
 import io.github.matthewjones372.pelican.optional
-import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.responseHeader
 
 val location   = responseHeader<String>("Location", "Where the new order lives")
@@ -303,7 +303,7 @@ placeOrder handledNow { req ->
 ```kotlin
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.formBody
-import io.github.matthewjones372.pelican.pekko.handledNow
+import io.github.matthewjones372.pelican.jetty.handledNow
 
 data class SignIn(val user: String, val remember: Boolean, val visits: Int)
 
@@ -333,8 +333,8 @@ import io.github.matthewjones372.pelican.StringCodec
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.filePart
+import io.github.matthewjones372.pelican.jetty.handledNow
 import io.github.matthewjones372.pelican.nonEmpty
-import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.textPart
 
 val caption = textPart("caption", StringCodec.nonEmpty(), description = "What to call it")
@@ -363,7 +363,7 @@ app.call(importOrders, In3("March", manifest, UploadedFile("orders.csv", "text/c
 ## Streaming
 
 The description is backend-agnostic; the *binder* is the backend's own stream
-type, so nothing in core knows what a `Source` is:
+type, so nothing in core knows what a `Sequence` or a `Source` is:
 
 ```kotlin
 import io.github.matthewjones372.pelican.div
@@ -376,15 +376,15 @@ val streamOrders = endpoint(userId, limit) {
 ```
 
 ```kotlin
-// pelican-pekko — Source<T, NotUsed>
-import io.github.matthewjones372.pelican.pekko.streamedNow
-import org.apache.pekko.stream.javadsl.Source
+// pelican-jetty: a Sequence<T>, pulled one element per write
+import io.github.matthewjones372.pelican.jetty.streamedNow
 
-streamOrders streamedNow { (id, max) -> Source.from(Store.orders(id, max)) }
+streamOrders streamedNow { (id, max) -> Store.orders(id, max).asSequence() }
 ```
 
 The stream type is the backend's own: a binder demands it, and the wire format
-— NDJSON, SSE, a chunked JSON array — is rendered by core either way.
+(NDJSON, SSE, a chunked JSON array) is rendered by core either way. On Pekko
+the same binder takes a `Source<T, NotUsed>`.
 
 `sse<T>()` and a chunked JSON array are the other two shapes. Collect them in a
 test with `app.collect(...)`.
@@ -495,8 +495,7 @@ under its own timeout. The body is `application/health+json`: 200 for `pass` or
 ```kotlin
 // build.gradle.kts
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0")
-    // Pekko itself comes from the shared block at the top of this page.
+    testImplementation("io.github.matthewjones372:pelican-test-jetty")
 }
 ```
 
@@ -504,13 +503,14 @@ dependencies {
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.In3
 import io.github.matthewjones372.pelican.In4
-import io.github.matthewjones372.pelican.pekko.start
-import io.github.matthewjones372.pelican.test.pekko.client
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.jetty.Handlers
+import io.github.matthewjones372.pelican.jetty.start
+import io.github.matthewjones372.pelican.test.jetty.client
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 
-val app = ordersApi().inMemory()          // pelican-test-pekko
+val app = ordersApi().inMemory(Handlers.onVirtualThreads)   // pelican-test-jetty
 
 // 1. behaviour — typed in, typed out, no path strings
 val user: User = app.call(getUser, 1L)
@@ -536,12 +536,74 @@ the test working — read the diff and decide whether the break was intended.
 
 ---
 
+## On Pekko
+
+Pekko HTTP is fully supported, at parity with Jetty, and is the choice for a
+team that already runs Pekko or Akka: Pelican can serve on the actor system
+the service already has. The first endpoint's `greet` description does not
+change; the binders, `start` and the dependencies do. This is
+[`example/hello/FirstEndpointOnPekko.kt`](../example/src/main/kotlin/example/hello/FirstEndpointOnPekko.kt),
+run with `./gradlew :example:runFirstEndpointOnPekko`.
+
+Pelican compiles against Pekko and ships none of it, so the build names the
+Pekko it runs. Either Scala cross-build works, `_2.13` or `_3`; pick one and
+use it for every Pekko line. On 1.0.0, which predates `pelican-bom`, give each
+Pelican module the version `1.0.0` instead.
+
+```kotlin
+// build.gradle.kts
+dependencies {
+    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
+    implementation("io.github.matthewjones372:pelican-pekko")        // brings pelican-core; compiles against Pekko
+    implementation("io.github.matthewjones372:pelican-jackson")
+    implementation("io.github.matthewjones372:pelican-pekko-docs")   // startWithDocs and Swagger UI
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
+    testImplementation("io.github.matthewjones372:pelican-test")
+    testImplementation("io.github.matthewjones372:pelican-test-pekko") // inMemory() on Pekko
+}
+```
+
+```kotlin
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.openapi.docs
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.pekko.handledNow
+
+fun greetingsOnPekko() = api(
+    endpoints = listOf(greet handledNow { name -> Greeting("Hello, $name!") }),
+    codecs = JacksonCodecs,
+) {
+    title = "Greetings"
+    version = "1.0.0"
+}
+
+fun main() {
+    val server = greetingsOnPekko().startWithDocs(port = 8080, docs = docs { docsPath = "/api-docs" })
+    println("Listening on ${server.baseUrl}, docs at ${server.baseUrl}/api-docs")
+}
+```
+
+A test reaches it with `greetingsOnPekko().inMemory("greetings")`, from
+`pelican-test-pekko`, which starts an actor system of that name. What else
+differs is the stream type, `Source<T, NotUsed>` where Jetty takes a
+`Sequence<T>`, and the lower-level door: `toRoute(system)` is a Pekko `Route`
+to concatenate with your own, and `start(system, port = 8080)` serves on an
+`ActorSystem` you already run. The reference manual's
+[backend table](reference.md#the-backend) lists every difference, and
+[Versions](reference.md#versions) has the supported Pekko releases.
+
+---
+
 ## Switching backend
 
-Two ship: `pelican-pekko` and `pelican-jetty`. `example/backends` is what the
+Two ship: `pelican-jetty` and `pelican-pekko`. `example/backends` is what the
 seam looks like. The descriptions in `Greetings.kt` name no server library,
-and `OnPekko.kt` and `OnJetty.kt` are the whole of binding them, one with
-Pekko `Source`s and one with `Sequence`s:
+and `OnJetty.kt` and `OnPekko.kt` are the whole of binding them, one with
+`Sequence`s and one with Pekko `Source`s:
 
 ```bash
 ./gradlew :example:runBackends

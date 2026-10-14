@@ -22,12 +22,7 @@ shapes it answers with.
 dependencies {
     implementation("io.github.matthewjones372:pelican-mcp:$pelicanVersion")         // the tools as values
     implementation("io.github.matthewjones372:pelican-mcp-server:$pelicanVersion")  // and spoken
-    implementation("io.github.matthewjones372:pelican-pekko-mcp:$pelicanVersion")   // over HTTP, on your backend
-    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
-    implementation("org.apache.pekko:pekko-actor-typed_2.13")
-    implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
+    implementation("io.github.matthewjones372:pelican-jetty-mcp:$pelicanVersion")   // over HTTP, on your backend
 }
 ```
 
@@ -35,6 +30,8 @@ Core and [`pelican-schema`](schemas.md) for the first, and no MCP SDK for
 either: a tool list is a value, and the protocol is JSON-RPC over lines of
 text. `pelican-mcp` has been on Maven Central since 0.2.0; the two serving
 modules are new since then, and `1.0.0-RC1` carries all three.
+`pelican-jetty-mcp` arrives with the next release; on 1.0.0,
+`pelican-pekko-mcp` serves the same tools on Pekko.
 
 ```kotlin
 val tools = ordersSpec().mcpTools(options)              // descriptions only
@@ -215,11 +212,11 @@ line the client tries to parse as a message.
 **Over HTTP**, on the port the endpoints are already served from:
 
 ```kotlin
-// Pekko
-api.routeWithMcp(system, toolOptions)
+api.start(port = 8080) { handlerWithMcp(options = toolOptions) }   // pelican-jetty-mcp
 ```
 
-`pelican-pekko-mcp`, like the http4k and Ktor mountings that were taken off
+`pelican-jetty-mcp`, like `pelican-pekko-mcp` on Pekko (`routeWithMcp`) and
+the http4k and Ktor mountings that were taken off
 `main` for 1.0 (in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)), is the same
 split the `-docs` modules make, for the same reason: a service that serves

@@ -77,6 +77,13 @@ one.
   was at runtime. A build that imports `com.fasterxml.jackson.core` and only
   had it through `pelican-core` declares it itself. Anyone using
   `pelican-jackson` already has it.
+- **The docs lead with Jetty.** The README, the cookbook and the other guides
+  install and serve with `pelican-jetty`, test with `pelican-test-jetty` and
+  call out with `JettyHttpTransport`, and so do the README's two compiled
+  examples. Pekko stays fully supported: the cookbook's
+  [On Pekko](docs/cookbook.md#on-pekko) recipe, compiled as
+  `FirstEndpointOnPekko.kt`, is the first endpoint served on it, and the
+  reference keeps every Pekko section.
 
 ## [1.0.0] — 2026-10-14
 

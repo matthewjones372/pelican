@@ -6,17 +6,17 @@ depends on — the list to read when deciding which ones a build actually needs.
 Thirty-one library modules, a BOM and a Gradle plugin; a typical build takes four or
 five. The layering is enforced by tests rather than convention.
 
-1.0 shipped one server backend and one JSON library.
-`main` has since added a second server, Jetty, with its own docs, MCP, test,
-streams and client modules, and brought back a second JSON library,
-`pelican-kotlinx`. A service picks Pekko or Jetty; the descriptions do not
-change. The http4k and Ktor backends, the OkHttp and Ktor client transports
-(`pelican-client-okhttp`, `pelican-client-ktor`) and
-`pelican-jsoniter` were complete and passing before 1.0,
-and were taken off `main` to keep 1.0 small. They are in the history at commit
+1.0 shipped one server backend and one JSON library. `main` has since added a
+second server, Jetty, with its own docs, MCP, test, streams and client modules,
+and brought back a second JSON library, `pelican-kotlinx`. A service picks
+Jetty, or Pekko when it already runs Pekko; the descriptions do not change. The
+http4k and Ktor backends, the OkHttp and Ktor client transports
+(`pelican-client-okhttp`, `pelican-client-ktor`) and `pelican-jsoniter` were
+complete and passing before 1.0, and were taken off `main` to keep 1.0 small.
+They are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e),
-the last commit before they were removed, and are meant to come back after
-1.0. The table below is what `main` has today.
+the last commit before they were removed, and are meant to come back after 1.0.
+The table below is what `main` has today.
 
 | Module | Depends on | Contains |
 |---|---|---|
@@ -24,12 +24,12 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-jackson` | core + Jackson | your `Codecs` |
 | `pelican-kotlinx` | core + kotlinx.serialization | your `Codecs`, for `@Serializable` payloads |
 | `pelican-arrow` | core + arrow-core | Arrow's `Either` into Pelican's `Outcome` and back |
-| `pelican-pekko` | core, Pekko HTTP *provided* | descriptions → that server's routes |
-| `pelican-pekko-docs` | pekko, openapi | serves the document and a page — Swagger UI or Redoc |
-| `pelican-pekko-mcp` | pekko, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
 | `pelican-jetty` | core + jetty-server | descriptions → a Jetty 12 core `Handler`, and `start` to serve it. No Pekko, no Scala, no servlet API |
-| `pelican-jetty-docs` | jetty, openapi | the same document and page as `pelican-pekko-docs`, as a Jetty `Handler` |
-| `pelican-jetty-mcp` | jetty, mcp-server | the same tools as `pelican-pekko-mcp`, on `/mcp`, as a Jetty `Handler` |
+| `pelican-jetty-docs` | jetty, openapi | serves the document and a page (Swagger UI or Redoc), as a Jetty `Handler` |
+| `pelican-jetty-mcp` | jetty, mcp-server | serves the tools over Streamable HTTP, on `/mcp`, as a Jetty `Handler` |
+| `pelican-pekko` | core, Pekko HTTP *provided* | descriptions → Pekko HTTP routes, for a service that already runs Pekko |
+| `pelican-pekko-docs` | pekko, openapi | the same document and page as `pelican-jetty-docs`, as a Pekko route |
+| `pelican-pekko-mcp` | pekko, mcp-server | the same tools as `pelican-jetty-mcp`, on `/mcp`, as a Pekko route |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
 | `pelican-health` | core *only* | live and ready probes in `application/health+json`, and checks that need only the JDK |
@@ -43,15 +43,15 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-codegen` | core | descriptions → a Kotlin client, as source |
 | `pelican-client-jetty` | core + jetty-client | where a generated client's requests go, over Jetty's `HttpClient`, the release `pelican-jetty` serves with. No server |
 | `pelican-client-pekko` | core, pekko-http *provided* | where a generated client's requests go, over Pekko HTTP's client |
-| `pelican-streams` | pekko, Pekko and lark *both provided* | one function: a streaming body as a lark `Stream`, whose failure is a value |
-| `pelican-streams-jetty` | jetty, lark-stream *provided* | the same on Jetty, over lark's `Stream.blocking`: a run's `stop()` wakes a blocked read and closes the upload. Runs on any lark backend, `lark-stream-forks` for one with no Pekko |
+| `pelican-streams-jetty` | jetty, lark-stream *provided* | a streaming body as a lark `Stream`, whose failure is a value, over lark's `Stream.blocking`: a run's `stop()` wakes a blocked read and closes the upload. Runs on any lark backend, `lark-stream-forks` for one with no Pekko |
+| `pelican-streams` | pekko, Pekko and lark *both provided* | the same on Pekko |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
 | `pelican-bom` | **nothing** | a platform pinning every module above to one version: `implementation(platform("io.github.matthewjones372:pelican-bom:$version"))`. Not the Gradle plugin, which `plugins { }` versions |
 | `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-golden` | test + openapi | per-endpoint goldens; fails on a breaking change |
-| `pelican-test-pekko` | test + pekko | the typed test client's in-memory transport |
-| `pelican-test-jetty` | test + jetty | the same on Jetty, through a `LocalConnector`: no socket, but Jetty's own HTTP parsing |
+| `pelican-test-jetty` | test + jetty | the typed test client's in-memory transport, through a `LocalConnector`: no socket, but Jetty's own HTTP parsing |
+| `pelican-test-pekko` | test + pekko | the same on Pekko |
 | `pelican-test-wiremock` | test + WireMock | WireMock stubbed and verified in endpoint values, and stub files exported from them |
 
 Every one of those dependency claims is a test, except `pelican-oidc`'s, which

@@ -32,13 +32,9 @@ document from the same function; see
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0")
-    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
-    implementation("org.apache.pekko:pekko-actor-typed_2.13")
-    implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
+    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
+    implementation("io.github.matthewjones372:pelican-jackson")
+    implementation("io.github.matthewjones372:pelican-client-jetty")
 }
 ```
 
@@ -132,36 +128,37 @@ fun interface ClientTransport {
 }
 ```
 
-`pelican-client-pekko` is the shipped adapter, over Pekko HTTP's client: add
-the module and a client finds it through `ServiceLoader`, with no line to
-write.
+`pelican-client-jetty` is the adapter to start with, over Jetty's
+`HttpClient`: add the module and a client finds it through `ServiceLoader`,
+with no line to write.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0")
-    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
-    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
-    implementation("org.apache.pekko:pekko-actor-typed_2.13")
-    implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
+    implementation("io.github.matthewjones372:pelican-client-jetty:$pelicanVersion")
 }
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
 ```
 
-A service already running Pekko hands over the `ActorSystem` it already has, so
-the calls go out on its dispatchers and under its configuration; a caller that
-does not run Pekko passes nothing and the adapter keeps a daemonic system of
-its own:
+A service already running a Jetty `HttpClient` hands it over, so the calls go
+out on its threads and under its configuration; a caller that passes nothing
+gets a client of its own, on daemon threads, started on the first request:
 
 ```kotlin
-val client = OrdersClient("https://orders.internal", JacksonCodecs, PekkoHttpTransport(system))
+val client = OrdersClient("https://orders.internal", JacksonCodecs, JettyHttpTransport(httpClient))
 ```
 
-`pelican-client-jetty` is the other transport that ships, over Jetty's
-`HttpClient`. The OkHttp adapter (`pelican-client-okhttp`), the one that runs
-on Android, and the Ktor one (`pelican-client-ktor`) were written and passing before 1.0, and were taken
-off `main` to keep 1.0 small. They are in the history at commit
+A borrowed client keeps its owner's protocol handlers, which matters for an
+endpoint that declares a 401; [On Jetty](reference.md#on-jetty-1) has the one
+line that fixes it.
+
+`pelican-client-pekko` is the other transport that ships, over Pekko HTTP's
+client, for a service that already runs Pekko: `PekkoHttpTransport(system)`
+sends on the `ActorSystem` it has. See [On Pekko
+HTTP](reference.md#on-pekko-http). The OkHttp adapter
+(`pelican-client-okhttp`), the one that runs on Android, and the Ktor one
+(`pelican-client-ktor`) were written and passing before 1.0, and were taken off
+`main` to keep 1.0 small. They are in the history at commit
 [`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
 and are meant to come back after 1.0.
 
@@ -216,6 +213,7 @@ What that bounds is the transport's answer:
 
 | Transport | What the deadline bounds | Where it comes from |
 |---|---|---|
+| `pelican-client-jetty` | the response head; the body streams on after it | the adapter, on the stage: Jetty's own `Request.timeout` covers the whole exchange |
 | `pelican-client-pekko` | the response head; the body streams on after it | the adapter, on the stage: Pekko's own timeouts are pool settings |
 | `InMemoryClientTransport` | nothing; there is no clock in a function call | — |
 
@@ -250,9 +248,9 @@ Two things a backend owns cannot cross, and both are refused by name rather
 than by `ClassCastException`. A `bytes(...)` request body: the handle a handler
 reads it through is that backend's own type, and core has no value to hand
 over. And a streamed response a handler produced as something other than a
-`Sequence` — Pekko's `Source` — which core cannot read without depending on
-that library. A backend whose binder streams as a `Sequence` crosses whole; on
-Pekko, those calls belong against a bound server.
+`Sequence`, such as Pekko's `Source`, which core cannot read without depending
+on that library. Jetty's binders stream as a `Sequence`, so those cross whole;
+on Pekko, those calls belong against a bound server.
 
 ## Blocking or suspending
 

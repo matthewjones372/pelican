@@ -203,6 +203,20 @@ class DoesNotCompileTest {
     }
 
     @Test
+    fun `a stream of the wrong element names the element the output declared, on Jetty`() {
+        val onJetty = typed.replace(
+            "import io.github.matthewjones372.pelican.pekko.*\nimport org.apache.pekko.stream.javadsl.Source",
+            "import io.github.matthewjones372.pelican.jetty.*",
+        )
+        val errors = compile("$onJetty\nval bound = watchOrders streamedNow { (_, max) -> sequenceOf(\"not a tick\") }")
+
+        withClue(errors.joinToString("\n")) {
+            errors.joinToString("\n") shouldContain
+                "Return type mismatch: expected 'Sequence<Tick>', actual 'Sequence<String>'."
+        }
+    }
+
+    @Test
     fun `a value where the endpoint declared a stream names StreamOf`() {
         val errors = compile("$typed\nval bound = streamOrders handledNow { _ -> User(1) }")
 
