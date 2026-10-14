@@ -5,10 +5,9 @@ package example.health
  *
  *     dependencies {
  *         // JacksonCodecs, which writes the health+json body
- *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
- *         // health { }, the probes and the built-in checks. On `main` only:
- *         // not yet on Maven Central, so build it from source until the next release
- *         // implementation("io.github.matthewjones372:pelican-health:<next release>")
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
+ *         // health { }, the probes and the built-in checks
+ *         implementation("io.github.matthewjones372:pelican-health:1.0.0")
  *     }
  */
 

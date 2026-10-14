@@ -27,7 +27,7 @@ dependencies {
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
-    implementation("org.apache.pekko:pekko-http_2.13:1.4.0")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
 }
 ```
 

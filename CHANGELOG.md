@@ -29,7 +29,7 @@ A version is cut by tagging — `git tag v1.0.0 && git push --tags`. The build
 reads the nearest `v` tag, so an untagged commit is a `-SNAPSHOT` of the next
 one.
 
-## [1.0.0] — Unreleased
+## [1.0.0] — 2026-10-14
 
 **`1.0.0-RC1` is the first candidate cut from this section.** The surface below
 is what it ships, and the stability promise above takes effect at `1.0.0`
@@ -49,6 +49,22 @@ is what the paragraph above promises.
 `pelican-test-wiremock` landed, so the one thing between the two candidates is
 that module. Nothing left the dumps: every line RC2's `.api` files carried is
 still there, and the only new ones are the module's own.
+
+**`1.0.0` is cut 2026-10-14, 134 commits after RC3, with no candidate
+between.** Candidates became snapshots after RC3, so what was tried in between
+was tried from Central's snapshot repository. Everything on `main` ships:
+`pelican-oidc` and callers in core, the three health modules, tagged failures
+under one status, the Redoc reference, synchronous handlers on virtual
+threads, pages beside an API, `toOutcome { }`, `stubFile`, `traced`,
+`RetryScheduler`, `TestCallers` and `errorMedia`. The library modules are
+compiled for Java 25, where RC3 was compiled for Java 21. The Gradle plugin is
+still compiled for Java 21.
+
+Ten lines left the dumps after RC3: the RC3 constructors of `ErrorSpec`
+and `ErrorOutput`, and the `start`, `startWithDocs`, `toRoute` and
+`routeWithDocs` overloads from before `handlers`. Each stays in the bytecode,
+hidden, so a caller compiled against RC3 still links. The stability promise
+above applies from this version.
 
 ### Removed — read this one first
 

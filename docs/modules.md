@@ -25,10 +25,10 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-pekko-mcp` | pekko, mcp-server | serves the tools over Streamable HTTP, on `/mcp` |
 | `pelican-metrics` | core + micrometer-core | one filter; meters tagged from the descriptions |
 | `pelican-metrics-otel` | core + opentelemetry-api | one filter; spans and a duration histogram, from the descriptions |
-| `pelican-health` | core *only* | live and ready probes in `application/health+json`, and checks that need only the JDK. On `main` only |
-| `pelican-health-kafka` | health; kafka-clients *provided* | `kafka(admin)`, over the service's own Kafka client. On `main` only |
-| `pelican-health-redis` | health; lettuce-core *provided* | `redis(connection)`, over the service's own Lettuce connection. On `main` only |
-| `pelican-oidc` | core + nimbus-jose-jwt | verifies an OpenID Connect provider's tokens and says who is calling. On `main` only; not in 1.0.0-RC3 |
+| `pelican-health` | core *only* | live and ready probes in `application/health+json`, and checks that need only the JDK |
+| `pelican-health-kafka` | health; kafka-clients *provided* | `kafka(admin)`, over the service's own Kafka client |
+| `pelican-health-redis` | health; lettuce-core *provided* | `redis(connection)`, over the service's own Lettuce connection |
+| `pelican-oidc` | core + nimbus-jose-jwt | verifies an OpenID Connect provider's tokens and says who is calling |
 | `pelican-openapi` | core | descriptions → OpenAPI 3.1.0 or 3.2.0 |
 | `pelican-schema` | core | one type → a JSON Schema 2020-12 document that resolves on its own |
 | `pelican-mcp` | core + schema | descriptions → MCP tool descriptions, and a dispatch that runs them. Values only, so deriving a tool list needs no server |

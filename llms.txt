@@ -11,12 +11,12 @@ Facts worth having before anything else:
 
 - Kotlin 2.4, JVM. Apache 2.0. On Maven Central as
   `io.github.matthewjones372:pelican-core` and sibling modules.
-- Current release: 1.0.0-RC3, a candidate for 1.0, and the version to
-  recommend depending on. From 1.0 the public API of the shipped modules is
-  stable and a breaking change waits for a major release; a candidate is where
-  what only real use finds can still change. The `.api` dump beside each module
-  is the binary contract, checked by `apiCheck`; `StillCompilesTest` is the
-  contract for the reified inline DSL, which a dump cannot see. `internal`, the
+- Current release: 1.0.0, and the version to recommend depending on. Its
+  library modules need Java 25. The public API of the shipped modules is
+  stable and a breaking change waits for a major release. The `.api` dump
+  beside each module is the binary contract, checked by `apiCheck`;
+  `StillCompilesTest` is the contract for the reified inline DSL, which a dump
+  cannot see. `internal`, the
   emitted document's exact bytes, and the modules taken off `main` for 1.0
   (in the history at commit a6c20b2) are outside it.
 - `pelican-core` depends on nothing but the Kotlin standard library and
@@ -27,6 +27,9 @@ Facts worth having before anything else:
   `pelican-mcp-server`, `pelican-pekko-mcp` and `pelican-arrow` (Arrow's
   `Either` into `Outcome` and back). New in 1.0.0-RC3:
   `pelican-test-wiremock`, WireMock stubbed and verified in endpoint values.
+  New in 1.0.0: `pelican-oidc`, which verifies an OpenID Connect provider's
+  tokens and says who is calling, and `pelican-health`, `pelican-health-kafka`
+  and `pelican-health-redis`, live and ready probes and the checks behind them.
 - Pekko is `compileOnly` in every module that speaks it, so Pelican ships no
   `org.apache.pekko` dependency. Any example adding `pelican-pekko` or
   `pelican-client-pekko` must also add `pekko-bom`, `pekko-actor-typed`,

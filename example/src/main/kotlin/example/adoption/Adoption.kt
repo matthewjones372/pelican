@@ -5,9 +5,9 @@ package example.adoption
  *
  *     dependencies {
  *         // the interpreter; brings pelican-core, and compiles against Pekko
- *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0-RC3")
+ *         implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
- *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0-RC3")
+ *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
  *     }
  */
 

@@ -3,12 +3,12 @@
 Linked from the [README](../README.md). The page for deciding *against* Pelican
 quickly, and for a reason that is actually true.
 
-Pelican's current release is 1.0.0-RC3, the candidate for 1.0. The
-README explains what it does and the reference manual explains how, but
-neither answers the question a reader arrives with, which is whether the thing
-they already have is worse. Usually it is not. This page is the honest version
-of that comparison: for each neighbour, what it does better than Pelican does,
-and which projects should take it instead.
+Pelican's current release is 1.0.0. The README explains what it does and the
+reference manual explains how, but neither answers the question a reader
+arrives with, which is whether the thing they already have is worse. Usually it
+is not. This page is the honest version of that comparison: for each
+neighbour, what it does better than Pelican does, and which projects should
+take it instead.
 
 Every claim about another project below was checked against that project's own
 current documentation in August 2026, and the version checked is named, because
