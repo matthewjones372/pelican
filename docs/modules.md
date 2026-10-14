@@ -39,6 +39,7 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-client-jetty` | core + jetty-client | where a generated client's requests go, over Jetty's `HttpClient`, the release `pelican-jetty` serves with. No server |
 | `pelican-client-pekko` | core, pekko-http *provided* | where a generated client's requests go, over Pekko HTTP's client |
 | `pelican-streams` | pekko, Pekko and lark *both provided* | one function: a streaming body as a lark `Stream`, whose failure is a value |
+| `pelican-streams-jetty` | jetty, lark-stream *provided* | the same on Jetty, over lark's `Stream.blocking`: a run's `stop()` wakes a blocked read and closes the upload. Runs on any lark backend, `lark-stream-forks` for one with no Pekko |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
 | `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
@@ -89,6 +90,8 @@ rests on its build file for now:
   reason above; lark for the same reason at one remove, since `lark-stream-pekko`
   pins `_2.13` as an `api` dependency of its own and shipping it would put that
   suffix back on a consumer's classpath through this module.
+- `pelican-streams-jetty` asserts it ships Jetty and Pelican and no lark or
+  Pekko: the consumer names `lark-stream` and the backend it runs on.
 - `pelican-test` asserts it drags in no server library and no matcher library.
 - `pelican-test-wiremock` asserts it is core, `pelican-test` and WireMock: no
   server library, and no JUnit, which it compiles against and does not ship. It

@@ -39,6 +39,7 @@ include(
     "pelican-client-jetty",
     "pelican-client-pekko",
     "pelican-streams",
+    "pelican-streams-jetty",
     "pelican-test",
     "pelican-test-golden",
     "pelican-test-pekko",
