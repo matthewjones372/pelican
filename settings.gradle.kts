@@ -40,6 +40,7 @@ group(
     "pelican-mcp", "pelican-mcp-server",
 )
 group("tooling", "pelican-codegen", "pelican-import")
+group("bom", "pelican-bom")
 
 include(
     "example",

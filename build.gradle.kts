@@ -74,9 +74,10 @@ repositories { mavenCentral() }
 
 spotless {
     kotlinGradle {
-        // settings.gradle.kts and this file. Each subproject formats its own
-        // build script in the `subprojects` block below.
-        target("*.gradle.kts")
+        // settings.gradle.kts, this file and the BOM's, which applies no
+        // Spotless of its own. Each other subproject formats its own build
+        // script in the `subprojects` block below.
+        target("*.gradle.kts", "bom/*/build.gradle.kts")
         ktlint(ktlintVersion).editorConfigOverride(ktlintOverrides)
     }
 }
@@ -114,6 +115,7 @@ val moduleDescriptions = mapOf(
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",
     "pelican-test-jetty" to "The in-memory transport for pelican-test, on Jetty.",
     "pelican-test-wiremock" to "WireMock stubbed and verified in endpoint values, and stub files exported from them.",
+    "pelican-bom" to "Every Pelican module at one version, so a build names the version once.",
 )
 
 // Coverage, aggregated across the modules rather than per-module: a line in
@@ -131,8 +133,8 @@ val moduleDescriptions = mapOf(
 // actually sits at, so a release that legitimately adds a hard-to-reach branch
 // does not have to move this line in the same commit.
 apiValidation {
-    // Neither is published, so neither has a surface to keep.
-    ignoredProjects += listOf("example", "benchmarks")
+    // The first two are not published, and the BOM has no classes.
+    ignoredProjects += listOf("example", "benchmarks", "pelican-bom")
 }
 
 kover {
@@ -169,7 +171,7 @@ dependencies {
     // that no test covers and pull the total down — a coverage floor that
     // falls because a benchmark was written is measuring the wrong thing.
     // See benchmarks/build.gradle.kts for why the agent stays off it entirely.
-    subprojects.filter { it.name != "benchmarks" }.forEach { kover(project(it.path)) }
+    subprojects.filter { it.name !in setOf("benchmarks", "pelican-bom") }.forEach { kover(project(it.path)) }
 }
 
 // A floor nobody runs is not a floor: `./gradlew build` checks it.
@@ -188,14 +190,22 @@ tasks.named("check") {
  */
 val publishedModules = subprojects.map { it.name } - setOf("example", "benchmarks")
 
+// What `pelican-bom` constrains, so a new module is in it without an edit there.
+extra["libraryModules"] = publishedModules - "pelican-bom"
+
 subprojects {
-    apply(plugin = "org.jetbrains.kotlin.jvm")
     repositories { mavenCentral() }
 
     // The namespace verified on the Central Portal, against the GitHub
     // account it names.
     group = "io.github.matthewjones372"
     version = scmVer
+
+    if (name in publishedModules) publishWithPom()
+    // A `java-platform` has no sources, so none of what follows applies to it.
+    if (name == "pelican-bom") return@subprojects
+
+    apply(plugin = "org.jetbrains.kotlin.jvm")
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
         // 25: the first LTS where a virtual thread blocked in `synchronized` no longer pins its carrier, which every
@@ -310,7 +320,6 @@ subprojects {
     }
 
     if (name in publishedModules) {
-        apply(plugin = "com.vanniktech.maven.publish")
         apply(plugin = "org.jetbrains.dokka")
 
         // The worker classpath named at the top of this file: the one GitHub's
@@ -341,40 +350,46 @@ subprojects {
                     sourcesJar = true,
                 ),
             )
+        }
+    }
+}
 
-            pom {
-                name.set(this@subprojects.name)
-                description.set(moduleDescriptions[this@subprojects.name] ?: "Part of Pelican.")
-                url.set("https://github.com/matthewjones372/pelican")
-                licenses {
-                    license {
-                        name.set("The Apache License, Version 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                    }
-                }
-                developers {
-                    developer {
-                        id.set("matthewjones372")
-                        name.set("Matt Jones")
-                    }
-                }
-                scm {
-                    url.set("https://github.com/matthewjones372/pelican")
-                    connection.set("scm:git:https://github.com/matthewjones372/pelican.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/matthewjones372/pelican.git")
+/** POM metadata and the local inspection repository, shared by the libraries and the BOM. */
+fun Project.publishWithPom() {
+    apply(plugin = "com.vanniktech.maven.publish")
+    extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
+        pom {
+            name.set(this@publishWithPom.name)
+            description.set(moduleDescriptions[this@publishWithPom.name] ?: "Part of Pelican.")
+            url.set("https://github.com/matthewjones372/pelican")
+            licenses {
+                license {
+                    name.set("The Apache License, Version 2.0")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
                 }
             }
-        }
-
-        extensions.configure<PublishingExtension> {
-            repositories {
-                // `./gradlew publishToMavenLocal` for a local try-out, and
-                // `publishAllPublicationsToLocalRepository` for something to
-                // inspect without installing it.
-                maven {
-                    name = "local"
-                    url = rootProject.layout.buildDirectory.dir("repo").get().asFile.toURI()
+            developers {
+                developer {
+                    id.set("matthewjones372")
+                    name.set("Matt Jones")
                 }
+            }
+            scm {
+                url.set("https://github.com/matthewjones372/pelican")
+                connection.set("scm:git:https://github.com/matthewjones372/pelican.git")
+                developerConnection.set("scm:git:ssh://git@github.com/matthewjones372/pelican.git")
+            }
+        }
+    }
+
+    extensions.configure<PublishingExtension> {
+        repositories {
+            // `./gradlew publishToMavenLocal` for a local try-out, and
+            // `publishAllPublicationsToLocalRepository` for something to
+            // inspect without installing it.
+            maven {
+                name = "local"
+                url = rootProject.layout.buildDirectory.dir("repo").get().asFile.toURI()
             }
         }
     }

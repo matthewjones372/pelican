@@ -149,6 +149,20 @@ dependencies {
 }
 ```
 
+After 1.0.0, `pelican-bom` lines every module up at one version, so a build
+names it once and leaves the modules without one:
+
+```kotlin
+dependencies {
+    implementation(platform("io.github.matthewjones372:pelican-bom:$version"))
+    implementation("io.github.matthewjones372:pelican-pekko")
+    implementation("io.github.matthewjones372:pelican-jackson")
+    implementation("io.github.matthewjones372:pelican-pekko-docs")
+    testImplementation("io.github.matthewjones372:pelican-test")
+    testImplementation("io.github.matthewjones372:pelican-test-pekko")
+}
+```
+
 Those modules are the standard stack. The examples on this page use them,
 except where a section names another module. [Modules](#modules) below lists
 every module, and [docs/modules.md](docs/modules.md) says what each depends on.

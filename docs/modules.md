@@ -3,7 +3,7 @@
 Linked from the [README](../README.md). What each module is for, and what it
 depends on — the list to read when deciding which ones a build actually needs.
 
-Thirty-one library modules and a Gradle plugin; a typical build takes four or
+Thirty-one library modules, a BOM and a Gradle plugin; a typical build takes four or
 five. The layering is enforced by tests rather than convention.
 
 1.0 shipped one server backend and one JSON library.
@@ -46,6 +46,7 @@ the last commit before they were removed, and are meant to come back after
 | `pelican-streams` | pekko, Pekko and lark *both provided* | one function: a streaming body as a lark `Stream`, whose failure is a value |
 | `pelican-streams-jetty` | jetty, lark-stream *provided* | the same on Jetty, over lark's `Stream.blocking`: a run's `stop()` wakes a blocked read and closes the upload. Runs on any lark backend, `lark-stream-forks` for one with no Pekko |
 | `pelican-import` | codegen + snakeyaml-engine | an OpenAPI document → descriptions, as source |
+| `pelican-bom` | **nothing** | a platform pinning every module above to one version: `implementation(platform("io.github.matthewjones372:pelican-bom:$version"))`. Not the Gradle plugin, which `plugins { }` versions |
 | `pelican-gradle-plugin` | **nothing** | `io.github.matthewjones372.pelican`: every generator, as Gradle tasks |
 | `pelican-test` | **core** | descriptions → a typed client for tests, on any backend |
 | `pelican-test-golden` | test + openapi | per-endpoint goldens; fails on a breaking change |
