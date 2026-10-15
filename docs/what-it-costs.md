@@ -26,8 +26,6 @@ runs.
 - [Routing as the number of endpoints grows](#routing-as-the-number-of-endpoints-grows)
 - [Decoding a body: Jackson and kotlinx](#decoding-a-body-jackson-and-kotlinx)
 - [Streaming and framing](#streaming-and-framing)
-- [Historical: http4k, before it left `main`](#historical-http4k-before-it-left-main)
-- [What the old harness got wrong](#what-the-old-harness-got-wrong)
 - [Reproducing these numbers](#reproducing-these-numbers)
 
 ## The short answer
@@ -100,8 +98,11 @@ section says otherwise, every benchmark uses the same settings, declared on
 the class:
 
 - **Three forks**, each a fresh JVM. A JIT decision can go one of two ways per
-  process, and only separate JVMs show it. One historical row below is bimodal
-  for exactly this reason.
+  process, and only separate JVMs show it: a benchmark can settle at one speed
+  in one fork and a markedly different one in another, each flat across its
+  iterations. A single-JVM timing loop cannot see that, and one that times two
+  handlers in the same JVM, off the same warmed profile, can report a
+  difference of zero that separate forks do not reproduce.
 - **Five one-second warmup iterations and five one-second measured
   iterations** per fork, so fifteen measured iterations in all.
 - **Errors are JMH's 99.9% confidence interval** over those fifteen
@@ -134,16 +135,15 @@ complement.
 Two machines appear on this page, and their numbers are never compared with
 each other.
 
-- **The cloud instance**, which took every current table: the Pekko, Jetty,
-  decode and socket measurements, in October 2026. An Intel Xeon at 2.80GHz,
+- **The cloud instance**, which took the Pekko, Jetty, decode and socket
+  measurements, in October 2026. An Intel Xeon at 2.80GHz,
   4 cores (one thread each), 16GB, Ubuntu 24.04.5 LTS, Linux 6.18.44 in a
   Firecracker microVM. The benchmarks ran on JDK 25.0.4.1, the toolchain
   `benchmarks/build.gradle.kts` names; Gradle itself ran on OpenJDK 21.0.12.
   Pekko 1.7.1, Pekko HTTP 1.4.1, Jetty 12.1.13.
 - **An Apple M3** (four performance and four efficiency cores), 24GB, macOS
-  26.5.2, on Temurin 21.0.9+10, which took the older tables: the routing scale,
-  and everything involving http4k. These were taken in August 2026 against the
-  interpreter as it was then, and have not been retaken.
+  26.5.2, on Temurin 21.0.9+10, which took the routing-scale table in August
+  2026. It has not been retaken.
 
 ### A quiet machine matters
 
@@ -405,12 +405,12 @@ Apple M3, in August 2026.
 | 50 | **701 ± 122ns** |
 | 200 | **645 ± 28ns** |
 
-**What it shows.** The cost does not grow with the number of endpoints. Before
-Pekko's interpreter moved onto the index, it registered one route per endpoint
-and let `Directives.concat` scan them, and the same benchmark measured about
-150µs a request at 200 endpoints. The [historical http4k
-table](#routing-on-http4k) shows the same contrast with a hand-written control
-that was comparable.
+**What it shows.** The cost does not grow with the number of endpoints. For
+contrast, when Pekko's interpreter registered one route per endpoint and let
+`Directives.concat` scan them, the same benchmark measured about 150µs a
+request at 200 endpoints. That figure is from the same machine but an older
+build, and there is no comparable hand-written control on this page, so read
+it as the reason the index exists rather than as a measured comparison.
 
 **Limitations.**
 
@@ -488,117 +488,6 @@ Both run with `./gradlew :benchmarks:jmh -PbenchmarkArgs="StreamingOverhead"`
 and `-PbenchmarkArgs="Framing"`. The specs do not record the machine they were
 taken on in the detail this page does, so treat them as earlier findings to be
 retested rather than current results.
-
-## Historical: http4k, before it left `main`
-
-These tables measure `pelican-http4k`, which was taken off `main` before 1.0.0
-together with its benchmark. The module and
-[its benchmark](https://github.com/matthewjones372/pelican/blob/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/benchmarks/src/main/kotlin/io/github/matthewjones372/pelican/benchmarks/Http4kOverheadBenchmark.kt)
-are in the history at commit
-[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e).
-**They cannot be rerun from the current branch**: reproducing them means
-checking out `a6c20b2` and running `:benchmarks:jmh` there. All of them were
-taken on the Apple M3, in August 2026.
-
-They are kept because they were measured, and because two of them make points
-about the interpreter rather than about one server: a fair baseline matters,
-and an index beats a scan. They have not been retested against the current
-interpreter.
-
-### One endpoint on http4k
-
-`GET /items/{itemId}?limit=`, answering JSON.
-
-| | per request | allocated |
-|---|---|---|
-| **Pelican, interpreted onto http4k** | **1215 ± 23ns** | **5643 ± 29B** |
-| http4k written the ordinary way | 1581 ± 365ns | 5725 ± 86B |
-| http4k with the response hand-tuned | 1140 ± 38ns | 5384 ± 25B |
-
-There are two baselines because one would flatter Pelican. An http4k
-`Response` is immutable, so the idiomatic `Response(status).header(...).body(...)`
-copies it at each step: three responses and two header lists where one of each
-will do. That chain is worth 341 bytes a request, and building the response in
-one construction is a trick anyone can use, so the hand-tuned row is the fair
-comparison. Against it the interpreter cost **75ns and 259 bytes**, clear of
-both errors. Against the idiomatic route it was ahead by 366ns and 82 bytes,
-which is a statement about the copies rather than about Pelican.
-
-The wide error on the middle row is the harness doing its job. That benchmark
-was bimodal at the fork level: one JVM settled at 2040ns and two at 1350ns,
-each flat to within one per cent across five iterations. It is a JIT decision
-that goes one of two ways per process, which a single-JVM loop cannot see and
-forks exist to expose. Read the row as "1350 or 2040, depending on the JVM",
-not as a number with a wobble.
-
-### An endpoint with nothing to decode
-
-`GET /ping`, answering text.
-
-| | per request | allocated |
-|---|---|---|
-| **Pelican** | **392 ± 59ns** | **2232B** |
-| http4k | 359 ± 26ns | 2069 ± 17B |
-
-Pelican allocated 163 bytes more, which is clear: the interpreter still matches
-the description and chooses the output shape when there is nothing to decode.
-The 33ns time difference is inside the two errors, so it is not resolved.
-
-### Routing on http4k
-
-From the same `RoutingScaleBenchmark`, with http4k columns, before the module
-was removed.
-
-| endpoints | **Pelican on http4k** | http4k routes, by hand |
-|---|---|---|
-| 1 | **220 ± 28ns** | 1725 ± 667ns |
-| 50 | **226 ± 21ns** | 37,920 ± 1095ns |
-| 200 | **223 ± 9ns** | 149,170 ± 7720ns |
-
-Unlike Pekko's, this hand-written control was comparable: the same routes
-registered with http4k's `routes(...)`, called the same way. Pelican's column is
-flat and the hand-written one grows with the endpoint count; at 200 endpoints
-the hand-written route is 669 times Pelican's figure. At one endpoint Pelican
-was ahead too, 220ns against 1725ns: matching one template through http4k's
-router cost more than walking a trie with one entry in it.
-
-Before Pelican took over dispatch on http4k, its routes measured the same as
-the hand-written ones, because both were the same ordered scan. An earlier
-attempt grouped the routes under a prefix using http4k's own nesting and
-measured 155µs at 200 endpoints: an outer scan is still a scan. Only owning the
-dispatch moved the number. The Ktor interpreter, also at `a6c20b2`, dispatched
-through the same index and was never measured.
-
-## What the old harness got wrong
-
-Before JMH, these numbers came from a JUnit test that looped and timed in one
-JVM. It had no warmup control, no forks, nothing stopping the JIT deleting
-work whose result went unused, and it measured allocation by differencing a
-per-thread counter. Most of what it reported survived the move to JMH. Two
-claims did not, and they are worth naming because they are the failure modes
-that kind of harness has.
-
-**"Free on an endpoint with no inputs"** did not survive. The old harness
-reported 0ns for the ping case. Measured in its own forked JVMs, Pelican
-allocated 163 bytes more, and its time was 33ns higher but within the error.
-A figure of zero only appears when two handlers are timed in the same JVM off
-the same warmed profile.
-
-**"0 to 35ns behind http4k written the ordinary way"** did not survive either,
-and not in the expected direction: the interpreted route was 366ns *ahead* of
-the idiomatic one. The old figure came from timing both handlers in one
-process, where the JIT had seen every call site and neither shape got the
-compilation it would have had on its own.
-
-The allocation figures barely moved: 5643 and 5725 bytes for that pair under
-JMH, against 5808 and 5672 from the old harness. Differencing a counter was the
-one thing it did honestly, and even that counted only the calling thread. On
-Pekko, where the numbers are now whole-JVM, they are larger and closer to the
-truth.
-
-Measuring through the coverage agent was the other early mistake, and it is
-why the benchmarks are no longer tests at all; see
-[the harness](#the-harness).
 
 ## Reproducing these numbers
 

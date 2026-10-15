@@ -5,7 +5,7 @@
 > a generated Kotlin client for callers are all derived from that one value.
 > There is no second source of truth, because there is no second description.
 > Pelican is a library rather than a framework: it does not own `main`, and it
-> serves through Jetty 12 or, for a service that already runs it, Pekko HTTP.
+> serves through Pekko HTTP (in 1.0.0) or Jetty 12 (on `main`, unreleased).
 
 Facts worth having before anything else:
 
@@ -16,39 +16,30 @@ Facts worth having before anything else:
   stable and a breaking change waits for a major release. The `.api` dump
   beside each module is the binary contract, checked by `apiCheck`;
   `StillCompilesTest` is the contract for the reified inline DSL, which a dump
-  cannot see. `internal`, the
-  emitted document's exact bytes, and the modules taken off `main` for 1.0
-  (in the history at commit a6c20b2) are outside it.
+  cannot see. `internal`, the emitted document's exact bytes, and modules not
+  yet in a release are outside it.
 - `pelican-core` depends on nothing but the Kotlin standard library and
   `jackson-core` (the streaming parser, not databind), and a test enforces it.
   Every JSON library, server library and HTTP client lives in a separate module.
-- Server backend: `pelican-jetty` (with `pelican-jetty-docs`,
-  `pelican-test-jetty`, `pelican-client-jetty`), the one to recommend for a new
-  service; it is on `main` and arrives with the release after 1.0.0. 1.0.0
-  itself serves on `pelican-pekko`, which stays fully supported and is the
-  choice for a service already running Pekko or Akka. JSON: `pelican-jackson`.
-  New since 0.2.0, shipping from 1.0.0-RC1:
-  `pelican-mcp-server`, `pelican-pekko-mcp` and `pelican-arrow` (Arrow's
-  `Either` into `Outcome` and back). New in 1.0.0-RC3:
-  `pelican-test-wiremock`, WireMock stubbed and verified in endpoint values.
-  New in 1.0.0: `pelican-oidc`, which verifies an OpenID Connect provider's
-  tokens and says who is calling, and `pelican-health`, `pelican-health-kafka`
-  and `pelican-health-redis`, live and ready probes and the checks behind them.
+- Server backends: `pelican-pekko` (with `pelican-pekko-docs`,
+  `pelican-test-pekko`, `pelican-client-pekko`) is the one in 1.0.0, and is the
+  one to recommend for a build that depends on a release. `pelican-jetty` (with
+  `pelican-jetty-docs`, `pelican-test-jetty`, `pelican-client-jetty`) needs no
+  Pekko or Scala, but it is on `main` only and not yet in a release, as are
+  `pelican-kotlinx` and `pelican-bom`; they are available as `1.0.1-SNAPSHOT`
+  from https://central.sonatype.com/repository/maven-snapshots/, with no
+  stability promise. On 1.0.0, write each module's version (`:1.0.0`): there
+  is no BOM. JSON: `pelican-jackson`.
 - Pekko is `compileOnly` in every module that speaks it, so Pelican ships no
   `org.apache.pekko` dependency. Any example adding `pelican-pekko` or
   `pelican-client-pekko` must also add `pekko-bom`, `pekko-actor-typed`,
   `pekko-stream` and `pekko-http`. Never name a Scala suffix on the user's
   behalf: `_2.13` and `_3` both work, and picking one for them is what puts
   two cross-builds on a classpath.
-- 1.0 shipped one backend, one JSON library and one client transport; Jetty
-  and `pelican-kotlinx` have joined them on `main` since. The http4k
-  and Ktor backends, the JDK, OkHttp and Ktor client transports and
-  `pelican-jsoniter` were complete before 1.0 and were
-  taken off `main` to keep 1.0 small. They are in the history at commit
-  a6c20b2 and are meant to come back after 1.0. Do not recommend them as
-  available today.
-- Errors a caller was promised are values in the return type — `orFail`,
-  `handledOrFail` — not exceptions.
+- Only the modules listed in docs/modules.md exist. Do not recommend an
+  http4k, Ktor, OkHttp or jsoniter module: none exists on `main` or in 1.0.0.
+- Errors a caller was promised are values in the return type (`orFail`,
+  `handledOrFail`), not exceptions.
 - OpenAPI 3.1.0 and 3.2.0.
 
 ## Docs
@@ -56,7 +47,7 @@ Facts worth having before anything else:
 - [README](https://github.com/matthewjones372/pelican): what it is and the
   smallest service that runs.
 - [Cookbook](https://github.com/matthewjones372/pelican/blob/main/docs/cookbook.md):
-  complete paste-ready recipes — typed inputs, declared failures, forms,
+  complete paste-ready recipes: typed inputs, declared failures, forms,
   uploads, streaming, security, filters, testing. Start here for code.
 - [Reference manual](https://github.com/matthewjones372/pelican/blob/main/docs/reference.md):
   the long form, with the reasoning, and every deliberate refusal.
@@ -94,9 +85,9 @@ Facts worth having before anything else:
 ## Optional
 
 - [AGENTS.md](https://github.com/matthewjones372/pelican/blob/main/AGENTS.md):
-  instructions for agents working *on* Pelican — layering, comment rules, the
+  instructions for agents working *on* Pelican: layering, comment rules, the
   testing order, the six build gates. Not needed to use the library.
 - [Changelog](https://github.com/matthewjones372/pelican/blob/main/CHANGELOG.md).
 - [TODO](https://github.com/matthewjones372/pelican/blob/main/TODO.md): reach and
-  audience — findability, announcement plans, and which HTTP stacks could come
+  audience: findability, announcement plans, and which HTTP stacks could come
   next.

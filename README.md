@@ -142,7 +142,7 @@ onto a web server you can mount beside the handlers you already have:
 - **Jetty 12** (`pelican-jetty`): the descriptions become a Jetty core
   `Handler`, with no Pekko or Scala on the classpath. `toHandler()` passes on
   any request it does not answer, so it sits in a `Handler.Sequence` beside
-  handlers of your own. It is on `main` and arrives with the next release; see
+  handlers of your own. It is on `main` and not yet in a release; see
   [Getting started](#getting-started).
 
 Because a Pelican route passes on what it does not describe, you can adopt it
@@ -310,13 +310,12 @@ plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
 
 ### Jetty, kotlinx and the BOM: on `main`, not yet released
 
-Three things on `main` are not in 1.0.0 and arrive with the next release:
+Three things on `main` are not yet in a release:
 
 - the Jetty 12 family: `pelican-jetty`, `pelican-jetty-docs`,
   `pelican-jetty-mcp`, `pelican-test-jetty`, `pelican-streams-jetty` and
   `pelican-client-jetty`;
-- `pelican-kotlinx`, a codec for `@Serializable` payloads (the 0.x releases
-  had one; 1.0.0 does not);
+- `pelican-kotlinx`, a codec for `@Serializable` payloads;
 - `pelican-bom`, which pins every module to one version so a build names the
   version once.
 
@@ -328,11 +327,21 @@ version `1.0.0` and import the binders from
 `pelican-pekko` has, under the same name, so only streaming handlers change
 (a Pekko `Source` where Jetty takes a `Sequence`).
 
-To try the unreleased modules now, build them from a clone.
+To try them now, use a snapshot. Builds of `main` are published by hand to
+Central's snapshot repository as `1.0.1-SNAPSHOT`, including the BOM and the
+plugin:
+
+```kotlin
+// beside mavenCentral() in your repositories { }, and in
+// pluginManagement { repositories { } } if you use the plugin
+maven("https://central.sonatype.com/repository/maven-snapshots/")
+```
+
+A snapshot is a moving build of `main` with no stability promise, and Central
+drops snapshots after 90 days. To build one yourself instead,
 `./gradlew publishToMavenLocal` installs the library modules and
 `./gradlew -p tooling/pelican-gradle-plugin publishToMavenLocal` installs the
-plugin, at a `-SNAPSHOT` of the next version (the version comes from the
-nearest git tag). Add `mavenLocal()` to your repositories to use them.
+plugin into `mavenLocal()`, at a `-SNAPSHOT` of the next version.
 
 ## What else a description can say
 
@@ -407,14 +416,6 @@ modules that are not in a release. The full statement is under
 [Stability](docs/reference.md#stability), supported Kotlin, JDK and Pekko
 versions are under [Versions](docs/reference.md#versions), and every change is
 recorded in [the changelog](CHANGELOG.md).
-
-Earlier versions of Pelican also had http4k and Ktor backends, a jsoniter
-codec and OkHttp and Ktor client transports. They were taken off `main` before
-1.0.0 to keep the first stable release small, and are kept in the history at
-commit
-[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e).
-[The roadmap](docs/roadmap.md#coming-back-after-10) says what is planned for
-them.
 
 ## Running the examples
 
