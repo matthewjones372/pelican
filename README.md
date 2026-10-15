@@ -85,46 +85,71 @@ In Pelican there is one copy. The route, the document and both clients are
 read off the same endpoint value, so they cannot describe different APIs, and
 the parts that the type system can check are checked by the compiler.
 
-## One endpoint, and what follows from it
+## A whole service, and what follows from it
 
-The example above, with each consequence spelled out. The description and
-handler are taken from
+`getBookmark` is one endpoint of a small bookmarks service. Its other two show
+more of what a description carries: refined query parameters with a default, a
+header, a JSON body, a `201` and a declared `401`. They are cut from the same
 [`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt),
 which is compiled on every build.
 
 ```kotlin
-data class Bookmark(val id: Long, val url: String, val title: String, val tags: List<String> = emptyList())
-data class NoSuchBookmark(val id: Long, val message: String)
+@JvmInline value class Slug(val value: String)
 
-val bookmarkId      = pathParam<Long>("bookmarkId", description = "The bookmark's id")
-val bookmarkMissing = errorJson<NoSuchBookmark>(404, "No bookmark with that id")
+val slug = StringCodec
+    .matching(Regex("[a-z0-9-]{1,40}"), "a slug: lowercase letters, digits and dashes")
+    .map(::Slug, Slug::value)
 
-val getBookmark = endpoint(bookmarkId) {
-    get("bookmarks" / bookmarkId)
-    summary = "Fetch one bookmark"
-    json<Bookmark>() orFail bookmarkMissing
+val limit       = queryParam("limit", IntCodec.between(1, 100), description = "How many to return").default(20)
+val tag         = queryParam("tag", slug, description = "Only bookmarks with this tag").optional()
+val apiKey      = headerParam("X-Api-Key", StringCodec.nonEmpty())
+val newBookmark = jsonBody<CreateBookmark>(description = "The bookmark to save")
+val badKey      = errorJson<ApiError>(401, "Missing or bad API key")
+
+val listBookmarks = endpoint(limit, tag) {
+    get("bookmarks")
+    summary = "List bookmarks, newest first"
+    jsonArray<Bookmark>()            // chunked `[{...},{...}]`, flushed as produced
 }
 
-val route = getBookmark handledOrFail { id ->                    // id: Long, already decoded
-    Bookmarks.find(id)?.let { ok(it) }                           // ok(...) has to carry a Bookmark
-        ?: bookmarkMissing(NoSuchBookmark(id, "No bookmark $id")) // the 404 the endpoint declared
+val createBookmark = endpoint(apiKey, newBookmark) {
+    post("bookmarks")
+    summary = "Save a bookmark"
+    json<Bookmark>(status = 201) orFail badKey
 }
+
+val routes = listOf(
+    listBookmarks streamedNow { (max, tag) ->               // max: Int, tag: Slug?
+        Bookmarks.list(max, tag).asSequence()
+    },
+    createBookmark handledOrFail { (key, req) ->            // key: String, req: CreateBookmark
+        if (key != "let-me-in") badKey(ApiError(401, "Bad API key"))
+        else ok(Bookmarks.add(req))
+    },
+)
 ```
 
-`getBookmark` holds no handler and does no work. It is data, and four things
-are read from it.
+The file binds these with the Jetty binders on `main`. On 1.0.0's Pekko
+backend the binders have the same names, and `streamedNow` returns a Pekko
+`Source` where Jetty takes a `Sequence`.
 
-**The handler receives decoded, typed arguments.** `id` is a `Long`. The
-handler never sees a string, and a request for `/bookmarks/abc` is answered
-with a 400 before the handler runs. A constraint such as
-`IntCodec.between(1, 100)` on a query parameter is both the check the server
-makes and the `minimum`/`maximum` in the published schema, so the document
-cannot promise a range the server does not enforce.
+None of these values holds a handler or does any work. They are data, and four
+things are read from them.
 
-**Every response is part of the endpoint's type.** `orFail bookmarkMissing`
-changes the type the handler must return to
-`Outcome<NoSuchBookmark, Bookmark>`. A handler that returns a bare `Bookmark`,
-or forgets that the 404 exists, does not compile:
+**The handler receives decoded, typed arguments.** `max` is an `Int`, `tag` a
+`Slug?` and `req` a `CreateBookmark`; no handler sees a string. A request for
+`/bookmarks/abc`, a `limit` of `0`, a `tag` with a space in it or a missing
+`X-Api-Key` is answered with a 400 before any handler runs, and an absent
+`limit` arrives as `20`. `IntCodec.between(1, 100)` is both the check the
+server makes and the `minimum`/`maximum` in the published schema, and the
+slug's pattern is the schema's `pattern`, so the document cannot promise a
+range or a format the server does not enforce.
+
+**Every response is part of the endpoint's type.** `orFail badKey` makes
+`createBookmark`'s handler return `Outcome<ApiError, Bookmark>`, just as
+`orFail bookmarkMissing` did for `getBookmark`, and the `201` is declared
+rather than set by hand. A handler that returns a bare `Bookmark`, or forgets
+that a declared failure exists, does not compile:
 
 ```
 getBookmark handledOrFail { id -> Bookmarks.find(id)!! }
@@ -143,7 +168,7 @@ sealed type to match on, and an exception nobody declared becomes an opaque
 
 **The OpenAPI document is generated from the same value the server routes
 on.** `/openapi.json` (OpenAPI 3.1.0 by default, or 3.2.0) and the Swagger UI
-page beside it are built from `getBookmark`, not from a parallel file or from
+page beside it are built from these values, not from a parallel file or from
 annotations a scanner reads. If the route changes, the document changes in the
 same commit, because there is nothing else to edit.
 
@@ -153,14 +178,15 @@ client is built from the same description:
 ```kotlin
 val bookmark: Bookmark = app.call(getBookmark, 1L)
 app.outcome(getBookmark, 9_999L) shouldBeError NoSuchBookmark(9_999L, "No bookmark 9999")
+app.collect(listBookmarks, In2(20, Slug("streams"))).single().title shouldBe "Pekko"
 
-app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
+app.request(listBookmarks, In2(20, Slug("streams"))) shouldBuild "GET /bookmarks?limit=20&tag=streams"
 ```
 
-The first two lines contain no path and no JSON, so renaming `bookmarkId` or
+The first three lines contain no path and no JSON, so renaming `bookmarkId` or
 changing `Bookmark` stops the test compiling instead of turning it into a 404
 at run time. That same property means a behaviour test cannot notice when the
-public URL moves, because the client moves with the server. The third line is
+public URL moves, because the client moves with the server. The last line is
 the guard for that: a URL pin, kept in a file of its own, compares against a
 literal string and is the one test that should fail on a rename.
 `pelican-test-golden` goes further and fails when a change to the published
