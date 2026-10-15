@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.pages
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -50,7 +51,8 @@ class RecordedDifferencesTest {
         fun here() = CompletableFuture.completedFuture(if (Thread.currentThread().isVirtual) "virtual" else "platform")
         val pekko = api(listOf(where handledByOnPekko { here() }), JacksonCodecs)
             .startOnPekko(port = 0, systemName = "recorded-differences")
-        val jetty = api(listOf(where handledByOnJetty { here() }), JacksonCodecs).startOnJetty(port = 0)
+        val jetty = api(listOf(where handledByOnJetty { here() }), JacksonCodecs)
+            .startOnJetty(port = 0, handlers = Handlers.onVirtualThreads)
 
         try {
             withClue(JettyDifference.STAGED_HANDLERS_START_VIRTUAL.reason) {

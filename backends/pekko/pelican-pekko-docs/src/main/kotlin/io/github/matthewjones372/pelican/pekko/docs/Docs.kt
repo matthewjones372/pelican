@@ -81,7 +81,7 @@ fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
 fun Api.routeWithDocs(
     system: ClassicActorSystemProvider,
     docs: Docs = docs(),
-    handlers: Handlers = Handlers.onVirtualThreads,
+    handlers: Handlers = Handlers.default,
 ): Route {
     val routes = listOf(toRoute(system, handlers)) + docsRoutes(docs)
     return routes.reduce { left, right -> Directives.concat(left, right) }
@@ -93,7 +93,7 @@ fun Api.startWithDocs(
     host: String = "127.0.0.1",
     systemName: String = "pelican",
     docs: Docs = docs(),
-    handlers: Handlers = Handlers.onVirtualThreads,
+    handlers: Handlers = Handlers.default,
 ): PelicanServer = start(port, host, systemName) { system: ActorSystem<Void> ->
     routeWithDocs(system, docs, handlers)
 }
@@ -108,7 +108,7 @@ fun Api.startWithDocs(
     port: Int = 8080,
     host: String = "127.0.0.1",
     docs: Docs = docs(),
-    handlers: Handlers = Handlers.onVirtualThreads,
+    handlers: Handlers = Handlers.default,
 ): PelicanServer = start(system, port, host) { on: ActorSystem<Void> ->
     routeWithDocs(on, docs, handlers)
 }
@@ -116,7 +116,7 @@ fun Api.startWithDocs(
 /** [routeWithDocs] as it was before spec 0058, kept so a caller compiled against RC2 still links. */
 @Deprecated("Binary compatibility only: call routeWithDocs with handlers.", level = DeprecationLevel.HIDDEN)
 fun Api.routeWithDocs(system: ClassicActorSystemProvider, docs: Docs = docs()): Route =
-    routeWithDocs(system, docs, Handlers.onVirtualThreads)
+    routeWithDocs(system, docs, Handlers.default)
 
 /** [startWithDocs] as it was before spec 0058. */
 @Deprecated("Binary compatibility only: call startWithDocs with handlers.", level = DeprecationLevel.HIDDEN)
@@ -125,7 +125,7 @@ fun Api.startWithDocs(
     host: String = "127.0.0.1",
     systemName: String = "pelican",
     docs: Docs = docs(),
-): PelicanServer = startWithDocs(port, host, systemName, docs, Handlers.onVirtualThreads)
+): PelicanServer = startWithDocs(port, host, systemName, docs, Handlers.default)
 
 /** The same, on a borrowed system. */
 @Deprecated("Binary compatibility only: call startWithDocs with handlers.", level = DeprecationLevel.HIDDEN)
@@ -134,7 +134,7 @@ fun Api.startWithDocs(
     port: Int = 8080,
     host: String = "127.0.0.1",
     docs: Docs = docs(),
-): PelicanServer = startWithDocs(system, port, host, docs, Handlers.onVirtualThreads)
+): PelicanServer = startWithDocs(system, port, host, docs, Handlers.default)
 
 /**
  * Matched against the request path directly rather than through a path matcher,

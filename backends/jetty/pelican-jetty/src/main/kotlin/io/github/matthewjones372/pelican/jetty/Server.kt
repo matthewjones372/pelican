@@ -79,7 +79,7 @@ val PELICAN_URI_COMPLIANCE: UriCompliance = UriCompliance.DEFAULT.with(
 fun Api.start(
     port: Int = 8080,
     host: String = "127.0.0.1",
-    handlers: Handlers = Handlers.onVirtualThreads,
+    handlers: Handlers = Handlers.default,
     handler: Api.() -> Handler = { toHandler(handlers) },
 ): PelicanServer {
     val server = Server(pelicanThreads(handlers))

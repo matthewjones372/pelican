@@ -74,7 +74,7 @@ private const val DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
  * service can depend on this module without the generator. See
  * `pelican-pekko-docs`.
  */
-fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handlers.onVirtualThreads): Route {
+fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handlers.default): Route {
     // Once per endpoint, captured by the routes: KType -> JavaType reflection
     // is not free, and a broken codec becomes a startup failure.
     val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
@@ -111,7 +111,7 @@ fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handler
 
 /** The route as it was built before spec 0058, kept so a caller compiled against RC2 still links. */
 @Deprecated("Binary compatibility only: call toRoute(system, handlers).", level = DeprecationLevel.HIDDEN)
-fun Api.toRoute(system: ClassicActorSystemProvider): Route = toRoute(system, Handlers.onVirtualThreads)
+fun Api.toRoute(system: ClassicActorSystemProvider): Route = toRoute(system, Handlers.default)
 
 /** [handler] on [threads]' executor, when [endpoint] was bound synchronously and there is one to move to. */
 private fun ((Params) -> CompletionStage<Any?>).on(

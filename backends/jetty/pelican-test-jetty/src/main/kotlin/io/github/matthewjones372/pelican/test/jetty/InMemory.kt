@@ -92,7 +92,7 @@ private fun RequestSpec.toJetty(): HttpTester.Request {
  * done. [handler] is how a module serving more than the endpoints, such as the document, is tested the same way.
  */
 fun Api.inMemory(
-    handlers: Handlers = Handlers.onVirtualThreads,
+    handlers: Handlers = Handlers.default,
     handler: Api.() -> Handler = { toHandler(handlers) },
 ): ApiClient = ApiClient(InMemoryTransport(handler()), codecs)
 

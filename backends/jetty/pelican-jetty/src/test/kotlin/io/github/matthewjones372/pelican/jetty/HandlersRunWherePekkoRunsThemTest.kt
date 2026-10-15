@@ -81,6 +81,19 @@ class HandlersRunWherePekkoRunsThemTest {
             text()
         }
 
+        /** Which kind of thread runs a handler, naming Pelican's platform pool. */
+        private fun pool(): String = when {
+            Thread.currentThread().isVirtual -> "virtual"
+            Thread.currentThread().name.startsWith("pelican-handler-") -> "pelican-handler"
+            else -> "platform"
+        }
+
+        /** What [Handlers.default] runs a handler on, on the JDK running the suite. */
+        private fun byDefault(): String =
+            if (Runtime.version().feature() >= UNPINNED_FROM) "virtual" else "pelican-handler"
+
+        private const val UNPINNED_FROM = 24
+
         private const val CALLS = 16
         private const val DISPATCHER_CALLS = 6
 
@@ -217,7 +230,9 @@ class HandlersRunWherePekkoRunsThemTest {
 
     @Test
     fun `started, a synchronous handler runs on the virtual thread jetty called, without a hop`() {
-        val server = jettyApi.start(port = 0) { recordingThread(toHandler()) }
+        val server = jettyApi.start(port = 0, handlers = Handlers.onVirtualThreads) {
+            recordingThread(toHandler(Handlers.onVirtualThreads))
+        }
         try {
             get("${server.baseUrl}/same").join().body() shouldBe "same"
             get("${server.baseUrl}/where").join().body() shouldBe "virtual"
@@ -228,10 +243,24 @@ class HandlersRunWherePekkoRunsThemTest {
 
     @Test
     fun `mounted on platform threads, a synchronous handler hops to a virtual one`() =
-        serving(Handlers.onDispatcher, PLATFORM_THREADS, recordingThread(jettyApi.toHandler())) { base ->
+        serving(
+            Handlers.onDispatcher,
+            PLATFORM_THREADS,
+            recordingThread(jettyApi.toHandler(Handlers.onVirtualThreads)),
+        ) { base ->
             get("$base/same").join().body() shouldBe "moved"
             get("$base/where").join().body() shouldBe "virtual"
         }
+
+    @Test
+    fun `by default a handler runs on a virtual thread from JDK 24, and on pelican's platform pool below it`() {
+        val server = api(listOf(where handledNow { pool() }), JacksonCodecs).start(port = 0)
+        try {
+            get("${server.baseUrl}/where").join().body() shouldBe byDefault()
+        } finally {
+            server.stop()
+        }
+    }
 
     /** [handler], told which thread Jetty asked it on. */
     private fun recordingThread(handler: Handler): Handler = object : Handler.Wrapper(handler) {

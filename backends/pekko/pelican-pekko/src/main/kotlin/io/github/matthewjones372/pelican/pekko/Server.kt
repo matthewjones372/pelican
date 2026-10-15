@@ -114,7 +114,7 @@ fun Api.start(
     port: Int = 8080,
     host: String = "127.0.0.1",
     systemName: String = "pelican",
-    handlers: Handlers = Handlers.onVirtualThreads,
+    handlers: Handlers = Handlers.default,
     route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, handlers) },
 ): PelicanServer {
     val system = ActorSystem.create(Behaviors.empty<Void>(), systemName)
@@ -134,7 +134,7 @@ fun Api.start(
     system: ActorSystem<Void>,
     port: Int = 8080,
     host: String = "127.0.0.1",
-    handlers: Handlers = Handlers.onVirtualThreads,
+    handlers: Handlers = Handlers.default,
     route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, handlers) },
 ): PelicanServer = bind(system, host, port, ownsSystem = false, route = route)
 
@@ -144,8 +144,8 @@ fun Api.start(
     port: Int = 8080,
     host: String = "127.0.0.1",
     systemName: String = "pelican",
-    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, Handlers.onVirtualThreads) },
-): PelicanServer = start(port, host, systemName, Handlers.onVirtualThreads, route)
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, Handlers.default) },
+): PelicanServer = start(port, host, systemName, Handlers.default, route)
 
 /** The same, on a borrowed system. */
 @Deprecated("Binary compatibility only: call start with handlers.", level = DeprecationLevel.HIDDEN)
@@ -153,8 +153,8 @@ fun Api.start(
     system: ActorSystem<Void>,
     port: Int = 8080,
     host: String = "127.0.0.1",
-    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, Handlers.onVirtualThreads) },
-): PelicanServer = start(system, port, host, Handlers.onVirtualThreads, route)
+    route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, Handlers.default) },
+): PelicanServer = start(system, port, host, Handlers.default, route)
 
 private fun Api.bind(
     system: ActorSystem<Void>,
