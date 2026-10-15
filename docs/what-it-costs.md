@@ -544,6 +544,71 @@ result of an earlier run of this benchmark, which led to Pelican decoding
 bodies from bytes, is in
 [spec 0046](../specs/0046-the-decode-path-unmeasured.md).
 
+### Encoding to bytes
+
+**What is measured.** `EncodeBenchmark` writes one response body of each size
+with no route and no server. "Via String" is what both backends did before
+`BodyCodec.encodeTo`: the codec's String, then its UTF-8 copy. "Via bytes" is
+`JacksonCodecs`' `encodeTo`, which writes straight to bytes. kotlinx keeps the
+default `encodeTo`, so its bytes row is `encodeToStream`, shown as the evidence
+for not overriding it.
+
+Machine: 4 vCPU Intel Xeon @ 2.10GHz, 16GB, Ubuntu 24.04, Linux 6.18, JDK 25.0.4
+for the benchmarks, JDK 21 running Gradle. Load average before the run 1.29,
+after it 1.43. Nothing else ran. Three forks of five 1s iterations after five
+1s warmups, `-Xms512m -Xmx512m`, `-prof gc`.
+
+```bash
+./gradlew :benchmarks:jmh -PbenchmarkArgs="EncodeBenchmark"
+```
+
+| body | Jackson, via String | Jackson, via bytes | kotlinx, via String | kotlinx, via bytes |
+|---|---|---|---|---|
+| 100B | 272 ± 30ns, 744B | 333 ± 81ns, 568B | 146 ± 17ns, 448B | 353 ± 34ns, 760B |
+| 1KB | 1330 ± 116ns, 2600B | 2634 ± 438ns, 1496B | 778 ± 66ns, 2304B | 2081 ± 280ns, 4984B |
+| 64KB | 121 ± 16µs, 328,369B | 131 ± 16µs, 120,001B | 41.5 ± 2.6µs, 131,328B | 133 ± 12µs, 331,425B |
+
+Each cell is time with its error, then bytes allocated per call.
+
+**Over a socket.** The current checkout is A and `origin/main` is B, Jetty
+only, the JSON GET and POST, three rounds in the order ABABAB. Load average
+was 1.29 before the run and 10.88 after it.
+
+```bash
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=rest
+```
+
+Highest sustained rate: A 40,000 req/s (rounds 40,000, 40,000, 50,000), B
+40,000 req/s (rounds 40,000, 40,000, 50,000).
+
+| req/s | percentile | A (this branch) median, range | B (main) median, range | B vs A | outside the spread |
+|---|---|---|---|---|---|
+| 10000 | p99 | 2.7ms, 1.2 to 3.7ms | 1.2ms, 863µs to 1.3ms | -58.0% | no |
+| 10000 | p99.9 | 24.7ms, 6.9 to 35.9ms | 7.9ms, 7.3 to 11.5ms | -67.9% | no |
+| 30000 | p50 | 434µs, 374 to 446µs | 369µs, 326 to 373µs | -15.1% | yes, B faster |
+| 30000 | p99 | 7.2ms, 6.6 to 8.5ms | 7.9ms, 7.2 to 8.9ms | +9.5% | no |
+| 30000 | p99.9 | 14.4ms, 14.2 to 18.9ms | 35.6ms, 15.4 to 37.4ms | +146.7% | no |
+| 40000 | p99 | 21.1ms, 14.0 to 28.5ms | 14.8ms, 13.7 to 19.6ms | -29.6% | no |
+
+The full table is in `benchmarks/build/wire-ab.md`.
+
+**Verdict.** Jackson's bytes path is lighter and not faster. It allocates less
+per call: 43% less at 1KB (1496B against 2600B) and 63% less at 64KB
+(120,001B against 328,369B), and 24% less at 100B. In time it is not faster in
+this isolated test. At 1KB it is about twice as slow, 2634 ± 438ns against
+1330 ± 116ns, well outside the errors. At 64KB the two overlap (131 ± 16µs
+against 121 ± 16µs), and at 100B they nearly do. kotlinx via String beats its
+stream route in both time and allocation at every size, which supports leaving
+its default in place.
+
+Over the socket, nothing separates the two builds beyond the spread except one
+cell, p50 at 30,000 req/s, where main was 15% faster, in the direction against
+this change. Every other cell overlaps, and the A rounds differ from each other
+by as much as A differs from B (p99 at 10,000 req/s runs from 1.2 to 3.7ms on A
+alone). Both builds sustained 40,000 req/s. The machine was loaded (10 and
+above during the rounds), so these figures are indicative of noise, not of a
+difference. The saving in allocation did not show up as latency here.
+
 ## Streaming and framing
 
 Two more benchmarks are in the module and are not retaken on this page. Their
