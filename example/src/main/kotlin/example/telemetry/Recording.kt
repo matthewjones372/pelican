@@ -46,8 +46,8 @@ class RecordedSpans : SpanExporter {
  * An SDK that keeps its spans in memory and understands `traceparent`.
  *
  * The propagator is the part worth noticing: `OpenTelemetrySdk` defaults to a
- * no-op one, so a service that never sets this extracts nothing however good
- * its header getter is, and every trace starts at its own front door.
+ * no-op one, so a service that never sets this extracts nothing, and every
+ * trace starts at its own front door.
  *
  * [metrics] is optional because the two signals have different homes here. The
  * spans have somewhere to go — `/admin/traces` reads them back — while the

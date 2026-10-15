@@ -85,20 +85,17 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * ### Context propagation
  *
- * [incomingHeaders] is how an inbound `traceparent` continues the caller's
- * trace instead of starting a new one. It has to be supplied because a filter
- * cannot read a header nobody declared: [Params] carries the inputs the
- * endpoint declared and `Params.underlying` is the backend's own request type,
- * so reading an arbitrary header is the one thing this module cannot do
- * without knowing which server is underneath. One function per service closes
- * that gap — on Pekko it is `params.request.getHeader(key)` — and
- * `example/src/main/kotlin/example/telemetry/` has it written out.
+ * An inbound `traceparent` continues the caller's trace by default, on every
+ * backend: [incomingHeaders] defaults to a getter over `Params.requestHeader`.
+ * That getter reads the first value of a header and cannot enumerate them, so
+ * `keys` is empty. The W3C trace-context and baggage propagators ask only for
+ * the keys they know, which is enough; a propagator that walks `keys`, such as
+ * Jaeger's `uberctx-` baggage, wants a getter of the service's own.
  *
- * Left out, the parent is [Context.current] instead. That is deliberate rather
- * than a stub: a service running the OpenTelemetry Java agent already has an
- * extracted context current on the request thread, and parenting to it makes
- * this span a child of the agent's, adding the route the agent could not know
- * to a trace the agent already joined correctly.
+ * With no `traceparent`, or with [incomingHeaders] null, the parent is
+ * [Context.current]. A service running the OpenTelemetry Java agent already has
+ * an extracted context current on the request thread, so this span becomes a
+ * child of the agent's, adding the route the agent could not know.
  *
  * The span is made current only for the synchronous part of the call into the
  * rest of the chain, because that is the only part this module owns a thread
@@ -134,15 +131,15 @@ import java.util.concurrent.ConcurrentHashMap
  * @param telemetry where the spans and measurements go. `OpenTelemetry.noop()`
  *   is a valid answer and costs almost nothing, which is what makes this safe
  *   to leave wired in a service that has not decided on a backend yet.
- * @param incomingHeaders how to read a request header off this backend's own
- *   request, for continuing an inbound trace. Null does not extract.
+ * @param incomingHeaders how to read the request's headers for continuing an
+ *   inbound trace. Defaults to `Params.requestHeader`; null does not extract.
  * @param scopeName the instrumentation scope the spans and the histogram are
  *   recorded under. Worth changing only to tell two Pelican `Api`s in one
  *   process apart.
  */
 fun openTelemetry(
     telemetry: OpenTelemetry,
-    incomingHeaders: TextMapGetter<Params>? = null,
+    incomingHeaders: TextMapGetter<Params>? = RequestHeaders,
     scopeName: String = INSTRUMENTATION_SCOPE,
 ): Filter {
     require(scopeName.isNotBlank()) {
@@ -182,6 +179,13 @@ fun openTelemetry(
             }
         }
     }
+}
+
+/** The request's headers, read through the backend-neutral `Params.requestHeader`. */
+private object RequestHeaders : TextMapGetter<Params> {
+    override fun keys(carrier: Params): Iterable<String> = emptyList()
+
+    override fun get(carrier: Params?, key: String): String? = carrier?.requestHeader(key)
 }
 
 /**

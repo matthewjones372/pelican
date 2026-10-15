@@ -76,6 +76,12 @@ one.
 
 ### Changed
 
+- **`openTelemetry(sdk)` continues an inbound trace with no getter**
+  (spec 0081). `incomingHeaders` defaults to a getter over
+  `Params.requestHeader`, so a `traceparent` is extracted on Jetty, Pekko and
+  the in-memory client; before, leaving it out started a new trace for every
+  request. The parameter stays for a service that reads headers elsewhere, and
+  null still turns extraction off.
 - **The library modules target Java 21** (spec 0079), where 1.0.0 targeted 25.
   `pelican-streams` and `pelican-streams-jetty` stay on 25, because
   `lark-stream` 0.9.0 is compiled for 25. CI runs the suites on 21 and 25.

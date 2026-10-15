@@ -3141,32 +3141,23 @@ registry now marks deprecated.
 
 #### Continuing a caller's trace
 
-An inbound `traceparent` should continue the caller's trace rather than start a
-new one, and doing that needs a header nobody declared:
+An inbound `traceparent` continues the caller's trace rather than starting a
+new one, with nothing to configure: `openTelemetry(sdk)` reads the request's
+headers through `Params.requestHeader`, which every backend supplies, so the
+same line works on Jetty, Pekko and the in-memory client.
 
-```kotlin
-val jettyHeaders = object : TextMapGetter<Params> {
-    override fun keys(carrier: Params) = carrier.request.headers.fieldNamesCollection
-    override fun get(carrier: Params?, key: String) = carrier?.request?.headers?.get(key)
-}
+`incomingHeaders` is there for a service that reads trace headers from
+somewhere else, and null turns extraction off. The default getter cannot list
+headers, so its `keys` is empty: the W3C trace-context and baggage propagators
+ask only for the keys they know, but a propagator that walks `keys`, such as
+Jaeger's `uberctx-` baggage, needs a getter of the service's own.
 
-api(routes, JacksonCodecs) { filter(openTelemetry(sdk, incomingHeaders = jettyHeaders)) }
-```
-
-A few lines, written once per service, and they are the one thing this module
-cannot write for you. `Params` carries the inputs the endpoint *declared*, and
-an incoming trace context is not part of an API's contract (it should not
-appear in its OpenAPI document), so the only route to the header is the
-backend's own request: `params.request` from `pelican-jetty` or `pelican-pekko`,
-over `Params.underlying`. Naming that type is exactly what a filter that works
-on any interpreter must not do.
-
-Left out, the parent is `Context.current()` instead, which is not a stub: a
-service running the OpenTelemetry Java agent already has the caller's context
-current on the request thread, so the span becomes a child of the agent's and
-adds the route the agent could not know to a trace it had already joined
-correctly. Note also that an SDK's default propagator is a no-op one: a service
-that never calls `setPropagators` extracts nothing however good its getter is.
+With no `traceparent`, or with `incomingHeaders = null`, the parent is
+`Context.current()`. A service running the OpenTelemetry Java agent already has
+the caller's context current on the request thread, so the span becomes a
+child of the agent's and adds the route the agent could not know. Note also
+that an SDK's default propagator is a no-op one: a service that never calls
+`setPropagators` extracts nothing.
 
 What was deliberately **not** done:
 
