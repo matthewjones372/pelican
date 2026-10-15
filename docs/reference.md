@@ -43,7 +43,7 @@ them is [Version alignment and the BOM](modules.md#version-alignment-and-the-bom
 | `pelican-kotlinx` | `main` | core, kotlinx-serialization-json | the `Codecs` for `@Serializable` payloads: kotlinx reads bodies, and the same `SerialDescriptor`s describe types |
 | `pelican-arrow` | yes | core, arrow-core | Arrow's `Either` into Pelican's `Outcome` and back: `toOutcome()`, its naming overloads, and `toEither()` |
 | `pelican-pekko` | yes | core; Pekko *provided* | descriptions to a Pekko HTTP `Route`, and `start` to serve it |
-| `pelican-pekko-docs` | yes | pekko, openapi | serves the document and a page (Swagger UI or Redoc), and a Redoc or Scalar reference beside it, over HTTP |
+| `pelican-pekko-docs` | yes | pekko, openapi | serves the document and a page (Swagger UI or Redoc), and a Redoc or RapiDoc reference beside it, over HTTP |
 | `pelican-pekko-mcp` | yes | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
 | `pelican-client-pekko` | yes | core; Pekko HTTP *provided* | where a generated client's requests go: `ClientTransport` over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-streams` | yes | pekko; Pekko and lark *provided* | a streamed upload as a lark `Stream` on Pekko, and the run's end as the declared `Outcome` |
@@ -3514,8 +3514,8 @@ ordersApi().startWithDocs(port = 8080, docs = docs { ui = DocsUi.Redoc; docsPath
 Swagger UI is a console: one operation expanded at a time, with the request form
 at the centre and *Try it out* sending real calls. Redoc is a read-only
 three-panel reference, which is the better of the two for a surface people read
-rather than poke. Scalar, served beside either as `scalarReference` below, is a
-three-panel reference that also sends requests. Both render the same document, and Swagger UI is configured no
+rather than poke. RapiDoc, served beside either as `rapiDocReference` below, is a
+reference that also sends requests. Both render the same document, and Swagger UI is configured no
 further than the title the API already carries.
 
 #### A reference beside the console, in your own look
@@ -3560,36 +3560,37 @@ redirect page nothing opens. `docs { }` fails at build time naming both.
 
 #### A reference that sends requests
 
-Redoc only reads. `scalarReference` serves Scalar instead: a three-panel
-reference like Redoc's, whose client sends a request from the page to the API.
+Redoc only reads. `rapiDocReference` serves RapiDoc instead: a reference whose
+console sends a request from the page to the API, and that calls on no service
+of its own.
 
 ```kotlin
 docs {
     docsPath = "/api-docs"                    // Swagger UI, as before
-    scalarReference("/reference") {           // Scalar, to read and to try
+    rapiDocReference("/reference") {          // RapiDoc, to read and to try
         theme {
             accent = "#0B7A75"
             font("Inter, sans-serif", stylesheet = "https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap")
+            logo("/logo.svg", altText = "Orders")
         }
+        attributes("allow-server-selection" to "false")
     }
 }
 ```
 
-`theme { }` is described below and works on either reference. `options` is
-Scalar's config, passed to `Scalar.createApiReference` as it is.
-`css` reaches Scalar as its `customCss`, which it applies after its own. Scalar
-sets its `--scalar-*` variables on `.light-mode` and `.dark-mode`, not on
-`:root`, so a theme sets them there too. Scalar has no logo option. Pelican sets
-`telemetry: false` and `proxyUrl: null` under the options, so requests go from
-the browser to the API and nowhere else; a service that wants either sets it in
-`options`. A service serves one reference page, so `reference` and
-`scalarReference` together are refused, as is either on `docsPath` or
-`openApiPath`.
+The page is one `<rapi-doc>` element from `rapidoc@9.3.8`, pinned exactly, and
+its attributes are RapiDoc's whole configuration. Pelican sets `allow-try`,
+`render-style="read"`, `theme="light"`, and turns off the header and the spec
+URL and file loaders, so the page reads this API's document and no other.
+`attributes(...)` takes RapiDoc's own names, as they are, over Pelican's.
+`theme { }` is described below and works on either reference. A service serves
+one reference page, so `reference` and `rapiDocReference` together are refused,
+as is either on `docsPath` or `openApiPath`.
 
 #### One theme for either reference
 
 `theme { }` names the slots a brand has, and both references read it, so a
-service can move between Redoc and Scalar without rewriting its look:
+service can move between Redoc and RapiDoc without rewriting its look:
 
 ```kotlin
 theme {
@@ -3600,21 +3601,24 @@ theme {
     error = "#C53030"                          // error responses
     font("Inter, sans-serif", stylesheet = "https://fonts.googleapis.com/css2?family=Inter&display=swap")
     codeFont("'JetBrains Mono', monospace")
-    logo("/logo.svg", altText = "Orders")      // Redoc only
+    logo("/logo.svg", altText = "Orders")
 }
 ```
 
 Under Redoc each slot lands where Redoc's `theme` reads it, and `options` is
 laid over it key by key, so a raw `theme.colors.primary` still wins and the
-theme's other keys stay. Under Scalar the slots become `--scalar-*` variables
-on `.light-mode` and `.dark-mode`, before the service's `css`, and the page is
-forced light, as Redoc's always is; `options` can say otherwise. Scalar has no
-logo, so a theme with one is refused under `scalarReference`. A blank slot is
-refused where it is written. Per-method colours, spacing and anything else
-past these slots stay in the renderer's own `options` or `css`.
+theme's other keys stay. Under RapiDoc the accent becomes `primary-color` and
+`nav-accent-color`, the text `text-color` and `nav-text-color`, the sidebar
+`nav-bg-color`, the fonts `regular-font` (with `load-fonts="false"`, so RapiDoc
+fetches no fonts of its own) and `mono-font`, success and error its `--green`
+and `--red`, and the logo an image in its `nav-logo` slot, at most 72px high.
+RapiDoc works out its shades from a hex colour, so under `rapiDocReference` a
+colour slot is `#rgb` or `#rrggbb` and anything else is refused. A blank slot is
+refused where it is written. Per-method colours, spacing and anything else past
+these slots stay in the renderer's own `options` or `attributes`.
 
 The pages load their JavaScript from a CDN (`unpkg` for Swagger UI,
-`jsDelivr` for Redoc and Scalar) so a browser that cannot reach one gets an empty page.
+`jsDelivr` for Redoc and RapiDoc) so a browser that cannot reach one gets an empty page.
 That is as true of the Swagger UI page as of the other two.
 
 ### Which version the document says, and how to choose

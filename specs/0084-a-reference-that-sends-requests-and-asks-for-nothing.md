@@ -72,11 +72,11 @@ keeps asking us to keep up with it. Recommended: RapiDoc 9.3.8.
 
 ## Stack
 
-- [ ] **`spec-0084-page`**: `RapiDocLook`, its builder, `rapiDocHtml`, the
+- [ ] **`spec-0084-page`** ([#321](https://github.com/matthewjones372/pelican/pull/321)): `RapiDocLook`, its builder, `rapiDocHtml`, the
       theme mapping and the hex refusal; tests in `pelican-openapi`.
       Done when: the page carries Pelican's attributes under the service's,
       each slot lands on its attribute, and `</script>` cannot break out.
-- [ ] **`spec-0084-route`**: `rapiDocReference` in `DocsBuilder`, served on
+- [ ] **`spec-0084-route`** ([#322](https://github.com/matthewjones372/pelican/pull/322)): `rapiDocReference` in `DocsBuilder`, served on
       Pekko and Jetty; Scalar removed; `example` asserts it over a socket.
       Done when: one `docs { }` serves Swagger and RapiDoc, and no `scalar`
       name is left in the API dump.
