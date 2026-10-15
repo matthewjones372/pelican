@@ -146,18 +146,64 @@ val jmh = tasks.register<JavaExec>("jmh") {
     args(providers.gradleProperty("benchmarkArgs").getOrElse("").split(" ").filter { it.isNotBlank() })
 }
 
+val wireAb = providers.gradleProperty("wireAb")
+val baselineClasspath = layout.buildDirectory.file("wire-ab/baseline-classpath.txt")
+
+/**
+ * The B side of `-PwireAb=<ref>`: `<ref>` checked out as a worktree under `build/wire-ab`, with this checkout's
+ * `WireServer.kt` copied in so only the libraries differ, built by its own Gradle, and its classpath written out.
+ */
+val wireBaseline = tasks.register("wireBaseline") {
+    description = "Builds the wire server against -PwireAb's ref, for `wire` to run as B"
+    onlyIf { wireAb.isPresent }
+    val repo = rootDir
+    val dir = layout.buildDirectory.dir("wire-ab/baseline").get().asFile
+    val server = file("src/main/kotlin/io/github/matthewjones372/pelican/benchmarks/wire/WireServer.kt")
+    val initScript = file("wire-ab.init.gradle.kts")
+    val out = baselineClasspath.get().asFile
+    doLast {
+        fun run(workDir: File, vararg command: String) {
+            val code = ProcessBuilder(*command).directory(workDir).inheritIO().start().waitFor()
+            check(code == 0) { "${command.joinToString(" ")} exited $code" }
+        }
+        run(repo, "git", "worktree", "prune")
+        if (dir.resolve(".git").exists()) {
+            run(dir, "git", "checkout", "-q", "--force", "--detach", wireAb.get())
+        } else {
+            run(repo, "git", "worktree", "add", "-q", "--detach", dir.path, wireAb.get())
+        }
+        server.copyTo(dir.resolve(server.relativeTo(repo)), overwrite = true)
+        run(
+            dir,
+            "./gradlew",
+            "-q",
+            "--init-script",
+            initScript.path,
+            "-PwireClasspathOut=${out.path}",
+            ":benchmarks:wireClasspath",
+        )
+    }
+}
+
 /**
  * `./gradlew :benchmarks:wire`: Pelican on Pekko and on Jetty over a loopback socket, driven at fixed rates (about
  * eight minutes; nothing else depends on it). The table lands in `build/wire-result.md` as well as on stdout.
- * `-PwireSmoke` runs one few-second step per server, to check the setup rather than measure.
+ * `-PwireSmoke` runs one few-second step per server, to check the setup rather than measure. `-PwireScenario` is
+ * `rest` (the default), `stream` or `both`. `-PwireAb=<ref>` compares Jetty from this checkout (A) with Jetty from
+ * `<ref>` (B), alternating for `-PwireRounds` rounds (3), into `build/wire-ab.md`; `-PwireAbPekko` adds Pekko.
  */
 tasks.register<JavaExec>("wire") {
     group = "verification"
     description = "Drives Pelican on Pekko and on Jetty over loopback at fixed rates and reports latency"
+    dependsOn(wireBaseline)
     mainClass.set("io.github.matthewjones372.pelican.benchmarks.wire.WireDriverKt")
     classpath(benchmarkRuntimeClasspath)
     javaLauncher.set(toolchainLauncher)
     jvmArgs("-Xms1g", "-Xmx1g")
-    args(layout.buildDirectory.file("wire-result.md").get().asFile.path)
+    args(layout.buildDirectory.get().asFile.path)
     if (providers.gradleProperty("wireSmoke").isPresent) args("--smoke")
+    providers.gradleProperty("wireScenario").orNull?.let { args("--scenario", it) }
+    providers.gradleProperty("wireRounds").orNull?.let { args("--rounds", it) }
+    if (providers.gradleProperty("wireAbPekko").isPresent) args("--pekko")
+    if (wireAb.isPresent) args("--baseline", baselineClasspath.get().asFile.path)
 }

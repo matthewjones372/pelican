@@ -24,15 +24,23 @@ import kotlin.concurrent.thread
 private val RATES =
     listOf(1_000, 5_000, 10_000, 20_000, 30_000, 40_000, 50_000, 60_000, 70_000, 80_000, 100_000, 120_000)
 
-private val SERVERS = listOf("pekko", "jetty")
+/** Responses a second for the streaming scenario, each one [FRAMES] frames. */
+private val STREAM_RATES = listOf(250, 500, 1_000, 2_000, 3_000, 4_000, 6_000, 8_000, 10_000, 15_000, 20_000)
 
-private const val WARMUP_RATE = 5_000
+private const val REST_WARMUP_RATE = 5_000
+private const val STREAM_WARMUP_RATE = 250
 
-/** How long each phase runs, in seconds; [SMOKE] only checks that both servers start and answer. */
-private data class Schedule(val warmup: Int, val settle: Int, val measure: Int, val rates: List<Int>)
+/** `rest` alternates the JSON GET and POST; `stream` alternates the NDJSON and SSE responses of [FRAMES] frames. */
+private enum class Scenario(val rates: List<Int>, val warmupRate: Int, val unit: String) {
+    REST(RATES, REST_WARMUP_RATE, "req/s"),
+    STREAM(STREAM_RATES, STREAM_WARMUP_RATE, "responses/s"),
+}
 
-private val FULL = Schedule(warmup = 30, settle = 5, measure = 15, rates = RATES)
-private val SMOKE = Schedule(warmup = 1, settle = 1, measure = 2, rates = RATES.take(1))
+/** How long each phase runs, in seconds; [SMOKE] only checks that the servers start and answer. */
+private data class Schedule(val warmup: Int, val settle: Int, val measure: Int, val steps: Int)
+
+private val FULL = Schedule(warmup = 30, settle = 5, measure = 15, steps = Int.MAX_VALUE)
+private val SMOKE = Schedule(warmup = 1, settle = 1, measure = 2, steps = 1)
 private const val PAUSE_MILLIS = 2_000L
 
 /** Senders sharing a step's schedule, so one thread's call into the client is not the ceiling. */
@@ -71,14 +79,14 @@ private const val P50 = 50.0
 private const val P99 = 99.0
 private const val P999 = 99.9
 
-/** A server in its own JVM, started by [WireServer]'s `main` and stopped by closing its stdin. */
-private class Child(name: String) : AutoCloseable {
+/** A server in its own JVM on [classpath], started by [WireServer]'s `main` and stopped by closing its stdin. */
+private class Child(name: String, classpath: String) : AutoCloseable {
     private val process: Process = ProcessBuilder(
         ProcessHandle.current().info().command().orElseThrow(),
         "-Xms1g",
         "-Xmx1g",
         "-cp",
-        System.getProperty("java.class.path"),
+        classpath,
         "io.github.matthewjones372.pelican.benchmarks.wire.WireServerKt",
         name,
     ).redirectError(ProcessBuilder.Redirect.INHERIT).start()
@@ -105,7 +113,7 @@ private class Child(name: String) : AutoCloseable {
  * On Jetty's client rather than the JDK's: the JDK client fell behind its own schedule at 20,000 to 40,000 requests a
  * second against both servers, so above that it was measuring itself.
  */
-private class Driver(port: Int) : AutoCloseable {
+private class Driver(port: Int, private val scenario: Scenario) : AutoCloseable {
     private val client = HttpClient().apply {
         maxConnectionsPerDestination = IN_FLIGHT
         connectTimeout = REQUEST_TIMEOUT.toMillis()
@@ -114,12 +122,19 @@ private class Driver(port: Int) : AutoCloseable {
 
     private val getUri = URI("http://127.0.0.1:$port/items/7?limit=25")
     private val postUri = URI("http://127.0.0.1:$port/items")
+    private val ndjsonUri = URI("http://127.0.0.1:$port/ndjson")
+    private val sseUri = URI("http://127.0.0.1:$port/sse")
 
-    private fun send(get: Boolean, done: (Int?, String?) -> Unit) {
-        val request = if (get) {
-            client.newRequest(getUri)
-        } else {
-            client.newRequest(postUri).method(HttpMethod.POST).body(StringRequestContent("application/json", BODY))
+    /** The scenario's first request when [even], its second otherwise; a stream is timed to its last byte. */
+    private fun send(even: Boolean, done: (Int?, String?) -> Unit) {
+        val request = when (scenario) {
+            Scenario.REST -> if (even) {
+                client.newRequest(getUri)
+            } else {
+                client.newRequest(postUri).method(HttpMethod.POST).body(StringRequestContent("application/json", BODY))
+            }
+
+            Scenario.STREAM -> client.newRequest(if (even) ndjsonUri else sseUri)
         }
         request.timeout(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).send(
             object : BufferingResponseListener() {
@@ -134,14 +149,32 @@ private class Driver(port: Int) : AutoCloseable {
     fun verify() {
         val answers = LinkedBlockingQueue<Pair<Int?, String?>>()
         send(true) { s, b -> answers.put(s to b) }
-        check(answers.take() == (200 to """{"id":7,"name":"item-25"}""")) { "GET answered wrongly" }
+        val first = answers.take()
         send(false) { s, b -> answers.put(s to b) }
-        check(answers.take() == (201 to """{"id":1,"name":"anvil"}""")) { "POST answered wrongly" }
+        val second = answers.take()
+        when (scenario) {
+            Scenario.REST -> {
+                check(first == (200 to """{"id":7,"name":"item-25"}""")) { "GET answered wrongly" }
+                check(second == (201 to """{"id":1,"name":"anvil"}""")) { "POST answered wrongly" }
+            }
+
+            Scenario.STREAM -> {
+                val frame = """{"id":$FRAMES,"name":"$FRAME_NAME"}"""
+                val ndjson = first.second.orEmpty().lines().filter { it.isNotEmpty() }
+                check(first.first == 200 && ndjson.size == FRAMES && ndjson.last() == frame) {
+                    "NDJSON answered wrongly"
+                }
+                val sse = second.second.orEmpty().lines().filter { it.startsWith("data:") }
+                check(second.first == 200 && sse.size == FRAMES && sse.last().endsWith(frame)) {
+                    "SSE answered wrongly"
+                }
+            }
+        }
     }
 
     override fun close() = client.stop()
 
-    /** [rate] requests a second, alternately GET and POST, for [settle] seconds unrecorded and [measure] recorded. */
+    /** [rate] requests a second, alternating the scenario's two, [settle] seconds unrecorded and [measure] recorded. */
     fun run(server: String, rate: Int, settle: Int, measure: Int): Step {
         val recorder = Recorder(HISTOGRAM_DIGITS)
         val errors = AtomicLong()
@@ -199,40 +232,144 @@ private fun Step.row(): String = "| $server | $rate | ${duration(latency.getValu
     "${duration(latency.getValueAtPercentile(P99))} | ${duration(latency.getValueAtPercentile(P999))} | " +
     "${duration(latency.maxValue)} | ${latency.totalCount} | $errors | ${if (keptUp) "yes" else "no"} |"
 
-/** Warms [server] up, then climbs the rates until it stops keeping up; returns its load averages. */
-private fun ladder(server: String, schedule: Schedule, row: (String) -> Unit): String = Child(server).use { child ->
-    Driver(child.port).use { driver ->
+/** One ladder: warms [server] up, then climbs the scenario's rates until it stops keeping up. */
+private fun ladder(
+    server: String,
+    label: String,
+    classpath: String,
+    scenario: Scenario,
+    schedule: Schedule,
+    notes: MutableList<String>,
+): List<Step> = Child(server, classpath).use { child ->
+    Driver(child.port, scenario).use { driver ->
         driver.verify()
         val before = loadAverage()
-        println("$server: warming up for ${schedule.warmup}s at $WARMUP_RATE req/s, load $before")
-        driver.run(server, WARMUP_RATE, 0, schedule.warmup)
-        for (rate in schedule.rates) {
+        println("$label: warming up for ${schedule.warmup}s at ${scenario.warmupRate} ${scenario.unit}, load $before")
+        driver.run(label, scenario.warmupRate, 0, schedule.warmup)
+        val steps = mutableListOf<Step>()
+        for (rate in scenario.rates.take(schedule.steps)) {
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(PAUSE_MILLIS))
-            val step = driver.run(server, rate, schedule.settle, schedule.measure)
+            val step = driver.run(label, rate, schedule.settle, schedule.measure)
             println(step.row())
-            row(step.row())
+            steps += step
             if (!step.keptUp) break
         }
-        "$server: load average $before before warmup, ${loadAverage()} after its last rate"
+        notes += "$label, ${scenario.name.lowercase()}: load average $before before warmup, " +
+            "${loadAverage()} after its last rate"
+        steps
+    }
+}
+
+private fun header(scenario: Scenario) = listOf(
+    "| server | ${scenario.unit} | p50 | p99 | p99.9 | max | requests | errors | kept up |",
+    "|---|---|---|---|---|---|---|---|---|",
+)
+
+private fun median(values: List<Long>): Long = values.sorted().let { (it[(it.size - 1) / 2] + it[it.size / 2]) / 2 }
+
+/** The highest rate a ladder kept up at, or 0 if it kept up at none. */
+private fun ceiling(steps: List<Step>): Int = steps.takeWhile { it.keptUp }.lastOrNull()?.rate ?: 0
+
+/**
+ * A's runs against B's, per rate and percentile: medians, each side's range, and whether the ranges are disjoint. A
+ * difference inside either side's own run-to-run spread is not one this run can attribute to the change.
+ */
+private fun comparison(server: String, scenario: Scenario, a: List<List<Step>>, b: List<List<Step>>): List<String> {
+    val lines = mutableListOf(
+        "### $server, ${scenario.name.lowercase()}",
+        "",
+        "Highest sustained ${scenario.unit}: A ${median(a.map { ceiling(it).toLong() })} " +
+            "(runs: ${a.joinToString { ceiling(it).toString() }}), B ${median(b.map { ceiling(it).toLong() })} " +
+            "(runs: ${b.joinToString { ceiling(it).toString() }}).",
+        "",
+        "| ${scenario.unit} | percentile | A median | A range | B median | B range | B vs A | outside the spread |",
+        "|---|---|---|---|---|---|---|---|",
+    )
+    for (rate in scenario.rates) {
+        val atA = a.mapNotNull { run -> run.find { it.rate == rate } }
+        val atB = b.mapNotNull { run -> run.find { it.rate == rate } }
+        if (atA.isEmpty() || atB.isEmpty()) continue
+        for ((name, percentile) in listOf("p50" to P50, "p99" to P99, "p99.9" to P999)) {
+            val va = atA.map { it.latency.getValueAtPercentile(percentile) }
+            val vb = atB.map { it.latency.getValueAtPercentile(percentile) }
+            val change = PERCENT * (median(vb) - median(va)) / median(va)
+            val outside = when {
+                va.size < 2 || vb.size < 2 -> "one run"
+                vb.max() < va.min() -> "yes, faster"
+                vb.min() > va.max() -> "yes, slower"
+                else -> "no"
+            }
+            lines += "| $rate | $name | ${duration(median(va))} | ${duration(va.min())} to " +
+                "${duration(va.max())} | ${duration(median(vb))} | ${duration(vb.min())} to ${duration(vb.max())} | " +
+                "${"%+.1f".format(Locale.ROOT, change)}% | $outside |"
+        }
+    }
+    return lines + ""
+}
+
+private const val PERCENT = 100.0
+
+/** What `:benchmarks:wire` passes: the output directory, then any of the flags `main` reads. */
+private class Options(private val args: Array<String>) {
+    private fun value(flag: String): String? = args.indexOf(flag).takeIf { it >= 0 }?.let { args[it + 1] }
+
+    val outDir = File(args.first())
+    val smoke = "--smoke" in args
+    val scenarios = when (val s = value("--scenario") ?: "rest") {
+        "both" -> Scenario.entries
+        else -> listOf(Scenario.valueOf(s.uppercase()))
+    }
+    val baseline: String? = value("--baseline")?.let { File(it).readText().trim() }
+    val rounds = if (smoke) 1 else value("--rounds")?.toInt() ?: DEFAULT_ROUNDS
+    val pekko = "--pekko" in args
+
+    private companion object {
+        const val DEFAULT_ROUNDS = 3
     }
 }
 
 /**
- * `./gradlew :benchmarks:wire`: Pelican on Pekko and Pelican on Jetty over loopback, each in turn, at each of
- * [RATES] until it stops keeping up. Prints a Markdown table and writes it to the path in the first argument;
- * `--smoke` as the second runs one short step per server instead.
+ * `./gradlew :benchmarks:wire`: each server over loopback, in turn, at each of the scenario's rates until it stops
+ * keeping up, written to `wire-result.md`. With `--baseline` (a classpath file, from `-PwireAb`), Jetty (and Pekko
+ * with `--pekko`) is run from this checkout as A and from the baseline as B, alternating for `--rounds` rounds, and
+ * the comparison is written to `wire-ab.md`.
  */
 fun main(args: Array<String>) {
+    val options = Options(args)
+    val schedule = if (options.smoke) SMOKE else FULL
+    val own = System.getProperty("java.class.path")
     val lines = mutableListOf(
         "JDK ${Runtime.version()}, ${System.getProperty("os.name")} ${System.getProperty("os.version")}, " +
             "${Runtime.getRuntime().availableProcessors()} cores",
         "",
-        "| server | req/s | p50 | p99 | p99.9 | max | requests | errors | kept up |",
-        "|---|---|---|---|---|---|---|---|---|",
     )
-    val schedule = if (args.getOrNull(1) == "--smoke") SMOKE else FULL
-    val notes = SERVERS.map { server -> ladder(server, schedule) { lines += it } }
-    val report = (lines + "" + notes).joinToString("\n")
+    val notes = mutableListOf<String>()
+    val baseline = options.baseline
+    for (scenario in options.scenarios) {
+        if (baseline == null) {
+            lines += header(scenario)
+            for (server in listOf("pekko", "jetty")) {
+                lines += ladder(server, server, own, scenario, schedule, notes).map { it.row() }
+            }
+            lines += ""
+        } else {
+            val servers = if (options.pekko) listOf("jetty", "pekko") else listOf("jetty")
+            for (server in servers) {
+                val a = mutableListOf<List<Step>>()
+                val b = mutableListOf<List<Step>>()
+                repeat(options.rounds) { round ->
+                    a += ladder(server, "$server A${round + 1}", own, scenario, schedule, notes)
+                    b += ladder(server, "$server B${round + 1}", baseline, scenario, schedule, notes)
+                }
+                lines += comparison(server, scenario, a, b)
+                lines += header(scenario)
+                lines += (a + b).flatten().map { it.row() }
+                lines += ""
+            }
+        }
+    }
+    val report = (lines + notes).joinToString("\n")
     println(report)
-    args.firstOrNull()?.let { File(it).apply { parentFile.mkdirs() }.writeText(report + "\n") }
+    val name = if (baseline == null) "wire-result.md" else "wire-ab.md"
+    File(options.outDir.apply { mkdirs() }, name).writeText(report + "\n")
 }
