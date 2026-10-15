@@ -71,11 +71,11 @@ picked for cream does not survive Scalar's dark background.
 
 ## Stack
 
-- [ ] **`spec-0081-theme`**: `ReferenceTheme`, its builder, `theme { }` on
+- [ ] **`spec-0081-theme`** ([#310](https://github.com/matthewjones372/pelican/pull/310)): `ReferenceTheme`, its builder, `theme { }` on
       both look builders, and the Redoc mapping with its key-by-key merge.
       Done when: a themed Redoc page carries each slot where Redoc reads it, and
       a raw `options` key beside it wins.
-- [ ] **`spec-0081-scalar`**: the Scalar mapping, light forced, the logo refusal.
+- [ ] **`spec-0081-scalar`** ([#313](https://github.com/matthewjones372/pelican/pull/313)): the Scalar mapping, light forced, the logo refusal.
       Done when: the variables land on `.light-mode, .dark-mode` before `css`,
       and a browser shows the accent (checked by hand, as 0054 did).
 - [ ] **`spec-0081-docs`**: the reference guide and the example use `theme { }`.
