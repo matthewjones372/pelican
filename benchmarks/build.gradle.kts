@@ -191,6 +191,8 @@ val wireBaseline = tasks.register("wireBaseline") {
  * `-PwireSmoke` runs one few-second step per server, to check the setup rather than measure. `-PwireScenario` is
  * `rest` (the default), `stream` or `both`. `-PwireAb=<ref>` compares Jetty from this checkout (A) with Jetty from
  * `<ref>` (B), alternating for `-PwireRounds` rounds (3), into `build/wire-ab.md`; `-PwireAbPekko` adds Pekko.
+ * `-PwirePool=queued|virtual` picks the pool Jetty's `start()` builds; `-PwireAbPool` compares this checkout on
+ * `VirtualThreadPool` (A) with it on the queued pool (B), with no second build.
  */
 tasks.register<JavaExec>("wire") {
     group = "verification"
@@ -206,4 +208,6 @@ tasks.register<JavaExec>("wire") {
     providers.gradleProperty("wireRounds").orNull?.let { args("--rounds", it) }
     if (providers.gradleProperty("wireAbPekko").isPresent) args("--pekko")
     if (wireAb.isPresent) args("--baseline", baselineClasspath.get().asFile.path)
+    providers.gradleProperty("wirePool").orNull?.let { args("--pool", it) }
+    if (providers.gradleProperty("wireAbPool").isPresent) args("--ab-pool")
 }

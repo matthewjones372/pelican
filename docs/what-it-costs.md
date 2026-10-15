@@ -445,6 +445,18 @@ git fetch origin
 `-PwireRounds=<n>` changes the three rounds and `-PwireAbPekko` adds Pekko.
 The first A/B run also builds the baseline, a few minutes more.
 
+**Jetty's thread pool.** The Jetty server JVM reads `pelican.jetty.pool`:
+`queued` is `start()`'s pool, Jetty's `QueuedThreadPool` running handlers on
+virtual threads, and `virtual` is Jetty's `VirtualThreadPool`, where its
+selectors and acceptors are virtual threads too. `-PwirePool=virtual` serves
+every Jetty run on it. `-PwireAbPool` compares the two within this checkout,
+`VirtualThreadPool` as A and the queued pool as B, with no second build:
+
+```bash
+./gradlew :benchmarks:wire -PwireAbPool -PwireScenario=both  # the two pools, A then B, three rounds
+./gradlew :benchmarks:wire -PwireAbPool -PwireSmoke          # checks the setup in a minute
+```
+
 **Main against main.** Placeholder: the noise table from
 `./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=both` run on
 `main`, on the cloud instance, goes here. Until it does, no A/B difference on
