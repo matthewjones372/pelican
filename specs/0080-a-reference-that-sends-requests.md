@@ -62,12 +62,12 @@ written down does not depend on that staying true.
 
 ## Stack
 
-- [ ] **`spec-0080-scalar-page`**: `ScalarLook`, its builder, `scalarHtml`;
+- [ ] **`spec-0080-scalar-page`** ([#305](https://github.com/matthewjones372/pelican/pull/305)): `ScalarLook`, its builder, `scalarHtml`;
       tests in `pelican-openapi`.
       Done when: the page carries options, css and stylesheets, `telemetry` and
       `proxyUrl` default off and yield to `options`, and `</script>` in the
       document or css cannot end the script or style.
-- [ ] **`spec-0080-scalar-route`**: `scalarReference` in `DocsBuilder`, the
+- [ ] **`spec-0080-scalar-route`** ([#307](https://github.com/matthewjones372/pelican/pull/307)): `scalarReference` in `DocsBuilder`, the
       refusals, both backends serving it; `example` asserts it over a socket.
       Done when: one `docs { }` serves Swagger at `/api-docs` and Scalar at
       `/reference` on Pekko and Jetty, reading `/openapi.json`.
