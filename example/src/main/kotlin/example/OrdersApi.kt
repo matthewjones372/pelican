@@ -185,7 +185,7 @@ fun ordersApi(): Api = api(
  * serving docs is opt-in, and `start()` alone serves the endpoints and nothing
  * else. `startWithDocs(docs = ordersDocs)` is what adds the pages: Swagger UI
  * at /api-docs to try a call, and a Redoc reference at /reference to read, in
- * the shop's own look (specs 0071 and 0081).
+ * the shop's own look (specs 0071 and 0082).
  */
 val ordersDocs = docs {
     docsPath = "/api-docs"

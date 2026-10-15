@@ -7,7 +7,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
-/** One theme, read by Redoc where Redoc reads each slot. See spec 0081. */
+/** One theme, read by Redoc where Redoc reads each slot. See spec 0082. */
 class ReferenceThemeTest {
 
     private fun redoc(configure: RedocLookBuilder.() -> Unit) = RedocLookBuilder().apply(configure).build()
