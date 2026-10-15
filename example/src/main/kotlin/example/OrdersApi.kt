@@ -185,26 +185,22 @@ fun ordersApi(): Api = api(
  * serving docs is opt-in, and `start()` alone serves the endpoints and nothing
  * else. `startWithDocs(docs = ordersDocs)` is what adds the pages: Swagger UI
  * at /api-docs to try a call, and a Redoc reference at /reference to read, in
- * the shop's own look (spec 0071).
+ * the shop's own look (specs 0071 and 0081).
  */
 val ordersDocs = docs {
     docsPath = "/api-docs"
     reference("/reference") {
-        logo(ORDERS_LOGO, altText = "Orders", backgroundColor = "#F2FBFA")
-        stylesheet("https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap")
-        options = jsonObj {
-            put(
-                "theme",
-                jsonObj {
-                    put("colors", jsonObj { put("primary", jsonObj { "main" to "#0B7A75" }) })
-                    put("typography", jsonObj { "fontFamily" to "Inter, sans-serif" })
-                    put("sidebar", jsonObj { "backgroundColor" to "#F2FBFA" })
-                },
-            )
-            "expandResponses" to "200,201"
+        theme {
+            accent = "#0B7A75"
+            sidebar = "#F2FBFA"
+            font("Inter, sans-serif", stylesheet = INTER)
+            logo(ORDERS_LOGO, altText = "Orders", backgroundColor = "#F2FBFA")
         }
+        options = jsonObj { "expandResponses" to "200,201" }
     }
 }
+
+private const val INTER = "https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
 
 /** A box with a tick, small enough to ride in the page as a `data:` URI rather than be served from somewhere. */
 private const val ORDERS_LOGO =

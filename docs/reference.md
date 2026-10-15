@@ -43,7 +43,7 @@ them is [Version alignment and the BOM](modules.md#version-alignment-and-the-bom
 | `pelican-kotlinx` | `main` | core, kotlinx-serialization-json | the `Codecs` for `@Serializable` payloads: kotlinx reads bodies, and the same `SerialDescriptor`s describe types |
 | `pelican-arrow` | yes | core, arrow-core | Arrow's `Either` into Pelican's `Outcome` and back: `toOutcome()`, its naming overloads, and `toEither()` |
 | `pelican-pekko` | yes | core; Pekko *provided* | descriptions to a Pekko HTTP `Route`, and `start` to serve it |
-| `pelican-pekko-docs` | yes | pekko, openapi | serves the document and a page (Swagger UI or Redoc) over HTTP |
+| `pelican-pekko-docs` | yes | pekko, openapi | serves the document and a page (Swagger UI or Redoc), and a Redoc or Scalar reference beside it, over HTTP |
 | `pelican-pekko-mcp` | yes | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
 | `pelican-client-pekko` | yes | core; Pekko HTTP *provided* | where a generated client's requests go: `ClientTransport` over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
 | `pelican-streams` | yes | pekko; Pekko and lark *provided* | a streamed upload as a lark `Stream` on Pekko, and the run's end as the declared `Outcome` |
@@ -3514,7 +3514,8 @@ ordersApi().startWithDocs(port = 8080, docs = docs { ui = DocsUi.Redoc; docsPath
 Swagger UI is a console: one operation expanded at a time, with the request form
 at the centre and *Try it out* sending real calls. Redoc is a read-only
 three-panel reference, which is the better of the two for a surface people read
-rather than poke. Both render the same document, and Swagger UI is configured no
+rather than poke. Scalar, served beside either as `scalarReference` below, is a
+three-panel reference that also sends requests. Both render the same document, and Swagger UI is configured no
 further than the title the API already carries.
 
 #### A reference beside the console, in your own look
@@ -3557,9 +3558,64 @@ The one pairing that is refused rather than ignored is `ui = DocsUi.Redoc` with
 `oauth`: Redoc sends no requests, so a flow configured there would register a
 redirect page nothing opens. `docs { }` fails at build time naming both.
 
-Both pages load their JavaScript from a CDN (`unpkg` for Swagger UI,
-`jsDelivr` for Redoc) so a browser that cannot reach one gets an empty page.
-That is as true of the Swagger UI page today as of the Redoc one.
+#### A reference that sends requests
+
+Redoc only reads. `scalarReference` serves Scalar instead: a three-panel
+reference like Redoc's, whose client sends a request from the page to the API.
+
+```kotlin
+docs {
+    docsPath = "/api-docs"                    // Swagger UI, as before
+    scalarReference("/reference") {           // Scalar, to read and to try
+        theme {
+            accent = "#0B7A75"
+            font("Inter, sans-serif", stylesheet = "https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap")
+        }
+    }
+}
+```
+
+`theme { }` is described below and works on either reference. `options` is
+Scalar's config, passed to `Scalar.createApiReference` as it is.
+`css` reaches Scalar as its `customCss`, which it applies after its own. Scalar
+sets its `--scalar-*` variables on `.light-mode` and `.dark-mode`, not on
+`:root`, so a theme sets them there too. Scalar has no logo option. Pelican sets
+`telemetry: false` and `proxyUrl: null` under the options, so requests go from
+the browser to the API and nowhere else; a service that wants either sets it in
+`options`. A service serves one reference page, so `reference` and
+`scalarReference` together are refused, as is either on `docsPath` or
+`openApiPath`.
+
+#### One theme for either reference
+
+`theme { }` names the slots a brand has, and both references read it, so a
+service can move between Redoc and Scalar without rewriting its look:
+
+```kotlin
+theme {
+    accent = "#0B7A75"                         // links, buttons, the selected operation
+    text = "#1F2933"                           // body and sidebar text
+    sidebar = "#F2FBFA"                        // the sidebar's background
+    success = "#2F855A"                        // success responses
+    error = "#C53030"                          // error responses
+    font("Inter, sans-serif", stylesheet = "https://fonts.googleapis.com/css2?family=Inter&display=swap")
+    codeFont("'JetBrains Mono', monospace")
+    logo("/logo.svg", altText = "Orders")      // Redoc only
+}
+```
+
+Under Redoc each slot lands where Redoc's `theme` reads it, and `options` is
+laid over it key by key, so a raw `theme.colors.primary` still wins and the
+theme's other keys stay. Under Scalar the slots become `--scalar-*` variables
+on `.light-mode` and `.dark-mode`, before the service's `css`, and the page is
+forced light, as Redoc's always is; `options` can say otherwise. Scalar has no
+logo, so a theme with one is refused under `scalarReference`. A blank slot is
+refused where it is written. Per-method colours, spacing and anything else
+past these slots stay in the renderer's own `options` or `css`.
+
+The pages load their JavaScript from a CDN (`unpkg` for Swagger UI,
+`jsDelivr` for Redoc and Scalar) so a browser that cannot reach one gets an empty page.
+That is as true of the Swagger UI page as of the other two.
 
 ### Which version the document says, and how to choose
 
