@@ -199,6 +199,7 @@ public final class io/github/matthewjones372/pelican/openapi/ScalarLookBuilder {
 	public final fun getOptions ()Lio/github/matthewjones372/pelican/JsonObj;
 	public final fun setOptions (Lio/github/matthewjones372/pelican/JsonObj;)V
 	public final fun stylesheet (Ljava/lang/String;)V
+	public final fun theme (Lkotlin/jvm/functions/Function1;)V
 }
 
 public final class io/github/matthewjones372/pelican/openapi/ScalarReference {
