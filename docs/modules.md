@@ -162,7 +162,7 @@ service. See [Versions](reference.md#versions).
 | Module | Availability | Depends on | Provides |
 |---|---|---|---|
 | `pelican-pekko` | 1.0.0 | core, `slf4j-api`; Pekko HTTP *provided* | descriptions to Pekko HTTP routes, and `start` to bind them |
-| `pelican-pekko-docs` | 1.0.0 | pekko, openapi | the document and a Swagger UI or Redoc page and a Redoc or Scalar reference beside it, as a route |
+| `pelican-pekko-docs` | 1.0.0 | pekko, openapi | the document and a Swagger UI or Redoc page and a Redoc or RapiDoc reference beside it, as a route |
 | `pelican-pekko-mcp` | 1.0.0 | pekko, mcp-server | MCP tools over Streamable HTTP on `/mcp`, as a route |
 | `pelican-test-pekko` | 1.0.0 | pekko, test | `inMemory()` through Pekko's own routing, no socket |
 | `pelican-client-pekko` | 1.0.0 | core; Pekko HTTP *provided* | a generated client's transport over Pekko HTTP's client. No server |
@@ -182,7 +182,7 @@ since it has no cross-build to choose.
 | Module | Availability | Depends on | Provides |
 |---|---|---|---|
 | `pelican-jetty` | main only | core, `jetty-server` 12.1.13, `slf4j-api` | descriptions to a Jetty `Handler` (`toHandler`), and `start` to serve it |
-| `pelican-jetty-docs` | main only | jetty, openapi | the document and a Swagger UI or Redoc page and a Redoc or Scalar reference beside it, as a `Handler` |
+| `pelican-jetty-docs` | main only | jetty, openapi | the document and a Swagger UI or Redoc page and a Redoc or RapiDoc reference beside it, as a `Handler` |
 | `pelican-jetty-mcp` | main only | jetty, mcp-server | MCP tools over Streamable HTTP on `/mcp`, as a `Handler` |
 | `pelican-test-jetty` | main only | jetty, test | `inMemory(handlers)` through a `LocalConnector`: no socket, but Jetty's own HTTP parsing |
 | `pelican-client-jetty` | main only | core, `jetty-client` | a generated client's transport over Jetty's `HttpClient`. No server |
