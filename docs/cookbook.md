@@ -440,7 +440,7 @@ val streamOrders = endpoint(userId, limit) {
 ```
 
 ```kotlin
-// pelican-jetty: a Sequence<T>, pulled one element per write
+// pelican-jetty: a Sequence<T>, pulled as the socket takes it
 import io.github.matthewjones372.pelican.jetty.streamedNow
 
 streamOrders streamedNow { (id, max) -> Store.orders(id, max, status = null).asSequence() }

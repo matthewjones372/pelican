@@ -378,7 +378,7 @@ import io.github.matthewjones372.pelican.jetty.streamedNow
 
 val routes = listOf(
     getOrder handledNow { id -> store.order(id) },
-    streamOrders streamedNow { store.orders().asSequence() },   // pulled one element per write
+    streamOrders streamedNow { store.orders().asSequence() },   // pulled as the socket takes it
 )
 
 val server = api(routes, JacksonCodecs).start(port = 8080)        // binds 127.0.0.1
@@ -454,9 +454,13 @@ handlers of their own, in `pelican-jetty-docs` and `pelican-jetty-mcp`, put
 after `toHandler` by `handlerWithDocs` and `handlerWithMcp`.
 
 **Streams, both ways, are blocking `Sequence`s**, which is what a virtual
-thread is for. A streamed response is written one element per
-`Response.write`, waiting for each write to complete, so a consumer that stops
-reading stops the producer; when the write fails because the client has gone,
+thread is for. A streamed response's first element goes out in its own
+`Response.write`; elements pulled while a write is still in flight are
+gathered into the next one, which is sent the moment that write completes, up
+to the connector's `outputAggregationSize` (8 KiB by default), past which the
+producer waits. So a consumer that stops reading stops the producer one buffer
+ahead, and an element followed by a pause is not held back by the pause. When
+a write fails because the client has gone,
 the thread pulling the sequence is interrupted, which is how a sequence
 sleeping or blocked between elements finds out. An `sse` keep-alive is
 scheduled on Jetty's own scheduler and fills any gap that long between
@@ -2351,7 +2355,7 @@ backend. Jetty has no equivalent and writes the brackets and commas itself, as
 ## Streaming behaviour
 
 - `ndjson` / `sse` / `jsonArray` write the source element by element. On Jetty
-  the source is a `Sequence`, pulled one element per completed write; see [On
+  the source is a `Sequence`, pulled at most one buffer ahead of the socket; see [On
   Jetty](#on-jetty). On Pekko each element is mapped into
   `HttpEntities.createChunked`, and back-pressure runs from the socket through
   Pekko Streams to your source. Tests throttle a source and fail if the first

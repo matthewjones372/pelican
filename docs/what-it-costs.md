@@ -450,6 +450,11 @@ The first A/B run also builds the baseline, a few minutes more.
 `main`, on the cloud instance, goes here. Until it does, no A/B difference on
 this page can be called larger than the noise.
 
+**Gathered frames.** Jetty writes the frames pulled while a write is in flight
+as one write, up to `outputAggregationSize` (8 KiB by default). Placeholder:
+`-PwireScenario=stream` against the `main` before it, on the cloud instance,
+goes here.
+
 ## Routing as the number of endpoints grows
 
 **What is measured.** Every other table uses an API of one endpoint, which

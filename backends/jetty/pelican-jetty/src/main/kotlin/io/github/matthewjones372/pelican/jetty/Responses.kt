@@ -24,16 +24,12 @@ import io.github.matthewjones372.pelican.spi.successNamedBy
 import io.github.matthewjones372.pelican.spi.taggedBody
 import org.eclipse.jetty.http.HttpHeader
 import org.eclipse.jetty.server.Response
-import org.eclipse.jetty.util.BufferUtil
 import org.eclipse.jetty.util.Callback
-import org.eclipse.jetty.util.thread.Scheduler
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
-import java.util.concurrent.Semaphore
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 
 private const val JSON = "application/json"
@@ -92,102 +88,37 @@ internal fun Reply.writeTo(response: Response, callback: Callback) {
 
 private val STREAM_WRITERS: Executor = Executors.newVirtualThreadPerTaskExecutor()
 
-/**
- * One write per frame, each waited on before the next is pulled, so a slow reader holds the producer. A failed
- * write ends the iteration, and the elements' iterator is closed however it ends.
- */
+/** The elements' iterator is closed however the stream ends. */
 private fun Streamed.writeFrames(response: Response, callback: Callback) {
     val upstream = elements.iterator()
-    val writer = FrameWriter(response, keepAlive, Thread.currentThread())
+    val writer = FrameWriter(
+        response,
+        response.request.components.scheduler,
+        response.request.connectionMetaData.httpConfiguration.outputAggregationSize,
+        keepAlive,
+        Thread.currentThread(),
+    )
     try {
-        writer.commit()
-        frames(upstream.asSequence()).filter { it.isNotEmpty() }.forEach(writer::write)
-        writer.finish(callback)
-    } catch (t: Throwable) {
-        writer.stop()
-        callback.failed(t)
+        writeFrames(frames(upstream.asSequence()), writer, callback)
     } finally {
         (upstream as? AutoCloseable)?.close()
     }
 }
 
 /**
- * Serialises the frames and the keep-alive comments: Jetty allows one pending write. A keep-alive that cannot be
- * written means the client has gone, so it interrupts [producer], which may be parked waiting for an element.
+ * A failure from the source or a write ends the iteration, after what was already handed over has gone, so the
+ * frames before a failure arrive as they did when each was written alone.
  */
-private class FrameWriter(
-    private val response: Response,
-    private val keepAlive: Duration?,
-    private val producer: Thread,
-) {
-    private val writing = Semaphore(1)
-    private val scheduler = response.request.components.scheduler
-    private var idle: Scheduler.Task? = null
-    private var stopped = false
-
-    /** Sends the status and headers before the first element is asked for, as Pekko does. */
-    fun commit() = write(ByteArray(0))
-
-    fun write(frame: ByteArray) {
-        writing.acquire()
-        try {
-            cancelKeepAlive()
-            val written = Callback.Completable()
-            response.write(false, ByteBuffer.wrap(frame), written)
-            written.get()
-        } finally {
-            writing.release()
-        }
-        scheduleKeepAlive()
-    }
-
-    fun finish(callback: Callback) {
-        writing.acquire()
-        stop()
-        response.write(true, BufferUtil.EMPTY_BUFFER, callback)
-    }
-
-    @Synchronized
-    fun stop() {
-        stopped = true
-        cancelKeepAlive()
-    }
-
-    @Synchronized
-    private fun cancelKeepAlive() {
-        idle?.cancel()
-        idle = null
-    }
-
-    @Synchronized
-    private fun scheduleKeepAlive() {
-        if (keepAlive == null || stopped) return
-        idle?.cancel()
-        idle = scheduler.schedule(::fill, keepAlive.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-    }
-
-    /** On the scheduler. A frame being written means the stream is not idle, and it reschedules once written. */
-    private fun fill() {
-        if (!writing.tryAcquire()) return
-        response.write(
-            false,
-            ByteBuffer.wrap(KEEP_ALIVE),
-            Callback.from(
-                {
-                    writing.release()
-                    scheduleKeepAlive()
-                },
-                {
-                    writing.release()
-                    stop()
-                    producer.interrupt()
-                },
-            ),
-        )
+internal fun writeFrames(frames: Sequence<ByteArray>, writer: FrameWriter, callback: Callback) {
+    try {
+        writer.commit()
+        frames.filter { it.isNotEmpty() }.forEach(writer::write)
+        writer.finish(callback)
+    } catch (t: Throwable) {
+        writer.abandon()
+        callback.failed(t)
     }
 }
-
-private val KEEP_ALIVE = SseOutput.KEEP_ALIVE_FRAME.toByteArray()
 
 /**
  * Frames documents as one JSON array, as Pekko's `EntityStreamingSupport.json()` does. The bracket travels with
