@@ -457,10 +457,89 @@ every Jetty run on it. `-PwireAbPool` compares the two within this checkout,
 ./gradlew :benchmarks:wire -PwireAbPool -PwireSmoke          # checks the setup in a minute
 ```
 
-**Main against main.** Placeholder: the noise table from
-`./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=both` run on
-`main`, on the cloud instance, goes here. Until it does, no A/B difference on
-this page can be called larger than the noise.
+**Main against main.** `origin/main` as A and as B, three rounds each, run on
+the cloud instance with nothing else running. Any difference below that is
+inside these ranges is noise on this machine.
+
+```bash
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=both
+```
+
+The machine: 4 cores, Intel Xeon @ 2.10GHz, one thread per core, 16 GB, no
+swap, Ubuntu 24.04.5 LTS, a Linux 6.18.44 Firecracker VM, JDK 25.0.4.1+1-LTS
+for the benchmark and JDK 21 for Gradle. Load averages were 0.00, 0.00, 0.00 on
+the freshly booted machine before the run and 4.72, 4.05, 4.05 after it (the
+run took about 55 minutes). During the run the load generator and server share
+the four cores, so the per-run loads in the file were 6 to 11.
+
+**Reading it.** At the middle rates the medians of identical builds agree on
+p50 to within about 4%, but p99 moves by 7% to 21% and p99.9 by 20% to 50%
+between sides, and a single side's own p99 range is often 2x to 5x wide. A
+result on this machine is therefore trusted only when the two ranges are
+disjoint and the gap is large: roughly 5% on p50, and a factor of 2 or more on
+p99 and p99.9. The highest sustained rate moved one step on the JSON scenario
+(B failed to keep up at 50000 req/s in one round of three, so its highest sustained rate there was 40000),
+so one rung of the ladder is also noise. Across the whole table only 2 of 48
+rows came out "outside the spread" with identical builds.
+
+#### Rest (JSON GET and POST)
+
+Highest sustained req/s: A 50000 (runs: 50000, 50000, 50000), B 50000 (runs: 50000, 50000, 40000).
+
+| req/s | percentile | A median | A range | B median | B range | B vs A | outside the spread |
+|---|---|---|---|---|---|---|---|
+| 1000 | p50 | 508µs | 490µs to 515µs | 528µs | 478µs to 530µs | +3.8% | no |
+| 1000 | p99 | 2.6ms | 1.7ms to 8.4ms | 3.1ms | 3.0ms to 7.2ms | +18.7% | no |
+| 1000 | p99.9 | 7.4ms | 3.8ms to 73.6ms | 23.5ms | 7.2ms to 84.7ms | +217.2% | no |
+| 5000 | p50 | 204µs | 199µs to 215µs | 198µs | 188µs to 207µs | -2.8% | no |
+| 5000 | p99 | 978µs | 629µs to 1.2ms | 1.1ms | 917µs to 1.2ms | +13.0% | no |
+| 5000 | p99.9 | 3.8ms | 3.7ms to 6.2ms | 5.7ms | 5.5ms to 6.4ms | +49.6% | no |
+| 10000 | p50 | 215µs | 210µs to 217µs | 213µs | 199µs to 217µs | -0.8% | no |
+| 10000 | p99 | 1.7ms | 1.4ms to 3.2ms | 1.5ms | 1.4ms to 3.2ms | -11.9% | no |
+| 10000 | p99.9 | 7.8ms | 7.5ms to 53.9ms | 10.5ms | 7.8ms to 26.7ms | +34.7% | no |
+| 20000 | p50 | 268µs | 267µs to 276µs | 271µs | 265µs to 277µs | +1.3% | no |
+| 20000 | p99 | 6.2ms | 3.3ms to 7.1ms | 5.7ms | 4.9ms to 6.1ms | -7.4% | no |
+| 20000 | p99.9 | 26.0ms | 12.2ms to 30.9ms | 20.5ms | 14.7ms to 40.0ms | -21.3% | no |
+| 30000 | p50 | 357µs | 336µs to 386µs | 354µs | 319µs to 380µs | -0.7% | no |
+| 30000 | p99 | 8.3ms | 7.8ms to 10.2ms | 10.0ms | 7.0ms to 13.5ms | +21.1% | no |
+| 30000 | p99.9 | 20.6ms | 19.6ms to 20.6ms | 28.3ms | 16.2ms to 38.9ms | +37.8% | no |
+| 40000 | p50 | 721µs | 611µs to 762µs | 608µs | 536µs to 1.0ms | -15.8% | no |
+| 40000 | p99 | 10.5ms | 9.2ms to 11.6ms | 9.4ms | 8.9ms to 12.8ms | -10.0% | no |
+| 40000 | p99.9 | 17.0ms | 16.9ms to 23.2ms | 20.1ms | 16.9ms to 25.9ms | +18.0% | no |
+| 50000 | p50 | 3.1ms | 3.0ms to 4.8ms | 2.7ms | 2.7ms to 11.5ms | -10.1% | no |
+| 50000 | p99 | 57.4ms | 27.8ms to 60.5ms | 53.4ms | 37.1ms to 280.2ms | -7.0% | no |
+| 50000 | p99.9 | 86.8ms | 48.6ms to 87.8ms | 73.7ms | 49.0ms to 308.0ms | -15.0% | no |
+| 60000 | p50 | 1241.5ms | 1224.7ms to 1461.7ms | 988.8ms | 888.1ms to 1089.5ms | -20.4% | yes, faster |
+| 60000 | p99 | 1922.0ms | 1916.8ms to 1954.5ms | 1902.1ms | 1839.2ms to 1965.0ms | -1.0% | no |
+| 60000 | p99.9 | 1991.2ms | 1978.7ms to 1995.4ms | 1960.3ms | 1929.4ms to 1991.2ms | -1.6% | no |
+
+#### Stream (NDJSON and SSE)
+
+Highest sustained responses/s: A 4000 (runs: 4000, 4000, 4000), B 4000 (runs: 4000, 4000, 4000).
+
+| responses/s | percentile | A median | A range | B median | B range | B vs A | outside the spread |
+|---|---|---|---|---|---|---|---|
+| 250 | p50 | 994µs | 986µs to 1.0ms | 982µs | 945µs to 1.1ms | -1.2% | no |
+| 250 | p99 | 4.5ms | 4.4ms to 5.4ms | 4.2ms | 4.0ms to 6.8ms | -7.1% | no |
+| 250 | p99.9 | 10.3ms | 9.7ms to 43.1ms | 25.3ms | 24.4ms to 29.4ms | +145.7% | no |
+| 500 | p50 | 869µs | 855µs to 906µs | 892µs | 889µs to 966µs | +2.7% | no |
+| 500 | p99 | 3.5ms | 3.2ms to 4.3ms | 6.1ms | 4.0ms to 7.5ms | +73.6% | no |
+| 500 | p99.9 | 10.1ms | 7.5ms to 148.6ms | 45.0ms | 40.2ms to 54.5ms | +344.3% | no |
+| 1000 | p50 | 824µs | 797µs to 855µs | 779µs | 755µs to 814µs | -5.5% | no |
+| 1000 | p99 | 80.1ms | 4.4ms to 93.2ms | 3.7ms | 2.6ms to 4.5ms | -95.4% | no |
+| 1000 | p99.9 | 159.3ms | 40.4ms to 208.0ms | 9.1ms | 6.5ms to 15.1ms | -94.3% | yes, faster |
+| 2000 | p50 | 717µs | 696µs to 738µs | 753µs | 664µs to 775µs | +4.9% | no |
+| 2000 | p99 | 6.7ms | 4.0ms to 9.0ms | 4.2ms | 3.8ms to 4.4ms | -37.8% | no |
+| 2000 | p99.9 | 23.9ms | 12.3ms to 53.7ms | 11.6ms | 11.3ms to 15.0ms | -51.6% | no |
+| 3000 | p50 | 851µs | 762µs to 982µs | 786µs | 715µs to 905µs | -7.6% | no |
+| 3000 | p99 | 5.4ms | 3.9ms to 7.4ms | 5.1ms | 4.8ms to 6.4ms | -5.9% | no |
+| 3000 | p99.9 | 12.0ms | 9.2ms to 15.6ms | 13.5ms | 9.8ms to 46.5ms | +12.3% | no |
+| 4000 | p50 | 1.1ms | 1.0ms to 1.2ms | 1.1ms | 942µs to 1.2ms | +5.8% | no |
+| 4000 | p99 | 6.8ms | 6.7ms to 9.4ms | 11.5ms | 8.1ms to 25.5ms | +68.6% | no |
+| 4000 | p99.9 | 12.5ms | 11.3ms to 27.0ms | 36.7ms | 14.7ms to 73.7ms | +192.9% | no |
+| 6000 | p50 | 458.5ms | 41.9ms to 644.3ms | 428.9ms | 40.0ms to 431.0ms | -6.5% | no |
+| 6000 | p99 | 1051.7ms | 213.8ms to 1317.0ms | 1234.2ms | 169.9ms to 1432.4ms | +17.3% | no |
+| 6000 | p99.9 | 1098.9ms | 260.8ms to 1431.3ms | 1285.6ms | 211.0ms to 1504.7ms | +17.0% | no |
 
 ### Thread pool
 
