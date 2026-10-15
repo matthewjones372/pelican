@@ -86,6 +86,7 @@ private class Child(name: String, side: Side) : AutoCloseable {
         "-Xms1g",
         "-Xmx1g",
         "-Dpelican.jetty.pool=${side.pool}",
+        "-Dpelican.jetty.connector=${side.connector}",
         "-cp",
         side.classpath,
         "io.github.matthewjones372.pelican.benchmarks.wire.WireServerKt",
@@ -310,9 +311,9 @@ private fun comparison(server: String, scenario: Scenario, a: List<List<Step>>, 
 
 private const val PERCENT = 100.0
 
-/** A classpath to run a server from, and the Jetty pool `start()` builds there (spec 0085). */
-private class Side(val name: String, val classpath: String, val pool: String) {
-    override fun toString() = "$name, $pool pool"
+/** A classpath to run a server from, and the Jetty pool and connector settings `start()` uses there (spec 0085). */
+private class Side(val name: String, val classpath: String, val pool: String, val connector: String = "") {
+    override fun toString() = "$name, $pool pool, connector ${connector.ifEmpty { "defaults" }}"
 }
 
 /** What `:benchmarks:wire` passes: the output directory, then any of the flags `main` reads. */
@@ -328,14 +329,17 @@ private class Options(private val args: Array<String>) {
     private val own = System.getProperty("java.class.path")
     private val pool = value("--pool") ?: "queued"
     private val abPool = "--ab-pool" in args
+    private val connector = value("--connector").orEmpty()
+    private val abConnector = value("--ab-connector")
 
-    /** A: this checkout, on `VirtualThreadPool` with `--ab-pool`. */
-    val mine = Side("this checkout", own, if (abPool) "virtual" else pool)
+    /** A: this checkout, on `VirtualThreadPool` with `--ab-pool` or with `--ab-connector`'s settings. */
+    val mine = Side("this checkout", own, if (abPool) "virtual" else pool, abConnector ?: connector)
 
-    /** B, if any: this checkout on the queued pool with `--ab-pool`, or `--baseline`'s build. */
+    /** B, if any: this checkout on its defaults with `--ab-pool` or `--ab-connector`, or `--baseline`'s build. */
     val baseline: Side? = when {
-        abPool -> Side("this checkout", own, "queued")
-        else -> value("--baseline")?.let { Side("the baseline", File(it).readText().trim(), pool) }
+        abPool -> Side("this checkout", own, "queued", connector)
+        abConnector != null -> Side("this checkout", own, pool)
+        else -> value("--baseline")?.let { Side("the baseline", File(it).readText().trim(), pool, connector) }
     }
     val rounds = if (smoke) 1 else value("--rounds")?.toInt() ?: DEFAULT_ROUNDS
     val pekko = "--pekko" in args

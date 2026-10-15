@@ -192,7 +192,9 @@ val wireBaseline = tasks.register("wireBaseline") {
  * `rest` (the default), `stream` or `both`. `-PwireAb=<ref>` compares Jetty from this checkout (A) with Jetty from
  * `<ref>` (B), alternating for `-PwireRounds` rounds (3), into `build/wire-ab.md`; `-PwireAbPekko` adds Pekko.
  * `-PwirePool=queued|virtual` picks the pool Jetty's `start()` builds; `-PwireAbPool` compares this checkout on
- * `VirtualThreadPool` (A) with it on the queued pool (B), with no second build.
+ * `VirtualThreadPool` (A) with it on the queued pool (B), with no second build. `-PwireConnector=<k=v,...>` applies
+ * Jetty connector settings to every Jetty run; `-PwireAbConnector=<k=v,...>` compares this checkout with those
+ * settings (A) against it on Jetty's defaults (B), with no second build.
  */
 tasks.register<JavaExec>("wire") {
     group = "verification"
@@ -210,4 +212,6 @@ tasks.register<JavaExec>("wire") {
     if (wireAb.isPresent) args("--baseline", baselineClasspath.get().asFile.path)
     providers.gradleProperty("wirePool").orNull?.let { args("--pool", it) }
     if (providers.gradleProperty("wireAbPool").isPresent) args("--ab-pool")
+    providers.gradleProperty("wireConnector").orNull?.let { args("--connector", it) }
+    providers.gradleProperty("wireAbConnector").orNull?.let { args("--ab-connector", it) }
 }
