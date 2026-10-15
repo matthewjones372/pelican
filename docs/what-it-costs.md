@@ -418,6 +418,38 @@ seconds behind schedule, so that step stopped early.
   be that handoff rather than Pekko itself, but this run does not separate the
   two.
 
+### Measuring a change
+
+`-PwireAb=<ref>` compares two builds on one machine. The current checkout is
+A. `<ref>` is checked out as a worktree under `benchmarks/build/wire-ab`, this
+checkout's `WireServer.kt` is copied into it so that only the libraries
+differ, and it is built by its own Gradle as B. Jetty from each then climbs
+the same ladder in turn, A then B, for three rounds (ABABAB), and
+`benchmarks/build/wire-ab.md` gives, per rate and percentile, each side's
+median and range over its rounds, B against A, and whether the two ranges are
+disjoint. Overlapping ranges mean the difference is inside run-to-run noise.
+
+`-PwireScenario=stream` swaps the GET and POST for two streamed responses of
+100 frames of about 40 bytes, one NDJSON and one SSE, alternating, timed to
+the last byte and counted in responses a second. `both` runs each scenario in
+turn.
+
+```bash
+git fetch origin
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=both  # on main: the noise, about 35 to 45 minutes
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=rest  # on a branch: the JSON GET and POST, about 17 minutes
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=stream  # on a branch: the streams, about 15 to 25 minutes
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireSmoke  # one round, one short step: checks the setup in a minute
+```
+
+`-PwireRounds=<n>` changes the three rounds and `-PwireAbPekko` adds Pekko.
+The first A/B run also builds the baseline, a few minutes more.
+
+**Main against main.** Placeholder: the noise table from
+`./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=both` run on
+`main`, on the cloud instance, goes here. Until it does, no A/B difference on
+this page can be called larger than the noise.
+
 ## Routing as the number of endpoints grows
 
 **What is measured.** Every other table uses an API of one endpoint, which
@@ -544,6 +576,8 @@ retested rather than current results.
 ./gradlew :benchmarks:jmh -PbenchmarkArgs="-prof jfr"             # a flight recording per fork
 ./gradlew :benchmarks:wire                # the socket run, about eight minutes
 ./gradlew :benchmarks:wire -PwireSmoke    # one short step per server, to check the setup
+./gradlew :benchmarks:wire -PwireScenario=stream  # the NDJSON and SSE responses instead
+./gradlew :benchmarks:wire -PwireAb=origin/main   # this checkout against main; see Measuring a change
 ```
 
 `-PbenchmarkArgs` is passed to JMH as written, so a class name filters the run
