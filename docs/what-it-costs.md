@@ -1,209 +1,230 @@
 # What it costs
 
-Linked from the [README](../README.md); kept here because a benchmark is
-detail, and the front page only has to say that it was measured.
+Linked from the [README](../README.md).
 
-A description has to be interpreted, and that is not free. What it costs is
-measured rather than argued about, by a JMH harness in the
-[`benchmarks`](../benchmarks) module: the same endpoint written twice, once
-described with Pelican and interpreted onto a backend, once written directly
-against that backend's own routing. Both decode a path parameter and an
-optional query parameter with a default, and both encode the same object with
-the same Jackson mapper, so what is left in the difference is the interpreter.
+A Pelican endpoint is a description, and a backend module interprets it on
+every request: it matches the path against the descriptions, decodes the
+declared inputs, calls the handler and renders the declared response. This
+page measures what that interpretation costs, by running the same endpoint
+twice on the same backend: once described with Pelican, once written directly
+against the backend's own routing. Both sides decode the same inputs and encode
+the same object with the same Jackson mapper, so the difference is the
+interpreter.
 
-## How these numbers were taken
+The measurements are taken with JMH in the [`benchmarks`](../benchmarks)
+module, plus one end-to-end run over a socket. They are numbers from one
+machine at a time, and the answer differs by backend and by where the handler
+runs.
 
-```bash
-./gradlew :benchmarks:jmh                       # everything
-./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 Pekko"    # one file, one fork
-./gradlew :benchmarks:jmh -PbenchmarkArgs="-prof jfr"     # a flight recording per fork
-```
+## Contents
 
-JMH 1.37, average time in nanoseconds per request, three forks, five
-one-second warmup iterations and five one-second measured ones per fork. Errors
-are JMH's 99.9% confidence interval over the fifteen measured iterations.
-Allocation is `-prof gc`'s `gc.alloc.rate.norm`, which is on by default,
-counts every thread rather than only the one calling, and — unlike a timing —
-is the same number every run.
+- [The short answer](#the-short-answer)
+- [How the measurements are taken](#how-the-measurements-are-taken)
+- [Pekko, in memory](#pekko-in-memory)
+- [Jetty, in memory](#jetty-in-memory)
+- [Pekko and Jetty over a socket](#pekko-and-jetty-over-a-socket)
+- [Routing as the number of endpoints grows](#routing-as-the-number-of-endpoints-grows)
+- [Decoding a body: Jackson and kotlinx](#decoding-a-body-jackson-and-kotlinx)
+- [Streaming and framing](#streaming-and-framing)
+- [Historical: http4k, before it left `main`](#historical-http4k-before-it-left-main)
+- [What the old harness got wrong](#what-the-old-harness-got-wrong)
+- [Reproducing these numbers](#reproducing-these-numbers)
 
-Two machines appear on this page. The Pekko, Jetty, decode and wire tables name
-the cloud instance. The http4k, routing scale and empty-endpoint tables were
-taken earlier on the Apple M3 and say so below.
+## The short answer
 
-- **The cloud instance**, which took the Pekko, Jetty, decode and wire tables:
-  an Intel Xeon at 2.80GHz, 4 cores (one thread each), 16GB, Ubuntu 24.04.5 LTS,
-  Linux 6.18.44 in a Firecracker microVM, on JDK 25.0.4.1, which is the
-  toolchain `benchmarks/build.gradle.kts` names. Gradle itself ran on OpenJDK
-  21.0.12. Pekko 1.7.1, Pekko HTTP 1.4.1, Jetty 12.1.13.
+- **On Pekko, with the handler on the dispatcher**, Pelican is faster than an
+  idiomatic hand-written route, level with one that avoids
+  `parameterOptional`, and **356ns and 784 bytes** behind the fastest route
+  written by hand. That last figure is the interpreter's cost on this endpoint.
+- **On Jetty, with the handler on the Jetty thread**, Pelican and the
+  hand-written handler overlap within their error on both a GET and a POST, so
+  the interpreter's time is below what this benchmark can resolve. It
+  allocates **1.1 to 1.3KB** more per request.
+- **Running a synchronous handler on a virtual thread**, which is the default on
+  both backends, is the largest cost measured. On Pekko's in-memory GET it is
+  about 50 times the dispatcher figure, and the reason has not been
+  investigated. On Jetty it adds about 9.5KB of allocation per request. A
+  handler that never blocks can opt out with `Handlers.onDispatcher`.
+- **On a JSON POST**, Pekko's body handling costs far more than routing does,
+  and Pelican on the dispatcher cannot be told apart from the hand-written
+  route in time. It allocates 2.0KB more.
+- **Routing stays flat** as an API grows from 1 to 200 endpoints, because
+  Pelican indexes the path templates instead of trying routes in turn. That
+  table was taken on an older machine and an older build and has not been
+  retaken.
+
+| Backend | Measurement | Baseline | Principal result | Detail |
+|---|---|---|---|---|
+| Pekko | in memory, `GET`, JMH | fastest hand-written route | +356ns, +784B | [Pekko](#pekko-in-memory) |
+| Pekko | in memory, `GET`, JMH | idiomatic hand-written route | 375ns faster, 1.6KB less | [Pekko](#pekko-in-memory) |
+| Pekko | in memory, JSON `POST`, JMH | hand-written `extractStrictEntity` | time within error, +2.0KB | [Pekko](#reading-a-body-on-pekko) |
+| Jetty | `LocalConnector`, `GET` and `POST`, JMH | hand-written Jetty core handler | time within error, +1.1 to 1.3KB | [Jetty](#jetty-in-memory) |
+| Pekko, Jetty | loopback socket, open-model load | each other, both Pelican | not an overhead measurement; see the section | [Over a socket](#pekko-and-jetty-over-a-socket) |
+| Pekko | in memory, 1 to 200 endpoints, JMH | none comparable on `main` | flat at 645 to 713ns | [Routing](#routing-as-the-number-of-endpoints-grows) |
+
+Rows from different sections are not comparable with each other. The Pekko
+benchmark hands the route a request that is already an object; the Jetty one
+parses and generates HTTP bytes; the socket run measures two whole servers
+under load; the routing table comes from a different machine. Each section
+says what its own baseline is.
+
+What this page does **not** establish:
+
+- That Pelican is free. It costs hundreds of nanoseconds and some kilobytes on
+  the endpoints measured here, and more where a handler is moved onto a
+  virtual thread.
+- How a service will perform in production. The in-memory benchmarks exclude
+  the network on purpose, and the socket run puts its load generator on the
+  same four cores as the servers.
+- Anything about endpoints shaped very differently from the ones measured: one
+  path parameter and one optional query parameter, and a small JSON body.
+
+For scale: the interpreter's own cost on the dispatcher is a few hundred
+nanoseconds. Median request latency in the
+[socket run](#pekko-and-jetty-over-a-socket), at the rates both servers
+sustained, was 283µs to 1.4ms, and a database call typically takes
+milliseconds. At that scale it is a small fraction
+of a request. The virtual-thread handoff measured on Pekko, about 77µs in
+memory, is not small at that scale, which is why it is called out above. The
+per-request work is the bag of decoded values, the `Params` around it and the
+response. None of the benchmarks here vary the number of declared inputs, so
+how the cost changes with them is not measured.
+
+## How the measurements are taken
+
+### The harness
+
+Each benchmark is a JMH class in `benchmarks/src/main/kotlin`. The `jmh` task
+runs them with JMH 1.37, reporting average time per operation. Unless a
+section says otherwise, every benchmark uses the same settings, declared on
+the class:
+
+- **Three forks**, each a fresh JVM. A JIT decision can go one of two ways per
+  process, and only separate JVMs show it. One historical row below is bimodal
+  for exactly this reason.
+- **Five one-second warmup iterations and five one-second measured
+  iterations** per fork, so fifteen measured iterations in all.
+- **Errors are JMH's 99.9% confidence interval** over those fifteen
+  iterations. Where two rows' intervals overlap, this page says the
+  difference is not resolved rather than reporting the gap between the means.
+- **Allocation is `-prof gc`'s `gc.alloc.rate.norm`**, bytes per operation,
+  which the task always passes. It counts every thread rather than only the
+  caller, and unlike time it barely varies from run to run, so it is often the
+  steadier of the two results.
+- **A pinned 512MB heap** per fork. These handlers allocate three or four
+  gigabytes a second and keep none of it. With the default heap ceiling, a
+  quarter of the machine's RAM, the young generation grew until its pages
+  stopped being resident, and on a workstation with an IDE open the benchmark
+  reported 491µs for a 14µs operation before the heap was pinned.
+- **Every benchmark returns its response**, which is how JMH knows the work was
+  not dead code. A handler whose result went unused could be optimised away.
+
+The benchmarks are not tests and nothing runs them as part of `check` or
+`build`. That keeps the coverage agent out of them: instrumentation rewrites
+more of Pelican than of a hand-written route, which is exactly the comparison
+being made, so a measurement taken through the agent reports the agent.
+
+The in-memory benchmarks have no socket, no connection handling and no OS
+scheduling of network I/O. That flatters both sides equally and isolates the
+layer under test; the [socket run](#pekko-and-jetty-over-a-socket) is the
+complement.
+
+### The machines
+
+Two machines appear on this page, and their numbers are never compared with
+each other.
+
+- **The cloud instance**, which took every current table: the Pekko, Jetty,
+  decode and socket measurements, in October 2026. An Intel Xeon at 2.80GHz,
+  4 cores (one thread each), 16GB, Ubuntu 24.04.5 LTS, Linux 6.18.44 in a
+  Firecracker microVM. The benchmarks ran on JDK 25.0.4.1, the toolchain
+  `benchmarks/build.gradle.kts` names; Gradle itself ran on OpenJDK 21.0.12.
+  Pekko 1.7.1, Pekko HTTP 1.4.1, Jetty 12.1.13.
 - **An Apple M3** (four performance and four efficiency cores), 24GB, macOS
-  26.5.2, on Temurin 21.0.9+10, which took the older tables: the http4k ones,
-  the routing scale and the empty endpoint. They have not been retaken, so do
-  not read them against the cloud instance's numbers.
+  26.5.2, on Temurin 21.0.9+10, which took the older tables: the routing scale,
+  and everything involving http4k. These were taken in August 2026 against the
+  interpreter as it was then, and have not been retaken.
 
-Two things about the harness are worth knowing before reading the table. Each
-fork runs with a pinned 512MB heap: these handlers allocate three or four
-gigabytes a second and keep none of it, and with the default ceiling of a
-quarter of the machine's RAM the young generation grows until its pages stop
-being resident. On a workstation with an IDE open that turns the benchmark into
-a measurement of paging, and it reported 491µs for a 14µs operation before the
-heap was pinned. And every benchmark returns its response, which is how JMH
-knows the work was not dead code; a handler whose result went unused could be
-optimised away entirely, and the fastest possible route is the one that does
-nothing.
+### A quiet machine matters
 
-Nothing wires the run into `check` or `build`, so it happens only when asked
-for. It is also not a test, which is how the coverage agent stays out of it:
-instrumentation rewrites bytecode, and it rewrites more of Pelican than of a
-hand-written route — precisely the comparison being made — so a measurement
-taken through the agent reports the agent. That cost an afternoon to notice
-when the benchmarks were tests. JMH forks its own JVMs and there is no test
-task left for an agent to attach to.
+A benchmark is only as quiet as the machine under it. The M3 tables were taken
+on an otherwise idle machine. The cloud instance had nothing else running, but
+its load average was about 2 during the JMH runs (JMH's own threads) and much
+higher during and just after the socket run, where the driver is part of the
+load. Each section gives the load average it saw.
 
-Everything below is in-memory. No socket, no connection handling, no OS
-scheduling. That flatters both sides equally and isolates the layer under test.
+The same command on the same laptop, with an IDE indexing a fresh module and
+eight gigabytes of swap in use, once reported two to five times these figures
+with error bars to match, and one row at thirty-five times. If a result comes
+back with an error close to its own size, that is the machine talking, and the
+run is worth repeating rather than reading.
 
-Some of the tables below hold http4k rows, taken while `pelican-http4k` was on
-main. That module and
-[its benchmark](https://github.com/matthewjones372/pelican/blob/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/benchmarks/src/main/kotlin/io/github/matthewjones372/pelican/benchmarks/Http4kOverheadBenchmark.kt)
-were taken off `main` for 1.0, and are in the history at commit
-[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e);
-they are meant to come back after 1.0. The numbers are left in because they
-were really measured, before the modules were removed, and because what they
-show is a claim about the interpreter rather than about one server. Each such
-table says so. Running them again means checking out `a6c20b2` and running
-`:benchmarks:jmh` there.
+## Pekko, in memory
 
-## http4k, measured before the module was removed (at `a6c20b2`)
+**What is measured.** One endpoint, `GET /items/{itemId}?limit=`, answering
+JSON, plus a JSON `POST /items`. Every route is sealed and called with
+`Route.function(system)`, so none of them pays for a socket; this is the same
+choice the in-memory transport in `pelican-test-pekko` makes.
 
-One endpoint, `GET /items/{itemId}?limit=`, answering JSON. Taken on the Apple M3.
+**The comparison.** Three hand-written Pekko routes for the GET, because one
+alone gives the wrong impression:
 
-| | per request | allocated |
-|---|---|---|
-| **Pelican, interpreted onto http4k** | **1215 ± 23ns** | **5643 ± 29B** |
-| http4k written the ordinary way | 1581 ± 365ns | 5725 ± 86B |
-| http4k with the response hand-tuned | 1140 ± 38ns | 5384 ± 25B |
+- *idiomatic*: `PathMatchers` and `parameterOptional`, the way the Pekko
+  documentation writes it;
+- *matchers only*: `PathMatchers`, with the query read off the request;
+- *one directive*: a single `extractRequest` that matches the path and reads
+  the query itself, which is what Pelican's interpreter does.
 
-Two baselines, because one would flatter. An http4k `Response` is immutable, so
-the idiomatic `Response(status).header(...).body(...)` copies it at each step —
-three responses and two header lists where one of each will do. That chain is
-worth 341 bytes a request, and building the response in one construction is a
-trick anyone can use, so the second row is the honest comparison against
-somebody who has done the same thing by hand. Against it the interpreter costs
-**75ns and 259 bytes**; against the idiomatic route it is 366ns and 83 bytes
-*ahead*, which is a statement about the copies rather than about Pelican.
-
-The wide error on the middle row is real and is the harness earning its keep.
-That benchmark is bimodal at the fork level: one JVM settled at 2040ns and two
-at 1350ns, each of them flat to within one per cent across five iterations. It
-is a JIT decision that goes one of two ways per process, which is exactly the
-thing a single-JVM loop cannot see and forks exist to expose. Read the row as
-"1350 or 2040, depending on the JVM", not as a number with a wobble.
-
-## What matching costs when there is more than one endpoint
-
-The tables in this section were taken on the Apple M3, not the cloud instance.
-
-Every table above uses an API of **one** endpoint, which measures decoding and
-rendering and says nothing about the thing that varies most between services.
-Registered with a router directly, the routes are reduced with
-`Directives.concat` into an ordered scan. The endpoint under test is declared
-last — the worst case a scan has, and the one a service acquires by adding
-endpoints over time.
-
-`./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"` — a class of its
-own, so the six-minute run above is unchanged. The two http4k columns were
-measured before the module was removed, at `a6c20b2`, as above;
-`RoutingScaleBenchmark` on main runs the Pekko column and its hand-written
-control.
-
-| endpoints | **Pelican on http4k** | http4k routes, by hand | **Pelican on Pekko** |
-|---|---|---|---|
-| 1 | **220 ± 28ns** | 1725 ± 667ns | **713 ± 23ns** |
-| 50 | **226 ± 21ns** | 37,920 ± 1095ns | **701 ± 122ns** |
-| 200 | **223 ± 9ns** | 149,170 ± 7720ns | **645 ± 28ns** |
-
-Both Pelican columns are flat, and the hand-written one is not. That is the
-whole of the difference between holding descriptions and holding handlers: given
-a list of opaque handlers a router can only try them in turn, and given the path
-templates they can be walked into a trie once and matched by segment afterwards.
-
-These are whole requests — a path parameter decoded, the handler run, the
-response encoded — not a dispatch microbenchmark. At two hundred endpoints
-http4k is **669 times** what the same service cost written by hand, and Pekko is
-two orders of magnitude over its own control.
-
-The single-endpoint row is worth reading twice: **220ns against 1725ns**, so this
-is not only a large-service story. Matching one template through http4k's router
-costs more than walking a trie that happens to have one entry in it.
-
-What replaced what: an earlier attempt grouped the routes under a prefix using
-http4k's own nesting, and measured 155µs at two hundred — an outer scan is still
-a scan. Only owning the dispatch moves the number.
-
-Ktor dispatches through the same index — `Route.pelican` installs one route per
-method the descriptions use and the trie decides which endpoint answers — and is
-not measured here either.
-
-## An endpoint with nothing to decode, measured before http4k was removed (at `a6c20b2`)
-
-`GET /ping`, answering text. Taken on the Apple M3.
-
-| | per request | allocated |
-|---|---|---|
-| **Pelican** | **392 ± 59ns** | **2232B** |
-| http4k | 359 ± 26ns | 2069 ± 17B |
-
-34ns and 163 bytes. The interpreter still has to match the description and
-choose the output shape even when there is nothing to decode, and this is what
-that costs on its own.
-
-## Pekko
-
-The same endpoint again, and three ways of writing it by hand rather than one,
-because the first number alone leaves the wrong impression. Every route here is
-sealed with `Route.function(system)`, so none of them pays for a socket, the
-same choice the in-memory transport in `pelican-test-pekko` makes. Pelican is
-measured twice: with `toRoute(system, Handlers.onDispatcher)`, which runs the
-synchronous handler on Pekko's dispatcher like the hand-written routes do, and
-on a virtual thread, which is what `toRoute` does by default.
+Pelican is measured twice: with `toRoute(system, Handlers.onDispatcher)`, which
+runs the synchronous handler on Pekko's dispatcher as the hand-written routes
+do, and on a virtual thread, which is what `toRoute` does by default.
 
 `./gradlew :benchmarks:jmh -PbenchmarkArgs="PekkoOverhead"`, on the cloud
-instance described above, with the settings above (three forks, five and five
-one-second iterations, a 512MB heap). The load average was 9.85 when the run
-started, left over from the wire run before it, and 2.06 when it ended. The run
-took about six minutes.
+instance, with the shared settings. The run took about six minutes. The load
+average was 9.85 when it started, left over from the socket run before it, and
+2.06 when it ended.
 
 | | per request | allocated |
 |---|---|---|
-| **Pelican, interpreted onto Pekko, handler on the dispatcher** | **1584 ± 68ns** | **3185 ± 64B** |
+| **Pelican, handler on the dispatcher** | **1584 ± 68ns** | **3185 ± 64B** |
 | Pelican, handler on a virtual thread (the default) | 78,499 ± 3352ns | 14,028 ± 116B |
 | Pekko, idiomatic (`PathMatchers` + `parameterOptional`) | 1959 ± 99ns | 4841 ± 3B |
 | Pekko, `PathMatchers` with the query read off the request | 1492 ± 96ns | 3801 ± 2B |
 | Pekko, one directive and both read off the request | 1228 ± 54ns | 2401 ± 2B |
 
-Against the idiomatic route, Pelican on the dispatcher is 375ns and 1.6KB
-under. That is a statement about `parameterOptional`, which the idiomatic row
-and the one below it price at about 470ns and a kilobyte on their own. Take that
-one directive out and a hand-written route draws level: 92ns apart, inside the
-two errors added together, and Pelican allocates 616 bytes less. Write the whole
-thing as a single `extractRequest` that matches the path and reads the query
-itself, which is what the interpreter does, and the hand-written version is
-**356ns and 784 bytes** ahead, which is the cost of the interpreter on this
-endpoint.
+**What it shows.**
 
-The virtual-thread row is 50 times the dispatcher row in time and 10.8KB above
-it in allocation. A synchronous handler that never blocks can opt out with
-`Handlers.onDispatcher`. The time gap is far larger than the extra allocation
-would explain, and this machine has four cores to hand a request between; I have
-not looked into where the time goes, and a machine with more cores may show a
-smaller gap.
+- Against the idiomatic route, Pelican on the dispatcher is **375ns and 1.6KB
+  cheaper**. That says more about `parameterOptional` than about Pelican: the
+  idiomatic row and the one below it put that one directive at about 470ns and
+  a kilobyte.
+- Against the matchers-only route, the two are 92ns apart, inside the sum of
+  their errors, so the time difference is not resolved. Pelican allocates 616
+  bytes less.
+- Against the single-directive route, the hand-written version is **356ns and
+  784 bytes ahead**, clear of both errors. This is the interpreter's cost on
+  this endpoint.
+- On a virtual thread the same request takes about 50 times as long and
+  allocates 10.8KB more.
 
-## Reading a body
+**Limitations.**
 
-The GET cases above never materialise anything: the request has no entity and
-the response is strict. `POST /items` with a JSON body is where Pekko's streams
-actually turn, because `toStrict` materialises. Same command, machine and run as
-the table above.
+- The virtual-thread gap is far larger than the extra allocation would
+  explain, and I have not looked into where the time goes. This machine has
+  four cores to hand a request between; a machine with more may show a smaller
+  gap. Treat the figure as measured but unexplained.
+- The run started on a machine still busy from the socket benchmark. The
+  intervals are tight, but a retake on an idle machine would be the cleaner
+  number.
+- One endpoint shape. Endpoints with more inputs, or larger responses, are not
+  measured.
+
+### Reading a body on Pekko
+
+The GET above never materialises a stream: the request has no entity and the
+response is strict. A JSON `POST /items` is where Pekko's streams actually run,
+because `toStrict` materialises one. The hand-written baseline uses
+`extractStrictEntity`. Same command, machine and run as the GET.
 
 | | per request | allocated |
 |---|---|---|
@@ -211,38 +232,44 @@ the table above.
 | Pelican, handler on a virtual thread (the default) | 105.1 ± 5.5µs | 15,699 ± 150B |
 | Pekko, hand-written `extractStrictEntity` | 97.5 ± 31.3µs | 12,234 ± 352B |
 
-Two orders of magnitude more than the routing above. Pelican on the dispatcher
-allocates 2.0KB more than the hand-written route, and its time is not
-distinguishable from it: the hand-written row's error of 31µs covers the
-difference. Pelican on a virtual thread is the slowest of the three, 25µs above
-the dispatcher. See
+**What it shows.** A body costs two orders of magnitude more than routing does
+on this backend. Pelican on the dispatcher allocates 2.0KB more than the
+hand-written route, and its time cannot be told apart from it: the
+hand-written row's error of 31µs covers the difference, so the lower mean is
+not evidence that Pelican is faster. Pelican on a virtual thread is clearly
+slower than Pelican on the dispatcher, by about 25µs; against the hand-written
+route it overlaps.
+
+**Limitations.** The hand-written row's wide interval makes this the least
+precise comparison on the page. The interpreter keeps a second way of reading a
+body for chunked uploads, which this benchmark does not exercise; see
 [`ChunkedBodyLimitTest`](../backends/pekko/pelican-pekko/src/test/kotlin/io/github/matthewjones372/pelican/pekko/ChunkedBodyLimitTest.kt)
-for why the interpreter keeps a second way of reading a body.
+for why it exists.
 
-## Jetty
+## Jetty, in memory
 
-The same GET and the same JSON POST, served by `toHandler` and by a
-`Handler.Abstract` written against Jetty 12 core that matches the path, reads
-the query with `Request.extractQueryParameters`, reads the body with
-`Content.Source.asByteArrayAsync` and writes the same Jackson bytes. Each runs
-on its own started `Server` with `PELICAN_URI_COMPLIANCE`, and every request
-goes through a `LocalConnector`.
+**What is measured.** The same GET and the same JSON POST, served by
+`toHandler` on a started Jetty `Server` with `PELICAN_URI_COMPLIANCE`, with
+every request sent through a `LocalConnector`.
 
-**These numbers are not comparable with the Pekko tables above, column to
-column.** A `LocalConnector` has no socket, but it is a real connector: each
-request arrives as bytes, is parsed as HTTP/1.1 by Jetty's parser on Jetty's
-thread pool, and its response is generated back into bytes that the caller
-waits for. Pekko's `Route.function` does none of that; it takes an
-`HttpRequest` that is already an object and returns one. The Jetty rows include
-a parse, a generate and two thread handoffs per request, so they say what
+**The comparison.** A `Handler.Abstract` written against Jetty 12 core that
+matches the path, reads the query with `Request.extractQueryParameters`, reads
+the body with `Content.Source.asByteArrayAsync` and writes the same Jackson
+bytes, on its own started `Server`. Pelican is measured with the handler on the
+Jetty thread (`Handlers.onDispatcher`) and on a virtual thread, the default.
+
+**Why these numbers do not compare with Pekko's.** A `LocalConnector` has no
+socket, but it is a real connector: each request arrives as bytes, is parsed as
+HTTP/1.1 on Jetty's thread pool, and its response is generated back into bytes
+that the caller waits for. Pekko's `Route.function` does none of that: it takes
+an `HttpRequest` that is already an object and returns one. The Jetty rows
+include a parse, a generate and two thread handoffs per request. They say what
 Pelican costs on Jetty against Jetty by hand, and nothing about which server is
-faster. That comparison needs a socket under both.
+faster.
 
 `./gradlew :benchmarks:jmh -PbenchmarkArgs="JettyOverhead DecodeBenchmark"`,
-with the settings above: three forks, five and five one-second iterations, a
-512MB heap. Jetty 12.1.13, on JDK 25.0.4.1, on the cloud instance described
-above. The load average was 2.06 at the start and 2.37 at the end; the run took
-about ten minutes.
+on the cloud instance, with the shared settings. The run took about ten
+minutes, with a load average of 2.06 at the start and 2.37 at the end.
 
 | | per request | allocated |
 |---|---|---|
@@ -253,51 +280,59 @@ about ten minutes.
 | Pelican, `POST /items`, on a virtual thread | 146 ± 10µs | 27,635 ± 175B |
 | Jetty core, hand-written `POST /items` | 120 ± 17µs | 17,076 ± 86B |
 
-Pelican on the Jetty thread and the hand-written handler overlap inside their
-error on both requests. Most of each figure is the connector's thread handoffs,
-which Pelican and the hand-written handler pay alike, so the interpreter's own
-time is below what this benchmark can resolve. Allocation is the steadier half.
-Against Jetty by hand, Pelican on the Jetty thread allocates **1283 bytes** more
-on the GET and **1082 bytes** more on the POST. Moving a synchronous handler onto
-a virtual thread, which `toHandler` does unless given `Handlers.onDispatcher`,
-costs about **9.5KB** a request on top. On the POST it is also the one row whose
-time sits above the others, by about 23µs over the hand-written handler, at the
-edge of the errors; on the GET it overlaps. A handler that never blocks can opt
-out of it.
+**What it shows.**
+
+- On both requests, Pelican on the Jetty thread and the hand-written handler
+  overlap within their error. Most of each figure is the connector's thread
+  handoffs, which both pay alike, so the interpreter's own time is below what
+  this benchmark can resolve.
+- Allocation is the steadier result. Pelican on the Jetty thread allocates
+  **1283 bytes** more than Jetty by hand on the GET and **1082 bytes** more on
+  the POST.
+- A virtual thread adds about **9.5KB** a request on both. On the POST it is
+  also the one row whose time sits above the others: about 26µs over the
+  hand-written handler and 23µs over Pelican on the Jetty thread, at the edge
+  of the errors. On the GET its time overlaps.
+
+**Limitations.** With most of the time spent in the connector, a regression in
+the interpreter of a few hundred nanoseconds would not show here. A benchmark
+that calls Jetty's handler without the connector would be needed to resolve
+the time difference, and none exists yet.
 
 ## Pekko and Jetty over a socket
 
-The tables above are in process, and the Jetty ones parse HTTP where the Pekko
-ones do not, so neither says which server is faster. `:benchmarks:wire` does:
-it starts Pelican on Pekko and Pelican on Jetty, each with its own `start()`
-and its defaults (synchronous handlers on a virtual thread per request; Jetty's
-`QueuedThreadPool` of 200 with virtual threads for handlers, Pekko's default
-dispatcher), each in a JVM of its own with a 1GB heap, and drives them in turn
-over loopback with the same GET and JSON POST as the tables above, alternating.
+**What is measured.** Two whole servers under load: Pelican on Pekko and
+Pelican on Jetty, each started through its own `start()` with its defaults,
+each in a JVM of its own with a 1GB heap, driven in turn over loopback with the
+same GET and JSON POST as the tables above, alternating. The defaults matter:
+synchronous handlers run on a virtual thread per request on both. Jetty uses
+its `QueuedThreadPool` of 200 with virtual threads for handlers; Pekko uses its
+default dispatcher.
 
-The driver is open-model: requests leave on a fixed schedule whether or not
-earlier ones have answered, and each one's latency runs from when it should
-have left, so a stall shows in every request queued behind it. It runs on
-Jetty's `HttpClient` with at most 256 requests in flight, because the JDK's
-client fell behind its own schedule at 20,000 to 40,000 requests a second and
-above that was measuring itself. Each server is warmed for 30 seconds at 5,000
-requests a second, then each rate runs 5 seconds unrecorded and 15 recorded. A
-server stops keeping up at the first rate whose p99 reaches 100ms, that loses
-more than 0.1% of its requests, or whose senders fall two seconds behind.
+**The comparison.** The two servers against each other. **Both are Pelican,
+so this is not a measurement of the interpreter's overhead.** It answers the
+question the in-memory tables cannot: with HTTP parsing, sockets and
+scheduling included on both, how do the two backends behave under a rising
+request rate?
 
-```bash
-./gradlew :benchmarks:wire              # about eight minutes; the table also lands in benchmarks/build/wire-result.md
-./gradlew :benchmarks:wire -PwireSmoke  # one short step per server, to check the setup
-```
+**The driver.** The load is open-model: requests leave on a fixed schedule
+whether or not earlier ones have answered, and each request's latency is
+measured from when it should have left, so a stall shows in every request
+queued behind it. The driver runs on Jetty's `HttpClient` with at most 256
+requests in flight; the JDK's client was tried first and fell behind its own
+schedule at 20,000 to 40,000 requests a second, at which point it was
+measuring itself. Each server is warmed for 30 seconds at 5,000 requests a
+second, then each rate runs for 5 seconds unrecorded and 15 recorded. A server
+stops keeping up at the first rate whose p99 reaches 100ms, that loses more
+than 0.1% of its requests, or whose senders fall two seconds behind.
 
-Measured on the cloud instance described above: an Intel Xeon at 2.80GHz, 4
-cores, 16GB, Ubuntu 24.04.5 LTS, Linux 6.18.44, JDK 25.0.4.1, Pekko 1.7.1, Pekko
-HTTP 1.4.1, Jetty 12.1.13. The command was `./gradlew :benchmarks:wire`, and it
-took 5m 58s. **The driver and both servers shared those four cores**, so the
-ceiling in this table is the pair's, not the server's alone. Load average on the
-machine was 1.70 before Pekko's warmup and 14.17 after its last rate; Jetty
-started at 13.28 (the average lags, so most of that is Pekko's own run) and ended
-at 10.70. The machine was idle at the start (0.25 one minute after boot).
+`./gradlew :benchmarks:wire` on the cloud instance, taking 5m 58s. **The
+driver and both servers shared the same four cores**, so each ceiling below
+belongs to the pair of driver and server, not to the server alone. The machine
+was idle at the start (load average 0.25 one minute after boot). The load
+average was 1.70 before Pekko's warmup and 14.17 after its last rate; Jetty
+started at 13.28, most of which is Pekko's run because the average lags, and
+ended at 10.70.
 
 | server | req/s | p50 | p99 | p99.9 | max | requests | errors | kept up |
 |---|---|---|---|---|---|---|---|---|
@@ -313,37 +348,97 @@ at 10.70. The machine was idle at the start (0.25 one minute after boot).
 | jetty | 30000 | 1.2ms | 29.6ms | 53.7ms | 85.9ms | 450000 | 0 | yes |
 | jetty | 40000 | 110.7ms | 825.8ms | 846.2ms | 862.5ms | 600000 | 0 | no |
 
-Requests are the recorded ones, over 15 seconds. Pekko at 30,000 sent 338,323 of
-the 450,000 it was due to, because its senders fell more than two seconds behind
-schedule, so that run stopped early.
+`requests` counts the recorded requests over 15 seconds. Pekko at 30,000 sent
+338,323 of the 450,000 it was due to, because its senders fell more than two
+seconds behind schedule, so that step stopped early.
 
-Reading it: Pekko's last rate that kept up was 20,000 requests a second and
-Jetty's was 30,000. Jetty's first failure, at 40,000, is the senders falling
-behind rather than errors, as Pekko's was at 30,000. At the rates both sustain,
-Jetty's tails are lower: p99 is 1.3 to 2.3ms against 6.7 to 8.1ms at 1,000 to
-10,000 requests a second, and p99.9 is 6 to 10ms against 23 to 50ms. At 20,000
-the gap narrows: p99 14.1ms against 21.9ms and p99.9 40.7ms against 45.7ms, so
-at that rate both are close to their limit on four cores. Median latency at
-5,000 and 10,000 is 283 to 324µs on Jetty and 663 to 807µs on Pekko.
+**What it shows.**
 
-Two cautions. Both servers' 1,000 requests a second row has a higher p99.9 than
-their 5,000 row, which I have not explained; the first row after the 30-second
-warmup may still be warming. And one run per server, in a fixed order with Pekko
-first, is no evidence about run-to-run variation: it says nothing about whether
-a second run would put the ceilings in the same place.
+- On this machine, with this driver, Pekko's last rate that kept up was 20,000
+  requests a second and Jetty's was 30,000. Both failed by the senders falling
+  behind, not by errors.
+- At the rates both sustained, Jetty's latencies were lower. From 1,000 to
+  10,000 requests a second, p99 was 1.3 to 2.3ms on Jetty against 6.7 to 8.1ms
+  on Pekko, p99.9 was 6 to 10ms against 23 to 50ms, and the median at 5,000
+  and 10,000 was 283 to 324µs against 663 to 807µs.
+- At 20,000 the gap narrows (p99 14.1ms against 21.9ms, p99.9 40.7ms against
+  45.7ms): both are close to their limit on four shared cores.
 
-## Reading a body: Jackson and kotlinx
+**Limitations.**
 
-`DecodeBenchmark` reads one JSON body of each size with no route and no
-server, so only the codec is measured. "via String" decodes the bytes to a
-`String` first, which is what a codec's `decodeFromString` takes; "via bytes"
-hands the codec the bytes, which is `JacksonCodecs`' `UTF8StreamJsonParser` and
-`KotlinxCodecs.decodeFrom`'s stream reader.
+- This is one run per server, in a fixed order with Pekko first. It is no
+  evidence about run-to-run variation, and says nothing about whether a second
+  run would put the ceilings in the same place.
+- The driver competes with the server for the same four cores, and the load
+  average shows it. A ceiling here is not a server's capacity, and neither
+  figure is a production throughput.
+- Both servers' 1,000 requests a second row has a higher p99.9 than their
+  5,000 row. That has not been explained; the first step after the warmup may
+  still be warming.
+- Both servers run handlers on virtual threads, the default. Given what the
+  in-memory Pekko table shows for virtual threads, some of Pekko's latency may
+  be that handoff rather than Pekko itself, but this run does not separate the
+  two.
 
-`./gradlew :benchmarks:jmh -PbenchmarkArgs="JettyOverhead DecodeBenchmark"`,
-three forks, five and five one-second iterations, JDK 25.0.4.1, on the cloud
-instance described above (the run in the Jetty section; load average 2.06 to
-2.37).
+## Routing as the number of endpoints grows
+
+**What is measured.** Every other table uses an API of one endpoint, which
+measures decoding and rendering and says nothing about matching a request
+against many endpoints. `RoutingScaleBenchmark` builds APIs of 1, 50 and 200
+endpoints and requests the one declared **last**, the worst case for a router
+that tries routes in order, and the one a service acquires by adding endpoints
+over time. Each request is a whole request: a path parameter decoded, the
+handler run, the response encoded.
+
+**The comparison.** Given a list of opaque handlers, a router can only try them
+in turn. Given path templates, Pelican builds a trie once and matches a
+request by its segments. Registered with Pekko directly, routes are reduced
+with `Directives.concat` into an ordered scan, and the benchmark includes that
+hand-written control.
+
+`./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"`, on the
+Apple M3, in August 2026.
+
+| endpoints | **Pelican on Pekko** |
+|---|---|
+| 1 | **713 ± 23ns** |
+| 50 | **701 ± 122ns** |
+| 200 | **645 ± 28ns** |
+
+**What it shows.** The cost does not grow with the number of endpoints. Before
+Pekko's interpreter moved onto the index, it registered one route per endpoint
+and let `Directives.concat` scan them, and the same benchmark measured about
+150µs a request at 200 endpoints. The [historical http4k
+table](#routing-on-http4k) shows the same contrast with a hand-written control
+that was comparable.
+
+**Limitations.**
+
+- The hand-written Pekko control is in the benchmark but its numbers are not
+  reported here, because it is not comparable: it runs each request through a
+  materialised flow, which cost about 23µs on its own when last measured and
+  swamps the small end. Pelican's row calls the sealed route directly.
+- The decoys are `/resource{n}/{id}`, so every endpoint has a distinct first
+  path segment. That is the shape most flattering to an index and least
+  flattering to a scan. A service whose endpoints all sit under one prefix,
+  such as `/orders`, is not measured.
+- Taken on the M3 against the August 2026 interpreter, with `-f 1` (one fork).
+  It has not been retaken on the cloud instance, so it cannot be read against
+  the Pekko table above. Jetty dispatches through the same index, and is not
+  measured here.
+
+## Decoding a body: Jackson and kotlinx
+
+**What is measured.** `DecodeBenchmark` decodes one JSON body of each size with
+no route and no server, so only the codec is measured.
+
+**The comparison.** Two routes into each library. "Via String" decodes the
+bytes to a `String` first, which is what a codec's `decodeFromString` takes.
+"Via bytes" hands the codec the bytes: `JacksonCodecs`' `UTF8StreamJsonParser`,
+and `KotlinxCodecs.decodeFrom`'s stream reader.
+
+`./gradlew :benchmarks:jmh -PbenchmarkArgs="JettyOverhead DecodeBenchmark"`, the
+same run as the [Jetty table](#jetty-in-memory), with the shared settings.
 
 | body | Jackson, via String | Jackson, via bytes | kotlinx, via String | kotlinx, via bytes |
 |---|---|---|---|---|
@@ -351,63 +446,179 @@ instance described above (the run in the Jetty section; load average 2.06 to
 | 1KB | 2521 ± 114ns, 3456B | 1748 ± 80ns, 2456B | 2788 ± 216ns, 2784B | 1493 ± 125ns, 2072B |
 | 64KB | 264 ± 11µs, 132,546B | 115 ± 7µs, 263,726B | 181 ± 9µs, 131,809B | 180 ± 10µs, 312,513B |
 
-Allocation is within 21 bytes either side on every cell. At 100 bytes kotlinx
-via String is the fastest and the only row clear of the others. At 1KB kotlinx
-via bytes is fastest, clear of Jackson via bytes by about 50ns beyond their
-errors. At 64KB Jackson via bytes is fastest by a wide margin: 115µs against
-180µs for either kotlinx route and 264µs for Jackson via String. On allocation,
-kotlinx allocates less than Jackson on small bodies by either route, and at 64KB
-the byte readers of both libraries allocate more than twice what the String
-route does, kotlinx's stream reader the most at 313KB for a 64KB body.
+Allocation varies by no more than 21 bytes either way in any cell.
+
+**What it shows.**
+
+- At 100 bytes, kotlinx via String is the fastest, and the only cell clear of
+  the others.
+- At 1KB, kotlinx via bytes is the fastest, clear of Jackson via bytes by about
+  50ns beyond their errors.
+- At 64KB, Jackson via bytes is the fastest by a wide margin: 115µs against
+  180µs for either kotlinx route and 264µs for Jackson via String.
+- On allocation, kotlinx allocates less than Jackson on the two small bodies by
+  either route. At 64KB the byte readers allocate more than the String route
+  does: about twice as much for Jackson, and 2.4 times for kotlinx, whose
+  stream reader allocates the most, 313KB for a 64KB body.
+
+**Limitations.** One payload shape at three sizes, decoded in isolation. Which
+codec is faster depends on the body size, so neither is faster overall. The
+result of an earlier run of this benchmark, which led to Pelican decoding
+bodies from bytes, is in
+[spec 0046](../specs/0046-the-decode-path-unmeasured.md).
+
+## Streaming and framing
+
+Two more benchmarks are in the module and are not retaken on this page. Their
+numbers were taken on 4 September 2026 and are recorded in the specs that
+asked for them, against the interpreter as it was then.
+
+- `StreamingOverheadBenchmark` compares an NDJSON response of 100 and 10,000
+  elements on Pekko against a hand-written `createChunked` route. Spec 0041
+  found the two within their error at both sizes, with identical allocation
+  per element. See [spec 0041](../specs/0041-what-the-description-costs-a-frame.md).
+- `FramingBenchmark` compares two ways of framing a streamed element (through
+  a `String`, or straight to bytes), and is a design measurement inside
+  Pelican rather than a comparison with hand-written code. See
+  [spec 0039](../specs/0039-three-allocations-a-frame.md), whose finding was
+  that the bytes route was slower in five cases of six, though it allocated
+  less, and was not adopted.
+
+Both run with `./gradlew :benchmarks:jmh -PbenchmarkArgs="StreamingOverhead"`
+and `-PbenchmarkArgs="Framing"`. The specs do not record the machine they were
+taken on in the detail this page does, so treat them as earlier findings to be
+retested rather than current results.
+
+## Historical: http4k, before it left `main`
+
+These tables measure `pelican-http4k`, which was taken off `main` before 1.0.0
+together with its benchmark. The module and
+[its benchmark](https://github.com/matthewjones372/pelican/blob/a6c20b20350dddb21ac4cbf2d22f88eb8756081e/benchmarks/src/main/kotlin/io/github/matthewjones372/pelican/benchmarks/Http4kOverheadBenchmark.kt)
+are in the history at commit
+[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e).
+**They cannot be rerun from the current branch**: reproducing them means
+checking out `a6c20b2` and running `:benchmarks:jmh` there. All of them were
+taken on the Apple M3, in August 2026.
+
+They are kept because they were measured, and because two of them make points
+about the interpreter rather than about one server: a fair baseline matters,
+and an index beats a scan. They have not been retested against the current
+interpreter.
+
+### One endpoint on http4k
+
+`GET /items/{itemId}?limit=`, answering JSON.
+
+| | per request | allocated |
+|---|---|---|
+| **Pelican, interpreted onto http4k** | **1215 ± 23ns** | **5643 ± 29B** |
+| http4k written the ordinary way | 1581 ± 365ns | 5725 ± 86B |
+| http4k with the response hand-tuned | 1140 ± 38ns | 5384 ± 25B |
+
+There are two baselines because one would flatter Pelican. An http4k
+`Response` is immutable, so the idiomatic `Response(status).header(...).body(...)`
+copies it at each step: three responses and two header lists where one of each
+will do. That chain is worth 341 bytes a request, and building the response in
+one construction is a trick anyone can use, so the hand-tuned row is the fair
+comparison. Against it the interpreter cost **75ns and 259 bytes**, clear of
+both errors. Against the idiomatic route it was ahead by 366ns and 82 bytes,
+which is a statement about the copies rather than about Pelican.
+
+The wide error on the middle row is the harness doing its job. That benchmark
+was bimodal at the fork level: one JVM settled at 2040ns and two at 1350ns,
+each flat to within one per cent across five iterations. It is a JIT decision
+that goes one of two ways per process, which a single-JVM loop cannot see and
+forks exist to expose. Read the row as "1350 or 2040, depending on the JVM",
+not as a number with a wobble.
+
+### An endpoint with nothing to decode
+
+`GET /ping`, answering text.
+
+| | per request | allocated |
+|---|---|---|
+| **Pelican** | **392 ± 59ns** | **2232B** |
+| http4k | 359 ± 26ns | 2069 ± 17B |
+
+Pelican allocated 163 bytes more, which is clear: the interpreter still matches
+the description and chooses the output shape when there is nothing to decode.
+The 33ns time difference is inside the two errors, so it is not resolved.
+
+### Routing on http4k
+
+From the same `RoutingScaleBenchmark`, with http4k columns, before the module
+was removed.
+
+| endpoints | **Pelican on http4k** | http4k routes, by hand |
+|---|---|---|
+| 1 | **220 ± 28ns** | 1725 ± 667ns |
+| 50 | **226 ± 21ns** | 37,920 ± 1095ns |
+| 200 | **223 ± 9ns** | 149,170 ± 7720ns |
+
+Unlike Pekko's, this hand-written control was comparable: the same routes
+registered with http4k's `routes(...)`, called the same way. Pelican's column is
+flat and the hand-written one grows with the endpoint count; at 200 endpoints
+the hand-written route is 669 times Pelican's figure. At one endpoint Pelican
+was ahead too, 220ns against 1725ns: matching one template through http4k's
+router cost more than walking a trie with one entry in it.
+
+Before Pelican took over dispatch on http4k, its routes measured the same as
+the hand-written ones, because both were the same ordered scan. An earlier
+attempt grouped the routes under a prefix using http4k's own nesting and
+measured 155µs at 200 endpoints: an outer scan is still a scan. Only owning the
+dispatch moved the number. The Ktor interpreter, also at `a6c20b2`, dispatched
+through the same index and was never measured.
 
 ## What the old harness got wrong
 
-These numbers replace a set taken by a JUnit test that looped and timed in one
-JVM, with no warmup control, no forks, nothing stopping the JIT deleting work
-whose result went unused, and allocation measured by differencing a thread
-counter. Most of what it said survives; two things do not, and are worth
-naming because they are the failure modes that harness had.
+Before JMH, these numbers came from a JUnit test that looped and timed in one
+JVM. It had no warmup control, no forks, nothing stopping the JIT deleting
+work whose result went unused, and it measured allocation by differencing a
+per-thread counter. Most of what it reported survived the move to JMH. Two
+claims did not, and they are worth naming because they are the failure modes
+that kind of harness has.
 
-**"Free on an endpoint with no inputs"** does not survive. The old harness
-reported 0ns for the ping case. Measured in its own forked JVM it is 34ns and
-163 bytes — small, but not nothing, and a number that only reaches zero when
-two handlers are timed in the same JVM off the same warmed profile.
+**"Free on an endpoint with no inputs"** did not survive. The old harness
+reported 0ns for the ping case. Measured in its own forked JVMs, Pelican
+allocated 163 bytes more, and its time was 33ns higher but within the error.
+A figure of zero only appears when two handlers are timed in the same JVM off
+the same warmed profile.
 
-**"0–35ns against http4k written the ordinary way"** does not survive either,
-and not in the direction you would expect: the interpreted route is 366ns
-*ahead* of the idiomatic one, not marginally behind it. The old figure came
-from timing both handlers in one process, where the JIT had seen every call
-site and neither shape got the compilation it would have had on its own.
+**"0 to 35ns behind http4k written the ordinary way"** did not survive either,
+and not in the expected direction: the interpreted route was 366ns *ahead* of
+the idiomatic one. The old figure came from timing both handlers in one
+process, where the JIT had seen every call site and neither shape got the
+compilation it would have had on its own.
 
-The allocation figures barely moved, which is the point of measuring them: 5643
-and 5725 bytes for that pair here, against 5808 and 5672 from the old harness.
-Differencing a counter was the one thing it did honestly, and even that only
-counted the calling thread — on Pekko, where the numbers are now whole-JVM,
-they are larger and more nearly true.
+The allocation figures barely moved: 5643 and 5725 bytes for that pair under
+JMH, against 5808 and 5672 from the old harness. Differencing a counter was the
+one thing it did honestly, and even that counted only the calling thread. On
+Pekko, where the numbers are now whole-JVM, they are larger and closer to the
+truth.
 
-Everything else the old document claimed is still standing, the Pekko claims
-as retaken on the cloud instance: Pelican is still cheaper than an idiomatic Pekko route, still level
-with one that drops `parameterOptional`, still a few hundred nanoseconds behind
-one written as a single directive, and, on a POST, no slower than a hand-written
-`extractStrictEntity` (within its error; Pelican allocates 2KB more).
+Measuring through the coverage agent was the other early mistake, and it is
+why the benchmarks are no longer tests at all; see
+[the harness](#the-harness).
 
-## For scale
+## Reproducing these numbers
 
-A loopback socket round trip is tens of microseconds and a database call is
-milliseconds, so on a realistic endpoint this is a fraction of a percent. It
-does not grow with the endpoint either — the cost is the per-request bag of
-decoded values, the `Params` around it and the response, and none of those
-scale with how many inputs are declared or how big the payload is. An endpoint
-that decodes nothing pays much the same as one that decodes two, which on the
-smaller absolute numbers of an empty endpoint reads as a larger ratio.
+```bash
+./gradlew :benchmarks:jmh                                         # every JMH benchmark
+./gradlew :benchmarks:jmh -PbenchmarkArgs="PekkoOverhead"         # the Pekko tables
+./gradlew :benchmarks:jmh -PbenchmarkArgs="JettyOverhead DecodeBenchmark"  # the Jetty and decode tables
+./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"     # the routing sweep, one fork
+./gradlew :benchmarks:jmh -PbenchmarkArgs="-prof jfr"             # a flight recording per fork
+./gradlew :benchmarks:wire                # the socket run, about eight minutes
+./gradlew :benchmarks:wire -PwireSmoke    # one short step per server, to check the setup
+```
 
-One caution about reproducing any of this. A benchmark is only as quiet as the
-machine under it, and the Apple M3 tables were taken on an otherwise idle one, and the cloud
-instance's were taken with nothing else running but a load average of about 2
-during the JMH runs (JMH's own threads), and much higher during the wire run,
-where the driver is part of the load. The same
-command on the same laptop, with an IDE indexing a fresh module and eight
-gigabytes of swap in use, reported two to five times these figures with error
-bars to match — one row came back at thirty-five times. If a score arrives with
-an error anywhere near its own size, that is the machine talking and not the
-library, and the run is worth repeating rather than reading.
+`-PbenchmarkArgs` is passed to JMH as written, so a class name filters the run
+and `-f`, `-wi` and `-i` override forks and iterations. The JMH results are
+also written to `benchmarks/build/jmh-result.json`, and the socket run's table
+to `benchmarks/build/wire-result.md`. The benchmarks run on JDK 25 whatever JDK
+runs Gradle, because the tasks name the toolchain.
+
+The [machines](#the-machines) and [load averages](#a-quiet-machine-matters)
+above are what a reproduction should be compared against. On different
+hardware, compare the rows within one run rather than against the absolute
+figures here.
