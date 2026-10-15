@@ -64,10 +64,10 @@ The three new slots are the ones a brand visibly owns and no mix can produce.
 
 ## Stack
 
-- [ ] **`spec-0083-palette`**: the derivations, under Scalar only.
+- [ ] **`spec-0083-palette`** ([#317](https://github.com/matthewjones372/pelican/pull/317)): the derivations, under Scalar only.
       Done when: each derived variable is in the theme's CSS, and the petshop's
       page, opened by hand, has terracotta buttons and warm panels.
-- [ ] **`spec-0083-slots`**: `methods { }`, `codePanel`, `headingWeight`, on
+- [ ] **`spec-0083-slots`** ([#318](https://github.com/matthewjones372/pelican/pull/318)): `methods { }`, `codePanel`, `headingWeight`, on
       both renderers.
       Done when: each lands where its renderer reads it, and a blank one is
       refused where it is written.

@@ -3600,6 +3600,9 @@ theme {
     error = "#C53030"                          // error responses
     font("Inter, sans-serif", stylesheet = "https://fonts.googleapis.com/css2?family=Inter&display=swap")
     codeFont("'JetBrains Mono', monospace")
+    methods { get = "#2F855A"; post = "#0B7A75" } // put, patch and delete too
+    codePanel = "#1F2933"                      // the panel the examples sit on
+    headingWeight = 800                        // 100 to 900
     logo("/logo.svg", altText = "Orders")      // Redoc only
 }
 ```
@@ -3608,7 +3611,14 @@ Under Redoc each slot lands where Redoc's `theme` reads it, and `options` is
 laid over it key by key, so a raw `theme.colors.primary` still wins and the
 theme's other keys stay. Under Scalar the slots become `--scalar-*` variables
 on `.light-mode` and `.dark-mode`, before the service's `css`, and the page is
-forced light, as Redoc's always is; `options` can say otherwise. Scalar has no
+forced light, as Redoc's always is; `options` can say otherwise. Most of a
+Scalar page reads variables no slot names, so the rest of its palette is mixed
+from the slots that are set: the accent colours the buttons, links, highlight
+and active sidebar item; the text colour, lightened, gives the secondary text;
+the sidebar colour gives the panels and, darkened toward the text, the borders.
+Scalar colours a method's badge with the variable it also uses for a status
+(`POST` and success are both green, `DELETE` and error both red), so under
+Scalar a method colour wins over the status that shares it. Scalar has no
 logo, so a theme with one is refused under `scalarReference`. A blank slot is
 refused where it is written. Per-method colours, spacing and anything else
 past these slots stay in the renderer's own `options` or `css`.
