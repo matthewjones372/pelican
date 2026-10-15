@@ -199,29 +199,59 @@ The current release is **1.0.0**, on Maven Central under the group
 so a service using them needs JDK 25 or newer. In 1.0.0 the server backend is
 Pekko HTTP and the JSON codec is Jackson.
 
-Pelican compiles against Pekko but ships none of it, so the build names the
-Pekko it runs. Either Scala cross-build works; pick `_2.13` or `_3` and use it
-on every Pekko line.
+### Choose the modules you need
+
+Pelican is a set of small modules, and a build takes only the ones it uses.
+Every module brings `pelican-core`, which holds the endpoint DSL and depends on
+nothing but the Kotlin standard library and `jackson-core`. On top of it a
+service picks:
+
+- **one backend**, which serves the descriptions (`pelican-pekko` in 1.0.0);
+- **one codec**, which any endpoint with a JSON body needs
+  (`pelican-jackson`);
+- **anything else only when it is wanted**: the OpenAPI document and Swagger UI
+  (`pelican-pekko-docs`), test clients, client transports, metrics, health,
+  OIDC, MCP.
+
+No module brings in a server you did not choose, and the backends do not bring
+the OpenAPI generator or a codec. The smallest JSON service on 1.0.0:
 
 ```kotlin
 // build.gradle.kts
+val pelicanVersion = "1.0.0"
+
 dependencies {
-    // The interpreter. Brings pelican-core; compiles against Pekko HTTP.
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
-    // Pekko itself: Pelican ships no Scala cross-build, so name the one you run.
+    // The backend. Brings pelican-core; compiles against Pekko HTTP.
+    implementation("io.github.matthewjones372:pelican-pekko:$pelicanVersion")
+    // The codec: JSON bodies with Jackson, and the schemas the document derives.
+    implementation("io.github.matthewjones372:pelican-jackson:$pelicanVersion")
+    // Pekko itself. Pelican ships none, so name the Scala build you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
     implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
-    // JSON bodies with Jackson, and the schemas the document derives.
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
-    // /openapi.json and Swagger UI beside the endpoints. startWithDocs lives here.
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
-    // The typed test client, and inMemory() to run it against a Pekko Api.
-    testImplementation("io.github.matthewjones372:pelican-test:1.0.0")
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0")
 }
 ```
+
+Either Scala cross-build of Pekko works; pick `_2.13` or `_3` and use it on
+every Pekko line.
+
+Adding a capability is adding its module. The example below serves its
+documentation and has a test, so it also needs:
+
+```kotlin
+dependencies {
+    // /openapi.json and Swagger UI beside the endpoints. Brings pelican-openapi.
+    implementation("io.github.matthewjones372:pelican-pekko-docs:$pelicanVersion")
+    // The typed test client run against a Pekko Api. Brings pelican-test.
+    testImplementation("io.github.matthewjones372:pelican-test-pekko:$pelicanVersion")
+}
+```
+
+1.0.0 has no BOM, so the one `pelicanVersion` value is what keeps the modules
+at the same version. [Modules](docs/modules.md#choosing-modules) lists every
+module, what each one brings with it, and the minimum set for other setups:
+a generated client, MCP tools, metrics.
 
 ### A first endpoint
 
@@ -316,8 +346,8 @@ Three things on `main` are not yet in a release:
   `pelican-jetty-mcp`, `pelican-test-jetty`, `pelican-streams-jetty` and
   `pelican-client-jetty`;
 - `pelican-kotlinx`, a codec for `@Serializable` payloads;
-- `pelican-bom`, which pins every module to one version so a build names the
-  version once.
+- `pelican-bom`, which manages the versions of Pelican's modules so a build
+  writes the version once.
 
 The cookbook and the other guides on `main` are written against these, so
 their dependency blocks use the BOM and their imports name
@@ -327,7 +357,24 @@ version `1.0.0` and import the binders from
 `pelican-pekko` has, under the same name, so only streaming handlers change
 (a Pekko `Source` where Jetty takes a `Sequence`).
 
-To try them now, use a snapshot. Builds of `main` are published by hand to
+The BOM manages versions and nothing else. Importing it adds no module to the
+classpath: you still declare each module you want, without a version, and
+leave out the ones you do not.
+
+```kotlin
+dependencies {
+    implementation(platform("io.github.matthewjones372:pelican-bom:1.0.1-SNAPSHOT"))
+    implementation("io.github.matthewjones372:pelican-jetty")
+    implementation("io.github.matthewjones372:pelican-jackson")
+    testImplementation("io.github.matthewjones372:pelican-test-jetty")
+}
+```
+
+It covers Pelican's own modules only, not Jackson, Pekko or Jetty, and not the
+Gradle plugin, whose version stays in `plugins { }`. See
+[Version alignment and the BOM](docs/modules.md#version-alignment-and-the-bom).
+
+To try these modules now, use a snapshot. Builds of `main` are published by hand to
 Central's snapshot repository as `1.0.1-SNAPSHOT`, including the BOM and the
 plugin:
 
