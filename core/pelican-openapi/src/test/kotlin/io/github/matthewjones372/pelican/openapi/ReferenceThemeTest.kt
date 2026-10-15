@@ -242,7 +242,9 @@ class ReferenceThemeTest {
             "--scalar-color-orange: #B07D2B;",
             "--scalar-color-yellow: #8C7A3B;",
             "--scalar-color-red: #9A3A1A;",
-            ":is(.light-mode, .dark-mode) .examples :is(.scalar-card, .scalar-code-block) { background: #3B2A20; }",
+            ":is(.light-mode, .dark-mode) .examples :is(.scalar-card, .scalar-code-block) { background: #3B2A20;",
+            "--scalar-color-1: color-mix(in srgb, white 92%, #3B2A20);",
+            "--scalar-border-color: color-mix(in srgb, white 14%, #3B2A20);",
             ":is(.light-mode, .dark-mode) :is(h1, h2, h3) { font-weight: 800; }",
         ).forEach { css shouldContain it }
         withClue("a method shares its variable with a status under Scalar, and the method wins") {
@@ -259,5 +261,27 @@ class ReferenceThemeTest {
         refusal { methods { get = "" } } shouldContain "get"
         refusal { codePanel = " " } shouldContain "codePanel"
         refusal { headingWeight = 950 } shouldContain "100 to 900"
+    }
+
+    @Test
+    fun `the light page's colours stay off the dark islands Scalar draws its examples in`() {
+        val css = scalar {
+            theme {
+                accent = "#C2562B"
+                text = "#3B2A20"
+                sidebar = "#FBF6EF"
+                methods { get = "#5E8C61" }
+            }
+        }.css.orEmpty()
+
+        val everywhere = css.substringAfter(".light-mode, .dark-mode { ").substringBefore(" }")
+        val lightOnly = css.substringAfter("\n.light-mode { ").substringBefore(" }")
+        listOf("--scalar-color-accent:", "--scalar-button-1:", "--scalar-link-color:", "--scalar-color-blue:")
+            .forEach { everywhere shouldContain it }
+        listOf("--scalar-color-1:", "--scalar-color-2:", "--scalar-background-2:", "--scalar-border-color:")
+            .forEach {
+                everywhere shouldNotContain it
+                lightOnly shouldContain it
+            }
     }
 }

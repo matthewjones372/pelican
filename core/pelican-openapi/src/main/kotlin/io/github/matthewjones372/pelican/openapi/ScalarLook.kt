@@ -63,26 +63,35 @@ class ScalarLookBuilder internal constructor() {
 class ScalarReference internal constructor(val path: String, val look: ScalarLook)
 
 /**
- * The theme as Scalar's variables, on the selectors Scalar sets its own on: a `:root` rule loses to them. Null when
- * the theme names no variable.
+ * The theme as Scalar's variables, on the selectors Scalar sets its own on: a `:root` rule loses to them. Scalar draws
+ * its example cards as `.dark-mode` islands inside a light page, so the light page's text, panel and border colours go
+ * on `.light-mode` alone, and only the brand's colours and fonts reach the islands too. Null when the theme names no
+ * variable. See specs 0082 and 0083.
  */
 private fun ReferenceTheme.scalarCss(): String? {
-    val variables = listOfNotNull(
-        accent?.let { "--scalar-color-accent: $it;" },
-        text?.let { "--scalar-color-1: $it;" },
-        sidebar?.let { "--scalar-sidebar-background-1: $it;" },
-        success?.let { "--scalar-color-green: $it;" },
-        error?.let { "--scalar-color-red: $it;" },
-        font?.let { "--scalar-font: $it;" },
-        codeFont?.let { "--scalar-font-code: $it;" },
-    ) + derivedPalette() + methodVariables()
+    val everywhere = brandVariables()
+    val lightOnly = lightVariables()
     val rules = listOfNotNull(
-        variables.takeIf { it.isNotEmpty() }?.let { ".light-mode, .dark-mode { ${it.joinToString(" ")} }" },
-        codePanel?.let { "$THEMED .examples :is(.scalar-card, .scalar-code-block) { background: $it; }" },
+        everywhere.takeIf { it.isNotEmpty() }?.let { ".light-mode, .dark-mode { ${it.joinToString(" ")} }" },
+        lightOnly.takeIf { it.isNotEmpty() }?.let { ".light-mode { ${it.joinToString(" ")} }" },
+        codePanel?.let { "$THEMED .examples :is(.scalar-card, .scalar-code-block) { ${codePanelVariables(it)} }" },
         headingWeight?.let { "$THEMED :is(h1, h2, h3) { font-weight: $it; }" },
     )
     return rules.joinToString("\n").ifEmpty { null }
 }
+
+private fun ReferenceTheme.brandVariables(): List<String> = listOfNotNull(
+    accent?.let { "--scalar-color-accent: $it;" },
+    success?.let { "--scalar-color-green: $it;" },
+    error?.let { "--scalar-color-red: $it;" },
+    font?.let { "--scalar-font: $it;" },
+    codeFont?.let { "--scalar-font-code: $it;" },
+) + accentPalette() + methodVariables()
+
+private fun ReferenceTheme.lightVariables(): List<String> = listOfNotNull(
+    text?.let { "--scalar-color-1: $it;" },
+    sidebar?.let { "--scalar-sidebar-background-1: $it;" },
+) + lightPalette()
 
 /**
  * Scalar colours a method's badge from the variable it also uses for a status: post and success are both green,
@@ -96,22 +105,39 @@ private fun ReferenceTheme.methodVariables(): List<String> = listOfNotNull(
     methods?.delete?.let { "--scalar-color-red: $it;" },
 )
 
+/**
+ * The code panel, and light text on it: Scalar draws the request example as a dark island but the response example as
+ * a light card, so a dark panel under the response needs its text, borders and inner panels turned light too.
+ */
+private fun codePanelVariables(panel: String): String = listOf(
+    "background: $panel;",
+    "--scalar-color-1: ${mix("white", ON_PANEL_TEXT, panel)};",
+    "--scalar-color-2: ${mix("white", ON_PANEL_SECONDARY, panel)};",
+    "--scalar-color-3: ${mix("white", ON_PANEL_TERTIARY, panel)};",
+    "--scalar-border-color: ${mix("white", ON_PANEL_BORDER, panel)};",
+    "--scalar-background-2: ${mix("white", ON_PANEL_RAISED, panel)};",
+    "--scalar-background-3: ${mix("white", ON_PANEL_BORDER, panel)};",
+).joinToString(" ")
+
 // Scalar sets its own look on one of these, whichever mode the page is in.
 private const val THEMED = ":is(.light-mode, .dark-mode)"
 
-/**
- * The rest of Scalar's palette, mixed from the slots a service set: most of a page reads these, not the seven above,
- * and left alone they are Scalar's black and greys. See spec 0083.
- */
-private fun ReferenceTheme.derivedPalette(): List<String> = listOfNotNull(
+/** The accent's share of Scalar's palette: it reads on a light page and on a dark island alike. See spec 0083. */
+private fun ReferenceTheme.accentPalette(): List<String> = accent?.let { a ->
+    listOf(
+        "--scalar-button-1: $a;",
+        "--scalar-button-1-hover: ${mix(a, HOVER, "black")};",
+        "--scalar-button-1-color: #fff;",
+        "--scalar-link-color: $a;",
+        "--scalar-link-color-hover: ${mix(a, HOVER, "black")};",
+        "--scalar-background-accent: ${mix(a, TINT, "transparent")};",
+    )
+}.orEmpty()
+
+/** The rest of the palette, mixed for the light page: grey text, panels and borders left alone are Scalar's. */
+private fun ReferenceTheme.lightPalette(): List<String> = listOfNotNull(
     accent?.let { a ->
         listOf(
-            "--scalar-button-1: $a;",
-            "--scalar-button-1-hover: ${mix(a, HOVER, "black")};",
-            "--scalar-button-1-color: #fff;",
-            "--scalar-link-color: $a;",
-            "--scalar-link-color-hover: ${mix(a, HOVER, "black")};",
-            "--scalar-background-accent: ${mix(a, TINT, "transparent")};",
             "--scalar-sidebar-color-active: $a;",
             "--scalar-sidebar-item-active-background: ${mix(a, ACTIVE_ITEM, "var(--scalar-sidebar-background-1)")};",
         )
@@ -142,6 +168,11 @@ private const val SECONDARY_TEXT = 78
 private const val TERTIARY_TEXT = 58
 private const val PANEL = 88
 private const val BORDER = 80
+private const val ON_PANEL_TEXT = 92
+private const val ON_PANEL_SECONDARY = 72
+private const val ON_PANEL_TERTIARY = 52
+private const val ON_PANEL_BORDER = 14
+private const val ON_PANEL_RAISED = 6
 
 /** A themed page is light, as Redoc's always is: a palette picked for a light page does not survive a dark one. */
 private val LIGHT: JsonObj = jsonObj {
