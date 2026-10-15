@@ -75,9 +75,53 @@ private fun ReferenceTheme.scalarCss(): String? {
         error?.let { "--scalar-color-red: $it;" },
         font?.let { "--scalar-font: $it;" },
         codeFont?.let { "--scalar-font-code: $it;" },
-    )
+    ) + derivedPalette()
     return if (variables.isEmpty()) null else ".light-mode, .dark-mode { ${variables.joinToString(" ")} }"
 }
+
+/**
+ * The rest of Scalar's palette, mixed from the slots a service set: most of a page reads these, not the seven above,
+ * and left alone they are Scalar's black and greys. See spec 0083.
+ */
+private fun ReferenceTheme.derivedPalette(): List<String> = listOfNotNull(
+    accent?.let { a ->
+        listOf(
+            "--scalar-button-1: $a;",
+            "--scalar-button-1-hover: ${mix(a, HOVER, "black")};",
+            "--scalar-button-1-color: #fff;",
+            "--scalar-link-color: $a;",
+            "--scalar-link-color-hover: ${mix(a, HOVER, "black")};",
+            "--scalar-background-accent: ${mix(a, TINT, "transparent")};",
+            "--scalar-sidebar-color-active: $a;",
+            "--scalar-sidebar-item-active-background: ${mix(a, ACTIVE_ITEM, "var(--scalar-sidebar-background-1)")};",
+        )
+    },
+    text?.let { t ->
+        listOf(
+            "--scalar-color-2: ${mix(t, SECONDARY_TEXT, "white")};",
+            "--scalar-color-3: ${mix(t, TERTIARY_TEXT, "white")};",
+            "--scalar-sidebar-color-2: ${mix(t, SECONDARY_TEXT, "white")};",
+        )
+    },
+    sidebar?.let { s ->
+        listOf(
+            "--scalar-background-2: $s;",
+            "--scalar-background-3: ${mix(s, PANEL, "var(--scalar-color-1)")};",
+            "--scalar-border-color: ${mix(s, BORDER, "var(--scalar-color-1)")};",
+        )
+    },
+).flatten()
+
+private fun mix(colour: String, percent: Int, with: String): String = "color-mix(in srgb, $colour $percent%, $with)"
+
+// How much of a slot's colour each derived variable keeps, in percent.
+private const val HOVER = 85
+private const val TINT = 12
+private const val ACTIVE_ITEM = 14
+private const val SECONDARY_TEXT = 78
+private const val TERTIARY_TEXT = 58
+private const val PANEL = 88
+private const val BORDER = 80
 
 /** A themed page is light, as Redoc's always is: a palette picked for a light page does not survive a dark one. */
 private val LIGHT: JsonObj = jsonObj {

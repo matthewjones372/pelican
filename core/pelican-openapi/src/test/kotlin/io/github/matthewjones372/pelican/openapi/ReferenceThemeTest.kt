@@ -5,6 +5,9 @@ import io.github.matthewjones372.pelican.parseJson
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldEndWith
+import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.Test
 
 /** One theme, read by Redoc where Redoc reads each slot. See spec 0082. */
@@ -109,10 +112,17 @@ class ReferenceThemeTest {
             }
         }
 
-        look.css shouldBe ".light-mode, .dark-mode { " +
-            "--scalar-color-accent: #C2562B; --scalar-color-1: #3B2A20; --scalar-sidebar-background-1: #FBF6EF; " +
-            "--scalar-color-green: #5E8C61; --scalar-color-red: #9A3A1A; --scalar-font: Nunito, sans-serif; " +
-            "--scalar-font-code: 'JetBrains Mono', monospace; }"
+        val css = look.css.orEmpty()
+        css shouldStartWith ".light-mode, .dark-mode { "
+        listOf(
+            "--scalar-color-accent: #C2562B;",
+            "--scalar-color-1: #3B2A20;",
+            "--scalar-sidebar-background-1: #FBF6EF;",
+            "--scalar-color-green: #5E8C61;",
+            "--scalar-color-red: #9A3A1A;",
+            "--scalar-font: Nunito, sans-serif;",
+            "--scalar-font-code: 'JetBrains Mono', monospace;",
+        ).forEach { css shouldContain it }
         look.stylesheets shouldBe listOf("https://fonts.example/nunito.css", "https://fonts.example/mono.css")
     }
 
@@ -130,13 +140,53 @@ class ReferenceThemeTest {
         scalar {
             theme { accent = "#C2562B" }
             css(".light-mode { --scalar-color-accent: #000000; }")
-        }.css shouldBe ".light-mode, .dark-mode { --scalar-color-accent: #C2562B; }\n" +
-            ".light-mode { --scalar-color-accent: #000000; }"
+        }.css.orEmpty().let { css ->
+            css shouldStartWith ".light-mode, .dark-mode { --scalar-color-accent: #C2562B;"
+            css shouldEndWith "}\n.light-mode { --scalar-color-accent: #000000; }"
+        }
     }
 
     @Test
     fun `a logo in a Scalar theme is refused, since Scalar has none`() {
         shouldThrow<IllegalArgumentException> { scalar { theme { logo("/paw.svg") } } }.message.toString() shouldContain
             "no logo"
+    }
+
+    @Test
+    fun `the rest of Scalar's palette is mixed from the accent, the text and the sidebar`() {
+        val css = scalar {
+            theme {
+                accent = "#C2562B"
+                text = "#3B2A20"
+                sidebar = "#FBF6EF"
+            }
+        }.css.orEmpty()
+
+        listOf(
+            "--scalar-button-1: #C2562B;",
+            "--scalar-button-1-hover: color-mix(in srgb, #C2562B 85%, black);",
+            "--scalar-button-1-color: #fff;",
+            "--scalar-link-color: #C2562B;",
+            "--scalar-link-color-hover: color-mix(in srgb, #C2562B 85%, black);",
+            "--scalar-background-accent: color-mix(in srgb, #C2562B 12%, transparent);",
+            "--scalar-sidebar-color-active: #C2562B;",
+            "--scalar-sidebar-item-active-background: " +
+                "color-mix(in srgb, #C2562B 14%, var(--scalar-sidebar-background-1));",
+            "--scalar-color-2: color-mix(in srgb, #3B2A20 78%, white);",
+            "--scalar-color-3: color-mix(in srgb, #3B2A20 58%, white);",
+            "--scalar-sidebar-color-2: color-mix(in srgb, #3B2A20 78%, white);",
+            "--scalar-background-2: #FBF6EF;",
+            "--scalar-background-3: color-mix(in srgb, #FBF6EF 88%, var(--scalar-color-1));",
+            "--scalar-border-color: color-mix(in srgb, #FBF6EF 80%, var(--scalar-color-1));",
+        ).forEach { css shouldContain it }
+    }
+
+    @Test
+    fun `a slot left out derives nothing`() {
+        val css = scalar { theme { text = "#3B2A20" } }.css.orEmpty()
+
+        css shouldContain "--scalar-color-2:"
+        css shouldNotContain "--scalar-button-1"
+        css shouldNotContain "--scalar-background-2"
     }
 }
