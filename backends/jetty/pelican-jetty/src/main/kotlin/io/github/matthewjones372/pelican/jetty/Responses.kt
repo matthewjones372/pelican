@@ -222,12 +222,12 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs, 
     fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
 
     return when (out) {
-        is JsonOutput<*> -> Strict(out.status, JSON, payload().encodeToString(value).toByteArray())
+        is JsonOutput<*> -> Strict(out.status, JSON, payload().encodeTo(value))
 
         is TextOutput -> Strict(out.status, TEXT, (value as String).toByteArray())
 
         is MediaOutput<*> ->
-            Strict(out.status, contentTypeOf(out.mediaType), payload().encodeToString(value).toByteArray())
+            Strict(out.status, contentTypeOf(out.mediaType), payload().encodeTo(value))
 
         is EmptyOutput -> Strict(out.status, null, ByteArray(0))
 
@@ -274,7 +274,9 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs, 
 /** Its status from the declaration rather than the payload's type, so two failures sharing a type stay distinct. */
 private fun failureResponse(declared: ErrorOutput<*>, err: Outcome.Err<*>, codecs: EndpointCodecs): Reply {
     val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
-    val body = taggedBody(declared, codec.encodeToString(err.error)).toByteArray()
+    // A tag is spliced into the encoded object, which needs it as text; an untagged failure goes out as encoded.
+    val body = if (declared.tag == null) codec.encodeTo(err.error)
+    else taggedBody(declared, codec.encodeToString(err.error)).toByteArray()
     val contentType = if (declared.mediaType == JSON_MEDIA_TYPE) JSON else contentTypeOf(declared.mediaType)
     return Strict(declared.status, contentType, body, err.headers)
 }

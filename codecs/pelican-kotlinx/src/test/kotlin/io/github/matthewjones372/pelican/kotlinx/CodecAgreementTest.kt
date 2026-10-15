@@ -298,6 +298,24 @@ class CodecAgreementTest {
     }
 
     @Test
+    fun `each codec writes the same bytes as its string, encoded as UTF-8`() {
+        // A backend writes `encodeTo`; a client, a tagged failure and the docs read `encodeToString`.
+        val lines = listOf(
+            Line("sku-1", quantity = 4, note = null),
+            Line("caf\u00e9-\u2615", note = "\uD834\uDD1E \"quoted\" \\ \n\u0001 " + "x".repeat(70_000)),
+            null,
+        )
+        val type = kotlin.reflect.typeOf<List<Line?>>()
+
+        listOf(JacksonCodecs, KotlinxCodecs).forEach { source ->
+            val codec = source.codec<List<Line?>>(type)
+            withClue(source) {
+                codec.encodeTo(lines) shouldBe codec.encodeToString(lines).toByteArray(Charsets.UTF_8)
+            }
+        }
+    }
+
+    @Test
     fun `a form body reads the same through either codec`() {
         // The claim `formCodec` is built on. A form carries strings, so the
         // schema decides what `quantity=4` is — and because that decision is

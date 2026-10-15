@@ -84,17 +84,11 @@ internal fun buildResponse(
     }
 
     val entity: ResponseEntity = when (out) {
-        is JsonOutput<*> -> HttpEntities.create(
-            ContentTypes.APPLICATION_JSON,
-            payload().encodeToString(value),
-        )
+        is JsonOutput<*> -> HttpEntities.create(ContentTypes.APPLICATION_JSON, encoded(payload(), value))
 
         is TextOutput -> HttpEntities.create(ContentTypes.TEXT_PLAIN_UTF8, value as String)
 
-        is MediaOutput<*> -> HttpEntities.create(
-            contentTypeOf(out.mediaType),
-            ByteString.fromString(payload().encodeToString(value)),
-        )
+        is MediaOutput<*> -> HttpEntities.create(contentTypeOf(out.mediaType), encoded(payload(), value))
 
         is EmptyOutput -> HttpEntities.EMPTY
 
@@ -115,7 +109,7 @@ internal fun buildResponse(
             val c = payload()
             val support = EntityStreamingSupport.json()
             val bytes = elements(value)
-                .map { ByteString.fromString(c.encodeToString(it)) }
+                .map { encoded(c, it) }
                 .via(support.framingRenderer())
             HttpEntities.createChunked(ContentTypes.APPLICATION_JSON, bytes)
         }
@@ -158,12 +152,15 @@ private fun successResponse(
  */
 
 /** JSON as every failure was before spec 0070, and the declared media type for one made with `errorMedia`. */
-private fun failureEntity(declared: ErrorOutput<*>, body: String): ResponseEntity =
+private fun failureEntity(declared: ErrorOutput<*>, body: ByteString): ResponseEntity =
     if (declared.mediaType == JSON_MEDIA_TYPE) {
         HttpEntities.create(ContentTypes.APPLICATION_JSON, body)
     } else {
-        HttpEntities.create(contentTypeOf(declared.mediaType), ByteString.fromString(body))
+        HttpEntities.create(contentTypeOf(declared.mediaType), body)
     }
+
+/** `fromArrayUnsafe`: the codec's array is never touched again, so wrapping it saves the copy `fromArray` makes. */
+private fun encoded(codec: BodyCodec<Any?>, value: Any?): ByteString = ByteString.fromArrayUnsafe(codec.encodeTo(value))
 
 private fun failureResponse(
     out: DeclaredResponses<*, *>,
@@ -174,11 +171,16 @@ private fun failureResponse(
     val codec = checkNotNull(codecs.alternatives[declared]) { "No codec was resolved for $declared" }
     return HttpResponse.create()
         .withStatus(statusOf(declared.status))
-        .withEntity(failureEntity(declared, taggedBody(declared, codec.encodeToString(err.error))))
+        .withEntity(failureEntity(declared, failureBody(declared, codec, err.error)))
         // Encoded and checked against the declaration when the handler
         // produced the failure, so there is nothing left to decide here.
         .addHeaders(err.headers.map { (name, value) -> RawHeader.create(name, value) })
 }
+
+/** A tag is spliced into the encoded object, which needs it as text; an untagged failure goes out as encoded. */
+private fun failureBody(declared: ErrorOutput<*>, codec: BodyCodec<Any?>, error: Any?): ByteString =
+    if (declared.tag == null) encoded(codec, error)
+    else ByteString.fromString(taggedBody(declared, codec.encodeToString(error)))
 
 @Suppress("UNCHECKED_CAST")
 private fun elements(value: Any?): Source<Any?, NotUsed> = value as Source<Any?, NotUsed>

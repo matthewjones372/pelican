@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.jackson
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.core.JacksonException
+import com.fasterxml.jackson.core.json.JsonWriteFeature
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -59,7 +60,9 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
         // that leaves the declared element type as `Object` — which carries no
         // `@JsonTypeInfo`, so a `List<PaymentMethod>` went out with no
         // discriminator on any of its members and could not be read back.
-        val writer = mapper.writerFor(javaType)
+        // Combined, an emoji is the four UTF-8 bytes `writeValueAsString` gives it; left
+        // alone, `writeValueAsBytes` escapes it as a pair of surrogates and `encodeTo` disagrees.
+        val writer = mapper.writerFor(javaType).with(JsonWriteFeature.COMBINE_UNICODE_SURROGATES_IN_UTF8)
         // `readerFor`, for the reason `writerFor` is here: resolved once with
         // the codec rather than once per request. `mapper.readValue` looks up a
         // root deserializer and builds a DeserializationContext on every call,
@@ -72,6 +75,9 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
 
             /** `UTF8StreamJsonParser` rather than the char-based reader, on the bytes as they arrived. */
             override fun decodeFrom(bytes: ByteArray): T = reader.readValue(bytes)
+
+            /** `UTF8JsonGenerator` into a recycled buffer, rather than a String encoded a second time. */
+            override fun encodeTo(value: T): ByteArray = writer.writeValueAsBytes(value)
         }
     }
 

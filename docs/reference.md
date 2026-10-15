@@ -528,6 +528,10 @@ interface Codecs : CodecFactory, SchemaSource
 `SchemaSource` is deliberately narrower than `Codecs`: generating documentation
 must not require a codec that can actually serialise anything.
 
+`BodyCodec` also has `decodeFrom(bytes)` and `encodeTo(value)`, which default to
+the String pair and are what a backend calls. A codec module overrides them
+where its library reads or writes UTF-8 for less than the String costs.
+
 Codecs are resolved **once per endpoint when the route is built**, never per
 request: `KType` → `JavaType` reflection is not cheap. It also means a missing
 or unusable codec is a startup failure rather than a surprise on first traffic.

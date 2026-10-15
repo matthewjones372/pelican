@@ -33,6 +33,12 @@ one.
 
 ### Added
 
+- **`BodyCodec.encodeTo(value)`**: the value as UTF-8 bytes. The default
+  encodes `encodeToString`'s result, so a codec written against 1.0 is
+  unchanged. `pelican-jackson` writes the bytes directly; `pelican-kotlinx`
+  keeps the default, which allocates less than its stream writer. `pelican-jetty`
+  and `pelican-pekko` send strict bodies and untagged failures through it, and
+  Pekko its JSON array elements (spec 0085).
 - **`Params.requestHeader(name)`**: the first value of a request header,
   matched without regard to case, declared or not. Supplied by `pelican-pekko`,
   `pelican-jetty` and the in-memory client from the reader they build for the

@@ -49,6 +49,9 @@ class KotlinxCodecs(private val json: Json) : Codecs {
             @OptIn(ExperimentalSerializationApi::class)
             override fun decodeFrom(bytes: ByteArray): T =
                 json.decodeFromStream(serializer, ByteArrayInputStream(bytes))
+
+            // No `encodeTo`: the default's compact String and one copy allocate half what
+            // `encodeToStream` does, at every size `EncodeBenchmark` measures (spec 0085).
         }
     }
 

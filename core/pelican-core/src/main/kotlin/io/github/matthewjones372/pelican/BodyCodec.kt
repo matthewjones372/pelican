@@ -20,6 +20,16 @@ interface BodyCodec<T> {
      * spec 0046 for what overriding it is worth, measured.
      */
     fun decodeFrom(bytes: ByteArray): T = decodeFromString(String(bytes, StandardCharsets.UTF_8))
+
+    /**
+     * The value as the UTF-8 bytes a backend writes. A JSON library writes them
+     * directly; going through a String builds the whole body in UTF-16 first and
+     * then copies it out again.
+     *
+     * The default keeps every codec written against 1.0 working unchanged. See
+     * spec 0085 for what overriding it is worth, measured.
+     */
+    fun encodeTo(value: T): ByteArray = encodeToString(value).toByteArray(StandardCharsets.UTF_8)
 }
 
 /**
