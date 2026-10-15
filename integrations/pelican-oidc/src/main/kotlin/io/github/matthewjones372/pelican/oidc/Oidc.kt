@@ -25,6 +25,8 @@ import java.text.ParseException
 import java.time.Clock
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -66,7 +68,9 @@ class Oidc internal constructor(
     private class Keys(val set: JWKSet, val fetchedAt: Instant)
 
     private val keys = AtomicReference<Keys?>(null)
-    private val refreshing = Any()
+
+    /** A lock, not a monitor: the fetch blocks, and below 24 a virtual thread in `synchronized` pins its carrier. */
+    private val refreshing = ReentrantLock()
 
     override fun authenticate(credentials: Credentials): Identity? {
         val token = credentials.bearerToken() ?: return null
@@ -136,7 +140,7 @@ class Oidc internal constructor(
         else -> emptySet()
     }
 
-    private fun current(): Keys = keys.get() ?: synchronized(refreshing) { keys.get() ?: load() }
+    private fun current(): Keys = keys.get() ?: refreshing.withLock { keys.get() ?: load() }
 
     /**
      * The provider's keys fetched again, at most once per [refetchAfter]: an
@@ -144,7 +148,7 @@ class Oidc internal constructor(
      * sending garbage looks like, which must not become a request to the
      * provider each time.
      */
-    private fun refetched(): Keys = synchronized(refreshing) {
+    private fun refetched(): Keys = refreshing.withLock {
         val held = keys.get()
         if (held != null && held.fetchedAt.plus(refetchAfter.toJavaDuration()).isAfter(clock.instant())) held
         else load()

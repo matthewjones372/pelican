@@ -4,6 +4,7 @@ public final class io/github/matthewjones372/pelican/pekko/Handlers {
 }
 
 public final class io/github/matthewjones372/pelican/pekko/Handlers$Companion {
+	public final fun getDefault ()Lio/github/matthewjones372/pelican/pekko/Handlers;
 	public final fun getOnDispatcher ()Lio/github/matthewjones372/pelican/pekko/Handlers;
 	public final fun getOnVirtualThreads ()Lio/github/matthewjones372/pelican/pekko/Handlers;
 	public final fun on (Ljava/util/concurrent/Executor;)Lio/github/matthewjones372/pelican/pekko/Handlers;

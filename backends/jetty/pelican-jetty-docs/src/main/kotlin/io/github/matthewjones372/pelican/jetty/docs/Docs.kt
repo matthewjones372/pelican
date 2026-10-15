@@ -65,7 +65,7 @@ fun Api.docsHandler(docs: Docs = docs()): Handler {
  * The endpoints and the documentation as one handler, the endpoints asked first as on Pekko, so an endpoint at a
  * docs path wins. Served with `api.start(handler = { handlerWithDocs() })`.
  */
-fun Api.handlerWithDocs(handlers: Handlers = Handlers.onVirtualThreads, docs: Docs = docs()): Handler =
+fun Api.handlerWithDocs(handlers: Handlers = Handlers.default, docs: Docs = docs()): Handler =
     Handler.Sequence(toHandler(handlers), docsHandler(docs))
 
 /** [start], with the document and the documentation page served alongside. */
@@ -73,7 +73,7 @@ fun Api.startWithDocs(
     port: Int = 8080,
     host: String = "127.0.0.1",
     docs: Docs = docs(),
-    handlers: Handlers = Handlers.onVirtualThreads,
+    handlers: Handlers = Handlers.default,
 ): PelicanServer = start(port, host, handlers) { handlerWithDocs(handlers, docs) }
 
 private class Page(val contentType: String, body: String) {

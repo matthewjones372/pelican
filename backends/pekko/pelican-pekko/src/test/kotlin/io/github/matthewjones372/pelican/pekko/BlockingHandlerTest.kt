@@ -61,6 +61,11 @@ class BlockingHandlerTest {
         text()
     }
 
+    private val pool = endpoint {
+        get("pool")
+        text()
+    }
+
     private val refused = errorJson<BlockingRefusal>(409, "Refused")
 
     private val refusing = endpoint {
@@ -88,6 +93,13 @@ class BlockingHandlerTest {
             refusing handledOrFail
                 { refused(BlockingRefusal(if (Thread.currentThread().isVirtual) "virtual" else "platform")) },
             broken handledNow { error("a bug in the handler") },
+            pool handledNow {
+                when {
+                    Thread.currentThread().isVirtual -> "virtual"
+                    Thread.currentThread().name.startsWith("pelican-handler-") -> "pelican-handler"
+                    else -> "platform"
+                }
+            },
         ),
         codecs = JacksonCodecs,
     )
@@ -142,6 +154,17 @@ class BlockingHandlerTest {
     }
 
     @Test
+    fun `by default a handler runs on a virtual thread from JDK 24, and on pelican's platform pool below it`() {
+        val server = api.start(testKit.system(), port = 0)
+        try {
+            get("${server.baseUrl}/pool").join().body() shouldBe
+                if (Runtime.version().feature() >= UNPINNED_FROM) "virtual" else "pelican-handler"
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
     fun `a declared failure is answered from the virtual thread as declared`() = serving { base ->
         val answer = get("$base/refusing").join()
         answer.statusCode() shouldBe 409
@@ -163,5 +186,6 @@ class BlockingHandlerTest {
         const val DISPATCHER_CALLS = 6
         const val DISPATCHER_THREADS = 2
         const val HALF_A_SECOND = 500L
+        const val UNPINNED_FROM = 24
     }
 }

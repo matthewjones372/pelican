@@ -49,7 +49,7 @@ import java.util.concurrent.CompletionStage
  * `HttpConfiguration.uriCompliance` to [PELICAN_URI_COMPLIANCE], or Jetty answers a `%2F` in a path parameter
  * with its own 400 before this handler sees it.
  */
-fun Api.toHandler(handlers: Handlers = Handlers.onVirtualThreads): Handler {
+fun Api.toHandler(handlers: Handlers = Handlers.default): Handler {
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
 
     // Once per endpoint rather than per request, so a broken codec is a startup failure.

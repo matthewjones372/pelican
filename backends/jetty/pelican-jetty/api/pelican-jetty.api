@@ -20,6 +20,7 @@ public final class io/github/matthewjones372/pelican/jetty/Handlers {
 }
 
 public final class io/github/matthewjones372/pelican/jetty/Handlers$Companion {
+	public final fun getDefault ()Lio/github/matthewjones372/pelican/jetty/Handlers;
 	public final fun getOnDispatcher ()Lio/github/matthewjones372/pelican/jetty/Handlers;
 	public final fun getOnVirtualThreads ()Lio/github/matthewjones372/pelican/jetty/Handlers;
 	public final fun on (Ljava/util/concurrent/Executor;)Lio/github/matthewjones372/pelican/jetty/Handlers;

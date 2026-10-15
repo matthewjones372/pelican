@@ -40,7 +40,7 @@ fun Api.mcpHandler(options: McpOptions = mcpOptions(), path: String = MCP_PATH):
  * Served with `api.start(handler = { handlerWithMcp() })`.
  */
 fun Api.handlerWithMcp(
-    handlers: Handlers = Handlers.onVirtualThreads,
+    handlers: Handlers = Handlers.default,
     options: McpOptions = mcpOptions(),
     path: String = MCP_PATH,
 ): Handler = Handler.Sequence(toHandler(handlers), mcpHandler(options, path))
