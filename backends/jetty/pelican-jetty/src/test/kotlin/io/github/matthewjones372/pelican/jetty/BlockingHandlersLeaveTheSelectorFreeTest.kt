@@ -9,6 +9,7 @@ import org.eclipse.jetty.server.HttpConnectionFactory
 import org.eclipse.jetty.server.NetworkConnector
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
+import org.eclipse.jetty.util.thread.QueuedThreadPool
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.net.http.HttpClient
@@ -17,6 +18,7 @@ import java.net.http.HttpResponse
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Spec 0085: Jetty may call Pelican on its selector, so a handler that blocks must never block there. */
 class BlockingHandlersLeaveTheSelectorFreeTest {
@@ -78,7 +80,32 @@ class BlockingHandlersLeaveTheSelectorFreeTest {
         }
     }
 
+    @Test
+    fun `a synchronous handler hopped off the selector costs no second dispatch to resume its connection`() {
+        val dispatched = AtomicInteger()
+        val pool = object : QueuedThreadPool() {
+            override fun execute(job: Runnable) {
+                if (!resumedHere(job)) dispatched.incrementAndGet().also { super.execute(job) }
+            }
+        }
+        val server = Server(pool)
+        server.addConnector(ServerConnector(server, HttpConnectionFactory(HttpConfiguration())))
+        server.handler = api(listOf(later handledNow { "now" }), JacksonCodecs).toHandler(Handlers.onVirtualThreads)
+        server.start()
+        try {
+            val base = "http://127.0.0.1:${(server.connectors.single() as NetworkConnector).localPort}"
+            get("$base/later").get(GATE_SECONDS, TimeUnit.SECONDS).body() shouldBe "now"
+            dispatched.set(0)
+            repeat(REQUESTS) { get("$base/later").get(GATE_SECONDS, TimeUnit.SECONDS).body() shouldBe "now" }
+            dispatched.get() shouldBe 0
+        } finally {
+            client.close()
+            server.stop()
+        }
+    }
+
     private companion object {
+        const val REQUESTS = 100
         const val BLOCKED = 8
         const val POOL_THREADS = 4
         const val GATE_SECONDS = 30L

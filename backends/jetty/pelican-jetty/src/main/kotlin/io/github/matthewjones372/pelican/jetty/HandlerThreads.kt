@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.jetty
 
 import io.github.matthewjones372.pelican.Params
+import org.eclipse.jetty.server.internal.HttpConnection
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -63,3 +64,30 @@ private fun platformThreads(): Executor =
         LinkedBlockingQueue(),
         Thread.ofPlatform().name("pelican-handler-", 0).daemon().factory(),
     ).apply { allowCoreThreadTimeOut(true) }
+
+/** Connections Jetty asked to resume while this thread finished a request it hopped to. */
+private val resumes = ThreadLocal<ArrayDeque<Runnable>?>()
+
+/**
+ * [work], then any connection Jetty asked to resume meanwhile, on this thread. A request answered off the thread Jetty
+ * called makes its connection resume reading through a dispatch to the pool; here, where [work] has just finished, it
+ * costs none, so a hopped synchronous handler costs one dispatch, as a request Jetty dispatched itself does.
+ */
+internal fun <T> resumingHere(work: () -> T): T {
+    val own = ArrayDeque<Runnable>()
+    resumes.set(own)
+    try {
+        return work()
+    } finally {
+        resumes.remove()
+        while (own.isNotEmpty()) own.removeFirst().run()
+    }
+}
+
+/** Whether [job], a connection resuming, was taken to run at the end of [resumingHere] on this thread. */
+internal fun resumedHere(job: Runnable): Boolean {
+    val own = resumes.get()
+    if (own == null || job !is HttpConnection) return false
+    own.addLast(job)
+    return true
+}

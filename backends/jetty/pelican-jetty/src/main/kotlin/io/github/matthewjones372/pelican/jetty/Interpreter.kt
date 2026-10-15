@@ -73,11 +73,33 @@ private fun ((Params) -> CompletionStage<Any?>).on(
     if (threads.executor == null || endpoint.invoke !is Synchronous) this
     else { params -> threads.mayBlock { this(params) } }
 
-/** [work] where these handlers may block: here under [Handlers.onDispatcher] or on a virtual thread, else hopped. */
+/**
+ * [work] where these handlers may block: here under [Handlers.onDispatcher] or on a virtual thread, else hopped. A
+ * hop to a virtual thread completes the stage inside [resumingHere], so a response written there costs no dispatch.
+ */
 private fun <T> Handlers.mayBlock(work: () -> CompletionStage<T>): CompletionStage<T> {
     val executor = executor
-    return if (executor == null || (virtual && Thread.currentThread().isVirtual)) work()
-    else CompletableFuture.supplyAsync(work, executor).thenCompose { it }
+    return when {
+        executor == null || (virtual && Thread.currentThread().isVirtual) -> work()
+
+        virtual -> {
+            val done = CompletableFuture<T>()
+            executor.execute {
+                resumingHere {
+                    try {
+                        work().whenComplete { value, failure ->
+                            if (failure == null) done.complete(value) else done.completeExceptionally(failure)
+                        }
+                    } catch (t: Throwable) {
+                        done.completeExceptionally(t)
+                    }
+                }
+            }
+            done
+        }
+
+        else -> CompletableFuture.supplyAsync(work, executor).thenCompose { it }
+    }
 }
 
 /**
