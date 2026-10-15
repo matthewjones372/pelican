@@ -71,6 +71,19 @@ one.
 
 ### Changed
 
+- **The library modules target Java 21** (spec 0079), where 1.0.0 targeted 25.
+  `pelican-streams` and `pelican-streams-jetty` stay on 25, because
+  `lark-stream` 0.9.0 is compiled for 25. CI runs the suites on 21 and 25.
+- **Synchronous handlers default to `Handlers.default`** (spec 0079): virtual
+  threads from JDK 24, and below it a shared pool of 200 daemon platform
+  threads named `pelican-handler-N`, because before JDK 24 a virtual thread
+  blocked inside `synchronized` pins its carrier. Nothing changes on 25. An
+  explicit `handlers` still wins. `Handlers.default` is new public API in
+  `pelican-pekko` and `pelican-jetty`.
+- **`pelican-oidc` guards its key fetch with a `ReentrantLock`**, not a
+  monitor, so a caller on a virtual thread below JDK 24 does not pin while the
+  provider answers.
+
 - **`pelican-core` no longer puts `jackson-core` on a caller's compile
   classpath.** It was an `api` dependency and is now `implementation`: no
   public signature in core names a Jackson type, and the parser stays where it

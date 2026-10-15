@@ -145,6 +145,11 @@ each other.
   26.5.2, on Temurin 21.0.9+10, which took the routing-scale table in August
   2026. It has not been retaken.
 
+Every current table ran on JDK 25, where `Handlers.default` is virtual
+threads, so "the default" on this page means virtual threads. Below JDK 24 the
+default is a pool of platform threads, which none of these benchmarks
+measures.
+
 ### A quiet machine matters
 
 A benchmark is only as quiet as the machine under it. The M3 tables were taken

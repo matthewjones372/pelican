@@ -183,8 +183,8 @@ The costs are real:
   against hand-written routes on the same backend in
   [What it costs](docs/what-it-costs.md). On the endpoints measured it is a few
   hundred nanoseconds on Pekko and below what the Jetty benchmark can resolve,
-  but the default of running synchronous handlers on a virtual thread costs
-  considerably more on Pekko and can be turned off.
+  but running synchronous handlers on a virtual thread, the default on JDK 24
+  and newer, costs considerably more on Pekko and can be turned off.
 - **A new library.** 1.0.0 is the first stable release.
 
 [Choosing between Pelican and the alternatives](docs/choosing.md) compares it
@@ -196,7 +196,8 @@ the wrong choice.
 
 The current release is **1.0.0**, on Maven Central under the group
 `io.github.matthewjones372`. Its library modules are compiled for **Java 25**,
-so a service using them needs JDK 25 or newer. In 1.0.0 the server backend is
+so a service using them needs JDK 25 or newer. `main` lowers that to Java 21,
+which is not yet released (see below). In 1.0.0 the server backend is
 Pekko HTTP and the JSON codec is Jackson.
 
 ### Choose the modules you need
@@ -340,12 +341,16 @@ plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
 
 ### Jetty, kotlinx and the BOM: on `main`, not yet released
 
-Three things on `main` are not yet in a release:
+Four things on `main` are not yet in a release:
 
 - the Jetty 12 family: `pelican-jetty`, `pelican-jetty-docs`,
   `pelican-jetty-mcp`, `pelican-test-jetty`, `pelican-streams-jetty` and
   `pelican-client-jetty`;
 - `pelican-kotlinx`, a codec for `@Serializable` payloads;
+- **Java 21**: the library modules target JDK 21, except `pelican-streams`
+  and `pelican-streams-jetty`, which stay on 25. Below JDK 24, synchronous
+  handlers default to a pool of platform threads rather than virtual threads;
+  see [Where a handler runs](docs/reference.md#where-a-handler-runs);
 - `pelican-bom`, which manages the versions of Pelican's modules so a build
   writes the version once.
 
@@ -444,7 +449,7 @@ Pelican with its handler on the dispatcher is cheaper than an idiomatic
 hand-written route and a few hundred nanoseconds behind the fastest one; on
 Jetty the difference is inside the measurement's error, with about 1.1 to 1.3KB
 more allocated per request. Running a synchronous handler on a virtual thread,
-which is the default on both backends, is the largest cost measured on Pekko
+the default on both backends on JDK 24 and newer, is the largest cost measured on Pekko
 and adds about 9.5KB per request on Jetty; a handler that never blocks can opt
 out. These are in-memory measurements on one machine, not a statement
 about production capacity.

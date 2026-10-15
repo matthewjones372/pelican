@@ -241,7 +241,8 @@ To compile and run, the generated file needs:
 - **`kotlinx-coroutines-core`**, only for a `suspending` client.
 - **A JDK and Kotlin compiler that can read Pelican's jars.** The 1.0.0
   library modules are compiled to JDK 25 bytecode with Kotlin 2.4.20, so the
-  caller runs on JDK 25 or newer. Pelican is not tested with older Kotlin
+  caller runs on JDK 25 or newer. On `main`, not yet released, the floor is
+  JDK 21. Pelican is not tested with older Kotlin
   compilers.
 
 The generated file itself only uses the Kotlin standard library, the JDK and

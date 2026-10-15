@@ -358,9 +358,9 @@ From the Pelican version, the same endpoint values also give:
   mounted beside `toRoute(system)`.
 - **No interpreter.** On Pekko, with the handler on the dispatcher, Pelican
   measured a few hundred nanoseconds and under a kilobyte per request behind
-  the fastest hand-written route, and faster than an idiomatic one. Its default
-  of running synchronous handlers on a virtual thread costs considerably more
-  and can be turned off with `Handlers.onDispatcher`. See
+  the fastest hand-written route, and faster than an idiomatic one. Running
+  synchronous handlers on a virtual thread, its default on JDK 24 and newer,
+  costs considerably more and can be turned off with `Handlers.onDispatcher`. See
   [What it costs](what-it-costs.md).
 - **No runtime dependency beyond Pekko and swagger-core.** Pelican adds
   `pelican-core` (which depends on `jackson-core`), its Jackson module and the
