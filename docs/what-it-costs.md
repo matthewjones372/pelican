@@ -616,6 +616,112 @@ everywhere and slower nowhere, so `start()` keeps the queued pool and
 its limit. There was no A against A run, so the spread is each side's own range
 over three rounds.
 
+### Connector settings
+
+Each group of connector settings (A) against Jetty's defaults (B), one build,
+ABABAB, three rounds, one run per group, with nothing else running. Machine:
+Intel Xeon @ 2.80GHz, 4 cores, 15 GiB, no swap, Ubuntu 24.04.5 on Linux
+6.18.44, benchmarks on JDK 25.0.4.1+1-LTS with JDK 21 running Gradle. This
+machine sustained less than the one in the main-against-main table (10000 to
+20000 req/s on the JSON scenario, 2000 to 3000 responses/s on streams), so
+only the shape of each comparison carries over. The rule is the one above:
+trust a difference only when the ranges are disjoint and the gap is about 5%
+on p50 or 2x on p99 and p99.9, and one rung of the ladder is noise. A step the
+load generator did not keep up at is an overloaded step; its percentiles
+measure the queue, so it does not count as a gain.
+
+Load averages (1, 5, 15 minutes) before and after each run:
+
+| run | group | before | after |
+|---|---|---|---|
+| 1 | output buffer | 0.33, 0.21, 0.08 | 5.60, 4.16, 3.51 |
+| 2 | output aggregation | 3.12, 3.69, 3.38 | 5.68, 4.23, 3.73 |
+| 3 | input buffer | 4.80, 4.09, 3.69 | 9.41, 6.62, 5.31 |
+| 4 | acceptors and selectors | 5.70, 5.99, 5.14 | 4.58, 3.74, 4.36 |
+| 5 | response headers | 3.10, 3.45, 4.25 | 8.12, 5.93, 5.09 |
+
+The runs went one after another, so only run 1 began on a quiet machine; the
+others began with the tail of the run before still in the averages.
+
+```bash
+./gradlew :benchmarks:wire -PwireAbConnector=outputBufferSize=65536,outputAggregationSize=8192 -PwireScenario=both
+./gradlew :benchmarks:wire -PwireAbConnector=outputAggregationSize=32768 -PwireScenario=stream
+./gradlew :benchmarks:wire -PwireAbConnector=inputBufferSize=16384 -PwireScenario=rest
+./gradlew :benchmarks:wire -PwireAbConnector=acceptors=2,selectors=4 -PwireScenario=both
+./gradlew :benchmarks:wire -PwireAbConnector=sendDateHeader=false,sendServerVersion=false -PwireScenario=rest
+```
+
+**Output buffer 64 KiB with 8 KiB aggregation.** Highest sustained: REST 10000
+for both; streams 3000 for both.
+
+| scenario | rate | metric | A | B (defaults) | outside the spread |
+|---|---|---|---|---|---|
+| REST | 1000 | p99 | 6.9ms | 4.9ms | B faster |
+| REST | 10000 | p99 | 23.5ms | 5.4ms | no |
+| stream | 500 | p99.9 | 51.5ms | 22.3ms | B faster |
+| stream | 3000 | p99 | 65.9ms | 94.4ms | no |
+
+Verdict: not kept. A was worse beyond the noise in two rows and better in none.
+
+**Output aggregation 32 KiB** (streams). Highest sustained: 3000 for both.
+
+| rate | metric | A | B (defaults) | outside the spread |
+|---|---|---|---|---|
+| 250 | p99 | 4.8ms | 6.2ms | no |
+| 2000 | p99 | 10.9ms | 18.1ms | no |
+| 3000 | p50 | 3.0ms | 4.7ms | no |
+| 4000 | p50 | 927.7ms | 1380.5ms | A faster, overloaded step |
+
+Verdict: not kept. The only row outside the spread is 4000 responses a second,
+a step neither side kept up at, where p50 is the length of a queue (about a
+second) and not a response time; the same kind of row came out "faster" with
+identical builds in the main-against-main table. Below saturation every row
+overlaps, and the highest sustained rate is the same. This is a judgment call
+on the rule, and a run at 3500 responses a second would settle it.
+
+**Input buffer 16 KiB** (REST). Highest sustained: 20000 for both.
+
+| rate | metric | A | B (defaults) | outside the spread |
+|---|---|---|---|---|
+| 1000 | p99 | 3.2ms | 3.3ms | no |
+| 5000 | p50 | 341µs | 315µs | no |
+| 10000 | p99 | 4.8ms | 17.7ms | no |
+| 20000 | p50 | 809µs | 729µs | no |
+
+Verdict: not kept. Nothing is outside the spread; the requests are small, so a
+larger read buffer has nothing to hold.
+
+**Acceptors 2, selectors 4.** Highest sustained: REST 20000 for both; streams
+A 2000, B 3000.
+
+| scenario | rate | metric | A | B (defaults) | outside the spread |
+|---|---|---|---|---|---|
+| REST | 10000 | p99 | 10.8ms | 4.2ms | no |
+| REST | 10000 | p99.9 | 54.3ms | 18.0ms | B faster |
+| stream | 250 | p99 | 4.3ms | 5.4ms | A faster, 24%, below the 2x bar |
+| stream | 3000 | p99 | 100.9ms | 74.6ms | no |
+
+Verdict: not kept. A was slower beyond the noise on REST p99.9, held a lower
+rate on streams (one rung), and its one better row is a 24% gap on p99.
+
+**`sendDateHeader=false`, `sendServerVersion=false`** (REST). Highest
+sustained: 20000 for both (A's first round did not keep up at 1000, an outlier).
+
+| rate | metric | A | B (defaults) | outside the spread |
+|---|---|---|---|---|
+| 1000 | p99 | 6.6ms | 2.9ms | B faster |
+| 5000 | p50 | 334µs | 338µs | no |
+| 10000 | p50 | 398µs | 393µs | no |
+| 20000 | p50 | 725µs | 725µs | no |
+
+Verdict: not kept. Dropping the headers saves nothing measurable on p50, and
+a response without `Date` and `Server` would change what a client sees. A
+client that relies on `Date` must not be served without it.
+
+**Summary.** No setting beat Jetty's defaults beyond the noise at a rate the
+server kept up with, so `start()` keeps Jetty's defaults and
+`-Dpelican.jetty.connector` stays a way to measure or override them.
+
 ## Routing as the number of endpoints grows
 
 **What is measured.** Every other table uses an API of one endpoint, which
