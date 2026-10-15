@@ -78,10 +78,9 @@ started.
   past it a handler reads the whole `Params` through `endpoint(lensInputs)`.
   More overloads or a builder would both work. Not urgent: six covers nearly
   every endpoint.
-- **Further transports, servers and codecs as restores.** OkHttp and Ktor client
-  transports, http4k and Ktor servers, and a jsoniter codec existed before 1.0
-  and are intended to return as restores rather than rewrites (specs 0073, 0075
-  and 0076 list them under "Not doing"). No spec is open for any of them and no
+- **Further transports, servers and codecs.** Specs 0073, 0075 and 0076 name
+  OkHttp and Ktor client transports, http4k and Ktor servers, and a jsoniter
+  codec as later work, under "Not doing". No spec is open for any of them and no
   order is set. Of the clients, OkHttp reaches the most new callers, since
   `java.net.http` does not exist on Android.
 
