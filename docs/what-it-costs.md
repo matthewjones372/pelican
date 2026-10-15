@@ -651,7 +651,7 @@ separate them.
 
 **Verdict, rest.** This branch is no worse than main beyond the noise from 1000
 to 40000 requests a second: every p50, p99 and p99.9 range overlaps except p99
-at 20000 req/s (4.4ms against 5.2ms, main 17% lower, under the 2x bar). The
+at 20000 req/s (4.4ms against 5.2ms, main 17% higher, under the 2x bar). The
 synchronous regression of the first measurement is gone. Main held 50000 req/s
 in two of three runs where this branch held 40000 in all three, so at 50000 main
 is lower at p50 (2.4ms against 7.9ms) with disjoint ranges; that is one rung of
