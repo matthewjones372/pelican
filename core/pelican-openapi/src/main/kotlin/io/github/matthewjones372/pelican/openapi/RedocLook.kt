@@ -32,7 +32,7 @@ class RedocLookBuilder internal constructor() {
     private val stylesheets = mutableListOf<String>()
     private var theme: ReferenceTheme? = null
 
-    /** The look in slots either renderer reads; [options], [logo] and [stylesheet] beside it win. See spec 0081. */
+    /** The look in slots either renderer reads; [options], [logo] and [stylesheet] beside it win. See spec 0082. */
     fun theme(configure: ReferenceThemeBuilder.() -> Unit) {
         theme = ReferenceThemeBuilder().apply(configure).build()
     }

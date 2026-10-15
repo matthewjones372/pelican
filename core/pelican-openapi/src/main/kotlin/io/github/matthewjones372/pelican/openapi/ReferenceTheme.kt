@@ -5,7 +5,7 @@ import io.github.matthewjones372.pelican.jsonObj
 
 /**
  * A reference page's look in slots both renderers read, so a service can change renderer without rewriting it.
- * Anything past these slots is the renderer's own options or CSS, which win over the theme. See spec 0081.
+ * Anything past these slots is the renderer's own options or CSS, which win over the theme. See spec 0082.
  */
 class ReferenceTheme internal constructor(
     /** Links, buttons and the selected operation. */

@@ -62,16 +62,16 @@ written down does not depend on that staying true.
 
 ## Stack
 
-- [ ] **`spec-0080-scalar-page`** ([#305](https://github.com/matthewjones372/pelican/pull/305)): `ScalarLook`, its builder, `scalarHtml`;
+- [x] **`spec-0080-scalar-page`** ([#305](https://github.com/matthewjones372/pelican/pull/305)): `ScalarLook`, its builder, `scalarHtml`;
       tests in `pelican-openapi`.
       Done when: the page carries options, css and stylesheets, `telemetry` and
       `proxyUrl` default off and yield to `options`, and `</script>` in the
       document or css cannot end the script or style.
-- [ ] **`spec-0080-scalar-route`** ([#307](https://github.com/matthewjones372/pelican/pull/307)): `scalarReference` in `DocsBuilder`, the
+- [x] **`spec-0080-scalar-route`** ([#307](https://github.com/matthewjones372/pelican/pull/307)): `scalarReference` in `DocsBuilder`, the
       refusals, both backends serving it; `example` asserts it over a socket.
       Done when: one `docs { }` serves Swagger at `/api-docs` and Scalar at
       `/reference` on Pekko and Jetty, reading `/openapi.json`.
-- [ ] **`spec-0080-docs`**: `docs/reference.md` and `docs/modules.md` say there
+- [x] **`spec-0080-docs`** ([#308](https://github.com/matthewjones372/pelican/pull/308)): `docs/reference.md` and `docs/modules.md` say there
       are three renderers and which one sends requests.
       Done when: the block above is in the reference guide.
 
