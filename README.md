@@ -7,325 +7,269 @@
 
 # Pelican
 
-Typed HTTP endpoints for Kotlin. You describe an endpoint once, and the server
-route, the OpenAPI document and a typed client are built from that description.
+Typed HTTP endpoints for Kotlin. Describe an endpoint once; serve it, document
+it, test it and generate its client from that one description.
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.matthewjones372/pelican-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core)
 [![build](https://github.com/matthewjones372/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
-[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmatthewjones372%2Fpelican%2Fbadges%2Fcoverage.json)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
-[![Kotlin 2.4.10](https://img.shields.io/badge/Kotlin-2.4.10-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
-[![OpenAPI 3.1 and 3.2](https://img.shields.io/badge/OpenAPI-3.1%20%7C%203.2-6BA539?logo=openapiinitiative&logoColor=white)](https://spec.openapis.org/oas/v3.2.0)
 [![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-[Getting started](#getting-started) · [The endpoint model](#the-endpoint-model) ·
-[Serving and testing](#serving-and-testing) · [Cookbook](docs/cookbook.md) ·
-[Reference manual](docs/reference.md) · [Choosing](docs/choosing.md)
+[Getting started](#getting-started) · [Cookbook](docs/cookbook.md) ·
+[Reference manual](docs/reference.md) · [Modules](docs/modules.md) ·
+[What it costs](docs/what-it-costs.md)
 
 </div>
 
 ---
 
-Pelican is a Kotlin library for describing HTTP APIs. You write down what an
-endpoint is (its path, its inputs, the types it can return) as an ordinary
-Kotlin value. Pelican builds the rest from that value: the server route, the
-OpenAPI document, a typed test client, and a generated Kotlin client for your
-callers.
+Pelican is a Kotlin library in which an HTTP endpoint is an ordinary value: its
+method and path, its typed inputs, and every response it can give, successes
+and failures alike. From that value Pelican derives the server route, the
+OpenAPI document, a typed client for your tests and a generated Kotlin client
+for your callers.
 
-The endpoint description is the only description of the HTTP contract. There is
-no annotation scanning and no hand-maintained YAML to keep in step with it.
+The problem it addresses is that an HTTP contract usually lives in four places.
+The handler decides what the server actually accepts and returns. An OpenAPI
+file, written by hand or scanned from annotations, says what it accepts and
+returns. Client models say it again, and tests say it a fourth time with URL
+strings and JSON literals. Each copy is maintained separately, so they drift:
+a parameter is renamed in the handler but not the document, a 404 is returned
+that no client knows about, a test keeps passing against a URL nobody serves.
 
-It is a library, not a framework. It does not own your `main`, and it serves
-through a web server you can mount beside your own handlers: Jetty 12, which
-these docs use, or Pekko HTTP for a service that already runs it. If you know
-tapir from Scala, this is the same idea, limited to what Kotlin's type system
-can express without implicits.
+In Pelican there is one copy. The route, the document and both clients are
+read off the same endpoint value, so they cannot describe different APIs, and
+the parts that the type system can check are checked by the compiler.
 
-A description, then the handler that answers it:
+## One endpoint, and what follows from it
+
+A description, then the handler that answers it. This is taken from
+[`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt),
+which is compiled on every build.
 
 ```kotlin
+data class Bookmark(val id: Long, val url: String, val title: String, val tags: List<String> = emptyList())
+data class NoSuchBookmark(val id: Long, val message: String)
+
+val bookmarkId      = pathParam<Long>("bookmarkId", description = "The bookmark's id")
+val bookmarkMissing = errorJson<NoSuchBookmark>(404, "No bookmark with that id")
+
 val getBookmark = endpoint(bookmarkId) {
     get("bookmarks" / bookmarkId)
     summary = "Fetch one bookmark"
     json<Bookmark>() orFail bookmarkMissing
 }
 
-getBookmark handledOrFail { id ->                    // id: Long, already decoded
-    Bookmarks.find(id)?.let { ok(it) }               // must be a Bookmark
-        ?: bookmarkMissing(NoSuchBookmark(id, "No bookmark $id"))   // must be the declared 404
+val route = getBookmark handledOrFail { id ->                    // id: Long, already decoded
+    Bookmarks.find(id)?.let { ok(it) }                           // ok(...) has to carry a Bookmark
+        ?: bookmarkMissing(NoSuchBookmark(id, "No bookmark $id")) // the 404 the endpoint declared
 }
 ```
 
-If you change the path parameter's type, the response type or the declared
-error, the handler stops compiling.
+`getBookmark` holds no handler and does no work. It is data, and four things
+are read from it.
 
-## What it does
+**The handler receives decoded, typed arguments.** `id` is a `Long`. The
+handler never sees a string, and a request for `/bookmarks/abc` is answered
+with a 400 before the handler runs. A constraint such as
+`IntCodec.between(1, 100)` on a query parameter is both the check the server
+makes and the `minimum`/`maximum` in the published schema, so the document
+cannot promise a range the server does not enforce.
 
-**The OpenAPI document comes from the code.** The document (3.1.0, or 3.2.0 on
-request) is generated from the same endpoint values the server is built from,
-so it stays in step with the server. See
-[Which version the document says](docs/reference.md#which-version-the-document-says-and-how-to-choose)
-for how to choose a version. For a tool that wants a JSON Schema for one type
-rather than the whole document, `pelican-schema` writes one that resolves on its
-own; see [A schema that resolves on its own](docs/schemas.md).
+**Every response is part of the endpoint's type.** `orFail bookmarkMissing`
+changes the type the handler must return to
+`Outcome<NoSuchBookmark, Bookmark>`. A handler that returns a bare `Bookmark`,
+or forgets that the 404 exists, does not compile:
 
-**Handlers get typed arguments.** A path parameter declared as `Long` arrives
-as a `Long`. There is no `Params` bag, no casting and no `String.toLong()` in
-each handler.
+```
+getBookmark handledOrFail { id -> Bookmarks.find(id)!! }
+  e: Return type mismatch: expected 'Outcome<NoSuchBookmark, Bookmark>', actual 'Bookmark'.
 
-**Bad input is rejected before your code runs.** Constraints are part of the
-input value, so the rule that refuses a request also appears in the schema:
-`between(1, 100)` is both the check and the `minimum`/`maximum`.
-
-**Every response is part of the endpoint's type.** `orFail` adds a failure to
-the endpoint's type and `or` adds a second success, such as a `200 Order`
-beside a `202 Accepted`. The handler says which one it is producing, and the
-generated client gets a sealed type to match on.
-
-**Tests call endpoints, and URLs are pinned separately.** Behaviour tests refer
-to endpoint values, so a rename stops them compiling instead of making them
-404. The URLs your callers depend on are pinned in a separate test, one line
-per endpoint: `app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"`.
-
-**Descriptions are independent of the backend.** Two servers ship, at parity:
-Jetty 12, with no Pekko or Scala on its classpath, and Pekko HTTP. 1.0 shipped
-Pekko and Jackson alone, to keep the first release small enough to support
-properly; Jetty has joined since, and kotlinx has come back as a second codec
-module. The http4k and
-Ktor interpreters and the jsoniter codec were written and passed the same
-parity suites, then were taken off `main` before 1.0. They are in the history at commit
-[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e), the last commit before they were
-removed, and are meant to come back after 1.0. Your descriptions will not need
-to change when they do.
-
-**The overhead is measured.** The interpreter is benchmarked with JMH against
-the same routes written by hand, with baselines and error bars in
-[what it costs](docs/what-it-costs.md). On a realistic endpoint the difference
-is a fraction of a percent of the request time.
-
-## Contents
-
-**[Getting started](#getting-started)**: install, the modules, a first
-endpoint, and what the compiler catches.
-
-**[The endpoint model](#the-endpoint-model)**: inputs and validation, declared
-failures, multiple responses, streaming, and the other things a description
-can say.
-
-**[Serving and testing](#serving-and-testing)**: running a server, filters and
-metrics, who is calling, the typed test client, golden files, stubbing another
-service, and clients for your callers.
-
-**[Appendix](#appendix)**: the longer documents, the runnable examples,
-[stability](#stability) and [versions](#versions).
-
-The reference manual, which explains the reasoning behind each design
-decision, is [docs/reference.md](docs/reference.md).
-
----
-
-# Getting started
-
-## Install
-
-The current release is **1.0.0**, on Maven Central under
-`io.github.matthewjones372`, and it needs Java 25. The stability promise
-applies to it (see [Stability](#stability)).
-
-`pelican-bom` lines every module up at one version, so a build names it once
-and leaves the modules without one:
-
-```kotlin
-dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
-    // The interpreter. Brings pelican-core and Jetty 12's server.
-    implementation("io.github.matthewjones372:pelican-jetty")
-    // The codec module: Jackson, and the schemas the document derives.
-    implementation("io.github.matthewjones372:pelican-jackson")
-    // /openapi.json and Swagger UI beside the endpoints. startWithDocs lives here.
-    implementation("io.github.matthewjones372:pelican-jetty-docs")
-    // The typed test client.
-    testImplementation("io.github.matthewjones372:pelican-test")
-    // inMemory(handlers) and server.client(): the test client run against a Jetty Api.
-    testImplementation("io.github.matthewjones372:pelican-test-jetty")
-}
+getUser handledNow { id -> "a string" }
+  e: Return type mismatch: expected 'User', actual 'String'.
 ```
 
-The Jetty modules and `pelican-bom` are new since 1.0.0 and arrive with the
-next release; until then, build them as described at the end of this section.
-1.0.0 itself serves on Pekko HTTP, and [On Pekko](docs/cookbook.md#on-pekko)
-has the dependencies for that.
+These are the compiler's own messages. `DoesNotCompileTest` compiles each
+mistake on every build and checks the message, so they cannot go out of date.
+The consequence is that the failures a caller can receive are a closed,
+declared set: the document lists them, the generated client gives the caller a
+sealed type to match on, and an exception nobody declared becomes an opaque
+500 with a reference in the log rather than a leaked stack trace.
 
-Those modules are the standard stack. The examples on this page use them,
-except where a section names another module. [Modules](#modules) below lists
-every module, and [docs/modules.md](docs/modules.md) says what each depends on.
+**The OpenAPI document is generated from the same value the server routes
+on.** `/openapi.json` (OpenAPI 3.1.0 by default, or 3.2.0) and the Swagger UI
+page beside it are built from `getBookmark`, not from a parallel file or from
+annotations a scanner reads. If the route changes, the document changes in the
+same commit, because there is nothing else to edit.
 
-The Gradle plugin is `io.github.matthewjones372.pelican`. It is published to
-Maven Central rather than the Gradle Plugin Portal, so the build needs to be
-told once:
-
-```kotlin
-// settings.gradle.kts
-pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-```
+**Tests call endpoint values, and URLs are pinned separately.** The typed test
+client is built from the same description:
 
 ```kotlin
-// build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
+val bookmark: Bookmark = app.call(getBookmark, 1L)
+app.outcome(getBookmark, 9_999L) shouldBeError NoSuchBookmark(9_999L, "No bookmark 9999")
+
+app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
 ```
 
-To build against unreleased changes, `./gradlew publishToMavenLocal` installs
-the modules and `./gradlew -p tooling/pelican-gradle-plugin publishToMavenLocal`
-installs the plugin. Between releases the version comes from the nearest git
-tag: an untagged commit gets a `-SNAPSHOT` of the next version.
+The first two lines contain no path and no JSON, so renaming `bookmarkId` or
+changing `Bookmark` stops the test compiling instead of turning it into a 404
+at run time. That same property means a behaviour test cannot notice when the
+public URL moves, because the client moves with the server. The third line is
+the guard for that: a URL pin, kept in a file of its own, compares against a
+literal string and is the one test that should fail on a rename.
+`pelican-test-golden` goes further and fails when a change to the published
+document would break existing callers, such as a new required body field.
 
-## Modules
+Some mistakes are beyond the type system: a declared path parameter missing
+from the path, a codec missing for a body type, a security scope the scheme
+never granted. Those are checked when the endpoint value or the `Api` is
+constructed, so they fail at start-up rather than on the first request.
 
-Every module uses the group `io.github.matthewjones372`, and all of them are
-on Maven Central at 1.0.0.
+## How it fits into a service
 
-**Core and documents**
+Pelican is a library, not an application framework. It does not own `main`,
+it has no registry or annotation scanning, and nothing has to run at start-up
+to discover endpoints. A set of routes is a `List` you build, split across
+files or filter like any other value.
 
-- `pelican-core`: endpoint descriptions, plain codecs, a small JSON tree and
-  parser, and the client SPI with an in-memory transport. It depends on the
-  Kotlin standard library and `jackson-core` only. It also holds callers
-  (`authenticated`), `pages`, and tagged failures.
-- `pelican-openapi`: descriptions to an OpenAPI 3.1.0 or 3.2.0 document, in
-  JSON or YAML, and a comparison of two documents that reports what would break
-  callers. Tagged failures are written as a `oneOf`, and the comparison reads
-  through `oneOf` and `anyOf`.
-- `pelican-schema`: one type as a JSON Schema 2020-12 document that resolves on
-  its own, for tools that do not read the OpenAPI document.
+Descriptions are independent of the server. A backend module interprets them
+onto a web server you can mount beside the handlers you already have:
 
-**JSON and Arrow**
+- **Pekko HTTP** (`pelican-pekko`): the descriptions become a Pekko `Route`.
+  `toRoute(system)` concatenates with your existing routes, and
+  `start(system, port = 8080)` serves on an actor system the service already
+  runs. This is the backend in the current release, 1.0.0.
+- **Jetty 12** (`pelican-jetty`): the descriptions become a Jetty core
+  `Handler`, with no Pekko or Scala on the classpath. `toHandler()` passes on
+  any request it does not answer, so it sits in a `Handler.Sequence` beside
+  handlers of your own. It is on `main` and not yet in a release; see
+  [Getting started](#getting-started).
 
-- `pelican-jackson`: the `Codecs`. Jackson reads and writes bodies, and
-  swagger-core describes the types for the document.
-- `pelican-kotlinx`: the `Codecs` for `@Serializable` payloads. kotlinx reads
-  and writes bodies, and the same `SerialDescriptor`s describe the types.
-- `pelican-arrow`: Arrow's `Either` to an `Outcome` (`toOutcome`) and back
-  (`toEither`), and a `toOutcome { }` that names which of several declared
-  failures a `Left` becomes.
+Because a Pelican route passes on what it does not describe, you can adopt it
+one endpoint at a time in an existing service. A parity suite runs the same
+descriptions against both backends and checks that they answer identically,
+down to producing the same OpenAPI document; the few recorded differences are
+listed under [On Jetty](docs/reference.md#on-jetty). Changing backend changes
+the binder imports and the type a streaming handler returns (a Pekko `Source`
+or a Kotlin `Sequence`), not the descriptions.
 
-**Server**
+`pelican-core` depends on the Kotlin standard library and `jackson-core`'s
+streaming parser and nothing else, and a test enforces that. Every JSON
+library, server and HTTP client lives in a separate module, so a build takes
+only what it uses.
 
-- `pelican-jetty`: descriptions to a Jetty 12 `Handler`, and `start` to serve
-  them, with no Pekko or Scala on the classpath. Synchronous handlers run on
-  virtual threads (`Handlers`), `pages` serves a classpath directory beside the
-  endpoints, and `toHandler` passes on what it does not answer, so it sits in a
-  `Handler.Sequence` beside handlers of your own.
-- `pelican-jetty-docs`: `/openapi.json` and a Swagger UI or Redoc page beside
-  the endpoints (`startWithDocs`).
-- `pelican-streams-jetty`: a streamed request body as a lark `Stream`, whose
-  failure is a value, and the result back as the declared `Outcome`.
-- `pelican-pekko`, `pelican-pekko-docs` and `pelican-streams`: the same on
-  Pekko HTTP, where the descriptions become a Pekko `Route`. See
-  [On Pekko](docs/cookbook.md#on-pekko).
+### Compared with writing the handlers by hand
 
-**Client**
+A hand-written handler is the most direct way to answer a request, and for a
+small internal API it may be all you need. What it does not give you is a
+second, machine-checked statement of what it does. The document, the client
+and the tests each restate the contract, and keeping them in step is a matter
+of discipline and review.
 
-- `pelican-client-jetty`: `JettyHttpTransport`, which sends a generated
-  client's requests through Jetty's `HttpClient`.
-- `pelican-client-pekko`: `PekkoHttpTransport`, which sends them through Pekko
-  HTTP's client, for a service that already runs one.
+With Pelican you write the description and the handler. The decoding, the
+400s for bad input, the document, the test client and the generated client
+come from the description, and the compiler checks that the handler agrees
+with it. [The same endpoints, by hand](docs/by-hand.md) shows two endpoints
+written both ways, against Pekko HTTP with swagger annotations, so the
+difference can be read rather than taken on trust.
 
-**Testing**
+The costs are real:
 
-- `pelican-test`: the typed test client, outcome assertions and URL pins, with
-  no server library and no matcher library. It also has `TestCallers`,
-  `signedInAs`, and an `inMemory()` that needs no backend module.
-- `pelican-test-jetty`: `inMemory(handlers)` and `server.client()`, which run
-  the typed test client against a Jetty `Api` without a socket, through Jetty's
-  `LocalConnector`, or against a running server.
-- `pelican-test-pekko`: the same on Pekko, `inMemory()`.
-- `pelican-test-golden`: one golden file per endpoint, failing when a change
-  would break existing callers.
-- `pelican-test-wiremock`: a WireMock server stubbed and verified with endpoint
-  values, for testing a client of somebody else's API, and `stubFile`, which
-  writes those stubs out as WireMock mapping files.
+- **A DSL to learn.** Inputs, outputs and failures are Pelican's types, and
+  some HTTP behaviour you would write directly is instead declared.
+- **Two backends.** If your service runs on Spring MVC, Ktor, Vert.x or
+  anything other than Pekko HTTP or Jetty 12, there is no module for it today.
+- **An interpreter between the request and your code.** Its cost is measured
+  against hand-written routes on the same backend in
+  [What it costs](docs/what-it-costs.md). On the endpoints measured it is a few
+  hundred nanoseconds on Pekko and below what the Jetty benchmark can resolve,
+  but the default of running synchronous handlers on a virtual thread costs
+  considerably more on Pekko and can be turned off.
+- **A new library.** 1.0.0 is the first stable release.
 
-**MCP**
+[Choosing between Pelican and the alternatives](docs/choosing.md) compares it
+with http4k's contracts, Ktor's OpenAPI plugins, Spring, Micronaut, Quarkus,
+tapir and writing the document first, and ends with the cases where Pelican is
+the wrong choice.
 
-- `pelican-mcp`: descriptions to MCP tool descriptions, and a dispatch that
-  runs a tool call through the handler. Values only, with no transport.
-- `pelican-mcp-server`: serves those tools over stdio (`mcpServe`), and the
-  request/response half of Streamable HTTP for a backend to mount. No MCP SDK.
-- `pelican-jetty-mcp`: mounts the tools on `/mcp` beside the endpoints, and
-  `pelican-pekko-mcp` does the same on Pekko.
+## Getting started
 
-**Metrics**
+The current release is **1.0.0**, on Maven Central under the group
+`io.github.matthewjones372`. Its library modules are compiled for **Java 25**,
+so a service using them needs JDK 25 or newer. In 1.0.0 the server backend is
+Pekko HTTP and the JSON codec is Jackson.
 
-- `pelican-metrics`: a filter giving Micrometer meters tagged by method, path
-  template and status, and a counter for requests refused before any filter
-  runs.
-- `pelican-metrics-otel`: the same for OpenTelemetry, with a `SERVER` span per
-  request and a duration histogram, and `traced`, a client transport that
-  opens a client span and sends `traceparent`.
+### Choose the modules you need
 
-**Health**
+Pelican is a set of small modules, and a build takes only the ones it uses.
+Every module brings `pelican-core`, which holds the endpoint DSL and depends on
+nothing but the Kotlin standard library and `jackson-core`. On top of it a
+service picks:
 
-- `pelican-health`: `/health/live` and `/health/ready` from one `health { }`
-  block, answered in `application/health+json`, with checks for a JDBC pool, a
-  downstream HTTP service, disk, heap and deadlocked threads.
-- `pelican-health-kafka`: `kafka(admin)`, over the Kafka `Admin` client the
-  service already holds.
-- `pelican-health-redis`: `redis(connection)`, over the Lettuce connection the
-  service already holds.
+- **one backend**, which serves the descriptions (`pelican-pekko` in 1.0.0);
+- **one codec**, which any endpoint with a JSON body needs
+  (`pelican-jackson`);
+- **anything else only when it is wanted**: the OpenAPI document and Swagger UI
+  (`pelican-pekko-docs`), test clients, client transports, metrics, health,
+  OIDC, MCP.
 
-**Security**
-
-- `pelican-oidc`: verifies an OpenID Connect provider's tokens for a caller, and
-  signs people in to pages.
-
-**Code generation and import**
-
-- `pelican-codegen`: descriptions to a Kotlin client, as source. The generated
-  client reads the tag of a tagged failure.
-- `pelican-import`: an OpenAPI document, in JSON or YAML, to descriptions, as
-  source.
-
-**Build plugin**
-
-- `pelican-gradle-plugin`: the `io.github.matthewjones372.pelican` plugin. It
-  runs the generators above as Gradle tasks: documents, clients, imported
-  endpoints, and the checks against committed copies.
-
-`example` and `benchmarks` are part of the build and are not published.
-
-In the repository the modules sit in directories by kind: `core/`, `codecs/`,
-`backends/jetty/`, `backends/pekko/`, `testing/`, `integrations/` and
-`tooling/`. The directory is not part of a module's name or coordinates.
-
-## Your first endpoint
-
-One endpoint, the server that serves it, and its tests. This code is compiled
-on every build: it is
-[`FirstEndpoint.kt`](example/src/main/kotlin/example/hello/FirstEndpoint.kt) in
-the example module.
+No module brings in a server you did not choose, and the backends do not bring
+the OpenAPI generator or a codec. The smallest JSON service on 1.0.0:
 
 ```kotlin
 // build.gradle.kts
+val pelicanVersion = "1.0.0"
+
 dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
-    implementation("io.github.matthewjones372:pelican-jetty")
-    implementation("io.github.matthewjones372:pelican-jackson")
-    implementation("io.github.matthewjones372:pelican-jetty-docs")
+    // The backend. Brings pelican-core; compiles against Pekko HTTP.
+    implementation("io.github.matthewjones372:pelican-pekko:$pelicanVersion")
+    // The codec: JSON bodies with Jackson, and the schemas the document derives.
+    implementation("io.github.matthewjones372:pelican-jackson:$pelicanVersion")
+    // Pekko itself. Pelican ships none, so name the Scala build you run.
+    implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
+    implementation("org.apache.pekko:pekko-actor-typed_2.13")
+    implementation("org.apache.pekko:pekko-stream_2.13")
+    implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
 }
 ```
+
+Either Scala cross-build of Pekko works; pick `_2.13` or `_3` and use it on
+every Pekko line.
+
+Adding a capability is adding its module. The example below serves its
+documentation and has a test, so it also needs:
+
+```kotlin
+dependencies {
+    // /openapi.json and Swagger UI beside the endpoints. Brings pelican-openapi.
+    implementation("io.github.matthewjones372:pelican-pekko-docs:$pelicanVersion")
+    // The typed test client run against a Pekko Api. Brings pelican-test.
+    testImplementation("io.github.matthewjones372:pelican-test-pekko:$pelicanVersion")
+}
+```
+
+1.0.0 has no BOM, so the one `pelicanVersion` value is what keeps the modules
+at the same version. [Modules](docs/modules.md#choosing-modules) lists every
+module, what each one brings with it, and the minimum set for other setups:
+a generated client, MCP tools, metrics.
+
+### A first endpoint
+
+One endpoint, served with its documentation. This is the file the example
+module compiles as
+[`FirstEndpoint.kt`](example/src/main/kotlin/example/hello/FirstEndpoint.kt)
+with the Pekko binders of
+[`FirstEndpointOnPekko.kt`](example/src/main/kotlin/example/hello/FirstEndpointOnPekko.kt).
 
 ```kotlin
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.jetty.handledNow
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pathParam
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
+import io.github.matthewjones372.pelican.pekko.handledNow
 
 data class Greeting(val message: String)
 
@@ -347,542 +291,210 @@ fun greetings() = api(
 
 fun main() {
     val server = greetings().startWithDocs(port = 8080, docs = docs { docsPath = "/api-docs" })
-    println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
+    println("Listening on ${server.baseUrl}, docs at ${server.baseUrl}/api-docs")
 }
 ```
 
-> [!TIP]
-> `./gradlew :example:runFirstEndpoint` serves this on `:8080`: the endpoint
-> and a Swagger UI page for it.
+Run it and open `http://127.0.0.1:8080/api-docs` for a Swagger UI page built
+from `greet`; the server listens on loopback unless given a `host`. From a
+clone of this repository, `./gradlew :example:runFirstEndpointOnPekko` serves
+the same thing.
 
-The document at `/openapi.json` and the Swagger UI page at `/api-docs` are
-both built from the `greet` value. There is no separate file describing the
-endpoint, and no annotation scanning.
-
-The test refers to the endpoint rather than the URL, and then checks the URL
-separately. These are two different promises: one to your own code, and one
-to your callers.
+And its test, with no socket:
 
 ```kotlin
-private val app = greetings().inMemory(Handlers.onVirtualThreads)   // pelican-test-jetty
+import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.shouldBuild
 
-app.call(greet, "world") shouldBe Greeting("Hello, world!")
+private val app = greetings().inMemory("first-endpoint")   // starts an actor system of that name
+
+app.call(greet, "world") shouldBe Greeting("Hello, world!")  // shouldBe is Kotest's; use any matcher
 app.request(greet, "world") shouldBuild "GET /hello/world"
 ```
 
-If you rename `who` or change `Greeting`, the handler and the first assertion
-stop compiling. The second assertion checks something else: whether the URL
-your callers use still exists.
+[On Pekko](docs/cookbook.md#on-pekko) in the cookbook covers serving on an
+actor system you already run and the Scala 3 cross-build.
 
-## What the compiler catches
+### The Gradle plugin
 
-Each of these errors is real compiler output for the mistake shown:
-
-```
-+(getUser handledNow { id: String -> ... })
-  e: Argument type mismatch: actual type is 'Params.(String) -> User', but 'Params.(Long) -> User' was expected.
-
-+(watchOrders streamedNow { (_, max) -> sequenceOf("not a tick") })
-  e: Return type mismatch: expected 'Sequence<Tick>', actual 'Sequence<String>'.
-
-+(getBookmark handledOrFail { id -> Bookmarks.find(id)!! })
-  e: Return type mismatch: expected 'Outcome<NoSuchBookmark, Bookmark>', actual 'Bookmark'.
-```
-
-`DoesNotCompileTest` compiles each of these on every build and checks the
-error message, so this list cannot go out of date.
-
-Some mistakes are beyond the type system: a path parameter missing from the
-path, a scope its security scheme never granted, a missing codec. These are
-checked when the endpoint value or the `Api` is constructed, so they fail at
-start-up rather than on the first request:
-
-```
-GET /things declares path parameter 'stray', but the path is /things
-```
-
----
-
-# The endpoint model
-
-A short tour, one idea and one example per section. The
-[reference manual](docs/reference.md) covers each in full, and the
-[cookbook](docs/cookbook.md) has complete recipes you can copy.
-
-## Inputs and validation
-
-Inputs are values. You declare them once, and the route, the decoder, the
-document and the test client all use them. A refinement narrows what is
-accepted and also appears in the schema:
+The optional plugin, `io.github.matthewjones372.pelican`, runs the generators
+as Gradle tasks: OpenAPI documents, Kotlin clients, endpoints imported from
+someone else's document, and the checks against committed copies. It is
+published to Maven Central rather than the Gradle Plugin Portal, so the build
+needs to be told once:
 
 ```kotlin
-val bookmarkId = pathParam<Long>("bookmarkId", description = "The bookmark's id")
-val limit      = queryParam("limit", IntCodec.between(1, 100), description = "How many to return").default(20)
-val tag        = queryParam("tag", slug, description = "Only bookmarks with this tag").optional()
-```
-
-Swagger UI reads the published constraints and will not send a request the
-server would reject. A request that gets through anyway gets a 400 before any
-handler runs, naming the parameter and the rule it broke.
-
-There are ready-made codecs for the primitives, `UUID`, the `java.time` types,
-`URI` and any Kotlin `enum`. Your own types take about three lines with
-`PlainCodec.mapOrFail` and are validated as they are decoded. Multi-valued
-parameters (`?tag=a&tag=b`, `?id=1,2`) decode to typed lists. See
-[Refined inputs](docs/reference.md#refined-inputs) and
-[More than one value](docs/reference.md#more-than-one-value).
-
-## Declared failures
-
-`orFail` adds the failure to the endpoint's type, so the handler has to
-produce it and the response body is the type the document says it is. An
-endpoint can declare several failures, and the handler names the one it is
-returning:
-
-```kotlin
-val placeOrder = endpoint(userId, apiKey, newOrder) {
-    post("users" / userId / "orders")
-    json<Order>(status = 201).orFail(badApiKey, noSuchUser)
-}
-
-placeOrder handledOrFail { (id, key, req) ->
-    when {
-        key != expected        -> badApiKey(ApiError(401, "Bad API key"))
-        Store.user(id) == null -> noSuchUser(ApiError(404, "No user $id"))
-        else                   -> ok(Store.create(id, req))
+// settings.gradle.kts
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
     }
 }
 ```
 
-The status comes from the declaration, not from the payload's type, so two
-failures can share a payload type. If the failures share a sealed supertype,
-the `when` is exhaustive. A failure can also carry response headers (for
-example a `Retry-After` on a 429), declared on that failure and supplied where
-it is produced.
-
-An endpoint with a single declared failure can skip the naming: `err(value)`
-is the counterpart of `ok` and means that one failure. In an Arrow codebase you
-can convert at the edge instead: `service.find(id).toOutcome()`, from
-`pelican-arrow`, treats a `Right` as `ok` and a `Left` as `err`, and
-`toOutcome(failure)` names the declaration when there are several. See
-[Declared failures](docs/reference.md#declared-failures).
-
-Two failures can share a status when each is `tagged`, for example two
-different 503s. The tag is written into the body, the document describes that
-status as a `oneOf` with a discriminator, and the generated client reads the
-tag. `pelican-arrow` also has `toOutcome { e -> ... }`, which names one of
-several declared failures for each `Left`. See specs
-[0063](specs/0063-two-failures-under-one-status.md) and
-[0060](specs/0060-an-either-with-several-failures.md).
-
-## More than one successful response
-
-A failure is just one alternative response. `or` declares several successes in
-the same way, such as a `201 Order` beside a `202 Queued`, and the handler
-names the one it is producing with `handledOneOf`. The document publishes both
-statuses with their own schemas and headers, and the generated client gives
-the caller a sealed type with one member per status. See
-[More than one successful response](docs/reference.md#more-than-one-successful-response).
-
-One response can also be written in more than one format, as in
-`negotiated(json<Report>(), media<Report>("text/csv"))`, with the caller's
-`Accept` header choosing between them. See
-[One response, several renderings](docs/reference.md#one-response-several-renderings).
-
-## Streaming
-
 ```kotlin
-ndjson<Order>()             // one JSON document per line
-sse<Tick>(eventName = "order", id = { it.sequence.toString() })
-jsonArray<Order>()          // `[{...},{...}]`, flushed as produced
-bytes()                     // opaque, never buffered
+// build.gradle.kts
+plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
 ```
 
-Handlers return the backend's own stream type (a `Sequence`, on Jetty), and
-back-pressure runs from the socket to the source. The test suite throttles a
-source and fails if the first frame does not arrive well before the last, so a
-response that buffers by mistake is caught. SSE streams can carry event ids and
-a retry directive, so a caller can resume where it left off. A request body can
-also be a typed stream, with `ndjsonIn<T>()`. See
-[Streaming](docs/reference.md#how-streaming-stays-backend-agnostic).
+### Jetty, kotlinx and the BOM: on `main`, not yet released
 
-`pelican-streams-jetty` hands a streamed request body to
-[lark's](https://github.com/matthewjones372/lark) `Stream`, which carries a
-failure as a value, and turns the result back into the `Outcome` the endpoint
-declared. A row the handler cannot read then becomes the declared failure
-rather than a 500. See
-[A stream that names its failure, on Jetty](docs/reference.md#a-stream-that-names-its-failure-on-jetty).
+Three things on `main` are not yet in a release:
 
-## Cookies, forms and uploads
+- the Jetty 12 family: `pelican-jetty`, `pelican-jetty-docs`,
+  `pelican-jetty-mcp`, `pelican-test-jetty`, `pelican-streams-jetty` and
+  `pelican-client-jetty`;
+- `pelican-kotlinx`, a codec for `@Serializable` payloads;
+- `pelican-bom`, which manages the versions of Pelican's modules so a build
+  writes the version once.
 
-Cookies, form bodies, multipart text parts and file uploads are inputs like any
-other, with the same codecs, the same `optional()`/`default(v)`, the same
-refinements and the same 400s. A form body is decoded against its published
-schema, a streamed file part is passed on without buffering, and a buffered
-part declares how much memory it may use. `or` lets one payload arrive either
-as a form or as JSON, with `Content-Type` deciding how it is decoded. See
-[Cookies](docs/reference.md#cookies),
-[Form bodies](docs/reference.md#form-bodies) and
-[Multipart uploads](docs/reference.md#multipart-uploads).
+The cookbook and the other guides on `main` are written against these, so
+their dependency blocks use the BOM and their imports name
+`io.github.matthewjones372.pelican.jetty`. On 1.0.0, give each module the
+version `1.0.0` and import the binders from
+`io.github.matthewjones372.pelican.pekko`: `pelican-jetty` has every binder
+`pelican-pekko` has, under the same name, so only streaming handlers change
+(a Pekko `Source` where Jetty takes a `Sequence`).
 
-## Response headers
-
-Response headers are declared on the endpoint with `emits(...)`, set from the
-handler with `setHeader`, and published in the document with their schemas.
-Setting an undeclared header throws, so the document and the actual responses
-stay in step. A header that belongs to one response, such as the `Location` on
-a 201, is declared on that response only. See
-[Response headers](docs/reference.md#response-headers).
-
-## Webhooks
-
-OpenAPI's `webhooks` are the calls a service sends. In Pelican a webhook is
-described the same way as an endpoint, but read in the other direction: a name,
-a method and a body, with no path, because the path belongs to whoever
-subscribed. The document publishes it under `webhooks`, the generated client
-gets a sender for it, and binding one as a route fails at construction. See
-[Webhooks](docs/reference.md#webhooks-the-calls-the-service-sends).
-
-## Tools a model can call
-
-The same descriptions can also be served as MCP tools. An endpoint already
-knows its name, its arguments, their constraints and the shape of its result,
-which is what a tool description needs. Arguments are decoded with the same
-codecs an HTTP request uses, calls go through the handler the route already
-has, and declared failures come back as results the model can act on.
-`mcpServe(api)` speaks the protocol over stdio, and `pelican-jetty-mcp` mounts
-it on `/mcp`. Neither needs an MCP SDK on the classpath. See
-[Tools a model can call](docs/mcp.md).
-
----
-
-# Serving and testing
-
-## Running a server
+The BOM manages versions and nothing else. Importing it adds no module to the
+classpath: you still declare each module you want, without a version, and
+leave out the ones you do not.
 
 ```kotlin
-ordersApi().start(port = 8080)                                  // endpoints only, on 127.0.0.1
-ordersApi().start(port = 8080, host = "0.0.0.0")                // every interface, said out loud
-ordersApi().startWithDocs(port = 8080, docs = ordersDocs)       // plus /openapi.json and /docs
-```
-
-The server listens on loopback by default; listening on the network has to be
-asked for explicitly. The handle is `AutoCloseable` with `block()`, `stop()`
-and `stopAsync()`.
-
-Pelican does not have to own the port. `toHandler()` returns a Jetty `Handler`
-and binds nothing, and it passes on any request it does not answer, so
-described endpoints can sit in a `Handler.Sequence` beside handlers you already
-have. This is how you would adopt Pelican one endpoint at a time:
-
-```kotlin
-ordersApi().start(port = 8080) { Handler.Sequence(health, toHandler()) }
-```
-
-A synchronous handler (`handledNow`, `handledOrFail` and the rest) runs on a
-virtual thread of its own, so it can block on a database call;
-`handlers = Handlers.onDispatcher` runs it on Jetty's own threads instead. And
-`pages = pages("ui")` in `api`'s block serves a classpath directory beside the
-endpoints, with an endpoint always winning over a page at the same path. See
-[Where a handler runs](docs/reference.md#where-a-handler-runs) and
-[Pages beside the endpoints](docs/reference.md#pages-beside-the-endpoints).
-
-These calls come from `io.github.matthewjones372.pelican.jetty`; see
-[On Jetty](docs/reference.md#on-jetty). On Pekko the same calls come from
-`io.github.matthewjones372.pelican.pekko`, `toRoute(system)` is the Pekko
-`Route` to concatenate with your own, and `start(system, port = 8080)` serves
-on an `ActorSystem` the service already has.
-
-## Filters
-
-A filter runs around every handler and sees the request with its inputs
-already decoded. To reject a request, a filter throws (`unauthorized()`,
-`forbidden()`, `tooManyRequests(retryAfterSeconds = 3600)`). Anything a filter
-works out is passed to the handler in a typed attribute:
-
-```kotlin
-val caller = attribute<Caller>("caller")
-
-val requireToken = before { p ->
-    p[caller] = tokens[p[authorization]?.removePrefix("Bearer ")]
-        ?: unauthorized("Present a bearer token")
-}
-
-api(endpoints, JacksonCodecs) { filter(requireToken) }
-```
-
-A filter can see which endpoint matched, which makes one-line integrations
-possible. `filter(metrics(registry))` gives Micrometer meters tagged by method,
-path template and status (`pelican-metrics`), and `filter(openTelemetry(sdk))`
-gives a `SERVER` span per request, named from the description
-(`pelican-metrics-otel`). Requests refused before the filter chain runs, such
-as a body over the size limit or a parameter that does not decode, are counted
-by `onRefusal(refusalCounter(...))`, since no filter sees them. See
-[Filters](docs/reference.md#filters) and [Metrics](docs/reference.md#metrics).
-
-## Who is calling
-
-An endpoint can declare who is calling it, under a security scheme, as a typed
-value built from the verified identity. A request with no credential, or one
-that fails verification, gets a 401 before the handler runs, and the document
-lists the scheme. `pelican-oidc` verifies an OpenID Connect provider's tokens:
-
-```kotlin
-data class Caller(val subject: String, val groups: Set<String>)
-
-val provider = oidc(issuer = "https://id.example.com", audience = "bookmarks")
-val caller = authenticated(provider.scheme) { id -> Caller(id.subject, id.groups) }
-
-val myAccount = endpoint {
-    get("account")
-    authenticatedBy(caller)
-    json<Account>()
-}
-
-val routes = listOf(myAccount handledNow { Account(this[caller].subject) })
-
-api(routes, JacksonCodecs) { authenticate(provider.scheme, provider) }
-```
-
-It fetches the provider's keys on first use and checks the signature, issuer,
-audience, expiry and algorithm. The same value can sign people in to pages
-with the authorization-code flow, keeping the session in an encrypted cookie.
-Tests call as anyone with `TestCallers` from `pelican-test`. Pelican says who
-is calling; what they may do stays in the service's own code. See
-[Who is calling](docs/reference.md#who-is-calling) and
-[spec 0061](specs/0061-who-is-calling.md).
-
-## Errors, limits and the rest
-
-An unhandled exception becomes a 500 with an opaque reference. The stack trace
-goes to the log with the same reference, so the two can be matched up without
-showing internals to callers. Declared failures are not affected. Request
-bodies are limited by `maxBodyBytes` (8 MiB by default), `covers = ...` makes
-an unbound endpoint a start-up failure, and `cors("https://app.example.com")`
-answers preflight requests from what the endpoints already declare. See
-[Errors](docs/reference.md#errors-and-what-a-caller-is-told),
-[Limits and startup checks](docs/reference.md#limits-and-startup-checks) and
-[CORS](docs/reference.md#cors).
-
-Descriptions carry a `KType` and no serializer, so the JSON library is a single
-argument: `api(routes, codecs = JacksonCodecs)`, or
-`JacksonCodecs(myObjectMapper)` to use your own mapper. For `@Serializable`
-payloads, `pelican-kotlinx` ships too: `api(routes, codecs = KotlinxCodecs)`. See
-[Choosing a JSON library](docs/reference.md#choosing-a-json-library).
-
-## Testing
-
-`pelican-test` uses the same descriptions to build a typed client, and
-`pelican-test-jetty` runs it against a Jetty `Api`, in memory or over a socket:
-
-```kotlin
-val app = bookmarksApi().inMemory(Handlers.onVirtualThreads)   // no socket; or .start().client() for a real one
-
-val bookmark: Bookmark = app.call(getBookmark, 1L)
-app.outcome(getBookmark, 9_999L) shouldBeError NoSuchBookmark(9_999L, "No bookmark 9999")
-```
-
-There are no path strings and no hand-written JSON, so renaming an input makes
-the tests stop compiling instead of returning 404s. The assertions throw plain
-`AssertionError`, so the module adds no matcher library to your classpath. Each
-suite runs both in memory and over a real socket.
-
-Because the client and the server are built from the same description, a
-rename changes both at once. So the URLs your callers use are pinned
-separately, against literal strings, in the one test that should fail on a
-rename:
-
-```kotlin
-app.request(getBookmark, 1L) shouldBuild "GET /bookmarks/1"
-app.request(listBookmarks, In2(20, Slug("streams"))) shouldBuild "GET /bookmarks?limit=20&tag=streams"
-```
-
-Some breaking changes are not caught by pinned URLs, such as a new required
-field in a request body or a deleted endpoint. `pelican-test-golden` records
-what the descriptions publish, one file per endpoint, and fails when a change
-would break existing callers:
-
-```kotlin
-private val golden = Golden()
-
-@Test fun `every endpoint publishes what it published`() {
-    golden.operations(bookmarksSpec())      // one file per endpoint
+dependencies {
+    implementation(platform("io.github.matthewjones372:pelican-bom:1.0.1-SNAPSHOT"))
+    implementation("io.github.matthewjones372:pelican-jetty")
+    implementation("io.github.matthewjones372:pelican-jackson")
+    testImplementation("io.github.matthewjones372:pelican-test-jetty")
 }
 ```
 
-```
-post-bookmarks.json — 1 change breaks callers.
+It covers Pelican's own modules only, not Jackson, Pekko or Jetty, and not the
+Gradle plugin, whose version stays in `plugins { }`. See
+[Version alignment and the BOM](docs/modules.md#version-alignment-and-the-bom).
 
-  POST /bookmarks
-    ✖ `folder` in the request body (application/json) is new and required
-        every caller that is not sending it is refused
-```
-
-A new optional parameter updates the golden file and passes; a breaking change
-fails. The same check runs from Gradle as `check<Name>Document`. See
-[Golden files](docs/golden-testing.md) and
-[Testing](docs/reference.md#testing).
-
-## Stubbing another service
-
-When the code under test is the caller and the API belongs to somebody else,
-`pelican-test-wiremock` runs a WireMock server stubbed with that API's endpoint
-values, written by hand or imported from its OpenAPI document. Each answer is
-an `Outcome` the endpoint declares, rendered by the same code a server uses.
-This test, from the example module, points the generated client at it:
+To try these modules now, use a snapshot. Builds of `main` are published by hand to
+Central's snapshot repository as `1.0.1-SNAPSHOT`, including the BOM and the
+plugin:
 
 ```kotlin
-@JvmField
-@RegisterExtension
-val orders = PelicanWireMockExtension(JacksonCodecs)
-
-private val client by lazy { OrdersClient(orders.baseUrl, JacksonCodecs, JettyHttpTransport()) }
-
-@Test
-fun `a stubbed declared failure reaches the client as the failure it declares`() {
-    orders.stub(getUser, 2L) answers noSuchUser(ApiError(404, "no such user"))
-
-    client.getUser(2L) shouldBe
-        GeneratedOutcome.Err(GetUserFailure.NotFound(GeneratedApiError(404, "no such user")))
-}
+// beside mavenCentral() in your repositories { }, and in
+// pluginManagement { repositories { } } if you use the plugin
+maven("https://central.sonatype.com/repository/maven-snapshots/")
 ```
 
-A request matches a stub when Pelican's own routing and decoding turn it into
-the stubbed input, so query order and encoding do not matter. `verify` and
-`calls` check what was sent. `stubFile` writes the same stubs out as WireMock
-mapping files for a demo or a local run, and fails when the contract no longer
-agrees with a committed file. See
-[Stubbing somebody else's service](docs/reference.md#stubbing-somebody-elses-service).
+A snapshot is a moving build of `main` with no stability promise, and Central
+drops snapshots after 90 days. To build one yourself instead,
+`./gradlew publishToMavenLocal` installs the library modules and
+`./gradlew -p tooling/pelican-gradle-plugin publishToMavenLocal` installs the
+plugin into `mavenLocal()`, at a `-SNAPSHOT` of the next version.
 
-## Clients for your callers
+## What else a description can say
 
-Callers who cannot depend on your descriptions get a generated Kotlin client
-instead. The Gradle plugin's `clients` entry runs `pelican-codegen` over the
-same descriptions the server uses. The client sends through a
-`ClientTransport`, here `JettyHttpTransport` from `pelican-client-jetty`
-(`PekkoHttpTransport` from `pelican-client-pekko` sends through a Pekko
-`ActorSystem` the service already runs):
+Each of these is covered in full in the [reference manual](docs/reference.md),
+with complete recipes in the [cookbook](docs/cookbook.md).
 
-```kotlin
-val client = OrdersClient("https://orders.internal", JacksonCodecs, JettyHttpTransport())
-```
+- **Inputs and validation.** Path, query, header and cookie parameters, form
+  bodies and multipart uploads, with codecs for primitives, `UUID`,
+  `java.time`, `URI` and enums. Refinements such as `between` and `matching`
+  are enforced and published together. See
+  [Refined inputs](docs/reference.md#refined-inputs).
+- **Several responses.** More than one declared failure, more than one
+  success (a `201` beside a `202`), and one response rendered in several media
+  types chosen by `Accept`. See
+  [Declared failures](docs/reference.md#declared-failures) and
+  [More than one successful response](docs/reference.md#more-than-one-successful-response).
+  `pelican-arrow` converts Arrow's `Either` to and from `Outcome`.
+- **Streaming.** NDJSON, server-sent events, a chunked JSON array and raw
+  bytes, with back-pressure from the socket to the source. See
+  [Streaming](docs/reference.md#how-streaming-stays-backend-agnostic).
+- **Response headers and webhooks.** Headers declared per response and checked
+  when set; webhooks published under `webhooks` with a sender in the generated
+  client. See [Response headers](docs/reference.md#response-headers) and
+  [Webhooks](docs/reference.md#webhooks-the-calls-the-service-sends).
+- **Who is calling.** Security schemes in the document, typed callers, and
+  `pelican-oidc` for OpenID Connect tokens and sign-in to pages. See
+  [Who is calling](docs/reference.md#who-is-calling).
+- **Running in production.** Filters with typed attributes, Micrometer
+  (`pelican-metrics`) and OpenTelemetry (`pelican-metrics-otel`), live and
+  ready probes (`pelican-health`), body limits, CORS, and opaque 500s. See
+  [Filters](docs/reference.md#filters) and
+  [Errors](docs/reference.md#errors-and-what-a-caller-is-told).
+- **Testing.** The typed client in memory or over a socket, URL pins,
+  [golden files](docs/golden-testing.md), and `pelican-test-wiremock` for
+  stubbing somebody else's API with its endpoint values. See
+  [Testing](docs/reference.md#testing).
+- **Clients and imports.** A [generated Kotlin client](docs/generated-client.md)
+  for callers who cannot depend on your descriptions, and
+  [importing an OpenAPI document](docs/importing.md) somebody else wrote into
+  descriptions you can serve, call or stub.
+- **Other consumers of the same descriptions.** [MCP tools](docs/mcp.md) a
+  model can call, served through the same handlers, and a standalone
+  [JSON Schema](docs/schemas.md) for one type.
 
-Each declared response becomes a member of a sealed type the caller can match
-on. `pelican-metrics-otel` adds `transport.traced(sdk)`, which opens a client
-span for each call and sends the current `traceparent`.
+[Modules](docs/modules.md) lists every module and what it depends on.
 
-The other direction is `pelican-import`: the plugin's `endpoints` entry reads
-an OpenAPI document somebody else wrote into endpoint descriptions, as Kotlin
-source, which you can then serve, call or stub. See
-[A generated Kotlin client](docs/generated-client.md) and
-[Importing an OpenAPI document](docs/importing.md).
+## Performance
 
-## Backends
+The interpreter is measured with JMH against the same endpoint written
+directly against each backend, and the results, their error bars and their
+limits are in [What it costs](docs/what-it-costs.md). In short: on Pekko,
+Pelican with its handler on the dispatcher is cheaper than an idiomatic
+hand-written route and a few hundred nanoseconds behind the fastest one; on
+Jetty the difference is inside the measurement's error, with about 1.1 to 1.3KB
+more allocated per request. Running a synchronous handler on a virtual thread,
+which is the default on both backends, is the largest cost measured on Pekko
+and adds about 9.5KB per request on Jetty; a handler that never blocks can opt
+out. These are in-memory measurements on one machine, not a statement
+about production capacity.
 
-The backend only affects handlers: bind the same endpoint values with another
-module's binders, and the only thing that changes is the type a streaming
-handler returns. Two ship, and both are fully supported. `pelican-jetty`, which
-every example here uses, is where to start: a stream is a `Sequence` pulled on
-a virtual thread, and nothing on the classpath is Scala. `pelican-pekko`, where
-a stream is a Pekko `Source`, is the choice for a team already running Pekko or
-Akka, whose actor system Pelican can share. [On Pekko](docs/cookbook.md#on-pekko)
-is the first endpoint served that way, with the dependencies it needs.
+## Stability
 
-```kotlin
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jetty.start
+From 1.0.0, the public API of the shipped modules is stable, and a breaking
+change waits for a major release. The build enforces what that covers: the
+`.api` dump beside each module is the binary contract, checked by `apiCheck`,
+and `StillCompilesTest` compiles pinned call sites of the reified inline DSL
+(`json<T>()`, `pathParam<T>()` and the rest), which a bytecode dump cannot see.
 
-api(listOf(getOrder handledNow { id -> store.order(id) }), JacksonCodecs).start(port = 8080)
-```
-
-A parity suite runs the same descriptions against both and checks that they
-respond identically, down to the generated OpenAPI document being the same
-string. The few places they differ, such as Jetty refusing a path that climbs
-above the root with its own 400, are recorded with a reason in
-[On Jetty](docs/reference.md#on-jetty). `example/backends/` shows how this
-works: the descriptions are in one file, with one binding file per backend.
-The http4k and Ktor interpreters were complete and passing when they were
-taken off `main` before 1.0; commit
-[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e)
-has them.
-
----
-
-# Appendix
-
-## Longer documents
-
-| Page | What it covers |
-|---|---|
-| [Cookbook](docs/cookbook.md) | Complete recipes, roughly in the order you need them: typed inputs, declared failures, forms, uploads, streaming, security, filters, testing. |
-| [Reference manual](docs/reference.md) | The long form: every module, the trade-offs, and the limitations. |
-| [Choosing between Pelican and the alternatives](docs/choosing.md) | When http4k's contracts, Ktor's plugins, Spring, Micronaut, Quarkus, tapir or a hand-written document are a better fit. |
-| [A whole service, in one file](docs/a-whole-service.md) | Models, inputs, endpoints, handlers, store, server and docs, compiled on every build. |
-| [A generated Kotlin client](docs/generated-client.md) | What callers get when they cannot use the descriptions directly. |
-| [Importing an OpenAPI document](docs/importing.md) | Reading a document somebody else wrote into descriptions: what comes out and what is refused. |
-| [The same endpoints, by hand](docs/by-hand.md) | The same two endpoints written directly against Pekko HTTP, for comparison. |
-| [Golden files](docs/golden-testing.md) | A test that fails when a change would break existing callers, and passes when it would not. |
-| [Tools a model can call](docs/mcp.md) | The endpoints as MCP tools: how they map, what is refused, and where credentials come from. |
-| [A schema that resolves on its own](docs/schemas.md) | A derived JSON Schema for tools that do not read your OpenAPI document. |
-| [Modules](docs/modules.md) | What each module is for and what it depends on. |
-| [What it costs](docs/what-it-costs.md) | JMH measurements of the interpreter against hand-written routes, with baselines and error bars. |
-| [Roadmap](docs/roadmap.md) | What is not built yet, and roughly the order it will be built in. |
+Not covered: anything `internal`, the exact bytes of the emitted document (pin
+what your callers depend on with [golden files](docs/golden-testing.md)), and
+modules that are not in a release. The full statement is under
+[Stability](docs/reference.md#stability), supported Kotlin, JDK and Pekko
+versions are under [Versions](docs/reference.md#versions), and every change is
+recorded in [the changelog](CHANGELOG.md).
 
 ## Running the examples
 
 ```bash
-./gradlew build                          # all modules: tests, detekt, spotless, coverage
-./gradlew :example:runReadmeExample      # the bookmarks service, on :8080
-./gradlew :example:run                   # the fuller orders API (streaming, SSE, raw bodies)
-./gradlew :example:runBackends           # the greetings service, through the backend seam
-./gradlew :example:runCodecs             # the notes service, over a codec module it does not name
-./gradlew :example:runSecured            # a filter enforcing the security the descriptions declare
-./gradlew :example:runTelemetry          # meters and spans from one set of descriptions, at /admin/report
-./gradlew :example:runShop               # a bookshop: three domain failures, three declared responses
-./gradlew :example:runMcp                # the orders API with its tools served on /mcp
-./gradlew :example:generateOrdersDocument  # the spec, with no server started
-./gradlew :example:generateOrdersClient    # the Kotlin client, likewise
+./gradlew build                            # every module: tests, detekt, spotless, coverage
+./gradlew :example:runFirstEndpointOnPekko # the greeting above, on Pekko, on :8080
+./gradlew :example:runFirstEndpoint        # the same on Jetty
+./gradlew :example:runReadmeExample        # the bookmarks service
+./gradlew :example:run                     # the fuller orders API: streaming, SSE, raw bodies
+./gradlew :example:runShop                 # a bookshop: three domain failures, three declared responses
+./gradlew :example:runSecured              # a filter enforcing the security the descriptions declare
+./gradlew :example:runTelemetry            # meters and spans from one set of descriptions
+./gradlew :example:runMcp                  # the orders API with its tools served on /mcp
+./gradlew :example:generateOrdersDocument  # the OpenAPI document, with no server started
+./gradlew :example:generateOrdersClient    # the generated Kotlin client, likewise
 ```
 
-`runFirstEndpoint` and `runBookmarks` are also available, and every example
-takes a port with `--args=8081`. The two generator tasks come from the
-repository's own Gradle plugin and do not start a server. `pelican-openapi` and
-`pelican-codegen` depend only on core, so neither needs an HTTP library.
+Every example takes a port with `--args=8081`.
+[petshop](https://github.com/matthewjones372/petshop) and
+[tweet-street](https://github.com/matthewjones372/tweet-street) are two
+larger projects outside this repository that use Pelican; petshop's README says
+where it helped and where it did not.
 
-Two larger projects use Pelican outside this repository.
-[petshop](https://github.com/matthewjones372/petshop) is a small service written
-to judge it alongside Lark and Proofload, and its README says where each one
-helped and where it did not. [tweet-street](https://github.com/matthewjones372/tweet-street)
-is a bank in four services; the bank and its approvals service serve their APIs
-and pages through Pelican on Pekko HTTP.
+## Further reading
 
-## Stability
-
-The current release is 1.0.0. The public API of the shipped modules is stable
-and checked by the build, and breaking changes wait for a major release.
-[The changelog](CHANGELOG.md) records the breaking changes made before 1.0.
-
-Two things in the repository define what is covered, and both are enforced by
-the build. The `.api` dump beside each module is the binary contract: if a
-signature is in the dump it is covered, and `apiCheck` fails when one changes.
-`StillCompilesTest` covers the reified inline part of the DSL, which a bytecode
-dump cannot see. `json<T>()`, `pathParam<T>()`, `errorJson<T>()` and the rest
-are compiled as source at the call site, so the suite compiles pinned call
-sites against the published modules.
-
-Not covered: anything `internal`; the exact bytes of the emitted document (use
-[golden files](docs/golden-testing.md) to pin what your own callers depend
-on); and the http4k, Ktor and other modules taken off `main` before 1.0, until
-they return. The full statement is in the reference
-manual under [Stability](docs/reference.md#stability), and every breaking
-change is recorded in [the changelog](CHANGELOG.md).
-
-## Versions
-
-The supported Kotlin, Pekko and JDK versions are listed in the reference
-manual under [Versions](docs/reference.md#versions). They are kept in one
-place so the lists cannot disagree.
-
-## License
-
-Apache 2.0. See [LICENSE](LICENSE).
+- [Getting started](#getting-started): installing 1.0.0 and a first endpoint.
+- [A whole service, in one file](docs/a-whole-service.md): models, inputs,
+  endpoints, handlers, server and docs, compiled on every build.
+- [Cookbook](docs/cookbook.md): complete recipes, roughly in the order you
+  need them.
+- [Reference manual](docs/reference.md): every feature, the reasoning behind
+  it, and its limitations.
+- [What it costs](docs/what-it-costs.md): the benchmark report.
+- [Roadmap](docs/roadmap.md): what is not built yet.
+- License: Apache 2.0. See [LICENSE](LICENSE).

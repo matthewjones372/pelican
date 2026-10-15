@@ -119,6 +119,24 @@ private fun statusOf(code: Int): StatusCode = ...
 Same rules in test sources. A test name should carry the claim; the KDoc above
 it should not repeat the name in longer words.
 
+## Documentation
+
+The README and `docs/` describe the library as it is on `main` today: what
+exists, how to use it, and its limits. They are not a history of the
+repository.
+
+- **No narrated history.** Do not document removed modules, abandoned
+  approaches, old module counts or how a feature used to work, and do not link
+  commits to explain how the code got here. History belongs in `CHANGELOG.md`
+  and commit messages. Mention it in the docs only where it explains a current
+  constraint, migration or non-obvious decision, in a sentence.
+- **Say what is released.** Anything on `main` but not in a release is
+  labelled as such wherever it is installed or recommended. Do not promise
+  what "the next release" contains.
+- **The roadmap is forward-looking.** A finished item leaves
+  `docs/roadmap.md`; it does not become a paragraph about what landed.
+- **No em dashes** in docs or their code samples.
+
 ## Imports
 
 **No wildcard imports, anywhere, and no unused ones.** One line per name, so an
