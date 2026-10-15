@@ -593,6 +593,75 @@ everywhere and slower nowhere, so `start()` keeps the queued pool and
 its limit. There was no A against A run, so the spread is each side's own range
 over three rounds.
 
+### Gathered frames, measured and dropped
+
+Spec 0085's second entry wrote the frames a stream had ready as one write, up
+to Jetty's `outputAggregationSize` (8 KiB by default), instead of one write per
+frame. Branch `spec-0085-frames` (#326) as A against main as B, three rounds,
+ABABAB, on 15 October 2026:
+
+```bash
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=stream
+```
+
+Machine: 4 cores of an Intel Xeon @ 2.80GHz, 15 GiB, Ubuntu 24.04, the
+benchmark on JDK 25.0.4 and Gradle on JDK 21. Load average 0.41 before and 4.90
+after; 3.5 to 6.6 during the runs. Both sides sustained 2000 responses a second
+in every round and fell behind at 3000.
+
+| responses/s | percentile | A, gathered | B, main | outside the spread |
+|---|---|---|---|---|
+| 250 | p99 | 11.2ms (7.9 to 29.4) | 6.6ms (6.1 to 7.3) | B faster |
+| 250 | p99.9 | 35.4ms (34.3 to 65.4) | 17.4ms (14.9 to 22.1) | B faster |
+| 1000 | p50 | 1.2ms (1.1 to 1.3) | 1.1ms (1.0 to 1.2) | no |
+| 1000 | p99 | 4.7ms (4.1 to 6.2) | 5.0ms (4.2 to 6.0) | no |
+| 2000 | p50 | 1.7ms (1.6 to 1.9) | 1.5ms (1.5 to 1.6) | no |
+| 2000 | p99 | 12.6ms (11.5 to 26.8) | 9.5ms (9.1 to 17.1) | no |
+
+No other cell was outside the spread. The change was not kept because it was
+no faster than main at any rate and its tail was worse at 250 responses a
+second.
+
+### Encoding to bytes, measured and dropped
+
+Spec 0085's third entry added `BodyCodec.encodeTo`, which Jackson and kotlinx
+overrode to encode straight to bytes instead of to a `String` and then to
+bytes. Branch `spec-0085-encode` (#327), measured in isolation with JMH and
+over the wire against main:
+
+```bash
+./gradlew :benchmarks:jmh -PbenchmarkArgs="EncodeBenchmark"
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=rest
+```
+
+Machine: 4 vCPUs of an Intel Xeon @ 2.10GHz, 16 GB, JDK 25.0.4. Load average
+1.29 before both runs, 1.43 after the JMH run and 10.88 after the wire run.
+
+Time per call with its error, then bytes allocated per call:
+
+| body | Jackson, via String | Jackson, via bytes | kotlinx, via String | kotlinx, via bytes |
+|---|---|---|---|---|
+| 100B | 272 ± 30ns, 744B | 333 ± 81ns, 568B | 146 ± 17ns, 448B | 353 ± 34ns, 760B |
+| 1KB | 1330 ± 116ns, 2600B | 2634 ± 438ns, 1496B | 778 ± 66ns, 2304B | 2081 ± 280ns, 4984B |
+| 64KB | 121 ± 16µs, 328,369B | 131 ± 16µs, 120,001B | 41.5 ± 2.6µs, 131,328B | 133 ± 12µs, 331,425B |
+
+Jackson's bytes path allocates 43% less at 1KB and 63% less at 64KB, but takes
+about twice as long at 1KB and overlaps at 64KB. kotlinx's bytes path is slower
+and allocates more at every size.
+
+Over the wire, A is the branch and B is main. Both sustained 40000 requests a
+second (40000, 40000, 50000 for each).
+
+| req/s | percentile | A, bytes | B, main | outside the spread |
+|---|---|---|---|---|
+| 10000 | p99 | 2.7ms (1.2 to 3.7) | 1.2ms (0.86 to 1.3) | no |
+| 30000 | p50 | 434µs (374 to 446) | 369µs (326 to 373) | B faster |
+| 30000 | p99 | 7.2ms (6.6 to 8.5) | 7.9ms (7.2 to 8.9) | no |
+| 40000 | p99 | 21.1ms (14.0 to 28.5) | 14.8ms (13.7 to 19.6) | no |
+
+The change was not kept because the allocation it saved did not make any
+request faster, and the one difference outside the spread favoured main.
+
 ## Routing as the number of endpoints grows
 
 **What is measured.** Every other table uses an API of one endpoint, which
