@@ -431,14 +431,17 @@ disjoint. Overlapping ranges mean the difference is inside run-to-run noise.
 
 `-PwireScenario=stream` swaps the GET and POST for two streamed responses of
 100 frames of about 40 bytes, one NDJSON and one SSE, alternating, timed to
-the last byte and counted in responses a second. `both` runs each scenario in
-turn.
+the last byte and counted in responses a second. `-PwireScenario=async`
+alternates a GET whose handler returns a completed stage with a GET to a path
+nothing routes, answered 404: the requests Jetty can answer without leaving its
+selector. `both` runs each scenario in turn.
 
 ```bash
 git fetch origin
 ./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=both  # on main: the noise, about 35 to 45 minutes
 ./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=rest  # on a branch: the JSON GET and POST, about 17 minutes
 ./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=stream  # on a branch: the streams, about 15 to 25 minutes
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=async  # on a branch: the staged GET and the 404
 ./gradlew :benchmarks:wire -PwireAb=origin/main -PwireSmoke  # one round, one short step: checks the setup in a minute
 ```
 
@@ -563,6 +566,120 @@ Highest sustained responses/s: A 4000 (runs: 4000, 4000, 4000), B 4000 (runs: 40
 | 6000 | p50 | 458.5ms | 41.9ms to 644.3ms | 428.9ms | 40.0ms to 431.0ms | -6.5% | no |
 | 6000 | p99 | 1051.7ms | 213.8ms to 1317.0ms | 1234.2ms | 169.9ms to 1432.4ms | +17.3% | no |
 | 6000 | p99.9 | 1098.9ms | 260.8ms to 1431.3ms | 1285.6ms | 211.0ms to 1504.7ms | +17.0% | no |
+
+### Non-blocking invocation
+
+**What is measured.** Spec 0085's `spec-0085-nonblocking` branch (A, head
+f736701e) against `origin/main` (B), three alternating rounds each, with
+`-PwireAb`. The change answers routing, 404 and 405, refusals and handlers
+that return a stage on Jetty's selector without a dispatch, and hops
+synchronous handlers to a virtual thread. `async` is the path it targets;
+`rest` is the path it adds a hop to, run to check for a regression. The first
+measurement found synchronous handlers slower than main because the hop cost a
+second dispatch to resume the connection; the hop thread now resumes the
+connection itself, so a synchronous request costs one dispatch like main, and
+the tables below replace that first measurement. In the tables, "B vs A" is
+main relative to this branch, so a negative number means main had the lower
+latency, and "yes, slower" or "yes, faster" describes main.
+
+**Machine.** Intel Xeon Processor at 2.10GHz, 4 cores (`nproc` 4), 15GiB memory,
+Ubuntu 24.04.5, Linux 6.18.44, JDK 25.0.4.1 for the benchmarks and JDK 21.0.12
+running Gradle. Load average before and after each run, one, five and fifteen
+minutes:
+
+| run | before | after |
+|---|---|---|
+| rest | 1.32, 0.79, 0.35 | 10.18, 6.86, 4.83 |
+| async | 8.00, 6.54, 4.76 (started right after rest) | 11.04, 7.22, 5.93 |
+
+The load climbs during each run because the load generator shares the four
+cores with the server, so neither run was on a quiet machine in the sense of
+[a quiet machine matters](#a-quiet-machine-matters); the per-round figures are
+in `wire-ab.md`. Nothing else ran on the machine. No main against main run
+exists on this page for this machine, so the spread used here is each side's
+own three rounds.
+
+```bash
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=rest
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=async
+```
+
+**async (a staged GET alternating with a 404).** Highest sustained req/s: A 60000 (runs: 60000, 60000, 60000), B 60000 (runs: 60000, 50000, 60000).
+
+| req/s | percentile | A median | A range | B median | B range | B vs A | outside the spread |
+|---|---|---|---|---|---|---|---|
+| 1000 | p50 | 391µs | 379µs to 416µs | 433µs | 397µs to 445µs | +10.7% | no |
+| 1000 | p99 | 2.0ms | 1.6ms to 2.9ms | 2.1ms | 1.8ms to 2.3ms | +4.0% | no |
+| 1000 | p99.9 | 5.2ms | 4.0ms to 27.9ms | 21.4ms | 4.5ms to 29.4ms | +312.0% | no |
+| 5000 | p50 | 176µs | 168µs to 195µs | 184µs | 168µs to 185µs | +4.5% | no |
+| 5000 | p99 | 1.5ms | 1.2ms to 4.1ms | 1.1ms | 925µs to 1.3ms | -30.3% | no |
+| 5000 | p99.9 | 28.3ms | 4.1ms to 74.2ms | 13.6ms | 4.9ms to 53.3ms | -52.0% | no |
+| 10000 | p50 | 162µs | 142µs to 177µs | 189µs | 188µs to 191µs | +16.2% | yes, slower |
+| 10000 | p99 | 2.7ms | 908µs to 2.9ms | 1.1ms | 925µs to 2.4ms | -60.9% | no |
+| 10000 | p99.9 | 24.8ms | 18.1ms to 47.5ms | 5.7ms | 5.0ms to 33.0ms | -77.1% | no |
+| 20000 | p50 | 174µs | 173µs to 189µs | 225µs | 215µs to 242µs | +29.7% | yes, slower |
+| 20000 | p99 | 3.2ms | 3.1ms to 3.4ms | 4.2ms | 3.0ms to 5.4ms | +30.4% | no |
+| 20000 | p99.9 | 24.1ms | 22.7ms to 30.1ms | 29.5ms | 11.7ms to 31.3ms | +22.5% | no |
+| 30000 | p50 | 199µs | 196µs to 231µs | 249µs | 236µs to 258µs | +25.2% | yes, slower |
+| 30000 | p99 | 6.3ms | 3.5ms to 88.4ms | 5.5ms | 5.5ms to 24.3ms | -11.4% | no |
+| 30000 | p99.9 | 43.2ms | 11.6ms to 150.2ms | 23.2ms | 19.1ms to 94.6ms | -46.1% | no |
+| 40000 | p50 | 272µs | 254µs to 282µs | 341µs | 335µs to 423µs | +25.2% | yes, slower |
+| 40000 | p99 | 5.9ms | 5.3ms to 11.6ms | 7.7ms | 5.8ms to 7.8ms | +30.5% | no |
+| 40000 | p99.9 | 11.3ms | 10.8ms to 44.1ms | 17.8ms | 11.2ms to 20.2ms | +57.0% | no |
+| 50000 | p50 | 434µs | 390µs to 777µs | 678µs | 630µs to 689µs | +56.0% | no |
+| 50000 | p99 | 10.1ms | 9.5ms to 13.8ms | 8.6ms | 8.4ms to 10.8ms | -14.3% | no |
+| 50000 | p99.9 | 20.6ms | 18.9ms to 55.8ms | 16.1ms | 14.0ms to 17.5ms | -21.9% | yes, faster |
+| 60000 | p50 | 1.6ms | 1.4ms to 1.7ms | 2.6ms | 1.5ms to 4.4ms | +59.0% | no |
+| 60000 | p99 | 21.7ms | 21.1ms to 22.8ms | 31.3ms | 25.8ms to 100.0ms | +44.4% | yes, slower |
+| 60000 | p99.9 | 35.9ms | 35.0ms to 52.4ms | 45.3ms | 45.2ms to 146.9ms | +25.9% | no |
+| 70000 | p50 | 219.4ms | 16.3ms to 283.9ms | 870.3ms | 631.2ms to 1109.4ms | +296.7% | yes, slower |
+| 70000 | p99 | 836.2ms | 458.2ms to 845.2ms | 1942.0ms | 1930.4ms to 1953.5ms | +132.2% | yes, slower |
+| 70000 | p99.9 | 872.9ms | 497.3ms to 917.0ms | 1989.1ms | 1986.0ms to 1992.3ms | +127.9% | yes, slower |
+
+**rest (the JSON GET and POST, synchronous handlers).** Highest sustained req/s: A 40000 (runs: 40000, 40000, 40000), B 50000 (runs: 50000, 40000, 50000).
+
+| req/s | percentile | A median | A range | B median | B range | B vs A | outside the spread |
+|---|---|---|---|---|---|---|---|
+| 1000 | p50 | 498µs | 470µs to 532µs | 504µs | 439µs to 556µs | +1.3% | no |
+| 1000 | p99 | 2.6ms | 2.0ms to 2.7ms | 2.2ms | 1.7ms to 3.4ms | -14.8% | no |
+| 1000 | p99.9 | 6.1ms | 6.0ms to 8.1ms | 5.4ms | 4.5ms to 45.7ms | -11.3% | no |
+| 5000 | p50 | 215µs | 205µs to 244µs | 205µs | 201µs to 216µs | -5.0% | no |
+| 5000 | p99 | 1.1ms | 835µs to 1.2ms | 1.0ms | 670µs to 1.3ms | -8.8% | no |
+| 5000 | p99.9 | 5.3ms | 5.1ms to 8.1ms | 6.9ms | 5.0ms to 7.1ms | +31.0% | no |
+| 10000 | p50 | 234µs | 211µs to 239µs | 218µs | 215µs to 222µs | -7.2% | no |
+| 10000 | p99 | 1.4ms | 1.1ms to 2.3ms | 4.3ms | 1.4ms to 4.8ms | +201.7% | no |
+| 10000 | p99.9 | 8.1ms | 7.5ms to 13.5ms | 39.8ms | 9.5ms to 66.8ms | +394.2% | no |
+| 20000 | p50 | 259µs | 252µs to 271µs | 259µs | 256µs to 276µs | +0.3% | no |
+| 20000 | p99 | 4.4ms | 4.3ms to 4.5ms | 5.2ms | 4.9ms to 10.2ms | +17.4% | yes, slower |
+| 20000 | p99.9 | 19.3ms | 17.1ms to 32.7ms | 17.9ms | 11.3ms to 47.6ms | -7.5% | no |
+| 30000 | p50 | 412µs | 314µs to 451µs | 339µs | 316µs to 402µs | -17.8% | no |
+| 30000 | p99 | 9.4ms | 8.1ms to 25.3ms | 11.0ms | 6.5ms to 27.4ms | +16.5% | no |
+| 30000 | p99.9 | 38.2ms | 29.7ms to 102.4ms | 41.9ms | 39.3ms to 85.7ms | +9.7% | no |
+| 40000 | p50 | 790µs | 628µs to 1.0ms | 600µs | 485µs to 904µs | -24.1% | no |
+| 40000 | p99 | 10.7ms | 9.6ms to 14.7ms | 9.8ms | 8.2ms to 13.1ms | -8.6% | no |
+| 40000 | p99.9 | 17.1ms | 15.8ms to 32.0ms | 16.4ms | 15.7ms to 24.9ms | -3.7% | no |
+| 50000 | p50 | 7.9ms | 6.5ms to 261.5ms | 2.4ms | 2.4ms to 2.7ms | -69.5% | yes, faster |
+| 50000 | p99 | 147.2ms | 125.1ms to 620.8ms | 45.9ms | 42.5ms to 260.2ms | -68.8% | no |
+| 50000 | p99.9 | 172.8ms | 171.7ms to 650.6ms | 69.5ms | 67.4ms to 339.7ms | -59.7% | no |
+
+**Verdict, async.** This branch is still faster at the median: from 10000 to
+40000 requests a second main's p50 is 16% to 30% higher and outside the spread
+at each rate. At 1000 and 5000 req/s and at 50000 and 60000 the p50 ranges
+overlap. The tails show no difference by the 2x rule: the only p99 and p99.9
+gaps outside the spread are 60000 req/s p99 (21.7ms against 31.3ms), 50000
+p99.9 (main lower, 16.1ms against 20.6ms) and the overloaded 70000 step, none
+of them 2x apart before overload. The highest sustained rate is 60000 for both
+(A 60000 three times, B 60000, 50000, 60000), so the ladder ceiling does not
+separate them.
+
+**Verdict, rest.** This branch is no worse than main beyond the noise from 1000
+to 40000 requests a second: every p50, p99 and p99.9 range overlaps except p99
+at 20000 req/s (4.4ms against 5.2ms, main 17% higher, under the 2x bar). The
+synchronous regression of the first measurement is gone. Main held 50000 req/s
+in two of three runs where this branch held 40000 in all three, so at 50000 main
+is lower at p50 (2.4ms against 7.9ms) with disjoint ranges; that is one rung of
+the ladder, which the noise rule treats as noise, but it is the one place the
+branch trails and a repeat would settle it.
 
 ### Thread pool
 
@@ -721,6 +838,75 @@ client that relies on `Date` must not be served without it.
 **Summary.** No setting beat Jetty's defaults beyond the noise at a rate the
 server kept up with, so `start()` keeps Jetty's defaults and
 `-Dpelican.jetty.connector` stays a way to measure or override them.
+
+### Gathered frames, measured and dropped
+
+Spec 0085's second entry wrote the frames a stream had ready as one write, up
+to Jetty's `outputAggregationSize` (8 KiB by default), instead of one write per
+frame. Branch `spec-0085-frames` (#326) as A against main as B, three rounds,
+ABABAB, on 15 October 2026:
+
+```bash
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=stream
+```
+
+Machine: 4 cores of an Intel Xeon @ 2.80GHz, 15 GiB, Ubuntu 24.04, the
+benchmark on JDK 25.0.4 and Gradle on JDK 21. Load average 0.41 before and 4.90
+after; 3.5 to 6.6 during the runs. Both sides sustained 2000 responses a second
+in every round and fell behind at 3000.
+
+| responses/s | percentile | A, gathered | B, main | outside the spread |
+|---|---|---|---|---|
+| 250 | p99 | 11.2ms (7.9 to 29.4) | 6.6ms (6.1 to 7.3) | B faster |
+| 250 | p99.9 | 35.4ms (34.3 to 65.4) | 17.4ms (14.9 to 22.1) | B faster |
+| 1000 | p50 | 1.2ms (1.1 to 1.3) | 1.1ms (1.0 to 1.2) | no |
+| 1000 | p99 | 4.7ms (4.1 to 6.2) | 5.0ms (4.2 to 6.0) | no |
+| 2000 | p50 | 1.7ms (1.6 to 1.9) | 1.5ms (1.5 to 1.6) | no |
+| 2000 | p99 | 12.6ms (11.5 to 26.8) | 9.5ms (9.1 to 17.1) | no |
+
+No other cell was outside the spread. The change was not kept because it was
+no faster than main at any rate and its tail was worse at 250 responses a
+second.
+
+### Encoding to bytes, measured and dropped
+
+Spec 0085's third entry added `BodyCodec.encodeTo`, which Jackson and kotlinx
+overrode to encode straight to bytes instead of to a `String` and then to
+bytes. Branch `spec-0085-encode` (#327), measured in isolation with JMH and
+over the wire against main:
+
+```bash
+./gradlew :benchmarks:jmh -PbenchmarkArgs="EncodeBenchmark"
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=rest
+```
+
+Machine: 4 vCPUs of an Intel Xeon @ 2.10GHz, 16 GB, JDK 25.0.4. Load average
+1.29 before both runs, 1.43 after the JMH run and 10.88 after the wire run.
+
+Time per call with its error, then bytes allocated per call:
+
+| body | Jackson, via String | Jackson, via bytes | kotlinx, via String | kotlinx, via bytes |
+|---|---|---|---|---|
+| 100B | 272 ± 30ns, 744B | 333 ± 81ns, 568B | 146 ± 17ns, 448B | 353 ± 34ns, 760B |
+| 1KB | 1330 ± 116ns, 2600B | 2634 ± 438ns, 1496B | 778 ± 66ns, 2304B | 2081 ± 280ns, 4984B |
+| 64KB | 121 ± 16µs, 328,369B | 131 ± 16µs, 120,001B | 41.5 ± 2.6µs, 131,328B | 133 ± 12µs, 331,425B |
+
+Jackson's bytes path allocates 43% less at 1KB and 63% less at 64KB, but takes
+about twice as long at 1KB and overlaps at 64KB. kotlinx's bytes path is slower
+and allocates more at every size.
+
+Over the wire, A is the branch and B is main. Both sustained 40000 requests a
+second (40000, 40000, 50000 for each).
+
+| req/s | percentile | A, bytes | B, main | outside the spread |
+|---|---|---|---|---|
+| 10000 | p99 | 2.7ms (1.2 to 3.7) | 1.2ms (0.86 to 1.3) | no |
+| 30000 | p50 | 434µs (374 to 446) | 369µs (326 to 373) | B faster |
+| 30000 | p99 | 7.2ms (6.6 to 8.5) | 7.9ms (7.2 to 8.9) | no |
+| 40000 | p99 | 21.1ms (14.0 to 28.5) | 14.8ms (13.7 to 19.6) | no |
+
+The change was not kept because the allocation it saved did not make any
+request faster, and the one difference outside the spread favoured main.
 
 ## Routing as the number of endpoints grows
 

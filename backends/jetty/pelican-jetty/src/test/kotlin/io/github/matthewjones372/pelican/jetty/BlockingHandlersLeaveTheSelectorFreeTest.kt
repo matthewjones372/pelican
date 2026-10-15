@@ -1,0 +1,133 @@
+package io.github.matthewjones372.pelican.jetty
+
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.kotest.matchers.shouldBe
+import org.eclipse.jetty.server.HttpConfiguration
+import org.eclipse.jetty.server.HttpConnectionFactory
+import org.eclipse.jetty.server.NetworkConnector
+import org.eclipse.jetty.server.Server
+import org.eclipse.jetty.server.ServerConnector
+import org.eclipse.jetty.util.thread.QueuedThreadPool
+import org.eclipse.jetty.util.thread.ThreadPool
+import org.eclipse.jetty.util.thread.VirtualThreadPool
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+
+/** Spec 0085: Jetty may call Pelican on its selector, so a handler that blocks must never block there. */
+class BlockingHandlersLeaveTheSelectorFreeTest {
+
+    private val blocked = endpoint {
+        get("blocked")
+        text()
+    }
+
+    private val later = endpoint {
+        get("later")
+        text()
+    }
+
+    private val entered = CountDownLatch(BLOCKED)
+    private val release = CountDownLatch(1)
+
+    private val blocking = api(
+        listOf(
+            blocked handledNow {
+                entered.countDown()
+                release.await(GATE_SECONDS, TimeUnit.SECONDS)
+                "released"
+            },
+            later handledBy { CompletableFuture.completedFuture("later") },
+        ),
+        JacksonCodecs,
+    )
+
+    private val client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()
+
+    private fun get(url: String): CompletableFuture<HttpResponse<String>> =
+        client.sendAsync(HttpRequest.newBuilder(URI.create(url)).GET().build(), HttpResponse.BodyHandlers.ofString())
+
+    @ParameterizedTest
+    @ValueSource(strings = ["QUEUED", "VIRTUAL"])
+    fun `while synchronous handlers block, a 404 and an asynchronous handler are still answered`(pool: String) {
+        // One selector and, on the queued pool, fewer threads than there are blocked handlers.
+        val threads = when (JettyPool.valueOf(pool)) {
+            JettyPool.QUEUED -> pelicanThreads(Handlers.onVirtualThreads, POOL_THREADS).apply { reservedThreads = 0 }
+            JettyPool.VIRTUAL -> pelicanPool(Handlers.onVirtualThreads, JettyPool.VIRTUAL)
+        }
+        val server = Server(threads)
+        val http = HttpConfiguration().apply { uriCompliance = PELICAN_URI_COMPLIANCE }
+        server.addConnector(ServerConnector(server, 1, 1, HttpConnectionFactory(http)))
+        server.handler = blocking.toHandler(Handlers.onVirtualThreads)
+        server.defaultHandler = Unanswered()
+        server.start()
+        try {
+            val base = "http://127.0.0.1:${(server.connectors.single() as NetworkConnector).localPort}"
+            val held = (1..BLOCKED).map { get("$base/blocked") }
+            entered.await(GATE_SECONDS, TimeUnit.SECONDS) shouldBe true
+
+            get("$base/nowhere").get(GATE_SECONDS, TimeUnit.SECONDS).statusCode() shouldBe 404
+            get("$base/later").get(GATE_SECONDS, TimeUnit.SECONDS).body() shouldBe "later"
+            held.none { it.isDone } shouldBe true
+
+            release.countDown()
+            held.map { it.get(GATE_SECONDS, TimeUnit.SECONDS).body() }.distinct() shouldBe listOf("released")
+        } finally {
+            release.countDown()
+            client.close()
+            server.stop()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["QUEUED", "VIRTUAL"])
+    fun `a synchronous handler hopped off the selector costs no second dispatch to resume its connection`(
+        pool: String,
+    ) {
+        val dispatched = AtomicInteger()
+        // Each of [pelicanPool]'s two, counting what gets past the check they make.
+        val threads: ThreadPool = when (JettyPool.valueOf(pool)) {
+            JettyPool.QUEUED -> object : QueuedThreadPool() {
+                override fun execute(job: Runnable) {
+                    if (!resumedHere(job)) dispatched.incrementAndGet().also { super.execute(job) }
+                }
+            }
+
+            JettyPool.VIRTUAL -> object : VirtualThreadPool(0) {
+                override fun execute(task: Runnable) {
+                    if (!resumedHere(task)) dispatched.incrementAndGet().also { super.execute(task) }
+                }
+            }
+        }
+        val server = Server(threads)
+        server.addConnector(ServerConnector(server, HttpConnectionFactory(HttpConfiguration())))
+        server.handler = api(listOf(later handledNow { "now" }), JacksonCodecs).toHandler(Handlers.onVirtualThreads)
+        server.start()
+        try {
+            val base = "http://127.0.0.1:${(server.connectors.single() as NetworkConnector).localPort}"
+            get("$base/later").get(GATE_SECONDS, TimeUnit.SECONDS).body() shouldBe "now"
+            dispatched.set(0)
+            repeat(REQUESTS) { get("$base/later").get(GATE_SECONDS, TimeUnit.SECONDS).body() shouldBe "now" }
+            dispatched.get() shouldBe 0
+        } finally {
+            client.close()
+            server.stop()
+        }
+    }
+
+    private companion object {
+        const val REQUESTS = 100
+        const val BLOCKED = 8
+        const val POOL_THREADS = 4
+        const val GATE_SECONDS = 30L
+    }
+}
