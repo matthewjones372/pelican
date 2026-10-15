@@ -162,7 +162,8 @@ is read the same way whoever bound it. See
 [Multipart uploads](#multipart-uploads).
 
 **`handledNow` means handled in place, on the request**, and *in place* is a
-virtual thread on both servers: see [Where a handler runs](#where-a-handler-runs).
+thread of its own, off the server's, on both servers (a virtual thread from
+JDK 24): see [Where a handler runs](#where-a-handler-runs).
 `-Now` is a claim about *when*, not about what the answer is carried on: the handler produces the value during the call rather than handing
 back something that completes later, which is `handledBy` and its `…By` family.
 The name does not vary per backend, because the description does not:
@@ -251,16 +252,35 @@ rather than by a shared supertype.
 ### Where a handler runs
 
 A synchronous handler (`handledNow`, `handledOrFail`, `handledWith`,
-`handledOneOf`) runs on a virtual thread of its own, with the filters around
-it (spec 0058). It may block: a JDBC call, an actor's ask, a generated client
-joined. What it holds while it waits is that virtual thread, not one of the
-server's own threads, which parse, route and write every other request.
+`handledOneOf`) runs off the server's own threads, with the filters around it
+(spec 0058). It may block: a JDBC call, an actor's ask, a generated client
+joined. What it holds while it waits is a thread of its own, not one of the
+server's, which parse, route and write every other request.
+
+Which thread that is depends on the JDK, unless you choose (spec 0079).
+`Handlers.default`, what every `handlers` parameter defaults to, is:
+
+- **JDK 24 and newer:** `Handlers.onVirtualThreads`, a virtual thread per
+  request.
+- **JDK 21 to 23:** a shared pool of 200 daemon platform threads named
+  `pelican-handler-N`, queueing past 200. Before JDK 24 a virtual thread that
+  blocks inside `synchronized` pins its carrier, and there are about as many
+  carriers as cores, so a few handlers blocking under a monitor (an older JDBC
+  driver, a synchronized cache) would stall every virtual thread in the
+  process. A platform thread can block anywhere.
+
+This applies on `main`. 1.0.0 requires JDK 25 and always uses virtual threads.
 
 ```kotlin
-api.start(port = 8080)                                        // Handlers.onVirtualThreads
+api.start(port = 8080)                                        // Handlers.default
+api.start(port = 8080, handlers = Handlers.onVirtualThreads)  // virtual on any JDK, pinning included
 api.start(port = 8080, handlers = Handlers.on(boundedPool))   // a service's own executor
 api.start(port = 8080, handlers = Handlers.onDispatcher)      // the server's thread that matched it
 ```
+
+On Jetty, `start` has Jetty's own pool call handlers on virtual threads only
+when `handlers` runs them on virtual threads anyway, so on JDK 21 to 23 the
+default leaves Jetty on its platform threads.
 
 `Handlers.onDispatcher` saves the hop (a few microseconds) for an API whose
 handlers never block. A `…By` handler returns a stage and chose its own thread,
@@ -415,15 +435,17 @@ the same server sees the relaxed paths too, so one that reads the path itself
 should do the same.
 
 **Where a handler runs** follows the same `Handlers` choice as on Pekko, and
-`start` makes the default cost nothing. Under `Handlers.onVirtualThreads`,
+`start` makes virtual threads cost nothing. Under `Handlers.onVirtualThreads`
+(the default from JDK 24),
 `start` gives Jetty a thread pool that calls every handler on a virtual thread,
 so a synchronous handler starts on one rather than hopping to one, and may
 block. `Handlers.onDispatcher` keeps Jetty's platform threads and runs the
 handler on the one that matched the request; `Handlers.on(executor)` moves it
 to a service's own. Mounted by hand on a server whose pool is platform threads,
-`toHandler()` still moves a synchronous handler to a virtual thread. A `…By`
-handler returns a stage and is never moved, so under `start` it begins on a
-virtual thread too.
+`toHandler(Handlers.onVirtualThreads)` still moves a synchronous handler to a
+virtual thread. Below JDK 24 the default is Pelican's platform pool, and
+`start` leaves Jetty on platform threads. A `…By` handler returns a stage and
+is never moved, so under `start` with virtual threads it begins on one too.
 
 **Pages are part of `toHandler`.** With `pages` set in `api`'s block, the
 handler is the endpoints followed by the pages, asked only for `GET`, so an
@@ -465,7 +487,8 @@ the stalled upload on the wire:
   HTML 400; Pekko answers 404. Jetty's URI parser refuses these before any
   handler runs and no compliance setting lifts it. Both refuse, and nothing is
   served from outside.
-- **A `…By` handler starts on a virtual thread** under `start`; on Pekko it
+- **A `…By` handler starts on a virtual thread** under `start` with
+  `Handlers.onVirtualThreads`; on Pekko it
   starts on the dispatcher. Jetty's pool calls every handler on a virtual
   thread, so there is no platform thread to start it on. A handler returning a
   stage blocks neither way.
@@ -6244,13 +6267,13 @@ place they are recorded.
 
 ## Versions
 
-What 1.0.0 is built with. `main` builds with the same versions, plus the two
-libraries only its unreleased modules use:
+What 1.0.0 is built with. `main` builds with the same versions, except the
+bytecode, plus the two libraries only its unreleased modules use:
 
 | | 1.0.0 |
 |---|---|
 | Kotlin | 2.4.20 |
-| Bytecode | JDK 25 |
+| Bytecode | JDK 25 (`main`: JDK 21; `pelican-streams` and `pelican-streams-jetty` JDK 25) |
 | Gradle | 9.8.0 |
 | Pekko | 1.7.1 |
 | Pekko HTTP | 1.4.1 |
@@ -6267,11 +6290,15 @@ libraries only its unreleased modules use:
 | kotlinx-serialization-json | `main` only: 1.11.0 |
 
 The libraries Pelican ships are floors, not pins: Gradle resolves upwards, so a
-service already on a newer Jackson keeps its own. The library modules compile
-to JDK 25 bytecode, so a service on 1.0.0 needs JDK 25 or newer to run. The
-suites run on whichever JDK started the
-build, never below the bytecode they load, and
-`TestRuntimeIsTheBuildRuntimeTest` is what holds that. CI on `main` runs them on 25.
+service already on a newer Jackson keeps its own. 1.0.0's library
+modules compile to JDK 25 bytecode, so a service on 1.0.0 needs JDK 25 or
+newer. On `main` they compile to JDK 21, except `pelican-streams` and
+`pelican-streams-jetty`, which stay on 25 because `lark-stream` 0.9.0 is
+compiled for 25; a build on JDK 21 that asks for either gets a Gradle
+resolution error rather than a failure at run time. The suites run on
+whichever JDK started the build, never below the bytecode they load, and
+`TestRuntimeIsTheBuildRuntimeTest` is what holds that. CI on `main` runs them
+on 21 and on 25.
 
 Pekko is the exception: Pelican ships none of it. Every module that speaks
 Pekko declares it `compileOnly`, so no `org.apache.pekko` dependency reaches

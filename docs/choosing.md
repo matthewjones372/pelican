@@ -73,9 +73,9 @@ ways and keeping those in step by hand has become a cost:
   hand-written routes on the same backend in [What it costs](what-it-costs.md):
   on Pekko with the handler on the dispatcher, a few hundred nanoseconds and
   under a kilobyte per request behind the fastest hand-written route; on Jetty,
-  within the benchmark's error in time and 1.1 to 1.3KB more allocated. The
-  default of running synchronous handlers on a virtual thread is the largest
-  cost measured and can be turned off for handlers that never block. These are
+  within the benchmark's error in time and 1.1 to 1.3KB more allocated. Running
+  synchronous handlers on a virtual thread, the default on JDK 24 and newer,
+  is the largest cost measured and can be turned off for handlers that never block. These are
   in-memory measurements on one machine, on two small endpoints.
 - **Fewer choices in the server.** Two backends exist, and only Pekko HTTP is
   in a release. A service on any other server cannot use Pelican without
@@ -95,9 +95,12 @@ ways and keeping those in step by hand has become a cost:
 
 A checklist for a team evaluating Pelican 1.0.0:
 
-- **JDK 25.** The library modules are compiled to JDK 25 bytecode, so the
-  service must run on JDK 25 or newer. The Gradle plugin needs Java 21 or newer
-  for the build. See [Versions](reference.md#versions).
+- **The JDK.** 1.0.0's library modules are compiled for JDK 25, so a
+  service on 1.0.0 must run on 25 or newer. On `main`, not yet released, they
+  target JDK 21, except `pelican-streams` and `pelican-streams-jetty` (25), and
+  synchronous handlers run on platform threads below JDK 24. The Gradle plugin
+  needs Java 21 or newer for the build. See [Versions](reference.md#versions)
+  and [Where a handler runs](reference.md#where-a-handler-runs).
 - **Backend.** `pelican-pekko` is the released backend. Pelican declares
   Pekko `compileOnly`, so the service names its own Pekko and Pekko HTTP
   versions and Scala cross-build (`_2.13` or `_3`). The Jetty 12 backend, its
