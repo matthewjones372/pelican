@@ -268,6 +268,8 @@ subprojects {
         javaLauncher.set(toolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(testJdk)) })
 
         systemProperty("pelican.launcherJavaVersion", testJdk.toString())
+        // `-PjettyPool=virtual` runs every suite's Jetty servers on `VirtualThreadPool` (spec 0085).
+        providers.gradleProperty("jettyPool").orNull?.let { systemProperty("pelican.jetty.pool", it) }
         // A backstop, not a budget: it exists so one wedged test cannot burn
         // the whole job, and it fires on nothing else. The slowest measured
         // method is `DoesNotCompileTest > a failure of the same payload type

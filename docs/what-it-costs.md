@@ -445,6 +445,18 @@ git fetch origin
 `-PwireRounds=<n>` changes the three rounds and `-PwireAbPekko` adds Pekko.
 The first A/B run also builds the baseline, a few minutes more.
 
+**Jetty's thread pool.** The Jetty server JVM reads `pelican.jetty.pool`:
+`queued` is `start()`'s pool, Jetty's `QueuedThreadPool` running handlers on
+virtual threads, and `virtual` is Jetty's `VirtualThreadPool`, where its
+selectors and acceptors are virtual threads too. `-PwirePool=virtual` serves
+every Jetty run on it. `-PwireAbPool` compares the two within this checkout,
+`VirtualThreadPool` as A and the queued pool as B, with no second build:
+
+```bash
+./gradlew :benchmarks:wire -PwireAbPool -PwireScenario=both  # the two pools, A then B, three rounds
+./gradlew :benchmarks:wire -PwireAbPool -PwireSmoke          # checks the setup in a minute
+```
+
 **Main against main.** `origin/main` as A and as B, three rounds each, run on
 the cloud instance with nothing else running. Any difference below that is
 inside these ranges is noise on this machine.
@@ -528,6 +540,58 @@ Highest sustained responses/s: A 4000 (runs: 4000, 4000, 4000), B 4000 (runs: 40
 | 6000 | p50 | 458.5ms | 41.9ms to 644.3ms | 428.9ms | 40.0ms to 431.0ms | -6.5% | no |
 | 6000 | p99 | 1051.7ms | 213.8ms to 1317.0ms | 1234.2ms | 169.9ms to 1432.4ms | +17.3% | no |
 | 6000 | p99.9 | 1098.9ms | 260.8ms to 1431.3ms | 1285.6ms | 211.0ms to 1504.7ms | +17.0% | no |
+
+### Thread pool
+
+`VirtualThreadPool` (A) against `start()`'s queued pool (B), one build, ABABAB,
+three rounds, `-PwireScenario=both`, on the 4-core cloud instance below. The
+machine was otherwise idle: load average 0.07 before and 3.61 after, and 8.6 to
+10.8 during the REST runs and 4.6 to 8.0 during the streams (the load generator
+is on the same machine).
+
+```bash
+./gradlew :benchmarks:wire -PwireAbPool -PwireScenario=both
+```
+
+Machine: Intel Xeon @ 2.80GHz, 4 cores, 15 GiB, Ubuntu 24.04.5 on Linux
+6.18.44, benchmarks on JDK 25.0.4 with JDK 21 running Gradle.
+
+Highest sustained rate, per run and the median of three:
+
+| scenario | A, virtual | B, queued |
+|---|---|---|
+| REST, req/s | 40000 (40000, 40000, 40000) | 30000 (40000, 30000, 30000) |
+| stream, responses/s | 4000 (4000, 3000, 4000) | 3000 (2000, 3000, 3000) |
+
+Latency at a few shared rates, median of three with the range in brackets. The
+pools disagree about which is faster, and the differences outside each side's
+own range are marked.
+
+| scenario | rate | p99, A | p99, B | outside the spread |
+|---|---|---|---|---|
+| REST | 5000 | 1.4ms (1.4 to 1.7) | 998µs (957µs to 1.1) | B faster |
+| REST | 10000 | 1.8ms (1.7 to 6.6) | 2.5ms (2.2 to 3.5) | no |
+| REST | 20000 | 6.2ms (4.0 to 8.1) | 5.5ms (4.9 to 6.5) | no |
+| REST | 30000 | 12.2ms (12.1 to 14.0) | 15.1ms (13.4 to 19.2) | no |
+| REST | 40000 | 20.9ms (15.7 to 32.0) | 133.9ms (64.8 to 1088.4) | A faster |
+| stream | 250 | 4.2ms (3.9 to 4.3) | 3.6ms (3.5 to 3.6) | B faster |
+| stream | 2000 | 6.1ms (4.3 to 6.1) | 6.8ms (5.1 to 20.6) | no |
+| stream | 3000 | 10.8ms (6.9 to 27.8) | 12.4ms (9.7 to 173.7) | no |
+| stream | 4000 | 79.0ms (62.8 to 306.4) | 240.9ms (100.6 to 381.2) | no |
+
+The full tables are in `benchmarks/build/wire-ab.md` after a run. Beyond these:
+the queued pool is also faster outside the spread at p50 for REST at 5000 and
+10000 and for streams at 2000, and at p99.9 for REST at 5000.
+
+**Verdict.** The virtual pool holds a higher rate before it falls behind, 40000
+requests a second against 30000, and is far better in the overloaded steps
+(REST at 40000, where the queued pool's p99 was 64.8ms to 1088.4ms). Below
+saturation it is no better and, at 5000 requests a second on REST and 250
+responses a second on streams, measurably slower at p99. It is not faster
+everywhere and slower nowhere, so `start()` keeps the queued pool and
+`-Dpelican.jetty.pool=virtual` stays an opt-in for a service that runs close to
+its limit. There was no A against A run, so the spread is each side's own range
+over three rounds.
 
 ## Routing as the number of endpoints grows
 
