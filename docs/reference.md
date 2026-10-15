@@ -434,18 +434,20 @@ using one as a file name must check it. A handler mounted beside `toHandler` on
 the same server sees the relaxed paths too, so one that reads the path itself
 should do the same.
 
-**Where a handler runs** follows the same `Handlers` choice as on Pekko, and
-`start` makes virtual threads cost nothing. Under `Handlers.onVirtualThreads`
-(the default from JDK 24),
-`start` gives Jetty a thread pool that calls every handler on a virtual thread,
-so a synchronous handler starts on one rather than hopping to one, and may
-block. `Handlers.onDispatcher` keeps Jetty's platform threads and runs the
-handler on the one that matched the request; `Handlers.on(executor)` moves it
-to a service's own. Mounted by hand on a server whose pool is platform threads,
-`toHandler(Handlers.onVirtualThreads)` still moves a synchronous handler to a
-virtual thread. Below JDK 24 the default is Pelican's platform pool, and
-`start` leaves Jetty on platform threads. A `…By` handler returns a stage and
-is never moved, so under `start` with virtual threads it begins on one too.
+**Where a handler runs** follows the same `Handlers` choice as on Pekko. Under
+any choice but `Handlers.onDispatcher`, `toHandler` tells Jetty it never blocks
+the thread that calls it, so Jetty calls it on its selector without a dispatch:
+routing, 404s, 405s, CORS preflights, refusals and `…By` handlers answer there.
+Whatever may block moves first. Under `Handlers.onVirtualThreads` (the default
+from JDK 24) a synchronous handler, an authenticator, or a `…By` handler taking
+a streamed body moves to a virtual thread, unless Jetty already called it on
+one; under `Handlers.on(executor)` it moves to the service's own. Mounted by
+hand on any server, `toHandler` makes the same moves. `Handlers.onDispatcher`
+has Jetty dispatch to its platform threads and runs the handler on the one that
+matched the request. With pages, or a module beside `toHandler` that may block,
+Jetty dispatches every request to its pool, which `start` has call handlers on
+virtual threads when `handlers` does. Below JDK 24 the default is Pelican's
+platform pool.
 
 **Pages are part of `toHandler`.** With `pages` set in `api`'s block, the
 handler is the endpoints followed by the pages, asked only for `GET`, so an
@@ -487,11 +489,6 @@ the stalled upload on the wire:
   HTML 400; Pekko answers 404. Jetty's URI parser refuses these before any
   handler runs and no compliance setting lifts it. Both refuse, and nothing is
   served from outside.
-- **A `…By` handler starts on a virtual thread** under `start` with
-  `Handlers.onVirtualThreads`; on Pekko it
-  starts on the dispatcher. Jetty's pool calls every handler on a virtual
-  thread, so there is no platform thread to start it on. A handler returning a
-  stage blocks neither way.
 - **A stalled NDJSON upload fails after five seconds** on Jetty; Pekko reads
   NDJSON as a `Source` and waits for its idle timeout. Jetty reads frames with
   a blocking reader, which needs a read timeout of its own, and takes the one

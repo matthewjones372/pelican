@@ -19,8 +19,8 @@ class Handlers private constructor(
 ) {
     companion object {
         /**
-         * A virtual thread per request, so a handler may block without holding one of Jetty's pool threads. [start]
-         * has Jetty call handlers on virtual threads already, so this costs no hop there.
+         * A virtual thread per request, so a handler may block without holding one of Jetty's pool threads. One Jetty
+         * already called on a virtual thread stays there; one called on its selector hops.
          */
         val onVirtualThreads: Handlers = Handlers(Executors.newVirtualThreadPerTaskExecutor(), virtual = true)
 

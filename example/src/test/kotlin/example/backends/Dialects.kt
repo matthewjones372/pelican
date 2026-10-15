@@ -65,12 +65,6 @@ enum class JettyDifference(val reason: String) {
             "handler runs, and no UriCompliance setting lifts it. Both refuse: nothing is served from outside.",
     ),
 
-    /** `handledBy` and its `CompletionStage` siblings start on a virtual thread; on Pekko, on the dispatcher. */
-    STAGED_HANDLERS_START_VIRTUAL(
-        "Under Handlers.onVirtualThreads Jetty's own pool calls every handler on a virtual thread, so there is no " +
-            "platform thread to start a staged handler on. A handler returning a stage does not block either way.",
-    ),
-
     /** A stalled NDJSON upload is a 500 after five seconds on Jetty; Pekko waits for its idle timeout. */
     STALLED_NDJSON_UPLOAD(
         "Jetty reads frames with a blocking reader, which needs a read timeout of its own; it uses the five " +

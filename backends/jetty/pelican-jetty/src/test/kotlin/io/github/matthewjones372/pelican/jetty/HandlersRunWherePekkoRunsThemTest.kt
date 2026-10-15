@@ -161,7 +161,9 @@ class HandlersRunWherePekkoRunsThemTest {
                 Asked("a synchronous handler, $handlers", "/where", handlers),
                 Asked("a declared failure, $handlers", "/refusing", handlers),
             )
-        } + listOf("dispatcher", "mine").map { Asked("an asynchronous handler is never moved, $it", "/later", it) }
+        } + listOf("virtual", "dispatcher", "mine").map {
+            Asked("an asynchronous handler is never moved, $it", "/later", it)
+        }
 
         @JvmStatic
         @AfterAll
@@ -229,12 +231,12 @@ class HandlersRunWherePekkoRunsThemTest {
         }
 
     @Test
-    fun `started, a synchronous handler runs on the virtual thread jetty called, without a hop`() {
+    fun `started, jetty calls pelican on its selector and a synchronous handler hops to a virtual thread`() {
         val server = jettyApi.start(port = 0, handlers = Handlers.onVirtualThreads) {
             recordingThread(toHandler(Handlers.onVirtualThreads))
         }
         try {
-            get("${server.baseUrl}/same").join().body() shouldBe "same"
+            get("${server.baseUrl}/same").join().body() shouldBe "moved"
             get("${server.baseUrl}/where").join().body() shouldBe "virtual"
         } finally {
             server.stop()

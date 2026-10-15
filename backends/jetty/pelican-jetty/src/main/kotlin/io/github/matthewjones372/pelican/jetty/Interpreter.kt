@@ -37,6 +37,7 @@ import org.eclipse.jetty.server.Handler
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.server.Response
 import org.eclipse.jetty.util.Callback
+import org.eclipse.jetty.util.thread.Invocable.InvocationType
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
@@ -57,7 +58,7 @@ fun Api.toHandler(handlers: Handlers = Handlers.default): Handler {
     val bound = endpoints.associateWith { endpoint -> handlerFor(endpoint).on(handlers, endpoint) }
 
     val cors = corsPolicy()
-    val answered = PelicanHandler(this, endpoints.routeIndex(), codecs, bound, cors)
+    val answered = PelicanHandler(this, endpoints.routeIndex(), codecs, bound, cors, handlers)
     val files = pages ?: return answered
     // The loader that built the handler, as a thread Jetty runs a request on may carry no useful one.
     val loader = Thread.currentThread().contextClassLoader ?: Pages::class.java.classLoader
@@ -68,27 +69,42 @@ fun Api.toHandler(handlers: Handlers = Handlers.default): Handler {
 private fun ((Params) -> CompletionStage<Any?>).on(
     threads: Handlers,
     endpoint: ServerEndpoint,
-): (Params) -> CompletionStage<Any?> {
-    val executor = threads.executor
-    return when {
-        executor == null || endpoint.invoke !is Synchronous -> this
+): (Params) -> CompletionStage<Any?> =
+    if (threads.executor == null || endpoint.invoke !is Synchronous) this
+    else { params -> threads.mayBlock { this(params) } }
 
-        threads.virtual -> { params ->
-            if (Thread.currentThread().isVirtual) this(params)
-            else CompletableFuture.supplyAsync({ this(params) }, executor).thenCompose { it }
-        }
-
-        else -> { params -> CompletableFuture.supplyAsync({ this(params) }, executor).thenCompose { it } }
-    }
+/** [work] where these handlers may block: here under [Handlers.onDispatcher] or on a virtual thread, else hopped. */
+private fun <T> Handlers.mayBlock(work: () -> CompletionStage<T>): CompletionStage<T> {
+    val executor = executor
+    return if (executor == null || (virtual && Thread.currentThread().isVirtual)) work()
+    else CompletableFuture.supplyAsync(work, executor).thenCompose { it }
 }
 
+/**
+ * Whether [invoke] may block before the handler's own hop: an [io.github.matthewjones372.pelican.Authenticator]
+ * is the caller's code, and an asynchronous handler may read a streamed body as it is called.
+ */
+private fun ServerEndpoint.blocksBeforeItsHandler(): Boolean {
+    val streamed = endpoint.bodyInput.let { it is RawBody || it is NdjsonBody<*> }
+    return endpoint.caller != null || (invoke !is Synchronous && streamed)
+}
+
+/**
+ * Declared `NON_BLOCKING` unless [threads] is [Handlers.onDispatcher], so Jetty may call it on its selector without a
+ * dispatch: routing, refusals and asynchronous handlers answer there, and whatever may block hops itself first.
+ * `EITHER` would buy nothing: a `Server` combines it to `NON_BLOCKING`, and a selector calling directly does not set
+ * `Invocable.isNonBlockingInvocation`, so the hop is decided by the thread, never by that flag.
+ */
 internal class PelicanHandler(
     private val api: Api,
     private val index: RouteIndex,
     private val codecs: Map<ServerEndpoint, EndpointCodecs>,
     private val handlers: Map<ServerEndpoint, (Params) -> CompletionStage<Any?>>,
     private val cors: CorsPolicy?,
-) : Handler.Abstract() {
+    private val threads: Handlers,
+) : Handler.Abstract(if (threads.executor == null) InvocationType.BLOCKING else InvocationType.NON_BLOCKING) {
+
+    private val blocking: Set<ServerEndpoint> = api.endpoints.filterTo(HashSet()) { it.blocksBeforeItsHandler() }
 
     /** In declaration order, which is the order Pekko's per-method routes name them in a 405. */
     private val methods: List<Method> = api.endpoints.map { it.endpoint.method }.distinct()
@@ -161,6 +177,13 @@ internal class PelicanHandler(
     }
 
     private fun invoke(
+        se: ServerEndpoint,
+        request: Request,
+        values: MutableMap<ParamKey<*>, Any?>,
+    ): CompletionStage<Reply> =
+        if (se in blocking) threads.mayBlock { invokeHere(se, request, values) } else invokeHere(se, request, values)
+
+    private fun invokeHere(
         se: ServerEndpoint,
         request: Request,
         values: MutableMap<ParamKey<*>, Any?>,
