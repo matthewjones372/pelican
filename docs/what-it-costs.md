@@ -546,109 +546,117 @@ Highest sustained responses/s: A 4000 (runs: 4000, 4000, 4000), B 4000 (runs: 40
 
 ### Non-blocking invocation
 
-**What is measured.** Spec 0085's `spec-0085-nonblocking` branch (A) against
-`origin/main` (B), three alternating rounds each, with `-PwireAb`. The change
-answers routing, 404 and 405, refusals and handlers that return a stage on
-Jetty's selector without a dispatch, and hops synchronous handlers to a virtual
-thread. `async` is the path it targets; `rest` is the path it adds a hop to,
-run to check for a regression. In the tables, "B vs A" is main relative to this
-branch, so a negative number means main had the lower latency.
+**What is measured.** Spec 0085's `spec-0085-nonblocking` branch (A, head
+f736701e) against `origin/main` (B), three alternating rounds each, with
+`-PwireAb`. The change answers routing, 404 and 405, refusals and handlers
+that return a stage on Jetty's selector without a dispatch, and hops
+synchronous handlers to a virtual thread. `async` is the path it targets;
+`rest` is the path it adds a hop to, run to check for a regression. The first
+measurement found synchronous handlers slower than main because the hop cost a
+second dispatch to resume the connection; the hop thread now resumes the
+connection itself, so a synchronous request costs one dispatch like main, and
+the tables below replace that first measurement. In the tables, "B vs A" is
+main relative to this branch, so a negative number means main had the lower
+latency, and "yes, slower" or "yes, faster" describes main.
 
-**Machine.** Intel Xeon at 2.10GHz, 4 cores (`nproc` 4), 15GiB memory, Ubuntu
-24.04.5, Linux 6.18.44, JDK 25.0.4.1 for the benchmarks and JDK 21 running Gradle.
-Load average before and after each run, one, five and fifteen minutes:
+**Machine.** Intel Xeon Processor at 2.10GHz, 4 cores (`nproc` 4), 15GiB memory,
+Ubuntu 24.04.5, Linux 6.18.44, JDK 25.0.4.1 for the benchmarks and JDK 21.0.12
+running Gradle. Load average before and after each run, one, five and fifteen
+minutes:
 
 | run | before | after |
 |---|---|---|
-| async | 0.06, 0.01, 0.00 (booted a minute earlier) | 7.86, 5.14, 3.53 |
-| rest | 6.81, 5.01, 3.50 | 10.50, 7.09, 5.35 |
+| rest | 1.32, 0.79, 0.35 | 10.18, 6.86, 4.83 |
+| async | 8.00, 6.54, 4.76 (started right after rest) | 11.04, 7.22, 5.93 |
 
 The load climbs during each run because the load generator shares the four
 cores with the server, so neither run was on a quiet machine in the sense of
-[a quiet machine matters](#a-quiet-machine-matters). The per-round load figures
-are in `wire-ab.md`. No main against main run exists yet on this page, so the
-spread here is only A against A.
+[a quiet machine matters](#a-quiet-machine-matters); the per-round figures are
+in `wire-ab.md`. Nothing else ran on the machine. No main against main run
+exists on this page for this machine, so the spread used here is each side's
+own three rounds.
 
 ```bash
-./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=async
 ./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=rest
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=async
 ```
 
-**async (a staged GET alternating with a 404).** Highest sustained req/s: A 30000 (runs: 60000, 30000, 30000), B 30000 (runs: 10000, 50000, 30000).
+**async (a staged GET alternating with a 404).** Highest sustained req/s: A 60000 (runs: 60000, 60000, 60000), B 60000 (runs: 60000, 50000, 60000).
 
 | req/s | percentile | A median | A range | B median | B range | B vs A | outside the spread |
 |---|---|---|---|---|---|---|---|
-| 1000 | p50 | 419µs | 397µs to 432µs | 477µs | 476µs to 514µs | +13.8% | yes, slower |
-| 1000 | p99 | 2.3ms | 1.7ms to 2.7ms | 3.0ms | 2.5ms to 26.3ms | +27.3% | no |
-| 1000 | p99.9 | 5.5ms | 4.9ms to 18.2ms | 111.5ms | 16.6ms to 131.7ms | +1931.0% | no |
-| 5000 | p50 | 189µs | 185µs to 194µs | 200µs | 198µs to 204µs | +5.8% | yes, slower |
-| 5000 | p99 | 1.5ms | 957µs to 1.6ms | 1.0ms | 970µs to 1.1ms | -28.2% | no |
-| 5000 | p99.9 | 27.5ms | 5.0ms to 28.2ms | 9.6ms | 5.3ms to 19.4ms | -65.2% | no |
-| 10000 | p50 | 155µs | 155µs to 172µs | 202µs | 199µs to 212µs | +30.0% | yes, slower |
-| 10000 | p99 | 1.8ms | 625µs to 1.9ms | 941µs | 621µs to 1.7ms | -46.3% | no |
-| 10000 | p99.9 | 25.6ms | 4.9ms to 54.6ms | 6.8ms | 6.1ms to 9.6ms | -73.5% | no |
-| 20000 | p50 | 181µs | 180µs to 182µs | 252µs | 237µs to 255µs | +38.8% | yes, slower |
-| 20000 | p99 | 2.0ms | 1.8ms to 2.2ms | 3.2ms | 3.1ms to 315.1ms | +61.6% | yes, slower |
-| 20000 | p99.9 | 10.1ms | 9.3ms to 23.2ms | 12.8ms | 12.6ms to 416.0ms | +27.2% | no |
-| 30000 | p50 | 226µs | 223µs to 230µs | 308µs | 296µs to 321µs | +36.6% | yes, slower |
-| 30000 | p99 | 4.5ms | 3.5ms to 7.1ms | 9.4ms | 7.9ms to 10.8ms | +107.2% | yes, slower |
-| 30000 | p99.9 | 14.5ms | 10.0ms to 15.5ms | 23.9ms | 17.7ms to 30.0ms | +64.1% | yes, slower |
-| 40000 | p50 | 473µs | 430µs to 13.9ms | 490µs | 434µs to 545µs | +3.6% | no |
-| 40000 | p99 | 241.2ms | 14.5ms to 537.4ms | 184.8ms | 16.5ms to 353.1ms | -23.4% | no |
-| 40000 | p99.9 | 267.1ms | 125.9ms to 580.4ms | 215.4ms | 38.5ms to 392.2ms | -19.4% | no |
-| 50000 | p50 | 619µs | 619µs to 619µs | 1.6ms | 1.6ms to 1.6ms | +153.8% | one run |
-| 50000 | p99 | 10.3ms | 10.3ms to 10.3ms | 36.5ms | 36.5ms to 36.5ms | +253.4% | one run |
-| 50000 | p99.9 | 16.2ms | 16.2ms to 16.2ms | 72.3ms | 72.3ms to 72.3ms | +346.3% | one run |
-| 60000 | p50 | 4.9ms | 4.9ms to 4.9ms | 563.6ms | 563.6ms to 563.6ms | +11405.0% | one run |
-| 60000 | p99 | 44.0ms | 44.0ms to 44.0ms | 1195.4ms | 1195.4ms to 1195.4ms | +2618.3% | one run |
-| 60000 | p99.9 | 79.8ms | 79.8ms to 79.8ms | 1214.3ms | 1214.3ms to 1214.3ms | +1422.4% | one run |
+| 1000 | p50 | 391µs | 379µs to 416µs | 433µs | 397µs to 445µs | +10.7% | no |
+| 1000 | p99 | 2.0ms | 1.6ms to 2.9ms | 2.1ms | 1.8ms to 2.3ms | +4.0% | no |
+| 1000 | p99.9 | 5.2ms | 4.0ms to 27.9ms | 21.4ms | 4.5ms to 29.4ms | +312.0% | no |
+| 5000 | p50 | 176µs | 168µs to 195µs | 184µs | 168µs to 185µs | +4.5% | no |
+| 5000 | p99 | 1.5ms | 1.2ms to 4.1ms | 1.1ms | 925µs to 1.3ms | -30.3% | no |
+| 5000 | p99.9 | 28.3ms | 4.1ms to 74.2ms | 13.6ms | 4.9ms to 53.3ms | -52.0% | no |
+| 10000 | p50 | 162µs | 142µs to 177µs | 189µs | 188µs to 191µs | +16.2% | yes, slower |
+| 10000 | p99 | 2.7ms | 908µs to 2.9ms | 1.1ms | 925µs to 2.4ms | -60.9% | no |
+| 10000 | p99.9 | 24.8ms | 18.1ms to 47.5ms | 5.7ms | 5.0ms to 33.0ms | -77.1% | no |
+| 20000 | p50 | 174µs | 173µs to 189µs | 225µs | 215µs to 242µs | +29.7% | yes, slower |
+| 20000 | p99 | 3.2ms | 3.1ms to 3.4ms | 4.2ms | 3.0ms to 5.4ms | +30.4% | no |
+| 20000 | p99.9 | 24.1ms | 22.7ms to 30.1ms | 29.5ms | 11.7ms to 31.3ms | +22.5% | no |
+| 30000 | p50 | 199µs | 196µs to 231µs | 249µs | 236µs to 258µs | +25.2% | yes, slower |
+| 30000 | p99 | 6.3ms | 3.5ms to 88.4ms | 5.5ms | 5.5ms to 24.3ms | -11.4% | no |
+| 30000 | p99.9 | 43.2ms | 11.6ms to 150.2ms | 23.2ms | 19.1ms to 94.6ms | -46.1% | no |
+| 40000 | p50 | 272µs | 254µs to 282µs | 341µs | 335µs to 423µs | +25.2% | yes, slower |
+| 40000 | p99 | 5.9ms | 5.3ms to 11.6ms | 7.7ms | 5.8ms to 7.8ms | +30.5% | no |
+| 40000 | p99.9 | 11.3ms | 10.8ms to 44.1ms | 17.8ms | 11.2ms to 20.2ms | +57.0% | no |
+| 50000 | p50 | 434µs | 390µs to 777µs | 678µs | 630µs to 689µs | +56.0% | no |
+| 50000 | p99 | 10.1ms | 9.5ms to 13.8ms | 8.6ms | 8.4ms to 10.8ms | -14.3% | no |
+| 50000 | p99.9 | 20.6ms | 18.9ms to 55.8ms | 16.1ms | 14.0ms to 17.5ms | -21.9% | yes, faster |
+| 60000 | p50 | 1.6ms | 1.4ms to 1.7ms | 2.6ms | 1.5ms to 4.4ms | +59.0% | no |
+| 60000 | p99 | 21.7ms | 21.1ms to 22.8ms | 31.3ms | 25.8ms to 100.0ms | +44.4% | yes, slower |
+| 60000 | p99.9 | 35.9ms | 35.0ms to 52.4ms | 45.3ms | 45.2ms to 146.9ms | +25.9% | no |
+| 70000 | p50 | 219.4ms | 16.3ms to 283.9ms | 870.3ms | 631.2ms to 1109.4ms | +296.7% | yes, slower |
+| 70000 | p99 | 836.2ms | 458.2ms to 845.2ms | 1942.0ms | 1930.4ms to 1953.5ms | +132.2% | yes, slower |
+| 70000 | p99.9 | 872.9ms | 497.3ms to 917.0ms | 1989.1ms | 1986.0ms to 1992.3ms | +127.9% | yes, slower |
 
-**rest (the JSON GET and POST, synchronous handlers).** Highest sustained req/s: A 30000 (runs: 30000, 1000, 40000), B 40000 (runs: 40000, 40000, 40000).
+**rest (the JSON GET and POST, synchronous handlers).** Highest sustained req/s: A 40000 (runs: 40000, 40000, 40000), B 50000 (runs: 50000, 40000, 50000).
 
 | req/s | percentile | A median | A range | B median | B range | B vs A | outside the spread |
 |---|---|---|---|---|---|---|---|
-| 1000 | p50 | 514µs | 506µs to 561µs | 521µs | 515µs to 544µs | +1.3% | no |
-| 1000 | p99 | 2.4ms | 2.4ms to 2.7ms | 2.7ms | 2.1ms to 3.5ms | +9.0% | no |
-| 1000 | p99.9 | 6.2ms | 6.0ms to 36.9ms | 28.9ms | 4.5ms to 41.7ms | +366.2% | no |
-| 5000 | p50 | 246µs | 242µs to 282µs | 214µs | 207µs to 234µs | -13.3% | yes, faster |
-| 5000 | p99 | 1.4ms | 1.3ms to 669.0ms | 1.0ms | 706µs to 1.6ms | -25.6% | no |
-| 5000 | p99.9 | 8.4ms | 5.5ms to 780.7ms | 6.0ms | 3.4ms to 14.0ms | -28.6% | no |
-| 10000 | p50 | 245µs | 239µs to 251µs | 228µs | 226µs to 235µs | -6.9% | yes, faster |
-| 10000 | p99 | 3.1ms | 2.5ms to 3.6ms | 1.8ms | 1.4ms to 2.0ms | -40.3% | yes, faster |
-| 10000 | p99.9 | 20.7ms | 17.2ms to 24.1ms | 8.1ms | 7.9ms to 11.1ms | -60.7% | yes, faster |
-| 20000 | p50 | 325µs | 304µs to 346µs | 275µs | 268µs to 277µs | -15.1% | yes, faster |
-| 20000 | p99 | 5.0ms | 5.0ms to 5.0ms | 4.0ms | 3.6ms to 4.2ms | -20.1% | yes, faster |
-| 20000 | p99.9 | 18.6ms | 16.1ms to 21.0ms | 11.8ms | 11.1ms to 15.2ms | -36.3% | yes, faster |
-| 30000 | p50 | 553µs | 476µs to 631µs | 377µs | 337µs to 378µs | -31.9% | yes, faster |
-| 30000 | p99 | 11.5ms | 8.9ms to 14.1ms | 10.0ms | 6.5ms to 13.8ms | -13.1% | no |
-| 30000 | p99.9 | 21.9ms | 17.4ms to 26.4ms | 47.0ms | 14.3ms to 62.5ms | +114.6% | no |
-| 40000 | p50 | 187.1ms | 3.6ms to 370.7ms | 764µs | 736µs to 1.7ms | -99.6% | yes, faster |
-| 40000 | p99 | 503.3ms | 98.0ms to 908.6ms | 15.7ms | 15.0ms to 61.6ms | -96.9% | yes, faster |
-| 40000 | p99.9 | 542.4ms | 156.9ms to 928.0ms | 42.1ms | 30.1ms to 96.4ms | -92.2% | yes, faster |
-| 50000 | p50 | 678.4ms | 678.4ms to 678.4ms | 21.9ms | 16.0ms to 228.7ms | -96.8% | one run |
-| 50000 | p99 | 1393.6ms | 1393.6ms to 1393.6ms | 160.7ms | 146.8ms to 558.4ms | -88.5% | one run |
-| 50000 | p99.9 | 1427.1ms | 1427.1ms to 1427.1ms | 189.3ms | 173.4ms to 598.7ms | -86.7% | one run |
+| 1000 | p50 | 498µs | 470µs to 532µs | 504µs | 439µs to 556µs | +1.3% | no |
+| 1000 | p99 | 2.6ms | 2.0ms to 2.7ms | 2.2ms | 1.7ms to 3.4ms | -14.8% | no |
+| 1000 | p99.9 | 6.1ms | 6.0ms to 8.1ms | 5.4ms | 4.5ms to 45.7ms | -11.3% | no |
+| 5000 | p50 | 215µs | 205µs to 244µs | 205µs | 201µs to 216µs | -5.0% | no |
+| 5000 | p99 | 1.1ms | 835µs to 1.2ms | 1.0ms | 670µs to 1.3ms | -8.8% | no |
+| 5000 | p99.9 | 5.3ms | 5.1ms to 8.1ms | 6.9ms | 5.0ms to 7.1ms | +31.0% | no |
+| 10000 | p50 | 234µs | 211µs to 239µs | 218µs | 215µs to 222µs | -7.2% | no |
+| 10000 | p99 | 1.4ms | 1.1ms to 2.3ms | 4.3ms | 1.4ms to 4.8ms | +201.7% | no |
+| 10000 | p99.9 | 8.1ms | 7.5ms to 13.5ms | 39.8ms | 9.5ms to 66.8ms | +394.2% | no |
+| 20000 | p50 | 259µs | 252µs to 271µs | 259µs | 256µs to 276µs | +0.3% | no |
+| 20000 | p99 | 4.4ms | 4.3ms to 4.5ms | 5.2ms | 4.9ms to 10.2ms | +17.4% | yes, slower |
+| 20000 | p99.9 | 19.3ms | 17.1ms to 32.7ms | 17.9ms | 11.3ms to 47.6ms | -7.5% | no |
+| 30000 | p50 | 412µs | 314µs to 451µs | 339µs | 316µs to 402µs | -17.8% | no |
+| 30000 | p99 | 9.4ms | 8.1ms to 25.3ms | 11.0ms | 6.5ms to 27.4ms | +16.5% | no |
+| 30000 | p99.9 | 38.2ms | 29.7ms to 102.4ms | 41.9ms | 39.3ms to 85.7ms | +9.7% | no |
+| 40000 | p50 | 790µs | 628µs to 1.0ms | 600µs | 485µs to 904µs | -24.1% | no |
+| 40000 | p99 | 10.7ms | 9.6ms to 14.7ms | 9.8ms | 8.2ms to 13.1ms | -8.6% | no |
+| 40000 | p99.9 | 17.1ms | 15.8ms to 32.0ms | 16.4ms | 15.7ms to 24.9ms | -3.7% | no |
+| 50000 | p50 | 7.9ms | 6.5ms to 261.5ms | 2.4ms | 2.4ms to 2.7ms | -69.5% | yes, faster |
+| 50000 | p99 | 147.2ms | 125.1ms to 620.8ms | 45.9ms | 42.5ms to 260.2ms | -68.8% | no |
+| 50000 | p99.9 | 172.8ms | 171.7ms to 650.6ms | 69.5ms | 67.4ms to 339.7ms | -59.7% | no |
 
-**Verdict, async.** This branch is faster at the median from 1000 to 30000
-requests a second, outside the A-vs-A spread at every one of those rates (main
-is 6% to 39% higher). At p99 it is faster only where the ranges are disjoint:
-20000 req/s (2.0ms against 3.2ms) and 30000 req/s (4.5ms against 9.4ms). Below
-that the p99 and p99.9 ranges overlap, so there is no difference beyond the
-spread. The highest sustained rate is 30000 for both, and each side's three runs
-ranged widely (A 30000 to 60000, B 10000 to 50000), so the ladder ceiling does
-not separate them.
+**Verdict, async.** This branch is still faster at the median: from 10000 to
+40000 requests a second main's p50 is 16% to 30% higher and outside the spread
+at each rate. At 1000 and 5000 req/s and at 50000 and 60000 the p50 ranges
+overlap. The tails show no difference by the 2x rule: the only p99 and p99.9
+gaps outside the spread are 60000 req/s p99 (21.7ms against 31.3ms), 50000
+p99.9 (main lower, 16.1ms against 20.6ms) and the overloaded 70000 step, none
+of them 2x apart before overload. The highest sustained rate is 60000 for both
+(A 60000 three times, B 60000, 50000, 60000), so the ladder ceiling does not
+separate them.
 
-**Verdict, rest.** This branch is slower than main, which is the regression the
-hop could cause. Main has the lower median at every rate from 5000 to 40000,
-outside the spread at each, and the lower p99 and p99.9 outside the spread at
-10000 and 20000 req/s (p99 1.8ms against 3.1ms at 10000, 4.0ms against 5.0ms at
-20000). At 1000 req/s there is no difference beyond the spread, and the tail at
-30000 overlaps. The highest sustained rate is 30000 for this branch (runs
-30000, 1000, 40000) against 40000 for main (40000 in all three), though one of
-this branch's runs failed at 5000 and ended its ladder early, so that gap is
-the least certain figure here. The synchronous path should not be taken as
-improved by this change; it needs a cheaper hop, or a decision that the async
-gain is worth it.
+**Verdict, rest.** This branch is no worse than main beyond the noise from 1000
+to 40000 requests a second: every p50, p99 and p99.9 range overlaps except p99
+at 20000 req/s (4.4ms against 5.2ms, main 17% lower, under the 2x bar). The
+synchronous regression of the first measurement is gone. Main held 50000 req/s
+in two of three runs where this branch held 40000 in all three, so at 50000 main
+is lower at p50 (2.4ms against 7.9ms) with disjoint ranges; that is one rung of
+the ladder, which the noise rule treats as noise, but it is the one place the
+branch trails and a repeat would settle it.
 
 ### Thread pool
 
