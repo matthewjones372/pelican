@@ -3575,15 +3575,16 @@ docs {
     docsPath = "/api-docs"                    // Swagger UI, as before
     scalarReference("/reference") {           // Scalar, to read and to try
         stylesheet("https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap")
-        css(":root { --scalar-color-accent: #0B7A75; --scalar-font: Inter, sans-serif; }")
+        css(".light-mode, .dark-mode { --scalar-color-accent: #0B7A75; --scalar-font: Inter, sans-serif; }")
         options = jsonObj { "hideDarkModeToggle" to true }
     }
 }
 ```
 
 `options` is Scalar's config, passed to `Scalar.createApiReference` as it is.
-`css` reaches Scalar as its `customCss`, which it applies after its own, so the
-`--scalar-*` variables set there win. Scalar has no logo option. Pelican sets
+`css` reaches Scalar as its `customCss`, which it applies after its own. Scalar
+sets its `--scalar-*` variables on `.light-mode` and `.dark-mode`, not on
+`:root`, so a theme sets them there too. Scalar has no logo option. Pelican sets
 `telemetry: false` and `proxyUrl: null` under the options, so requests go from
 the browser to the API and nowhere else; a service that wants either sets it in
 `options`. A service serves one reference page, so `reference` and
