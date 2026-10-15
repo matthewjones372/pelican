@@ -37,8 +37,11 @@ public final class io/github/matthewjones372/pelican/openapi/Docs {
 	public final fun getOpenApiPath ()Ljava/lang/String;
 	public final fun getRedoc ()Lio/github/matthewjones372/pelican/openapi/RedocLook;
 	public final fun getReference ()Lio/github/matthewjones372/pelican/openapi/Reference;
+	public final fun getReferencePath ()Ljava/lang/String;
+	public final fun getScalarReference ()Lio/github/matthewjones372/pelican/openapi/ScalarReference;
 	public final fun getUi ()Lio/github/matthewjones372/pelican/openapi/DocsUi;
 	public final fun getVersion ()Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+	public final fun referencePage (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lkotlin/Pair;
 }
 
 public final class io/github/matthewjones372/pelican/openapi/DocsBuilder {
@@ -50,6 +53,8 @@ public final class io/github/matthewjones372/pelican/openapi/DocsBuilder {
 	public final fun redoc (Lkotlin/jvm/functions/Function1;)V
 	public final fun reference (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun reference$default (Lio/github/matthewjones372/pelican/openapi/DocsBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun scalarReference (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun scalarReference$default (Lio/github/matthewjones372/pelican/openapi/DocsBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun setDocsPath (Ljava/lang/String;)V
 	public final fun setOauth (Lio/github/matthewjones372/pelican/openapi/DocsOAuth;)V
 	public final fun setOpenApiPath (Ljava/lang/String;)V
@@ -161,6 +166,11 @@ public final class io/github/matthewjones372/pelican/openapi/ScalarLookBuilder {
 	public final fun getOptions ()Lio/github/matthewjones372/pelican/JsonObj;
 	public final fun setOptions (Lio/github/matthewjones372/pelican/JsonObj;)V
 	public final fun stylesheet (Ljava/lang/String;)V
+}
+
+public final class io/github/matthewjones372/pelican/openapi/ScalarReference {
+	public final fun getLook ()Lio/github/matthewjones372/pelican/openapi/ScalarLook;
+	public final fun getPath ()Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/openapi/SwaggerUiKt {

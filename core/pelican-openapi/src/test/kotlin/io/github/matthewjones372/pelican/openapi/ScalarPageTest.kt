@@ -79,4 +79,33 @@ class ScalarPageTest {
         shouldThrow<IllegalArgumentException> { look { stylesheet(" ") } }.message.toString() shouldContain "URL"
         shouldThrow<IllegalArgumentException> { look { css("") } }.message.toString() shouldContain "css"
     }
+
+    @Test
+    fun `a Scalar reference beside the console is a page of its own, on a path of its own`() {
+        val docs = docs {
+            docsPath = "/api-docs"
+            scalarReference("/reference") { css(":root { --scalar-color-accent: #C2562B; }") }
+        }
+
+        docs.ui shouldBe DocsUi.SwaggerUi
+        docs.scalarReference?.path shouldBe "/reference"
+        docs.scalarReference?.look?.css shouldBe ":root { --scalar-color-accent: #C2562B; }"
+        shouldThrow<IllegalArgumentException> { docs { scalarReference("/docs") } }.message.toString() shouldContain
+            "docsPath"
+        shouldThrow<IllegalArgumentException> {
+            docs { scalarReference("/openapi.json") }
+        }.message.toString() shouldContain "openApiPath"
+        shouldThrow<IllegalArgumentException> { docs { scalarReference(" ") } }.message.toString() shouldContain
+            "path"
+    }
+
+    @Test
+    fun `a Scalar reference and a Redoc reference together are refused, since there is one reference page`() {
+        shouldThrow<IllegalArgumentException> {
+            docs {
+                reference("/reference")
+                scalarReference("/try")
+            }
+        }.message.toString() shouldContain "one reference page"
+    }
 }

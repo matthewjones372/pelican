@@ -38,3 +38,6 @@ class ScalarLookBuilder internal constructor() {
 
     internal fun build(): ScalarLook = ScalarLook(options, css, stylesheets.toList())
 }
+
+/** A Scalar reference served beside the docs page, at [path]. */
+class ScalarReference internal constructor(val path: String, val look: ScalarLook)

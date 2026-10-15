@@ -87,4 +87,31 @@ class ReferenceBesideConsoleTest {
             server.stop()
         }
     }
+
+    @Test
+    fun `a scalar reference beside the console reads the same document, and sends its requests to the api`() {
+        val server = ordersApi().startWithDocs(
+            port = 0,
+            docs = docs {
+                docsPath = "/api-docs"
+                scalarReference("/reference") {
+                    css(":root { --scalar-color-accent: #0B7A75; }")
+                    stylesheet("https://fonts.example/inter.css")
+                }
+            },
+        )
+        try {
+            get("${server.baseUrl}/api-docs").body() shouldContain "swagger-ui"
+
+            val reference = get("${server.baseUrl}/reference")
+            reference.statusCode() shouldBe 200
+            reference.body() shouldContain "@scalar/api-reference@1/"
+            reference.body() shouldContain """"url":"/openapi.json""""
+            reference.body() shouldContain """"proxyUrl":null"""
+            reference.body() shouldContain "--scalar-color-accent: #0B7A75;"
+            reference.body() shouldContain """href="https://fonts.example/inter.css""""
+        } finally {
+            server.stop()
+        }
+    }
 }

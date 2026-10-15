@@ -78,6 +78,12 @@ class DocsServedAsPekkoServesTest {
             openApiPath = null
             docsPath = null
         }
+        private val scalar = docs {
+            docsPath = "/api-docs"
+            scalarReference("/reference") { css(":root { --scalar-color-accent: #C2562B; }") }
+        }
+        private val jettyScalar = jettyApi.startWithDocs(port = 0, docs = scalar)
+        private val pekkoScalar = pekkoApi.pekkoStartWithDocs(port = 0, docs = scalar)
         private val jettyOff = jettyApi.startWithDocs(port = 0, docs = off)
         private val pekkoOff = pekkoApi.pekkoStartWithDocs(port = 0, docs = off)
         private val docsAlone = jettyApi.start(port = 0) { docsHandler(console) }
@@ -88,8 +94,8 @@ class DocsServedAsPekkoServesTest {
         @AfterAll
         fun stopAll() {
             client.close()
-            listOf(jetty, jettyRedoc, jettyOff, docsAlone).forEach { it.stop() }
-            listOf(pekko, pekkoRedoc, pekkoOff).forEach { it.stop() }
+            listOf(jetty, jettyRedoc, jettyScalar, jettyOff, docsAlone).forEach { it.stop() }
+            listOf(pekko, pekkoRedoc, pekkoScalar, pekkoOff).forEach { it.stop() }
         }
     }
 
@@ -130,6 +136,12 @@ class DocsServedAsPekkoServesTest {
     }
 
     @ParameterizedTest(name = "{0}")
+    @CsvSource("/openapi.json", "/api-docs", "/reference")
+    fun `a scalar reference beside the console answers as on pekko`(path: String) {
+        withClue(path) { ask(jettyScalar.baseUrl, path) shouldBe ask(pekkoScalar.baseUrl, path) }
+    }
+
+    @ParameterizedTest(name = "{0}")
     @CsvSource("/openapi.json", "/docs")
     fun `with every page switched off the endpoints alone answer, as on pekko`(path: String) {
         withClue(path) { ask(jettyOff.baseUrl, path) shouldBe ask(pekkoOff.baseUrl, path) }
@@ -162,6 +174,10 @@ class DocsServedAsPekkoServesTest {
         ask(jetty.baseUrl, "/api-docs").body shouldContain "swagger-ui"
         ask(jetty.baseUrl, "/reference").body shouldContain """"x-logo":{"url":"/logo.svg","altText":"Widgets"}"""
         ask(jettyRedoc.baseUrl, "/docs").body shouldContain """href="https://fonts.example/inter.css""""
+        val scalarPage = ask(jettyScalar.baseUrl, "/reference")
+        scalarPage.allowOrigin shouldBe ORIGIN
+        scalarPage.body shouldContain "Scalar.createApiReference"
+        scalarPage.body shouldContain """"url":"/openapi.json""""
     }
 
     @Test

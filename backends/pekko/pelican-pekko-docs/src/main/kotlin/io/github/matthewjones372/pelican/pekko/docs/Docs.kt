@@ -40,7 +40,7 @@ typealias Docs = io.github.matthewjones372.pelican.openapi.Docs
 fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }
     val uiPath = docs.docsPath?.takeIf { it.isNotBlank() }
-    if (specPath == null && uiPath == null && docs.reference == null) return emptyList()
+    if (specPath == null && uiPath == null && docs.referencePath == null) return emptyList()
 
     // Generated once and shared by the routes, rather than once per route.
     val document = spec().openApiJson(docs.version)
@@ -70,9 +70,8 @@ fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
             }
         }
         // Beside the page above, reading the same document: a reference for reading, a console for trying.
-        docs.reference?.let { reference ->
-            val page = redocHtml(title, specPath.orEmpty(), document, reference.look)
-            add(staticRoute(reference.path, ContentTypes.TEXT_HTML_UTF8, page, cors))
+        docs.referencePage(title, specPath.orEmpty(), document)?.let { (path, page) ->
+            add(staticRoute(path, ContentTypes.TEXT_HTML_UTF8, page, cors))
         }
     }
 }
