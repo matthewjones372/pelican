@@ -64,6 +64,9 @@ class FunctionalStyleTest {
             "endpoint and handed to the interpreter as a Map",
         "core/pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/RedocLook.kt" to
             "RedocLookBuilder collects stylesheets a call at a time, and the RedocLook it builds is handed a copy",
+        "core/pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/RapiDocLook.kt" to
+            "RapiDocLookBuilder collects attributes and stylesheets a call at a time, and the RapiDocLook it builds " +
+            "is handed copies",
         "core/pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/ScalarLook.kt" to
             "ScalarLookBuilder collects stylesheets a call at a time, and the ScalarLook it builds is handed a copy",
         "core/pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/OpenApi.kt" to
