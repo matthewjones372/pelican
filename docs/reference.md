@@ -3574,14 +3574,16 @@ reference like Redoc's, whose client sends a request from the page to the API.
 docs {
     docsPath = "/api-docs"                    // Swagger UI, as before
     scalarReference("/reference") {           // Scalar, to read and to try
-        stylesheet("https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap")
-        css(".light-mode, .dark-mode { --scalar-color-accent: #0B7A75; --scalar-font: Inter, sans-serif; }")
-        options = jsonObj { "hideDarkModeToggle" to true }
+        theme {
+            accent = "#0B7A75"
+            font("Inter, sans-serif", stylesheet = "https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap")
+        }
     }
 }
 ```
 
-`options` is Scalar's config, passed to `Scalar.createApiReference` as it is.
+`theme { }` is described below and works on either reference. `options` is
+Scalar's config, passed to `Scalar.createApiReference` as it is.
 `css` reaches Scalar as its `customCss`, which it applies after its own. Scalar
 sets its `--scalar-*` variables on `.light-mode` and `.dark-mode`, not on
 `:root`, so a theme sets them there too. Scalar has no logo option. Pelican sets
@@ -3590,6 +3592,33 @@ the browser to the API and nowhere else; a service that wants either sets it in
 `options`. A service serves one reference page, so `reference` and
 `scalarReference` together are refused, as is either on `docsPath` or
 `openApiPath`.
+
+#### One theme for either reference
+
+`theme { }` names the slots a brand has, and both references read it, so a
+service can move between Redoc and Scalar without rewriting its look:
+
+```kotlin
+theme {
+    accent = "#0B7A75"                         // links, buttons, the selected operation
+    text = "#1F2933"                           // body and sidebar text
+    sidebar = "#F2FBFA"                        // the sidebar's background
+    success = "#2F855A"                        // success responses
+    error = "#C53030"                          // error responses
+    font("Inter, sans-serif", stylesheet = "https://fonts.googleapis.com/css2?family=Inter&display=swap")
+    codeFont("'JetBrains Mono', monospace")
+    logo("/logo.svg", altText = "Orders")      // Redoc only
+}
+```
+
+Under Redoc each slot lands where Redoc's `theme` reads it, and `options` is
+laid over it key by key, so a raw `theme.colors.primary` still wins and the
+theme's other keys stay. Under Scalar the slots become `--scalar-*` variables
+on `.light-mode` and `.dark-mode`, before the service's `css`, and the page is
+forced light, as Redoc's always is; `options` can say otherwise. Scalar has no
+logo, so a theme with one is refused under `scalarReference`. A blank slot is
+refused where it is written. Per-method colours, spacing and anything else
+past these slots stay in the renderer's own `options` or `css`.
 
 The pages load their JavaScript from a CDN (`unpkg` for Swagger UI,
 `jsDelivr` for Redoc and Scalar) so a browser that cannot reach one gets an empty page.
