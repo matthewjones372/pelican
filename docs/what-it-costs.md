@@ -451,9 +451,48 @@ The first A/B run also builds the baseline, a few minutes more.
 this page can be called larger than the noise.
 
 **Gathered frames.** Jetty writes the frames pulled while a write is in flight
-as one write, up to `outputAggregationSize` (8 KiB by default). Placeholder:
-`-PwireScenario=stream` against the `main` before it, on the cloud instance,
-goes here.
+as one write, up to `outputAggregationSize` (8 KiB by default). Measured with
+`./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=stream`, branch
+`spec-0085-frames` as A against `origin/main` as B, three rounds each, ABABAB,
+on 15 October 2026. Machine: 4 cores of an Intel Xeon at 2.80GHz, 15 GiB, Ubuntu
+24.04, Gradle on JDK 21 and the benchmark on JDK 25.0.4. Load average (1, 5, 15
+minutes) was 0.41, 0.11, 0.04 before the first build and 4.90, 3.90, 2.83 after
+the run; the per-run loads were 3.5 to 6.6 (the load average includes the load
+generator, which runs on the same machine). Times are to the last byte of a
+stream of 100 frames; the table gives the median and range over the three rounds.
+
+Highest sustained rate: A 2000 responses/s (2000, 2000, 2000), B 2000 responses/s
+(2000, 2000, 2000). Both fell behind at 3000.
+
+| responses/s | percentile | A (this branch) median | A range | B (main) median | B range | B vs A | outside the spread |
+|---|---|---|---|---|---|---|---|
+| 250 | p50 | 1.5ms | 1.5ms to 2.2ms | 1.5ms | 1.5ms to 1.6ms | +0.7% | no |
+| 250 | p99 | 11.2ms | 7.9ms to 29.4ms | 6.6ms | 6.1ms to 7.3ms | -40.6% | yes, faster |
+| 250 | p99.9 | 35.4ms | 34.3ms to 65.4ms | 17.4ms | 14.9ms to 22.1ms | -50.9% | yes, faster |
+| 500 | p50 | 1.4ms | 1.3ms to 1.7ms | 1.3ms | 1.2ms to 1.4ms | -4.9% | no |
+| 500 | p99 | 6.4ms | 4.6ms to 62.0ms | 8.1ms | 4.4ms to 9.3ms | +26.5% | no |
+| 500 | p99.9 | 19.1ms | 16.0ms to 127.3ms | 20.1ms | 11.8ms to 28.1ms | +5.1% | no |
+| 1000 | p50 | 1.2ms | 1.1ms to 1.3ms | 1.1ms | 1.0ms to 1.2ms | -4.2% | no |
+| 1000 | p99 | 4.7ms | 4.1ms to 6.2ms | 5.0ms | 4.2ms to 6.0ms | +5.2% | no |
+| 1000 | p99.9 | 14.6ms | 14.3ms to 29.5ms | 17.3ms | 13.0ms to 17.6ms | +18.7% | no |
+| 2000 | p50 | 1.7ms | 1.6ms to 1.9ms | 1.5ms | 1.5ms to 1.6ms | -14.4% | no |
+| 2000 | p99 | 12.6ms | 11.5ms to 26.8ms | 9.5ms | 9.1ms to 17.1ms | -24.4% | no |
+| 2000 | p99.9 | 43.5ms | 24.5ms to 66.1ms | 34.9ms | 29.9ms to 41.4ms | -19.7% | no |
+| 3000 | p50 | 457.2ms | 18.0ms to 458.8ms | 11.8ms | 10.8ms to 81.8ms | -97.4% | no |
+| 3000 | p99 | 1108.3ms | 199.2ms to 1261.4ms | 288.6ms | 117.6ms to 680.5ms | -74.0% | no |
+| 3000 | p99.9 | 1194.3ms | 273.9ms to 1352.7ms | 380.1ms | 147.7ms to 741.9ms | -68.2% | no |
+
+At 250 responses/s main's p99 and p99.9 are lower outside the spread (6.6ms
+against 11.2ms, and 17.4ms against 35.4ms). No other cell is outside the
+spread. There is no difference beyond the A-vs-A spread at the highest
+sustained rate, and gathering frames is not shown to be faster than main.
+
+`-PwireScenario=rest` run once on the same checkout, to confirm nothing else
+moved: highest sustained 20000 req/s for A and 20000 for B, with the ranges
+overlapping at 1000, 5000 and 10000 req/s. At 20000 B's p50 is higher outside
+the spread (1.0ms against 698µs) and at 30000, past the sustained rate, B's is
+lower; the load average on that run reached 9.5 on four cores, so the rest
+result is noise-limited and shows no regression this branch can be blamed for.
 
 ## Routing as the number of endpoints grows
 
