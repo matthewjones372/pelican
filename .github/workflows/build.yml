@@ -88,6 +88,11 @@ jobs:
       - name: The checked-in client is what the descriptions generate
         run: git diff --exit-code -- example/src/test/kotlin/example/generated
 
+      # The charts in docs/what-it-costs.md are drawn from that page's tables.
+      # A table edited without redrawing would put two different numbers side by side.
+      - name: The benchmark charts match the tables they are drawn from
+        run: python3 docs/assets/what-it-costs.py --check
+
   # Dependabot's version updates read the manifests; its security alerts read
   # the dependency graph, which for Gradle is empty unless something submits
   # it. This is that something, so an advisory against a transitive dependency

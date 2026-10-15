@@ -120,6 +120,13 @@ the class:
 - **Every benchmark returns its response**, which is how JMH knows the work was
   not dead code. A handler whose result went unused could be optimised away.
 
+In the charts on this page, a dot is the mean and its whiskers are the
+99.9% interval, so where two rows' whiskers overlap the difference is not
+resolved. Allocation is drawn as a bar, because its error is a few bytes.
+Each chart is drawn from the table above it by
+[`what-it-costs.py`](assets/what-it-costs.py), and the tables remain the
+exact figures.
+
 The benchmarks are not tests and nothing runs them as part of `check` or
 `build`. That keeps the coverage agent out of them: instrumentation rewrites
 more of Pelican than of a hand-written route, which is exactly the comparison
@@ -197,6 +204,14 @@ average was 9.85 when it started, left over from the socket run before it, and
 | Pekko, `PathMatchers` with the query read off the request | 1492 ± 96ns | 3801 ± 2B |
 | Pekko, one directive and both read off the request | 1228 ± 54ns | 2401 ± 2B |
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/what-it-costs/pekko-get-dark.svg">
+  <img src="assets/what-it-costs/pekko-get-light.svg" alt="Pekko in-memory GET: time and allocation per request for Pelican on the dispatcher and three hand-written routes">
+</picture>
+
+The virtual-thread row is left out of the chart: at 78µs it is fifty times
+the others and would flatten them.
+
 **What it shows.**
 
 - Against the idiomatic route, Pelican on the dispatcher is **375ns and 1.6KB
@@ -236,6 +251,11 @@ because `toStrict` materialises one. The hand-written baseline uses
 | **Pelican, handler on the dispatcher** | **79.8 ± 4.5µs** | **14,247 ± 106B** |
 | Pelican, handler on a virtual thread (the default) | 105.1 ± 5.5µs | 15,699 ± 150B |
 | Pekko, hand-written `extractStrictEntity` | 97.5 ± 31.3µs | 12,234 ± 352B |
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/what-it-costs/pekko-post-dark.svg">
+  <img src="assets/what-it-costs/pekko-post-light.svg" alt="Pekko in-memory JSON POST: time and allocation per request for Pelican on the dispatcher, Pelican on a virtual thread, and the hand-written route">
+</picture>
 
 **What it shows.** A body costs two orders of magnitude more than routing does
 on this backend. Pelican on the dispatcher allocates 2.0KB more than the
@@ -284,6 +304,11 @@ minutes, with a load average of 2.06 at the start and 2.37 at the end.
 | **Pelican, `POST /items`, on the Jetty thread** | **123 ± 13µs** | **18,158 ± 137B** |
 | Pelican, `POST /items`, on a virtual thread | 146 ± 10µs | 27,635 ± 175B |
 | Jetty core, hand-written `POST /items` | 120 ± 17µs | 17,076 ± 86B |
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/what-it-costs/jetty-dark.svg">
+  <img src="assets/what-it-costs/jetty-light.svg" alt="Jetty through a LocalConnector, GET and POST: time and allocation per request for Pelican on the Jetty thread, Pelican on a virtual thread, and a hand-written Jetty core handler">
+</picture>
 
 **What it shows.**
 
@@ -352,6 +377,14 @@ ended at 10.70.
 | jetty | 20000 | 482µs | 14.1ms | 40.7ms | 62.7ms | 299999 | 0 | yes |
 | jetty | 30000 | 1.2ms | 29.6ms | 53.7ms | 85.9ms | 450000 | 0 | yes |
 | jetty | 40000 | 110.7ms | 825.8ms | 846.2ms | 862.5ms | 600000 | 0 | no |
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/what-it-costs/socket-dark.svg">
+  <img src="assets/what-it-costs/socket-light.svg" alt="Median and p99 latency against offered request rate for Pelican on Pekko and Pelican on Jetty, on a log scale, with the rates each did not keep up with drawn hollow">
+</picture>
+
+Both lines are Pelican, so the chart compares the backends, not Pelican with
+hand-written code. The latency axis is logarithmic.
 
 `requests` counts the recorded requests over 15 seconds. Pekko at 30,000 sent
 338,323 of the 450,000 it was due to, because its senders fell more than two
@@ -450,6 +483,13 @@ same run as the [Jetty table](#jetty-in-memory), with the shared settings.
 | 100B | 884 ± 78ns, 1608B | 780 ± 22ns, 1536B | 547 ± 26ns, 936B | 699 ± 50ns, 1152B |
 | 1KB | 2521 ± 114ns, 3456B | 1748 ± 80ns, 2456B | 2788 ± 216ns, 2784B | 1493 ± 125ns, 2072B |
 | 64KB | 264 ± 11µs, 132,546B | 115 ± 7µs, 263,726B | 181 ± 9µs, 131,809B | 180 ± 10µs, 312,513B |
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/what-it-costs/decode-dark.svg">
+  <img src="assets/what-it-costs/decode-light.svg" alt="Decode time and allocation for 100B, 1KB and 64KB bodies, with Jackson and kotlinx each reading from a String and from bytes">
+</picture>
+
+Each body size is drawn on its own axes.
 
 Allocation varies by no more than 21 bytes either way in any cell.
 
