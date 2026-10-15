@@ -22,9 +22,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 25 is the toolchain and the floor: the first LTS where `synchronized` no longer pins a virtual
-        # thread's carrier. Each job compiles to 25 and runs the suites on its own JDK.
+        # 21 is the floor (spec 0079): below 24 `Handlers.default` runs handlers on platform threads, and the
+        # 21 job is what exercises that. Each job compiles to 21 and runs the suites on its own JDK.
         include:
+          - java: "21"
+            gradleArgs: ""
           - java: "25"
             gradleArgs: ""
 

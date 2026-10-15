@@ -460,6 +460,8 @@ fun runtimeOf(name: String, modules: List<String>): NamedDomainObjectProvider<ou
     return configurations.resolvable(name) {
         extendsFrom(declared.get())
         attributes.addAllLater(configurations.runtimeClasspath.get().attributes)
+        // pelican-streams-jetty is Java 25 (lark is), so the set resolves as a service on 25 would.
+        attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
     }
 }
 
