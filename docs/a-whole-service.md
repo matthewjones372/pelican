@@ -1,12 +1,17 @@
 # A whole service, in one file
 
-Linked from the [README](../README.md). Models, inputs, endpoints, handlers,
-store, server and docs, in one file — too long for a front page, and the thing
-to read once you want to see all of it at once.
+One service with everything in it: models, inputs, endpoints, handlers, a
+store, the server and its docs. It is the file to read when you want to see how
+the pieces fit together rather than one feature at a time; the
+[cookbook](cookbook.md) has the features one at a time.
 
-This block lives in the repository as
+The code below is
 [`ReadmeExample.kt`](../example/src/main/kotlin/example/readme/ReadmeExample.kt),
-so it compiles on every build. Run it with `./gradlew :example:runReadmeExample`.
+which the example module compiles on every build. Run it from a clone with:
+
+```bash
+./gradlew :example:runReadmeExample
+```
 
 ```kotlin
 // build.gradle.kts
@@ -17,6 +22,11 @@ dependencies {
     implementation("io.github.matthewjones372:pelican-jetty-docs")
 }
 ```
+
+`pelican-bom` and the Jetty modules are on `main` and not yet in a release; for
+1.0.0, use the Pekko dependencies with explicit `:1.0.0` versions from
+[Getting started](../README.md#getting-started). The service changes in three
+places for Pekko, listed [after the code](#on-pekko-instead).
 
 ```kotlin
 import io.github.matthewjones372.pelican.ApiError
@@ -139,7 +149,7 @@ fun main() {
         version = "1.0.0"
     }
     val server = api.startWithDocs(port = 8080, docs = docs { docsPath = "/api-docs" })
-    println("Listening on ${server.baseUrl} — docs at ${server.baseUrl}/api-docs")
+    println("Listening on ${server.baseUrl}, docs at ${server.baseUrl}/api-docs")
 }
 ```
 
@@ -147,8 +157,59 @@ Swagger UI is at `/api-docs` and the document at `/openapi.json`. Both are
 generated from the values above.
 
 ```bash
-curl localhost:8080/bookmarks/1          # {"id":1,"url":"https://pekko.apache.org",...}
-curl localhost:8080/bookmarks/42         # 404 {"id":42,"message":"No bookmark 42"}
-curl 'localhost:8080/bookmarks?limit=0'  # 400, naming the constraint it broke
-open localhost:8080/api-docs             # Swagger UI
+curl 127.0.0.1:8080/bookmarks/1          # {"id":1,"url":"https://pekko.apache.org",...}
+curl 127.0.0.1:8080/bookmarks/42         # 404 {"id":42,"message":"No bookmark 42"}
+curl '127.0.0.1:8080/bookmarks?limit=0'  # 400, naming the constraint it broke
+open http://127.0.0.1:8080/api-docs      # Swagger UI
 ```
+
+## How it is laid out
+
+The six numbered sections are in the order the service depends on them, and
+each decision below is one the rest of the docs assume.
+
+**Inputs are declared once, as values.** `bookmarkId`, `limit`, `tag` and the
+rest are ordinary `val`s, not annotations or strings inside a route. The same
+value routes the request, decodes the parameter, writes it into the OpenAPI
+document and builds the request in the typed test client, so a rename or a
+type change reaches all four at once. A refinement such as
+`IntCodec.between(1, 100)` is enforced before the handler runs and appears in
+the schema, which is why `?limit=0` is a 400 the document already predicted.
+`Slug` is a value class over `String`, so a tag cannot be passed where some
+other string was meant.
+
+**Failures are values too.** `bookmarkMissing` and `badKey` are listed on their
+endpoints with `orFail`, which puts them in the endpoint's type: the handler
+returns `ok(...)` or one of them, and the document lists exactly those
+statuses.
+
+**The descriptions import nothing but core.** Section 3 uses only
+`io.github.matthewjones372.pelican`. An endpoint description does no work and
+holds no handler, so the OpenAPI generator, the test client and the client
+generator read it without a server, and either backend can bind it.
+
+**Handlers live in one list, apart from the descriptions.** Section 5 pairs
+each description with its implementation through a backend's binder
+(`handledOrFail`, `streamedNow`). It is the only section that knows which
+server runs the service, and the destructured parameters arrive decoded and
+typed in the order the endpoint declared them. `routes` is the list `api(...)`
+serves; a larger service keeps one such list per area and concatenates them.
+
+**The store is a stand-in.** `Bookmarks` is an in-memory object so the file
+runs on its own; a real service puts its own data access there.
+
+## On Pekko instead
+
+On 1.0.0, or on a service that already runs Pekko HTTP, three things change:
+
+- The binder imports: `io.github.matthewjones372.pelican.pekko.handledOrFail`
+  and `io.github.matthewjones372.pelican.pekko.streamedNow` in place of the
+  `jetty` ones. The names are the same.
+- `listBookmarks`' handler returns a Pekko `Source` instead of a `Sequence`:
+  `Source.from(Bookmarks.list(max, tag))`, importing
+  `org.apache.pekko.stream.javadsl.Source`.
+- `startWithDocs` comes from `io.github.matthewjones372.pelican.pekko.docs`.
+
+Sections 1 to 4 and 6 are unchanged.
+[On Pekko](cookbook.md#on-pekko) in the cookbook shows the same switch on the
+one-endpoint example.
