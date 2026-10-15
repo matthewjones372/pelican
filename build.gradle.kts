@@ -205,12 +205,15 @@ subprojects {
     // A `java-platform` has no sources, so none of what follows applies to it.
     if (name == "pelican-bom") return@subprojects
 
+    // lark-stream 0.9.0 is class file 69, so a module built on it is Java 25 until lark targets 21.
+    val jvmFloor = if (name in setOf("pelican-streams", "pelican-streams-jetty")) 25 else 21
+
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
-        // 25: the first LTS where a virtual thread blocked in `synchronized` no longer pins its carrier, which every
-        // handler here runs on. The Gradle plugin compiles for 21 in its own build file: it runs inside Gradle.
-        jvmToolchain(25)
+        // 21, the LTS most services run. Below 24 a virtual thread blocked in `synchronized` pins its carrier, which
+        // `Handlers.default` answers with platform threads (spec 0079). The streams modules need what lark needs.
+        jvmToolchain(jvmFloor)
 
         compilerOptions {
             // Without this, every interface with a method body also gets a
@@ -255,13 +258,13 @@ subprojects {
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
 
-        // `jvmToolchain(25)` above sets the Java toolchain as well as the
-        // Kotlin one, and a `Test` task with no launcher of its own takes it.
-        // So every job in the CI matrix would compile *and run* on the
-        // toolchain, and a matrix of runtimes would exercise one. The tests
-        // run on whichever JDK started the build instead, but never below 25,
-        // the bytecode they have to load.
-        val testJdk = maxOf(JavaVersion.current().majorVersion.toInt(), 25)
+        // `jvmToolchain` above sets the Java toolchain as well as the Kotlin
+        // one, and a `Test` task with no launcher of its own takes it. So
+        // every job in the CI matrix would compile *and run* on the toolchain,
+        // and a matrix of runtimes would exercise one. The tests run on
+        // whichever JDK started the build instead, but never below the
+        // bytecode they have to load.
+        val testJdk = maxOf(JavaVersion.current().majorVersion.toInt(), jvmFloor)
         javaLauncher.set(toolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(testJdk)) })
 
         systemProperty("pelican.launcherJavaVersion", testJdk.toString())
