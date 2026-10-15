@@ -28,7 +28,7 @@ docs {
     docsPath = "/api-docs"                       // Swagger, as now
     scalarReference("/reference") {
         stylesheet("https://fonts.googleapis.com/css2?family=Nunito&display=swap")
-        css(""":root { --scalar-color-accent: #C2562B; --scalar-font: Nunito, sans-serif; }""")
+        css(""".light-mode, .dark-mode { --scalar-color-accent: #C2562B; --scalar-font: Nunito, sans-serif; }""")
         options = jsonObj { "layout" to "modern"; "hideDarkModeToggle" to true }
     }
 }
