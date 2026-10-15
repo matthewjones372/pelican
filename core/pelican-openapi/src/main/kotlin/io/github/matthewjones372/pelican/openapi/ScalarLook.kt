@@ -24,7 +24,7 @@ class ScalarLookBuilder internal constructor() {
     private var css: String? = null
     private val stylesheets = mutableListOf<String>()
 
-    /** CSS for the page, typically `:root { --scalar-color-accent: …; }`. */
+    /** CSS for the page. Scalar sets its variables on `.light-mode` and `.dark-mode`, so override them there. */
     fun css(css: String) {
         require(css.isNotBlank()) { "A Scalar page's css needs some CSS." }
         this.css = css
