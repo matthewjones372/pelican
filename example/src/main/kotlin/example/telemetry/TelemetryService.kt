@@ -60,7 +60,6 @@ import io.github.matthewjones372.pelican.forbidden
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jetty.handledNow
 import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.jetty.request
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.metrics.metrics
 import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
@@ -72,7 +71,6 @@ import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.queryParam
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.OpenTelemetry
-import io.opentelemetry.context.propagation.TextMapGetter
 
 // ============================================================== the payloads
 
@@ -207,22 +205,6 @@ fun telemetryService(registry: MeterRegistry, telemetry: OpenTelemetry, report: 
 
     // The whole of the instrumentation, and the gate they both have to see.
     filter(metrics(registry))
-    filter(openTelemetry(telemetry, incomingHeaders = jettyHeaders))
+    filter(openTelemetry(telemetry))
     filter(gate)
-}
-
-/**
- * Reading `traceparent` off the request, which is the one thing a
- * backend-agnostic filter cannot do: an incoming trace context is not an input
- * the endpoint declared, so the only way to it is `Params.underlying` — the
- * backend's own request object, whose type this module knows and
- * `pelican-metrics-otel` deliberately does not.
- */
-val jettyHeaders: TextMapGetter<Params> = object : TextMapGetter<Params> {
-
-    override fun keys(carrier: Params): Iterable<String> =
-        carrier.request.headers.map { it.lowerCaseName }
-
-    override fun get(carrier: Params?, key: String): String? =
-        carrier?.request?.headers?.get(key)
 }

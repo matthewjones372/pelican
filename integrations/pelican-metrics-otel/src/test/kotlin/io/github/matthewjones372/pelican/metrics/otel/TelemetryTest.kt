@@ -254,7 +254,7 @@ class TelemetryTest {
     }
 
     @Test
-    fun `without a getter the span joins whatever context is already current`() {
+    fun `with no traceparent the span joins whatever context is already current`() {
         // The agent's case: something outside Pelican has already extracted the
         // caller's context onto this thread, and the right thing to do is to
         // hang a span carrying the route off it rather than start a trace.
