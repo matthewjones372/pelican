@@ -67,8 +67,6 @@ class FunctionalStyleTest {
         "core/pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/RapiDocLook.kt" to
             "RapiDocLookBuilder collects attributes and stylesheets a call at a time, and the RapiDocLook it builds " +
             "is handed copies",
-        "core/pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/ScalarLook.kt" to
-            "ScalarLookBuilder collects stylesheets a call at a time, and the ScalarLook it builds is handed a copy",
         "core/pelican-openapi/src/main/kotlin/io/github/matthewjones372/pelican/openapi/OpenApi.kt" to
             "component schemas are collected as the document is walked, then emitted once",
         "core/pelican-schema/src/main/kotlin/io/github/matthewjones372/pelican/schema/StandaloneSchemas.kt" to
