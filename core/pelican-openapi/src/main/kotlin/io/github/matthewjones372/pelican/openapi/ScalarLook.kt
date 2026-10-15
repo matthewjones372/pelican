@@ -75,9 +75,29 @@ private fun ReferenceTheme.scalarCss(): String? {
         error?.let { "--scalar-color-red: $it;" },
         font?.let { "--scalar-font: $it;" },
         codeFont?.let { "--scalar-font-code: $it;" },
-    ) + derivedPalette()
-    return if (variables.isEmpty()) null else ".light-mode, .dark-mode { ${variables.joinToString(" ")} }"
+    ) + derivedPalette() + methodVariables()
+    val rules = listOfNotNull(
+        variables.takeIf { it.isNotEmpty() }?.let { ".light-mode, .dark-mode { ${it.joinToString(" ")} }" },
+        codePanel?.let { "$THEMED .examples :is(.scalar-card, .scalar-code-block) { background: $it; }" },
+        headingWeight?.let { "$THEMED :is(h1, h2, h3) { font-weight: $it; }" },
+    )
+    return rules.joinToString("\n").ifEmpty { null }
 }
+
+/**
+ * Scalar colours a method's badge from the variable it also uses for a status: post and success are both green,
+ * delete and error both red. These come after the statuses, so the method wins. See spec 0083.
+ */
+private fun ReferenceTheme.methodVariables(): List<String> = listOfNotNull(
+    methods?.get?.let { "--scalar-color-blue: $it;" },
+    methods?.post?.let { "--scalar-color-green: $it;" },
+    methods?.put?.let { "--scalar-color-orange: $it;" },
+    methods?.patch?.let { "--scalar-color-yellow: $it;" },
+    methods?.delete?.let { "--scalar-color-red: $it;" },
+)
+
+// Scalar sets its own look on one of these, whichever mode the page is in.
+private const val THEMED = ":is(.light-mode, .dark-mode)"
 
 /**
  * The rest of Scalar's palette, mixed from the slots a service set: most of a page reads these, not the seven above,

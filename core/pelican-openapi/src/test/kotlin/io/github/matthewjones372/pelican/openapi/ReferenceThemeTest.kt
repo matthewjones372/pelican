@@ -3,6 +3,8 @@ package io.github.matthewjones372.pelican.openapi
 import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.parseJson
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldEndWith
@@ -188,5 +190,74 @@ class ReferenceThemeTest {
         css shouldContain "--scalar-color-2:"
         css shouldNotContain "--scalar-button-1"
         css shouldNotContain "--scalar-background-2"
+    }
+
+    @Test
+    fun `method colours, the code panel and the heading weight land where Redoc reads them`() {
+        val look = redoc {
+            theme {
+                font("Nunito, sans-serif")
+                methods {
+                    get = "#5E8C61"
+                    post = "#C2562B"
+                    delete = "#9A3A1A"
+                }
+                codePanel = "#3B2A20"
+                headingWeight = 800
+            }
+        }
+
+        look.options shouldBe parseJson(
+            """
+            {"theme":{
+              "colors":{"http":{"get":"#5E8C61","post":"#C2562B","delete":"#9A3A1A"}},
+              "typography":{"fontFamily":"Nunito, sans-serif",
+                            "headings":{"fontFamily":"Nunito, sans-serif","fontWeight":"800"}},
+              "rightPanel":{"backgroundColor":"#3B2A20"}
+            }}
+            """,
+        )
+    }
+
+    @Test
+    fun `method colours, the code panel and the heading weight land where Scalar reads them`() {
+        val css = scalar {
+            theme {
+                success = "#5E8C61"
+                methods {
+                    get = "#5E8C61"
+                    post = "#C2562B"
+                    put = "#B07D2B"
+                    patch = "#8C7A3B"
+                    delete = "#9A3A1A"
+                }
+                codePanel = "#3B2A20"
+                headingWeight = 800
+            }
+        }.css.orEmpty()
+
+        listOf(
+            "--scalar-color-blue: #5E8C61;",
+            "--scalar-color-green: #C2562B;",
+            "--scalar-color-orange: #B07D2B;",
+            "--scalar-color-yellow: #8C7A3B;",
+            "--scalar-color-red: #9A3A1A;",
+            ":is(.light-mode, .dark-mode) .examples :is(.scalar-card, .scalar-code-block) { background: #3B2A20; }",
+            ":is(.light-mode, .dark-mode) :is(h1, h2, h3) { font-weight: 800; }",
+        ).forEach { css shouldContain it }
+        withClue("a method shares its variable with a status under Scalar, and the method wins") {
+            css.indexOf("--scalar-color-green: #C2562B;") shouldBeGreaterThan
+                css.indexOf("--scalar-color-green: #5E8C61;")
+        }
+    }
+
+    @Test
+    fun `a blank method colour or code panel, or a weight CSS does not have, is refused where it is written`() {
+        fun refusal(configure: ReferenceThemeBuilder.() -> Unit) =
+            shouldThrow<IllegalArgumentException> { redoc { theme(configure) } }.message.toString()
+
+        refusal { methods { get = "" } } shouldContain "get"
+        refusal { codePanel = " " } shouldContain "codePanel"
+        refusal { headingWeight = 950 } shouldContain "100 to 900"
     }
 }

@@ -26,7 +26,38 @@ class ReferenceTheme internal constructor(
     val stylesheets: List<String> = emptyList(),
     /** Redoc's `x-logo`. Scalar has no logo, so a Scalar reference refuses one. */
     val logo: JsonObj? = null,
+    /** Each method's badge. Under Scalar a method shares its colour with a status, and the method wins. */
+    val methods: MethodColours? = null,
+    /** The panel the request and response examples sit on. */
+    val codePanel: String? = null,
+    /** The weight of the page's headings, 100 to 900. */
+    val headingWeight: Int? = null,
 )
+
+/** A colour per HTTP method, for the method badges. See spec 0083. */
+class MethodColours internal constructor(
+    val get: String? = null,
+    val post: String? = null,
+    val put: String? = null,
+    val patch: String? = null,
+    val delete: String? = null,
+)
+
+/** What `methods { }` writes into. */
+class MethodColoursBuilder internal constructor() {
+    var get: String? = null
+        set(value) { field = notBlankColour("get", value) }
+    var post: String? = null
+        set(value) { field = notBlankColour("post", value) }
+    var put: String? = null
+        set(value) { field = notBlankColour("put", value) }
+    var patch: String? = null
+        set(value) { field = notBlankColour("patch", value) }
+    var delete: String? = null
+        set(value) { field = notBlankColour("delete", value) }
+
+    internal fun build(): MethodColours = MethodColours(get, post, put, patch, delete)
+}
 
 /** What `theme { }` writes into. Each slot is documented on [ReferenceTheme]. */
 class ReferenceThemeBuilder internal constructor() {
@@ -40,12 +71,27 @@ class ReferenceThemeBuilder internal constructor() {
         set(value) { field = notBlank("success", value) }
     var error: String? = null
         set(value) { field = notBlank("error", value) }
+    var codePanel: String? = null
+        set(value) { field = notBlank("codePanel", value) }
+    var headingWeight: Int? = null
+        set(value) {
+            require(value == null || value in LIGHTEST..HEAVIEST) {
+                "A theme's headingWeight is a CSS font weight, 100 to 900; $value is not one."
+            }
+            field = value
+        }
 
     private var font: String? = null
     private var fontStylesheet: String? = null
     private var codeFont: String? = null
     private var codeFontStylesheet: String? = null
     private var logo: JsonObj? = null
+    private var methods: MethodColours? = null
+
+    /** A colour for each method's badge: `methods { get = "#5E8C61"; post = "#C2562B" }`. */
+    fun methods(configure: MethodColoursBuilder.() -> Unit) {
+        methods = MethodColoursBuilder().apply(configure).build()
+    }
 
     /** The font for text and headings, and the [stylesheet] it is loaded from, if it is not installed. */
     fun font(family: String, stylesheet: String? = null) {
@@ -74,13 +120,21 @@ class ReferenceThemeBuilder internal constructor() {
         codeFont = codeFont,
         stylesheets = listOfNotNull(fontStylesheet, codeFontStylesheet),
         logo = logo,
+        methods = methods,
+        codePanel = codePanel,
+        headingWeight = headingWeight,
     )
 
-    private fun notBlank(slot: String, value: String?): String? {
-        require(value == null || value.isNotBlank()) { "A theme's $slot cannot be blank; leave it out instead." }
-        return value
-    }
+    private fun notBlank(slot: String, value: String?): String? = notBlankColour(slot, value)
 }
+
+private fun notBlankColour(slot: String, value: String?): String? {
+    require(value == null || value.isNotBlank()) { "A theme's $slot cannot be blank; leave it out instead." }
+    return value
+}
+
+private const val LIGHTEST = 100
+private const val HEAVIEST = 900
 
 internal fun logoJson(url: String, altText: String?, backgroundColor: String?): JsonObj = jsonObj {
     "url" to url
@@ -90,36 +144,49 @@ internal fun logoJson(url: String, altText: String?, backgroundColor: String?): 
 
 /** The theme as Redoc's options; null when it names nothing Redoc reads there. */
 internal fun ReferenceTheme.redocOptions(): JsonObj? {
-    val colors = pruned(
-        jsonObj {
-            put("primary", accent?.let { jsonObj { "main" to it } })
-            put("success", success?.let { jsonObj { "main" to it } })
-            put("text", text?.let { jsonObj { "primary" to it } })
-            put("responses", error?.let { jsonObj { put("error", jsonObj { "color" to it }) } })
-        },
-    )
-    val typography = pruned(
-        jsonObj {
-            font?.let { "fontFamily" to it }
-            put("headings", font?.let { jsonObj { "fontFamily" to it } })
-            put("code", codeFont?.let { jsonObj { "fontFamily" to it } })
-        },
-    )
-    val sidebarLook = pruned(
-        jsonObj {
-            sidebar?.let { "backgroundColor" to it }
-            text?.let { "textColor" to it }
-        },
-    )
     val theme = pruned(
         jsonObj {
-            put("colors", colors)
-            put("typography", typography)
-            put("sidebar", sidebarLook)
+            put("colors", redocColors())
+            put("typography", redocTypography())
+            put("sidebar", redocSidebar())
+            put("rightPanel", codePanel?.let { jsonObj { "backgroundColor" to it } })
         },
     )
     return theme?.let { jsonObj { put("theme", it) } }
 }
+
+private fun ReferenceTheme.redocColors(): JsonObj? = pruned(
+    jsonObj {
+        put("primary", accent?.let { jsonObj { "main" to it } })
+        put("success", success?.let { jsonObj { "main" to it } })
+        put("text", text?.let { jsonObj { "primary" to it } })
+        put("responses", error?.let { jsonObj { put("error", jsonObj { "color" to it }) } })
+        put("http", methods?.let { m -> pruned(byMethod(m)) })
+    },
+)
+
+private fun ReferenceTheme.redocTypography(): JsonObj? = pruned(
+    jsonObj {
+        font?.let { "fontFamily" to it }
+        put(
+            "headings",
+            pruned(
+                jsonObj {
+                    font?.let { "fontFamily" to it }
+                    headingWeight?.let { "fontWeight" to it.toString() }
+                },
+            ),
+        )
+        put("code", codeFont?.let { jsonObj { "fontFamily" to it } })
+    },
+)
+
+private fun ReferenceTheme.redocSidebar(): JsonObj? = pruned(
+    jsonObj {
+        sidebar?.let { "backgroundColor" to it }
+        text?.let { "textColor" to it }
+    },
+)
 
 /** [over] laid on this object key by key, so a nested key [over] does not name keeps this one's value. */
 internal infix fun JsonObj.under(over: JsonObj): JsonObj = JsonObj(
@@ -129,5 +196,13 @@ internal infix fun JsonObj.under(over: JsonObj): JsonObj = JsonObj(
         if (mine is JsonObj && theirs is JsonObj) mine under theirs else theirs ?: checkNotNull(mine)
     },
 )
+
+private fun byMethod(m: MethodColours): JsonObj = jsonObj {
+    m.get?.let { "get" to it }
+    m.post?.let { "post" to it }
+    m.put?.let { "put" to it }
+    m.patch?.let { "patch" to it }
+    m.delete?.let { "delete" to it }
+}
 
 private fun pruned(obj: JsonObj): JsonObj? = obj.takeUnless { it.isEmpty }

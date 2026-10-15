@@ -94,6 +94,28 @@ public final class io/github/matthewjones372/pelican/openapi/DocsUi : java/lang/
 	public static fun values ()[Lio/github/matthewjones372/pelican/openapi/DocsUi;
 }
 
+public final class io/github/matthewjones372/pelican/openapi/MethodColours {
+	public fun <init> ()V
+	public final fun getDelete ()Ljava/lang/String;
+	public final fun getGet ()Ljava/lang/String;
+	public final fun getPatch ()Ljava/lang/String;
+	public final fun getPost ()Ljava/lang/String;
+	public final fun getPut ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/MethodColoursBuilder {
+	public final fun getDelete ()Ljava/lang/String;
+	public final fun getGet ()Ljava/lang/String;
+	public final fun getPatch ()Ljava/lang/String;
+	public final fun getPost ()Ljava/lang/String;
+	public final fun getPut ()Ljava/lang/String;
+	public final fun setDelete (Ljava/lang/String;)V
+	public final fun setGet (Ljava/lang/String;)V
+	public final fun setPatch (Ljava/lang/String;)V
+	public final fun setPost (Ljava/lang/String;)V
+	public final fun setPut (Ljava/lang/String;)V
+}
+
 public final class io/github/matthewjones372/pelican/openapi/OpenApiKt {
 	public static final fun openApi (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)Lio/github/matthewjones372/pelican/JsonObj;
 	public static synthetic fun openApi$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/JsonObj;
@@ -146,9 +168,12 @@ public final class io/github/matthewjones372/pelican/openapi/ReferenceTheme {
 	public fun <init> ()V
 	public final fun getAccent ()Ljava/lang/String;
 	public final fun getCodeFont ()Ljava/lang/String;
+	public final fun getCodePanel ()Ljava/lang/String;
 	public final fun getError ()Ljava/lang/String;
 	public final fun getFont ()Ljava/lang/String;
+	public final fun getHeadingWeight ()Ljava/lang/Integer;
 	public final fun getLogo ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getMethods ()Lio/github/matthewjones372/pelican/openapi/MethodColours;
 	public final fun getSidebar ()Ljava/lang/String;
 	public final fun getStylesheets ()Ljava/util/List;
 	public final fun getSuccess ()Ljava/lang/String;
@@ -161,14 +186,19 @@ public final class io/github/matthewjones372/pelican/openapi/ReferenceThemeBuild
 	public final fun font (Ljava/lang/String;Ljava/lang/String;)V
 	public static synthetic fun font$default (Lio/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun getAccent ()Ljava/lang/String;
+	public final fun getCodePanel ()Ljava/lang/String;
 	public final fun getError ()Ljava/lang/String;
+	public final fun getHeadingWeight ()Ljava/lang/Integer;
 	public final fun getSidebar ()Ljava/lang/String;
 	public final fun getSuccess ()Ljava/lang/String;
 	public final fun getText ()Ljava/lang/String;
 	public final fun logo (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public static synthetic fun logo$default (Lio/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun methods (Lkotlin/jvm/functions/Function1;)V
 	public final fun setAccent (Ljava/lang/String;)V
+	public final fun setCodePanel (Ljava/lang/String;)V
 	public final fun setError (Ljava/lang/String;)V
+	public final fun setHeadingWeight (Ljava/lang/Integer;)V
 	public final fun setSidebar (Ljava/lang/String;)V
 	public final fun setSuccess (Ljava/lang/String;)V
 	public final fun setText (Ljava/lang/String;)V
