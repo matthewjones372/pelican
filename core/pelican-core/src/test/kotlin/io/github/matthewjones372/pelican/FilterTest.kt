@@ -102,4 +102,9 @@ class FilterTest {
         unwrapCompletion(failure) shouldBe boom
         seen shouldBe listOf<Any?>(boom)
     }
+
+    @Test
+    fun `a hand-built Params reads no request headers`() {
+        params().requestHeader("traceparent") shouldBe null
+    }
 }

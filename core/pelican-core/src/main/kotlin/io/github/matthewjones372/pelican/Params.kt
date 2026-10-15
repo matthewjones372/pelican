@@ -17,7 +17,17 @@ class Params(
      * does a fresh connect.
      */
     internal val resumeFrom: String? = null,
+    /** The request's headers, as the interpreter read them for the caller check. Null for a hand-built [Params]. */
+    private val requestHeaders: Credentials? = null,
 ) {
+    @Deprecated("Kept so code compiled against 1.0 still links.", level = DeprecationLevel.HIDDEN)
+    constructor(
+        values: Map<ParamKey<*>, Any?>,
+        underlying: Any?,
+        endpoint: Endpoint<*, *>? = null,
+        resumeFrom: String? = null,
+    ) : this(values, underlying, endpoint, resumeFrom, null)
+
     @Suppress("UNCHECKED_CAST")
     operator fun <T> get(key: ParamKey<T>): T {
         if (!values.containsKey(key)) {
@@ -30,6 +40,9 @@ class Params(
     }
 
     operator fun contains(key: ParamKey<*>): Boolean = values.containsKey(key)
+
+    /** The first value of request header [name], matched without regard to case, whether or not it was declared. */
+    fun requestHeader(name: String): String? = requestHeaders?.header(name)
 
     /**
      * The whole bag, for the one caller that walks it rather than reading known

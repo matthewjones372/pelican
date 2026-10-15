@@ -2809,9 +2809,11 @@ val requireToken = before { p ->
 
 This is `example/src/main/kotlin/example/filters/FilterExample.kt`, where the
 endpoints the filter guards declare `authorization` as an input. A filter that
-needs a header no endpoint declares reads the backend's own request through
-`p.request`, an extension in `pelican-jetty` and `pelican-pekko` over
-`Params.underlying`.
+needs a header no endpoint declares reads it with `p.requestHeader(name)`: the
+first value, matched without regard to case, the same on every backend and in
+the in-memory client. A `Params` built by hand has no request and reads null.
+For anything else on the request, `p.request` is the backend's own, an
+extension in `pelican-jetty` and `pelican-pekko` over `Params.underlying`.
 
 `before { }` is the common shape (look, throw to reject, return to let through)
 and exists because "remember to call `next`" is the step that is easy to

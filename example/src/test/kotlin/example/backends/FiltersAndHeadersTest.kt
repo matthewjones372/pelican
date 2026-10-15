@@ -1,5 +1,6 @@
 package example.backends
 
+import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.openapi.openApiJson
@@ -24,8 +25,14 @@ import org.junit.jupiter.params.provider.MethodSource
 class FiltersAndHeadersTest {
 
     companion object {
+        /** Reads a header no endpoint declares, through the backend-neutral read. */
+        private val tenantEcho = Filter { params, next ->
+            params.setRawHeader("X-Seen-Tenant", params.requestHeader("x-tenant") ?: "none")
+            next(params)
+        }
+
         private val running: Map<String, Running> =
-            allBackends.associate { it.name to it.start(port = 0) }
+            allBackends.associate { it.name to it.start(port = 0, outerFilters = listOf(tenantEcho)) }
 
         private val clients: Map<String, ApiClient> =
             running.mapValues { (_, server) -> apiClient(server.baseUrl, JacksonCodecs) }
@@ -59,6 +66,14 @@ class FiltersAndHeadersTest {
     fun `the filter can read a request header and answer with it`(name: String, client: ApiClient) {
         val req = client.request(echo, In2("trace-me", Note("hi")))
         client.transport.send(req).shouldHaveHeader("X-Request-Id", "trace-me")
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `a filter reads an undeclared request header the same way on every backend`(name: String, client: ApiClient) {
+        val req = client.request(greet, In2("ada", false)).withHeader("X-Tenant", "acme")
+        client.transport.send(req).shouldHaveStatus(200).shouldHaveHeader("X-Seen-Tenant", "acme")
+        client.response(greet, In2("ada", false)).shouldHaveHeader("X-Seen-Tenant", "none")
     }
 
     @ParameterizedTest(name = "{0}")
