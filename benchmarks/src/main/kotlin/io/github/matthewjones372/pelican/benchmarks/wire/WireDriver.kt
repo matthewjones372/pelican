@@ -83,14 +83,15 @@ private const val P50 = 50.0
 private const val P99 = 99.0
 private const val P999 = 99.9
 
-/** A server in its own JVM on [classpath], started by [WireServer]'s `main` and stopped by closing its stdin. */
-private class Child(name: String, classpath: String) : AutoCloseable {
+/** A server in its own JVM, started by [WireServer]'s `main` and stopped by closing its stdin. */
+private class Child(name: String, side: Side) : AutoCloseable {
     private val process: Process = ProcessBuilder(
         ProcessHandle.current().info().command().orElseThrow(),
         "-Xms1g",
         "-Xmx1g",
+        "-Dpelican.jetty.pool=${side.pool}",
         "-cp",
-        classpath,
+        side.classpath,
         "io.github.matthewjones372.pelican.benchmarks.wire.WireServerKt",
         name,
     ).redirectError(ProcessBuilder.Redirect.INHERIT).start()
@@ -255,11 +256,11 @@ private fun Step.row(): String = "| $server | $rate | ${duration(latency.getValu
 private fun ladder(
     server: String,
     label: String,
-    classpath: String,
+    side: Side,
     scenario: Scenario,
     schedule: Schedule,
     notes: MutableList<String>,
-): List<Step> = Child(server, classpath).use { child ->
+): List<Step> = Child(server, side).use { child ->
     Driver(child.port, scenario).use { driver ->
         driver.verify()
         val before = loadAverage()
@@ -328,6 +329,11 @@ private fun comparison(server: String, scenario: Scenario, a: List<List<Step>>, 
 
 private const val PERCENT = 100.0
 
+/** A classpath to run a server from, and the Jetty pool `start()` builds there (spec 0085). */
+private class Side(val name: String, val classpath: String, val pool: String) {
+    override fun toString() = "$name, $pool pool"
+}
+
 /** What `:benchmarks:wire` passes: the output directory, then any of the flags `main` reads. */
 private class Options(private val args: Array<String>) {
     private fun value(flag: String): String? = args.indexOf(flag).takeIf { it >= 0 }?.let { args[it + 1] }
@@ -338,7 +344,18 @@ private class Options(private val args: Array<String>) {
         "both" -> Scenario.entries
         else -> listOf(Scenario.valueOf(s.uppercase()))
     }
-    val baseline: String? = value("--baseline")?.let { File(it).readText().trim() }
+    private val own = System.getProperty("java.class.path")
+    private val pool = value("--pool") ?: "queued"
+    private val abPool = "--ab-pool" in args
+
+    /** A: this checkout, on `VirtualThreadPool` with `--ab-pool`. */
+    val mine = Side("this checkout", own, if (abPool) "virtual" else pool)
+
+    /** B, if any: this checkout on the queued pool with `--ab-pool`, or `--baseline`'s build. */
+    val baseline: Side? = when {
+        abPool -> Side("this checkout", own, "queued")
+        else -> value("--baseline")?.let { Side("the baseline", File(it).readText().trim(), pool) }
+    }
     val rounds = if (smoke) 1 else value("--rounds")?.toInt() ?: DEFAULT_ROUNDS
     val pekko = "--pekko" in args
 
@@ -356,7 +373,6 @@ private class Options(private val args: Array<String>) {
 fun main(args: Array<String>) {
     val options = Options(args)
     val schedule = if (options.smoke) SMOKE else FULL
-    val own = System.getProperty("java.class.path")
     val lines = mutableListOf(
         "JDK ${Runtime.version()}, ${System.getProperty("os.name")} ${System.getProperty("os.version")}, " +
             "${Runtime.getRuntime().availableProcessors()} cores",
@@ -364,11 +380,13 @@ fun main(args: Array<String>) {
     )
     val notes = mutableListOf<String>()
     val baseline = options.baseline
+    val mine = options.mine
+    baseline?.let { lines += listOf("A: $mine. B: $it.", "") }
     for (scenario in options.scenarios) {
         if (baseline == null) {
             lines += header(scenario)
             for (server in listOf("pekko", "jetty")) {
-                lines += ladder(server, server, own, scenario, schedule, notes).map { it.row() }
+                lines += ladder(server, server, mine, scenario, schedule, notes).map { it.row() }
             }
             lines += ""
         } else {
@@ -377,7 +395,7 @@ fun main(args: Array<String>) {
                 val a = mutableListOf<List<Step>>()
                 val b = mutableListOf<List<Step>>()
                 repeat(options.rounds) { round ->
-                    a += ladder(server, "$server A${round + 1}", own, scenario, schedule, notes)
+                    a += ladder(server, "$server A${round + 1}", mine, scenario, schedule, notes)
                     b += ladder(server, "$server B${round + 1}", baseline, scenario, schedule, notes)
                 }
                 lines += comparison(server, scenario, a, b)

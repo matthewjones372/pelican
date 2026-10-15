@@ -74,13 +74,13 @@ private fun ((Params) -> CompletionStage<Any?>).on(
     else { params -> threads.mayBlock { this(params) } }
 
 /**
- * [work] where these handlers may block: here under [Handlers.onDispatcher] or on a virtual thread, else hopped. A
+ * [work] where these handlers may block: here under [Handlers.onDispatcher] or where [mayBlockHere], else hopped. A
  * hop to a virtual thread completes the stage inside [resumingHere], so a response written there costs no dispatch.
  */
 private fun <T> Handlers.mayBlock(work: () -> CompletionStage<T>): CompletionStage<T> {
     val executor = executor
     return when {
-        executor == null || (virtual && Thread.currentThread().isVirtual) -> work()
+        executor == null || (virtual && mayBlockHere()) -> work()
 
         virtual -> {
             val done = CompletableFuture<T>()
@@ -115,7 +115,7 @@ private fun ServerEndpoint.blocksBeforeItsHandler(): Boolean {
  * Declared `NON_BLOCKING` unless [threads] is [Handlers.onDispatcher], so Jetty may call it on its selector without a
  * dispatch: routing, refusals and asynchronous handlers answer there, and whatever may block hops itself first.
  * `EITHER` would buy nothing: a `Server` combines it to `NON_BLOCKING`, and a selector calling directly does not set
- * `Invocable.isNonBlockingInvocation`, so the hop is decided by the thread, never by that flag.
+ * `Invocable.isNonBlockingInvocation`, so the hop is decided by where Pelican knows it may block, never by that flag.
  */
 internal class PelicanHandler(
     private val api: Api,
@@ -132,8 +132,11 @@ internal class PelicanHandler(
     private val methods: List<Method> = api.endpoints.map { it.endpoint.method }.distinct()
 
     override fun handle(request: Request, response: Response, callback: Callback): Boolean {
+        // A tree that may block is dispatched by Jetty, never run on its selector, so a virtual thread here may block.
+        val dispatched = threads.virtual && Thread.currentThread().isVirtual &&
+            request.connectionMetaData.connector.server.invocationType == InvocationType.BLOCKING
         val answered = try {
-            route(request)
+            dispatchedHere(dispatched) { route(request) }
         } catch (t: Throwable) {
             CompletableFuture.completedStage(errorResponse(t, api))
         } ?: return false

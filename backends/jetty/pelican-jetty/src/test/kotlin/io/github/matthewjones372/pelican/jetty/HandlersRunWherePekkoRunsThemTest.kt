@@ -161,9 +161,12 @@ class HandlersRunWherePekkoRunsThemTest {
                 Asked("a synchronous handler, $handlers", "/where", handlers),
                 Asked("a declared failure, $handlers", "/refusing", handlers),
             )
-        } + listOf("virtual", "dispatcher", "mine").map {
-            Asked("an asynchronous handler is never moved, $it", "/later", it)
-        }
+        } + asyncCases().map { Asked("an asynchronous handler is never moved, $it", "/later", it) }
+
+        /** On [JettyPool.VIRTUAL] Jetty's selector is itself a virtual thread, so a staged handler starts on one. */
+        private fun asyncCases(): List<String> =
+            if (JettyPool.configured() == JettyPool.QUEUED) listOf("virtual", "dispatcher", "mine")
+            else listOf("dispatcher", "mine")
 
         @JvmStatic
         @AfterAll

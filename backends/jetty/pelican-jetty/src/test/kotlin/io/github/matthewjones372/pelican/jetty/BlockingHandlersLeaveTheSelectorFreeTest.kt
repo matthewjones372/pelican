@@ -10,7 +10,10 @@ import org.eclipse.jetty.server.NetworkConnector
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
 import org.eclipse.jetty.util.thread.QueuedThreadPool
-import org.junit.jupiter.api.Test
+import org.eclipse.jetty.util.thread.ThreadPool
+import org.eclipse.jetty.util.thread.VirtualThreadPool
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -53,10 +56,15 @@ class BlockingHandlersLeaveTheSelectorFreeTest {
     private fun get(url: String): CompletableFuture<HttpResponse<String>> =
         client.sendAsync(HttpRequest.newBuilder(URI.create(url)).GET().build(), HttpResponse.BodyHandlers.ofString())
 
-    @Test
-    fun `while synchronous handlers block, a 404 and an asynchronous handler are still answered`() {
-        // One selector, and fewer pool threads than there are blocked handlers.
-        val server = Server(pelicanThreads(Handlers.onVirtualThreads, POOL_THREADS).apply { reservedThreads = 0 })
+    @ParameterizedTest
+    @ValueSource(strings = ["QUEUED", "VIRTUAL"])
+    fun `while synchronous handlers block, a 404 and an asynchronous handler are still answered`(pool: String) {
+        // One selector and, on the queued pool, fewer threads than there are blocked handlers.
+        val threads = when (JettyPool.valueOf(pool)) {
+            JettyPool.QUEUED -> pelicanThreads(Handlers.onVirtualThreads, POOL_THREADS).apply { reservedThreads = 0 }
+            JettyPool.VIRTUAL -> pelicanPool(Handlers.onVirtualThreads, JettyPool.VIRTUAL)
+        }
+        val server = Server(threads)
         val http = HttpConfiguration().apply { uriCompliance = PELICAN_URI_COMPLIANCE }
         server.addConnector(ServerConnector(server, 1, 1, HttpConnectionFactory(http)))
         server.handler = blocking.toHandler(Handlers.onVirtualThreads)
@@ -80,15 +88,27 @@ class BlockingHandlersLeaveTheSelectorFreeTest {
         }
     }
 
-    @Test
-    fun `a synchronous handler hopped off the selector costs no second dispatch to resume its connection`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["QUEUED", "VIRTUAL"])
+    fun `a synchronous handler hopped off the selector costs no second dispatch to resume its connection`(
+        pool: String,
+    ) {
         val dispatched = AtomicInteger()
-        val pool = object : QueuedThreadPool() {
-            override fun execute(job: Runnable) {
-                if (!resumedHere(job)) dispatched.incrementAndGet().also { super.execute(job) }
+        // Each of [pelicanPool]'s two, counting what gets past the check they make.
+        val threads: ThreadPool = when (JettyPool.valueOf(pool)) {
+            JettyPool.QUEUED -> object : QueuedThreadPool() {
+                override fun execute(job: Runnable) {
+                    if (!resumedHere(job)) dispatched.incrementAndGet().also { super.execute(job) }
+                }
+            }
+
+            JettyPool.VIRTUAL -> object : VirtualThreadPool(0) {
+                override fun execute(task: Runnable) {
+                    if (!resumedHere(task)) dispatched.incrementAndGet().also { super.execute(task) }
+                }
             }
         }
-        val server = Server(pool)
+        val server = Server(threads)
         server.addConnector(ServerConnector(server, HttpConnectionFactory(HttpConfiguration())))
         server.handler = api(listOf(later handledNow { "now" }), JacksonCodecs).toHandler(Handlers.onVirtualThreads)
         server.start()

@@ -91,3 +91,23 @@ internal fun resumedHere(job: Runnable): Boolean {
     own.addLast(job)
     return true
 }
+
+/** Set while this thread runs a request Jetty dispatched to a virtual thread, rather than one its selector runs. */
+private val dispatched = ThreadLocal<Boolean>()
+
+/**
+ * Whether code may block on this thread: one Pelican hopped to, or a virtual thread Jetty dispatched. Being virtual is
+ * not enough, as on [org.eclipse.jetty.util.thread.VirtualThreadPool] Jetty's selectors are virtual threads too.
+ */
+internal fun mayBlockHere(): Boolean = resumes.get() != null || dispatched.get() == true
+
+/** [work], marked as running where it may block when [blocking] holds. */
+internal fun <T> dispatchedHere(blocking: Boolean, work: () -> T): T {
+    if (!blocking) return work()
+    dispatched.set(true)
+    try {
+        return work()
+    } finally {
+        dispatched.remove()
+    }
+}

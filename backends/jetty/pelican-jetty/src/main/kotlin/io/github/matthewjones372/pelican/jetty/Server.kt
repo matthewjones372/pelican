@@ -14,6 +14,8 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
 import org.eclipse.jetty.util.VirtualThreads
 import org.eclipse.jetty.util.thread.QueuedThreadPool
+import org.eclipse.jetty.util.thread.ThreadPool
+import org.eclipse.jetty.util.thread.VirtualThreadPool
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -82,7 +84,7 @@ fun Api.start(
     handlers: Handlers = Handlers.default,
     handler: Api.() -> Handler = { toHandler(handlers) },
 ): PelicanServer {
-    val server = Server(pelicanThreads(handlers))
+    val server = Server(pelicanPool(handlers))
     val http = HttpConfiguration().apply { uriCompliance = PELICAN_URI_COMPLIANCE }
     server.addConnector(
         ServerConnector(server, HttpConnectionFactory(http)).apply {
@@ -117,3 +119,38 @@ internal fun pelicanThreads(handlers: Handlers, maxThreads: Int = DEFAULT_MAX_TH
 
 /** Jetty's own default. */
 private const val DEFAULT_MAX_THREADS = 200
+
+/** The pools [start] can build, chosen by the `pelican.jetty.pool` system property so one build can measure both. */
+internal enum class JettyPool {
+    /** [pelicanThreads]: Jetty's own work on platform threads, handlers on virtual ones where [Handlers] says. */
+    QUEUED,
+
+    /** Jetty's [VirtualThreadPool]: everything, selectors and acceptors included, on virtual threads. */
+    VIRTUAL,
+    ;
+
+    companion object {
+        fun configured(): JettyPool = System.getProperty(POOL_PROPERTY)?.let { valueOf(it.uppercase()) } ?: QUEUED
+    }
+}
+
+internal const val POOL_PROPERTY = "pelican.jetty.pool"
+
+/**
+ * [pool], where [handlers] runs handlers on virtual threads anyway. [Handlers.onDispatcher] and [Handlers.on] keep
+ * [pelicanThreads], since they promise a handler a Jetty platform thread or a hop to their own executor.
+ */
+internal fun pelicanPool(handlers: Handlers, pool: JettyPool = JettyPool.configured()): ThreadPool =
+    if (pool == JettyPool.VIRTUAL && handlers.virtual) {
+        // Unbounded, as the virtual-threads executor under [pelicanThreads] is, so the two differ only in the pool.
+        object : VirtualThreadPool(UNBOUNDED) {
+            override fun execute(task: Runnable) {
+                if (!resumedHere(task)) super.execute(task)
+            }
+        }.apply { name = "pelican-" }
+    } else {
+        pelicanThreads(handlers)
+    }
+
+/** [VirtualThreadPool] takes no semaphore at zero. */
+private const val UNBOUNDED = 0
