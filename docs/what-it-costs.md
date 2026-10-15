@@ -460,6 +460,29 @@ every Jetty run on it. `-PwireAbPool` compares the two within this checkout,
 ./gradlew :benchmarks:wire -PwireAbPool -PwireSmoke          # checks the setup in a minute
 ```
 
+**Jetty's connector.** The Jetty server JVM also reads `pelican.jetty.connector`,
+a list of `key=value` pairs separated by commas, each overriding one of Jetty's
+connector defaults: `outputBufferSize` and `outputAggregationSize` (bytes, 32768
+and 8192), `inputBufferSize` (bytes, 8192), `acceptors` and `selectors` (sized
+from the cores), and `sendDateHeader` and `sendServerVersion` (both `true`). An
+unknown key fails at start. `-PwireConnector=<k=v,...>` serves every Jetty run
+with those settings, and `-PwireAbConnector=<k=v,...>` compares this checkout
+with them (A) against Jetty's defaults (B), with no second build. Setting
+`outputBufferSize` resets `outputAggregationSize` to a quarter of it unless
+both are given. One A/B per group of settings:
+
+```bash
+./gradlew :benchmarks:wire -PwireAbConnector=outputBufferSize=65536 -PwireScenario=both
+./gradlew :benchmarks:wire -PwireAbConnector=outputAggregationSize=32768 -PwireScenario=stream
+./gradlew :benchmarks:wire -PwireAbConnector=inputBufferSize=16384 -PwireScenario=rest
+./gradlew :benchmarks:wire -PwireAbConnector=acceptors=2,selectors=4 -PwireScenario=both
+./gradlew :benchmarks:wire -PwireAbConnector=sendDateHeader=false,sendServerVersion=false -PwireScenario=rest
+```
+
+HTTP/2 cleartext is not among them: the load driver speaks HTTP/1.1, so an h2c
+connection factory would never be chosen in this benchmark and could not be
+measured. It needs an HTTP/2 transport in the driver first.
+
 **Main against main.** `origin/main` as A and as B, three rounds each, run on
 the cloud instance with nothing else running. Any difference below that is
 inside these ranges is noise on this machine.

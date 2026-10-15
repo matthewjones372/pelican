@@ -85,9 +85,8 @@ fun Api.start(
     handler: Api.() -> Handler = { toHandler(handlers) },
 ): PelicanServer {
     val server = Server(pelicanPool(handlers))
-    val http = HttpConfiguration().apply { uriCompliance = PELICAN_URI_COMPLIANCE }
     server.addConnector(
-        ServerConnector(server, HttpConnectionFactory(http)).apply {
+        pelicanConnector(server, ConnectorSettings.configured()).apply {
             this.host = host
             this.port = port
         },
@@ -154,3 +153,63 @@ internal fun pelicanPool(handlers: Handlers, pool: JettyPool = JettyPool.configu
 
 /** [VirtualThreadPool] takes no semaphore at zero. */
 private const val UNBOUNDED = 0
+
+/** [start]'s connector, with [settings] applied over Jetty's defaults. */
+internal fun pelicanConnector(server: Server, settings: ConnectorSettings): ServerConnector {
+    val http = HttpConfiguration().apply {
+        uriCompliance = PELICAN_URI_COMPLIANCE
+        settings.applyTo(this)
+    }
+    val factory = HttpConnectionFactory(http).apply { settings.applyTo(this) }
+    return ServerConnector(server, settings.acceptors, settings.selectors, factory)
+}
+
+/**
+ * Connector settings for measuring one against another (spec 0085), read by [start] from the
+ * `pelican.jetty.connector` system property as `key=value` pairs separated by commas. A key left out keeps
+ * Jetty's default, and an unknown key fails, so a typo cannot pass for a measurement of the default.
+ */
+internal class ConnectorSettings private constructor(private val values: Map<String, String>) {
+    val acceptors: Int = values["acceptors"]?.toInt() ?: JETTY_CHOOSES
+    val selectors: Int = values["selectors"]?.toInt() ?: JETTY_CHOOSES
+
+    fun applyTo(http: HttpConfiguration) {
+        // The buffer first: setting it resets the aggregation size to a quarter of it.
+        values["outputBufferSize"]?.let { http.outputBufferSize = it.toInt() }
+        values["outputAggregationSize"]?.let { http.outputAggregationSize = it.toInt() }
+        values["sendDateHeader"]?.let { http.sendDateHeader = it.toBooleanStrict() }
+        values["sendServerVersion"]?.let { http.sendServerVersion = it.toBooleanStrict() }
+    }
+
+    fun applyTo(factory: HttpConnectionFactory) {
+        values["inputBufferSize"]?.let { factory.inputBufferSize = it.toInt() }
+    }
+
+    companion object {
+        private val KEYS = setOf(
+            "acceptors",
+            "selectors",
+            "outputBufferSize",
+            "outputAggregationSize",
+            "inputBufferSize",
+            "sendDateHeader",
+            "sendServerVersion",
+        )
+
+        fun parse(text: String): ConnectorSettings = ConnectorSettings(
+            text.split(',').filter { it.isNotBlank() }.associate { pair ->
+                val parts = pair.split('=', limit = 2).map { it.trim() }
+                require(parts.size == 2) { "$CONNECTOR_PROPERTY wants key=value, not '$pair'" }
+                require(parts[0] in KEYS) { "$CONNECTOR_PROPERTY has no '${parts[0]}'; it knows $KEYS" }
+                parts[0] to parts[1]
+            },
+        )
+
+        fun configured(): ConnectorSettings = parse(System.getProperty(CONNECTOR_PROPERTY).orEmpty())
+    }
+}
+
+internal const val CONNECTOR_PROPERTY = "pelican.jetty.connector"
+
+/** What [ServerConnector] takes to mean: size it from the machine's cores. */
+private const val JETTY_CHOOSES = -1
