@@ -145,6 +145,24 @@ public final class io/github/matthewjones372/pelican/openapi/ReportKt {
 	public static synthetic fun report$default (Ljava/util/List;Ljava/lang/String;ZILjava/lang/Object;)Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/openapi/ScalarKt {
+	public static final fun scalarHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/ScalarLook;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/ScalarLook {
+	public fun <init> ()V
+	public final fun getCss ()Ljava/lang/String;
+	public final fun getOptions ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getStylesheets ()Ljava/util/List;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/ScalarLookBuilder {
+	public final fun css (Ljava/lang/String;)V
+	public final fun getOptions ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun setOptions (Lio/github/matthewjones372/pelican/JsonObj;)V
+	public final fun stylesheet (Ljava/lang/String;)V
+}
+
 public final class io/github/matthewjones372/pelican/openapi/SwaggerUiKt {
 	public static final fun docsOAuth (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
 	public static synthetic fun docsOAuth$default (Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
