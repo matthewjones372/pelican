@@ -37,8 +37,11 @@ public final class io/github/matthewjones372/pelican/openapi/Docs {
 	public final fun getOpenApiPath ()Ljava/lang/String;
 	public final fun getRedoc ()Lio/github/matthewjones372/pelican/openapi/RedocLook;
 	public final fun getReference ()Lio/github/matthewjones372/pelican/openapi/Reference;
+	public final fun getReferencePath ()Ljava/lang/String;
+	public final fun getScalarReference ()Lio/github/matthewjones372/pelican/openapi/ScalarReference;
 	public final fun getUi ()Lio/github/matthewjones372/pelican/openapi/DocsUi;
 	public final fun getVersion ()Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+	public final fun referencePage (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lkotlin/Pair;
 }
 
 public final class io/github/matthewjones372/pelican/openapi/DocsBuilder {
@@ -50,6 +53,8 @@ public final class io/github/matthewjones372/pelican/openapi/DocsBuilder {
 	public final fun redoc (Lkotlin/jvm/functions/Function1;)V
 	public final fun reference (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun reference$default (Lio/github/matthewjones372/pelican/openapi/DocsBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun scalarReference (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun scalarReference$default (Lio/github/matthewjones372/pelican/openapi/DocsBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun setDocsPath (Ljava/lang/String;)V
 	public final fun setOauth (Lio/github/matthewjones372/pelican/openapi/DocsOAuth;)V
 	public final fun setOpenApiPath (Ljava/lang/String;)V
@@ -129,11 +134,44 @@ public final class io/github/matthewjones372/pelican/openapi/RedocLookBuilder {
 	public static synthetic fun logo$default (Lio/github/matthewjones372/pelican/openapi/RedocLookBuilder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun setOptions (Lio/github/matthewjones372/pelican/JsonObj;)V
 	public final fun stylesheet (Ljava/lang/String;)V
+	public final fun theme (Lkotlin/jvm/functions/Function1;)V
 }
 
 public final class io/github/matthewjones372/pelican/openapi/Reference {
 	public final fun getLook ()Lio/github/matthewjones372/pelican/openapi/RedocLook;
 	public final fun getPath ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/ReferenceTheme {
+	public fun <init> ()V
+	public final fun getAccent ()Ljava/lang/String;
+	public final fun getCodeFont ()Ljava/lang/String;
+	public final fun getError ()Ljava/lang/String;
+	public final fun getFont ()Ljava/lang/String;
+	public final fun getLogo ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getSidebar ()Ljava/lang/String;
+	public final fun getStylesheets ()Ljava/util/List;
+	public final fun getSuccess ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder {
+	public final fun codeFont (Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun codeFont$default (Lio/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun font (Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun font$default (Lio/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun getAccent ()Ljava/lang/String;
+	public final fun getError ()Ljava/lang/String;
+	public final fun getSidebar ()Ljava/lang/String;
+	public final fun getSuccess ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+	public final fun logo (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun logo$default (Lio/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun setAccent (Ljava/lang/String;)V
+	public final fun setError (Ljava/lang/String;)V
+	public final fun setSidebar (Ljava/lang/String;)V
+	public final fun setSuccess (Ljava/lang/String;)V
+	public final fun setText (Ljava/lang/String;)V
 }
 
 public final class io/github/matthewjones372/pelican/openapi/ReportKt {
@@ -161,6 +199,12 @@ public final class io/github/matthewjones372/pelican/openapi/ScalarLookBuilder {
 	public final fun getOptions ()Lio/github/matthewjones372/pelican/JsonObj;
 	public final fun setOptions (Lio/github/matthewjones372/pelican/JsonObj;)V
 	public final fun stylesheet (Ljava/lang/String;)V
+	public final fun theme (Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class io/github/matthewjones372/pelican/openapi/ScalarReference {
+	public final fun getLook ()Lio/github/matthewjones372/pelican/openapi/ScalarLook;
+	public final fun getPath ()Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/openapi/SwaggerUiKt {

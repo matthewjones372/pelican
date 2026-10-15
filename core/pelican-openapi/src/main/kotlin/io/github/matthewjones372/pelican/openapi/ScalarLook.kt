@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican.openapi
 
 import io.github.matthewjones372.pelican.JsonObj
+import io.github.matthewjones372.pelican.jsonObj
 
 /**
  * How a Scalar page looks: Scalar's own config, passed to `createApiReference` as it is, CSS for its variables, and
@@ -23,6 +24,17 @@ class ScalarLookBuilder internal constructor() {
 
     private var css: String? = null
     private val stylesheets = mutableListOf<String>()
+    private var theme: ReferenceTheme? = null
+
+    /** The look in slots either renderer reads; [options], [css] and [stylesheet] beside it win. See spec 0081. */
+    fun theme(configure: ReferenceThemeBuilder.() -> Unit) {
+        val built = ReferenceThemeBuilder().apply(configure).build()
+        require(built.logo == null) {
+            "Scalar has no logo, so a theme under scalarReference(...) cannot carry one. Drop the logo, or serve " +
+                "Redoc with reference(...)."
+        }
+        theme = built
+    }
 
     /** CSS for the page. Scalar sets its variables on `.light-mode` and `.dark-mode`, so override them there. */
     fun css(css: String) {
@@ -36,5 +48,39 @@ class ScalarLookBuilder internal constructor() {
         stylesheets += url
     }
 
-    internal fun build(): ScalarLook = ScalarLook(options, css, stylesheets.toList())
+    internal fun build(): ScalarLook {
+        val themed = theme ?: return ScalarLook(options, css, stylesheets.toList())
+        val raw = options
+        return ScalarLook(
+            options = if (raw == null) LIGHT else LIGHT under raw,
+            css = listOfNotNull(themed.scalarCss(), css).joinToString("\n").ifEmpty { null },
+            stylesheets = themed.stylesheets + stylesheets,
+        )
+    }
+}
+
+/** A Scalar reference served beside the docs page, at [path]. */
+class ScalarReference internal constructor(val path: String, val look: ScalarLook)
+
+/**
+ * The theme as Scalar's variables, on the selectors Scalar sets its own on: a `:root` rule loses to them. Null when
+ * the theme names no variable.
+ */
+private fun ReferenceTheme.scalarCss(): String? {
+    val variables = listOfNotNull(
+        accent?.let { "--scalar-color-accent: $it;" },
+        text?.let { "--scalar-color-1: $it;" },
+        sidebar?.let { "--scalar-sidebar-background-1: $it;" },
+        success?.let { "--scalar-color-green: $it;" },
+        error?.let { "--scalar-color-red: $it;" },
+        font?.let { "--scalar-font: $it;" },
+        codeFont?.let { "--scalar-font-code: $it;" },
+    )
+    return if (variables.isEmpty()) null else ".light-mode, .dark-mode { ${variables.joinToString(" ")} }"
+}
+
+/** A themed page is light, as Redoc's always is: a palette picked for a light page does not survive a dark one. */
+private val LIGHT: JsonObj = jsonObj {
+    "forceDarkModeState" to "light"
+    "hideDarkModeToggle" to true
 }

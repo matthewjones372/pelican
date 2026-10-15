@@ -1,7 +1,6 @@
 package io.github.matthewjones372.pelican.openapi
 
 import io.github.matthewjones372.pelican.JsonObj
-import io.github.matthewjones372.pelican.jsonObj
 
 /**
  * How a Redoc page looks: Redoc's own options, passed to `Redoc.init` as they are, a logo, and the stylesheets the
@@ -31,15 +30,17 @@ class RedocLookBuilder internal constructor() {
 
     private var logo: JsonObj? = null
     private val stylesheets = mutableListOf<String>()
+    private var theme: ReferenceTheme? = null
+
+    /** The look in slots either renderer reads; [options], [logo] and [stylesheet] beside it win. See spec 0081. */
+    fun theme(configure: ReferenceThemeBuilder.() -> Unit) {
+        theme = ReferenceThemeBuilder().apply(configure).build()
+    }
 
     /** Redoc's logo, above the sidebar: an image [url], which may be a `data:` URI for a small SVG. */
     fun logo(url: String, altText: String? = null, backgroundColor: String? = null) {
         require(url.isNotBlank()) { "A Redoc logo needs the URL of an image." }
-        logo = jsonObj {
-            "url" to url
-            altText?.let { "altText" to it }
-            backgroundColor?.let { "backgroundColor" to it }
-        }
+        logo = logoJson(url, altText, backgroundColor)
     }
 
     /** A stylesheet the page links to, for the fonts the options name. */
@@ -48,7 +49,16 @@ class RedocLookBuilder internal constructor() {
         stylesheets += url
     }
 
-    internal fun build(): RedocLook = RedocLook(options, logo, stylesheets.toList())
+    internal fun build(): RedocLook {
+        val themed = theme?.redocOptions()
+        val raw = options
+        val merged = when {
+            themed == null -> raw
+            raw == null -> themed
+            else -> themed under raw
+        }
+        return RedocLook(merged, logo ?: theme?.logo, theme?.stylesheets.orEmpty() + stylesheets)
+    }
 }
 
 /** A Redoc reference served beside the docs page, at [path]. */

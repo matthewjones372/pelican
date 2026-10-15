@@ -35,7 +35,7 @@ private const val JSON = "application/json"
 fun Api.docsHandler(docs: Docs = docs()): Handler {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }
     val uiPath = docs.docsPath?.takeIf { it.isNotBlank() }
-    if (specPath == null && uiPath == null && docs.reference == null) return DocsHandler(emptyMap(), null)
+    if (specPath == null && uiPath == null && docs.referencePath == null) return DocsHandler(emptyMap(), null)
 
     // Generated once and shared by the pages, rather than once per page.
     val document = spec().openApiJson(docs.version)
@@ -52,9 +52,8 @@ fun Api.docsHandler(docs: Docs = docs()): Handler {
             putIfAbsent(uiPath.trim('/'), Page(HTML, page))
             if (redirectPath != null) putIfAbsent(redirectPath.trim('/'), Page(HTML, oauth2RedirectHtml()))
         }
-        docs.reference?.let { reference ->
-            val page = redocHtml(title, specPath.orEmpty(), document, reference.look)
-            putIfAbsent(reference.path.trim('/'), Page(HTML, page))
+        docs.referencePage(title, specPath.orEmpty(), document)?.let { (path, page) ->
+            putIfAbsent(path.trim('/'), Page(HTML, page))
         }
     }
     // The API's own CORS setting covers the document as well; reading it is a plain GET, so nothing to preflight.
