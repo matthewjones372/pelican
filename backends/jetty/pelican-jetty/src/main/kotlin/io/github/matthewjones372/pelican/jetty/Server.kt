@@ -104,12 +104,16 @@ fun Api.start(
 }
 
 /**
- * Jetty's own pool, calling handlers on virtual threads when [handlers] runs them on one anyway, so a synchronous
- * handler starts on a virtual thread rather than hopping to one. Any other choice keeps Jetty's platform threads,
- * which is where [Handlers.onDispatcher] promises a handler runs.
+ * Jetty's own pool, calling handlers on virtual threads when [handlers] runs them on one anyway; any other choice
+ * keeps Jetty's platform threads, which is where [Handlers.onDispatcher] promises a handler runs. A connection resumed
+ * by a thread finishing a hopped request is run by that thread: see [resumingHere].
  */
 internal fun pelicanThreads(handlers: Handlers, maxThreads: Int = DEFAULT_MAX_THREADS): QueuedThreadPool =
-    QueuedThreadPool(maxThreads).apply {
+    object : QueuedThreadPool(maxThreads) {
+        override fun execute(job: Runnable) {
+            if (!resumedHere(job)) super.execute(job)
+        }
+    }.apply {
         if (handlers.virtual) virtualThreadsExecutor = VirtualThreads.getNamedVirtualThreadsExecutor("pelican-")
     }
 
@@ -139,7 +143,11 @@ internal const val POOL_PROPERTY = "pelican.jetty.pool"
 internal fun pelicanPool(handlers: Handlers, pool: JettyPool = JettyPool.configured()): ThreadPool =
     if (pool == JettyPool.VIRTUAL && handlers.virtual) {
         // Unbounded, as the virtual-threads executor under [pelicanThreads] is, so the two differ only in the pool.
-        VirtualThreadPool(UNBOUNDED).apply { name = "pelican-" }
+        object : VirtualThreadPool(UNBOUNDED) {
+            override fun execute(task: Runnable) {
+                if (!resumedHere(task)) super.execute(task)
+            }
+        }.apply { name = "pelican-" }
     } else {
         pelicanThreads(handlers)
     }

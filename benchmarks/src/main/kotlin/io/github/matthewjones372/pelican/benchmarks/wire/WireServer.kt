@@ -12,9 +12,12 @@ import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.queryParam
 import org.apache.pekko.stream.javadsl.Source
+import java.util.concurrent.CompletableFuture
+import io.github.matthewjones372.pelican.jetty.handledBy as stagedOnJetty
 import io.github.matthewjones372.pelican.jetty.handledNow as onJetty
 import io.github.matthewjones372.pelican.jetty.start as startJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedOnJetty
+import io.github.matthewjones372.pelican.pekko.handledBy as stagedOnPekko
 import io.github.matthewjones372.pelican.pekko.handledNow as onPekko
 import io.github.matthewjones372.pelican.pekko.start as startPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedOnPekko
@@ -43,6 +46,16 @@ private val createItem = endpoint(jsonBody<NewItem>()) {
     json<Item>(status = 201)
 }
 
+/** A handler that returns a stage already complete: nothing in answering it blocks. */
+private val staged = endpoint {
+    get("staged")
+    json<Item>()
+}
+
+private const val STAGED_ID = 3L
+
+private fun stagedItem(): CompletableFuture<Item> = CompletableFuture.completedFuture(Item(STAGED_ID, "staged"))
+
 private val ndjsonFrames = endpoint {
     get("ndjson")
     ndjson<Frame>()
@@ -55,7 +68,7 @@ private val sseFrames = endpoint {
 
 private fun frames(): Sequence<Frame> = (1..FRAMES).asSequence().map { Frame(it, FRAME_NAME) }
 
-/** The JMH benchmarks' GET and POST and the two streamed responses, bound by whichever backend [bind] is. */
+/** The JMH benchmarks' GET and POST, a staged GET and the two streamed responses, bound by [bind]'s backend. */
 private fun wireApi(bind: List<ServerEndpoint>): Api = api(endpoints = bind, codecs = JacksonCodecs)
 
 /**
@@ -73,6 +86,7 @@ fun main(args: Array<String>) {
                 listOf(
                     getItem onPekko { (id, lim) -> Item(id, "item-$lim") },
                     createItem onPekko { body -> Item(1, body.name) },
+                    staged stagedOnPekko { stagedItem() },
                     ndjsonFrames streamedOnPekko { Source.range(1, FRAMES).map { n -> Frame(n, FRAME_NAME) } },
                     sseFrames streamedOnPekko { Source.range(1, FRAMES).map { n -> Frame(n, FRAME_NAME) } },
                 ),
@@ -86,6 +100,7 @@ fun main(args: Array<String>) {
                 listOf(
                     getItem onJetty { (id, lim) -> Item(id, "item-$lim") },
                     createItem onJetty { body -> Item(1, body.name) },
+                    staged stagedOnJetty { stagedItem() },
                     ndjsonFrames streamedOnJetty { frames() },
                     sseFrames streamedOnJetty { frames() },
                 ),

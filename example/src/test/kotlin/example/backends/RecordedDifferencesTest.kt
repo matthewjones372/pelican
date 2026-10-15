@@ -4,7 +4,6 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.pages
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -42,26 +41,6 @@ class RecordedDifferencesTest {
 
         withClue(JettyDifference.ESCAPING_PATHS.reason) {
             statuses shouldBe mapOf("pekko" to 404, "jetty" to 400)
-        }
-    }
-
-    @Test
-    fun `a staged handler starts on a virtual thread on jetty, and on the dispatcher on pekko`() {
-        val where = endpoint { get("where"); text() }
-        fun here() = CompletableFuture.completedFuture(if (Thread.currentThread().isVirtual) "virtual" else "platform")
-        val pekko = api(listOf(where handledByOnPekko { here() }), JacksonCodecs)
-            .startOnPekko(port = 0, systemName = "recorded-differences")
-        val jetty = api(listOf(where handledByOnJetty { here() }), JacksonCodecs)
-            .startOnJetty(port = 0, handlers = Handlers.onVirtualThreads)
-
-        try {
-            withClue(JettyDifference.STAGED_HANDLERS_START_VIRTUAL.reason) {
-                mapOf("pekko" to bodyOf(pekko.baseUrl, "/where"), "jetty" to bodyOf(jetty.baseUrl, "/where")) shouldBe
-                    mapOf("pekko" to "platform", "jetty" to "virtual")
-            }
-        } finally {
-            pekko.stop()
-            jetty.stop()
         }
     }
 
@@ -113,13 +92,6 @@ class RecordedDifferencesTest {
 
     private fun statusOf(baseUrl: String, path: String): Int =
         exchange(baseUrl, path).substringAfter(' ').substringBefore(' ').toInt()
-
-    private fun bodyOf(baseUrl: String, path: String): String =
-        exchange(baseUrl, path).substringAfter("\r\n\r\n").lines().first {
-            it.isNotBlank() &&
-                it.trim().toIntOrNull(HEX) == null
-        }
 }
 
 private const val SOCKET_TIMEOUT_MILLIS = 5_000
-private const val HEX = 16
