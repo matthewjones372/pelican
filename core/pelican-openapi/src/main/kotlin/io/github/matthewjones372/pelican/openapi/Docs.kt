@@ -34,16 +34,16 @@ class Docs internal constructor(
     /** How the page at [docsPath] looks when [ui] is [DocsUi.Redoc]. */
     val redoc: RedocLook = RedocLook.PLAIN,
 
-    /** A Scalar reference served beside the page at [docsPath], whose client sends requests. See spec 0080. */
-    val scalarReference: ScalarReference? = null,
+    /** A RapiDoc reference served beside the page at [docsPath], whose console sends requests. See spec 0084. */
+    val rapiDocReference: RapiDocReference? = null,
 ) {
     /** Where the reference beside [docsPath] is served, whichever renderer it is; null when there is none. */
-    val referencePath: String? get() = reference?.path ?: scalarReference?.path
+    val referencePath: String? get() = reference?.path ?: rapiDocReference?.path
 
-    /** The page served beside [docsPath], Redoc's or Scalar's, as its path and its HTML; null when there is none. */
+    /** The page served beside [docsPath], Redoc's or RapiDoc's, as its path and its HTML; null when there is none. */
     fun referencePage(title: String, specPath: String, spec: String): Pair<String, String>? =
         reference?.let { it.path to redocHtml(title, specPath, spec, it.look) }
-            ?: scalarReference?.let { it.path to scalarHtml(title, specPath, spec, it.look) }
+            ?: rapiDocReference?.let { it.path to rapiDocHtml(title, specPath, spec, it.look) }
 }
 
 /**
@@ -63,7 +63,7 @@ class DocsBuilder internal constructor() {
 
     private var reference: Reference? = null
     private var redoc: RedocLook = RedocLook.PLAIN
-    private var scalarReference: ScalarReference? = null
+    private var rapiDocReference: RapiDocReference? = null
 
     /** A Redoc reference at [path], beside the page [ui] serves at [docsPath], in the look [configure] gives it. */
     fun reference(path: String, configure: RedocLookBuilder.() -> Unit = {}) {
@@ -71,10 +71,10 @@ class DocsBuilder internal constructor() {
         reference = Reference(path, RedocLookBuilder().apply(configure).build())
     }
 
-    /** A Scalar reference at [path], beside the page [ui] serves at [docsPath], in the look [configure] gives it. */
-    fun scalarReference(path: String, configure: ScalarLookBuilder.() -> Unit = {}) {
-        require(path.isNotBlank()) { "docs { scalarReference(...) } needs a path to serve the reference at." }
-        scalarReference = ScalarReference(path, ScalarLookBuilder().apply(configure).build())
+    /** A RapiDoc reference at [path], beside the page [ui] serves at [docsPath], in the look [configure] gives it. */
+    fun rapiDocReference(path: String, configure: RapiDocLookBuilder.() -> Unit = {}) {
+        require(path.isNotBlank()) { "docs { rapiDocReference(...) } needs a path to serve the reference at." }
+        rapiDocReference = RapiDocReference(path, RapiDocLookBuilder().apply(configure).build())
     }
 
     /** How the page at [docsPath] looks, when it is Redoc's: `docs { ui = DocsUi.Redoc; redoc { ... } }`. */
@@ -83,11 +83,11 @@ class DocsBuilder internal constructor() {
     }
 
     internal fun build(): Docs {
-        require(reference == null || scalarReference == null) {
-            "docs { reference(...) } and docs { scalarReference(...) } both ask for one reference page. Keep one."
+        require(reference == null || rapiDocReference == null) {
+            "docs { reference(...) } and docs { rapiDocReference(...) } both ask for one reference page. Keep one."
         }
-        val referencePath = reference?.path ?: scalarReference?.path
-        val referenceCall = if (reference != null) "reference" else "scalarReference"
+        val referencePath = reference?.path ?: rapiDocReference?.path
+        val referenceCall = if (reference != null) "reference" else "rapiDocReference"
         referencePath?.let { path ->
             val taken = if (path == docsPath) "docsPath" else "openApiPath"
             require(path != docsPath && path != openApiPath) {
@@ -117,7 +117,7 @@ class DocsBuilder internal constructor() {
             version = version,
             reference = reference,
             redoc = redoc,
-            scalarReference = scalarReference,
+            rapiDocReference = rapiDocReference,
         )
     }
 }

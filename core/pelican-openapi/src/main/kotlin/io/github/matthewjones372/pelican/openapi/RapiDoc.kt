@@ -61,9 +61,12 @@ private fun logoImg(logo: JsonObj): String {
     fun field(name: String) = (logo[name] as? JsonStr)?.value
     val url = field("url").orEmpty()
     val alt = field("altText")?.let { " alt=${attr(it)}" }.orEmpty()
-    val background = field("backgroundColor")?.let { " style=${attr("background: $it;")}" }.orEmpty()
-    return """<img slot="nav-logo" src=${attr(url)}$alt$background/>"""
+    val style = listOfNotNull(LOGO_SIZE, field("backgroundColor")?.let { "background: $it;" }).joinToString(" ")
+    return """<img slot="nav-logo" src=${attr(url)}$alt style=${attr(style)}/>"""
 }
+
+// RapiDoc leaves the slot's image at its own size, so an SVG with no height fills the navigation; 72px, as Redoc's.
+private const val LOGO_SIZE = "display: block; max-width: 100%; max-height: 72px; margin: 16px auto;"
 
 // Exact, as spec 0054 recommends: 9.3.8 has been unchanged for two years, and 11 is a rewrite. See spec 0084.
 private const val RAPIDOC_BUNDLE = "https://cdn.jsdelivr.net/npm/rapidoc@9.3.8/dist/rapidoc-min.js"

@@ -77,7 +77,8 @@ class RapiDocPageTest {
             "load-fonts" to "false",
             "style" to "--green: #5E8C61; --red: #9A3A1A;",
         )
-        page shouldContain """<img slot="nav-logo" src="/paw.svg" alt="Shop" style="background: #FBF6EF;"/>"""
+        page shouldContain
+            """<img slot="nav-logo" src="/paw.svg" alt="Shop" style="$LOGO_SIZE background: #FBF6EF;"/>"""
         page shouldContain """<link rel="stylesheet" href="https://fonts.example/nunito.css"/>"""
     }
 
@@ -95,4 +96,36 @@ class RapiDocPageTest {
         val quoted = look { attributes("heading-text" to "a\" onload=\"x") }
         rapiDocHtml("Shop", "/openapi.json", spec, quoted) shouldContain "heading-text=\"a&quot; onload=&quot;x\""
     }
+
+    @Test
+    fun `a RapiDoc reference beside the console is a page of its own, on a path of its own`() {
+        val docs = docs {
+            docsPath = "/api-docs"
+            rapiDocReference("/reference") { attributes("render-style" to "focused") }
+        }
+
+        docs.ui shouldBe DocsUi.SwaggerUi
+        docs.rapiDocReference?.path shouldBe "/reference"
+        docs.rapiDocReference?.look?.attributes?.get("render-style") shouldBe "focused"
+        shouldThrow<IllegalArgumentException> { docs { rapiDocReference("/docs") } }.message.toString() shouldContain
+            "docsPath"
+        shouldThrow<IllegalArgumentException> {
+            docs { rapiDocReference("/openapi.json") }
+        }.message.toString() shouldContain "openApiPath"
+        shouldThrow<IllegalArgumentException> { docs { rapiDocReference(" ") } }.message.toString() shouldContain
+            "path"
+    }
+
+    @Test
+    fun `a RapiDoc reference and a Redoc reference together are refused, since there is one reference page`() {
+        shouldThrow<IllegalArgumentException> {
+            docs {
+                reference("/reference")
+                rapiDocReference("/try")
+            }
+        }.message.toString() shouldContain "one reference page"
+    }
 }
+
+/** RapiDoc leaves the slot's image at its own size; a 96px SVG filled the navigation's width. */
+private const val LOGO_SIZE = "display: block; max-width: 100%; max-height: 72px; margin: 16px auto;"
