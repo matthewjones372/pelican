@@ -189,7 +189,7 @@ val wireBaseline = tasks.register("wireBaseline") {
  * `./gradlew :benchmarks:wire`: Pelican on Pekko and on Jetty over a loopback socket, driven at fixed rates (about
  * eight minutes; nothing else depends on it). The table lands in `build/wire-result.md` as well as on stdout.
  * `-PwireSmoke` runs one few-second step per server, to check the setup rather than measure. `-PwireScenario` is
- * `rest` (the default), `stream` or `both`. `-PwireAb=<ref>` compares Jetty from this checkout (A) with Jetty from
+ * `rest` (the default), `async`, `stream` or `both`. `-PwireAb=<ref>` compares Jetty from this checkout (A) with Jetty from
  * `<ref>` (B), alternating for `-PwireRounds` rounds (3), into `build/wire-ab.md`; `-PwireAbPekko` adds Pekko.
  */
 tasks.register<JavaExec>("wire") {

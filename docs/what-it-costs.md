@@ -431,14 +431,17 @@ disjoint. Overlapping ranges mean the difference is inside run-to-run noise.
 
 `-PwireScenario=stream` swaps the GET and POST for two streamed responses of
 100 frames of about 40 bytes, one NDJSON and one SSE, alternating, timed to
-the last byte and counted in responses a second. `both` runs each scenario in
-turn.
+the last byte and counted in responses a second. `-PwireScenario=async`
+alternates a GET whose handler returns a completed stage with a GET to a path
+nothing routes, answered 404: the requests Jetty can answer without leaving its
+selector. `both` runs each scenario in turn.
 
 ```bash
 git fetch origin
 ./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=both  # on main: the noise, about 35 to 45 minutes
 ./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=rest  # on a branch: the JSON GET and POST, about 17 minutes
 ./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=stream  # on a branch: the streams, about 15 to 25 minutes
+./gradlew :benchmarks:wire -PwireAb=origin/main -PwireScenario=async  # on a branch: the staged GET and the 404
 ./gradlew :benchmarks:wire -PwireAb=origin/main -PwireSmoke  # one round, one short step: checks the setup in a minute
 ```
 

@@ -30,9 +30,13 @@ private val STREAM_RATES = listOf(250, 500, 1_000, 2_000, 3_000, 4_000, 6_000, 8
 private const val REST_WARMUP_RATE = 5_000
 private const val STREAM_WARMUP_RATE = 250
 
-/** `rest` alternates the JSON GET and POST; `stream` alternates the NDJSON and SSE responses of [FRAMES] frames. */
+/**
+ * `rest` alternates the JSON GET and POST; `async` alternates a GET whose handler returns a completed stage with a GET
+ * nothing routes, answered 404; `stream` alternates the NDJSON and SSE responses of [FRAMES] frames.
+ */
 private enum class Scenario(val rates: List<Int>, val warmupRate: Int, val unit: String) {
     REST(RATES, REST_WARMUP_RATE, "req/s"),
+    ASYNC(RATES, REST_WARMUP_RATE, "req/s"),
     STREAM(STREAM_RATES, STREAM_WARMUP_RATE, "responses/s"),
 }
 
@@ -122,6 +126,8 @@ private class Driver(port: Int, private val scenario: Scenario) : AutoCloseable 
 
     private val getUri = URI("http://127.0.0.1:$port/items/7?limit=25")
     private val postUri = URI("http://127.0.0.1:$port/items")
+    private val stagedUri = URI("http://127.0.0.1:$port/staged")
+    private val missingUri = URI("http://127.0.0.1:$port/nowhere")
     private val ndjsonUri = URI("http://127.0.0.1:$port/ndjson")
     private val sseUri = URI("http://127.0.0.1:$port/sse")
 
@@ -133,6 +139,8 @@ private class Driver(port: Int, private val scenario: Scenario) : AutoCloseable 
             } else {
                 client.newRequest(postUri).method(HttpMethod.POST).body(StringRequestContent("application/json", BODY))
             }
+
+            Scenario.ASYNC -> client.newRequest(if (even) stagedUri else missingUri)
 
             Scenario.STREAM -> client.newRequest(if (even) ndjsonUri else sseUri)
         }
@@ -156,6 +164,11 @@ private class Driver(port: Int, private val scenario: Scenario) : AutoCloseable 
             Scenario.REST -> {
                 check(first == (200 to """{"id":7,"name":"item-25"}""")) { "GET answered wrongly" }
                 check(second == (201 to """{"id":1,"name":"anvil"}""")) { "POST answered wrongly" }
+            }
+
+            Scenario.ASYNC -> {
+                check(first == (200 to """{"id":3,"name":"staged"}""")) { "staged GET answered wrongly" }
+                check(second.first == NOT_FOUND) { "unknown path answered wrongly" }
             }
 
             Scenario.STREAM -> {
@@ -197,11 +210,12 @@ private class Driver(port: Int, private val scenario: Scenario) : AutoCloseable 
                         inFlight.release()
                         break
                     }
-                    send(i % 2 == 0L) { status, _ ->
+                    val even = i % 2 == 0L
+                    send(even) { status, _ ->
                         val latency = System.nanoTime() - intended
                         inFlight.release()
                         if (intended >= recordFrom) {
-                            if (status == null || status !in OK) errors.incrementAndGet()
+                            if (status == null || !answered(even, status)) errors.incrementAndGet()
                             recorder.recordValue(latency)
                         }
                     }
@@ -214,8 +228,13 @@ private class Driver(port: Int, private val scenario: Scenario) : AutoCloseable 
         return Step(server, rate, recorder.intervalHistogram, errors.get(), abandoned.get())
     }
 
+    /** A 2xx, except for the request `async` sends where nothing routes, whose right answer is a 404. */
+    private fun answered(even: Boolean, status: Int): Boolean =
+        if (scenario == Scenario.ASYNC && !even) status == NOT_FOUND else status in OK
+
     private companion object {
         val OK = 200..299
+        const val NOT_FOUND = 404
         const val BODY = """{"name":"anvil"}"""
     }
 }
