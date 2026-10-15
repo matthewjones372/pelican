@@ -111,6 +111,29 @@ public final class io/github/matthewjones372/pelican/openapi/OpenApiVersion : ja
 	public static fun values ()[Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
 }
 
+public final class io/github/matthewjones372/pelican/openapi/RapiDocKt {
+	public static final fun rapiDocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/RapiDocLook;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/RapiDocLook {
+	public fun <init> ()V
+	public final fun getAttributes ()Ljava/util/Map;
+	public final fun getLogo ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getStyle ()Ljava/lang/String;
+	public final fun getStylesheets ()Ljava/util/List;
+}
+
+public final class io/github/matthewjones372/pelican/openapi/RapiDocLookBuilder {
+	public final fun attributes ([Lkotlin/Pair;)V
+	public final fun stylesheet (Ljava/lang/String;)V
+	public final fun theme (Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class io/github/matthewjones372/pelican/openapi/RapiDocReference {
+	public final fun getLook ()Lio/github/matthewjones372/pelican/openapi/RapiDocLook;
+	public final fun getPath ()Ljava/lang/String;
+}
+
 public final class io/github/matthewjones372/pelican/openapi/RedocKt {
 	public static final fun redocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 	public static final fun redocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/RedocLook;)Ljava/lang/String;
