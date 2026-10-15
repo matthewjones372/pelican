@@ -12,15 +12,60 @@ it, test it and generate its client from that one description.
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.matthewjones372/pelican-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core)
 [![build](https://github.com/matthewjones372/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmatthewjones372%2Fpelican%2Fbadges%2Fcoverage.json)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
+[![Kotlin 2.4.20](https://img.shields.io/badge/kotlin-2.4.20-7f52ff)](docs/reference.md#versions)
 [![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 [Getting started](#getting-started) · [Cookbook](docs/cookbook.md) ·
 [Reference manual](docs/reference.md) · [Modules](docs/modules.md) ·
-[What it costs](docs/what-it-costs.md)
+[What it costs](docs/what-it-costs.md) · [All docs](docs/README.md)
 
 </div>
 
 ---
+
+## The idea, in one example
+
+```kotlin
+data class Bookmark(val id: Long, val url: String, val title: String, val tags: List<String> = emptyList())
+data class NoSuchBookmark(val id: Long, val message: String)
+
+val bookmarkId      = pathParam<Long>("bookmarkId", description = "The bookmark's id")
+val bookmarkMissing = errorJson<NoSuchBookmark>(404, "No bookmark with that id")
+
+val getBookmark = endpoint(bookmarkId) {
+    get("bookmarks" / bookmarkId)
+    json<Bookmark>() orFail bookmarkMissing
+}
+
+val route = getBookmark handledOrFail { id ->                    // id: Long, already decoded
+    Bookmarks.find(id)?.let { ok(it) }
+        ?: bookmarkMissing(NoSuchBookmark(id, "No bookmark $id"))
+}
+```
+
+Cut from [`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt),
+which is compiled on every build; imports and the rest of the service are there.
+
+`getBookmark` is a value, and the server route, the OpenAPI document, a typed
+test client and a generated Kotlin client are all read from it. The handler
+receives an already-decoded `Long`, so a request for `/bookmarks/abc` is
+answered with a 400 before the handler runs. Because the 404 is declared, the
+handler must return `Outcome<NoSuchBookmark, Bookmark>`, and one that forgets
+the failure does not compile.
+
+**Who this is for.** Pelican fits a Kotlin service on JDK 25 or newer whose
+HTTP contract is consumed in several ways (a published OpenAPI document,
+clients, tests) and has drifted before, running on Pekko HTTP or free to
+choose its server. It is probably not for a small internal API with one caller
+in the same repository, a service on Spring, Ktor or another server Pelican
+has no module for, a contract negotiated as an OpenAPI file before any code,
+or a service that cannot take on a young library maintained mainly by one
+person.
+[Choosing between Pelican and the alternatives](docs/choosing.md) has the full
+comparison and the rest of the cases where it is the wrong choice.
+
+## Why one description
 
 Pelican is a Kotlin library in which an HTTP endpoint is an ordinary value: its
 method and path, its typed inputs, and every response it can give, successes
@@ -42,7 +87,8 @@ the parts that the type system can check are checked by the compiler.
 
 ## One endpoint, and what follows from it
 
-A description, then the handler that answers it. This is taken from
+The example above, with each consequence spelled out. The description and
+handler are taken from
 [`ReadmeExample.kt`](example/src/main/kotlin/example/readme/ReadmeExample.kt),
 which is compiled on every build.
 
@@ -190,7 +236,11 @@ The costs are real:
 [Choosing between Pelican and the alternatives](docs/choosing.md) compares it
 with http4k's contracts, Ktor's OpenAPI plugins, Spring, Micronaut, Quarkus,
 tapir and writing the document first, and ends with the cases where Pelican is
-the wrong choice.
+the wrong choice. For evidence from outside this repository,
+[petshop](https://github.com/matthewjones372/petshop) and
+[tweet-street](https://github.com/matthewjones372/tweet-street) are two larger
+services that use Pelican; petshop's README says where it helped and where it
+did not.
 
 ## Getting started
 
@@ -199,22 +249,21 @@ The current release is **1.0.0**, on Maven Central under the group
 so a service using them needs JDK 25 or newer. In 1.0.0 the server backend is
 Pekko HTTP and the JSON codec is Jackson.
 
+To see it running before writing anything, clone the repository and run the
+greeting example below:
+
+```bash
+git clone https://github.com/matthewjones372/pelican && cd pelican && ./gradlew :example:runFirstEndpointOnPekko
+```
+
+It serves the endpoint on port 8080, with its Swagger UI at
+`http://127.0.0.1:8080/api-docs`.
+
 ### Choose the modules you need
 
-Pelican is a set of small modules, and a build takes only the ones it uses.
-Every module brings `pelican-core`, which holds the endpoint DSL and depends on
-nothing but the Kotlin standard library and `jackson-core`. On top of it a
-service picks:
-
-- **one backend**, which serves the descriptions (`pelican-pekko` in 1.0.0);
-- **one codec**, which any endpoint with a JSON body needs
-  (`pelican-jackson`);
-- **anything else only when it is wanted**: the OpenAPI document and Swagger UI
-  (`pelican-pekko-docs`), test clients, client transports, metrics, health,
-  OIDC, MCP.
-
-No module brings in a server you did not choose, and the backends do not bring
-the OpenAPI generator or a codec. The smallest JSON service on 1.0.0:
+The common case on 1.0.0, and what the first endpoint below needs: the Pekko
+backend, the Jackson codec, the OpenAPI document with Swagger UI, and the typed
+test client.
 
 ```kotlin
 // build.gradle.kts
@@ -225,28 +274,37 @@ dependencies {
     implementation("io.github.matthewjones372:pelican-pekko:$pelicanVersion")
     // The codec: JSON bodies with Jackson, and the schemas the document derives.
     implementation("io.github.matthewjones372:pelican-jackson:$pelicanVersion")
+    // /openapi.json and Swagger UI beside the endpoints. Brings pelican-openapi.
+    implementation("io.github.matthewjones372:pelican-pekko-docs:$pelicanVersion")
     // Pekko itself. Pelican ships none, so name the Scala build you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
     implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
+    // The typed test client run against a Pekko Api. Brings pelican-test.
+    testImplementation("io.github.matthewjones372:pelican-test-pekko:$pelicanVersion")
 }
 ```
 
 Either Scala cross-build of Pekko works; pick `_2.13` or `_3` and use it on
 every Pekko line.
 
-Adding a capability is adding its module. The example below serves its
-documentation and has a test, so it also needs:
+That block is a choice, not a bundle. Pelican is a set of small modules, and a
+build takes only the ones it uses. Every module brings `pelican-core`, which
+holds the endpoint DSL and depends on nothing but the Kotlin standard library
+and `jackson-core`. On top of it a service picks:
 
-```kotlin
-dependencies {
-    // /openapi.json and Swagger UI beside the endpoints. Brings pelican-openapi.
-    implementation("io.github.matthewjones372:pelican-pekko-docs:$pelicanVersion")
-    // The typed test client run against a Pekko Api. Brings pelican-test.
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:$pelicanVersion")
-}
-```
+- **one backend**, which serves the descriptions (`pelican-pekko` in 1.0.0);
+- **one codec**, which any endpoint with a JSON body needs
+  (`pelican-jackson`);
+- **anything else only when it is wanted**: the OpenAPI document and Swagger UI
+  (`pelican-pekko-docs`), test clients, client transports, metrics, health,
+  OIDC, MCP.
+
+No module brings in a server you did not choose, and the backends do not bring
+the OpenAPI generator or a codec. The smallest JSON service on 1.0.0 drops
+`pelican-pekko-docs` and `pelican-test-pekko` from the block above, and adding
+a capability later is adding its module.
 
 1.0.0 has no BOM, so the one `pelicanVersion` value is what keeps the modules
 at the same version. [Modules](docs/modules.md#choosing-modules) lists every
@@ -296,9 +354,8 @@ fun main() {
 ```
 
 Run it and open `http://127.0.0.1:8080/api-docs` for a Swagger UI page built
-from `greet`; the server listens on loopback unless given a `host`. From a
-clone of this repository, `./gradlew :example:runFirstEndpointOnPekko` serves
-the same thing.
+from `greet`; the server listens on loopback unless given a `host`. The
+clone-and-run command [above](#getting-started) serves the same thing.
 
 And its test, with no socket:
 
@@ -481,13 +538,11 @@ recorded in [the changelog](CHANGELOG.md).
 ```
 
 Every example takes a port with `--args=8081`.
-[petshop](https://github.com/matthewjones372/petshop) and
-[tweet-street](https://github.com/matthewjones372/tweet-street) are two
-larger projects outside this repository that use Pelican; petshop's README says
-where it helped and where it did not.
 
 ## Further reading
 
+- [The docs index](docs/README.md): every guide, with reading orders for
+  evaluating, using and going deeper.
 - [Getting started](#getting-started): installing 1.0.0 and a first endpoint.
 - [A whole service, in one file](docs/a-whole-service.md): models, inputs,
   endpoints, handlers, server and docs, compiled on every build.
@@ -497,4 +552,6 @@ where it helped and where it did not.
   it, and its limitations.
 - [What it costs](docs/what-it-costs.md): the benchmark report.
 - [Roadmap](docs/roadmap.md): what is not built yet.
+- [Contributing](CONTRIBUTING.md): building, testing and the compatibility
+  gates.
 - License: Apache 2.0. See [LICENSE](LICENSE).
