@@ -72,16 +72,18 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
         val endpoint = matched.endpoint
         refuseWhatCannotCross(endpoint)
 
+        val credentials = request.credentials()
         val params = Params(
             values,
             request,
             endpoint,
             resumeFrom = if (endpoint.resumable) request.header(SseOutput.LAST_EVENT_ID) else null,
+            requestHeaders = credentials,
         )
         val resolved = codecs.getValue(matched)
 
         return try {
-            api.decodeCaller(endpoint, request.credentials(), values)
+            api.decodeCaller(endpoint, credentials, values)
             negotiate(endpoint, request)
             decodeInputs(endpoint, request, query, values)
             decodeBody(endpoint, request, resolved, values)

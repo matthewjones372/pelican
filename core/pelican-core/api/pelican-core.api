@@ -1166,8 +1166,10 @@ public abstract interface class io/github/matthewjones372/pelican/ParamKey {
 }
 
 public final class io/github/matthewjones372/pelican/Params {
-	public fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;Lio/github/matthewjones372/pelican/Credentials;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;Lio/github/matthewjones372/pelican/Credentials;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun contains (Lio/github/matthewjones372/pelican/Attribute;)Z
 	public final fun contains (Lio/github/matthewjones372/pelican/ParamKey;)Z
 	public final fun find (Lio/github/matthewjones372/pelican/Attribute;)Ljava/lang/Object;
@@ -1176,6 +1178,7 @@ public final class io/github/matthewjones372/pelican/Params {
 	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
 	public final fun getUnderlying ()Ljava/lang/Object;
 	public final fun missingRequiredHeaders ()Ljava/util/List;
+	public final fun requestHeader (Ljava/lang/String;)Ljava/lang/String;
 	public final fun responseHeaders ()Ljava/util/List;
 	public final fun set (Lio/github/matthewjones372/pelican/Attribute;Ljava/lang/Object;)V
 	public final fun setHeader (Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/Object;)V

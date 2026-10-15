@@ -33,6 +33,11 @@ one.
 
 ### Added
 
+- **`Params.requestHeader(name)`**: the first value of a request header,
+  matched without regard to case, declared or not. Supplied by `pelican-pekko`,
+  `pelican-jetty` and the in-memory client from the reader they build for the
+  caller check, so a filter that only needs a header names no backend. A
+  hand-built `Params` reads null (spec 0081).
 - **`pelican-bom`**: a platform pinning every library module to one version,
   so a build writes `implementation(platform("io.github.matthewjones372:pelican-bom:$version"))`
   and names the modules without one (spec 0078). Generated from the set of

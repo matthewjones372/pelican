@@ -167,13 +167,14 @@ internal class PelicanHandler(
     ): CompletionStage<Reply> {
         val ep = se.endpoint
         // Built before decoding, so a filter or a failing decode can still put a header on the way out.
-        val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep))
+        val credentials = request.credentials()
+        val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep), requestHeaders = credentials)
 
         val accept = request.headers.getValuesList(HttpHeader.ACCEPT)
 
         // Who is calling first, then what they will take, then the inputs: Pekko's order, so a 401 tells nothing else.
         try {
-            api.decodeCaller(ep, request.credentials(), values)
+            api.decodeCaller(ep, credentials, values)
             negotiate(ep, accept)
             decodePlainInputs(ep, request, values)
         } catch (t: Throwable) {

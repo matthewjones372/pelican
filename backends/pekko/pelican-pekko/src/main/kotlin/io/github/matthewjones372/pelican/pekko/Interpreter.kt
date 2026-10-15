@@ -507,11 +507,12 @@ private fun invoke(
 
     // Built before decoding, so a filter or a failing decode can still put a
     // header on the way out.
-    val params = Params(values, req, ep, resumeFrom = req.resumePoint(ep))
+    val credentials = req.credentials()
+    val params = Params(values, req, ep, resumeFrom = req.resumePoint(ep), requestHeaders = credentials)
 
     // ---- who is calling ----------------------------------------------------
     try {
-        api.decodeCaller(ep, req.credentials(), values)
+        api.decodeCaller(ep, credentials, values)
     } catch (t: Throwable) {
         return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params))
     }
