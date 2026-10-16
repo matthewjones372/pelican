@@ -516,7 +516,11 @@ construction.
 Three interfaces carry it, all in `core/BodyCodec.kt`:
 
 ```kotlin
-interface BodyCodec<T>   { fun encodeToString(value: T): String; fun decodeFromString(text: String): T }
+interface BodyCodec<T> {
+    fun encodeToString(value: T): String
+    fun decodeFromString(text: String): T
+    fun encoded(value: T): ByteArray? = null
+}
 interface CodecFactory   { fun <T> codec(type: KType): BodyCodec<T> }
 interface SchemaSource   { fun schema(type: KType, components: SchemaComponents): JsonObj }
 interface Codecs : CodecFactory, SchemaSource

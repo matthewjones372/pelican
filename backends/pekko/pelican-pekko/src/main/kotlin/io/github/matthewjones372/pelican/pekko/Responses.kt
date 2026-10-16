@@ -84,17 +84,18 @@ internal fun buildResponse(
     }
 
     val entity: ResponseEntity = when (out) {
-        is JsonOutput<*> -> HttpEntities.create(
-            ContentTypes.APPLICATION_JSON,
-            payload().encodeToString(value),
-        )
+        is JsonOutput<*> -> finished(ContentTypes.APPLICATION_JSON, payload(), value) { text ->
+            HttpEntities.create(ContentTypes.APPLICATION_JSON, text)
+        }
 
         is TextOutput -> HttpEntities.create(ContentTypes.TEXT_PLAIN_UTF8, value as String)
 
-        is MediaOutput<*> -> HttpEntities.create(
-            contentTypeOf(out.mediaType),
-            ByteString.fromString(payload().encodeToString(value)),
-        )
+        is MediaOutput<*> -> {
+            val type = contentTypeOf(out.mediaType)
+            finished(type, payload(), value) { text ->
+                HttpEntities.create(type, ByteString.fromString(text))
+            }
+        }
 
         is EmptyOutput -> HttpEntities.EMPTY
 
@@ -212,6 +213,18 @@ private val contentTypes = ConcurrentHashMap<String, ContentType>()
 
 private fun contentTypeOf(mediaType: String): ContentType =
     contentTypes.computeIfAbsent(mediaType, ::parseContentType)
+
+private fun finished(
+    type: ContentType,
+    codec: BodyCodec<Any?>,
+    value: Any?,
+    text: (String) -> ResponseEntity,
+): ResponseEntity {
+    val held = codec.encoded(value)
+    // `fromArray` copies. The send path only reads this array.
+    return if (held != null) HttpEntities.create(type, ByteString.fromArrayUnsafe(held))
+    else text(codec.encodeToString(value))
+}
 
 private fun parseContentType(mediaType: String): ContentType {
     val slash = mediaType.indexOf('/')
