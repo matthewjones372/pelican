@@ -20,6 +20,9 @@ interface BodyCodec<T> {
      * spec 0046 for what overriding it is worth, measured.
      */
     fun decodeFrom(bytes: ByteArray): T = decodeFromString(String(bytes, StandardCharsets.UTF_8))
+
+    /** Bytes this codec already holds, or null to encode as today. The server does not modify the array. */
+    fun encoded(value: T): ByteArray? = null
 }
 
 /**

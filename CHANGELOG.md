@@ -33,6 +33,10 @@ one.
 
 ### Added
 
+- **`BodyCodec.encoded`**: bytes the codec already holds, or null to encode as
+  today. Jetty wraps the array. Pekko retains it with
+  `ByteString.fromArrayUnsafe`. Jackson and kotlinx do not override it
+  (spec 0086).
 - **`Params.requestHeader(name)`**: the first value of a request header,
   matched without regard to case, declared or not. Supplied by `pelican-pekko`,
   `pelican-jetty` and the in-memory client from the reader they build for the

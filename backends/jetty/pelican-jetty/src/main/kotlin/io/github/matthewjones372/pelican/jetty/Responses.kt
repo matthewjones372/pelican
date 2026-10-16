@@ -222,12 +222,11 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs, 
     fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
 
     return when (out) {
-        is JsonOutput<*> -> Strict(out.status, JSON, payload().encodeToString(value).toByteArray())
+        is JsonOutput<*> -> Strict(out.status, JSON, finished(payload(), value))
 
         is TextOutput -> Strict(out.status, TEXT, (value as String).toByteArray())
 
-        is MediaOutput<*> ->
-            Strict(out.status, contentTypeOf(out.mediaType), payload().encodeToString(value).toByteArray())
+        is MediaOutput<*> -> Strict(out.status, contentTypeOf(out.mediaType), finished(payload(), value))
 
         is EmptyOutput -> Strict(out.status, null, ByteArray(0))
 
@@ -281,6 +280,9 @@ private fun failureResponse(declared: ErrorOutput<*>, err: Outcome.Err<*>, codec
 
 /** As Pekko writes a declared media type: its parameters dropped, and a text type's fixed UTF-8 left implied. */
 private fun contentTypeOf(mediaType: String): String = mediaType.substringBefore(';').trim()
+
+private fun finished(codec: BodyCodec<Any?>, value: Any?): ByteArray =
+    codec.encoded(value) ?: codec.encodeToString(value).toByteArray()
 
 private val log: Logger = LoggerFactory.getLogger("io.github.matthewjones372.pelican.jetty")
 
