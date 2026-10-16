@@ -62,9 +62,10 @@ means those bytes are the body.
 
 ## Stack
 
-- [ ] **`spec-0086-encoded`** — `encoded` on `BodyCodec`, Jetty wraps it, Pekko
-      retains it with `fromArrayUnsafe`, the `.api` dump, and the one-line
-      `BodyCodec` sketch in `docs/reference.md`.
+- [x] **`spec-0086-encoded`** ([#333](https://github.com/matthewjones372/pelican/pull/333)):
+      `encoded` on `BodyCodec`, Jetty wraps it, Pekko retains it with
+      `fromArrayUnsafe`, the `.api` dump, and the one-line `BodyCodec` sketch
+      in `docs/reference.md`.
       Done when: the checks below pass and `./gradlew build` is green.
 
 ## Acceptance
