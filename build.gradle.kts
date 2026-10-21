@@ -233,7 +233,7 @@ subprojects {
         // Assertions only. The tests still run on the JUnit platform — kotest
         // is here for its matchers and for the failure messages they produce,
         // not as a second test framework.
-        "testImplementation"("io.kotest:kotest-assertions-core:6.2.5")
+        "testImplementation"("io.kotest:kotest-assertions-core:6.2.6")
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 
