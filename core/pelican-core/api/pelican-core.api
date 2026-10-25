@@ -1702,6 +1702,16 @@ public final class io/github/matthewjones372/pelican/spi/RequestPathsKt {
 	public static final fun withoutDotSegments (Ljava/lang/String;)Ljava/lang/String;
 }
 
+public abstract interface class io/github/matthewjones372/pelican/spi/RequestView : io/github/matthewjones372/pelican/Credentials {
+	public static final field COOKIE Ljava/lang/String;
+	public fun cookie (Ljava/lang/String;)Ljava/lang/String;
+	public abstract fun getMethod ()Ljava/lang/String;
+	public abstract fun getRawPath ()Ljava/lang/String;
+	public abstract fun getRawQuery ()Ljava/lang/String;
+	public abstract fun header (Ljava/lang/String;)Ljava/lang/String;
+	public abstract fun headers (Ljava/lang/String;)Ljava/util/List;
+}
+
 public final class io/github/matthewjones372/pelican/spi/RequestsKt {
 	public static final fun acceptable (Ljava/util/List;Ljava/util/Set;)Z
 	public static final fun decodeCaller (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/Endpoint;Lio/github/matthewjones372/pelican/Credentials;Ljava/util/Map;)V
