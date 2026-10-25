@@ -109,8 +109,10 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
       inline is 211k (208–214k) against `raw-gannet`'s 279k (275–285k), 76%. The same build served 238k earlier
       the same day; interleaved with today's, it serves 209–214k, so the machine moved and the 225k is quoted
       against a different day's ceiling. Later entries are judged against `raw-gannet` in the same run.
-- [ ] **`spec-0089-view`**: `RequestView`, `RouteIndex` matching in place, dot segments without a split; Gannet adopts.
-      Done when: routing and building allocate nothing for `/baseline11` (JMH `-prof gc`).
+- [ ] **`spec-0089-view`**: `RouteIndex` matching in place, and dot segments resolved without a split, in core; Gannet adopts.
+      Done when: routing `/baseline11` allocates nothing (JMH `-prof gc`, `RequestPathBenchmark`).
+- [ ] **`spec-0089-view-gannet`**: `RequestView`; Gannet reads the request through it.
+      Done when: building the request allocates only the view, which takes the credentials object's place.
 - [ ] **`spec-0089-plan`**: `EndpointPlan` with slot-backed `Params` and the query scanned once; Gannet adopts.
       Done when: plain inputs allocate only the decoded values.
 - [ ] **`spec-0089-jetty`** / **`spec-0089-pekko`**: each backend on the view and plan, its copies deleted.

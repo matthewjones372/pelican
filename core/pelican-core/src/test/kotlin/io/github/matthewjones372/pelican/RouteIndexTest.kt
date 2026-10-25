@@ -32,8 +32,12 @@ class RouteIndexTest {
     private val adminUser = bound(endpoint { get("users" / "admin"); text() })
     private val root = bound(endpoint { get(""); text() })
 
+    // "Aa" and "BB" share a `String.hashCode`, which the literal table is sorted by.
+    private val aa = bound(endpoint { get("Aa"); text() })
+    private val bb = bound(endpoint { get("BB"); text() })
+
     private val index = listOf(
-        listOrders, watchOrders, getOrder, deleteOrder, userPosts, getUser, adminUser, root,
+        listOrders, watchOrders, getOrder, deleteOrder, userPosts, getUser, adminUser, root, aa, bb,
     ).routeIndex()
 
     private fun match(method: Method, path: String): Pair<ServerEndpoint?, Map<ParamKey<*>, Any?>> {
@@ -160,6 +164,27 @@ class RouteIndexTest {
     @Test
     fun `a trailing slash does not change which endpoint answers`() {
         match(Method.GET, "/orders/").first shouldBe listOrders
+    }
+
+    @Test
+    fun `literals whose hashes collide each reach their own endpoint`() {
+        match(Method.GET, "/Aa").first shouldBe aa
+        match(Method.GET, "/BB").first shouldBe bb
+        match(Method.GET, "/Ab").first.shouldBeNull()
+    }
+
+    @Test
+    fun `repeated slashes do not shift which segment a capture reads`() {
+        val (found, values) = match(Method.GET, "//users//ada//posts")
+        found shouldBe userPosts
+        values[name] shouldBe "ada"
+    }
+
+    @Test
+    fun `a capture after a literal that spelled itself with an escape reads its own segment`() {
+        val (found, values) = match(Method.GET, "/%6Frders/42")
+        found shouldBe getOrder
+        values[orderId] shouldBe 42L
     }
 
     @Test

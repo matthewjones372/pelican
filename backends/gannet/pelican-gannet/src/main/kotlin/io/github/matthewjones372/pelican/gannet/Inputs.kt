@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.parseFormBody
 import io.github.matthewjones372.pelican.spi.decodeList
+import io.github.matthewjones372.pelican.spi.withoutDotSegments
 
 /**
  * The path as the request line spelled it, with its dot segments resolved and every other escape still there, so
@@ -17,26 +18,6 @@ import io.github.matthewjones372.pelican.spi.decodeList
 internal fun HttpRequest.routedPath(): String? {
     if (path.startsWith("//")) return null
     return withoutDotSegments(path)
-}
-
-/**
- * RFC 3986's remove_dot_segments, reading `%2E` as the `.` it spells as Pekko does, so no `.` or `..` reaches the
- * index as a value: a handler using a path param as a name is never handed one. Null when a `..` would climb above
- * the root.
- */
-internal fun withoutDotSegments(path: String): String? {
-    if (!path.startsWith('/')) return path
-    val segments = path.split('/').drop(1)
-    val kept = segments.foldIndexed(emptyList<String>()) { i, acc, segment ->
-        // A dot segment last leaves the path ending in a slash, as RFC 3986 resolves `/a/b/..` to `/a/`.
-        val trailing = if (i == segments.lastIndex) listOf("") else emptyList()
-        when (segment.replace("%2e", ".", ignoreCase = true)) {
-            "." -> acc + trailing
-            ".." -> if (acc.isEmpty()) return null else acc.dropLast(1) + trailing
-            else -> acc + segment
-        }
-    }
-    return "/" + kept.joinToString("/")
 }
 
 /** Cookies parsed by core, as [decodePlainInputs] parses them, so a session reads the same on every backend. */

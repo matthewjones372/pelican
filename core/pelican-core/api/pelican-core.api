@@ -1698,6 +1698,10 @@ public final class io/github/matthewjones372/pelican/spi/RequestBodyCodecs {
 	public final fun decode (Ljava/lang/String;[B)Ljava/lang/Object;
 }
 
+public final class io/github/matthewjones372/pelican/spi/RequestPathsKt {
+	public static final fun withoutDotSegments (Ljava/lang/String;)Ljava/lang/String;
+}
+
 public final class io/github/matthewjones372/pelican/spi/RequestsKt {
 	public static final fun acceptable (Ljava/util/List;Ljava/util/Set;)Z
 	public static final fun decodeCaller (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/Endpoint;Lio/github/matthewjones372/pelican/Credentials;Ljava/util/Map;)V
