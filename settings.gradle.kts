@@ -13,6 +13,21 @@ plugins {
 }
 
 rootProject.name = "pelican"
+
+// Where every project resolves its dependencies. Central's snapshot repository
+// serves Gannet, the server under `pelican-gannet`, and is asked for nothing
+// else: only that group, and only its snapshots.
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        mavenCentral()
+        maven("https://central.sonatype.com/repository/maven-snapshots/") {
+            name = "centralSnapshots"
+            content { includeGroup("io.github.matthewjones372") }
+            mavenContent { snapshotsOnly() }
+        }
+    }
+}
 // Directories are grouped by kind (spec 0078); project names are not, so
 // `:pelican-jetty` and every Maven coordinate stay as they were.
 fun group(dir: String, vararg names: String) = names.forEach { name ->
@@ -32,6 +47,7 @@ group(
     "pelican-jetty", "pelican-jetty-docs", "pelican-jetty-mcp",
     "pelican-test-jetty", "pelican-client-jetty", "pelican-streams-jetty",
 )
+group("backends/gannet", "pelican-gannet", "pelican-gannet-docs", "pelican-test-gannet")
 group("testing", "pelican-test", "pelican-test-golden", "pelican-test-wiremock")
 group(
     "integrations",

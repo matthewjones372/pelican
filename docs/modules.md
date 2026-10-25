@@ -82,7 +82,7 @@ coordinate.
 
 **On `main`: `pelican-bom`** (main only, published as `1.0.1-SNAPSHOT` to
 Central's snapshot repository). It is a Gradle `java-platform` with no
-dependencies of its own, only a version constraint for each of the 31 library
+dependencies of its own, only a version constraint for each of the 33 library
 modules:
 
 ```kotlin
@@ -191,6 +191,31 @@ since it has no cross-build to choose.
 Typical stack: `pelican-bom`, `pelican-jetty`, `pelican-jackson` or
 `pelican-kotlinx`, `pelican-jetty-docs`, and `pelican-test-jetty` for tests.
 
+### Gannet backend
+
+Experimental. For a Linux service that wants neither Pekko nor Jetty: the
+interpreter that serves an `Api` on
+[Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
+io_uring with a carrier thread and ring per core and each connection a fiber.
+Gannet is its own library, `io.github.matthewjones372:gannet`, on `main` as a
+`0.1.0-SNAPSHOT` from Central's snapshot repository. Every binder
+`pelican-jetty` has exists here under the same name, taking the same
+`Sequence`; handlers run on virtual threads unless `Handlers.onDispatcher`
+keeps them on the carrier. Linux 6.1 or later, JDK 25, and two JVM flags:
+`--enable-native-access=ALL-UNNAMED --add-exports
+java.base/jdk.internal.vm=ALL-UNNAMED`. TLS through `GannetConfig.tls`; no
+HTTP/2 or compression. None of the three is published, nor in `pelican-bom`:
+use them from a build of `main`.
+
+| Module | Availability | Depends on | Provides |
+|---|---|---|---|
+| `pelican-gannet` | main only | core, Gannet | descriptions to a `GannetHandler` (`toHandler`), and `start` to serve it on a `GannetServer` |
+| `pelican-gannet-docs` | main only | gannet, openapi | the document and a Swagger UI or Redoc page and a Redoc or RapiDoc reference beside it, as a `GannetHandler` |
+| `pelican-test-gannet` | main only | gannet, test | `onLoopback(handlers)`: the API started on a loopback port, with the typed client over a socket |
+
+Typical stack: `pelican-gannet`, `pelican-jackson` or `pelican-kotlinx`,
+`pelican-gannet-docs`, and `pelican-test-gannet` for tests.
+
 ### Testing
 
 | Module | Availability | Depends on | Provides |
@@ -226,7 +251,7 @@ not acquire the OpenTelemetry API, and the reverse.
 | `pelican-codegen` | 1.0.0 | core | descriptions to a Kotlin client, as source |
 | `pelican-import` | 1.0.0 | codegen, `snakeyaml-engine` | an OpenAPI document to descriptions and handler stubs, as source |
 | Gradle plugin `io.github.matthewjones372.pelican` | 1.0.0 | nothing on your classpath | every generator as Gradle tasks: clients, documents, endpoints |
-| `pelican-bom` | main only | nothing | version constraints for the 31 library modules; see [above](#version-alignment-and-the-bom) |
+| `pelican-bom` | main only | nothing | version constraints for the 33 library modules; see [above](#version-alignment-and-the-bom) |
 
 Most builds use the generators through the plugin rather than declaring
 `pelican-codegen` or `pelican-import`. The plugin is on Maven Central, not the

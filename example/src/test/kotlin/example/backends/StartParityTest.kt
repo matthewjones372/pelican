@@ -1,5 +1,6 @@
 package example.backends
 
+import io.github.matthewjones372.pelican.gannet.GannetTests
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 import kotlin.reflect.jvm.kotlinFunction
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 
@@ -41,6 +43,7 @@ class StartParityTest {
     private val backends = listOf(
         "pekko" to "io.github.matthewjones372.pelican.pekko",
         "jetty" to "io.github.matthewjones372.pelican.jetty",
+        "gannet" to "io.github.matthewjones372.pelican.gannet",
     )
 
     @Test
@@ -77,12 +80,13 @@ class StartParityTest {
     fun `a bare start binds loopback, and answers there`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "start-parity-pekko")
         val jetty = jettyApi().startOnJetty(port = 0)
+        val gannet = if (GannetTests.run) gannetApi().startOnGannet(port = 0) else null
 
         try {
-            val bound = mapOf("pekko" to pekko.host, "jetty" to jetty.host)
-            withClue("bound: $bound") { bound.values.toSet() shouldBe setOf("127.0.0.1") }
+            val bound = listOfNotNull("pekko" to pekko.host, "jetty" to jetty.host, gannet?.let { "gannet" to it.host })
+            withClue("bound: $bound") { bound.map { it.second }.toSet() shouldBe setOf("127.0.0.1") }
 
-            listOf("pekko" to pekko.baseUrl, "jetty" to jetty.baseUrl)
+            listOfNotNull("pekko" to pekko.baseUrl, "jetty" to jetty.baseUrl, gannet?.let { "gannet" to it.baseUrl })
                 .forEach { (name, baseUrl) ->
                     withClue(name) {
                         baseUrl shouldStartWith "http://127.0.0.1:"
@@ -92,6 +96,7 @@ class StartParityTest {
         } finally {
             pekko.stop()
             jetty.stop()
+            gannet?.stop()
         }
     }
 }

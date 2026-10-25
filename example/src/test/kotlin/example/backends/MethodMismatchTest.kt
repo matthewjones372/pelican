@@ -2,11 +2,17 @@ package example.backends
 
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.RequestSpec
+import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import io.github.matthewjones372.pelican.gannet.handledNow as handledOnGannet
+import io.github.matthewjones372.pelican.gannet.handledWith as handledWithOnGannet
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
 import io.github.matthewjones372.pelican.jetty.handledNow as handledOnJetty
 import io.github.matthewjones372.pelican.jetty.handledWith as handledWithOnJetty
 import io.github.matthewjones372.pelican.pekko.handledNow as handledOnPekko
@@ -64,6 +70,25 @@ class MethodMismatchTest {
             covers = emptyList(),
         ).inMemoryOnJetty(Handlers.onVirtualThreads).use {
             it.transport.send(postToHello).status shouldBe 404
+        }
+    }
+
+    /** No in-memory transport here, so over a socket; the interpreter routes as Jetty's does. */
+    @Test
+    @RequiresGannet
+    fun `gannet answers 404 for the same reason`() {
+        val server = greetingsApi(
+            listOf(
+                greet handledOnGannet { (who, shout) -> greetingOf(who, shout) },
+                outbox handledWithOnGannet { },
+            ),
+            covers = emptyList(),
+        ).startOnGannet(port = 0)
+
+        try {
+            apiClient(server.baseUrl, JacksonCodecs).use { it.transport.send(postToHello).status shouldBe 404 }
+        } finally {
+            server.stop()
         }
     }
 }

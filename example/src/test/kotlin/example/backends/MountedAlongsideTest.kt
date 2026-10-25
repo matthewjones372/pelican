@@ -3,6 +3,9 @@ package example.backends
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.GannetHandler
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import io.github.matthewjones372.pelican.gannet.then
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -17,6 +20,9 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import io.github.matthewjones372.pelican.gannet.handledNow as handledNowOnGannet
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
+import io.github.matthewjones372.pelican.gannet.toHandler as toGannetHandler
 import io.github.matthewjones372.pelican.jetty.handledNow as handledNowOnJetty
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.toHandler as toJettyHandler
@@ -77,6 +83,25 @@ class MountedAlongsideTest {
 
         val server = api(widget handledNowOnJetty { Widget(1) })
             .startOnJetty(port = 0) { Handler.Sequence(handWritten, toJettyHandler()) }
+
+        try {
+            bothAnswer(server.baseUrl)
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    @RequiresGannet
+    fun `gannet chains a described handler with a hand-written one`() {
+        val handWritten = GannetHandler { exchange ->
+            if (exchange.request.path != "/health") return@GannetHandler false
+            exchange.respond(200, body = "ok".toByteArray())
+            true
+        }
+
+        val server = api(widget handledNowOnGannet { Widget(1) })
+            .startOnGannet(port = 0) { handWritten then toGannetHandler() }
 
         try {
             bothAnswer(server.baseUrl)

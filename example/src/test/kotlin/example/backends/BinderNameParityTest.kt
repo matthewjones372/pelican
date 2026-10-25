@@ -41,7 +41,7 @@ class BinderNameParityTest {
         "handledBy", "handledByOrFail", "handledByOneOf", "streamedBy", "streamedByOrFail",
     )
 
-    private val backends = listOf(PEKKO, JETTY)
+    private val backends = listOf(PEKKO, JETTY, GANNET)
 
     @Test
     fun `every backend binds in place under the same names`() {
@@ -66,5 +66,6 @@ class BinderNameParityTest {
     private companion object {
         const val PEKKO = "io.github.matthewjones372.pelican.pekko"
         const val JETTY = "io.github.matthewjones372.pelican.jetty"
+        const val GANNET = "io.github.matthewjones372.pelican.gannet"
     }
 }

@@ -3,6 +3,7 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.ResponseSpec
@@ -11,6 +12,8 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import io.github.matthewjones372.pelican.gannet.handledOneOf as handledOneOfOnGannet
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
 import io.github.matthewjones372.pelican.jetty.handledOneOf as handledOneOfOnJetty
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledOneOf as handledOneOfOnPekko
@@ -49,6 +52,20 @@ class BareOkTest {
         val server = brokenApi(
             remember handledOneOfOnJetty { (_, note) -> ok(Greeting(note.text, language = "en")) },
         ).startOnJetty(port = 0)
+
+        try {
+            asking(server.baseUrl).shouldBeRefused()
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    @RequiresGannet
+    fun `and so does gannet`() {
+        val server = brokenApi(
+            remember handledOneOfOnGannet { (_, note) -> ok(Greeting(note.text, language = "en")) },
+        ).startOnGannet(port = 0)
 
         try {
             asking(server.baseUrl).shouldBeRefused()

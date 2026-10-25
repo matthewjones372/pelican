@@ -1,5 +1,7 @@
 package example.backends
 
+import io.github.matthewjones372.pelican.gannet.GannetTests
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
@@ -8,6 +10,8 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletionStage
 import kotlin.concurrent.thread
+import io.github.matthewjones372.pelican.gannet.PelicanServer as GannetServer
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
 import io.github.matthewjones372.pelican.jetty.PelicanServer as JettyServer
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.PelicanServer as PekkoServer
@@ -28,6 +32,7 @@ class ServerShapeParityTest {
     private val handles = listOf(
         "pekko" to PekkoServer::class.java,
         "jetty" to JettyServer::class.java,
+        "gannet" to GannetServer::class.java,
     )
 
     @Test
@@ -68,13 +73,30 @@ class ServerShapeParityTest {
     }
 
     @Test
+    @RequiresGannet
+    fun `gannet serves inside a use block, and closing releases block`() {
+        val parked = gannetApi().startOnGannet(port = 0).use { server ->
+            answersOn(server.baseUrl)
+            parkedIn(server::block)
+        }
+
+        parked.releasedWithin()
+    }
+
+    @Test
     fun `and stopAsync completes once the server is down, on every backend`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "shape-parity-async")
         val jetty = jettyApi().startOnJetty(port = 0)
+        val gannet = if (GannetTests.run) gannetApi().startOnGannet(port = 0) else null
 
-        val parked = listOf("pekko" to parkedIn(pekko::block), "jetty" to parkedIn(jetty::block))
+        val parked = listOfNotNull(
+            "pekko" to parkedIn(pekko::block),
+            "jetty" to parkedIn(jetty::block),
+            gannet?.let { "gannet" to parkedIn(it::block) },
+        )
 
-        listOf(pekko::stopAsync, jetty::stopAsync).forEach { it().toCompletableFuture().join() }
+        listOfNotNull(pekko::stopAsync, jetty::stopAsync, gannet?.let { it::stopAsync })
+            .forEach { it().toCompletableFuture().join() }
 
         parked.forEach { (name, thread) -> withClue(name) { thread.releasedWithin() } }
     }

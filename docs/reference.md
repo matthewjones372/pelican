@@ -10,7 +10,7 @@ reading it can use).
 
 Contents:
 
-- **Modules and backends:** [Modules](#modules), [The backend](#the-backend) (including [On Jetty](#on-jetty)), [Choosing a JSON library](#choosing-a-json-library)
+- **Modules and backends:** [Modules](#modules), [The backend](#the-backend) (including [On Jetty](#on-jetty) and [On Gannet](#on-gannet)), [Choosing a JSON library](#choosing-a-json-library)
 - **Defining endpoints and inputs:** [Everything is a value](#everything-is-a-value), [Typechecked endpoints](#typechecked-endpoints), [Refined inputs](#refined-inputs), [More than one value](#more-than-one-value), [Cookies](#cookies), [Form bodies](#form-bodies), [Multipart uploads](#multipart-uploads)
 - **Responses and errors:** [Response headers](#response-headers), [Declared failures](#declared-failures), [More than one successful response](#more-than-one-successful-response), [One response, several renderings](#one-response-several-renderings), [Streaming](#a-whole-list-or-a-stream-of-one) (and the sections after it, through [Streaming behaviour](#streaming-behaviour)), [Errors](#errors-and-what-a-caller-is-told), [Limits and startup checks](#limits-and-startup-checks)
 - **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
@@ -54,6 +54,9 @@ them is [Version alignment and the BOM](modules.md#version-alignment-and-the-bom
 | `pelican-client-jetty` | `main` | core, jetty-client | where a generated client's requests go: `ClientTransport` over Jetty's `HttpClient`, for a service on `pelican-jetty` or one that runs no Pekko |
 | `pelican-streams-jetty` | `main` | jetty; lark-stream *provided* | the same as `pelican-streams` on Jetty, over `Stream.blocking`, on any lark backend |
 | `pelican-test-jetty` | `main` | test, jetty | the in-memory transport on Jetty, through a `LocalConnector`, and `PelicanServer.client()` |
+| `pelican-gannet` | `main` | core, Gannet | descriptions to a `GannetHandler` on Gannet, an HTTP/1.1 server on io_uring, with `start` to serve them. See [On Gannet](#on-gannet) |
+| `pelican-gannet-docs` | `main` | gannet, openapi | the document and a page, as a `GannetHandler` beside the endpoints: `handlerWithDocs`, `docsHandler`, `startWithDocs` |
+| `pelican-test-gannet` | `main` | gannet, test | `onLoopback()`: the typed client against the API started on a loopback port |
 | `pelican-metrics` | yes | core, micrometer-core | descriptions to Micrometer meters, tagged from what the descriptions already say |
 | `pelican-metrics-otel` | yes | core, opentelemetry-api | descriptions to OpenTelemetry server spans and the specified duration histogram, and `traced` for client calls |
 | `pelican-health` | yes | **core** | live and ready probes in `application/health+json`, and checks on a JDBC pool, a downstream service, disk, heap and threads, on the JDK alone |
@@ -496,6 +499,81 @@ the stalled upload on the wire:
 - **A page asked for with `Range` is the whole file, 200**, on Jetty; Pekko
   answers 206 with `Content-Range` and only those bytes. Pages are small static assets, and a client that
   asks for a range and gets 200 takes the whole body, as RFC 9110 allows.
+
+### On Gannet
+
+`pelican-gannet` serves the same descriptions on
+[Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server over
+Linux's io_uring: a carrier thread and ring per core, each connection a fiber
+on the JDK's internal continuation. Gannet is a library of its own,
+`io.github.matthewjones372:gannet`, and this module depends on it. The
+binders are Jetty's, by name and by type, `Sequence` included, so moving a
+service is an import swap. It is experimental, on `main` and in no release,
+and Gannet is a `0.1.0-SNAPSHOT` from Central's snapshot repository.
+
+It needs Linux 6.1 or later, JDK 25, and two flags on every JVM that runs it,
+which Gannet's `GannetSupport.FLAGS` spells out; `start` throws Gannet's
+`GannetUnavailableException` naming whichever is missing:
+
+```
+--enable-native-access=ALL-UNNAMED --add-exports java.base/jdk.internal.vm=ALL-UNNAMED
+```
+
+```kotlin
+import io.github.matthewjones372.pelican.gannet.handledNow
+import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.gannet.streamedNow
+
+val routes = listOf(
+    getOrder handledNow { id -> store.order(id) },
+    streamOrders streamedNow { store.orders().asSequence() },   // pulled one element per write
+)
+
+val server = api(routes, JacksonCodecs).start(port = 8080)        // binds 127.0.0.1
+server.use { it.block() }
+```
+
+`start` returns a `PelicanServer` with the same five members as Jetty's, and
+takes Gannet's `GannetConfig` for its sizing and limits. `GannetConfig.tls`
+serves the port over TLS only, and `baseUrl` is then `https`. The last
+parameter is the handler to serve. A `GannetHandler` answers Gannet's
+`HttpExchange` and returns
+true, or returns false so the next one is asked; `then` chains two, and
+`onlyFor(Method.GET)` joins a hand-written one to the merged 405 as on Jetty:
+
+```kotlin
+api.start(port = 8080) { health.onlyFor(Method.GET) then toHandler() }
+```
+
+**Where a handler runs.** Routing, 404s, 405s, preflights, refusals and `…By`
+handlers answer on the carrier, in the connection's fiber. A synchronous
+handler moves to a virtual thread with its filters and authenticator under
+`Handlers.default`, or to the service's executor under `Handlers.on`.
+`Handlers.onDispatcher` runs it inline on the carrier: no hop at all, and a
+handler that blocks there stalls every connection on that core. Reading a
+streamed upload, and pulling a streamed response's `Sequence`, always happen
+off the carrier. A strict body is read where the endpoint runs; on the carrier
+that parks only the fiber.
+
+**Streams** behave as on Jetty: one write per element, each waited on, so a
+consumer that stops reading stops the producer, and a write to a client that
+has gone interrupts the thread pulling the sequence. `rows.toSequence()`,
+`rows.reader()` and `wake()` read an upload as on Jetty, with the same
+five-second read timeout.
+
+**Testing.** `pelican-test-gannet`'s `onLoopback()` is the typed client, as
+`inMemory()` is on Jetty and Pekko. Gannet has no in-memory connector, so it
+starts the API on a loopback port and stops it when the client closes.
+
+#### What differs on Gannet
+
+Recorded in `GannetDifference`, beside `JettyDifference`, and held on the wire
+by `RecordedDifferencesTest`. Everything else in `example/backends/` answers as
+Jetty does, including the two other entries in `JettyDifference`.
+
+- **A path that climbs above the root**, or starts with an empty segment, is a
+  404, as on Pekko, where Jetty answers its own 400. Gannet hands the path
+  over as it arrived, and the interpreter routes it nowhere.
 
 ## Choosing a JSON library
 
@@ -6322,12 +6400,12 @@ place they are recorded.
 ## Versions
 
 What 1.0.0 is built with. `main` builds with the same versions, except the
-bytecode, plus the two libraries only its unreleased modules use:
+bytecode, plus the libraries only its unreleased modules use:
 
 | | 1.0.0 |
 |---|---|
 | Kotlin | 2.4.20 |
-| Bytecode | JDK 25 (`main`: JDK 21; `pelican-streams` and `pelican-streams-jetty` JDK 25) |
+| Bytecode | JDK 25 (`main`: JDK 21; `pelican-streams`, `pelican-streams-jetty` and the `pelican-gannet` modules JDK 25) |
 | Gradle | 9.8.0 |
 | Pekko | 1.7.1 |
 | Pekko HTTP | 1.4.1 |
@@ -6342,14 +6420,17 @@ bytecode, plus the two libraries only its unreleased modules use:
 | nimbus-jose-jwt | 10.10 |
 | Jetty | `main` only: 12.1.13 (`jetty-server`, `jetty-client`) |
 | kotlinx-serialization-json | `main` only: 1.11.0 |
+| Gannet | `main` only: 0.1.0-SNAPSHOT |
 
 The libraries Pelican ships are floors, not pins: Gradle resolves upwards, so a
 service already on a newer Jackson keeps its own. 1.0.0's library
 modules compile to JDK 25 bytecode, so a service on 1.0.0 needs JDK 25 or
 newer. On `main` they compile to JDK 21, except `pelican-streams` and
 `pelican-streams-jetty`, which stay on 25 because `lark-stream` 0.9.0 is
-compiled for 25; a build on JDK 21 that asks for either gets a Gradle
-resolution error rather than a failure at run time. The suites run on
+compiled for 25, and the `pelican-gannet` modules, whose Gannet needs the
+foreign-function API and internal continuation; a build on JDK 21 that asks
+for any of them gets a Gradle resolution error rather than a failure at run
+time. The suites run on
 whichever JDK started the build, never below the bytecode they load, and
 `TestRuntimeIsTheBuildRuntimeTest` is what holds that. CI on `main` runs them
 on 21 and on 25.

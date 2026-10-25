@@ -33,6 +33,20 @@ one.
 
 ### Added
 
+- **`pelican-gannet`** (spec 0088): an `Api` served on
+  [Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
+  io_uring, one carrier thread and ring per core, each connection a fiber on
+  the JDK's internal continuation. Linux 6.1+, JDK 25, experimental.
+  `toHandler`, `start` (taking a `GannetConfig`, TLS included) and the
+  thirteen binders, under the names and types Jetty's have;
+  `pelican-gannet-docs` for the document and its pages, and
+  `pelican-test-gannet` for the typed client over loopback. Handlers run on
+  virtual threads by default; `Handlers.onDispatcher` runs them on the carrier.
+  Every suite in `example/backends/` runs on it as a third backend. It differs
+  from Jetty in one recorded place: a path climbing above the root is a 404, as
+  on Pekko. `example` and `benchmarks` now build on JDK 25 to depend on it.
+  Gannet is `io.github.matthewjones372:gannet:0.1.0-SNAPSHOT`, resolved from
+  Central's snapshot repository.
 - **`BodyCodec.encoded`**: bytes the codec already holds, or null to encode as
   today. Jetty wraps the array. Pekko retains it with
   `ByteString.fromArrayUnsafe`. Jackson and kotlinx do not override it

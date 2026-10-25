@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -15,6 +16,8 @@ import java.net.URI
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnGannet
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
@@ -105,6 +108,33 @@ class SlowConsumerTest {
                 }
             },
         ).startOnJetty(port = 0)
+
+        try {
+            readOneFrameThenVanish(server.baseUrl)
+            closed.shouldFireWithinTheTimeout("the sequence")
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    @RequiresGannet
+    @Suppress("SleepInsteadOfDelay") // The next element, which never comes.
+    fun `gannet stops pulling the sequence when the consumer disappears`() {
+        val closed = CountDownLatch(1)
+        val server = api(
+            drip streamedNowOnGannet {
+                sequence {
+                    try {
+                        yield(Tick(1))
+                        Thread.sleep(NEXT_ELEMENT_MILLIS)
+                        yield(Tick(2))
+                    } finally {
+                        closed.countDown()
+                    }
+                }
+            },
+        ).startOnGannet(port = 0)
 
         try {
             readOneFrameThenVanish(server.baseUrl)

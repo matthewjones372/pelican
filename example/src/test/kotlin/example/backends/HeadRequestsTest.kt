@@ -26,13 +26,13 @@ import org.junit.jupiter.params.provider.MethodSource
 class HeadRequestsTest {
 
     companion object {
-        private val running: Map<String, Running> = allBackends.associate { it.name to it.start(port = 0) }
+        private val running: Map<String, Running> = runnableBackends.associate { it.name to it.start(port = 0) }
 
         private val clients: Map<String, ApiClient> =
             running.mapValues { (_, server) -> apiClient(server.baseUrl, JacksonCodecs) }
 
         @JvmStatic
-        fun backends(): List<Array<Any>> = allBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
+        fun backends(): List<Array<Any>> = runnableBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
 
         @JvmStatic
         @AfterAll
@@ -84,9 +84,12 @@ class HeadRequestsTest {
      * Jetty agrees for its own reason: `toHandler` routes HEAD as a method of
      * its own and never answers it from a GET, so `/motd` passes on and
      * `Unanswered` says 404, the HEAD route's path rejection winning as above.
+     *
+     * Gannet routes as Jetty's does, and its runtime never rewrites a HEAD either.
      */
     private val pinned = mapOf(
         "pekko" to 404,
         "jetty" to 404,
+        "gannet" to 404,
     )
 }

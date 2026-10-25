@@ -3,6 +3,7 @@ package example.backends
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
@@ -14,6 +15,8 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlin.time.Duration.Companion.milliseconds
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnGannet
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
@@ -96,6 +99,27 @@ class SseKeepAliveTest {
                 }
             },
         ).startOnJetty(port = 0)
+
+        try {
+            body(server.baseUrl).shouldCarryKeepAlives()
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    @RequiresGannet
+    @Suppress("SleepInsteadOfDelay") // The quiet stretch, on the virtual thread pulling the sequence.
+    fun `gannet fills the silence`() {
+        val server = api(
+            quiet streamedNowOnGannet {
+                sequence {
+                    yield(Tick(1))
+                    Thread.sleep(QUIET_MILLIS)
+                    yield(Tick(2))
+                }
+            },
+        ).startOnGannet(port = 0)
 
         try {
             body(server.baseUrl).shouldCarryKeepAlives()

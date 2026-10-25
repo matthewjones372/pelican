@@ -33,6 +33,7 @@ val styledModules = listOf(
     "pelican-arrow",
     "pelican-pekko",
     "pelican-jetty",
+    "pelican-gannet",
     "pelican-metrics",
     "pelican-metrics-otel",
     "pelican-health",
@@ -40,7 +41,7 @@ val styledModules = listOf(
     "pelican-health-redis",
     "pelican-oidc",
     "pelican-client-pekko",
-    "pelican-test", "pelican-test-pekko", "pelican-test-jetty",
+    "pelican-test", "pelican-test-pekko", "pelican-test-jetty", "pelican-test-gannet",
     // Joined the gate with spec 0062's stubFile, the module's first accumulator.
     "pelican-test-wiremock",
 )

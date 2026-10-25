@@ -69,9 +69,6 @@ val ktlintVersion = "1.8.0"
 // .editorconfig beside the rest, which is also what the IDE reads.
 val ktlintOverrides = mapOf("ktlint_standard_kdoc" to "disabled")
 
-// The root project builds nothing, but Spotless resolves ktlint here.
-repositories { mavenCentral() }
-
 spotless {
     kotlinGradle {
         // settings.gradle.kts, this file and the BOM's, which applies no
@@ -110,10 +107,13 @@ val moduleDescriptions = mapOf(
     "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
     "pelican-streams" to "A streaming body as a lark Stream, whose failure is a value.",
     "pelican-streams-jetty" to "A streaming body on Jetty as a lark Stream, whose failure is a value.",
+    "pelican-gannet" to "Endpoint descriptions served on Gannet, an HTTP/1.1 server on io_uring.",
+    "pelican-gannet-docs" to "Serves the OpenAPI document and Swagger UI on Gannet.",
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
     "pelican-test-golden" to "Golden files per endpoint that fail on a change breaking existing callers.",
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",
     "pelican-test-jetty" to "The in-memory transport for pelican-test, on Jetty.",
+    "pelican-test-gannet" to "A loopback transport for pelican-test, on Gannet.",
     "pelican-test-wiremock" to "WireMock stubbed and verified in endpoint values, and stub files exported from them.",
     "pelican-bom" to "Every Pelican module at one version, so a build names the version once.",
 )
@@ -171,7 +171,17 @@ dependencies {
     // that no test covers and pull the total down — a coverage floor that
     // falls because a benchmark was written is measuring the wrong thing.
     // See benchmarks/build.gradle.kts for why the agent stays off it entirely.
-    subprojects.filter { it.name !in setOf("benchmarks", "pelican-bom") }.forEach { kover(project(it.path)) }
+    //
+    // The Gannet modules count only where their tests must run. They skip wherever io_uring is unusable -- off Linux,
+    // and on a Linux whose seccomp profile or `io_uring_disabled` refuses `io_uring_setup`, as CI's container does --
+    // and skipped lines would pull the total down. Being on Linux says nothing about the second, so the signal is
+    // `PELICAN_REQUIRE_URING=1`, which makes those tests fail rather than skip (spec 0088).
+    val gannetModules = setOf("pelican-gannet", "pelican-gannet-docs", "pelican-test-gannet")
+    val gannetRuns = System.getenv("PELICAN_REQUIRE_URING") == "1"
+    subprojects
+        .filter { it.name !in setOf("benchmarks", "pelican-bom") }
+        .filter { gannetRuns || it.name !in gannetModules }
+        .forEach { kover(project(it.path)) }
 }
 
 // A floor nobody runs is not a floor: `./gradlew build` checks it.
@@ -184,18 +194,25 @@ tasks.named("check") {
 }
 
 /**
- * Every module but the example and the benchmarks is published. The example is
- * a runnable service and a test suite, and the benchmarks are a JMH harness;
- * nobody should be able to depend on either by accident.
+ * Every module but the example, the benchmarks and the Gannet backend is
+ * published. The example is a runnable service and a test suite, and the
+ * benchmarks are a JMH harness; nobody should be able to depend on either by
+ * accident. The Gannet modules are experimental and on main only: they depend
+ * on a Gannet snapshot, which a release must not.
  */
-val publishedModules = subprojects.map { it.name } - setOf("example", "benchmarks")
+val publishedModules = subprojects.map { it.name } -
+    setOf("example", "benchmarks", "pelican-gannet", "pelican-gannet-docs", "pelican-test-gannet")
 
 // What `pelican-bom` constrains, so a new module is in it without an edit there.
 extra["libraryModules"] = publishedModules - "pelican-bom"
 
-subprojects {
-    repositories { mavenCentral() }
+val floor25 = setOf(
+    "pelican-streams", "pelican-streams-jetty",
+    "pelican-gannet", "pelican-gannet-docs", "pelican-test-gannet",
+    "example", "benchmarks",
+)
 
+subprojects {
     // The namespace verified on the Central Portal, against the GitHub
     // account it names.
     group = "io.github.matthewjones372"
@@ -205,8 +222,10 @@ subprojects {
     // A `java-platform` has no sources, so none of what follows applies to it.
     if (name == "pelican-bom") return@subprojects
 
-    // lark-stream 0.9.0 is class file 69, so a module built on it is Java 25 until lark targets 21.
-    val jvmFloor = if (name in setOf("pelican-streams", "pelican-streams-jetty")) 25 else 21
+    // lark-stream 0.9.0 is class file 69, so a module built on it is Java 25 until lark targets 21. Gannet needs FFM
+    // and the JDK's internal continuation, and whatever depends on it is 25 too: the example's parity suites and the
+    // benchmarks run every backend (spec 0088).
+    val jvmFloor = if (name in floor25) 25 else 21
 
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
@@ -268,6 +287,9 @@ subprojects {
         javaLauncher.set(toolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(testJdk)) })
 
         systemProperty("pelican.launcherJavaVersion", testJdk.toString())
+        // Whether the Gannet tests may skip. An input, so a cached run that skipped them is not reused for one
+        // that must run them.
+        inputs.property("pelicanRequireUring", System.getenv("PELICAN_REQUIRE_URING").orEmpty())
         // `-PjettyPool=virtual` runs every suite's Jetty servers on `VirtualThreadPool` (spec 0085).
         providers.gradleProperty("jettyPool").orNull?.let { systemProperty("pelican.jetty.pool", it) }
         // A backstop, not a budget: it exists so one wedged test cannot burn

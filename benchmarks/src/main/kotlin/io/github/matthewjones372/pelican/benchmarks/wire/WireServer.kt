@@ -13,6 +13,11 @@ import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.queryParam
 import org.apache.pekko.stream.javadsl.Source
 import java.util.concurrent.CompletableFuture
+import io.github.matthewjones372.pelican.gannet.Handlers as GannetHandlers
+import io.github.matthewjones372.pelican.gannet.handledBy as stagedOnGannet
+import io.github.matthewjones372.pelican.gannet.handledNow as onGannet
+import io.github.matthewjones372.pelican.gannet.start as startGannet
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedOnGannet
 import io.github.matthewjones372.pelican.jetty.handledBy as stagedOnJetty
 import io.github.matthewjones372.pelican.jetty.handledNow as onJetty
 import io.github.matthewjones372.pelican.jetty.start as startJetty
@@ -74,8 +79,9 @@ private fun wireApi(bind: List<ServerEndpoint>): Api = api(endpoints = bind, cod
 /**
  * One server for [WireDriver], in a JVM of its own so neither server shares a heap or a JIT with the driver.
  *
- * Both start through their own `start()` with its defaults. Prints the port, then serves until stdin closes, which
- * is how the driver stops it and how it stops if the driver dies.
+ * Each starts through its own `start()` with its defaults; `gannet-inline` is Gannet with
+ * `Handlers.onDispatcher`, so the cost of the hop to a virtual thread is a number (spec 0088). Prints the port,
+ * then serves until stdin closes, which is how the driver stops it and how it stops if the driver dies.
  */
 fun main(args: Array<String>) {
     val stop: () -> Unit
@@ -109,7 +115,22 @@ fun main(args: Array<String>) {
             stop = server::stop
         }
 
-        else -> error("Expected pekko or jetty, got ${args.single()}")
+        "gannet", "gannet-inline" -> {
+            val handlers = if (args.single() == "gannet") GannetHandlers.default else GannetHandlers.onDispatcher
+            val server = wireApi(
+                listOf(
+                    getItem onGannet { (id, lim) -> Item(id, "item-$lim") },
+                    createItem onGannet { body -> Item(1, body.name) },
+                    staged stagedOnGannet { stagedItem() },
+                    ndjsonFrames streamedOnGannet { frames() },
+                    sseFrames streamedOnGannet { frames() },
+                ),
+            ).startGannet(port = 0, handlers = handlers)
+            port = server.port
+            stop = server::stop
+        }
+
+        else -> error("Expected pekko, jetty, gannet or gannet-inline, got ${args.single()}")
     }
     println("PORT $port")
     System.out.flush()

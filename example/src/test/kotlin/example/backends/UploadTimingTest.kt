@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ndjsonIn
 import io.kotest.assertions.withClue
@@ -14,6 +15,9 @@ import java.io.OutputStream
 import java.net.Socket
 import java.net.URI
 import java.nio.charset.StandardCharsets
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnGannet
+import io.github.matthewjones372.pelican.gannet.toSequence as toSequenceOnGannet
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.jetty.toSequence as toSequenceOnJetty
@@ -65,6 +69,18 @@ class UploadTimingTest {
     @Test
     fun `jetty answers the first frame before the last one is sent`() {
         val server = api(relay streamedNowOnJetty { rows -> rows.toSequenceOnJetty() }).startOnJetty(port = 0)
+
+        try {
+            server.baseUrl.shouldAnswerBeforeTheUploadEnds()
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    @RequiresGannet
+    fun `gannet answers the first frame before the last one is sent`() {
+        val server = api(relay streamedNowOnGannet { rows -> rows.toSequenceOnGannet() }).startOnGannet(port = 0)
 
         try {
             server.baseUrl.shouldAnswerBeforeTheUploadEnds()
