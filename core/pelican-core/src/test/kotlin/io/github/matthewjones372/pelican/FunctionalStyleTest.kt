@@ -55,6 +55,8 @@ class FunctionalStyleTest {
             "type claimed each component name while one is being described",
         "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/InMemory.kt" to
             "the per-request value bag handed to Params, as in each interpreter",
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/spi/EndpointPlan.kt" to
+            "a request's slots, and the copy of them Map.entries hands lensInputs; no request walks it",
         "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/spi/Requests.kt" to
             "the response-to-codec table, keyed by identity because two responses can carry one payload " +
             "type and a negotiated one carries the same type under several encodings; built once per " +
@@ -90,8 +92,6 @@ class FunctionalStyleTest {
             "the per-request value bag handed to Params",
         "backends/jetty/pelican-jetty/src/main/kotlin/io/github/matthewjones372/pelican/jetty/Interpreter.kt" to
             "the per-request value bag handed to Params, as on Pekko",
-        "backends/gannet/pelican-gannet/src/main/kotlin/io/github/matthewjones372/pelican/gannet/Interpreter.kt" to
-            "the per-request value bag handed to Params, as on Jetty",
         "backends/pekko/pelican-pekko/src/main/kotlin/io/github/matthewjones372/pelican/pekko/Responses.kt" to
             "the empty parameter map Pekko's customWithFixedCharset takes, and the cache of the content " +
             "types built from it — one entry per declared media type, none of them from a request",

@@ -182,7 +182,8 @@ class ParamsReadAsJettyReadsThemTest {
             listOf(".", "..", "%2E", "%2e%2e", ".%2E", "%2E.", "%2E%2E/", "x/..", "x/%2E%2E").map { "/items/$it" }
 
         @JvmStatic
-        fun malformed(): List<String> = listOf("/items/ada%zz", "/items/x?q=%zz")
+        fun malformed(): List<String> =
+            listOf("/items/ada%zz", "/items/x?q=%zz", "/items/x?other=%zz", "/items/x?q=a&other=%4")
     }
 
     private fun ask(baseUrl: String, target: String, headers: List<Pair<String, String>>): Seen {

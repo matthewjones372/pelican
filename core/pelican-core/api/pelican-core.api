@@ -1664,6 +1664,16 @@ public final class io/github/matthewjones372/pelican/spi/CorsHeaders {
 	public static final field REQUEST_METHOD Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/spi/EndpointPlan {
+	public final fun decodePlainInputs (Lio/github/matthewjones372/pelican/spi/RequestView;Lio/github/matthewjones372/pelican/spi/Slots;)V
+	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
+	public final fun slots ()Lio/github/matthewjones372/pelican/spi/Slots;
+}
+
+public final class io/github/matthewjones372/pelican/spi/EndpointPlanKt {
+	public static final fun plan (Lio/github/matthewjones372/pelican/Endpoint;)Lio/github/matthewjones372/pelican/spi/EndpointPlan;
+}
+
 public final class io/github/matthewjones372/pelican/spi/HandlersKt {
 	public static final fun declaredInputCount (Lio/github/matthewjones372/pelican/Endpoint;)I
 	public static final fun failureNamedBy (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Outcome$Err;)Lio/github/matthewjones372/pelican/ErrorOutput;
@@ -1726,7 +1736,9 @@ public final class io/github/matthewjones372/pelican/spi/RequestsKt {
 }
 
 public final class io/github/matthewjones372/pelican/spi/RouteIndex {
+	public final fun decodeCaptures (Lio/github/matthewjones372/pelican/ServerEndpoint;Ljava/lang/String;Ljava/util/Map;)V
 	public final fun describesPath (Ljava/lang/String;)Z
+	public final fun find (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public final fun match (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;Ljava/util/Map;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public final fun routeFor (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 }
@@ -1739,6 +1751,23 @@ public final class io/github/matthewjones372/pelican/spi/ServerErrorsKt {
 	public static final fun classifyError (Ljava/lang/Throwable;Lio/github/matthewjones372/pelican/Api;)Lio/github/matthewjones372/pelican/spi/ClassifiedError;
 	public static final fun renderError (Ljava/lang/Throwable;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/Endpoint;)Lio/github/matthewjones372/pelican/spi/RenderedError;
 	public static synthetic fun renderError$default (Ljava/lang/Throwable;Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/Endpoint;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/spi/RenderedError;
+}
+
+public final class io/github/matthewjones372/pelican/spi/Slots : kotlin/collections/AbstractMutableMap {
+	public fun containsKey (Lio/github/matthewjones372/pelican/ParamKey;)Z
+	public final fun containsKey (Ljava/lang/Object;)Z
+	public fun get (Lio/github/matthewjones372/pelican/ParamKey;)Ljava/lang/Object;
+	public final fun get (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun getEntries ()Ljava/util/Set;
+	public fun getOrDefault (Lio/github/matthewjones372/pelican/ParamKey;Ljava/lang/Object;)Ljava/lang/Object;
+	public final fun getOrDefault (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+	public fun getSize ()I
+	public fun put (Lio/github/matthewjones372/pelican/ParamKey;Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun put (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+	public fun remove (Lio/github/matthewjones372/pelican/ParamKey;)Ljava/lang/Object;
+	public fun remove (Lio/github/matthewjones372/pelican/ParamKey;Ljava/lang/Object;)Z
+	public final fun remove (Ljava/lang/Object;)Ljava/lang/Object;
+	public final fun remove (Ljava/lang/Object;Ljava/lang/Object;)Z
 }
 
 public final class io/github/matthewjones372/pelican/spi/TaggedBodiesKt {
