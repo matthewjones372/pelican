@@ -204,7 +204,8 @@ Gannet is its own library, `io.github.matthewjones372:gannet`, on `main` as a
 keeps them on the carrier. Linux 6.1 or later, JDK 25, and two JVM flags:
 `--enable-native-access=ALL-UNNAMED --add-exports
 java.base/jdk.internal.vm=ALL-UNNAMED`. TLS through `GannetConfig.tls`; no
-HTTP/2 or compression.
+HTTP/2 or compression. None of the three is published, nor in `pelican-bom`:
+use them from a build of `main`.
 
 | Module | Availability | Depends on | Provides |
 |---|---|---|---|
@@ -212,8 +213,8 @@ HTTP/2 or compression.
 | `pelican-gannet-docs` | main only | gannet, openapi | the document and a Swagger UI or Redoc page and a Redoc or RapiDoc reference beside it, as a `GannetHandler` |
 | `pelican-test-gannet` | main only | gannet, test | `onLoopback(handlers)`: the API started on a loopback port, with the typed client over a socket |
 
-Typical stack: `pelican-bom`, `pelican-gannet`, `pelican-jackson` or
-`pelican-kotlinx`, `pelican-gannet-docs`, and `pelican-test-gannet` for tests.
+Typical stack: `pelican-gannet`, `pelican-jackson` or `pelican-kotlinx`,
+`pelican-gannet-docs`, and `pelican-test-gannet` for tests.
 
 ### Testing
 
