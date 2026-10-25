@@ -140,7 +140,9 @@ internal class PelicanHandler(
         } catch (t: Throwable) {
             CompletableFuture.completedStage(errorResponse(t, api))
         } ?: return false
-        answered.whenComplete { reply, failure -> (reply ?: errorResponse(failure, api)).writeTo(response, callback) }
+        answered.whenComplete { reply, failure ->
+            (reply ?: errorResponse(failure, api)).writeTo(response, callback.afterReadingRest(request))
+        }
         return true
     }
 
