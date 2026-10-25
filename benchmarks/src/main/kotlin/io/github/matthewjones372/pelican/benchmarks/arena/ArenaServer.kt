@@ -77,7 +77,10 @@ private val jsonItems = endpoint(count, m) {
 
 private fun page(items: List<DatasetItem>, n: Int, mult: Long): JsonPage {
     val first = items.take(n.coerceIn(0, items.size)).map {
-        PricedItem(it.id, it.name, it.category, it.price, it.quantity, it.active, it.tags, it.rating, it.price * it.quantity * mult)
+        PricedItem(
+            it.id, it.name, it.category, it.price, it.quantity, it.active, it.tags, it.rating,
+            it.price * it.quantity * mult,
+        )
     }
     return JsonPage(first, first.size)
 }

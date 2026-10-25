@@ -88,19 +88,19 @@ private class Child(name: String, side: Side) : AutoCloseable {
     private val process: Process = ProcessBuilder(
         // Local benchmarking hook: `-Dwire.serverCpus=0,1` runs the server under `taskset` on those cores.
         System.getProperty("wire.serverCpus")?.let { listOf("taskset", "-c", it) }.orEmpty() + listOf(
-        ProcessHandle.current().info().command().orElseThrow(),
-        "-Xms1g",
-        "-Xmx1g",
-        // What the io_uring runtime needs (`UringSupport.FLAGS`); the other servers ignore them.
-        "--enable-native-access=ALL-UNNAMED",
-        "--add-exports",
-        "java.base/jdk.internal.vm=ALL-UNNAMED",
-        "-Dpelican.jetty.pool=${side.pool}",
-        "-Dpelican.jetty.connector=${side.connector}",
-        "-cp",
-        side.classpath,
-        "io.github.matthewjones372.pelican.benchmarks.wire.WireServerKt",
-        name,
+            ProcessHandle.current().info().command().orElseThrow(),
+            "-Xms1g",
+            "-Xmx1g",
+            // What the io_uring runtime needs (`UringSupport.FLAGS`); the other servers ignore them.
+            "--enable-native-access=ALL-UNNAMED",
+            "--add-exports",
+            "java.base/jdk.internal.vm=ALL-UNNAMED",
+            "-Dpelican.jetty.pool=${side.pool}",
+            "-Dpelican.jetty.connector=${side.connector}",
+            "-cp",
+            side.classpath,
+            "io.github.matthewjones372.pelican.benchmarks.wire.WireServerKt",
+            name,
         ),
     ).redirectError(ProcessBuilder.Redirect.INHERIT).start()
 
@@ -396,7 +396,8 @@ fun main(args: Array<String>) {
     for (scenario in options.scenarios) {
         if (baseline == null) {
             lines += header(scenario)
-            val order = System.getProperty("wire.servers")?.split(',') ?: listOf("pekko", "jetty", "uring", "uring-inline")
+            val order = System.getProperty("wire.servers")?.split(',')
+                ?: listOf("pekko", "jetty", "uring", "uring-inline")
             for (server in order) {
                 lines += ladder(server, server, mine, scenario, schedule, notes).map { it.row() }
             }
