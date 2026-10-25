@@ -553,7 +553,9 @@ handler moves to a virtual thread with its filters and authenticator under
 handler that blocks there stalls every connection on that core. Reading a
 streamed upload, and pulling a streamed response's `Sequence`, always happen
 off the carrier. A strict body is read where the endpoint runs; on the carrier
-that parks only the fiber.
+that parks only the fiber. One that has not arrived within
+`strictBodyTimeoutMillis` is a 408, as on Jetty; the deadline is checked every
+250 ms, so the 408 can come up to 250 ms after it.
 
 **Streams** behave as on Jetty: one write per element, each waited on, so a
 consumer that stops reading stops the producer, and a write to a client that
