@@ -217,3 +217,12 @@ tasks.register<JavaExec>("wire") {
     providers.gradleProperty("wireConnector").orNull?.let { args("--connector", it) }
     providers.gradleProperty("wireAbConnector").orNull?.let { args("--ab-connector", it) }
 }
+
+/** Writes the benchmarks' runtime classpath, built, to `build/arena-classpath.txt`, for `benchmarks/arena.sh`. */
+tasks.register("arenaClasspath") {
+    description = "Builds the arena servers and writes their classpath for benchmarks/arena.sh"
+    dependsOn(benchmarkRuntimeClasspath)
+    val out = layout.buildDirectory.file("arena-classpath.txt")
+    outputs.file(out)
+    doLast { out.get().asFile.writeText(benchmarkRuntimeClasspath.asPath) }
+}

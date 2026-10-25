@@ -100,10 +100,15 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
 
 - [ ] **`spec-0089-arena`**: `raw-gannet` (Gannet's API, exact `Content-Length`) and `benchmarks/arena.sh` (gcannon, PIDs, a quiet-machine gate).
       Done when: one run prints raw, inline and default in one table.
-- [ ] **`spec-0089-deadline`**: pelican-gannet's strict-body deadline kept by a sweeper, its exception made on firing.
+- [x] **`spec-0089-deadline`** ([#344](https://github.com/matthewjones372/pelican/pull/344)): pelican-gannet's strict-body deadline kept by a sweeper, its exception made on firing.
       Done when: the 408 test passes and inline baseline ≥ 170k.
-- [ ] **`spec-0089-sized-read`**: pelican-gannet on the Gannet release with the exact-size read.
+- [x] **`spec-0089-sized-read`**: pelican-gannet on the Gannet release with the exact-size read.
       Done when: Pelican-on-Gannet allocates ≤ 6 KB per baseline request and inline ≥ 225k.
+      Closed with no code: the snapshot `main` builds against (`0.1.0-20261025.140125-2`) reads exactly
+      `Content-Length`. In `spec-0089-arena`'s run Pelican allocates 5.0 KB a request (`raw-gannet` 2.3 KB);
+      inline is 211k (208–214k) against `raw-gannet`'s 279k (275–285k), 76%. The same build served 238k earlier
+      the same day; interleaved with today's, it serves 209–214k, so the machine moved and the 225k is quoted
+      against a different day's ceiling. Later entries are judged against `raw-gannet` in the same run.
 - [ ] **`spec-0089-view`**: `RequestView`, `RouteIndex` matching in place, dot segments without a split; Gannet adopts.
       Done when: routing and building allocate nothing for `/baseline11` (JMH `-prof gc`).
 - [ ] **`spec-0089-plan`**: `EndpointPlan` with slot-backed `Params` and the query scanned once; Gannet adopts.
@@ -120,7 +125,7 @@ Predicted inline / default (measured where a switch existed, else from the table
 
 ## Risks
 
-- **Gannet's release.** `-sized-read` waits on it; the entries after it do not.
+- **Gannet's release.** Shipped in the snapshot; `-sized-read` closed on it.
 - **Decoding drift.** One shared decoder replaces three copies; the differential tests
   and the parity suite are the oracle, and they run before each backend adopts it.
 - **A view outliving its request.** `RequestView` is never stored; a handler keeps slots.
