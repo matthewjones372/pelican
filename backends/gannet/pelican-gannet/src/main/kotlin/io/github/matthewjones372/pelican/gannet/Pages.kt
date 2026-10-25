@@ -37,7 +37,7 @@ internal class PagesHandler(
         }
         val resolved = below?.let { pages.resolve(it, ::isFile) } ?: return false
         val asked = request.query?.let { "$path?$it" } ?: path
-        val sendTo = if (resolved.redirect) null else pages.guard?.redirectFor(asked, request.credentials())
+        val sendTo = if (resolved.redirect) null else pages.guard?.redirectFor(asked, GannetView(request))
         when {
             resolved.redirect -> redirect(MOVED_PERMANENTLY, "$path/").writeTo(exchange)
 

@@ -3,10 +3,10 @@ package io.github.matthewjones372.pelican.gannet
 import io.github.matthewjones372.gannet.HttpRequest
 import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.Cookies
-import io.github.matthewjones372.pelican.Credentials
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.parseFormBody
+import io.github.matthewjones372.pelican.spi.RequestView
 import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.withoutDotSegments
 
@@ -20,17 +20,23 @@ internal fun HttpRequest.routedPath(): String? {
     return withoutDotSegments(path)
 }
 
-/** Cookies parsed by core, as [decodePlainInputs] parses them, so a session reads the same on every backend. */
-internal fun HttpRequest.credentials(): Credentials = object : Credentials {
-    override fun header(name: String): String? = headers[name]
+/** Gannet's request read in place: what an authenticator, `Params.requestHeader` and the plain inputs read. */
+internal class GannetView(val request: HttpRequest) : RequestView {
+    override val method: String get() = request.method
+    override val rawPath: String get() = request.path
+    override val rawQuery: String? get() = request.query
 
-    override fun cookie(name: String): String? = Cookies.parseAll(headers.all("Cookie"))[name]?.firstOrNull()
+    override fun header(name: String): String? = request.headers[name]
+
+    // Most requests carry no line under most names, and `Headers.all` builds two lists to say so.
+    override fun headers(name: String): List<String> =
+        if (name in request.headers) request.headers.all(name) else emptyList()
 }
 
 /** Query, header and cookie inputs, read as `pelican-pekko` reads them. Path captures are already in [into]. */
-internal fun decodePlainInputs(ep: Endpoint<*, *>, request: HttpRequest, into: MutableMap<ParamKey<*>, Any?>) {
+internal fun decodePlainInputs(ep: Endpoint<*, *>, view: RequestView, into: MutableMap<ParamKey<*>, Any?>) {
     if (ep.queries.isNotEmpty()) {
-        val query = queryOf(request)
+        val query = queryOf(view.rawQuery)
         ep.queries.forEach { q ->
             val values = query[q.name]
             into[q] = when {
@@ -43,10 +49,10 @@ internal fun decodePlainInputs(ep: Endpoint<*, *>, request: HttpRequest, into: M
     }
 
     ep.headerParams.forEach { h ->
-        val raw = request.headers[h.name]
+        val raw = view.header(h.name)
         into[h] = when {
             // RFC 9110 reads two field lines under one name as one joined field, so a list reads every line.
-            h.listStyle != null -> h.decodeList(request.headers.all(h.name))
+            h.listStyle != null -> h.decodeList(view.headers(h.name))
 
             raw != null -> h.codec.decode(h.name, raw)
 
@@ -57,7 +63,7 @@ internal fun decodePlainInputs(ep: Endpoint<*, *>, request: HttpRequest, into: M
     }
 
     if (ep.cookieParams.isEmpty()) return
-    val cookies = Cookies.parseAll(request.headers.all("Cookie"))
+    val cookies = Cookies.parseAll(view.headers("Cookie"))
     ep.cookieParams.forEach { c ->
         val raw = cookies[c.name]?.first()
         into[c] = when {
@@ -73,8 +79,8 @@ internal fun decodePlainInputs(ep: Endpoint<*, *>, request: HttpRequest, into: M
  * The query as the values each name carries, decoded as a form, where `+` is a space. One that will not decode is
  * the caller's 400, as on Pekko.
  */
-private fun queryOf(request: HttpRequest): Map<String, List<String>> = try {
-    parseFormBody(request.query.orEmpty()).groupBy({ it.first }, { it.second })
+private fun queryOf(rawQuery: String?): Map<String, List<String>> = try {
+    parseFormBody(rawQuery.orEmpty()).groupBy({ it.first }, { it.second })
 } catch (e: IllegalArgumentException) {
     throw ApiException(400, "Illegal query string", e.message, cause = e)
 }
