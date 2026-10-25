@@ -1,5 +1,10 @@
 # 0087 — A runtime on io_uring
 
+> **Superseded.** The runtime this spec built now lives outside Pelican, as
+> [Gannet](https://github.com/matthewjones372/gannet)
+> (`io.github.matthewjones372:gannet`). `pelican-gannet` depends on it and
+> carries no copy; see **Closing**.
+
 ## Problem
 
 Pelican serves on Pekko or Jetty, so it is bounded by them. On a 4-core VM with two
@@ -101,3 +106,12 @@ PELICAN_REQUIRE_URING=1 ./gradlew :pelican-uring:check
    refusal message says so; no fallback to another backend.
 4. **Unbounded fiber writes.** A strict reply queues whole, however large. Recommended:
    accept it, since a strict body is already in memory; only streams need the ack.
+
+## Closing
+
+Built as described, in `pelican-uring`, then extracted into Gannet, a library of
+its own, which has since added TLS (`GannetConfig.tls`). The Pelican module is now
+`backends/gannet/pelican-gannet`, package `io.github.matthewjones372.pelican.gannet`,
+and holds only spec 0088's interpreter. The runtime's tests, and its design from
+here on, are Gannet's. `PELICAN_REQUIRE_URING=1` still decides whether the Gannet
+modules' tests may skip and whether Kover counts them.

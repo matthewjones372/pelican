@@ -1,5 +1,11 @@
 # 0088 — Served on io_uring
 
+> The runtime under this interpreter is now [Gannet](https://github.com/matthewjones372/gannet),
+> an external library (see spec 0087's **Closing**). The modules are `pelican-gannet`
+> and `pelican-gannet-docs`, package `io.github.matthewjones372.pelican.gannet`;
+> `UringHandler` is `GannetHandler`, `OnUring` is `OnGannet` and `UringDifference` is
+> `GannetDifference`. `pelican-test-gannet` is the test kit this spec left out.
+
 ## Problem
 
 Spec 0087 gives a per-core io_uring runtime with HTTP/1.1, but nothing a Pelican

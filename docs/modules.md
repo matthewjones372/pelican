@@ -191,25 +191,29 @@ since it has no cross-build to choose.
 Typical stack: `pelican-bom`, `pelican-jetty`, `pelican-jackson` or
 `pelican-kotlinx`, `pelican-jetty-docs`, and `pelican-test-jetty` for tests.
 
-### io_uring backend
+### Gannet backend
 
-For a Linux service that wants neither Pekko nor Jetty: an HTTP/1.1 server on
-io_uring, a carrier thread and ring per core, each connection a fiber, and the
-interpreter that serves an `Api` on it. Every binder `pelican-jetty` has exists
-here under the same name, taking the same `Sequence`; handlers run on virtual
-threads unless `Handlers.onDispatcher` keeps them on the carrier. Linux 6.1 or
-later, JDK 25, and two JVM flags: `--enable-native-access=ALL-UNNAMED
---add-exports java.base/jdk.internal.vm=ALL-UNNAMED`. No TLS, HTTP/2 or
-compression.
+Experimental. For a Linux service that wants neither Pekko nor Jetty: the
+interpreter that serves an `Api` on
+[Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
+io_uring with a carrier thread and ring per core and each connection a fiber.
+Gannet is its own library, `io.github.matthewjones372:gannet`, on `main` as a
+`0.1.0-SNAPSHOT` from Central's snapshot repository. Every binder
+`pelican-jetty` has exists here under the same name, taking the same
+`Sequence`; handlers run on virtual threads unless `Handlers.onDispatcher`
+keeps them on the carrier. Linux 6.1 or later, JDK 25, and two JVM flags:
+`--enable-native-access=ALL-UNNAMED --add-exports
+java.base/jdk.internal.vm=ALL-UNNAMED`. TLS through `GannetConfig.tls`; no
+HTTP/2 or compression.
 
 | Module | Availability | Depends on | Provides |
 |---|---|---|---|
-| `pelican-uring` | main only | core | descriptions to a `UringHandler` (`toHandler`), `start` to serve it, and the runtime under it: `UringServer` and the `HttpHandler` it calls |
-| `pelican-uring-docs` | main only | uring, openapi | the document and a Swagger UI or Redoc page and a Redoc or RapiDoc reference beside it, as a `UringHandler` |
+| `pelican-gannet` | main only | core, Gannet | descriptions to a `GannetHandler` (`toHandler`), and `start` to serve it on a `GannetServer` |
+| `pelican-gannet-docs` | main only | gannet, openapi | the document and a Swagger UI or Redoc page and a Redoc or RapiDoc reference beside it, as a `GannetHandler` |
+| `pelican-test-gannet` | main only | gannet, test | `onLoopback(handlers)`: the API started on a loopback port, with the typed client over a socket |
 
-Typical stack: `pelican-bom`, `pelican-uring`, `pelican-jackson` or
-`pelican-kotlinx`, and `pelican-uring-docs`. There is no `-test-` module yet:
-test through `pelican-test`'s `apiClient` against `start(port = 0)`.
+Typical stack: `pelican-bom`, `pelican-gannet`, `pelican-jackson` or
+`pelican-kotlinx`, `pelican-gannet-docs`, and `pelican-test-gannet` for tests.
 
 ### Testing
 
