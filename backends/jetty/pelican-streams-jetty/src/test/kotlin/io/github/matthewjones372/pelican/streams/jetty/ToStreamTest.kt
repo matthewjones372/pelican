@@ -1,11 +1,11 @@
 package io.github.matthewjones372.pelican.streams.jetty
 
-import io.github.matthewjones372.lark.stream.Exit
-import io.github.matthewjones372.lark.stream.Forks
-import io.github.matthewjones372.lark.stream.mapOrFail
-import io.github.matthewjones372.lark.stream.run
-import io.github.matthewjones372.lark.stream.runCollect
-import io.github.matthewjones372.lark.stream.runFold
+import io.github.matthewjones372.surefold.stream.Exit
+import io.github.matthewjones372.surefold.stream.Forks
+import io.github.matthewjones372.surefold.stream.mapOrFail
+import io.github.matthewjones372.surefold.stream.run
+import io.github.matthewjones372.surefold.stream.runCollect
+import io.github.matthewjones372.surefold.stream.runFold
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -17,7 +17,7 @@ import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-/** An upload arrives as frames, the handler converts once, and every operator after that is lark's, on Forks. */
+/** An upload arrives as frames, the handler converts once, and every operator after that is surefold's, on Forks. */
 class ToStreamTest {
 
     data class Note(val text: String)
@@ -63,7 +63,7 @@ class ToStreamTest {
             },
             refused handledBy { rows ->
                 rows.toStream()
-                    .mapOrFail { row -> row.text.ifEmpty { raise(Empty(1)) } }
+                    .mapOrFail { row -> row.text.ifEmpty { fail(Empty(1)) } }
                     .runFold(0) { seen, _ -> seen + 1 }
                     .run(Forks())
                     .thenApply { Tally(if (it is Exit.Failed) REFUSED else it.valueOr(-1)) }

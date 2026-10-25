@@ -1,8 +1,8 @@
 package io.github.matthewjones372.pelican.streams.jetty
 
-import io.github.matthewjones372.lark.stream.Exit
-import io.github.matthewjones372.lark.stream.Stream
-import io.github.matthewjones372.lark.stream.blocking
+import io.github.matthewjones372.surefold.stream.Exit
+import io.github.matthewjones372.surefold.stream.Stream
+import io.github.matthewjones372.surefold.stream.blocking
 import io.github.matthewjones372.pelican.ErrorOutput
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.StreamIn
@@ -11,7 +11,7 @@ import io.github.matthewjones372.pelican.ok
 import java.util.concurrent.CompletionStage
 
 /**
- * The frames of a streaming body as a lark [Stream], read one at a time as the run pulls them. A run's `stop()`
+ * The frames of a streaming body as a surefold [Stream], read one at a time as the run pulls them. A run's `stop()`
  * wakes a read blocked on the upload, and however the run ends the upload is released.
  */
 fun <T : Any> StreamIn<T>.toStream(): Stream<Nothing, T> =
@@ -23,7 +23,7 @@ fun <T : Any> StreamIn<T>.toStream(): Stream<Nothing, T> =
     )
 
 /**
- * The [Exit] a lark run completes with, as the [Outcome] a handler answers: `Done` is the value, `Failed` is
+ * The [Exit] a surefold run completes with, as the [Outcome] a handler answers: `Done` is the value, `Failed` is
  * [failure], and `Died` is rethrown, since a throwable nobody declared is not the declared failure.
  */
 fun <E : Any, A : Any> CompletionStage<Exit<E, A>>.toOutcome(

@@ -105,8 +105,8 @@ val moduleDescriptions = mapOf(
     "pelican-oidc" to "Verifies OpenID Connect tokens for a Pelican caller.",
     "pelican-client-jetty" to "A generated client's transport, over Jetty's HttpClient.",
     "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
-    "pelican-streams" to "A streaming body as a lark Stream, whose failure is a value.",
-    "pelican-streams-jetty" to "A streaming body on Jetty as a lark Stream, whose failure is a value.",
+    "pelican-streams" to "A streaming body as a surefold Stream, whose failure is a value.",
+    "pelican-streams-jetty" to "A streaming body on Jetty as a surefold Stream, whose failure is a value.",
     "pelican-gannet" to "Endpoint descriptions served on Gannet, an HTTP/1.1 server on io_uring.",
     "pelican-gannet-docs" to "Serves the OpenAPI document and Swagger UI on Gannet.",
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
@@ -222,7 +222,7 @@ subprojects {
     // A `java-platform` has no sources, so none of what follows applies to it.
     if (name == "pelican-bom") return@subprojects
 
-    // lark-stream 0.9.0 is class file 69, so a module built on it is Java 25 until lark targets 21. Gannet needs FFM
+    // surefold-stream is class file 69, so a module built on it is Java 25 until surefold targets 21. Gannet needs FFM
     // and the JDK's internal continuation, and whatever depends on it is 25 too: the example's parity suites and the
     // benchmarks run every backend (spec 0088).
     val jvmFloor = if (name in floor25) 25 else 21
@@ -231,7 +231,7 @@ subprojects {
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
         // 21, the LTS most services run. Below 24 a virtual thread blocked in `synchronized` pins its carrier, which
-        // `Handlers.default` answers with platform threads (spec 0079). The streams modules need what lark needs.
+        // `Handlers.default` answers with platform threads (spec 0079). The streams modules need what surefold needs.
         jvmToolchain(jvmFloor)
 
         compilerOptions {

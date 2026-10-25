@@ -5,7 +5,7 @@
 `pelican-metrics-otel` continues a trace on the way in: an inbound `traceparent` makes the server's span a child of
 the caller's. On the way out, nothing does. A Pelican client sends the headers its endpoint declares and no others,
 so a service that calls another through a generated client starts a new trace at every call, and the span it was in
-has no child for the call (lark-bank spec 0024: the bank's screening call to bank-checks).
+has no child for the call (surefold-bank spec 0024: the bank's screening call to bank-checks).
 
 ## Not doing
 
