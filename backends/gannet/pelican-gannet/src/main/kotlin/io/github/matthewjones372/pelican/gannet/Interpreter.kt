@@ -36,6 +36,7 @@ import io.github.matthewjones372.pelican.spi.plan
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.responseCodecs
 import io.github.matthewjones372.pelican.spi.routeIndex
+import io.github.matthewjones372.pelican.spi.succeeded
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.Executor
@@ -88,11 +89,13 @@ internal class PelicanHandler(
         val answered = try {
             route(exchange)
         } catch (t: Throwable) {
-            CompletableFuture.completedStage(errorResponse(t, api))
+            CompletableFuture.completedFuture(errorResponse(t, api))
         } ?: return false
         // Detached either way: an answer ready now is written here, on the carrier, before this returns.
         exchange.detach()
-        answered.whenComplete { reply, failure -> deliver(exchange, reply ?: errorResponse(failure, api)) }
+        val now = answered.succeeded()
+        if (now != null) deliver(exchange, now.resultNow())
+        else answered.whenComplete { reply, failure -> deliver(exchange, reply ?: errorResponse(failure, api)) }
         return true
     }
 
@@ -129,7 +132,7 @@ internal class PelicanHandler(
         val matched = try {
             index.find(method, path)
         } catch (t: Throwable) {
-            return CompletableFuture.completedStage(errorResponse(t, api))
+            return CompletableFuture.completedFuture(errorResponse(t, api))
         }
         if (matched == null) {
             exchange.declinePath()
@@ -141,7 +144,7 @@ internal class PelicanHandler(
             index.decodeCaptures(matched, path, values)
         } catch (t: Throwable) {
             // A capture that would not decode is its own route's 400.
-            return CompletableFuture.completedStage(errorResponse(t, api, matched.endpoint))
+            return CompletableFuture.completedFuture(errorResponse(t, api, matched.endpoint))
         }
         val answered = invoke(matched, request, values)
         return if (cors == null) answered
@@ -168,10 +171,10 @@ internal class PelicanHandler(
             }
 
             is CorsPreflight.Refused ->
-                CompletableFuture.completedStage(errorResponse(ApiException(403, "Forbidden", decision.reason), api))
+                CompletableFuture.completedFuture(errorResponse(ApiException(403, "Forbidden", decision.reason), api))
 
             is CorsPreflight.Allowed ->
-                CompletableFuture.completedStage(Strict(204, null, ByteArray(0), decision.headers))
+                CompletableFuture.completedFuture(Strict(204, null, ByteArray(0), decision.headers))
         }
     }
 
@@ -202,14 +205,24 @@ internal class PelicanHandler(
             negotiate(ep, accept)
             plans.getValue(se).decodePlainInputs(view, values)
         } catch (t: Throwable) {
-            return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params.responseHeaders()))
+            return CompletableFuture.completedFuture(errorResponse(t, api, ep).withHeaders(params.responseHeaders()))
         }
 
         val handled = try {
             readBody(ep, request, values, codecs.getValue(se))
             handlers.getValue(se)(params)
         } catch (t: Throwable) {
-            CompletableFuture.failedStage(t)
+            CompletableFuture.failedFuture(t)
+        }
+        // A handler that has already answered, as every synchronous one has, is answered without a stage per step.
+        val now = handled.succeeded()
+        if (now != null) {
+            val reply = try {
+                buildResponse(ep.output, now.resultNow(), codecs.getValue(se), accept)
+            } catch (t: Throwable) {
+                errorResponse(t, api, ep)
+            }
+            return CompletableFuture.completedFuture(reply.withHeaders(params.responseHeaders()))
         }
         return handled
             .thenApply { result -> buildResponse(ep.output, result, codecs.getValue(se), accept) }

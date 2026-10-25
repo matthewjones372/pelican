@@ -1678,6 +1678,7 @@ public final class io/github/matthewjones372/pelican/spi/HandlersKt {
 	public static final fun declaredInputCount (Lio/github/matthewjones372/pelican/Endpoint;)I
 	public static final fun failureNamedBy (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Outcome$Err;)Lio/github/matthewjones372/pelican/ErrorOutput;
 	public static final fun handlerFor (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/ServerEndpoint;)Lkotlin/jvm/functions/Function1;
+	public static final fun succeeded (Ljava/util/concurrent/CompletionStage;)Ljava/util/concurrent/CompletableFuture;
 	public static final fun successNamedBy (Lio/github/matthewjones372/pelican/DeclaredResponses;Lio/github/matthewjones372/pelican/Outcome$Ok;)Lio/github/matthewjones372/pelican/Output;
 }
 

@@ -123,8 +123,14 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
       +10.6% over its parent, 87% of `raw-gannet` from 79%, five interleaved rounds.
 - [ ] **`spec-0089-jetty`** / **`spec-0089-pekko`**: each backend on the view and plan, its copies deleted.
       Done when: its parity suite passes and Jetty's baseline does not regress.
-- [ ] **`spec-0089-success`**: a completed stage answered without chaining; reply headers built once.
+- [x] **`spec-0089-success`**: a completed stage answered without chaining; reply headers built once.
       Done when: the success path allocates at most two objects of its own (JMH).
+      On Gannet; Jetty and Pekko take `spi.succeeded()` with their own entries. Only a plain `CompletableFuture`
+      is read in place, since every query on the minimal stage `completedStage` returns throws. "Built once" is
+      the head of a reply carrying only its content type; a head with a handler's headers is still built per reply.
+      Measured: `GannetHandlerBenchmark` 296 B/op for a whole `/baseline11` (568 on `-plan`, 1680 on `-view-gannet`),
+      the reply's stage and its `Strict` the success path's own; Pelican on Gannet 2.81–2.88 KB a request from
+      3.10–3.14 (`raw-gannet` 2.29–2.30); `gannet-inline` +1.4%, `gannet` +4.1% over `-plan`, five interleaved rounds.
 
 Predicted inline / default (measured where a switch existed, else from the table): today
 131k / 94k; `-deadline` ~175k / ~110k; `-sized-read` ~230k / ~120k; `-view` ~237k;
