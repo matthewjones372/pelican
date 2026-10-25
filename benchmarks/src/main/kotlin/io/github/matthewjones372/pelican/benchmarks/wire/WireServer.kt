@@ -21,6 +21,11 @@ import io.github.matthewjones372.pelican.pekko.handledBy as stagedOnPekko
 import io.github.matthewjones372.pelican.pekko.handledNow as onPekko
 import io.github.matthewjones372.pelican.pekko.start as startPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedOnPekko
+import io.github.matthewjones372.pelican.uring.Handlers as UringHandlers
+import io.github.matthewjones372.pelican.uring.handledBy as stagedOnUring
+import io.github.matthewjones372.pelican.uring.handledNow as onUring
+import io.github.matthewjones372.pelican.uring.start as startUring
+import io.github.matthewjones372.pelican.uring.streamedNow as streamedOnUring
 
 data class Item(val id: Long, val name: String)
 
@@ -74,8 +79,9 @@ private fun wireApi(bind: List<ServerEndpoint>): Api = api(endpoints = bind, cod
 /**
  * One server for [WireDriver], in a JVM of its own so neither server shares a heap or a JIT with the driver.
  *
- * Both start through their own `start()` with its defaults. Prints the port, then serves until stdin closes, which
- * is how the driver stops it and how it stops if the driver dies.
+ * Each starts through its own `start()` with its defaults; `uring-inline` is the io_uring backend with
+ * `Handlers.onDispatcher`, so the cost of the hop to a virtual thread is a number (spec 0088). Prints the port,
+ * then serves until stdin closes, which is how the driver stops it and how it stops if the driver dies.
  */
 fun main(args: Array<String>) {
     val stop: () -> Unit
@@ -109,7 +115,22 @@ fun main(args: Array<String>) {
             stop = server::stop
         }
 
-        else -> error("Expected pekko or jetty, got ${args.single()}")
+        "uring", "uring-inline" -> {
+            val handlers = if (args.single() == "uring") UringHandlers.default else UringHandlers.onDispatcher
+            val server = wireApi(
+                listOf(
+                    getItem onUring { (id, lim) -> Item(id, "item-$lim") },
+                    createItem onUring { body -> Item(1, body.name) },
+                    staged stagedOnUring { stagedItem() },
+                    ndjsonFrames streamedOnUring { frames() },
+                    sseFrames streamedOnUring { frames() },
+                ),
+            ).startUring(port = 0, handlers = handlers)
+            port = server.port
+            stop = server::stop
+        }
+
+        else -> error("Expected pekko, jetty, uring or uring-inline, got ${args.single()}")
     }
     println("PORT $port")
     System.out.flush()

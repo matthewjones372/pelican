@@ -20,6 +20,8 @@ dependencies {
     implementation(project(":pelican-pekko"))
     implementation(project(":pelican-jackson"))
     implementation(project(":pelican-jetty"))
+    // The third server in `:benchmarks:wire` (spec 0088).
+    implementation(project(":pelican-uring"))
     implementation(project(":pelican-kotlinx"))
 
     // Pekko is declared here for the reason a consumer declares it: it is
