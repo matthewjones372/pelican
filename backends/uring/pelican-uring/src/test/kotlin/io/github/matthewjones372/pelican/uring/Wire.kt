@@ -1,18 +1,9 @@
 package io.github.matthewjones372.pelican.uring
 
-import io.kotest.assertions.fail
-import org.junit.jupiter.api.Assumptions
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.Socket
 import java.time.Duration
-
-/** Skips a test where io_uring cannot run, unless `PELICAN_REQUIRE_URING=1` says this host must run it. */
-fun assumeUring() {
-    val problem = UringSupport.problem() ?: return
-    if (System.getenv("PELICAN_REQUIRE_URING") == "1") fail("PELICAN_REQUIRE_URING=1, but: $problem")
-    Assumptions.assumeTrue(false, problem)
-}
 
 val testConfig = UringConfig(
     carriers = 2,

@@ -25,6 +25,7 @@ import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.responseHeader
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.handledOrFail
 import io.github.matthewjones372.pelican.uring.start
@@ -44,6 +45,7 @@ import io.github.matthewjones372.pelican.jetty.handledOrFail as jettyHandledOrFa
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** Filters, refusals in both shipped envelopes, the refusal observer, a broken handler and negotiation. */
+@RequiresUring
 class RefusalsAnsweredAsJettyAnswersThemTest {
 
     data class Said(val text: String)

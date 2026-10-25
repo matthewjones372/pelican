@@ -10,6 +10,7 @@ import io.github.matthewjones372.pelican.path
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.uring.HttpExchange
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.UringHandler
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.handledWith
@@ -36,6 +37,7 @@ import io.github.matthewjones372.pelican.jetty.start as jettyStart
 import io.github.matthewjones372.pelican.jetty.toHandler as jettyToHandler
 
 /** An API mounted beside a hand-written handler, before and after it, on both servers. */
+@RequiresUring
 class ComposedAsJettyComposesTest {
 
     /** A handler the service wrote itself, knowing nothing of Pelican. */

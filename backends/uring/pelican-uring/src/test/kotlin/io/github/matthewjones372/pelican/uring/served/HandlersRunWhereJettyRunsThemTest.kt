@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.uring.Handlers
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.UringConfig
 import io.github.matthewjones372.pelican.uring.handledBy
 import io.github.matthewjones372.pelican.uring.handledNow
@@ -35,6 +36,7 @@ import io.github.matthewjones372.pelican.jetty.handledOrFail as jettyHandledOrFa
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** Spec 0058 on io_uring: a synchronous handler may block, and runs where [Handlers] says, as on Jetty. */
+@RequiresUring
 class HandlersRunWhereJettyRunsThemTest {
 
     data class Refusal(val reason: String)

@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.pages
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
 import io.kotest.matchers.shouldBe
@@ -17,6 +18,7 @@ import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 
 /** Pages packed in a jar, as a service ships them, answer as pages from a directory do. */
+@RequiresUring
 class PagesFromAJarTest {
 
     private val ping = endpoint {

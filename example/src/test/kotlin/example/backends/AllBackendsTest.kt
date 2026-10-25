@@ -55,7 +55,7 @@ class AllBackendsTest {
 
     companion object {
         private val running: Map<String, Running> =
-            allBackends.associate { it.name to it.start(port = 0) }
+            runnableBackends.associate { it.name to it.start(port = 0) }
 
         private val clients: Map<String, ApiClient> =
             running.mapValues { (_, server) -> apiClient(server.baseUrl, JacksonCodecs) }
@@ -63,7 +63,7 @@ class AllBackendsTest {
         /** The parameter list: a name to label the invocation, and a client to drive. */
         @JvmStatic
         fun backends(): List<Array<Any>> =
-            allBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
+            runnableBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
 
         @JvmStatic
         @AfterAll

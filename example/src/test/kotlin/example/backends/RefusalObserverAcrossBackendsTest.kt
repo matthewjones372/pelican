@@ -38,7 +38,7 @@ class RefusalObserverAcrossBackendsTest {
 
         /** What each transport's observer was told, in the order it was told. */
         private val observed: Map<String, MutableList<String>> =
-            (allBackends.map { it.name } + IN_MEMORY).associateWith { mutableListOf() }
+            (runnableBackends.map { it.name } + IN_MEMORY).associateWith { mutableListOf() }
 
         private fun recorder(name: String): RefusalObserver {
             val into = observed.getValue(name)
@@ -47,7 +47,7 @@ class RefusalObserverAcrossBackendsTest {
             }
         }
 
-        private val running: Map<String, Running> = allBackends.associate { backend ->
+        private val running: Map<String, Running> = runnableBackends.associate { backend ->
             backend.name to backend.start(port = 0, onRefusal = recorder(backend.name))
         }
 

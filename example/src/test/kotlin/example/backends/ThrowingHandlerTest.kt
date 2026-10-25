@@ -28,7 +28,7 @@ import org.junit.jupiter.params.provider.MethodSource
 class ThrowingHandlerTest {
 
     companion object {
-        private val running: Map<Pair<String, String>, Running> = allBackends.flatMap { backend ->
+        private val running: Map<Pair<String, String>, Running> = runnableBackends.flatMap { backend ->
             allDialects.map { dialect ->
                 (backend.name to dialect.name) to backend.start(port = 0, refusals = dialect.renderer)
             }
@@ -38,7 +38,7 @@ class ThrowingHandlerTest {
             running.mapValues { (_, server) -> apiClient(server.baseUrl, JacksonCodecs) }
 
         @JvmStatic
-        fun backends(): List<Array<Any>> = allBackends.flatMap { backend ->
+        fun backends(): List<Array<Any>> = runnableBackends.flatMap { backend ->
             allDialects.map { dialect ->
                 arrayOf<Any>("${backend.name}/${dialect.name}", clients.getValue(backend.name to dialect.name), dialect)
             }

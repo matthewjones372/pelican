@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.SchemaComponents
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jsonObj
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
 import io.kotest.matchers.nulls.shouldBeNull
@@ -26,6 +27,7 @@ import io.github.matthewjones372.pelican.jetty.start as jettyStart
  * A codec may already hold the bytes. Null is today's path. An array is the
  * body, including when it is not what `encodeToString` would have produced.
  */
+@RequiresUring
 class EncodedBodyTest {
 
     companion object {

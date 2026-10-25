@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.RequestSpec
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import io.github.matthewjones372.pelican.jetty.handledNow as handledOnJetty
@@ -74,6 +75,7 @@ class MethodMismatchTest {
 
     /** No in-memory transport here, so over a socket; the interpreter routes as Jetty's does. */
     @Test
+    @RequiresUring
     fun `uring answers 404 for the same reason`() {
         val server = greetingsApi(
             listOf(

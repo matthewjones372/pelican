@@ -5,6 +5,7 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.pages
+import io.github.matthewjones372.pelican.uring.UringTests
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -27,7 +28,7 @@ import io.github.matthewjones372.pelican.uring.start as startOnUring
 class RecordedDifferencesTest {
 
     companion object {
-        private val running: Map<String, Running> = allBackends.associate { it.name to it.start(port = 0) }
+        private val running: Map<String, Running> = runnableBackends.associate { it.name to it.start(port = 0) }
 
         @JvmStatic
         @AfterAll
@@ -42,7 +43,7 @@ class RecordedDifferencesTest {
         val statuses = running.mapValues { (_, server) -> statusOf(server.baseUrl, path) }
 
         withClue(JettyDifference.ESCAPING_PATHS.reason + "\n" + UringDifference.ESCAPING_PATHS.reason) {
-            statuses shouldBe mapOf("pekko" to 404, "jetty" to 400, "uring" to 404)
+            statuses shouldBe mapOf("pekko" to 404, "jetty" to 400, "uring" to 404).filterKeys { it in running }
         }
     }
 
@@ -54,27 +55,30 @@ class RecordedDifferencesTest {
         val pekko = withPages(where handledByOnPekko { CompletableFuture.completedFuture("") })
             .startOnPekko(port = 0, systemName = "recorded-ranges")
         val jetty = withPages(where handledByOnJetty { CompletableFuture.completedFuture("") }).startOnJetty(port = 0)
-        val uring = withPages(where handledByOnUring { CompletableFuture.completedFuture("") }).startOnUring(port = 0)
+        val uring = if (UringTests.run) {
+            withPages(where handledByOnUring { CompletableFuture.completedFuture("") }).startOnUring(port = 0)
+        } else {
+            null
+        }
 
         try {
             val ranged = "Range: bytes=0-3"
             val answers = mapOf(
                 "pekko" to exchange(pekko.baseUrl, "/notes.txt", ranged),
                 "jetty" to exchange(jetty.baseUrl, "/notes.txt", ranged),
-                "uring" to exchange(uring.baseUrl, "/notes.txt", ranged),
-            )
+            ) + listOfNotNull(uring?.let { "uring" to exchange(it.baseUrl, "/notes.txt", ranged) })
             withClue(JettyDifference.NO_RANGES_ON_PAGES.reason + "\n" + answers) {
                 answers.mapValues { (_, raw) -> raw.substringAfter(' ').substringBefore(' ').toInt() } shouldBe
-                    mapOf("pekko" to 206, "jetty" to 200, "uring" to 200)
+                    mapOf("pekko" to 206, "jetty" to 200, "uring" to 200).filterKeys { it in answers }
                 answers.getValue("pekko").lowercase() shouldContain "content-range: bytes 0-3/10"
                 answers.getValue("pekko").substringAfter("\r\n\r\n") shouldBe "abcd"
                 answers.getValue("jetty").substringAfter("\r\n\r\n") shouldBe "abcdefghij"
-                answers.getValue("uring").substringAfter("\r\n\r\n") shouldBe "abcdefghij"
+                answers["uring"]?.substringAfter("\r\n\r\n")?.let { it shouldBe "abcdefghij" }
             }
         } finally {
             pekko.stop()
             jetty.stop()
-            uring.stop()
+            uring?.stop()
         }
     }
 

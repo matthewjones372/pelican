@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.negotiated
 import io.github.matthewjones372.pelican.orFail
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -201,6 +202,7 @@ class ContentNegotiationTest {
     }
 
     @Test
+    @RequiresUring
     fun `uring negotiates, and sends an unregistered status`() {
         val server = api(
             listOf(
@@ -252,6 +254,7 @@ class ContentNegotiationTest {
     }
 
     @Test
+    @RequiresUring
     fun `uring writes a +json media type with the JSON codec and names it on the wire`() {
         val problem = endpoint { get("problem"); media<Widget>("application/problem+json") }
         val server = api(endpoints = listOf(problem handledNowOnUring { Widget(3) }), codecs = JacksonCodecs)

@@ -6,6 +6,7 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.uring.PelicanServer
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.start
 import io.github.matthewjones372.pelican.uring.streamedNow
 import io.kotest.assertions.fail
@@ -28,6 +29,7 @@ import kotlin.time.Duration.Companion.seconds
  * A reader that stops, and one that leaves, and what each does to the handler's sequence. Pekko's answers are
  * asserted in `example`'s `SlowConsumerTest` and `UnboundedStreamTest`, over the same shapes.
  */
+@RequiresUring
 class SlowConsumerTest {
 
     data class Pulse(val seq: Long, val pad: String = "")

@@ -42,9 +42,9 @@ class MetricsAcrossBackendsTest {
 
     companion object {
         private val registries: Map<String, MeterRegistry> =
-            allBackends.associate { it.name to SimpleMeterRegistry() }
+            runnableBackends.associate { it.name to SimpleMeterRegistry() }
 
-        private val running: Map<String, Running> = allBackends.associate { backend ->
+        private val running: Map<String, Running> = runnableBackends.associate { backend ->
             backend.name to backend.start(
                 port = 0,
                 // Outermost, so that the 403 raised by `gate` is counted too.
@@ -60,7 +60,7 @@ class MetricsAcrossBackendsTest {
 
         @JvmStatic
         fun backends(): List<Array<Any>> =
-            allBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
+            runnableBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
 
         @JvmStatic
         @AfterAll

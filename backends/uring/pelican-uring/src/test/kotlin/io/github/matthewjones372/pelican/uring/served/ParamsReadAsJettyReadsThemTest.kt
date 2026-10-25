@@ -16,6 +16,7 @@ import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.positive
 import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.repeated
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
 import io.kotest.assertions.withClue
@@ -41,6 +42,7 @@ data class Filters(val tags: List<String>, val ids: List<Long>, val features: Li
 data class Strictly(val term: String, val key: String, val jar: String)
 
 /** Path, query, header and cookie inputs on both servers, asked the same questions over a socket. */
+@RequiresUring
 class ParamsReadAsJettyReadsThemTest {
 
     /** What a caller can see of an answer, and so what the two servers are compared on. */

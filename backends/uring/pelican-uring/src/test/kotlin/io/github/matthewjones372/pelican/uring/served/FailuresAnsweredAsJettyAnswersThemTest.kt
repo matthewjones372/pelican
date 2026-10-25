@@ -17,6 +17,7 @@ import io.github.matthewjones372.pelican.or
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.responseHeader
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.bytesOrFail
 import io.github.matthewjones372.pelican.uring.handledByOneOf
 import io.github.matthewjones372.pelican.uring.handledOrFail
@@ -39,6 +40,7 @@ import io.github.matthewjones372.pelican.jetty.handledOrFail as jettyHandledOrFa
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** Declared successes and failures on both servers, asked the same questions over a socket. */
+@RequiresUring
 class FailuresAnsweredAsJettyAnswersThemTest {
 
     /** What a caller can see of an answer, the headers the declarations name included. */

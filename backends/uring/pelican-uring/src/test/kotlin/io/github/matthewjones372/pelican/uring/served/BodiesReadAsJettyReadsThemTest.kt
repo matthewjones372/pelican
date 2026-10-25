@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.or
 import io.github.matthewjones372.pelican.rawBody
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.bytesNow
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
@@ -32,6 +33,7 @@ import io.github.matthewjones372.pelican.jetty.toSequence as jettyToSequence
 data class Note(val text: String)
 
 /** Request bodies in and opaque bytes out on both servers, asked the same questions over a socket. */
+@RequiresUring
 class BodiesReadAsJettyReadsThemTest {
 
     /** What a caller can see of an answer, and so what the two servers are compared on. */

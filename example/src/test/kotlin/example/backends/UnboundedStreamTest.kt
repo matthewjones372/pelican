@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.StreamOf
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.uring.assumeUring
 import io.kotest.assertions.fail
 import io.kotest.assertions.withClue
 import io.kotest.matchers.longs.shouldBeLessThan
@@ -133,9 +134,12 @@ class UnboundedStreamTest {
                 .startOnJetty(port = 0)
                 .let { server -> running(server.baseUrl, server::stop) }
 
-            "uring" -> api(route streamedNowOnUring { ticks(produced, limit) })
-                .startOnUring(port = 0)
-                .let { server -> running(server.baseUrl, server::stop) }
+            "uring" -> {
+                assumeUring()
+                api(route streamedNowOnUring { ticks(produced, limit) })
+                    .startOnUring(port = 0)
+                    .let { server -> running(server.baseUrl, server::stop) }
+            }
 
             else -> error("no such backend: $backend")
         }

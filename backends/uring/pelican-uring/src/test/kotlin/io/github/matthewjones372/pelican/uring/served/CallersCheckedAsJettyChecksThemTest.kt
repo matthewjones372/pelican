@@ -11,6 +11,7 @@ import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.queryParam
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
 import io.kotest.assertions.withClue
@@ -24,6 +25,7 @@ import io.github.matthewjones372.pelican.jetty.handledNow as jettyHandledNow
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** The caller on both servers (spec 0061): refused before the handler, and handed to it when verified. */
+@RequiresUring
 class CallersCheckedAsJettyChecksThemTest {
 
     /** One request, named so a failing case says which. */

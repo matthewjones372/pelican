@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.pages
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
 import io.kotest.assertions.withClue
@@ -22,6 +23,7 @@ import io.github.matthewjones372.pelican.jetty.handledNow as jettyHandledNow
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** Spec 0059 on both servers: a classpath directory beside the endpoints, which always win. */
+@RequiresUring
 class PagesServedAsJettyServesThemTest {
 
     /** One request to one of the [servers], named so a failing case says which. */

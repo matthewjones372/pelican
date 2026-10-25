@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.uring.docs
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
 import io.kotest.matchers.shouldBe
@@ -14,6 +15,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 /** The one-argument spellings a service types first: every default in place. */
+@RequiresUring
 class DefaultsTest {
 
     private val motd = endpoint {

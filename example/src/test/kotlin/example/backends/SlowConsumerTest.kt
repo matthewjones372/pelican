@@ -5,6 +5,7 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.stream.javadsl.Source
@@ -117,6 +118,7 @@ class SlowConsumerTest {
     }
 
     @Test
+    @RequiresUring
     @Suppress("SleepInsteadOfDelay") // The next element, which never comes.
     fun `uring stops pulling the sequence when the consumer disappears`() {
         val closed = CountDownLatch(1)

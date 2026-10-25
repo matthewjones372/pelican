@@ -6,6 +6,7 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.pathParam
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledBy
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.handledWith
@@ -29,6 +30,7 @@ import io.github.matthewjones372.pelican.jetty.start as jettyStart
 data class Greeting(val text: String)
 
 /** One API on both servers, asked the same questions over a socket. */
+@RequiresUring
 class ServedAsJettyServesTest {
 
     /** What a caller can see of an answer, and so what the two servers are compared on. */

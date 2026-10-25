@@ -3,6 +3,8 @@ package example.backends
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
+import io.github.matthewjones372.pelican.uring.RequiresUring
+import io.github.matthewjones372.pelican.uring.UringTests
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -71,6 +73,7 @@ class ServerShapeParityTest {
     }
 
     @Test
+    @RequiresUring
     fun `uring serves inside a use block, and closing releases block`() {
         val parked = uringApi().startOnUring(port = 0).use { server ->
             answersOn(server.baseUrl)
@@ -84,15 +87,16 @@ class ServerShapeParityTest {
     fun `and stopAsync completes once the server is down, on every backend`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "shape-parity-async")
         val jetty = jettyApi().startOnJetty(port = 0)
-        val uring = uringApi().startOnUring(port = 0)
+        val uring = if (UringTests.run) uringApi().startOnUring(port = 0) else null
 
-        val parked = listOf(
+        val parked = listOfNotNull(
             "pekko" to parkedIn(pekko::block),
             "jetty" to parkedIn(jetty::block),
-            "uring" to parkedIn(uring::block),
+            uring?.let { "uring" to parkedIn(it::block) },
         )
 
-        listOf(pekko::stopAsync, jetty::stopAsync, uring::stopAsync).forEach { it().toCompletableFuture().join() }
+        listOfNotNull(pekko::stopAsync, jetty::stopAsync, uring?.let { it::stopAsync })
+            .forEach { it().toCompletableFuture().join() }
 
         parked.forEach { (name, thread) -> withClue(name) { thread.releasedWithin() } }
     }

@@ -3,6 +3,7 @@ package example.backends
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
+import io.github.matthewjones372.pelican.uring.UringTests
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
@@ -79,13 +80,13 @@ class StartParityTest {
     fun `a bare start binds loopback, and answers there`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "start-parity-pekko")
         val jetty = jettyApi().startOnJetty(port = 0)
-        val uring = uringApi().startOnUring(port = 0)
+        val uring = if (UringTests.run) uringApi().startOnUring(port = 0) else null
 
         try {
-            val bound = mapOf("pekko" to pekko.host, "jetty" to jetty.host, "uring" to uring.host)
-            withClue("bound: $bound") { bound.values.toSet() shouldBe setOf("127.0.0.1") }
+            val bound = listOfNotNull("pekko" to pekko.host, "jetty" to jetty.host, uring?.let { "uring" to it.host })
+            withClue("bound: $bound") { bound.map { it.second }.toSet() shouldBe setOf("127.0.0.1") }
 
-            listOf("pekko" to pekko.baseUrl, "jetty" to jetty.baseUrl, "uring" to uring.baseUrl)
+            listOfNotNull("pekko" to pekko.baseUrl, "jetty" to jetty.baseUrl, uring?.let { "uring" to it.baseUrl })
                 .forEach { (name, baseUrl) ->
                     withClue(name) {
                         baseUrl shouldStartWith "http://127.0.0.1:"
@@ -95,7 +96,7 @@ class StartParityTest {
         } finally {
             pekko.stop()
             jetty.stop()
-            uring.stop()
+            uring?.stop()
         }
     }
 }

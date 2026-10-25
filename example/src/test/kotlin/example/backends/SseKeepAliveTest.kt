@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.shouldBe
@@ -107,6 +108,7 @@ class SseKeepAliveTest {
     }
 
     @Test
+    @RequiresUring
     @Suppress("SleepInsteadOfDelay") // The quiet stretch, on the virtual thread pulling the sequence.
     fun `uring fills the silence`() {
         val server = api(

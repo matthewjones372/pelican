@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.UringHandler
 import io.github.matthewjones372.pelican.uring.then
 import io.kotest.assertions.withClue
@@ -91,6 +92,7 @@ class MountedAlongsideTest {
     }
 
     @Test
+    @RequiresUring
     fun `uring chains a described handler with a hand-written one`() {
         val handWritten = UringHandler { exchange ->
             if (exchange.request.path != "/health") return@UringHandler false

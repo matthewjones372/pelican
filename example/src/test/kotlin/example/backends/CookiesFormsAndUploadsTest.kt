@@ -27,14 +27,14 @@ class CookiesFormsAndUploadsTest {
 
     companion object {
         private val running: Map<String, Running> =
-            allBackends.associate { it.name to it.start(port = 0) }
+            runnableBackends.associate { it.name to it.start(port = 0) }
 
         private val clients: Map<String, ApiClient> =
             running.mapValues { (_, server) -> apiClient(server.baseUrl, JacksonCodecs) }
 
         @JvmStatic
         fun backends(): List<Array<Any>> =
-            allBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
+            runnableBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
 
         @JvmStatic
         @AfterAll

@@ -19,9 +19,9 @@ class TraceAcrossBackendsTest {
 
     companion object {
         private val recorded: Map<String, RecordedSpans> =
-            allBackends.associate { it.name to RecordedSpans() }
+            runnableBackends.associate { it.name to RecordedSpans() }
 
-        private val running: Map<String, Running> = allBackends.associate { backend ->
+        private val running: Map<String, Running> = runnableBackends.associate { backend ->
             val sdk = recordingTelemetry(recorded.getValue(backend.name))
             backend.name to backend.start(port = 0, outerFilters = listOf(openTelemetry(sdk)))
         }
@@ -31,7 +31,7 @@ class TraceAcrossBackendsTest {
 
         @JvmStatic
         fun backends(): List<Array<Any>> =
-            allBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
+            runnableBackends.map { arrayOf(it.name, clients.getValue(it.name)) }
 
         @JvmStatic
         @AfterAll

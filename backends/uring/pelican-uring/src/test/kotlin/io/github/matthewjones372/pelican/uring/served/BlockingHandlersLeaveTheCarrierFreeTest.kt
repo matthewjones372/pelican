@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.uring.Handlers
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.UringConfig
 import io.github.matthewjones372.pelican.uring.handledBy
 import io.github.matthewjones372.pelican.uring.handledNow
@@ -20,6 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /** Spec 0088: routing and asynchronous handlers stay on the carrier, so a blocked handler pool holds up neither. */
+@RequiresUring
 class BlockingHandlersLeaveTheCarrierFreeTest {
 
     private val blocked = endpoint {

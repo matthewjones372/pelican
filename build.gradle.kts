@@ -174,12 +174,15 @@ dependencies {
     // falls because a benchmark was written is measuring the wrong thing.
     // See benchmarks/build.gradle.kts for why the agent stays off it entirely.
     //
-    // `pelican-uring` counts only where its tests can run: off Linux they skip, and skipped lines would pull the
-    // total down for whoever builds on a Mac (spec 0087).
-    val uringRuns = System.getProperty("os.name").startsWith("Linux")
+    // The io_uring modules count only where their tests must run. They skip wherever io_uring is unusable -- off
+    // Linux, and on a Linux whose seccomp profile or `io_uring_disabled` refuses `io_uring_setup`, as CI's container
+    // does -- and skipped lines would pull the total down. Being on Linux says nothing about the second, so the
+    // signal is `PELICAN_REQUIRE_URING=1`, which makes those tests fail rather than skip (specs 0087, 0088).
+    val uringModules = setOf("pelican-uring", "pelican-uring-docs")
+    val uringRuns = System.getenv("PELICAN_REQUIRE_URING") == "1"
     subprojects
         .filter { it.name !in setOf("benchmarks", "pelican-bom") }
-        .filter { uringRuns || it.name != "pelican-uring" }
+        .filter { uringRuns || it.name !in uringModules }
         .forEach { kover(project(it.path)) }
 }
 
@@ -283,6 +286,9 @@ subprojects {
         javaLauncher.set(toolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(testJdk)) })
 
         systemProperty("pelican.launcherJavaVersion", testJdk.toString())
+        // Whether the io_uring tests may skip. An input, so a cached run that skipped them is not reused for one
+        // that must run them.
+        inputs.property("pelicanRequireUring", System.getenv("PELICAN_REQUIRE_URING").orEmpty())
         // `-PjettyPool=virtual` runs every suite's Jetty servers on `VirtualThreadPool` (spec 0085).
         providers.gradleProperty("jettyPool").orNull?.let { systemProperty("pelican.jetty.pool", it) }
         // A backstop, not a budget: it exists so one wedged test cannot burn

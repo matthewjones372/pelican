@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.ResponseSpec
 import io.github.matthewjones372.pelican.test.apiClient
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -60,6 +61,7 @@ class BareOkTest {
     }
 
     @Test
+    @RequiresUring
     fun `and so does uring`() {
         val server = brokenApi(
             remember handledOneOfOnUring { (_, note) -> ok(Greeting(note.text, language = "en")) },

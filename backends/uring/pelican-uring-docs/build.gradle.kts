@@ -5,6 +5,7 @@ dependencies {
     api(project(":pelican-openapi"))
 
     testImplementation(project(":pelican-jackson"))
+    testImplementation(testFixtures(project(":pelican-uring")))
 
     // Jetty is the reference: the test asks both servers the same questions over a socket.
     testImplementation(project(":pelican-jetty-docs"))

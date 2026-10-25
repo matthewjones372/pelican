@@ -11,6 +11,7 @@ import io.github.matthewjones372.pelican.formBody
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.nonEmpty
 import io.github.matthewjones372.pelican.textPart
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
 import io.kotest.assertions.withClue
@@ -38,6 +39,7 @@ data class Login(val user: String, val remember: Boolean, val visits: Int)
 data class Upload(val caption: String, val notes: String, val filename: String?, val type: String?, val content: String)
 
 /** Url-encoded forms and multipart uploads on both servers, asked the same questions over a socket. */
+@RequiresUring
 class FormsAndUploadsReadAsJettyReadsThemTest {
 
     data class Seen(val status: Int, val contentType: String?, val body: String)

@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.lastEventId
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.queryParam
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.start
 import io.github.matthewjones372.pelican.uring.streamedBy
 import io.github.matthewjones372.pelican.uring.streamedByOrFail
@@ -42,6 +43,7 @@ import io.github.matthewjones372.pelican.jetty.streamedNow as jettyStreamedNow
 import io.github.matthewjones372.pelican.jetty.streamedOrFail as jettyStreamedOrFail
 
 /** Streamed responses on both servers, compared on the bytes a caller reads. */
+@RequiresUring
 class StreamedAsJettyStreamsTest {
 
     data class Tick(val seq: Int, val at: String)

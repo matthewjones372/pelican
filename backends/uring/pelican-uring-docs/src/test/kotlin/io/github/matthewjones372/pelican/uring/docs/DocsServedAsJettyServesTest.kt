@@ -11,6 +11,7 @@ import io.github.matthewjones372.pelican.openapi.DocsUi
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.docsOAuth
 import io.github.matthewjones372.pelican.pathParam
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
 import io.kotest.assertions.withClue
@@ -30,6 +31,7 @@ import io.github.matthewjones372.pelican.jetty.handledNow as jettyHandledNow
 data class Widget(val id: Long, val name: String)
 
 /** One API and its docs on both servers, asked the same questions over a socket. */
+@RequiresUring
 class DocsServedAsJettyServesTest {
 
     data class Seen(

@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.filePart
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ndjsonIn
 import io.github.matthewjones372.pelican.uring.READ_TIMEOUT_MILLIS
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.reader
 import io.github.matthewjones372.pelican.uring.start
@@ -40,6 +41,7 @@ data class Tally(val count: Int)
 private val THREE_FRAMES = listOf("Hello", "Bonjour", "Hola").joinToString("") { """{"text":"$it"}""" + "\n" }
 
 /** NDJSON uploads on both servers, asked the same questions over a socket. */
+@RequiresUring
 class StreamedUploadsReadAsJettyReadsThemTest {
 
     data class Seen(val status: Int, val contentType: String?, val body: String)

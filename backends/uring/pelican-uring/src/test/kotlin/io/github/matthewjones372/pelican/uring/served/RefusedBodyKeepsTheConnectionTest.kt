@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsonBody
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
 import io.kotest.assertions.withClue
@@ -18,6 +19,7 @@ import java.net.Socket
  * Pekko's `ChunkedBodyLimitTest` check, on io_uring: an over-limit chunked body is refused on a connection that is
  * still usable. A raw socket, because a client that opens a second connection would pass either way.
  */
+@RequiresUring
 class RefusedBodyKeepsTheConnectionTest {
 
     data class Jotted(val text: String)

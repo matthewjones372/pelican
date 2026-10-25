@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.optional
+import io.github.matthewjones372.pelican.uring.RequiresUring
 import io.github.matthewjones372.pelican.uring.bytesNow
 import io.github.matthewjones372.pelican.uring.handledNow
 import io.github.matthewjones372.pelican.uring.start
@@ -24,6 +25,7 @@ import io.github.matthewjones372.pelican.jetty.handledNow as jettyHandledNow
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** CORS on both servers: the preflight, and the headers on every answer an endpoint gives. */
+@RequiresUring
 class CorsAnsweredAsJettyAnswersItTest {
 
     data class Note(val text: String)

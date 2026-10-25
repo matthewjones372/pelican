@@ -30,6 +30,8 @@ dependencies {
     // The third server: `OnUring`, the io_uring runtime, run by the same parity suites.
     implementation(project(":pelican-uring"))
     implementation(project(":pelican-uring-docs"))
+    // `RequiresUring`, so the io_uring cases skip where io_uring cannot run.
+    testImplementation(testFixtures(project(":pelican-uring")))
     // Serving the docs is opt-in: this is the module that adds them to a server.
     implementation(project(":pelican-jetty-docs"))
     // And on Pekko, for `FirstEndpointOnPekko`.
