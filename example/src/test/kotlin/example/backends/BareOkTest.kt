@@ -7,7 +7,7 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.ResponseSpec
 import io.github.matthewjones372.pelican.test.apiClient
-import io.github.matthewjones372.pelican.uring.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -16,8 +16,8 @@ import io.github.matthewjones372.pelican.jetty.handledOneOf as handledOneOfOnJet
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledOneOf as handledOneOfOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.uring.handledOneOf as handledOneOfOnUring
-import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.handledOneOf as handledOneOfOnUring
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
 
 class BareOkTest {
 

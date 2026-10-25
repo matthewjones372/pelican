@@ -6,7 +6,7 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ndjsonIn
-import io.github.matthewjones372.pelican.uring.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
@@ -21,9 +21,9 @@ import io.github.matthewjones372.pelican.jetty.toSequence as toSequenceOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 import io.github.matthewjones372.pelican.pekko.toSource as toSourceOnPekko
-import io.github.matthewjones372.pelican.uring.start as startOnUring
-import io.github.matthewjones372.pelican.uring.streamedNow as streamedNowOnUring
-import io.github.matthewjones372.pelican.uring.toSequence as toSequenceOnUring
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnUring
+import io.github.matthewjones372.pelican.gannet.toSequence as toSequenceOnUring
 
 /**
  * A typed upload is read as it arrives, which is the whole claim `ndjsonIn`

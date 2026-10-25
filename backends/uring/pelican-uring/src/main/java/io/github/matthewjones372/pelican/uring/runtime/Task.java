@@ -1,8 +1,0 @@
-package io.github.matthewjones372.pelican.uring.runtime;
-
-/** Work another thread hands a carrier: [run] on the carrier, or [reject] on whichever thread finds it stopped. */
-interface Task {
-    void run();
-
-    void reject();
-}

@@ -7,7 +7,7 @@ import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.RequestSpec
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.pekko.inMemory
-import io.github.matthewjones372.pelican.uring.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresUring
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import io.github.matthewjones372.pelican.jetty.handledNow as handledOnJetty
@@ -15,9 +15,9 @@ import io.github.matthewjones372.pelican.jetty.handledWith as handledWithOnJetty
 import io.github.matthewjones372.pelican.pekko.handledNow as handledOnPekko
 import io.github.matthewjones372.pelican.pekko.handledWith as handledWithOnPekko
 import io.github.matthewjones372.pelican.test.jetty.inMemory as inMemoryOnJetty
-import io.github.matthewjones372.pelican.uring.handledNow as handledOnUring
-import io.github.matthewjones372.pelican.uring.handledWith as handledWithOnUring
-import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.handledNow as handledOnUring
+import io.github.matthewjones372.pelican.gannet.handledWith as handledWithOnUring
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
 
 /**
  * Where an interpreter's answer is its router's and not Pelican's, made

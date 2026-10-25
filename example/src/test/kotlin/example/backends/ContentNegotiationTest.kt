@@ -9,7 +9,7 @@ import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.negotiated
 import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.uring.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -26,9 +26,9 @@ import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.handledOrFail as handledOrFailOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.uring.handledNow as handledNowOnUring
-import io.github.matthewjones372.pelican.uring.handledOrFail as handledOrFailOnUring
-import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.handledNow as handledNowOnUring
+import io.github.matthewjones372.pelican.gannet.handledOrFail as handledOrFailOnUring
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
 
 /**
  * Pelican resolves its own codecs and never goes through a `Marshaller`, a

@@ -3,8 +3,8 @@ package example.backends
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
-import io.github.matthewjones372.pelican.uring.RequiresUring
-import io.github.matthewjones372.pelican.uring.UringTests
+import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.UringTests
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -14,8 +14,8 @@ import io.github.matthewjones372.pelican.jetty.PelicanServer as JettyServer
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.PelicanServer as PekkoServer
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.uring.PelicanServer as UringServer
-import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.PelicanServer as UringServer
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
 
 /**
  * The handle a backend hands back, pinned to one shape.

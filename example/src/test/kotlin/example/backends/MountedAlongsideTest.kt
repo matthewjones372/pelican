@@ -4,9 +4,9 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.uring.RequiresUring
-import io.github.matthewjones372.pelican.uring.UringHandler
-import io.github.matthewjones372.pelican.uring.then
+import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.UringHandler
+import io.github.matthewjones372.pelican.gannet.then
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.http.javadsl.server.Directives
@@ -26,9 +26,9 @@ import io.github.matthewjones372.pelican.jetty.toHandler as toJettyHandler
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.toRoute as toPekkoRoute
-import io.github.matthewjones372.pelican.uring.handledNow as handledNowOnUring
-import io.github.matthewjones372.pelican.uring.start as startOnUring
-import io.github.matthewjones372.pelican.uring.toHandler as toUringHandler
+import io.github.matthewjones372.pelican.gannet.handledNow as handledNowOnUring
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.toHandler as toUringHandler
 
 class MountedAlongsideTest {
 

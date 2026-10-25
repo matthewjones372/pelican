@@ -110,8 +110,8 @@ val moduleDescriptions = mapOf(
     "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
     "pelican-streams" to "A streaming body as a lark Stream, whose failure is a value.",
     "pelican-streams-jetty" to "A streaming body on Jetty as a lark Stream, whose failure is a value.",
-    "pelican-uring" to "An HTTP/1.1 server on io_uring, a carrier per core, and endpoint descriptions served on it.",
-    "pelican-uring-docs" to "Serves the OpenAPI document and Swagger UI on the io_uring runtime.",
+    "pelican-gannet" to "An HTTP/1.1 server on io_uring, a carrier per core, and endpoint descriptions served on it.",
+    "pelican-gannet-docs" to "Serves the OpenAPI document and Swagger UI on the io_uring runtime.",
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
     "pelican-test-golden" to "Golden files per endpoint that fail on a change breaking existing callers.",
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",
@@ -178,7 +178,7 @@ dependencies {
     // Linux, and on a Linux whose seccomp profile or `io_uring_disabled` refuses `io_uring_setup`, as CI's container
     // does -- and skipped lines would pull the total down. Being on Linux says nothing about the second, so the
     // signal is `PELICAN_REQUIRE_URING=1`, which makes those tests fail rather than skip (specs 0087, 0088).
-    val uringModules = setOf("pelican-uring", "pelican-uring-docs")
+    val uringModules = setOf("pelican-gannet", "pelican-gannet-docs")
     val uringRuns = System.getenv("PELICAN_REQUIRE_URING") == "1"
     subprojects
         .filter { it.name !in setOf("benchmarks", "pelican-bom") }
@@ -206,7 +206,7 @@ val publishedModules = subprojects.map { it.name } - setOf("example", "benchmark
 extra["libraryModules"] = publishedModules - "pelican-bom"
 
 val floor25 = setOf(
-    "pelican-streams", "pelican-streams-jetty", "pelican-uring", "pelican-uring-docs", "example", "benchmarks",
+    "pelican-streams", "pelican-streams-jetty", "pelican-gannet", "pelican-gannet-docs", "example", "benchmarks",
 )
 
 subprojects {

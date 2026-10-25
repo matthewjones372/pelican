@@ -5,7 +5,7 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.uring.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.stream.javadsl.Source
@@ -20,8 +20,8 @@ import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
-import io.github.matthewjones372.pelican.uring.start as startOnUring
-import io.github.matthewjones372.pelican.uring.streamedNow as streamedNowOnUring
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnUring
 
 /**
  * A consumer that takes one frame and walks away, and what the handler's stream

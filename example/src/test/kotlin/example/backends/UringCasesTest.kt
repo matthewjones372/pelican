@@ -1,7 +1,7 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.uring.RequiresUring
-import io.github.matthewjones372.pelican.uring.UringTests
+import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.UringTests
 import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.Test
 

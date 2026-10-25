@@ -5,7 +5,7 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.pages
-import io.github.matthewjones372.pelican.uring.UringTests
+import io.github.matthewjones372.pelican.gannet.UringTests
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -21,8 +21,8 @@ import io.github.matthewjones372.pelican.jetty.handledBy as handledByOnJetty
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledBy as handledByOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.uring.handledBy as handledByOnUring
-import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.handledBy as handledByOnUring
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
 
 /** The entries of [JettyDifference] and [UringDifference] that a request can show, held true on every server. */
 class RecordedDifferencesTest {

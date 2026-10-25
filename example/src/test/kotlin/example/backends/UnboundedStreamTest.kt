@@ -7,7 +7,7 @@ import io.github.matthewjones372.pelican.StreamOf
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.uring.assumeUring
+import io.github.matthewjones372.pelican.gannet.assumeUring
 import io.kotest.assertions.fail
 import io.kotest.assertions.withClue
 import io.kotest.matchers.longs.shouldBeLessThan
@@ -27,8 +27,8 @@ import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
-import io.github.matthewjones372.pelican.uring.start as startOnUring
-import io.github.matthewjones372.pelican.uring.streamedNow as streamedNowOnUring
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnUring
 
 /**
  * What an endpoint that never ends costs, asked as a question about demand

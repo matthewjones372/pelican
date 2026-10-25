@@ -66,6 +66,6 @@ class BinderNameParityTest {
     private companion object {
         const val PEKKO = "io.github.matthewjones372.pelican.pekko"
         const val JETTY = "io.github.matthewjones372.pelican.jetty"
-        const val URING = "io.github.matthewjones372.pelican.uring"
+        const val URING = "io.github.matthewjones372.pelican.gannet"
     }
 }

@@ -3,7 +3,7 @@ package example.backends
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
-import io.github.matthewjones372.pelican.uring.UringTests
+import io.github.matthewjones372.pelican.gannet.UringTests
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
@@ -13,7 +13,7 @@ import kotlin.reflect.KParameter
 import kotlin.reflect.jvm.kotlinFunction
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.gannet.start as startOnUring
 
 /**
  * The call a user types first, pinned to one shape whichever backend publishes
@@ -43,7 +43,7 @@ class StartParityTest {
     private val backends = listOf(
         "pekko" to "io.github.matthewjones372.pelican.pekko",
         "jetty" to "io.github.matthewjones372.pelican.jetty",
-        "uring" to "io.github.matthewjones372.pelican.uring",
+        "uring" to "io.github.matthewjones372.pelican.gannet",
     )
 
     @Test

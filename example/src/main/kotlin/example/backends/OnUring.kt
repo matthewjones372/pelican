@@ -16,14 +16,14 @@ import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.lastEventId
-import io.github.matthewjones372.pelican.uring.bytesNow
-import io.github.matthewjones372.pelican.uring.handledNow
-import io.github.matthewjones372.pelican.uring.handledOneOf
-import io.github.matthewjones372.pelican.uring.handledOrFail
-import io.github.matthewjones372.pelican.uring.handledWith
-import io.github.matthewjones372.pelican.uring.start
-import io.github.matthewjones372.pelican.uring.streamedNow
-import io.github.matthewjones372.pelican.uring.toSequence
+import io.github.matthewjones372.pelican.gannet.bytesNow
+import io.github.matthewjones372.pelican.gannet.handledNow
+import io.github.matthewjones372.pelican.gannet.handledOneOf
+import io.github.matthewjones372.pelican.gannet.handledOrFail
+import io.github.matthewjones372.pelican.gannet.handledWith
+import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.gannet.streamedNow
+import io.github.matthewjones372.pelican.gannet.toSequence
 
 /**
  * The io_uring binding of [greetingEndpoints].

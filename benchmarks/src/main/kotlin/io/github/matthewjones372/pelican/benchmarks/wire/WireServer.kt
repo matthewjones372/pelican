@@ -21,11 +21,11 @@ import io.github.matthewjones372.pelican.pekko.handledBy as stagedOnPekko
 import io.github.matthewjones372.pelican.pekko.handledNow as onPekko
 import io.github.matthewjones372.pelican.pekko.start as startPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedOnPekko
-import io.github.matthewjones372.pelican.uring.Handlers as UringHandlers
-import io.github.matthewjones372.pelican.uring.handledBy as stagedOnUring
-import io.github.matthewjones372.pelican.uring.handledNow as onUring
-import io.github.matthewjones372.pelican.uring.start as startUring
-import io.github.matthewjones372.pelican.uring.streamedNow as streamedOnUring
+import io.github.matthewjones372.pelican.gannet.Handlers as UringHandlers
+import io.github.matthewjones372.pelican.gannet.handledBy as stagedOnUring
+import io.github.matthewjones372.pelican.gannet.handledNow as onUring
+import io.github.matthewjones372.pelican.gannet.start as startUring
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedOnUring
 
 data class Item(val id: Long, val name: String)
 

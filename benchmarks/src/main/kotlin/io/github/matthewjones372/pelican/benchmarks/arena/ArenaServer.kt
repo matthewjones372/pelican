@@ -19,9 +19,9 @@ import io.github.matthewjones372.pelican.jetty.start as startJetty
 import io.github.matthewjones372.pelican.pekko.Handlers as PekkoHandlers
 import io.github.matthewjones372.pelican.pekko.handledNow as onPekko
 import io.github.matthewjones372.pelican.pekko.start as startPekko
-import io.github.matthewjones372.pelican.uring.Handlers as UringHandlers
-import io.github.matthewjones372.pelican.uring.handledNow as onUring
-import io.github.matthewjones372.pelican.uring.start as startUring
+import io.github.matthewjones372.pelican.gannet.Handlers as UringHandlers
+import io.github.matthewjones372.pelican.gannet.handledNow as onUring
+import io.github.matthewjones372.pelican.gannet.start as startUring
 
 data class Rating(val score: Int, val count: Int)
 

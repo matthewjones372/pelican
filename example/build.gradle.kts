@@ -28,10 +28,10 @@ dependencies {
     // Pekko's own logging at the slf4j API `pelican-pekko` writes to.
     runtimeOnly("org.apache.pekko:pekko-slf4j_2.13")
     // The third server: `OnUring`, the io_uring runtime, run by the same parity suites.
-    implementation(project(":pelican-uring"))
-    implementation(project(":pelican-uring-docs"))
+    implementation(project(":pelican-gannet"))
+    implementation(project(":pelican-gannet-docs"))
     // `RequiresUring`, so the io_uring cases skip where io_uring cannot run.
-    testImplementation(testFixtures(project(":pelican-uring")))
+    testImplementation(testFixtures(project(":pelican-gannet")))
     // Serving the docs is opt-in: this is the module that adds them to a server.
     implementation(project(":pelican-jetty-docs"))
     // And on Pekko, for `FirstEndpointOnPekko`.
