@@ -32,6 +32,7 @@ group(
     "pelican-jetty", "pelican-jetty-docs", "pelican-jetty-mcp",
     "pelican-test-jetty", "pelican-client-jetty", "pelican-streams-jetty",
 )
+group("backends/uring", "pelican-uring", "pelican-uring-docs")
 group("testing", "pelican-test", "pelican-test-golden", "pelican-test-wiremock")
 group(
     "integrations",

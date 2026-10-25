@@ -97,8 +97,9 @@ A checklist for a team evaluating Pelican 1.0.0:
 
 - **The JDK.** 1.0.0's library modules are compiled for JDK 25, so a
   service on 1.0.0 must run on 25 or newer. On `main`, not yet released, they
-  target JDK 21, except `pelican-streams` and `pelican-streams-jetty` (25), and
-  synchronous handlers run on platform threads below JDK 24. The Gradle plugin
+  target JDK 21, except `pelican-streams`, `pelican-streams-jetty` and the
+  `pelican-uring` modules (25), and synchronous handlers run on platform
+  threads below JDK 24. The Gradle plugin
   needs Java 21 or newer for the build. See [Versions](reference.md#versions)
   and [Where a handler runs](reference.md#where-a-handler-runs).
 - **Backend.** `pelican-pekko` is the released backend. Pelican declares

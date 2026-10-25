@@ -82,7 +82,7 @@ coordinate.
 
 **On `main`: `pelican-bom`** (main only, published as `1.0.1-SNAPSHOT` to
 Central's snapshot repository). It is a Gradle `java-platform` with no
-dependencies of its own, only a version constraint for each of the 31 library
+dependencies of its own, only a version constraint for each of the 33 library
 modules:
 
 ```kotlin
@@ -191,6 +191,26 @@ since it has no cross-build to choose.
 Typical stack: `pelican-bom`, `pelican-jetty`, `pelican-jackson` or
 `pelican-kotlinx`, `pelican-jetty-docs`, and `pelican-test-jetty` for tests.
 
+### io_uring backend
+
+For a Linux service that wants neither Pekko nor Jetty: an HTTP/1.1 server on
+io_uring, a carrier thread and ring per core, each connection a fiber, and the
+interpreter that serves an `Api` on it. Every binder `pelican-jetty` has exists
+here under the same name, taking the same `Sequence`; handlers run on virtual
+threads unless `Handlers.onDispatcher` keeps them on the carrier. Linux 6.1 or
+later, JDK 25, and two JVM flags: `--enable-native-access=ALL-UNNAMED
+--add-exports java.base/jdk.internal.vm=ALL-UNNAMED`. No TLS, HTTP/2 or
+compression.
+
+| Module | Availability | Depends on | Provides |
+|---|---|---|---|
+| `pelican-uring` | main only | core | descriptions to a `UringHandler` (`toHandler`), `start` to serve it, and the runtime under it: `UringServer` and the `HttpHandler` it calls |
+| `pelican-uring-docs` | main only | uring, openapi | the document and a Swagger UI or Redoc page and a Redoc or RapiDoc reference beside it, as a `UringHandler` |
+
+Typical stack: `pelican-bom`, `pelican-uring`, `pelican-jackson` or
+`pelican-kotlinx`, and `pelican-uring-docs`. There is no `-test-` module yet:
+test through `pelican-test`'s `apiClient` against `start(port = 0)`.
+
 ### Testing
 
 | Module | Availability | Depends on | Provides |
@@ -226,7 +246,7 @@ not acquire the OpenTelemetry API, and the reverse.
 | `pelican-codegen` | 1.0.0 | core | descriptions to a Kotlin client, as source |
 | `pelican-import` | 1.0.0 | codegen, `snakeyaml-engine` | an OpenAPI document to descriptions and handler stubs, as source |
 | Gradle plugin `io.github.matthewjones372.pelican` | 1.0.0 | nothing on your classpath | every generator as Gradle tasks: clients, documents, endpoints |
-| `pelican-bom` | main only | nothing | version constraints for the 31 library modules; see [above](#version-alignment-and-the-bom) |
+| `pelican-bom` | main only | nothing | version constraints for the 33 library modules; see [above](#version-alignment-and-the-bom) |
 
 Most builds use the generators through the plugin rather than declaring
 `pelican-codegen` or `pelican-import`. The plugin is on Maven Central, not the

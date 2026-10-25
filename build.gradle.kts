@@ -110,6 +110,8 @@ val moduleDescriptions = mapOf(
     "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
     "pelican-streams" to "A streaming body as a lark Stream, whose failure is a value.",
     "pelican-streams-jetty" to "A streaming body on Jetty as a lark Stream, whose failure is a value.",
+    "pelican-uring" to "An HTTP/1.1 server on io_uring, a carrier per core, and endpoint descriptions served on it.",
+    "pelican-uring-docs" to "Serves the OpenAPI document and Swagger UI on the io_uring runtime.",
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
     "pelican-test-golden" to "Golden files per endpoint that fail on a change breaking existing callers.",
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",
@@ -171,7 +173,14 @@ dependencies {
     // that no test covers and pull the total down — a coverage floor that
     // falls because a benchmark was written is measuring the wrong thing.
     // See benchmarks/build.gradle.kts for why the agent stays off it entirely.
-    subprojects.filter { it.name !in setOf("benchmarks", "pelican-bom") }.forEach { kover(project(it.path)) }
+    //
+    // `pelican-uring` counts only where its tests can run: off Linux they skip, and skipped lines would pull the
+    // total down for whoever builds on a Mac (spec 0087).
+    val uringRuns = System.getProperty("os.name").startsWith("Linux")
+    subprojects
+        .filter { it.name !in setOf("benchmarks", "pelican-bom") }
+        .filter { uringRuns || it.name != "pelican-uring" }
+        .forEach { kover(project(it.path)) }
 }
 
 // A floor nobody runs is not a floor: `./gradlew build` checks it.
@@ -193,6 +202,10 @@ val publishedModules = subprojects.map { it.name } - setOf("example", "benchmark
 // What `pelican-bom` constrains, so a new module is in it without an edit there.
 extra["libraryModules"] = publishedModules - "pelican-bom"
 
+val floor25 = setOf(
+    "pelican-streams", "pelican-streams-jetty", "pelican-uring", "pelican-uring-docs", "example", "benchmarks",
+)
+
 subprojects {
     repositories { mavenCentral() }
 
@@ -205,8 +218,10 @@ subprojects {
     // A `java-platform` has no sources, so none of what follows applies to it.
     if (name == "pelican-bom") return@subprojects
 
-    // lark-stream 0.9.0 is class file 69, so a module built on it is Java 25 until lark targets 21.
-    val jvmFloor = if (name in setOf("pelican-streams", "pelican-streams-jetty")) 25 else 21
+    // lark-stream 0.9.0 is class file 69, so a module built on it is Java 25 until lark targets 21. The io_uring
+    // runtime needs FFM and the JDK's internal continuation (spec 0087), and whatever depends on it is 25 too: the
+    // example's parity suites and the benchmarks run every backend (spec 0088).
+    val jvmFloor = if (name in floor25) 25 else 21
 
     apply(plugin = "org.jetbrains.kotlin.jvm")
 

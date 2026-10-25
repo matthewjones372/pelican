@@ -1,0 +1,224 @@
+public final class io/github/matthewjones372/pelican/uring/BodiesKt {
+	public static final fun toRequestBody (Lio/github/matthewjones372/pelican/ByteStreamHandle;)Lio/github/matthewjones372/pelican/uring/RequestBody;
+	public static final fun toSequence (Lio/github/matthewjones372/pelican/ByteStreamHandle;)Lkotlin/sequences/Sequence;
+}
+
+public final class io/github/matthewjones372/pelican/uring/BodyTooLargeException : java/io/IOException {
+	public fun <init> (J)V
+	public final fun getLimit ()J
+}
+
+public final class io/github/matthewjones372/pelican/uring/DeclinesKt {
+	public static final fun onlyFor (Lio/github/matthewjones372/pelican/uring/UringHandler;Lio/github/matthewjones372/pelican/Method;)Lio/github/matthewjones372/pelican/uring/UringHandler;
+	public static final fun then (Lio/github/matthewjones372/pelican/uring/UringHandler;Lio/github/matthewjones372/pelican/uring/UringHandler;)Lio/github/matthewjones372/pelican/uring/UringHandler;
+}
+
+public final class io/github/matthewjones372/pelican/uring/FrameReader : java/lang/AutoCloseable, java/util/Iterator, kotlin/jvm/internal/markers/KMappedMarker {
+	public fun close ()V
+	public fun hasNext ()Z
+	public fun next ()Ljava/lang/Object;
+	public fun remove ()V
+	public final fun wake ()V
+}
+
+public final class io/github/matthewjones372/pelican/uring/Handlers {
+	public static final field Companion Lio/github/matthewjones372/pelican/uring/Handlers$Companion;
+	public synthetic fun <init> (Ljava/util/concurrent/Executor;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/matthewjones372/pelican/uring/Handlers$Companion {
+	public final fun getDefault ()Lio/github/matthewjones372/pelican/uring/Handlers;
+	public final fun getOnDispatcher ()Lio/github/matthewjones372/pelican/uring/Handlers;
+	public final fun getOnVirtualThreads ()Lio/github/matthewjones372/pelican/uring/Handlers;
+	public final fun on (Ljava/util/concurrent/Executor;)Lio/github/matthewjones372/pelican/uring/Handlers;
+}
+
+public final class io/github/matthewjones372/pelican/uring/HandlersKt {
+	public static final fun bytesNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun bytesOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun getRequest (Lio/github/matthewjones372/pelican/Params;)Lio/github/matthewjones372/pelican/uring/HttpRequest;
+	public static final fun handledBy (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledByOneOf (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledByOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledOneOf (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun handledWith (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun streamedBy (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun streamedByOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun streamedNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun streamedOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+}
+
+public final class io/github/matthewjones372/pelican/uring/Headers {
+	public fun <init> (Ljava/util/List;)V
+	public final fun all (Ljava/lang/String;)Ljava/util/List;
+	public final fun contains (Ljava/lang/String;)Z
+	public final fun get (Ljava/lang/String;)Ljava/lang/String;
+	public final fun getFields ()Ljava/util/List;
+	public final fun getNames ()Ljava/util/Set;
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/uring/HttpExchange {
+	public static final field Companion Lio/github/matthewjones372/pelican/uring/HttpExchange$Companion;
+	public abstract fun detach ()V
+	public abstract fun getOnCarrier ()Z
+	public abstract fun getRequest ()Lio/github/matthewjones372/pelican/uring/HttpRequest;
+	public abstract fun offload (Ljava/util/concurrent/Executor;Lkotlin/jvm/functions/Function1;)V
+	public abstract fun respond (ILjava/util/List;[B)V
+	public static synthetic fun respond$default (Lio/github/matthewjones372/pelican/uring/HttpExchange;ILjava/util/List;[BILjava/lang/Object;)V
+	public abstract fun stream (ILjava/util/List;)Lio/github/matthewjones372/pelican/uring/ResponseStream;
+	public static synthetic fun stream$default (Lio/github/matthewjones372/pelican/uring/HttpExchange;ILjava/util/List;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/uring/ResponseStream;
+}
+
+public final class io/github/matthewjones372/pelican/uring/HttpExchange$Companion {
+	public final fun getEMPTY_BODY ()[B
+}
+
+public abstract interface class io/github/matthewjones372/pelican/uring/HttpHandler {
+	public abstract fun handle (Lio/github/matthewjones372/pelican/uring/HttpExchange;)V
+}
+
+public final class io/github/matthewjones372/pelican/uring/HttpRequest {
+	public final fun getBody ()Lio/github/matthewjones372/pelican/uring/RequestBody;
+	public final fun getHeaders ()Lio/github/matthewjones372/pelican/uring/Headers;
+	public final fun getMethod ()Ljava/lang/String;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getQuery ()Ljava/lang/String;
+	public final fun getTarget ()Ljava/lang/String;
+	public final fun getVersion ()Lio/github/matthewjones372/pelican/uring/HttpVersion;
+}
+
+public final class io/github/matthewjones372/pelican/uring/HttpVersion : java/lang/Enum {
+	public static final field HTTP_1_0 Lio/github/matthewjones372/pelican/uring/HttpVersion;
+	public static final field HTTP_1_1 Lio/github/matthewjones372/pelican/uring/HttpVersion;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/uring/HttpVersion;
+	public static fun values ()[Lio/github/matthewjones372/pelican/uring/HttpVersion;
+}
+
+public final class io/github/matthewjones372/pelican/uring/InterpreterKt {
+	public static final fun toHandler (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/uring/Handlers;)Lio/github/matthewjones372/pelican/uring/UringHandler;
+	public static synthetic fun toHandler$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/uring/Handlers;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/uring/UringHandler;
+}
+
+public final class io/github/matthewjones372/pelican/uring/MalformedBodyException : java/io/IOException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class io/github/matthewjones372/pelican/uring/PelicanServer : java/lang/AutoCloseable {
+	public final fun block ()V
+	public fun close ()V
+	public final fun getApi ()Lio/github/matthewjones372/pelican/Api;
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getPort ()I
+	public final fun getServer ()Lio/github/matthewjones372/pelican/uring/UringServer;
+	public final fun stop ()V
+	public final fun stopAsync ()Ljava/util/concurrent/CompletionStage;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/uring/RequestBody {
+	public abstract fun fail (Ljava/io/IOException;)V
+	public abstract fun getLength ()Ljava/lang/Long;
+	public fun inputStream ()Ljava/io/InputStream;
+	public abstract fun read ([BII)I
+	public abstract fun read ([BIILjava/time/Duration;)I
+	public abstract fun readAll ()[B
+	public abstract fun readAll (J)[B
+}
+
+public abstract interface class io/github/matthewjones372/pelican/uring/ResponseStream : java/lang/AutoCloseable {
+	public abstract fun abort ()V
+	public abstract fun close ()V
+	public abstract fun write ([BII)V
+	public static synthetic fun write$default (Lio/github/matthewjones372/pelican/uring/ResponseStream;[BIIILjava/lang/Object;)V
+}
+
+public final class io/github/matthewjones372/pelican/uring/ServerKt {
+	public static final fun start (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lio/github/matthewjones372/pelican/uring/Handlers;Lio/github/matthewjones372/pelican/uring/UringConfig;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/uring/PelicanServer;
+	public static synthetic fun start$default (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lio/github/matthewjones372/pelican/uring/Handlers;Lio/github/matthewjones372/pelican/uring/UringConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/uring/PelicanServer;
+}
+
+public final class io/github/matthewjones372/pelican/uring/StreamedUploadsKt {
+	public static final fun reader (Lio/github/matthewjones372/pelican/StreamIn;)Lio/github/matthewjones372/pelican/uring/FrameReader;
+	public static final fun toSequence (Lio/github/matthewjones372/pelican/StreamIn;)Lkotlin/sequences/Sequence;
+}
+
+public final class io/github/matthewjones372/pelican/uring/UringConfig {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;IIIIJJLjava/time/Duration;Ljava/time/Duration;IIIIIIILjava/time/Duration;)V
+	public synthetic fun <init> (Ljava/lang/String;IIIIJJLjava/time/Duration;Ljava/time/Duration;IIIIIIILjava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()I
+	public final fun component11 ()I
+	public final fun component12 ()I
+	public final fun component13 ()I
+	public final fun component14 ()I
+	public final fun component15 ()I
+	public final fun component16 ()I
+	public final fun component17 ()Ljava/time/Duration;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()Ljava/time/Duration;
+	public final fun component9 ()Ljava/time/Duration;
+	public final fun copy (Ljava/lang/String;IIIIJJLjava/time/Duration;Ljava/time/Duration;IIIIIIILjava/time/Duration;)Lio/github/matthewjones372/pelican/uring/UringConfig;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/uring/UringConfig;Ljava/lang/String;IIIIJJLjava/time/Duration;Ljava/time/Duration;IIIIIIILjava/time/Duration;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/uring/UringConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBacklog ()I
+	public final fun getBufferCount ()I
+	public final fun getBufferSize ()I
+	public final fun getCarriers ()I
+	public final fun getCompletionEntries ()I
+	public final fun getDrainBytes ()J
+	public final fun getFixedFiles ()I
+	public final fun getHeldBuffers ()I
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getIdleTimeout ()Ljava/time/Duration;
+	public final fun getMaxBodyBytes ()J
+	public final fun getMaxHeaderBytes ()I
+	public final fun getMaxRequestLineBytes ()I
+	public final fun getPort ()I
+	public final fun getRingEntries ()I
+	public final fun getStopGrace ()Ljava/time/Duration;
+	public final fun getTick ()Ljava/time/Duration;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/uring/UringHandler {
+	public abstract fun handle (Lio/github/matthewjones372/pelican/uring/HttpExchange;)Z
+}
+
+public final class io/github/matthewjones372/pelican/uring/UringServer : java/lang/AutoCloseable {
+	public static final field Companion Lio/github/matthewjones372/pelican/uring/UringServer$Companion;
+	public synthetic fun <init> (Lio/github/matthewjones372/pelican/uring/runtime/Carriers;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun awaitStopped ()V
+	public fun close ()V
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getPort ()I
+	public final fun stop ()V
+	public final fun stop (Ljava/time/Duration;)V
+}
+
+public final class io/github/matthewjones372/pelican/uring/UringServer$Companion {
+	public final fun start (Lio/github/matthewjones372/pelican/uring/UringConfig;Lio/github/matthewjones372/pelican/uring/HttpHandler;)Lio/github/matthewjones372/pelican/uring/UringServer;
+	public static synthetic fun start$default (Lio/github/matthewjones372/pelican/uring/UringServer$Companion;Lio/github/matthewjones372/pelican/uring/UringConfig;Lio/github/matthewjones372/pelican/uring/HttpHandler;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/uring/UringServer;
+}
+
+public final class io/github/matthewjones372/pelican/uring/UringSupport {
+	public static final field FLAGS Ljava/lang/String;
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/uring/UringSupport;
+	public final fun problem ()Ljava/lang/String;
+	public final fun require ()V
+}
+
+public final class io/github/matthewjones372/pelican/uring/UringUnavailableException : java/lang/IllegalStateException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
