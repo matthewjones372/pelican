@@ -8,9 +8,9 @@ import io.github.matthewjones372.pelican.PathSegment
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.decodeSegment
 // File-level rather than in a companion: `const` in a private companion is
-// still a public static field on the class, and this is a sizing hint, not
-// something the published surface should promise.
-private const val INITIAL_CAPTURES = 4
+// still a public static field on the class. `String.hashCode`'s, which the
+// literal table is sorted by.
+private const val HASH_MULTIPLIER = 31
 
 /**
  * The endpoint a request reaches, found without trying the others.
@@ -40,19 +40,27 @@ class RouteIndex internal constructor(private val root: Node) {
      * found, so a walk that backtracks leaves nothing behind.
      *
      * [path] is the **raw** request path, as it arrived on the request line:
-     * this splits on `/` before decoding anything, so `%2F` stays inside the
-     * segment that carried it rather than becoming a separator.
+     * segments are found by `/` before anything is decoded, so `%2F` stays
+     * inside the segment that carried it rather than becoming a separator.
+     * The path is read in place, and a match with no captures allocates
+     * nothing.
      */
     fun match(method: Method, path: String, into: MutableMap<ParamKey<*>, Any?>): ServerEndpoint? {
-        val captured = ArrayList<String>(INITIAL_CAPTURES)
-        val found = walk(root, method, path, at = 0, captured = captured) ?: return null
+        val found = walk(root, method, path, at = 0) ?: return null
 
-        // Zipped against the endpoint that matched, not against the node that
-        // captured. Two endpoints may name one position differently —
-        // `/users/{userId}` beside `/users/{name}/posts` — and each handler
-        // reads the key it declared.
-        found.endpoint.pathSpec.captures.forEachIndexed { i, param ->
-            into[param] = param.codec.decode(param.name, captured[i])
+        // Read off the endpoint that matched, not the node that captured: two
+        // endpoints may name one position differently — `/users/{userId}`
+        // beside `/users/{name}/posts` — and each handler reads the key it
+        // declared. Segment i of the path is segment i of its template.
+        val segments = found.endpoint.pathSpec.segments
+        var at = 0
+        for (i in segments.indices) {
+            val start = skipSlashes(path, at)
+            at = segmentEnd(path, start)
+            val segment = segments[i]
+            if (segment is PathSegment.Capture) {
+                into[segment.param] = segment.param.codec.decode(segment.param.name, decoded(path, start, at))
+            }
         }
         return found
     }
@@ -67,10 +75,6 @@ class RouteIndex internal constructor(private val root: Node) {
      * route it was aimed at. A query, header or cookie is decoded after the
      * route is already in hand and never had the problem.
      *
-     * Walked a second time rather than threaded out of [match], because this
-     * runs only for a request that is being refused anyway, and the alternative
-     * is a return type every interpreter pays for on the path that matters.
-     *
      * Total by construction: this is called from a `catch`, and a path that is
      * malformed rather than merely undecodable — `/things/%zz` — throws out of
      * the walk itself. A second throw there would replace the refusal being
@@ -80,7 +84,7 @@ class RouteIndex internal constructor(private val root: Node) {
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
     fun routeFor(method: Method, path: String): ServerEndpoint? =
         try {
-            walk(root, method, path, at = 0, captured = ArrayList(INITIAL_CAPTURES))
+            walk(root, method, path, at = 0)
         } catch (_: Throwable) {
             null
         }
@@ -93,59 +97,50 @@ class RouteIndex internal constructor(private val root: Node) {
      * empty, which is a request that is going to be refused either way.
      */
     fun describesPath(path: String): Boolean =
-        Method.entries.any { method ->
-            walk(root, method, path, at = 0, captured = ArrayList(INITIAL_CAPTURES)) != null
-        }
+        Method.entries.any { method -> walk(root, method, path, at = 0) != null }
 
     /**
      * One segment at a time, literals before the capture.
      *
      * A literal that matches can still fail further down — `/orders/watch`
      * beside `/orders/{id}/items` — so a failed descent falls through to the
-     * capture rather than giving up, and anything the failed branch captured is
-     * dropped with it.
+     * capture rather than giving up.
      *
-     * Decoded here, after the split and before either comparison: a literal and
-     * a capture then answer the same question about the same text, so `/%61dmin`
-     * reaches the `admin` route rather than only the one that captures.
+     * A segment with an escape in it is decoded before either comparison: a
+     * literal and a capture then answer the same question about the same text,
+     * so `/%61dmin` reaches the `admin` route rather than only the one that
+     * captures. One without is compared where it lies.
      */
-    private fun walk(
-        node: Node,
-        method: Method,
-        path: String,
-        at: Int,
-        captured: MutableList<String>,
-    ): ServerEndpoint? {
+    private fun walk(node: Node, method: Method, path: String, at: Int): ServerEndpoint? {
         val start = skipSlashes(path, at)
         if (start >= path.length) return node.endpoints[method]
 
-        val end = path.indexOf('/', start).let { if (it < 0) path.length else it }
+        val end = segmentEnd(path, start)
+        val literal = if (hasEscape(path, start, end)) {
+            decoded(path, start, end).let { node.literal(it, 0, it.length) }
+        } else {
+            node.literal(path, start, end)
+        }
+        val byLiteral = literal?.let { walk(it, method, path, end) }
+        if (byLiteral != null) return byLiteral
+
+        return node.capture?.let { walk(it, method, path, end) }
+    }
+
+    private fun segmentEnd(path: String, start: Int): Int =
+        path.indexOf('/', start).let { if (it < 0) path.length else it }
+
+    private fun hasEscape(path: String, start: Int, end: Int): Boolean {
+        for (i in start until end) if (path[i] == '%') return true
+        return false
+    }
+
+    private fun decoded(path: String, start: Int, end: Int): String {
         val raw = path.substring(start, end)
-        val segment = when (val decoded = decodeSegment(raw)) {
+        return when (val decoded = decodeSegment(raw)) {
             is DecodedSegment.Ok -> decoded.text
             DecodedSegment.Malformed -> throw malformed(raw)
         }
-
-        val byLiteral = node.literals[segment]?.let { walk(it, method, path, end, captured) }
-        if (byLiteral != null) return byLiteral
-
-        return node.capture?.let { capture -> byCapture(capture, method, path, end, segment, captured) }
-    }
-
-    /** The capture branch, with what it wrote unwound if it comes to nothing. */
-    private fun byCapture(
-        capture: Node,
-        method: Method,
-        path: String,
-        end: Int,
-        segment: String,
-        captured: MutableList<String>,
-    ): ServerEndpoint? {
-        val depth = captured.size
-        captured.add(segment)
-        val found = walk(capture, method, path, end, captured)
-        if (found == null) while (captured.size > depth) captured.removeAt(captured.size - 1)
-        return found
     }
 
     /** Where the next segment starts: `//a` and `/a` name the same path. */
@@ -157,11 +152,32 @@ class RouteIndex internal constructor(private val root: Node) {
 
     /** One node of the trie: where a literal goes, where a capture goes, what ends here. */
     internal class Node(
-        val literals: Map<String, Node>,
+        literals: Map<String, Node>,
         /** Where any captured segment goes, whatever the endpoints beneath call it. */
         val capture: Node?,
         val endpoints: Map<Method, ServerEndpoint>,
-    )
+    ) {
+        // Sorted by `String.hashCode`, so a segment still lying in the path is
+        // looked up by hashing it there rather than by cutting it out first.
+        private val names: Array<String> = literals.keys.sortedBy { it.hashCode() }.toTypedArray()
+        private val hashes: IntArray = IntArray(names.size) { names[it].hashCode() }
+        private val children: Array<Node> = Array(names.size) { literals.getValue(names[it]) }
+
+        /** The child for the literal `text[start, end)`, or null. */
+        fun literal(text: String, start: Int, end: Int): Node? {
+            var hash = 0
+            for (i in start until end) hash = HASH_MULTIPLIER * hash + text[i].code
+            var i = hashes.binarySearch(hash)
+            if (i < 0) return null
+            while (i > 0 && hashes[i - 1] == hash) i--
+            while (i < names.size && hashes[i] == hash) {
+                val name = names[i]
+                if (name.length == end - start && text.regionMatches(start, name, 0, name.length)) return children[i]
+                i++
+            }
+            return null
+        }
+    }
 
     private companion object {
         /**
