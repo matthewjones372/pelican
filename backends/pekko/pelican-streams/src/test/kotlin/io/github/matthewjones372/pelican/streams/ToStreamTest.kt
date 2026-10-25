@@ -1,10 +1,5 @@
 package io.github.matthewjones372.pelican.streams
 
-import io.github.matthewjones372.surefold.stream.Exit
-import io.github.matthewjones372.surefold.stream.mapOrFail
-import io.github.matthewjones372.surefold.stream.run
-import io.github.matthewjones372.surefold.stream.runCollect
-import io.github.matthewjones372.surefold.stream.runFold
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -12,6 +7,11 @@ import io.github.matthewjones372.pelican.ndjsonIn
 import io.github.matthewjones372.pelican.pekko.handledBy
 import io.github.matthewjones372.pelican.test.frames
 import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.surefold.stream.Exit
+import io.github.matthewjones372.surefold.stream.mapOrFail
+import io.github.matthewjones372.surefold.stream.run
+import io.github.matthewjones372.surefold.stream.runCollect
+import io.github.matthewjones372.surefold.stream.runFold
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.javadsl.Behaviors

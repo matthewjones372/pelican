@@ -40,7 +40,9 @@ class DependenciesTest {
             .filter { it.isNotBlank() }
             .filterNot { entry -> allowed.any { entry.startsWith(it) } }
 
-        withClue("a consumer brings their own Pekko and their own surefold, so this module ships neither: $unexpected") {
+        withClue(
+            "a consumer brings their own Pekko and their own surefold, so this module ships neither: $unexpected",
+        ) {
             unexpected.shouldBeEmpty()
         }
     }

@@ -1,13 +1,13 @@
 package io.github.matthewjones372.pelican.streams
 
-import io.github.matthewjones372.surefold.stream.Exit
-import io.github.matthewjones372.surefold.stream.Stream
-import io.github.matthewjones372.surefold.stream.from
 import io.github.matthewjones372.pelican.ErrorOutput
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.StreamIn
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.toSource
+import io.github.matthewjones372.surefold.stream.Exit
+import io.github.matthewjones372.surefold.stream.Stream
+import io.github.matthewjones372.surefold.stream.from
 import java.util.concurrent.CompletionStage
 
 /*

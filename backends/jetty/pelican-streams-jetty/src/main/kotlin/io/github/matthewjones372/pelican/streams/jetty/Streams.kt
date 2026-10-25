@@ -1,13 +1,13 @@
 package io.github.matthewjones372.pelican.streams.jetty
 
-import io.github.matthewjones372.surefold.stream.Exit
-import io.github.matthewjones372.surefold.stream.Stream
-import io.github.matthewjones372.surefold.stream.blocking
 import io.github.matthewjones372.pelican.ErrorOutput
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.StreamIn
 import io.github.matthewjones372.pelican.jetty.reader
 import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.surefold.stream.Exit
+import io.github.matthewjones372.surefold.stream.Stream
+import io.github.matthewjones372.surefold.stream.blocking
 import java.util.concurrent.CompletionStage
 
 /**

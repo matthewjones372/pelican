@@ -1,11 +1,5 @@
 package io.github.matthewjones372.pelican.streams.jetty
 
-import io.github.matthewjones372.surefold.stream.Exit
-import io.github.matthewjones372.surefold.stream.Forks
-import io.github.matthewjones372.surefold.stream.mapOrFail
-import io.github.matthewjones372.surefold.stream.run
-import io.github.matthewjones372.surefold.stream.runCollect
-import io.github.matthewjones372.surefold.stream.runFold
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -14,6 +8,12 @@ import io.github.matthewjones372.pelican.jetty.handledBy
 import io.github.matthewjones372.pelican.ndjsonIn
 import io.github.matthewjones372.pelican.test.frames
 import io.github.matthewjones372.pelican.test.jetty.inMemory
+import io.github.matthewjones372.surefold.stream.Exit
+import io.github.matthewjones372.surefold.stream.Forks
+import io.github.matthewjones372.surefold.stream.mapOrFail
+import io.github.matthewjones372.surefold.stream.run
+import io.github.matthewjones372.surefold.stream.runCollect
+import io.github.matthewjones372.surefold.stream.runFold
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
