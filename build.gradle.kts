@@ -113,6 +113,7 @@ val moduleDescriptions = mapOf(
     "pelican-test-golden" to "Golden files per endpoint that fail on a change breaking existing callers.",
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",
     "pelican-test-jetty" to "The in-memory transport for pelican-test, on Jetty.",
+    "pelican-test-gannet" to "A loopback transport for pelican-test, on Gannet.",
     "pelican-test-wiremock" to "WireMock stubbed and verified in endpoint values, and stub files exported from them.",
     "pelican-bom" to "Every Pelican module at one version, so a build names the version once.",
 )
@@ -175,7 +176,7 @@ dependencies {
     // and on a Linux whose seccomp profile or `io_uring_disabled` refuses `io_uring_setup`, as CI's container does --
     // and skipped lines would pull the total down. Being on Linux says nothing about the second, so the signal is
     // `PELICAN_REQUIRE_URING=1`, which makes those tests fail rather than skip (spec 0088).
-    val gannetModules = setOf("pelican-gannet", "pelican-gannet-docs")
+    val gannetModules = setOf("pelican-gannet", "pelican-gannet-docs", "pelican-test-gannet")
     val gannetRuns = System.getenv("PELICAN_REQUIRE_URING") == "1"
     subprojects
         .filter { it.name !in setOf("benchmarks", "pelican-bom") }
@@ -203,7 +204,9 @@ val publishedModules = subprojects.map { it.name } - setOf("example", "benchmark
 extra["libraryModules"] = publishedModules - "pelican-bom"
 
 val floor25 = setOf(
-    "pelican-streams", "pelican-streams-jetty", "pelican-gannet", "pelican-gannet-docs", "example", "benchmarks",
+    "pelican-streams", "pelican-streams-jetty",
+    "pelican-gannet", "pelican-gannet-docs", "pelican-test-gannet",
+    "example", "benchmarks",
 )
 
 subprojects {

@@ -1,0 +1,13 @@
+public final class io/github/matthewjones372/pelican/test/gannet/LoopbackKt {
+	public static final fun client (Lio/github/matthewjones372/pelican/gannet/PelicanServer;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public static final fun onLoopback (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/gannet/Handlers;Lio/github/matthewjones372/gannet/GannetConfig;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public static synthetic fun onLoopback$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/gannet/Handlers;Lio/github/matthewjones372/gannet/GannetConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/test/ApiClient;
+}
+
+public final class io/github/matthewjones372/pelican/test/gannet/LoopbackTransport : io/github/matthewjones372/pelican/test/Transport, java/lang/AutoCloseable {
+	public fun <init> (Lio/github/matthewjones372/pelican/gannet/PelicanServer;)V
+	public fun close ()V
+	public final fun getServer ()Lio/github/matthewjones372/pelican/gannet/PelicanServer;
+	public fun send (Lio/github/matthewjones372/pelican/test/RequestSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+}
+

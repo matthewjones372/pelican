@@ -47,7 +47,7 @@ group(
     "pelican-jetty", "pelican-jetty-docs", "pelican-jetty-mcp",
     "pelican-test-jetty", "pelican-client-jetty", "pelican-streams-jetty",
 )
-group("backends/gannet", "pelican-gannet", "pelican-gannet-docs")
+group("backends/gannet", "pelican-gannet", "pelican-gannet-docs", "pelican-test-gannet")
 group("testing", "pelican-test", "pelican-test-golden", "pelican-test-wiremock")
 group(
     "integrations",
