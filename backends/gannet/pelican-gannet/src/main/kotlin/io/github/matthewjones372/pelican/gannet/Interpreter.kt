@@ -18,19 +18,21 @@ import io.github.matthewjones372.pelican.NegotiatedBody
 import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.Pages
-import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.spi.CorsHeaders
+import io.github.matthewjones372.pelican.spi.EndpointPlan
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex
+import io.github.matthewjones372.pelican.spi.Slots
 import io.github.matthewjones372.pelican.spi.acceptable
 import io.github.matthewjones372.pelican.spi.decodeCaller
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.ndjsonFrames
+import io.github.matthewjones372.pelican.spi.plan
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.responseCodecs
 import io.github.matthewjones372.pelican.spi.routeIndex
@@ -50,10 +52,11 @@ fun Api.toHandler(handlers: Handlers = Handlers.default): GannetHandler {
 
     // Once per endpoint rather than per request, so a broken codec is a startup failure.
     val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
+    val plans = endpoints.associateWith { it.endpoint.plan() }
     val bound = endpoints.associateWith { endpoint -> handlerFor(endpoint) }
 
     val cors = corsPolicy()
-    val answered = PelicanHandler(this, endpoints.routeIndex(), codecs, bound, cors, handlers)
+    val answered = PelicanHandler(this, endpoints.routeIndex(), plans, codecs, bound, cors, handlers)
     val files = pages ?: return answered
     // The loader that built the handler, as a carrier thread may carry no useful one.
     val loader = Thread.currentThread().contextClassLoader ?: Pages::class.java.classLoader
@@ -69,6 +72,7 @@ fun Api.toHandler(handlers: Handlers = Handlers.default): GannetHandler {
 internal class PelicanHandler(
     private val api: Api,
     private val index: RouteIndex,
+    private val plans: Map<ServerEndpoint, EndpointPlan>,
     private val codecs: Map<ServerEndpoint, EndpointCodecs>,
     private val handlers: Map<ServerEndpoint, (Params) -> CompletionStage<Any?>>,
     private val cors: CorsPolicy?,
@@ -122,19 +126,22 @@ internal class PelicanHandler(
             exchange.declineMethods(methods.map { it.name })
             return preflight(exchange, path)
         }
-        val values = LinkedHashMap<ParamKey<*>, Any?>()
-
         val matched = try {
-            index.match(method, path, values)
+            index.find(method, path)
         } catch (t: Throwable) {
-            // A capture that would not decode is that route's 400, so the route is looked up again to name it.
-            val refused = index.routeFor(method, path)?.endpoint
-            return CompletableFuture.completedStage(errorResponse(t, api, refused))
+            return CompletableFuture.completedStage(errorResponse(t, api))
         }
-
         if (matched == null) {
             exchange.declinePath()
             return preflight(exchange, path)
+        }
+
+        val values = plans.getValue(matched).slots()
+        try {
+            index.decodeCaptures(matched, path, values)
+        } catch (t: Throwable) {
+            // A capture that would not decode is its own route's 400.
+            return CompletableFuture.completedStage(errorResponse(t, api, matched.endpoint))
         }
         val answered = invoke(matched, request, values)
         return if (cors == null) answered
@@ -171,7 +178,7 @@ internal class PelicanHandler(
     private fun invoke(
         se: ServerEndpoint,
         request: HttpRequest,
-        values: MutableMap<ParamKey<*>, Any?>,
+        values: Slots,
     ): CompletionStage<Reply> {
         val executor = placement.getValue(se) ?: return invokeHere(se, request, values)
         return CompletableFuture.supplyAsync({ invokeHere(se, request, values) }, executor).thenCompose { it }
@@ -180,7 +187,7 @@ internal class PelicanHandler(
     private fun invokeHere(
         se: ServerEndpoint,
         request: HttpRequest,
-        values: MutableMap<ParamKey<*>, Any?>,
+        values: Slots,
     ): CompletionStage<Reply> {
         val ep = se.endpoint
         // Built before decoding, so a filter or a failing decode can still put a header on the way out.
@@ -193,7 +200,7 @@ internal class PelicanHandler(
         try {
             api.decodeCaller(ep, view, values)
             negotiate(ep, accept)
-            decodePlainInputs(ep, view, values)
+            plans.getValue(se).decodePlainInputs(view, values)
         } catch (t: Throwable) {
             return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params.responseHeaders()))
         }
@@ -214,7 +221,7 @@ internal class PelicanHandler(
     private fun readBody(
         ep: Endpoint<*, *>,
         request: HttpRequest,
-        values: MutableMap<ParamKey<*>, Any?>,
+        values: Slots,
         codecs: EndpointCodecs,
     ) {
         when (val body = ep.bodyInput) {

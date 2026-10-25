@@ -113,8 +113,14 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
       Done when: routing `/baseline11` allocates nothing (JMH `-prof gc`, `RequestPathBenchmark`).
 - [ ] **`spec-0089-view-gannet`**: `RequestView`; Gannet reads the request through it.
       Done when: building the request allocates only the view, which takes the credentials object's place.
-- [ ] **`spec-0089-plan`**: `EndpointPlan` with slot-backed `Params` and the query scanned once; Gannet adopts.
+- [x] **`spec-0089-plan`**: `EndpointPlan` with slot-backed `Params` and the query scanned once; Gannet adopts.
       Done when: plain inputs allocate only the decoded values.
+      `Slots` is a `MutableMap` over the plan's array, so `Params`, `decodeCaller`, the multipart reader and the
+      index's captures read and write it unchanged, and a key with no slot is absent. The slots belong to the endpoint,
+      so the index finds it first (`RouteIndex.find`) and then decodes its captures (`decodeCaptures`).
+      Measured: `PlainInputsBenchmark` 152 B/op (the slots and the two values) against 1224 B/op for the form
+      reading; Pelican on Gannet 3.15 KB a request from 4.40–4.53 KB (`raw-gannet` 2.32–2.35 KB); `gannet-inline`
+      +10.6% over its parent, 87% of `raw-gannet` from 79%, five interleaved rounds.
 - [ ] **`spec-0089-jetty`** / **`spec-0089-pekko`**: each backend on the view and plan, its copies deleted.
       Done when: its parity suite passes and Jetty's baseline does not regress.
 - [ ] **`spec-0089-success`**: a completed stage answered without chaining; reply headers built once.
@@ -131,7 +137,8 @@ Predicted inline / default (measured where a switch existed, else from the table
 - **Decoding drift.** One shared decoder replaces three copies; the differential tests
   and the parity suite are the oracle, and they run before each backend adopts it.
 - **A view outliving its request.** `RequestView` is never stored; a handler keeps slots.
-- **Gates.** The slot array needs a `FunctionalStyleTest` entry with its reason. The
+- **Gates.** The slot array is not an accumulator and needs no `FunctionalStyleTest` entry;
+  `EndpointPlan.kt` has one for the copy `Slots.entries` hands `lensInputs`. The
   sweeper's stack needs none: each deadline is its own link, not an element of a collection.
 - **Noise.** This machine is shared; `arena.sh` waits for an idle machine and alternates
   contestants, and a number is quoted only with its run-to-run spread.
@@ -157,5 +164,7 @@ Matt took each recommendation on 2026-10-25.
    What lies beyond that API is Gannet's work, tracked in Gannet issues.
 2. **Split.** Threading and codec output moved to spec 0090, with its own targets.
 3. **An illegal escape in an undeclared query parameter stays a 400**, as today, checked
-   by a scan that allocates nothing.
+   by a scan that allocates nothing. An escape of two ASCII hex digits passes; anything else is
+   put to `URLDecoder`, whose message stays the 400's detail, since what it refuses has varied
+   by JDK (25 reads the digits with `HexFormat`; the `parseInt` older ones used took `%+1`).
 4. **`nonBlocking()` does not detect a blocking handler**; spec 0090 records the non-goal.

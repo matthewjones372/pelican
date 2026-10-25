@@ -46,13 +46,24 @@ class RouteIndex internal constructor(private val root: Node) {
      * nothing.
      */
     fun match(method: Method, path: String, into: MutableMap<ParamKey<*>, Any?>): ServerEndpoint? {
-        val found = walk(root, method, path, at = 0) ?: return null
+        val found = find(method, path) ?: return null
+        decodeCaptures(found, path, into)
+        return found
+    }
 
+    /**
+     * [match] without the captures: the endpoint, for a backend that needs it
+     * before it has anywhere to put them. A malformed segment still throws.
+     */
+    fun find(method: Method, path: String): ServerEndpoint? = walk(root, method, path, at = 0)
+
+    /** The captures of [endpoint], which [find] reached by this [path], decoded into [into]. */
+    fun decodeCaptures(endpoint: ServerEndpoint, path: String, into: MutableMap<ParamKey<*>, Any?>) {
         // Read off the endpoint that matched, not the node that captured: two
         // endpoints may name one position differently — `/users/{userId}`
         // beside `/users/{name}/posts` — and each handler reads the key it
         // declared. Segment i of the path is segment i of its template.
-        val segments = found.endpoint.pathSpec.segments
+        val segments = endpoint.endpoint.pathSpec.segments
         var at = 0
         for (i in segments.indices) {
             val start = skipSlashes(path, at)
@@ -62,7 +73,6 @@ class RouteIndex internal constructor(private val root: Node) {
                 into[segment.param] = segment.param.codec.decode(segment.param.name, decoded(path, start, at))
             }
         }
-        return found
     }
 
     /**
