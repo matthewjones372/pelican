@@ -91,10 +91,10 @@ request without copying it, so the remaining per-request work is decoding the va
 handler asked for. **Deadline:** option A, the shared scheduler with `removeOnCancelPolicy`
 and the exception made only on firing, was measured: 154–158k, with the carriers at 155%
 CPU, because every request takes the executor's lock. Option B, a sweeper: each strict
-read appends itself to a lock-free queue and marks itself done, and one thread fails
-whatever is overdue every 250 ms, so a request pays a CAS and the exception exists only
-when it fires. Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a
-Gannet issue.
+read pushes itself onto a lock-free stack and marks itself done, and every 250 ms one
+thread drops what is done and fails whatever is overdue, so a request pays two CASes, a
+done deadline is held for one sweep at most, and the exception exists only when it fires.
+Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Gannet issue.
 
 ## Stack
 
@@ -124,8 +124,8 @@ Predicted inline / default (measured where a switch existed, else from the table
 - **Decoding drift.** One shared decoder replaces three copies; the differential tests
   and the parity suite are the oracle, and they run before each backend adopts it.
 - **A view outliving its request.** `RequestView` is never stored; a handler keeps slots.
-- **Gates.** The slot array needs a `FunctionalStyleTest` entry with its reason; the
-  sweeper's queue another.
+- **Gates.** The slot array needs a `FunctionalStyleTest` entry with its reason. The
+  sweeper's stack needs none: each deadline is its own link, not an element of a collection.
 - **Noise.** This machine is shared; `arena.sh` waits for an idle machine and alternates
   contestants, and a number is quoted only with its run-to-run spread.
 

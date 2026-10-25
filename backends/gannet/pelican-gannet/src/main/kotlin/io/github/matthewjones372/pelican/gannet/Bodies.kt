@@ -12,9 +12,6 @@ import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.decode
 import java.io.IOException
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.TimeUnit
 
 private const val READ_CHUNK_BYTES = 8 * 1024
 
@@ -32,32 +29,24 @@ fun ByteStreamHandle.toSequence(): Sequence<ByteArray> {
     return generateSequence { input.readNBytes(READ_CHUNK_BYTES).takeIf { it.isNotEmpty() } }.constrainOnce()
 }
 
-/** Ends a strict read that outlives [Api.strictBodyTimeoutMillis]: it fails the body, which wakes the read. */
-private val DEADLINES: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { task ->
-    Thread.ofPlatform().name("pelican-body-deadline").daemon().unstarted(task)
-}
-
-/** The body did not arrive in time; one per read, so a late deadline cannot be mistaken for another's. */
-private class TimedOut : IOException("Timed out reading the request body")
-
 /**
  * A body a codec sees whole, checked against the limit and decoded. A declared oversize is refused before a byte is
  * read; one with no declared length is read to the limit and refused, and Gannet drains what is left of it so
  * the 413 goes down a connection that is still whole. On the carrier the read parks only the connection's fiber.
+ * A read that outlives [Api.strictBodyTimeoutMillis] is failed by the sweeper, which wakes it.
  */
 internal fun readStrictBody(request: HttpRequest, api: Api, codec: RequestBodyCodecs): Any? {
     val body = request.body
     val declared = body.length
     if (declared != null && declared > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
 
-    val timedOut = TimedOut()
-    val deadline = DEADLINES.schedule({ body.fail(timedOut) }, api.strictBodyTimeoutMillis, TimeUnit.MILLISECONDS)
+    val deadline = DEADLINES.arm(body, api.strictBodyTimeoutMillis)
     val bytes = try {
         body.readAll(api.maxBodyBytes)
     } catch (e: BodyTooLargeException) {
         throw PayloadTooLarge(api.maxBodyBytes).apply { addSuppressed(e) }
     } catch (e: IOException) {
-        throw if (e === timedOut) {
+        throw if (e === deadline.settle()) {
             ApiException(
                 REQUEST_TIMEOUT,
                 "Timed out reading the request body",
@@ -69,7 +58,7 @@ internal fun readStrictBody(request: HttpRequest, api: Api, codec: RequestBodyCo
             ApiException(BAD_REQUEST, "Malformed request body", e.message, cause = e)
         }
     } finally {
-        deadline.cancel(false)
+        deadline.settle()
     }
     return codec.decode(request.headers[CONTENT_TYPE], bytes)
 }
