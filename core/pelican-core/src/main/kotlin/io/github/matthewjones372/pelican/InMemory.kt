@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.readStrictBody
+import io.github.matthewjones372.pelican.spi.refuseIllegalQuery
 import io.github.matthewjones372.pelican.spi.renderError
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.responseCodecs
@@ -390,10 +391,11 @@ private fun target(url: String): Pair<String, String> {
 
 /**
  * The query string as the values each name carries, percent-decoded as a form:
- * a `+` in a query is a space, which is the one place that rule holds.
+ * a `+` in a query is a space, which is the one place that rule holds. Refused as a bound server refuses it.
  */
 private fun queryValues(search: String): Map<String, List<String>> =
     search
+        .also(::refuseIllegalQuery)
         .split('&')
         .filter { it.isNotEmpty() }
         .map { pair ->

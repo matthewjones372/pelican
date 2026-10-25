@@ -316,6 +316,13 @@ is `a+b`. `?q=` and a bare `?q` both arrive as a present, empty value, and only
 a parameter nobody sent at all is absent, which is the difference an
 `optional()` or a `default(...)` acts on.
 
+Escapes in a query, or in a form body, are read as strict UTF-8. Bytes that do
+not spell UTF-8, such as `?q=%e9` or a bare `?%f0`, are a **400** with the
+detail `The percent-encoded bytes are not UTF-8`, rather than a U+FFFD handed
+to the handler. That holds for every pair, names included, and for pairs the
+endpoint never declared, as an escape that is not two hex digits (`?x=%zz`)
+does. An endpoint that declares no query parameter never reads its query.
+
 `RequestLinePropertyTest` makes both halves of this a property rather than a
 table: for two hundred generated strings per backend, a value sent in the path
 and in the query of one typed call comes back as itself, and a request line

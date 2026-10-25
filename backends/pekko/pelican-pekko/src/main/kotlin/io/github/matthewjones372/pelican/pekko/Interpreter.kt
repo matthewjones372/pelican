@@ -35,6 +35,7 @@ import io.github.matthewjones372.pelican.spi.decodeCaller
 import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.ndjsonFrames
+import io.github.matthewjones372.pelican.spi.refuseIllegalQuery
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.responseCodecs
 import io.github.matthewjones372.pelican.spi.routeIndex
@@ -280,7 +281,9 @@ private fun decodePlainInputs(
     req: HttpRequest,
     into: MutableMap<ParamKey<*>, Any?>,
 ) = with(into) {
-    // Path captures are already here: the index decoded them as it matched.
+    // Path captures are already here: the index decoded them as it matched. Pekko's parser refuses an illegal
+    // escape itself, but reads bytes that are not UTF-8 as U+FFFD, so core's strict reading goes first.
+    if (ep.queries.isNotEmpty()) req.uri.rawQueryString().ifPresent(::refuseIllegalQuery)
     val query = req.uri.query()
 
     ep.queries.forEach { q ->

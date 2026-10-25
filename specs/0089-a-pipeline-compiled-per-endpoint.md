@@ -82,7 +82,8 @@ over `Params`; `Params.get` of an undeclared key still throws, because the plan 
 slot for it; `successNamedBy` and `failureNamedBy` still check every reply; the route
 and the document are still read from one `Endpoint`; percent-decoding, dot segments,
 `+` as a space, 400/401/406/408/413 and their bodies are byte-for-byte as today, as the
-parity suite and the differential tests check; a codec still fails at startup.
+parity suite and the differential tests check, except the strict UTF-8 of decision 5; a
+codec still fails at startup.
 
 ## Why this shape
 
@@ -121,6 +122,10 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
       Measured: `PlainInputsBenchmark` 152 B/op (the slots and the two values) against 1224 B/op for the form
       reading; Pelican on Gannet 3.15 KB a request from 4.40–4.53 KB (`raw-gannet` 2.32–2.35 KB); `gannet-inline`
       +10.6% over its parent, 87% of `raw-gannet` from 79%, five interleaved rounds.
+- [x] **`spec-0089-strict-utf8`**: decision 5, core's query and form decoding strict UTF-8, before Jetty adopts it.
+      Done when: `StrictDecodingTest` gives one 400 for escapes that are not UTF-8 on all three backends.
+      One allocation-free scan per pair (`checkFormEncoded`) replaces the escape check; Jetty and Pekko call it through
+      `spi.refuseIllegalQuery` until their own entries move them onto the plan.
 - [ ] **`spec-0089-jetty`** / **`spec-0089-pekko`**: each backend on the view and plan, its copies deleted.
       Done when: its parity suite passes and Jetty's baseline does not regress.
 - [x] **`spec-0089-success`**: a completed stage answered without chaining; reply headers built once.
@@ -174,3 +179,13 @@ Matt took each recommendation on 2026-10-25.
    put to `URLDecoder`, whose message stays the 400's detail, since what it refuses has varied
    by JDK (25 reads the digits with `HexFormat`; the `parseInt` older ones used took `%+1`).
 4. **`nonBlocking()` does not detect a blocking handler**; spec 0090 records the non-goal.
+5. **Query strings and form bodies are strict UTF-8 in core** (Matt, 2026-10-25, option B),
+   so that Jetty's move onto the shared decoder changes no answer of its own. Escapes whose
+   bytes are not UTF-8 (truncated, overlong, a surrogate, past U+10FFFF, split by a literal)
+   are a 400, `Illegal query string`, detail `The percent-encoded bytes are not UTF-8`, for
+   names and values alike and for undeclared pairs, as decision 3's escapes are; an illegal
+   escape in the same name or value wins, with `URLDecoder`'s message. A form body carrying
+   them is a 400 with that detail. Before: Gannet and Pekko served `?q=%e9` as U+FFFD (200)
+   and read `?%f0` as a key named U+FFFD; Jetty answered `?q=%e9` with a 500 and dropped
+   `?%f0`. Pekko's own parser still refuses `?q=%zz` in words of its own
+   (`JettyDifference.ILLEGAL_ESCAPES_IN_QUERY`); Jetty's detail for it becomes `URLDecoder`'s.

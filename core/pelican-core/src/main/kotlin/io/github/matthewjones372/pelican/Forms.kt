@@ -30,7 +30,11 @@ fun parseFormBody(text: String): List<Pair<String, String>> =
 fun renderFormBody(pairs: List<Pair<String, String>>): String =
     pairs.joinToString("&") { (name, value) -> encodeFormValue(name) + "=" + encodeFormValue(value) }
 
-private fun decodeFormValue(raw: String): String = URLDecoder.decode(raw, StandardCharsets.UTF_8)
+/** Strict: escapes that are not UTF-8 throw rather than decoding to U+FFFD. */
+private fun decodeFormValue(raw: String): String {
+    checkFormEncoded(raw, 0, raw.length)
+    return URLDecoder.decode(raw, StandardCharsets.UTF_8)
+}
 
 private fun encodeFormValue(raw: String): String = URLEncoder.encode(raw, StandardCharsets.UTF_8)
 

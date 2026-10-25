@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.pages
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -44,6 +45,20 @@ class RecordedDifferencesTest {
 
         withClue(JettyDifference.ESCAPING_PATHS.reason + "\n" + GannetDifference.ESCAPING_PATHS.reason) {
             statuses shouldBe mapOf("pekko" to 404, "jetty" to 400, "gannet" to 404).filterKeys { it in running }
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = ["/items/x?q=%zz", "/items/x?other=%4"])
+    fun `an illegal escape in a query is a 400 everywhere, and pekko's is in words of its own`(target: String) {
+        val answers = running.mapValues { (_, server) -> exchange(server.baseUrl, target) }
+
+        withClue(JettyDifference.ILLEGAL_ESCAPES_IN_QUERY.reason + "\n" + answers) {
+            answers.values.map { it.substringAfter(' ').substringBefore(' ') }.toSet() shouldBe setOf("400")
+            answers["pekko"]?.substringAfter("\r\n\r\n")?.shouldStartWith("Illegal request-target")
+            listOfNotNull(answers["jetty"], answers["gannet"])
+                .map { it.substringAfter("\r\n\r\n") }
+                .forEach { it shouldStartWith """{"status":400,"error":"Illegal query string","detail":"URLDecoder""" }
         }
     }
 

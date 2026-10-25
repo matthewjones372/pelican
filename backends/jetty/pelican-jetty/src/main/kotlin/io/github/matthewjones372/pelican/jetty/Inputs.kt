@@ -6,6 +6,7 @@ import io.github.matthewjones372.pelican.Credentials
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.spi.decodeList
+import io.github.matthewjones372.pelican.spi.refuseIllegalQuery
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.util.Fields
 
@@ -88,8 +89,12 @@ internal fun decodePlainInputs(ep: Endpoint<*, *>, request: Request, into: Mutab
     }
 }
 
-/** A query that will not decode is the caller's 400, as in Pekko; Jetty's `BadMessageException` is one of these. */
+/**
+ * A query that will not decode is the caller's 400, as in Pekko. Core's strict reading goes first, since Jetty's
+ * own refuses bytes that are not UTF-8 with an exception that reached the caller as a 500.
+ */
 private fun queryOf(request: Request): Fields = try {
+    request.httpURI.query?.let(::refuseIllegalQuery)
     Request.extractQueryParameters(request)
 } catch (e: IllegalArgumentException) {
     throw ApiException(400, "Illegal query string", e.message, cause = e)

@@ -65,6 +65,15 @@ enum class JettyDifference(val reason: String) {
             "handler runs, and no UriCompliance setting lifts it. Both refuse: nothing is served from outside.",
     ),
 
+    /**
+     * `?q=%zz` is Pekko's own plain-text 400, `Illegal request-target: ...`; Jetty and Gannet answer core's 400,
+     * `Illegal query string`, with `URLDecoder`'s message as its detail.
+     */
+    ILLEGAL_ESCAPES_IN_QUERY(
+        "Pekko's request parser refuses an escape that is not two hex digits before any route runs, and no " +
+            "parsing mode lifts it. All three refuse with a 400; only the body's words differ.",
+    ),
+
     /** A stalled NDJSON upload is a 500 after five seconds on Jetty; Pekko waits for its idle timeout. */
     STALLED_NDJSON_UPLOAD(
         "Jetty reads frames with a blocking reader, which needs a read timeout of its own; it uses the five " +
