@@ -73,7 +73,7 @@ class RecordedDifferencesTest {
                 answers.getValue("pekko").lowercase() shouldContain "content-range: bytes 0-3/10"
                 answers.getValue("pekko").substringAfter("\r\n\r\n") shouldBe "abcd"
                 answers.getValue("jetty").substringAfter("\r\n\r\n") shouldBe "abcdefghij"
-                answers["uring"]?.substringAfter("\r\n\r\n")?.let { it shouldBe "abcdefghij" }
+                if (uring != null) answers.getValue("uring").substringAfter("\r\n\r\n") shouldBe "abcdefghij"
             }
         } finally {
             pekko.stop()
