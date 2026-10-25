@@ -104,13 +104,15 @@ the transport now.
       Done when: the decorator's own tests prove it fires with frames, and the
       suite that fails in CI runs through it. **Both hold; the trace from a real
       CI failure goes under Measured when one appears.**
-- [ ] **`spec-0052-the-fix`** — whatever entry one names. The standing
+- [x] **`spec-0052-the-fix`** — whatever entry one names. The standing
       hypothesis is that a `NonFailureCancellation` should not reach a caller
       as a thrown exception.
       Done when: a sighting's trace names what completes the exchange, that
       cause is fixed, and `main` stays green on 25 across consecutive runs.
       Written when the matrix ran 21, 23 and 25; #199 left only 25, and green
       runs on their own settle nothing — see **Quiet is not evidence** below.
+      **Closed by reproducing it instead: see The cause, 2026-10-25.** The
+      hypothesis was wrong; the cancellation is real, and is the transport's.
 
 ## Acceptance
 
@@ -301,6 +303,56 @@ each failure was identified by the task that failed and by whether the suite
 ran at all, since a build that dies in lint or compilation uploads a ~10 KB
 test-report artifact against ~900 KB when the suite runs.
 
+### The cause, 2026-10-25
+
+Two causes, one on each side of the socket, and both are a connection reused
+or closed with a body still unread on it. Each now has a test that failed on
+every run before its fix.
+
+**Client: Pekko's pool reuses the connection of a cancelled entity.** Every
+example sighting is a `POST` straight after a streamed response the caller
+closed early: `Streamed` closes its body on the array's `]`, before the
+chunked terminator, and `take(2)` closes an `sse` with eight events to come.
+Closing `asInputStream` cancels the entity. Pekko's pool wraps the entity in
+`captureMaterializationTerminationAndKillSwitch`, whose `postStop` completes
+the termination promise with *success* on a cancel; `WaitingForEndOfResponseEntity
+.onResponseEntityCompleted` then makes the slot idle. The same cancel is
+tearing the connection down, a hop or two behind, so a request handed the slot
+in between fails with `StageWasCompleted` through `BusyState.onConnectionFailed`,
+and a `POST` is not retried. A `GET` is, which is why no `GET` ever failed.
+
+It is the client alone. With six callers on one transport, abandon-then-`POST`
+failed 415 of 900 times against a Pekko HTTP server and 0 of 900 with the Jetty
+client against the same server. `ClosedEarlyTest` is that shape against the
+JDK's `HttpServer`: 121 of 240 `POST`s failed before, none after.
+
+The fix is `DrainOnCancel` under `PekkoHttpTransport`'s body: a close reads
+the rest and discards it, so the entity ends and the connection is clean.
+Past 1 MiB or 5 s it stops reading instead, and the connection's idle timeout
+fails it, which the pool counts as a failure and never reuses. That costs an
+abandoned endless stream its slot until the idle timeout; reusing it is the
+bug.
+
+**Server: Jetty closes on a body nobody read.** When a response completes
+with request content unread, Jetty makes the connection non-persistent, but
+by then a strict response has gone out without `Connection: close`, and the
+next byte of the body hits a closed parser and the socket is closed under a
+client still writing. That is the Broken pipe in `no boundary chunked` (a
+multipart type with no boundary is refused before a byte is read), the reset
+in the streamed-upload test (its handler stops at the closing boundary, before
+the chunked terminator), and an `EOFException` for a client that took the
+response as keep-alive. `pelican-jetty` now reads what is left of a body after
+writing the response and before completing it, up to 1 MiB, so the connection
+stays whole. Two new cases in `RefusedBodyKeepsTheConnectionTest` send the
+body only after reading the answer, so only the server reading it can pass;
+both failed with Broken pipe before.
+
+The parallel run the earlier investigation used, `:pelican-jetty:test
+:example:test :pelican-pekko:test --rerun`, confirms it. Before: 1 failure in
+12 runs, a `PekkoTransportClientTest` `StageWasCompleted`. After: 0 in 23 runs
+with results, and one run lost to a Gradle daemon killed under the machine's
+load, with no test report.
+
 ## Open questions
 
 - ~~**Does a `TestWatcher` see it?**~~ **Answered: yes**, and it does not help.
@@ -311,18 +363,15 @@ test-report artifact against ~900 KB when the suite runs.
 - ~~**Is `StreamConverters.asInputStream` the wrong bridge?**~~ **Not this
   time.** The cancellation never reaches it — it arrives while the response head
   is still awaited. The question stands on its own merits for body-read races,
-  but it is not this flake.
+  but it is not this flake. **Revised: it is.** The cancellation is caused one
+  exchange earlier, by closing that bridge before its end. See **The cause**.
 - ~~**Should a `NonFailureCancellation` ever reach a caller?**~~ **Answered: not
   as itself.** It now crosses as an `IOException`, which is what the other
   transports raise and what a retry policy acts on. Whether it should reach a
   caller *at all* is the open part, and depends on the root cause below.
-- **What completes the exchange?** The one thing still unknown, and the only
-  thing a root-cause fix should be written on. The first sighting's frames were
-  capped at fourteen and ran out before reaching it; the cap is 40 now. Until a
-  sighting names it, the standing reading is a pooled connection going away
-  under an in-flight non-idempotent request — consistent with the `POST`, and
-  assumed no further than that.
-- **How reproducible is it locally?** Unknown and probably poorly: 0049 needed
-  a soak of tens of thousands of iterations and never hit its race. Three
-  sightings in a day of ordinary CI suggests CI provokes this more readily than
-  a loop will, so entry one's logging may have to land and wait.
+- ~~**What completes the exchange?**~~ **Answered: the client's own cancel of
+  the previous response on that connection**, which Pekko's pool counts as a
+  finished entity. See **The cause**.
+- ~~**How reproducible is it locally?**~~ **On every run, with six callers on
+  one transport.** The 2026-09-23 soak sent only `POST`s, and never closed a
+  response early. See **The cause**.

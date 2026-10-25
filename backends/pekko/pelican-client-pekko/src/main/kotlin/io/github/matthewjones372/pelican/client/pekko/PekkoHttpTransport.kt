@@ -40,6 +40,11 @@ private const val CONTENT_LENGTH = "Content-Length"
 
 private val READ_LIMIT: Duration = Duration.ofDays(1)
 
+/** How much of a body closed before its end is read and discarded to keep its connection reusable. */
+private const val DRAIN_BYTES: Long = 1024L * 1024L
+
+private val DRAIN_TIME: Duration = Duration.ofSeconds(5)
+
 /**
  * A [ClientTransport] over Pekko HTTP's client, for a caller who would rather
  * send through the stack their service already runs than acquire a second one.
@@ -221,9 +226,10 @@ class PekkoHttpTransport @JvmOverloads constructor(
      *
      * `asInputStream` materialises the response into a bounded queue the reader
      * drains, so a slow caller backpressures the connection rather than filling
-     * memory, and closing the stream cancels the source. A caller who neither
-     * reads nor closes is the one case this cannot cover: the stream stays
-     * materialised, backpressuring, until the pool's idle timeout fails it.
+     * memory, and closing the stream before its end has [DrainOnCancel] read
+     * the rest rather than cancel it. A caller who neither reads nor closes is
+     * the one case this cannot cover: the stream stays materialised,
+     * backpressuring, until the pool's idle timeout fails it.
      *
      * The read limit is not a request deadline. It fires when no chunk arrives
      * for that long, and the connection's own idle timeout is what notices a
@@ -231,7 +237,7 @@ class PekkoHttpTransport @JvmOverloads constructor(
      * be a bug in every `sse` response that goes quiet between events.
      */
     private fun bodyStream(bytes: Source<ByteString, *>): InputStream =
-        bytes.runWith(StreamConverters.asInputStream(READ_LIMIT), running)
+        bytes.via(DrainOnCancel(DRAIN_BYTES, DRAIN_TIME)).runWith(StreamConverters.asInputStream(READ_LIMIT), running)
 
     private fun pekkoMethod(method: Method): HttpMethod =
         HttpMethods.lookup(method.name).orElseThrow { IllegalArgumentException("Pekko knows no method ${method.name}") }

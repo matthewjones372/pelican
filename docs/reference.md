@@ -408,6 +408,13 @@ hand-written handler the way Pekko's `get` directive wraps a route, so it joins
 that merged `Allow`. The docs and MCP handlers are wrapped that way, which is
 why a `PUT /mcp` answers 405 listing `GET, POST` on both servers.
 
+**A body nobody read is read after the response.** A refusal decided before
+the body arrived, or a handler that stops reading early, leaves bytes the client
+is still sending. Jetty would close the connection under it, which the client
+sees as a broken pipe or a reset in place of the answer. So once the response is
+written, what is left of the body is read and discarded, up to 1 MiB, and the
+connection stays open for the next request.
+
 **A server built by hand needs two settings `start` makes for you:**
 
 ```kotlin
@@ -4797,10 +4804,15 @@ socket drains it and a request Pekko materialises a second time asks for the
 bytes a second time rather than sending a stream already consumed. The response
 entity's `Source[ByteString]` is run into `StreamConverters.asInputStream()`,
 which hands back a stream fed by a bounded queue: a slow reader backpressures
-the connection instead of filling memory, and closing the stream cancels the
-source. A caller who neither reads nor closes is the one case that cannot be
-covered from here: the stream stays materialised, backpressuring, until the
-pool's idle timeout fails it.
+the connection instead of filling memory. Closing the stream before its end
+reads the rest and throws it away, up to 1 MiB or five seconds, rather than
+cancelling it: Pekko's pool counts a cancelled entity as a finished one and
+hands its connection to the next request while it is still closing, which
+fails a `POST` that is not retried. Past either bound nothing more is read and
+the connection's idle timeout ends it, so an abandoned endless stream holds its
+pool slot until then. A caller who neither reads nor closes is the one case
+that cannot be covered from here: the stream stays materialised,
+backpressuring, until the pool's idle timeout fails it.
 
 `Content-Type` and `Content-Length` need saying separately, because Pekko keeps
 neither in its header list. They belong to the entity, and a header added under

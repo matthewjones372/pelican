@@ -127,6 +127,22 @@ one.
   `FirstEndpointOnPekko.kt`, is the first endpoint served on it, and the
   reference keeps every Pekko section.
 
+### Fixed
+
+- **A `POST` after a stream closed early no longer fails on Pekko** (spec
+  0052). Closing a `PekkoHttpTransport` response body before its end cancelled
+  the entity, and Pekko's pool reused that connection while it was still
+  closing, so the next non-idempotent call failed with "The exchange was
+  cancelled before a response arrived". The rest of the body is now read and
+  discarded, up to 1 MiB or five seconds; past that the connection is left to
+  its idle timeout and never reused.
+- **`pelican-jetty` reads a body it answered before reading** (spec 0052). A
+  refusal decided before the body arrived, or a handler that stopped at a
+  multipart closing boundary, let Jetty close the connection under a client
+  still writing, after a response that had not said `Connection: close`. The
+  rest of the body is now read after the response, up to 1 MiB, and the
+  connection stays open.
+
 ## [1.0.0] — 2026-10-14
 
 **`1.0.0-RC1` is the first candidate cut from this section.** The surface below

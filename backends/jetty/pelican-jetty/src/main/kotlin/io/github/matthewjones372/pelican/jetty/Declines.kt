@@ -47,7 +47,7 @@ class Unanswered : Handler.Abstract.NonBlocking() {
     override fun handle(request: Request, response: Response, callback: Callback): Boolean {
         val seen = request.declines()
         val reply = if (seen.methodTaken || seen.methods.isEmpty()) NOT_FOUND else methodNotAllowed(seen.methods)
-        reply.writeTo(response, callback)
+        reply.writeTo(response, callback.afterReadingRest(request))
         return true
     }
 }
