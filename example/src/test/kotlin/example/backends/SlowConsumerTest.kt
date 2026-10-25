@@ -19,6 +19,8 @@ import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
+import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.uring.streamedNow as streamedNowOnUring
 
 /**
  * A consumer that takes one frame and walks away, and what the handler's stream
@@ -105,6 +107,32 @@ class SlowConsumerTest {
                 }
             },
         ).startOnJetty(port = 0)
+
+        try {
+            readOneFrameThenVanish(server.baseUrl)
+            closed.shouldFireWithinTheTimeout("the sequence")
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    @Suppress("SleepInsteadOfDelay") // The next element, which never comes.
+    fun `uring stops pulling the sequence when the consumer disappears`() {
+        val closed = CountDownLatch(1)
+        val server = api(
+            drip streamedNowOnUring {
+                sequence {
+                    try {
+                        yield(Tick(1))
+                        Thread.sleep(NEXT_ELEMENT_MILLIS)
+                        yield(Tick(2))
+                    } finally {
+                        closed.countDown()
+                    }
+                }
+            },
+        ).startOnUring(port = 0)
 
         try {
             readOneFrameThenVanish(server.baseUrl)

@@ -77,3 +77,15 @@ enum class JettyDifference(val reason: String) {
             "A client that asks for a range and gets 200 takes the whole body, as RFC 9110 allows.",
     ),
 }
+
+/**
+ * Where the io_uring interpreter answers otherwise than Jetty's, which it was copied from, and why. Everything
+ * [JettyDifference] lists that is not here, it answers as Jetty does. `RecordedDifferencesTest` holds these true.
+ */
+enum class UringDifference(val reason: String) {
+    /** The paths of [JettyDifference.ESCAPING_PATHS] are a 404, as on Pekko, not Jetty's 400. */
+    ESCAPING_PATHS(
+        "The runtime hands the interpreter the path as it arrived, and nothing between them refuses one. A path " +
+            "that climbs above the root, or starts with an empty segment, is routed nowhere, which is Pekko's answer.",
+    ),
+}

@@ -2,8 +2,10 @@ package example.backends
 
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.RequestSpec
+import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -12,6 +14,9 @@ import io.github.matthewjones372.pelican.jetty.handledWith as handledWithOnJetty
 import io.github.matthewjones372.pelican.pekko.handledNow as handledOnPekko
 import io.github.matthewjones372.pelican.pekko.handledWith as handledWithOnPekko
 import io.github.matthewjones372.pelican.test.jetty.inMemory as inMemoryOnJetty
+import io.github.matthewjones372.pelican.uring.handledNow as handledOnUring
+import io.github.matthewjones372.pelican.uring.handledWith as handledWithOnUring
+import io.github.matthewjones372.pelican.uring.start as startOnUring
 
 /**
  * Where an interpreter's answer is its router's and not Pelican's, made
@@ -64,6 +69,24 @@ class MethodMismatchTest {
             covers = emptyList(),
         ).inMemoryOnJetty(Handlers.onVirtualThreads).use {
             it.transport.send(postToHello).status shouldBe 404
+        }
+    }
+
+    /** No in-memory transport here, so over a socket; the interpreter routes as Jetty's does. */
+    @Test
+    fun `uring answers 404 for the same reason`() {
+        val server = greetingsApi(
+            listOf(
+                greet handledOnUring { (who, shout) -> greetingOf(who, shout) },
+                outbox handledWithOnUring { },
+            ),
+            covers = emptyList(),
+        ).startOnUring(port = 0)
+
+        try {
+            apiClient(server.baseUrl, JacksonCodecs).use { it.transport.send(postToHello).status shouldBe 404 }
+        } finally {
+            server.stop()
         }
     }
 }

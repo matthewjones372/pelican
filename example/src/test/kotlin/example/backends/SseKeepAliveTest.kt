@@ -18,6 +18,8 @@ import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
+import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.uring.streamedNow as streamedNowOnUring
 
 /**
  * An SSE stream that goes quiet still says something.
@@ -96,6 +98,26 @@ class SseKeepAliveTest {
                 }
             },
         ).startOnJetty(port = 0)
+
+        try {
+            body(server.baseUrl).shouldCarryKeepAlives()
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    @Suppress("SleepInsteadOfDelay") // The quiet stretch, on the virtual thread pulling the sequence.
+    fun `uring fills the silence`() {
+        val server = api(
+            quiet streamedNowOnUring {
+                sequence {
+                    yield(Tick(1))
+                    Thread.sleep(QUIET_MILLIS)
+                    yield(Tick(2))
+                }
+            },
+        ).startOnUring(port = 0)
 
         try {
             body(server.baseUrl).shouldCarryKeepAlives()

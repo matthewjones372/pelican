@@ -26,6 +26,8 @@ import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
+import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.uring.streamedNow as streamedNowOnUring
 
 /**
  * What an endpoint that never ends costs, asked as a question about demand
@@ -131,6 +133,10 @@ class UnboundedStreamTest {
                 .startOnJetty(port = 0)
                 .let { server -> running(server.baseUrl, server::stop) }
 
+            "uring" -> api(route streamedNowOnUring { ticks(produced, limit) })
+                .startOnUring(port = 0)
+                .let { server -> running(server.baseUrl, server::stop) }
+
             else -> error("no such backend: $backend")
         }
 
@@ -140,7 +146,7 @@ class UnboundedStreamTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = ["pekko", "jetty"])
+    @ValueSource(strings = ["pekko", "jetty", "uring"])
     @Suppress("SleepInsteadOfDelay") // The point is a reader that stopped, measured in wall clock.
     fun `a consumer that stops reading stops the producer`(backend: String) {
         val produced = AtomicLong()
@@ -171,7 +177,7 @@ class UnboundedStreamTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = ["pekko", "jetty"])
+    @ValueSource(strings = ["pekko", "jetty", "uring"])
     fun `a consumer that keeps up gets every element, in order`(backend: String) {
         val produced = AtomicLong()
         val server = serve(backend, counted, produced, limit = ELEMENTS)

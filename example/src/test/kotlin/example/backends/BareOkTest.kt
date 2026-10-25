@@ -15,6 +15,8 @@ import io.github.matthewjones372.pelican.jetty.handledOneOf as handledOneOfOnJet
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledOneOf as handledOneOfOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
+import io.github.matthewjones372.pelican.uring.handledOneOf as handledOneOfOnUring
+import io.github.matthewjones372.pelican.uring.start as startOnUring
 
 class BareOkTest {
 
@@ -49,6 +51,19 @@ class BareOkTest {
         val server = brokenApi(
             remember handledOneOfOnJetty { (_, note) -> ok(Greeting(note.text, language = "en")) },
         ).startOnJetty(port = 0)
+
+        try {
+            asking(server.baseUrl).shouldBeRefused()
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `and so does uring`() {
+        val server = brokenApi(
+            remember handledOneOfOnUring { (_, note) -> ok(Greeting(note.text, language = "en")) },
+        ).startOnUring(port = 0)
 
         try {
             asking(server.baseUrl).shouldBeRefused()

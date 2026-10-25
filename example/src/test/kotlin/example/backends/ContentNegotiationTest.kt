@@ -25,6 +25,9 @@ import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.handledOrFail as handledOrFailOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
+import io.github.matthewjones372.pelican.uring.handledNow as handledNowOnUring
+import io.github.matthewjones372.pelican.uring.handledOrFail as handledOrFailOnUring
+import io.github.matthewjones372.pelican.uring.start as startOnUring
 
 /**
  * Pelican resolves its own codecs and never goes through a `Marshaller`, a
@@ -197,6 +200,24 @@ class ContentNegotiationTest {
         }
     }
 
+    @Test
+    fun `uring negotiates, and sends an unregistered status`() {
+        val server = api(
+            listOf(
+                widget handledNowOnUring { Widget(1) },
+                odd handledOrFailOnUring { teapotish(Widget(2)) },
+                nothing handledNowOnUring { },
+                export handledNowOnUring { Widget(7) },
+            ),
+        ).startOnUring(port = 0)
+
+        try {
+            probe(server.baseUrl)
+        } finally {
+            server.stop()
+        }
+    }
+
     /** Plain Jackson, with no override: a `+json` type is JSON already (RFC 6839). */
     @Test
     fun `pekko writes a +json media type with the JSON codec and names it on the wire`() {
@@ -219,6 +240,22 @@ class ContentNegotiationTest {
         val problem = endpoint { get("problem"); media<Widget>("application/problem+json") }
         val server = api(endpoints = listOf(problem handledNowOnJetty { Widget(3) }), codecs = JacksonCodecs)
             .startOnJetty(port = 0)
+
+        try {
+            val response = get(server.baseUrl, "/problem", accept = "application/problem+json")
+            response.statusCode() shouldBe 200
+            response.body() shouldBe """{"id":3}"""
+            contentTypeOf(response) shouldStartWith "application/problem+json"
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `uring writes a +json media type with the JSON codec and names it on the wire`() {
+        val problem = endpoint { get("problem"); media<Widget>("application/problem+json") }
+        val server = api(endpoints = listOf(problem handledNowOnUring { Widget(3) }), codecs = JacksonCodecs)
+            .startOnUring(port = 0)
 
         try {
             val response = get(server.baseUrl, "/problem", accept = "application/problem+json")

@@ -84,9 +84,12 @@ class HeadRequestsTest {
      * Jetty agrees for its own reason: `toHandler` routes HEAD as a method of
      * its own and never answers it from a GET, so `/motd` passes on and
      * `Unanswered` says 404, the HEAD route's path rejection winning as above.
+     *
+     * The io_uring interpreter routes as Jetty's does, and its runtime never rewrites a HEAD either.
      */
     private val pinned = mapOf(
         "pekko" to 404,
         "jetty" to 404,
+        "uring" to 404,
     )
 }

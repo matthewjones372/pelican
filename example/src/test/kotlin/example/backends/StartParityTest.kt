@@ -12,6 +12,7 @@ import kotlin.reflect.KParameter
 import kotlin.reflect.jvm.kotlinFunction
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
+import io.github.matthewjones372.pelican.uring.start as startOnUring
 
 /**
  * The call a user types first, pinned to one shape whichever backend publishes
@@ -41,6 +42,7 @@ class StartParityTest {
     private val backends = listOf(
         "pekko" to "io.github.matthewjones372.pelican.pekko",
         "jetty" to "io.github.matthewjones372.pelican.jetty",
+        "uring" to "io.github.matthewjones372.pelican.uring",
     )
 
     @Test
@@ -77,12 +79,13 @@ class StartParityTest {
     fun `a bare start binds loopback, and answers there`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "start-parity-pekko")
         val jetty = jettyApi().startOnJetty(port = 0)
+        val uring = uringApi().startOnUring(port = 0)
 
         try {
-            val bound = mapOf("pekko" to pekko.host, "jetty" to jetty.host)
+            val bound = mapOf("pekko" to pekko.host, "jetty" to jetty.host, "uring" to uring.host)
             withClue("bound: $bound") { bound.values.toSet() shouldBe setOf("127.0.0.1") }
 
-            listOf("pekko" to pekko.baseUrl, "jetty" to jetty.baseUrl)
+            listOf("pekko" to pekko.baseUrl, "jetty" to jetty.baseUrl, "uring" to uring.baseUrl)
                 .forEach { (name, baseUrl) ->
                     withClue(name) {
                         baseUrl shouldStartWith "http://127.0.0.1:"
@@ -92,6 +95,7 @@ class StartParityTest {
         } finally {
             pekko.stop()
             jetty.stop()
+            uring.stop()
         }
     }
 }

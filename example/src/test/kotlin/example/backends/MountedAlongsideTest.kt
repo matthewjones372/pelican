@@ -4,6 +4,8 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.uring.UringHandler
+import io.github.matthewjones372.pelican.uring.then
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.http.javadsl.server.Directives
@@ -23,6 +25,9 @@ import io.github.matthewjones372.pelican.jetty.toHandler as toJettyHandler
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.toRoute as toPekkoRoute
+import io.github.matthewjones372.pelican.uring.handledNow as handledNowOnUring
+import io.github.matthewjones372.pelican.uring.start as startOnUring
+import io.github.matthewjones372.pelican.uring.toHandler as toUringHandler
 
 class MountedAlongsideTest {
 
@@ -77,6 +82,24 @@ class MountedAlongsideTest {
 
         val server = api(widget handledNowOnJetty { Widget(1) })
             .startOnJetty(port = 0) { Handler.Sequence(handWritten, toJettyHandler()) }
+
+        try {
+            bothAnswer(server.baseUrl)
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `uring chains a described handler with a hand-written one`() {
+        val handWritten = UringHandler { exchange ->
+            if (exchange.request.path != "/health") return@UringHandler false
+            exchange.respond(200, body = "ok".toByteArray())
+            true
+        }
+
+        val server = api(widget handledNowOnUring { Widget(1) })
+            .startOnUring(port = 0) { handWritten then toUringHandler() }
 
         try {
             bothAnswer(server.baseUrl)
