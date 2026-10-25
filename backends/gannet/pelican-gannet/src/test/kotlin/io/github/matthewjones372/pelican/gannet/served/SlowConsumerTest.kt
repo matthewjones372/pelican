@@ -4,11 +4,11 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.gannet.PelicanServer
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.gannet.streamedNow
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.fail
 import io.kotest.assertions.withClue
 import io.kotest.matchers.longs.shouldBeLessThan
@@ -29,7 +29,7 @@ import kotlin.time.Duration.Companion.seconds
  * A reader that stops, and one that leaves, and what each does to the handler's sequence. Pekko's answers are
  * asserted in `example`'s `SlowConsumerTest` and `UnboundedStreamTest`, over the same shapes.
  */
-@RequiresUring
+@RequiresGannet
 class SlowConsumerTest {
 
     data class Pulse(val seq: Long, val pad: String = "")

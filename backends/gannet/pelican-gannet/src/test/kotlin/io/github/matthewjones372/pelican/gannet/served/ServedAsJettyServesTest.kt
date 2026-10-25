@@ -4,13 +4,13 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledBy
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.handledWith
 import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.pathParam
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
@@ -30,7 +30,7 @@ import io.github.matthewjones372.pelican.jetty.start as jettyStart
 data class Greeting(val text: String)
 
 /** One API on both servers, asked the same questions over a socket. */
-@RequiresUring
+@RequiresGannet
 class ServedAsJettyServesTest {
 
     /** What a caller can see of an answer, and so what the two servers are compared on. */
@@ -61,7 +61,7 @@ class ServedAsJettyServesTest {
 
         private fun served(endpoints: List<ServerEndpoint>) = api(endpoints, JacksonCodecs)
 
-        private val uring = served(
+        private val gannet = served(
             listOf(
                 greet handledNow { name -> Greeting("Hello, $name!") },
                 forget handledWith { },
@@ -85,7 +85,7 @@ class ServedAsJettyServesTest {
         @AfterAll
         fun stopBoth() {
             client.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
     }
@@ -113,26 +113,26 @@ class ServedAsJettyServesTest {
         "PUT, /hello/ada",
         "POST, /hello/ada",
     )
-    fun `uring answers as jetty does`(method: String, path: String) {
+    fun `gannet answers as jetty does`(method: String, path: String) {
         withClue("$method $path") {
-            ask(uring.baseUrl, method, path) shouldBe ask(jetty.baseUrl, method, path)
+            ask(gannet.baseUrl, method, path) shouldBe ask(jetty.baseUrl, method, path)
         }
     }
 
     @Test
     fun `a get is answered with the handler's value`() {
-        ask(uring.baseUrl, "GET", "/hello/ada") shouldBe
+        ask(gannet.baseUrl, "GET", "/hello/ada") shouldBe
             Seen(200, "application/json", null, """{"text":"Hello, ada!"}""")
     }
 
     @Test
     fun `a path nobody described is a 404`() {
-        ask(uring.baseUrl, "GET", "/nobody/described/this").status shouldBe 404
+        ask(gannet.baseUrl, "GET", "/nobody/described/this").status shouldBe 404
     }
 
     @Test
     fun `a verb nobody declared is a 405 naming the ones that are`() {
-        val seen = ask(uring.baseUrl, "PUT", "/hello/ada")
+        val seen = ask(gannet.baseUrl, "PUT", "/hello/ada")
 
         seen.status shouldBe 405
         seen.allow shouldBe "GET, DELETE, POST"

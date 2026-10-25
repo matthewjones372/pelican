@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican.gannet
 
+import io.github.matthewjones372.gannet.HttpRequest
 import io.github.matthewjones372.pelican.ByteStream
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Outcome
@@ -61,7 +62,7 @@ infix fun <I, E : Any, T> Endpoint<I, Outcome<E, StreamOf<T>>>.streamedByOrFail(
     f: Params.(I) -> CompletionStage<Outcome<E, Sequence<T>>>,
 ): ServerEndpoint = ServerEndpoint(this) { p -> p.f(inputs.extract(p)).thenApply { it as Any? } }
 
-/** Escape hatch: the io_uring runtime's request behind this call. */
+/** Escape hatch: Gannet's request behind this call. */
 val Params.request: HttpRequest
     get() = underlying as HttpRequest
 

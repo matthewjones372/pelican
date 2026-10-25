@@ -91,7 +91,7 @@ private class Child(name: String, side: Side) : AutoCloseable {
             ProcessHandle.current().info().command().orElseThrow(),
             "-Xms1g",
             "-Xmx1g",
-            // What the io_uring runtime needs (`UringSupport.FLAGS`); the other servers ignore them.
+            // What Gannet needs (`GannetSupport.FLAGS`); the other servers ignore them.
             "--enable-native-access=ALL-UNNAMED",
             "--add-exports",
             "java.base/jdk.internal.vm=ALL-UNNAMED",
@@ -397,7 +397,7 @@ fun main(args: Array<String>) {
         if (baseline == null) {
             lines += header(scenario)
             val order = System.getProperty("wire.servers")?.split(',')
-                ?: listOf("pekko", "jetty", "uring", "uring-inline")
+                ?: listOf("pekko", "jetty", "gannet", "gannet-inline")
             for (server in order) {
                 lines += ladder(server, server, mine, scenario, schedule, notes).map { it.row() }
             }

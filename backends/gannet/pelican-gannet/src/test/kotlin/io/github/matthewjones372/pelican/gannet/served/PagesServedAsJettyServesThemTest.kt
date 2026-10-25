@@ -7,11 +7,11 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.cors
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.pages
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.pages
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
@@ -23,7 +23,7 @@ import io.github.matthewjones372.pelican.jetty.handledNow as jettyHandledNow
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** Spec 0059 on both servers: a classpath directory beside the endpoints, which always win. */
-@RequiresUring
+@RequiresGannet
 class PagesServedAsJettyServesThemTest {
 
     /** One request to one of the [servers], named so a failing case says which. */
@@ -66,7 +66,7 @@ class PagesServedAsJettyServesThemTest {
             cors = cors(ORIGIN)
         }
 
-        private val uring = variants.keys.associateWith { variant ->
+        private val gannet = variants.keys.associateWith { variant ->
             served(listOf(about handledNow { "the endpoint" }, opsStream handledNow { "a stream" }), variant)
                 .start(port = 0)
         }
@@ -103,7 +103,7 @@ class PagesServedAsJettyServesThemTest {
             "/ui/..%2Fpages-secret.txt",
         )
 
-        /** Escapes Jetty refuses with its own 400 before any handler sees them; uring answers 404, as Pekko does. */
+        /** Escapes Jetty refuses with its own 400 before any handler sees them; gannet answers 404, as Pekko does. */
         private val refusedByJetty = listOf(
             "/%2E%2E/pages-secret.txt",
             "/guide/%2E%2E/%2e%2e/pages-secret.txt",
@@ -192,7 +192,7 @@ class PagesServedAsJettyServesThemTest {
         @AfterAll
         fun stop() {
             asking.close()
-            uring.values.forEach { it.stop() }
+            gannet.values.forEach { it.stop() }
             jetty.values.forEach { it.stop() }
         }
     }
@@ -200,11 +200,11 @@ class PagesServedAsJettyServesThemTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("refusals")
     fun `an escape jetty refuses itself serves nothing on either`(path: String) {
-        val onUring = asking.ask(uring.getValue("plain").baseUrl, "GET", path)
+        val onGannet = asking.ask(gannet.getValue("plain").baseUrl, "GET", path)
         val onJetty = asking.ask(jetty.getValue("plain").baseUrl, "GET", path)
-        onUring.status shouldBe 404
+        onGannet.status shouldBe 404
         onJetty.status shouldBe 400
-        onUring.body shouldNotContain "not a page"
+        onGannet.body shouldNotContain "not a page"
     }
 
     @Test
@@ -212,20 +212,20 @@ class PagesServedAsJettyServesThemTest {
         val first = asking.ask(jetty.getValue("plain").baseUrl, "GET", "/ops")
         listOf("If-None-Match" to "ETag", "If-Modified-Since" to "Last-Modified").forEach { (condition, validator) ->
             val again = mapOf(condition to checkNotNull(first.headers[validator]))
-            val onUring = asking.ask(uring.getValue("plain").baseUrl, "GET", "/ops", again)
+            val onGannet = asking.ask(gannet.getValue("plain").baseUrl, "GET", "/ops", again)
             val onJetty = asking.ask(jetty.getValue("plain").baseUrl, "GET", "/ops", again)
-            withClue("$condition: uring $onUring, jetty $onJetty") { onUring shouldBe onJetty }
+            withClue("$condition: gannet $onGannet, jetty $onJetty") { onGannet shouldBe onJetty }
         }
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("cases")
-    fun `uring serves pages as jetty does`(asked: Asked) {
-        val onUring = asking.ask(uring.getValue(asked.servers).baseUrl, asked.method, asked.path, asked.headers)
+    fun `gannet serves pages as jetty does`(asked: Asked) {
+        val onGannet = asking.ask(gannet.getValue(asked.servers).baseUrl, asked.method, asked.path, asked.headers)
         val onJetty = asking.ask(jetty.getValue(asked.servers).baseUrl, asked.method, asked.path, asked.headers)
-        withClue("${asked.name}: uring $onUring, jetty $onJetty") {
-            onUring.body shouldNotContain "not a page"
-            onUring shouldBe onJetty
+        withClue("${asked.name}: gannet $onGannet, jetty $onJetty") {
+            onGannet.body shouldNotContain "not a page"
+            onGannet shouldBe onJetty
         }
     }
 }

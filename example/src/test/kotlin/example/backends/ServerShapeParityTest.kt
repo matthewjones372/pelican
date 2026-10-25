@@ -1,21 +1,21 @@
 package example.backends
 
+import io.github.matthewjones372.pelican.gannet.GannetTests
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldHaveStatus
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.UringTests
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletionStage
 import kotlin.concurrent.thread
+import io.github.matthewjones372.pelican.gannet.PelicanServer as GannetServer
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
 import io.github.matthewjones372.pelican.jetty.PelicanServer as JettyServer
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.PelicanServer as PekkoServer
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.gannet.PelicanServer as UringServer
-import io.github.matthewjones372.pelican.gannet.start as startOnUring
 
 /**
  * The handle a backend hands back, pinned to one shape.
@@ -32,7 +32,7 @@ class ServerShapeParityTest {
     private val handles = listOf(
         "pekko" to PekkoServer::class.java,
         "jetty" to JettyServer::class.java,
-        "uring" to UringServer::class.java,
+        "gannet" to GannetServer::class.java,
     )
 
     @Test
@@ -73,9 +73,9 @@ class ServerShapeParityTest {
     }
 
     @Test
-    @RequiresUring
-    fun `uring serves inside a use block, and closing releases block`() {
-        val parked = uringApi().startOnUring(port = 0).use { server ->
+    @RequiresGannet
+    fun `gannet serves inside a use block, and closing releases block`() {
+        val parked = gannetApi().startOnGannet(port = 0).use { server ->
             answersOn(server.baseUrl)
             parkedIn(server::block)
         }
@@ -87,15 +87,15 @@ class ServerShapeParityTest {
     fun `and stopAsync completes once the server is down, on every backend`() {
         val pekko = pekkoApi().startOnPekko(port = 0, systemName = "shape-parity-async")
         val jetty = jettyApi().startOnJetty(port = 0)
-        val uring = if (UringTests.run) uringApi().startOnUring(port = 0) else null
+        val gannet = if (GannetTests.run) gannetApi().startOnGannet(port = 0) else null
 
         val parked = listOfNotNull(
             "pekko" to parkedIn(pekko::block),
             "jetty" to parkedIn(jetty::block),
-            uring?.let { "uring" to parkedIn(it::block) },
+            gannet?.let { "gannet" to parkedIn(it::block) },
         )
 
-        listOfNotNull(pekko::stopAsync, jetty::stopAsync, uring?.let { it::stopAsync })
+        listOfNotNull(pekko::stopAsync, jetty::stopAsync, gannet?.let { it::stopAsync })
             .forEach { it().toCompletableFuture().join() }
 
         parked.forEach { (name, thread) -> withClue(name) { thread.releasedWithin() } }

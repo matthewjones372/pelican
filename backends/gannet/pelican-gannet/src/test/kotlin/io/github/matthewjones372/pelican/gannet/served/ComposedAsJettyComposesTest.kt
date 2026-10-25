@@ -1,23 +1,23 @@
 package io.github.matthewjones372.pelican.gannet.served
 
+import io.github.matthewjones372.gannet.HttpExchange
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.path
-import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.responseHeader
-import io.github.matthewjones372.pelican.gannet.HttpExchange
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.UringHandler
+import io.github.matthewjones372.pelican.gannet.GannetHandler
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.handledWith
 import io.github.matthewjones372.pelican.gannet.onlyFor
 import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.gannet.then
 import io.github.matthewjones372.pelican.gannet.toHandler
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.path
+import io.github.matthewjones372.pelican.pathParam
+import io.github.matthewjones372.pelican.responseHeader
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.eclipse.jetty.http.HttpHeader
@@ -37,11 +37,11 @@ import io.github.matthewjones372.pelican.jetty.start as jettyStart
 import io.github.matthewjones372.pelican.jetty.toHandler as jettyToHandler
 
 /** An API mounted beside a hand-written handler, before and after it, on both servers. */
-@RequiresUring
+@RequiresGannet
 class ComposedAsJettyComposesTest {
 
     /** A handler the service wrote itself, knowing nothing of Pelican. */
-    private class Health : UringHandler {
+    private class Health : GannetHandler {
         override fun handle(exchange: HttpExchange): Boolean {
             if (exchange.request.path != "/health") return false
             exchange.respond(200, listOf("Content-Type" to "text/plain; charset=UTF-8"), "ok".toByteArray())
@@ -98,13 +98,13 @@ class ComposedAsJettyComposesTest {
         private val plain: List<ServerEndpoint> = listOf(greet handledNow { name -> "Hello, $name!" })
         private val jettyPlain: List<ServerEndpoint> = listOf(greet jettyHandledNow { name -> "Hello, $name!" })
 
-        private val uringBefore = withPeek.start(port = 0) {
+        private val gannetBefore = withPeek.start(port = 0) {
             Health().onlyFor(Method.GET) then toHandler()
         }
         private val jettyBefore = jettyWithPeek.jettyStart(port = 0) {
             Handler.Sequence(JettyHealth().jettyOnlyFor(Method.GET), jettyToHandler())
         }
-        private val uringAfter = api(plain, JacksonCodecs).start(port = 0) {
+        private val gannetAfter = api(plain, JacksonCodecs).start(port = 0) {
             toHandler() then Health().onlyFor(Method.GET)
         }
         private val jettyAfter = api(jettyPlain, JacksonCodecs).jettyStart(port = 0) {
@@ -117,7 +117,7 @@ class ComposedAsJettyComposesTest {
         @AfterAll
         fun stopAll() {
             asking.close()
-            listOf(uringBefore, uringAfter).forEach { it.stop() }
+            listOf(gannetBefore, gannetAfter).forEach { it.stop() }
             listOf(jettyBefore, jettyAfter).forEach { it.stop() }
         }
     }
@@ -135,9 +135,9 @@ class ComposedAsJettyComposesTest {
         "GET, /health",
         "PUT, /health",
     )
-    fun `mounted before the api, uring answers as jetty does`(method: String, path: String) {
+    fun `mounted before the api, gannet answers as jetty does`(method: String, path: String) {
         withClue("$method $path") {
-            asking.ask(uringBefore.baseUrl, method, path) shouldBe asking.ask(jettyBefore.baseUrl, method, path)
+            asking.ask(gannetBefore.baseUrl, method, path) shouldBe asking.ask(jettyBefore.baseUrl, method, path)
         }
     }
 
@@ -150,20 +150,20 @@ class ComposedAsJettyComposesTest {
         "POST, /health",
         "GET, /nobody/described/this",
     )
-    fun `mounted after the api, uring answers as jetty does`(method: String, path: String) {
+    fun `mounted after the api, gannet answers as jetty does`(method: String, path: String) {
         withClue("$method $path") {
-            asking.ask(uringAfter.baseUrl, method, path) shouldBe asking.ask(jettyAfter.baseUrl, method, path)
+            asking.ask(gannetAfter.baseUrl, method, path) shouldBe asking.ask(jettyAfter.baseUrl, method, path)
         }
     }
 
     @Test
     fun `the api passes on what it does not describe to a handler after it`() {
-        asking.ask(uringAfter.baseUrl, "GET", "/health").body shouldBe "ok"
+        asking.ask(gannetAfter.baseUrl, "GET", "/health").body shouldBe "ok"
     }
 
     @Test
     fun `a refused verb names the methods of every handler that passed on it`() {
-        val answer = asking.ask(uringBefore.baseUrl, "PUT", "/health")
+        val answer = asking.ask(gannetBefore.baseUrl, "PUT", "/health")
 
         answer.status shouldBe 405
         answer.headers["Allow"] shouldBe "GET, POST, HEAD"
@@ -171,7 +171,7 @@ class ComposedAsJettyComposesTest {
 
     @Test
     fun `a declared head answers with its headers and no body`() {
-        val answer = asking.ask(uringBefore.baseUrl, "HEAD", "/peek")
+        val answer = asking.ask(gannetBefore.baseUrl, "HEAD", "/peek")
 
         answer.status shouldBe 200
         answer.headers["X-Request-Id"] shouldBe "r-1"

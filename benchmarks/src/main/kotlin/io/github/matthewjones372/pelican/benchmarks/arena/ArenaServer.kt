@@ -13,15 +13,15 @@ import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.queryParam
 import java.io.File
+import io.github.matthewjones372.pelican.gannet.Handlers as GannetHandlers
+import io.github.matthewjones372.pelican.gannet.handledNow as onGannet
+import io.github.matthewjones372.pelican.gannet.start as startGannet
 import io.github.matthewjones372.pelican.jetty.Handlers as JettyHandlers
 import io.github.matthewjones372.pelican.jetty.handledNow as onJetty
 import io.github.matthewjones372.pelican.jetty.start as startJetty
 import io.github.matthewjones372.pelican.pekko.Handlers as PekkoHandlers
 import io.github.matthewjones372.pelican.pekko.handledNow as onPekko
 import io.github.matthewjones372.pelican.pekko.start as startPekko
-import io.github.matthewjones372.pelican.gannet.Handlers as UringHandlers
-import io.github.matthewjones372.pelican.gannet.handledNow as onUring
-import io.github.matthewjones372.pelican.gannet.start as startUring
 
 data class Rating(val score: Int, val count: Int)
 
@@ -126,21 +126,23 @@ fun main(args: Array<String>) {
             bound = s.port
         }
 
-        "uring", "uring-inline" -> {
-            val handlers = if (backend == "uring") UringHandlers.default else UringHandlers.onDispatcher
+        "gannet", "gannet-inline" -> {
+            val handlers = if (backend == "gannet") GannetHandlers.default else GannetHandlers.onDispatcher
             val s = arenaApi(
                 listOf(
-                    getSum onUring { (x, y) -> (x + y).toString() },
-                    postSum onUring { (x, y, body) -> (x + y + body).toString() },
-                    pipeline onUring { "ok" },
-                    jsonItems onUring { (n, mult) -> page(items, n, mult) },
+                    getSum onGannet { (x, y) -> (x + y).toString() },
+                    postSum onGannet { (x, y, body) -> (x + y + body).toString() },
+                    pipeline onGannet { "ok" },
+                    jsonItems onGannet { (n, mult) -> page(items, n, mult) },
                 ),
-            ).startUring(port = port, handlers = handlers)
+            ).startGannet(port = port, handlers = handlers)
             server = AutoCloseable { s.stop() }
             bound = s.port
         }
 
-        else -> error("Expected pekko, pekko-dispatcher, jetty, jetty-dispatcher, uring or uring-inline, got $backend")
+        else -> error(
+            "Expected pekko, pekko-dispatcher, jetty, jetty-dispatcher, gannet or gannet-inline, got $backend",
+        )
     }
     println("ARENA $backend ready port=$bound items=${items.size}")
     System.out.flush()

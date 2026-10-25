@@ -16,6 +16,10 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.forbidden
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import io.github.matthewjones372.pelican.gannet.handledNow
+import io.github.matthewjones372.pelican.gannet.handledOrFail
+import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsonBody
@@ -25,10 +29,6 @@ import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.responseHeader
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.handledNow
-import io.github.matthewjones372.pelican.gannet.handledOrFail
-import io.github.matthewjones372.pelican.gannet.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
@@ -45,7 +45,7 @@ import io.github.matthewjones372.pelican.jetty.handledOrFail as jettyHandledOrFa
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** Filters, refusals in both shipped envelopes, the refusal observer, a broken handler and negotiation. */
-@RequiresUring
+@RequiresGannet
 class RefusalsAnsweredAsJettyAnswersThemTest {
 
     data class Said(val text: String)
@@ -79,7 +79,7 @@ class RefusalsAnsweredAsJettyAnswersThemTest {
     }
 
     /** Both servers in one envelope, each with its own observer. */
-    class Servers(val name: String, val uring: String, val jetty: String) {
+    class Servers(val name: String, val gannet: String, val jetty: String) {
         override fun toString() = name
     }
 
@@ -154,7 +154,7 @@ class RefusalsAnsweredAsJettyAnswersThemTest {
         private fun echoed(trace: String?, said: Said): Echoed =
             if (said.text == "boom") error("the note that broke the handler") else Echoed(said.text, trace)
 
-        private val uringRoutes: List<ServerEndpoint> = listOf(
+        private val gannetRoutes: List<ServerEndpoint> = listOf(
             greet handledNow { name -> "Hello, $name!" },
             echo handledNow { (trace, said) -> echoed(trace, said) },
             strict handledNow { (term, key, jar) -> Strictly(term, key, jar) },
@@ -178,7 +178,7 @@ class RefusalsAnsweredAsJettyAnswersThemTest {
 
         /** What each server's observer was told, in the order it was told. */
         private val observed: Map<String, ConcurrentLinkedQueue<String>> =
-            listOf("uring", "jetty").flatMap { s -> listOf("envelope", "problem").map { "$s/$it" } }
+            listOf("gannet", "jetty").flatMap { s -> listOf("envelope", "problem").map { "$s/$it" } }
                 .associateWith { ConcurrentLinkedQueue<String>() }
 
         private fun served(routes: List<ServerEndpoint>, renderer: RefusalRenderer, server: String) =
@@ -197,8 +197,8 @@ class RefusalsAnsweredAsJettyAnswersThemTest {
 
         private val dialects = mapOf("envelope" to ApiErrorEnvelope, "problem" to ProblemDetails)
 
-        private val uring = dialects.mapValues { (name, renderer) ->
-            served(uringRoutes, renderer, "uring/$name").start(port = 0)
+        private val gannet = dialects.mapValues { (name, renderer) ->
+            served(gannetRoutes, renderer, "gannet/$name").start(port = 0)
         }
         private val jetty = dialects.mapValues { (name, renderer) ->
             served(jettyRoutes, renderer, "jetty/$name").jettyStart(port = 0)
@@ -206,7 +206,7 @@ class RefusalsAnsweredAsJettyAnswersThemTest {
 
         @JvmStatic
         fun envelopes(): List<Servers> =
-            dialects.keys.map { Servers(it, uring.getValue(it).baseUrl, jetty.getValue(it).baseUrl) }
+            dialects.keys.map { Servers(it, gannet.getValue(it).baseUrl, jetty.getValue(it).baseUrl) }
 
         private const val JSON = "application/json"
         private fun note(text: String) = """{"text":"$text"}"""
@@ -255,7 +255,7 @@ class RefusalsAnsweredAsJettyAnswersThemTest {
         @AfterAll
         fun stopAll() {
             asking.close()
-            uring.values.forEach { it.stop() }
+            gannet.values.forEach { it.stop() }
             jetty.values.forEach { it.stop() }
         }
     }
@@ -267,29 +267,29 @@ class RefusalsAnsweredAsJettyAnswersThemTest {
 
     @ParameterizedTest(name = "{0}: {1}")
     @MethodSource("cases")
-    fun `uring answers as jetty does`(servers: Servers, asked: Asked) {
-        withClue(asked) { asked.of(servers.uring) shouldBe asked.of(servers.jetty) }
+    fun `gannet answers as jetty does`(servers: Servers, asked: Asked) {
+        withClue(asked) { asked.of(servers.gannet) shouldBe asked.of(servers.jetty) }
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("envelopes")
     fun `the same refusals are observed the same way on both`(servers: Servers) {
         val refusals = asked().filter { it.name != "a header a filter sets" && it.name != "a header a filter reads" }
-        val seen = listOf("uring" to servers.uring, "jetty" to servers.jetty).associate { (server, baseUrl) ->
+        val seen = listOf("gannet" to servers.gannet, "jetty" to servers.jetty).associate { (server, baseUrl) ->
             val log = observed.getValue("$server/${servers.name}")
             log.clear()
             refusals.forEach { it.of(baseUrl) }
             server to log.toList()
         }
 
-        seen.getValue("uring") shouldBe seen.getValue("jetty")
-        seen.getValue("uring") shouldContain "accept 406 /strict"
+        seen.getValue("gannet") shouldBe seen.getValue("jetty")
+        seen.getValue("gannet") shouldContain "accept 406 /strict"
     }
 
     @Test
     fun `a handler that throws answers a 500 naming a reference, and nothing of the throwable`() {
         val answer =
-            asking.ask(uring.getValue("problem").baseUrl, "POST", "/echo", mapOf("Content-Type" to JSON), note("boom"))
+            asking.ask(gannet.getValue("problem").baseUrl, "POST", "/echo", mapOf("Content-Type" to JSON), note("boom"))
 
         answer.status shouldBe 500
         answer.headers["Content-Type"] shouldBe "application/problem+json"
@@ -300,7 +300,7 @@ class RefusalsAnsweredAsJettyAnswersThemTest {
 
     @Test
     fun `a negotiated answer goes out in the rendering the caller asked for`() {
-        val answer = asking.ask(uring.getValue("envelope").baseUrl, "GET", "/export", mapOf("Accept" to "text/csv"))
+        val answer = asking.ask(gannet.getValue("envelope").baseUrl, "GET", "/export", mapOf("Accept" to "text/csv"))
 
         answer.body shouldBe "id\n7\n"
         answer.headers["Content-Type"] shouldBe "text/csv"

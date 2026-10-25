@@ -1,5 +1,8 @@
 package io.github.matthewjones372.pelican.gannet
 
+import io.github.matthewjones372.gannet.BodyTooLargeException
+import io.github.matthewjones372.gannet.HttpRequest
+import io.github.matthewjones372.gannet.RequestBody
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.ByteStreamHandle
@@ -18,10 +21,10 @@ private const val READ_CHUNK_BYTES = 8 * 1024
 /** RFC 9110's status for a caller who did not finish sending in time. */
 private const val REQUEST_TIMEOUT = 408
 
-internal class UringByteStream(val body: RequestBody) : ByteStreamHandle
+internal class GannetByteStream(val body: RequestBody) : ByteStreamHandle
 
-/** The request body as the runtime's own handle. Nothing has been read from it yet. */
-fun ByteStreamHandle.toRequestBody(): RequestBody = (this as UringByteStream).body
+/** The request body as Gannet's own handle. Nothing has been read from it yet. */
+fun ByteStreamHandle.toRequestBody(): RequestBody = (this as GannetByteStream).body
 
 /** The request body as chunks read as the sequence is iterated, blocking: for a handler on a virtual thread. */
 fun ByteStreamHandle.toSequence(): Sequence<ByteArray> {
@@ -39,7 +42,7 @@ private class TimedOut : IOException("Timed out reading the request body")
 
 /**
  * A body a codec sees whole, checked against the limit and decoded. A declared oversize is refused before a byte is
- * read; one with no declared length is read to the limit and refused, and the runtime drains what is left of it so
+ * read; one with no declared length is read to the limit and refused, and Gannet drains what is left of it so
  * the 413 goes down a connection that is still whole. On the carrier the read parks only the connection's fiber.
  */
 internal fun readStrictBody(request: HttpRequest, api: Api, codec: RequestBodyCodecs): Any? {

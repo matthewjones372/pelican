@@ -1,5 +1,7 @@
 package io.github.matthewjones372.pelican.gannet
 
+import io.github.matthewjones372.gannet.HttpExchange
+import io.github.matthewjones372.gannet.HttpRequest
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.BodyCodec
@@ -37,13 +39,13 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.Executor
 
 /**
- * Interprets an [Api] as a handler for the io_uring runtime. Endpoints only: nothing here generates an OpenAPI
+ * Interprets an [Api] as a handler for Gannet. Endpoints only: nothing here generates an OpenAPI
  * document.
  *
  * It passes on (returns false) wherever Pekko's route rejects, so a handler after it in a [then] chain is asked
  * next; [start] answers whatever every handler passed on with the 404 or 405 Pekko would.
  */
-fun Api.toHandler(handlers: Handlers = Handlers.default): UringHandler {
+fun Api.toHandler(handlers: Handlers = Handlers.default): GannetHandler {
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
 
     // Once per endpoint rather than per request, so a broken codec is a startup failure.
@@ -71,7 +73,7 @@ internal class PelicanHandler(
     private val handlers: Map<ServerEndpoint, (Params) -> CompletionStage<Any?>>,
     private val cors: CorsPolicy?,
     threads: Handlers,
-) : UringHandler {
+) : GannetHandler {
 
     private val placement: Map<ServerEndpoint, Executor?> = api.endpoints.associateWith { it.placedBy(threads) }
 
@@ -98,7 +100,7 @@ internal class PelicanHandler(
             try {
                 errorResponse(t, api).writeTo(exchange)
             } catch (_: Throwable) {
-                // Already answered: the reply that failed had started, and the runtime ends it.
+                // Already answered: the reply that failed had started, and Gannet ends it.
             }
         }
     }
@@ -219,7 +221,7 @@ internal class PelicanHandler(
             null -> Unit
 
             // Handed over unconsumed, and exempt from the limit as on Pekko: nothing here holds it whole.
-            is RawBody -> values[body] = UringByteStream(request.body)
+            is RawBody -> values[body] = GannetByteStream(request.body)
 
             is MultipartBody -> readMultipart(request, api, body, values)
 
@@ -231,7 +233,7 @@ internal class PelicanHandler(
             // Framed by core as the handler reads, so nothing is held but the frame being read.
             is NdjsonBody<*> -> {
                 val frames = api.ndjsonFrames(ep, codecs.body, request.headers[CONTENT_TYPE])
-                values[body] = UringFrames<Any?>(request.body, frames)
+                values[body] = GannetFrames<Any?>(request.body, frames)
             }
         }
     }

@@ -1,15 +1,20 @@
 plugins {
-    // `RequiresUring` and `assumeUring`, shared with the tests of every module that serves on io_uring.
+    // `RequiresGannet` and `assumeGannet`, shared with the tests of every module that serves on io_uring.
     `java-test-fixtures`
 }
 
-// The runtime reaches the JDK's own continuation, which java.base does not export, and calls io_uring through FFM.
-// Both are flags on every JVM that runs it; `UringSupport` names them when one is missing.
+// A snapshot from Central's snapshot repository, which settings.gradle.kts admits for this group only.
+val gannetVersion = "0.1.0-SNAPSHOT"
+
+// Gannet reaches the JDK's own continuation, which java.base does not export, and calls io_uring through FFM. Both
+// are flags on every JVM that runs it; `GannetSupport` names them when one is missing.
 val runtimeFlags =
     listOf("--enable-native-access=ALL-UNNAMED", "--add-exports", "java.base/jdk.internal.vm=ALL-UNNAMED")
 
 dependencies {
     api(project(":pelican-core"))
+    // The server underneath, its own library; its types are in this module's signatures.
+    api("io.github.matthewjones372:gannet:$gannetVersion")
 
     testFixturesImplementation("org.junit.jupiter:junit-jupiter-api:6.1.3")
 
@@ -32,20 +37,6 @@ kover {
     }
 }
 
-tasks.withType<JavaCompile>().configureEach {
-    options.compilerArgs.addAll(listOf("--add-exports", "java.base/jdk.internal.vm=ALL-UNNAMED"))
-}
-
 tasks.withType<Test>().configureEach {
     jvmArgs(runtimeFlags)
-}
-
-// detekt and ktlint read Kotlin only. The Java core gets whitespace rules that need no formatter download.
-spotless {
-    java {
-        target("src/**/*.java")
-        trimTrailingWhitespace()
-        endWithNewline()
-        leadingTabsToSpaces(4)
-    }
 }

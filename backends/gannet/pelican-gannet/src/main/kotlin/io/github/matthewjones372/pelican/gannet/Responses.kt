@@ -1,5 +1,7 @@
 package io.github.matthewjones372.pelican.gannet
 
+import io.github.matthewjones372.gannet.HttpExchange
+import io.github.matthewjones372.gannet.ResponseStream
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.ByteStreamOutput

@@ -3,21 +3,21 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.ResponseSpec
 import io.github.matthewjones372.pelican.test.apiClient
-import io.github.matthewjones372.pelican.gannet.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import io.github.matthewjones372.pelican.gannet.handledOneOf as handledOneOfOnGannet
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
 import io.github.matthewjones372.pelican.jetty.handledOneOf as handledOneOfOnJetty
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledOneOf as handledOneOfOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.gannet.handledOneOf as handledOneOfOnUring
-import io.github.matthewjones372.pelican.gannet.start as startOnUring
 
 class BareOkTest {
 
@@ -61,11 +61,11 @@ class BareOkTest {
     }
 
     @Test
-    @RequiresUring
-    fun `and so does uring`() {
+    @RequiresGannet
+    fun `and so does gannet`() {
         val server = brokenApi(
-            remember handledOneOfOnUring { (_, note) -> ok(Greeting(note.text, language = "en")) },
-        ).startOnUring(port = 0)
+            remember handledOneOfOnGannet { (_, note) -> ok(Greeting(note.text, language = "en")) },
+        ).startOnGannet(port = 0)
 
         try {
             asking(server.baseUrl).shouldBeRefused()

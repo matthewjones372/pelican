@@ -1,14 +1,14 @@
 package io.github.matthewjones372.pelican.gannet.served
 
+import io.github.matthewjones372.gannet.GannetConfig
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.gannet.Handlers
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.UringConfig
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledBy
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.net.URI
@@ -21,7 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /** Spec 0088: routing and asynchronous handlers stay on the carrier, so a blocked handler pool holds up neither. */
-@RequiresUring
+@RequiresGannet
 class BlockingHandlersLeaveTheCarrierFreeTest {
 
     private val blocked = endpoint {
@@ -57,7 +57,7 @@ class BlockingHandlersLeaveTheCarrierFreeTest {
     @Test
     fun `while every handler thread blocks, a 404 and an asynchronous handler are still answered`() {
         val pool = Executors.newFixedThreadPool(BLOCKED)
-        val server = blocking.start(port = 0, handlers = Handlers.on(pool), config = UringConfig(carriers = 1))
+        val server = blocking.start(port = 0, handlers = Handlers.on(pool), config = GannetConfig(carriers = 1))
         try {
             val held = (1..BLOCKED).map { get("${server.baseUrl}/blocked") }
             entered.await(GATE_SECONDS, TimeUnit.SECONDS) shouldBe true

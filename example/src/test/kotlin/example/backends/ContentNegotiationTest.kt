@@ -6,10 +6,10 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.negotiated
 import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.gannet.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -20,15 +20,15 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlin.reflect.KType
+import io.github.matthewjones372.pelican.gannet.handledNow as handledNowOnGannet
+import io.github.matthewjones372.pelican.gannet.handledOrFail as handledOrFailOnGannet
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
 import io.github.matthewjones372.pelican.jetty.handledNow as handledNowOnJetty
 import io.github.matthewjones372.pelican.jetty.handledOrFail as handledOrFailOnJetty
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.handledOrFail as handledOrFailOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.gannet.handledNow as handledNowOnUring
-import io.github.matthewjones372.pelican.gannet.handledOrFail as handledOrFailOnUring
-import io.github.matthewjones372.pelican.gannet.start as startOnUring
 
 /**
  * Pelican resolves its own codecs and never goes through a `Marshaller`, a
@@ -202,16 +202,16 @@ class ContentNegotiationTest {
     }
 
     @Test
-    @RequiresUring
-    fun `uring negotiates, and sends an unregistered status`() {
+    @RequiresGannet
+    fun `gannet negotiates, and sends an unregistered status`() {
         val server = api(
             listOf(
-                widget handledNowOnUring { Widget(1) },
-                odd handledOrFailOnUring { teapotish(Widget(2)) },
-                nothing handledNowOnUring { },
-                export handledNowOnUring { Widget(7) },
+                widget handledNowOnGannet { Widget(1) },
+                odd handledOrFailOnGannet { teapotish(Widget(2)) },
+                nothing handledNowOnGannet { },
+                export handledNowOnGannet { Widget(7) },
             ),
-        ).startOnUring(port = 0)
+        ).startOnGannet(port = 0)
 
         try {
             probe(server.baseUrl)
@@ -254,11 +254,11 @@ class ContentNegotiationTest {
     }
 
     @Test
-    @RequiresUring
-    fun `uring writes a +json media type with the JSON codec and names it on the wire`() {
+    @RequiresGannet
+    fun `gannet writes a +json media type with the JSON codec and names it on the wire`() {
         val problem = endpoint { get("problem"); media<Widget>("application/problem+json") }
-        val server = api(endpoints = listOf(problem handledNowOnUring { Widget(3) }), codecs = JacksonCodecs)
-            .startOnUring(port = 0)
+        val server = api(endpoints = listOf(problem handledNowOnGannet { Widget(3) }), codecs = JacksonCodecs)
+            .startOnGannet(port = 0)
 
         try {
             val response = get(server.baseUrl, "/problem", accept = "application/problem+json")

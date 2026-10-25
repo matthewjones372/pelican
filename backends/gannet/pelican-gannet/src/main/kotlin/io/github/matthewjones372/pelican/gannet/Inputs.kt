@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican.gannet
 
+import io.github.matthewjones372.gannet.HttpRequest
 import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.Cookies
 import io.github.matthewjones372.pelican.Credentials

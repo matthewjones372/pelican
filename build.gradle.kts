@@ -69,9 +69,6 @@ val ktlintVersion = "1.8.0"
 // .editorconfig beside the rest, which is also what the IDE reads.
 val ktlintOverrides = mapOf("ktlint_standard_kdoc" to "disabled")
 
-// The root project builds nothing, but Spotless resolves ktlint here.
-repositories { mavenCentral() }
-
 spotless {
     kotlinGradle {
         // settings.gradle.kts, this file and the BOM's, which applies no
@@ -110,8 +107,8 @@ val moduleDescriptions = mapOf(
     "pelican-client-pekko" to "A generated client's transport, over Pekko HTTP's client.",
     "pelican-streams" to "A streaming body as a lark Stream, whose failure is a value.",
     "pelican-streams-jetty" to "A streaming body on Jetty as a lark Stream, whose failure is a value.",
-    "pelican-gannet" to "An HTTP/1.1 server on io_uring, a carrier per core, and endpoint descriptions served on it.",
-    "pelican-gannet-docs" to "Serves the OpenAPI document and Swagger UI on the io_uring runtime.",
+    "pelican-gannet" to "Endpoint descriptions served on Gannet, an HTTP/1.1 server on io_uring.",
+    "pelican-gannet-docs" to "Serves the OpenAPI document and Swagger UI on Gannet.",
     "pelican-test" to "A typed test client derived from the endpoint descriptions. Backend-agnostic.",
     "pelican-test-golden" to "Golden files per endpoint that fail on a change breaking existing callers.",
     "pelican-test-pekko" to "The in-memory transport for pelican-test, on Pekko HTTP.",
@@ -174,15 +171,15 @@ dependencies {
     // falls because a benchmark was written is measuring the wrong thing.
     // See benchmarks/build.gradle.kts for why the agent stays off it entirely.
     //
-    // The io_uring modules count only where their tests must run. They skip wherever io_uring is unusable -- off
-    // Linux, and on a Linux whose seccomp profile or `io_uring_disabled` refuses `io_uring_setup`, as CI's container
-    // does -- and skipped lines would pull the total down. Being on Linux says nothing about the second, so the
-    // signal is `PELICAN_REQUIRE_URING=1`, which makes those tests fail rather than skip (specs 0087, 0088).
-    val uringModules = setOf("pelican-gannet", "pelican-gannet-docs")
-    val uringRuns = System.getenv("PELICAN_REQUIRE_URING") == "1"
+    // The Gannet modules count only where their tests must run. They skip wherever io_uring is unusable -- off Linux,
+    // and on a Linux whose seccomp profile or `io_uring_disabled` refuses `io_uring_setup`, as CI's container does --
+    // and skipped lines would pull the total down. Being on Linux says nothing about the second, so the signal is
+    // `PELICAN_REQUIRE_URING=1`, which makes those tests fail rather than skip (spec 0088).
+    val gannetModules = setOf("pelican-gannet", "pelican-gannet-docs")
+    val gannetRuns = System.getenv("PELICAN_REQUIRE_URING") == "1"
     subprojects
         .filter { it.name !in setOf("benchmarks", "pelican-bom") }
-        .filter { uringRuns || it.name !in uringModules }
+        .filter { gannetRuns || it.name !in gannetModules }
         .forEach { kover(project(it.path)) }
 }
 
@@ -210,8 +207,6 @@ val floor25 = setOf(
 )
 
 subprojects {
-    repositories { mavenCentral() }
-
     // The namespace verified on the Central Portal, against the GitHub
     // account it names.
     group = "io.github.matthewjones372"
@@ -221,9 +216,9 @@ subprojects {
     // A `java-platform` has no sources, so none of what follows applies to it.
     if (name == "pelican-bom") return@subprojects
 
-    // lark-stream 0.9.0 is class file 69, so a module built on it is Java 25 until lark targets 21. The io_uring
-    // runtime needs FFM and the JDK's internal continuation (spec 0087), and whatever depends on it is 25 too: the
-    // example's parity suites and the benchmarks run every backend (spec 0088).
+    // lark-stream 0.9.0 is class file 69, so a module built on it is Java 25 until lark targets 21. Gannet needs FFM
+    // and the JDK's internal continuation, and whatever depends on it is 25 too: the example's parity suites and the
+    // benchmarks run every backend (spec 0088).
     val jvmFloor = if (name in floor25) 25 else 21
 
     apply(plugin = "org.jetbrains.kotlin.jvm")
@@ -286,7 +281,7 @@ subprojects {
         javaLauncher.set(toolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(testJdk)) })
 
         systemProperty("pelican.launcherJavaVersion", testJdk.toString())
-        // Whether the io_uring tests may skip. An input, so a cached run that skipped them is not reused for one
+        // Whether the Gannet tests may skip. An input, so a cached run that skipped them is not reused for one
         // that must run them.
         inputs.property("pelicanRequireUring", System.getenv("PELICAN_REQUIRE_URING").orEmpty())
         // `-PjettyPool=virtual` runs every suite's Jetty servers on `VirtualThreadPool` (spec 0085).

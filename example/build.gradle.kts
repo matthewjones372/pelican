@@ -27,10 +27,10 @@ dependencies {
     implementation("org.apache.pekko:pekko-http_2.13:1.4.2")
     // Pekko's own logging at the slf4j API `pelican-pekko` writes to.
     runtimeOnly("org.apache.pekko:pekko-slf4j_2.13")
-    // The third server: `OnUring`, the io_uring runtime, run by the same parity suites.
+    // The third server: `OnGannet`, Gannet, run by the same parity suites.
     implementation(project(":pelican-gannet"))
     implementation(project(":pelican-gannet-docs"))
-    // `RequiresUring`, so the io_uring cases skip where io_uring cannot run.
+    // `RequiresGannet`, so the Gannet cases skip where io_uring cannot run.
     testImplementation(testFixtures(project(":pelican-gannet")))
     // Serving the docs is opt-in: this is the module that adds them to a server.
     implementation(project(":pelican-jetty-docs"))
@@ -399,7 +399,7 @@ tasks.named("compileTestKotlin") {
 // garbage-collection stall long enough to trip the build's 60s test timeout.
 tasks.withType<Test>().configureEach {
     maxHeapSize = "2g"
-    // `OnUring`'s runtime calls io_uring through FFM and parks on the JDK's own continuation (spec 0087).
+    // Gannet, under `OnGannet`, calls io_uring through FFM and parks on the JDK's own continuation (spec 0087).
     jvmArgs("--enable-native-access=ALL-UNNAMED", "--add-exports", "java.base/jdk.internal.vm=ALL-UNNAMED")
 }
 

@@ -8,12 +8,12 @@ import io.github.matthewjones372.pelican.bufferedFile
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.filePart
 import io.github.matthewjones372.pelican.formBody
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import io.github.matthewjones372.pelican.gannet.handledNow
+import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.nonEmpty
 import io.github.matthewjones372.pelican.textPart
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.handledNow
-import io.github.matthewjones372.pelican.gannet.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -39,7 +39,7 @@ data class Login(val user: String, val remember: Boolean, val visits: Int)
 data class Upload(val caption: String, val notes: String, val filename: String?, val type: String?, val content: String)
 
 /** Url-encoded forms and multipart uploads on both servers, asked the same questions over a socket. */
-@RequiresUring
+@RequiresGannet
 class FormsAndUploadsReadAsJettyReadsThemTest {
 
     data class Seen(val status: Int, val contentType: String?, val body: String)
@@ -83,7 +83,7 @@ class FormsAndUploadsReadAsJettyReadsThemTest {
         private fun served(vararg endpoints: ServerEndpoint) =
             api(endpoints.toList(), JacksonCodecs) { maxBodyBytes = 1024 }
 
-        private val uring = served(
+        private val gannet = served(
             login handledNow { it },
             upload handledNow { (caption, notes, file) -> uploaded(caption, notes, file) },
             gate handledNow { file ->
@@ -103,7 +103,7 @@ class FormsAndUploadsReadAsJettyReadsThemTest {
         @AfterAll
         fun stopBoth() {
             client.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
 
@@ -162,8 +162,8 @@ class FormsAndUploadsReadAsJettyReadsThemTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("asks")
-    fun `uring reads a form or an upload as jetty does`(ask: Ask) {
-        withClue(ask) { send(uring.baseUrl, ask) shouldBe send(jetty.baseUrl, ask) }
+    fun `gannet reads a form or an upload as jetty does`(ask: Ask) {
+        withClue(ask) { send(gannet.baseUrl, ask) shouldBe send(jetty.baseUrl, ask) }
     }
 
     @Test
@@ -171,7 +171,7 @@ class FormsAndUploadsReadAsJettyReadsThemTest {
         val notesPart = part("notes", "a poem", "about.txt", "text/plain")
         val body = envelope(part("caption", "The notes"), notesPart, part("file", "line one", "n.txt", "text/plain"))
 
-        send(uring.baseUrl, Ask("upload", "/upload", multipart, body, chunked = true)) shouldBe Seen(
+        send(gannet.baseUrl, Ask("upload", "/upload", multipart, body, chunked = true)) shouldBe Seen(
             200,
             "application/json",
             """{"caption":"The notes","notes":"a poem","filename":"n.txt","type":"text/plain","content":"line one"}""",
@@ -180,7 +180,7 @@ class FormsAndUploadsReadAsJettyReadsThemTest {
 
     @Test
     fun `a form field that will not decode is a 400 naming the field`() {
-        val seen = send(uring.baseUrl, Ask("bad", "/login", FORM, "user=ada&remember=on&visits=lots", false))
+        val seen = send(gannet.baseUrl, Ask("bad", "/login", FORM, "user=ada&remember=on&visits=lots", false))
 
         seen.status shouldBe 400
         seen.body shouldContain "visits"
@@ -188,7 +188,7 @@ class FormsAndUploadsReadAsJettyReadsThemTest {
 
     @Test
     fun `the handler holds a streamed file before the upload has finished arriving`() {
-        val uri = URI.create(uring.baseUrl)
+        val uri = URI.create(gannet.baseUrl)
         Socket(uri.host, uri.port).use { socket ->
             val out = socket.getOutputStream()
             out.ascii(

@@ -1,19 +1,19 @@
 package io.github.matthewjones372.pelican.gannet.served
 
+import io.github.matthewjones372.gannet.GannetConfig
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.gannet.Handlers
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.UringConfig
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledBy
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.handledOrFail
 import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.orFail
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
@@ -35,8 +35,8 @@ import io.github.matthewjones372.pelican.jetty.handledNow as jettyHandledNow
 import io.github.matthewjones372.pelican.jetty.handledOrFail as jettyHandledOrFail
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
-/** Spec 0058 on io_uring: a synchronous handler may block, and runs where [Handlers] says, as on Jetty. */
-@RequiresUring
+/** Spec 0058 on Gannet: a synchronous handler may block, and runs where [Handlers] says, as on Jetty. */
+@RequiresGannet
 class HandlersRunWhereJettyRunsThemTest {
 
     data class Refusal(val reason: String)
@@ -85,7 +85,7 @@ class HandlersRunWhereJettyRunsThemTest {
             else -> "platform"
         }
 
-        private val uringApi: Api = api(
+        private val gannetApi: Api = api(
             listOf(
                 where handledNow { thread() },
                 refusing handledOrFail { refused(Refusal(thread())) },
@@ -107,10 +107,10 @@ class HandlersRunWhereJettyRunsThemTest {
 
         private val mine = Executors.newThreadPerTaskExecutor(Thread.ofPlatform().name("mine-", 0).factory())
 
-        private val uring = mapOf(
-            "virtual" to uringApi.start(port = 0),
-            "dispatcher" to uringApi.start(port = 0, handlers = Handlers.onDispatcher),
-            "mine" to uringApi.start(port = 0, handlers = Handlers.on(mine)),
+        private val gannet = mapOf(
+            "virtual" to gannetApi.start(port = 0),
+            "dispatcher" to gannetApi.start(port = 0, handlers = Handlers.onDispatcher),
+            "mine" to gannetApi.start(port = 0, handlers = Handlers.on(mine)),
         )
 
         private val jetty = mapOf(
@@ -134,7 +134,7 @@ class HandlersRunWhereJettyRunsThemTest {
         @AfterAll
         fun stop() {
             asking.close()
-            uring.values.forEach { it.stop() }
+            gannet.values.forEach { it.stop() }
             jetty.values.forEach { it.stop() }
             mine.close()
         }
@@ -150,19 +150,19 @@ class HandlersRunWhereJettyRunsThemTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("cases")
     fun `a handler runs where jetty would run it`(asked: Asked) {
-        val onUring = asking.ask(uring.getValue(asked.handlers).baseUrl, "GET", asked.path)
+        val onGannet = asking.ask(gannet.getValue(asked.handlers).baseUrl, "GET", asked.path)
         val onJetty = asking.ask(jetty.getValue(asked.handlers).baseUrl, "GET", asked.path)
-        withClue("${asked.name}: uring $onUring, jetty $onJetty") { onUring shouldBe onJetty }
+        withClue("${asked.name}: gannet $onGannet, jetty $onJetty") { onGannet shouldBe onJetty }
     }
 
     @Test
     fun `on the dispatcher a synchronous handler runs on the carrier that read its request`() {
-        get("${uring.getValue("dispatcher").baseUrl}/carrier").join().body() shouldStartWith "pelican-uring-"
+        get("${gannet.getValue("dispatcher").baseUrl}/carrier").join().body() shouldStartWith "gannet-"
     }
 
     @Test
     fun `handlers that block all run at once, on one carrier`() {
-        val server = uringApi.start(port = 0, config = UringConfig(carriers = 1))
+        val server = gannetApi.start(port = 0, config = GannetConfig(carriers = 1))
         try {
             val answers = (1..CALLS).map { get("${server.baseUrl}/gated") }.map { it.join().body() }
             answers.distinct() shouldBe listOf("together")
@@ -173,6 +173,6 @@ class HandlersRunWhereJettyRunsThemTest {
 
     @Test
     fun `by default a handler runs on a virtual thread`() {
-        get("${uring.getValue("virtual").baseUrl}/where").join().body() shouldBe "virtual"
+        get("${gannet.getValue("virtual").baseUrl}/where").join().body() shouldBe "virtual"
     }
 }

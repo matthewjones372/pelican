@@ -6,14 +6,14 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.cors
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import io.github.matthewjones372.pelican.gannet.handledNow
+import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.openapi.DocsUi
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.docsOAuth
 import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.handledNow
-import io.github.matthewjones372.pelican.gannet.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -31,7 +31,7 @@ import io.github.matthewjones372.pelican.jetty.handledNow as jettyHandledNow
 data class Widget(val id: Long, val name: String)
 
 /** One API and its docs on both servers, asked the same questions over a socket. */
-@RequiresUring
+@RequiresGannet
 class DocsServedAsJettyServesTest {
 
     data class Seen(
@@ -58,7 +58,7 @@ class DocsServedAsJettyServesTest {
             cors = cors(ORIGIN)
         }
 
-        private val uringApi = served(getWidget handledNow { id -> Widget(id, "widget-$id") })
+        private val gannetApi = served(getWidget handledNow { id -> Widget(id, "widget-$id") })
         private val jettyApi = served(getWidget jettyHandledNow { id -> Widget(id, "widget-$id") })
 
         private val console = docs {
@@ -72,9 +72,9 @@ class DocsServedAsJettyServesTest {
             redoc { stylesheet("https://fonts.example/inter.css") }
         }
 
-        private val uring = uringApi.startWithDocs(port = 0, docs = console)
+        private val gannet = gannetApi.startWithDocs(port = 0, docs = console)
         private val jetty = jettyApi.jettyStartWithDocs(port = 0, docs = console)
-        private val uringRedoc = uringApi.startWithDocs(port = 0, docs = redoc)
+        private val gannetRedoc = gannetApi.startWithDocs(port = 0, docs = redoc)
         private val jettyRedoc = jettyApi.jettyStartWithDocs(port = 0, docs = redoc)
         private val off = docs {
             openApiPath = null
@@ -84,11 +84,11 @@ class DocsServedAsJettyServesTest {
             docsPath = "/api-docs"
             rapiDocReference("/reference") { theme { accent = "#C2562B" } }
         }
-        private val uringRapiDoc = uringApi.startWithDocs(port = 0, docs = rapiDoc)
+        private val gannetRapiDoc = gannetApi.startWithDocs(port = 0, docs = rapiDoc)
         private val jettyRapiDoc = jettyApi.jettyStartWithDocs(port = 0, docs = rapiDoc)
-        private val uringOff = uringApi.startWithDocs(port = 0, docs = off)
+        private val gannetOff = gannetApi.startWithDocs(port = 0, docs = off)
         private val jettyOff = jettyApi.jettyStartWithDocs(port = 0, docs = off)
-        private val docsAlone = uringApi.start(port = 0) { docsHandler(console) }
+        private val docsAlone = gannetApi.start(port = 0) { docsHandler(console) }
 
         private val client: HttpClient = HttpClient.newHttpClient()
 
@@ -96,7 +96,7 @@ class DocsServedAsJettyServesTest {
         @AfterAll
         fun stopAll() {
             client.close()
-            listOf(uring, uringRedoc, uringRapiDoc, uringOff, docsAlone).forEach { it.stop() }
+            listOf(gannet, gannetRedoc, gannetRapiDoc, gannetOff, docsAlone).forEach { it.stop() }
             listOf(jetty, jettyRedoc, jettyRapiDoc, jettyOff).forEach { it.stop() }
         }
     }
@@ -128,55 +128,55 @@ class DocsServedAsJettyServesTest {
         "/nobody/described/this",
     )
     fun `swagger's console, its redirect and the reference answer as on jetty`(path: String) {
-        withClue(path) { ask(uring.baseUrl, path) shouldBe ask(jetty.baseUrl, path) }
+        withClue(path) { ask(gannet.baseUrl, path) shouldBe ask(jetty.baseUrl, path) }
     }
 
     @ParameterizedTest(name = "{0}")
     @CsvSource("/spec/openapi.json", "/docs", "/openapi.json", "/docs/oauth2-redirect.html")
     fun `redoc at the docs path, under a moved document, answers as on jetty`(path: String) {
-        withClue(path) { ask(uringRedoc.baseUrl, path) shouldBe ask(jettyRedoc.baseUrl, path) }
+        withClue(path) { ask(gannetRedoc.baseUrl, path) shouldBe ask(jettyRedoc.baseUrl, path) }
     }
 
     @ParameterizedTest(name = "{0}")
     @CsvSource("/openapi.json", "/api-docs", "/reference")
     fun `a rapidoc reference beside the console answers as on jetty`(path: String) {
-        withClue(path) { ask(uringRapiDoc.baseUrl, path) shouldBe ask(jettyRapiDoc.baseUrl, path) }
+        withClue(path) { ask(gannetRapiDoc.baseUrl, path) shouldBe ask(jettyRapiDoc.baseUrl, path) }
     }
 
     @ParameterizedTest(name = "{0}")
     @CsvSource("/openapi.json", "/docs")
     fun `with every page switched off the endpoints alone answer, as on jetty`(path: String) {
-        withClue(path) { ask(uringOff.baseUrl, path) shouldBe ask(jettyOff.baseUrl, path) }
+        withClue(path) { ask(gannetOff.baseUrl, path) shouldBe ask(jettyOff.baseUrl, path) }
     }
 
     @Test
     fun `the endpoints still answer beside the docs, as on jetty`() {
-        for ((uringUrl, jettyUrl) in listOf(uring.baseUrl to jetty.baseUrl, uringOff.baseUrl to jettyOff.baseUrl)) {
-            ask(uringUrl, "/widgets/3") shouldBe ask(jettyUrl, "/widgets/3")
+        for ((gannetUrl, jettyUrl) in listOf(gannet.baseUrl to jetty.baseUrl, gannetOff.baseUrl to jettyOff.baseUrl)) {
+            ask(gannetUrl, "/widgets/3") shouldBe ask(jettyUrl, "/widgets/3")
         }
     }
 
     @ParameterizedTest(name = "{0} {1}")
     @CsvSource("PUT, /openapi.json", "POST, /api-docs", "DELETE, /reference", "PUT, /widgets/3", "OPTIONS, /api-docs")
     fun `a verb the docs do not take is refused as on jetty, naming every route's`(method: String, path: String) {
-        withClue("$method $path") { ask(uring.baseUrl, path, method) shouldBe ask(jetty.baseUrl, path, method) }
+        withClue("$method $path") { ask(gannet.baseUrl, path, method) shouldBe ask(jetty.baseUrl, path, method) }
     }
 
     @Test
     fun `a verb nobody takes lists the api's and the docs' methods`() {
-        ask(uring.baseUrl, "/openapi.json", "PUT").allow shouldBe "GET, OPTIONS"
+        ask(gannet.baseUrl, "/openapi.json", "PUT").allow shouldBe "GET, OPTIONS"
     }
 
     @Test
     fun `the pages are what was asked for, not merely the same on both`() {
-        val spec = ask(uring.baseUrl, "/openapi.json")
+        val spec = ask(gannet.baseUrl, "/openapi.json")
         spec.status shouldBe 200
         spec.allowOrigin shouldBe ORIGIN
         spec.body shouldContain "\"operationId\": \"getWidget\""
-        ask(uring.baseUrl, "/api-docs").body shouldContain "swagger-ui"
-        ask(uring.baseUrl, "/reference").body shouldContain """"x-logo":{"url":"/logo.svg","altText":"Widgets"}"""
-        ask(uringRedoc.baseUrl, "/docs").body shouldContain """href="https://fonts.example/inter.css""""
-        val rapiDocPage = ask(uringRapiDoc.baseUrl, "/reference")
+        ask(gannet.baseUrl, "/api-docs").body shouldContain "swagger-ui"
+        ask(gannet.baseUrl, "/reference").body shouldContain """"x-logo":{"url":"/logo.svg","altText":"Widgets"}"""
+        ask(gannetRedoc.baseUrl, "/docs").body shouldContain """href="https://fonts.example/inter.css""""
+        val rapiDocPage = ask(gannetRapiDoc.baseUrl, "/reference")
         rapiDocPage.allowOrigin shouldBe ORIGIN
         rapiDocPage.body shouldContain "<rapi-doc "
         rapiDocPage.body shouldContain """spec-url="/openapi.json""""

@@ -4,14 +4,14 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.filePart
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.ndjsonIn
 import io.github.matthewjones372.pelican.gannet.READ_TIMEOUT_MILLIS
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.reader
 import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.gannet.toSequence
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.ndjsonIn
 import io.kotest.assertions.withClue
 import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.shouldBe
@@ -41,7 +41,7 @@ data class Tally(val count: Int)
 private val THREE_FRAMES = listOf("Hello", "Bonjour", "Hola").joinToString("") { """{"text":"$it"}""" + "\n" }
 
 /** NDJSON uploads on both servers, asked the same questions over a socket. */
-@RequiresUring
+@RequiresGannet
 class StreamedUploadsReadAsJettyReadsThemTest {
 
     data class Seen(val status: Int, val contentType: String?, val body: String)
@@ -72,16 +72,16 @@ class StreamedUploadsReadAsJettyReadsThemTest {
             text()
         }
 
-        private val uringReached = CountDownLatch(1)
+        private val gannetReached = CountDownLatch(1)
         private val jettyReached = CountDownLatch(1)
 
         private fun served(vararg endpoints: ServerEndpoint) =
             api(endpoints.toList(), JacksonCodecs) { maxBodyBytes = 1024 }
 
-        private val uring = served(
+        private val gannet = served(
             tally handledNow { rows -> Tally(rows.toSequence().count()) },
             gate handledNow { rows ->
-                Tally(rows.toSequence().onEach { uringReached.countDown() }.count())
+                Tally(rows.toSequence().onEach { gannetReached.countDown() }.count())
             },
             first handledNow { rows -> rows.reader().use { it.next() } },
             stalled handledNow { file -> "read ${file.bytes().size}" },
@@ -102,12 +102,12 @@ class StreamedUploadsReadAsJettyReadsThemTest {
         @AfterAll
         fun stopBoth() {
             client.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
 
         @JvmStatic
-        fun servers(): List<String> = listOf("uring", "jetty")
+        fun servers(): List<String> = listOf("gannet", "jetty")
 
         @JvmStatic
         fun asks(): List<Ask> = listOf(false, true).flatMap { chunked ->
@@ -139,20 +139,20 @@ class StreamedUploadsReadAsJettyReadsThemTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("asks")
-    fun `uring reads a streamed upload as jetty does`(ask: Ask) {
-        withClue(ask) { send(uring.baseUrl, ask) shouldBe send(jetty.baseUrl, ask) }
+    fun `gannet reads a streamed upload as jetty does`(ask: Ask) {
+        withClue(ask) { send(gannet.baseUrl, ask) shouldBe send(jetty.baseUrl, ask) }
     }
 
     @Test
     fun `a streamed upload reaches the handler as the frames it was written as`() {
-        val seen = send(uring.baseUrl, asks().first())
+        val seen = send(gannet.baseUrl, asks().first())
 
         seen shouldBe Seen(200, "application/json", """{"count":3}""")
     }
 
     @Test
     fun `a frame that will not decode is a 400 naming the line it was on`() {
-        val seen = send(uring.baseUrl, asks().first { it.name == "undecodable frame" })
+        val seen = send(gannet.baseUrl, asks().first { it.name == "undecodable frame" })
 
         withClue(seen) {
             seen.status shouldBe 400
@@ -162,13 +162,14 @@ class StreamedUploadsReadAsJettyReadsThemTest {
 
     @Test
     fun `a frame larger than the service will hold is a 413`() {
-        send(uring.baseUrl, asks().first { it.name == "frame past maxFrameBytes" }).status shouldBe 413
+        send(gannet.baseUrl, asks().first { it.name == "frame past maxFrameBytes" }).status shouldBe 413
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("servers")
     fun `the handler holds the first frame before the last one is sent`(server: String) {
-        val (baseUrl, reached) = if (server == "uring") uring.baseUrl to uringReached else jetty.baseUrl to jettyReached
+        val (baseUrl, reached) =
+            if (server == "gannet") gannet.baseUrl to gannetReached else jetty.baseUrl to jettyReached
         openUpload(baseUrl, "/gate").use { socket ->
             val out = socket.getOutputStream()
             out.chunk("""{"text":"first"}""" + "\n")
@@ -186,7 +187,7 @@ class StreamedUploadsReadAsJettyReadsThemTest {
 
     @Test
     fun `a reader closed after one frame answers while the rest of the upload is unsent`() {
-        openUpload(uring.baseUrl, "/first").use { socket ->
+        openUpload(gannet.baseUrl, "/first").use { socket ->
             socket.getOutputStream().chunk("""{"text":"only"}""" + "\n")
 
             val answer = String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
@@ -199,7 +200,7 @@ class StreamedUploadsReadAsJettyReadsThemTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("servers")
     fun `an upload that stops arriving is given up on after jetty's read timeout`(server: String) {
-        val baseUrl = if (server == "uring") uring.baseUrl else jetty.baseUrl
+        val baseUrl = if (server == "gannet") gannet.baseUrl else jetty.baseUrl
         val started = System.nanoTime()
         openUpload(baseUrl, "/stalled", "multipart/form-data; boundary=B").use { socket ->
             val opened = "--B\r\nContent-Disposition: form-data; name=\"file\"; filename=\"f\"\r\n\r\nx"

@@ -4,14 +4,14 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.cors
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import io.github.matthewjones372.pelican.gannet.bytesNow
+import io.github.matthewjones372.pelican.gannet.handledNow
+import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.jsonBody
 import io.github.matthewjones372.pelican.optional
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.bytesNow
-import io.github.matthewjones372.pelican.gannet.handledNow
-import io.github.matthewjones372.pelican.gannet.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -25,7 +25,7 @@ import io.github.matthewjones372.pelican.jetty.handledNow as jettyHandledNow
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** CORS on both servers: the preflight, and the headers on every answer an endpoint gives. */
-@RequiresUring
+@RequiresGannet
 class CorsAnsweredAsJettyAnswersItTest {
 
     data class Note(val text: String)
@@ -61,7 +61,7 @@ class CorsAnsweredAsJettyAnswersItTest {
 
         private fun served(endpoints: List<ServerEndpoint>) = api(endpoints, JacksonCodecs) { cors = cors(ALLOWED) }
 
-        private val uring = served(
+        private val gannet = served(
             listOf(
                 echo handledNow { (trace, note) -> Echoed(note.text, trace) },
                 logo bytesNow { sequenceOf("PELICAN".toByteArray()) },
@@ -114,7 +114,7 @@ class CorsAnsweredAsJettyAnswersItTest {
         @AfterAll
         fun stopBoth() {
             asking.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
     }
@@ -123,13 +123,13 @@ class CorsAnsweredAsJettyAnswersItTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("asked")
-    fun `uring answers as jetty does`(asked: Asked) {
-        withClue(asked) { asked.of(uring.baseUrl) shouldBe asked.of(jetty.baseUrl) }
+    fun `gannet answers as jetty does`(asked: Asked) {
+        withClue(asked) { asked.of(gannet.baseUrl) shouldBe asked.of(jetty.baseUrl) }
     }
 
     @Test
     fun `a preflight is answered from the description of that path`() {
-        val answer = asking.ask(uring.baseUrl, "OPTIONS", "/echo", preflight(ALLOWED))
+        val answer = asking.ask(gannet.baseUrl, "OPTIONS", "/echo", preflight(ALLOWED))
 
         answer.status shouldBe 204
         answer.headers["Access-Control-Allow-Origin"] shouldBe ALLOWED
@@ -140,7 +140,7 @@ class CorsAnsweredAsJettyAnswersItTest {
 
     @Test
     fun `a method that path never describes is refused, with nothing leaked`() {
-        val answer = asking.ask(uring.baseUrl, "OPTIONS", "/echo", preflight(ALLOWED, "DELETE"))
+        val answer = asking.ask(gannet.baseUrl, "OPTIONS", "/echo", preflight(ALLOWED, "DELETE"))
 
         answer.status shouldBe 403
         answer.body shouldContain "DELETE"
@@ -149,7 +149,7 @@ class CorsAnsweredAsJettyAnswersItTest {
 
     @Test
     fun `an error carries the headers, or the browser hides why the call failed`() {
-        val answer = asking.ask(uring.baseUrl, "POST", "/echo", fromBrowser, "not json")
+        val answer = asking.ask(gannet.baseUrl, "POST", "/echo", fromBrowser, "not json")
 
         answer.status shouldBe 400
         answer.headers["Access-Control-Allow-Origin"] shouldBe ALLOWED

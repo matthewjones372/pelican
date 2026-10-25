@@ -4,17 +4,17 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.lastEventId
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.queryParam
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.gannet.streamedBy
 import io.github.matthewjones372.pelican.gannet.streamedByOrFail
 import io.github.matthewjones372.pelican.gannet.streamedNow
 import io.github.matthewjones372.pelican.gannet.streamedOrFail
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.lastEventId
+import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.pelican.orFail
+import io.github.matthewjones372.pelican.queryParam
 import io.kotest.assertions.withClue
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.shouldBe
@@ -43,7 +43,7 @@ import io.github.matthewjones372.pelican.jetty.streamedNow as jettyStreamedNow
 import io.github.matthewjones372.pelican.jetty.streamedOrFail as jettyStreamedOrFail
 
 /** Streamed responses on both servers, compared on the bytes a caller reads. */
-@RequiresUring
+@RequiresGannet
 class StreamedAsJettyStreamsTest {
 
     data class Tick(val seq: Int, val at: String)
@@ -116,7 +116,7 @@ class StreamedAsJettyStreamsTest {
 
         private fun served(endpoints: List<ServerEndpoint>) = api(endpoints, JacksonCodecs)
 
-        private val uring = served(
+        private val gannet = served(
             listOf(
                 countdown streamedNow { ticks.asSequence() },
                 everyone streamedBy { CompletableFuture.completedFuture(ticks.asSequence()) },
@@ -204,7 +204,7 @@ class StreamedAsJettyStreamsTest {
         @AfterAll
         fun stopBoth() {
             client.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
     }
@@ -256,15 +256,15 @@ class StreamedAsJettyStreamsTest {
         "/later?gone=false,",
         "/later?gone=true,",
     )
-    fun `uring streams as jetty does`(path: String, lastEventId: String?) {
+    fun `gannet streams as jetty does`(path: String, lastEventId: String?) {
         withClue("$path $lastEventId") {
-            get(uring.baseUrl, path, lastEventId) shouldBe get(jetty.baseUrl, path, lastEventId)
+            get(gannet.baseUrl, path, lastEventId) shouldBe get(jetty.baseUrl, path, lastEventId)
         }
     }
 
     @Test
     fun `sse frames are core's, with the retry ahead of the first event`() {
-        get(uring.baseUrl, "/replay").body shouldBe
+        get(gannet.baseUrl, "/replay").body shouldBe
             "retry: 15000\n\n" +
             "event: tick\nid: 1\ndata: {\"seq\":1,\"at\":\"one\"}\n\n" +
             "event: tick\nid: 2\ndata: {\"seq\":2,\"at\":\"two\"}\n\n"
@@ -272,18 +272,18 @@ class StreamedAsJettyStreamsTest {
 
     @Test
     fun `a reconnect carries the last id it saw to the handler`() {
-        get(uring.baseUrl, "/replay", lastEventId = "1").body shouldBe
+        get(gannet.baseUrl, "/replay", lastEventId = "1").body shouldBe
             "retry: 15000\n\nevent: tick\nid: 2\ndata: {\"seq\":2,\"at\":\"two\"}\n\n"
     }
 
     @Test
     fun `an empty array is still an array`() {
-        get(uring.baseUrl, "/nobody") shouldBe Seen(200, "application/json", "[]")
+        get(gannet.baseUrl, "/nobody") shouldBe Seen(200, "application/json", "[]")
     }
 
     @Test
     fun `a quiet sse stream is filled with comments`() {
-        val body = get(uring.baseUrl, "/quiet").body
+        val body = get(gannet.baseUrl, "/quiet").body
 
         withClue(body) {
             body.windowed(6).count { it.startsWith("data: ") } shouldBe 2
@@ -296,7 +296,7 @@ class StreamedAsJettyStreamsTest {
     fun `a stream that fails has already said 200, so the connection is dropped unfinished`(path: String) {
         // The end of the headers, or the one frame sent before the failure.
         val before = if (path == "/broken") "\r\n\r\n" else """"at":"one"}"""
-        listOf(uring.baseUrl, jetty.baseUrl).forEach { baseUrl ->
+        listOf(gannet.baseUrl, jetty.baseUrl).forEach { baseUrl ->
             val seen = raw(baseUrl, path, before)
             withClue("$baseUrl$path: $seen") {
                 seen shouldStartWith "HTTP/1.1 200"

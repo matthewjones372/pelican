@@ -3,10 +3,10 @@ package example.backends
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.UringHandler
+import io.github.matthewjones372.pelican.gannet.GannetHandler
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.then
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.http.javadsl.server.Directives
@@ -20,15 +20,15 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import io.github.matthewjones372.pelican.gannet.handledNow as handledNowOnGannet
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
+import io.github.matthewjones372.pelican.gannet.toHandler as toGannetHandler
 import io.github.matthewjones372.pelican.jetty.handledNow as handledNowOnJetty
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.toHandler as toJettyHandler
 import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.toRoute as toPekkoRoute
-import io.github.matthewjones372.pelican.gannet.handledNow as handledNowOnUring
-import io.github.matthewjones372.pelican.gannet.start as startOnUring
-import io.github.matthewjones372.pelican.gannet.toHandler as toUringHandler
 
 class MountedAlongsideTest {
 
@@ -92,16 +92,16 @@ class MountedAlongsideTest {
     }
 
     @Test
-    @RequiresUring
-    fun `uring chains a described handler with a hand-written one`() {
-        val handWritten = UringHandler { exchange ->
-            if (exchange.request.path != "/health") return@UringHandler false
+    @RequiresGannet
+    fun `gannet chains a described handler with a hand-written one`() {
+        val handWritten = GannetHandler { exchange ->
+            if (exchange.request.path != "/health") return@GannetHandler false
             exchange.respond(200, body = "ok".toByteArray())
             true
         }
 
-        val server = api(widget handledNowOnUring { Widget(1) })
-            .startOnUring(port = 0) { handWritten then toUringHandler() }
+        val server = api(widget handledNowOnGannet { Widget(1) })
+            .startOnGannet(port = 0) { handWritten then toGannetHandler() }
 
         try {
             bothAnswer(server.baseUrl)

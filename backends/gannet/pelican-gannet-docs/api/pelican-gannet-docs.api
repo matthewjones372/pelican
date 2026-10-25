@@ -1,8 +1,8 @@
 public final class io/github/matthewjones372/pelican/gannet/docs/DocsKt {
-	public static final fun docsHandler (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/gannet/UringHandler;
-	public static synthetic fun docsHandler$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/gannet/UringHandler;
-	public static final fun handlerWithDocs (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/gannet/Handlers;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/gannet/UringHandler;
-	public static synthetic fun handlerWithDocs$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/gannet/Handlers;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/gannet/UringHandler;
+	public static final fun docsHandler (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/gannet/GannetHandler;
+	public static synthetic fun docsHandler$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/gannet/GannetHandler;
+	public static final fun handlerWithDocs (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/gannet/Handlers;Lio/github/matthewjones372/pelican/openapi/Docs;)Lio/github/matthewjones372/pelican/gannet/GannetHandler;
+	public static synthetic fun handlerWithDocs$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/gannet/Handlers;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/gannet/GannetHandler;
 	public static final fun startWithDocs (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;Lio/github/matthewjones372/pelican/gannet/Handlers;)Lio/github/matthewjones372/pelican/gannet/PelicanServer;
 	public static synthetic fun startWithDocs$default (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;Lio/github/matthewjones372/pelican/gannet/Handlers;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/gannet/PelicanServer;
 }

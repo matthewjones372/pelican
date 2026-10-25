@@ -8,12 +8,12 @@ import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.authenticated
 import io.github.matthewjones372.pelican.bearerAuth
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import io.github.matthewjones372.pelican.gannet.handledNow
+import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.queryParam
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.handledNow
-import io.github.matthewjones372.pelican.gannet.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
@@ -25,7 +25,7 @@ import io.github.matthewjones372.pelican.jetty.handledNow as jettyHandledNow
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** The caller on both servers (spec 0061): refused before the handler, and handed to it when verified. */
-@RequiresUring
+@RequiresGannet
 class CallersCheckedAsJettyChecksThemTest {
 
     /** One request, named so a failing case says which. */
@@ -71,7 +71,7 @@ class CallersCheckedAsJettyChecksThemTest {
         private fun served(routes: List<ServerEndpoint>) =
             api(routes, JacksonCodecs) { authenticate(bearer, verifier) }
 
-        private val uring = served(
+        private val gannet = served(
             listOf(
                 whoAmI handledNow { ran.incrementAndGet(); "you are ${this[caller]}" },
                 greeting handledNow { "hello ${this[maybe] ?: "stranger"}" },
@@ -109,24 +109,24 @@ class CallersCheckedAsJettyChecksThemTest {
         @AfterAll
         fun stop() {
             asking.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("cases")
-    fun `uring checks the caller as jetty does`(asked: Asked) {
-        val onUring = asking.ask(uring.baseUrl, "GET", asked.path, asked.headers)
+    fun `gannet checks the caller as jetty does`(asked: Asked) {
+        val onGannet = asking.ask(gannet.baseUrl, "GET", asked.path, asked.headers)
         val onJetty = asking.ask(jetty.baseUrl, "GET", asked.path, asked.headers)
-        withClue("${asked.name}: uring $onUring, jetty $onJetty") { onUring shouldBe onJetty }
+        withClue("${asked.name}: gannet $onGannet, jetty $onJetty") { onGannet shouldBe onJetty }
     }
 
     @Test
     fun `a refused caller never reaches the handler`() {
         val before = ran.get()
-        asking.ask(uring.baseUrl, "GET", "/me").status shouldBe 401
-        asking.ask(uring.baseUrl, "GET", "/count?n=1", mapOf("Cookie" to "session=eve")).status shouldBe 401
+        asking.ask(gannet.baseUrl, "GET", "/me").status shouldBe 401
+        asking.ask(gannet.baseUrl, "GET", "/count?n=1", mapOf("Cookie" to "session=eve")).status shouldBe 401
         ran.get() shouldBe before
     }
 }

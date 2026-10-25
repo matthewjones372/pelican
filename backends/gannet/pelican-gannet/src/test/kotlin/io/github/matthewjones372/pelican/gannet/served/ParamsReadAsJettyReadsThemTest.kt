@@ -9,6 +9,9 @@ import io.github.matthewjones372.pelican.cookieParam
 import io.github.matthewjones372.pelican.default
 import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import io.github.matthewjones372.pelican.gannet.handledNow
+import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.headerParam
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.optional
@@ -16,9 +19,6 @@ import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.positive
 import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.repeated
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.handledNow
-import io.github.matthewjones372.pelican.gannet.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
@@ -42,7 +42,7 @@ data class Filters(val tags: List<String>, val ids: List<Long>, val features: Li
 data class Strictly(val term: String, val key: String, val jar: String)
 
 /** Path, query, header and cookie inputs on both servers, asked the same questions over a socket. */
-@RequiresUring
+@RequiresGannet
 class ParamsReadAsJettyReadsThemTest {
 
     /** What a caller can see of an answer, and so what the two servers are compared on. */
@@ -91,7 +91,7 @@ class ParamsReadAsJettyReadsThemTest {
         private fun served(endpoints: List<ServerEndpoint>, observer: RefusalObserver? = null) =
             api(endpoints, JacksonCodecs) { observer?.let { onRefusal(it) } }
 
-        private val uring = served(
+        private val gannet = served(
             listOf(
                 count handledNow { it.toString() },
                 roundtrip handledNow { (p, q) -> RoundTrip(p, q) },
@@ -120,7 +120,7 @@ class ParamsReadAsJettyReadsThemTest {
         @AfterAll
         fun stopBoth() {
             client.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
 
@@ -208,27 +208,27 @@ class ParamsReadAsJettyReadsThemTest {
 
     @ParameterizedTest(name = "{0} {1}")
     @MethodSource("requests")
-    fun `uring reads every input as jetty does`(target: String, headers: List<Pair<String, String>>) {
+    fun `gannet reads every input as jetty does`(target: String, headers: List<Pair<String, String>>) {
         withClue("GET $target $headers") {
-            ask(uring.baseUrl, target, headers) shouldBe ask(jetty.baseUrl, target, headers)
+            ask(gannet.baseUrl, target, headers) shouldBe ask(jetty.baseUrl, target, headers)
         }
     }
 
     @Test
     fun `an encoded slash stays inside the segment that carried it`() {
-        ask(uring.baseUrl, "/items/a%2Fb", emptyList()).body shouldBe """{"fromPath":"a/b"}"""
+        ask(gannet.baseUrl, "/items/a%2Fb", emptyList()).body shouldBe """{"fromPath":"a/b"}"""
     }
 
     @Test
     fun `and decoding happens once, so an encoded escape arrives as text`() {
-        ask(uring.baseUrl, "/items/%2561", emptyList()).body shouldBe """{"fromPath":"%61"}"""
+        ask(gannet.baseUrl, "/items/%2561", emptyList()).body shouldBe """{"fromPath":"%61"}"""
     }
 
     @Test
     fun `a list reaches the handler as a list, whichever way it was spread`() {
         val headers = listOf("X-Feature" to "beta,dark", "Cookie" to "seen=x; seen=y")
 
-        ask(uring.baseUrl, "/filters?tag=kotlin&tag=http&id=1%2C2", headers).body shouldBe
+        ask(gannet.baseUrl, "/filters?tag=kotlin&tag=http&id=1%2C2", headers).body shouldBe
             """{"tags":["kotlin","http"],"ids":[1,2],"features":["beta","dark"],"seen":["x","y"]}"""
     }
 
@@ -236,7 +236,7 @@ class ParamsReadAsJettyReadsThemTest {
     fun `a bad path param is a 400 counted against its own route`() {
         refused.clear()
 
-        ask(uring.baseUrl, "/count/not-a-number", emptyList()).status shouldBe 400
+        ask(gannet.baseUrl, "/count/not-a-number", emptyList()).status shouldBe 400
         refused shouldBe listOf("decode 400 /count/{n}")
     }
 
@@ -245,7 +245,7 @@ class ParamsReadAsJettyReadsThemTest {
         val characters = (' '..'~').map { it.toString() } + listOf("é", "€", "ß")
         val differing = characters.map { "a${it}b" }.filter { sent ->
             val target = "/items/${escaped(sent)}?q=${URLEncoder.encode(sent, Charsets.UTF_8)}"
-            ask(uring.baseUrl, target, emptyList()) != ask(jetty.baseUrl, target, emptyList())
+            ask(gannet.baseUrl, target, emptyList()) != ask(jetty.baseUrl, target, emptyList())
         }
 
         differing shouldBe emptyList()
@@ -260,7 +260,7 @@ class ParamsReadAsJettyReadsThemTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("traversals")
     fun `no spelling of a dot segment reaches a handler as a value`(target: String) {
-        val body = ask(uring.baseUrl, target, emptyList()).body
+        val body = ask(gannet.baseUrl, target, emptyList()).body
 
         withClue("GET $target answered $body") {
             (body == """{"fromPath":".."}""" || body == """{"fromPath":"."}""") shouldBe false
@@ -270,15 +270,15 @@ class ParamsReadAsJettyReadsThemTest {
     @Test
     fun `a path climbing above the root is routed nowhere, a 404 as on Pekko`() {
         // Jetty refuses the request line with its own 400; nothing here clamps it to `/items/x` either.
-        statusOf(uring.baseUrl, "/../items/x") shouldBe 404
-        statusOf(uring.baseUrl, "/..") shouldBe 404
+        statusOf(gannet.baseUrl, "/../items/x") shouldBe 404
+        statusOf(gannet.baseUrl, "/..") shouldBe 404
         statusOf(jetty.baseUrl, "/../items/x") shouldBe 400
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("malformed")
     fun `a malformed escape is refused, as jetty refuses it`(target: String) {
-        val status = statusOf(uring.baseUrl, target)
+        val status = statusOf(gannet.baseUrl, target)
 
         withClue("GET $target") {
             status shouldBe statusOf(jetty.baseUrl, target)

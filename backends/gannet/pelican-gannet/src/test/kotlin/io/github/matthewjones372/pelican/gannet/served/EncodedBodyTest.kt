@@ -6,10 +6,10 @@ import io.github.matthewjones372.pelican.JsonObj
 import io.github.matthewjones372.pelican.SchemaComponents
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jsonObj
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.jsonObj
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -27,7 +27,7 @@ import io.github.matthewjones372.pelican.jetty.start as jettyStart
  * A codec may already hold the bytes. Null is today's path. An array is the
  * body, including when it is not what `encodeToString` would have produced.
  */
-@RequiresUring
+@RequiresGannet
 class EncodedBodyTest {
 
     companion object {
@@ -46,7 +46,7 @@ class EncodedBodyTest {
             media<String>("text/csv")
         }
 
-        private val uring = api(
+        private val gannet = api(
             listOf(
                 plain handledNow { "plain" },
                 held handledNow { "held" },
@@ -70,7 +70,7 @@ class EncodedBodyTest {
         @AfterAll
         fun stopBoth() {
             client.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
     }
@@ -87,7 +87,7 @@ class EncodedBodyTest {
     @Test
     fun `a json response with nothing held is the utf-8 of encodeToString`() {
         val text = Holding.strings.encodeToString("plain").toByteArray().toList()
-        ask(uring.baseUrl, "/plain") shouldBe text
+        ask(gannet.baseUrl, "/plain") shouldBe text
         ask(jetty.baseUrl, "/plain") shouldBe text
     }
 
@@ -96,9 +96,9 @@ class EncodedBodyTest {
         val before = Holding.fixed.copyOf().toList()
         val text = Holding.strings.encodeToString("held").toByteArray().toList()
         text shouldNotBe before
-        ask(uring.baseUrl, "/held") shouldBe before
+        ask(gannet.baseUrl, "/held") shouldBe before
         ask(jetty.baseUrl, "/held") shouldBe before
-        ask(uring.baseUrl, "/sheet") shouldBe before
+        ask(gannet.baseUrl, "/sheet") shouldBe before
         ask(jetty.baseUrl, "/sheet") shouldBe before
         Holding.fixed.toList() shouldBe before
     }

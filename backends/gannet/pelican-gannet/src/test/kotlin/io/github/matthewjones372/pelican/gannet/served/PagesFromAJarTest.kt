@@ -2,11 +2,11 @@ package io.github.matthewjones372.pelican.gannet.served
 
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.pages
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.pages
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
@@ -18,7 +18,7 @@ import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 
 /** Pages packed in a jar, as a service ships them, answer as pages from a directory do. */
-@RequiresUring
+@RequiresGannet
 class PagesFromAJarTest {
 
     private val ping = endpoint {

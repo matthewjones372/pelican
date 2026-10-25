@@ -2,11 +2,11 @@ package io.github.matthewjones372.pelican.gannet.served
 
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jsonBody
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
@@ -16,10 +16,10 @@ import java.io.BufferedReader
 import java.net.Socket
 
 /**
- * Pekko's `ChunkedBodyLimitTest` check, on io_uring: an over-limit chunked body is refused on a connection that is
+ * Pekko's `ChunkedBodyLimitTest` check, on Gannet: an over-limit chunked body is refused on a connection that is
  * still usable. A raw socket, because a client that opens a second connection would pass either way.
  */
-@RequiresUring
+@RequiresGannet
 class RefusedBodyKeepsTheConnectionTest {
 
     data class Jotted(val text: String)

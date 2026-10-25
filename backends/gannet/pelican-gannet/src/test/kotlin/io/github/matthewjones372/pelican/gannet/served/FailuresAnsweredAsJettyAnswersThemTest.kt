@@ -9,6 +9,11 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.errorMedia
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import io.github.matthewjones372.pelican.gannet.bytesOrFail
+import io.github.matthewjones372.pelican.gannet.handledByOneOf
+import io.github.matthewjones372.pelican.gannet.handledOrFail
+import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.of
@@ -17,11 +22,6 @@ import io.github.matthewjones372.pelican.or
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.responseHeader
-import io.github.matthewjones372.pelican.gannet.RequiresUring
-import io.github.matthewjones372.pelican.gannet.bytesOrFail
-import io.github.matthewjones372.pelican.gannet.handledByOneOf
-import io.github.matthewjones372.pelican.gannet.handledOrFail
-import io.github.matthewjones372.pelican.gannet.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -40,7 +40,7 @@ import io.github.matthewjones372.pelican.jetty.handledOrFail as jettyHandledOrFa
 import io.github.matthewjones372.pelican.jetty.start as jettyStart
 
 /** Declared successes and failures on both servers, asked the same questions over a socket. */
-@RequiresUring
+@RequiresGannet
 class FailuresAnsweredAsJettyAnswersThemTest {
 
     /** What a caller can see of an answer, the headers the declarations name included. */
@@ -127,7 +127,7 @@ class FailuresAnsweredAsJettyAnswersThemTest {
 
         private fun served(endpoints: List<ServerEndpoint>) = api(endpoints, JacksonCodecs)
 
-        private val uring = served(
+        private val gannet = served(
             listOf(
                 ready handledOrFail { c -> readiness(c) },
                 fetchBlob bytesOrFail { id ->
@@ -159,7 +159,7 @@ class FailuresAnsweredAsJettyAnswersThemTest {
         @AfterAll
         fun stopBoth() {
             client.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
     }
@@ -185,19 +185,19 @@ class FailuresAnsweredAsJettyAnswersThemTest {
             "POST /pets/1/adoption", "POST /pets/2/adoption", "POST /pets/3/adoption",
         ],
     )
-    fun `uring answers a declared response as jetty does`(request: String) {
-        withClue(request) { ask(uring.baseUrl, request) shouldBe ask(jetty.baseUrl, request) }
+    fun `gannet answers a declared response as jetty does`(request: String) {
+        withClue(request) { ask(gannet.baseUrl, request) shouldBe ask(jetty.baseUrl, request) }
     }
 
     @Test
     fun `the failure goes out in its own media type`() {
-        ask(uring.baseUrl, "GET /ready/chip") shouldBe
+        ask(gannet.baseUrl, "GET /ready/chip") shouldBe
             Seen(503, "application/health+json", noHeaders, """{"status":"fail"}""")
     }
 
     @Test
     fun `and a failure declared with errorJson is still application json`() {
-        val seen = ask(uring.baseUrl, "GET /ready/disk")
+        val seen = ask(gannet.baseUrl, "GET /ready/disk")
 
         seen.status shouldBe 500
         seen.contentType shouldBe "application/json"
@@ -205,12 +205,12 @@ class FailuresAnsweredAsJettyAnswersThemTest {
 
     @Test
     fun `the stream is served when there is one`() {
-        ask(uring.baseUrl, "GET /blobs/1") shouldBe Seen(200, "application/octet-stream", noHeaders, "blobby")
+        ask(gannet.baseUrl, "GET /blobs/1") shouldBe Seen(200, "application/octet-stream", noHeaders, "blobby")
     }
 
     @Test
     fun `and the declared failure is answered before any byte of it`() {
-        val seen = ask(uring.baseUrl, "GET /blobs/9")
+        val seen = ask(gannet.baseUrl, "GET /blobs/9")
 
         seen.status shouldBe 404
         seen.body shouldContain "No blob 9"
@@ -218,7 +218,7 @@ class FailuresAnsweredAsJettyAnswersThemTest {
 
     @Test
     fun `a declared failure carries its payload and its header`() {
-        val seen = ask(uring.baseUrl, "GET /echo/flood")
+        val seen = ask(gannet.baseUrl, "GET /echo/flood")
 
         seen.status shouldBe 429
         seen.contentType shouldBe "application/json"
@@ -228,13 +228,13 @@ class FailuresAnsweredAsJettyAnswersThemTest {
 
     @Test
     fun `a header declared on a failure is absent from the success`() {
-        ask(uring.baseUrl, "GET /echo/hello").headers["Retry-After"] shouldBe null
+        ask(gannet.baseUrl, "GET /echo/hello").headers["Retry-After"] shouldBe null
     }
 
     @Test
     fun `each declared success gets its own status, and its own header`() {
-        val known = ask(uring.baseUrl, "PUT /greetings/ada")
-        val learned = ask(uring.baseUrl, "PUT /greetings/zoe")
+        val known = ask(gannet.baseUrl, "PUT /greetings/ada")
+        val learned = ask(gannet.baseUrl, "PUT /greetings/zoe")
 
         known.status shouldBe 200
         known.headers shouldBe mapOf("Retry-After" to null, "Location" to null, "X-Request-Id" to "r-ada")
@@ -244,7 +244,7 @@ class FailuresAnsweredAsJettyAnswersThemTest {
 
     @Test
     fun `a tagged failure says which one it is, first`() {
-        ask(uring.baseUrl, "POST /pets/2/adoption").body shouldBe """{"kind":"registry_down","retryIn":30}"""
+        ask(gannet.baseUrl, "POST /pets/2/adoption").body shouldBe """{"kind":"registry_down","retryIn":30}"""
     }
 
     private val noHeaders = mapOf("Retry-After" to null, "Location" to null, "X-Request-Id" to null)

@@ -74,8 +74,8 @@ interface Running : AutoCloseable {
 /**
  * Every backend the example can run, in one list.
  *
- * Pekko, Jetty and the io_uring runtime, and every suite below is parameterised
+ * Pekko, Jetty and Gannet, and every suite below is parameterised
  * over the list, so a returning interpreter is one more entry. At commit a6c20b2 it held Pekko,
  * http4k and Ktor.
  */
-val allBackends: List<Backend> = listOf(OnPekko, OnJetty, OnUring)
+val allBackends: List<Backend> = listOf(OnPekko, OnJetty, OnGannet)

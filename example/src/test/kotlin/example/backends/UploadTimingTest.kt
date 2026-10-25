@@ -4,9 +4,9 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ndjsonIn
-import io.github.matthewjones372.pelican.gannet.RequiresUring
 import io.kotest.assertions.withClue
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
@@ -15,15 +15,15 @@ import java.io.OutputStream
 import java.net.Socket
 import java.net.URI
 import java.nio.charset.StandardCharsets
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnGannet
+import io.github.matthewjones372.pelican.gannet.toSequence as toSequenceOnGannet
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.jetty.toSequence as toSequenceOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
 import io.github.matthewjones372.pelican.pekko.toSource as toSourceOnPekko
-import io.github.matthewjones372.pelican.gannet.start as startOnUring
-import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnUring
-import io.github.matthewjones372.pelican.gannet.toSequence as toSequenceOnUring
 
 /**
  * A typed upload is read as it arrives, which is the whole claim `ndjsonIn`
@@ -78,9 +78,9 @@ class UploadTimingTest {
     }
 
     @Test
-    @RequiresUring
-    fun `uring answers the first frame before the last one is sent`() {
-        val server = api(relay streamedNowOnUring { rows -> rows.toSequenceOnUring() }).startOnUring(port = 0)
+    @RequiresGannet
+    fun `gannet answers the first frame before the last one is sent`() {
+        val server = api(relay streamedNowOnGannet { rows -> rows.toSequenceOnGannet() }).startOnGannet(port = 0)
 
         try {
             server.baseUrl.shouldAnswerBeforeTheUploadEnds()

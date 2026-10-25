@@ -13,6 +13,11 @@ import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.queryParam
 import org.apache.pekko.stream.javadsl.Source
 import java.util.concurrent.CompletableFuture
+import io.github.matthewjones372.pelican.gannet.Handlers as GannetHandlers
+import io.github.matthewjones372.pelican.gannet.handledBy as stagedOnGannet
+import io.github.matthewjones372.pelican.gannet.handledNow as onGannet
+import io.github.matthewjones372.pelican.gannet.start as startGannet
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedOnGannet
 import io.github.matthewjones372.pelican.jetty.handledBy as stagedOnJetty
 import io.github.matthewjones372.pelican.jetty.handledNow as onJetty
 import io.github.matthewjones372.pelican.jetty.start as startJetty
@@ -21,11 +26,6 @@ import io.github.matthewjones372.pelican.pekko.handledBy as stagedOnPekko
 import io.github.matthewjones372.pelican.pekko.handledNow as onPekko
 import io.github.matthewjones372.pelican.pekko.start as startPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedOnPekko
-import io.github.matthewjones372.pelican.gannet.Handlers as UringHandlers
-import io.github.matthewjones372.pelican.gannet.handledBy as stagedOnUring
-import io.github.matthewjones372.pelican.gannet.handledNow as onUring
-import io.github.matthewjones372.pelican.gannet.start as startUring
-import io.github.matthewjones372.pelican.gannet.streamedNow as streamedOnUring
 
 data class Item(val id: Long, val name: String)
 
@@ -79,7 +79,7 @@ private fun wireApi(bind: List<ServerEndpoint>): Api = api(endpoints = bind, cod
 /**
  * One server for [WireDriver], in a JVM of its own so neither server shares a heap or a JIT with the driver.
  *
- * Each starts through its own `start()` with its defaults; `uring-inline` is the io_uring backend with
+ * Each starts through its own `start()` with its defaults; `gannet-inline` is Gannet with
  * `Handlers.onDispatcher`, so the cost of the hop to a virtual thread is a number (spec 0088). Prints the port,
  * then serves until stdin closes, which is how the driver stops it and how it stops if the driver dies.
  */
@@ -115,22 +115,22 @@ fun main(args: Array<String>) {
             stop = server::stop
         }
 
-        "uring", "uring-inline" -> {
-            val handlers = if (args.single() == "uring") UringHandlers.default else UringHandlers.onDispatcher
+        "gannet", "gannet-inline" -> {
+            val handlers = if (args.single() == "gannet") GannetHandlers.default else GannetHandlers.onDispatcher
             val server = wireApi(
                 listOf(
-                    getItem onUring { (id, lim) -> Item(id, "item-$lim") },
-                    createItem onUring { body -> Item(1, body.name) },
-                    staged stagedOnUring { stagedItem() },
-                    ndjsonFrames streamedOnUring { frames() },
-                    sseFrames streamedOnUring { frames() },
+                    getItem onGannet { (id, lim) -> Item(id, "item-$lim") },
+                    createItem onGannet { body -> Item(1, body.name) },
+                    staged stagedOnGannet { stagedItem() },
+                    ndjsonFrames streamedOnGannet { frames() },
+                    sseFrames streamedOnGannet { frames() },
                 ),
-            ).startUring(port = 0, handlers = handlers)
+            ).startGannet(port = 0, handlers = handlers)
             port = server.port
             stop = server::stop
         }
 
-        else -> error("Expected pekko, jetty, uring or uring-inline, got ${args.single()}")
+        else -> error("Expected pekko, jetty, gannet or gannet-inline, got ${args.single()}")
     }
     println("PORT $port")
     System.out.flush()

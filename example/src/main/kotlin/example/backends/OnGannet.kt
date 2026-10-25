@@ -4,8 +4,8 @@ package example.backends
  * To run this in a project of your own:
  *
  *     dependencies {
- *         // the interpreter and the io_uring runtime under it; brings pelican-core
- *         implementation("io.github.matthewjones372:pelican-uring:1.0.0")
+ *         // the interpreter and Gannet under it; brings pelican-core
+ *         implementation("io.github.matthewjones372:pelican-gannet:1.0.0")
  *     }
  */
 
@@ -15,7 +15,6 @@ import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.lastEventId
 import io.github.matthewjones372.pelican.gannet.bytesNow
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.handledOneOf
@@ -24,15 +23,16 @@ import io.github.matthewjones372.pelican.gannet.handledWith
 import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.gannet.streamedNow
 import io.github.matthewjones372.pelican.gannet.toSequence
+import io.github.matthewjones372.pelican.lastEventId
 
 /**
- * The io_uring binding of [greetingEndpoints].
+ * The Gannet binding of [greetingEndpoints].
  *
  * [jettyRoutes] again under another import: the binders have the same names and the stream type is the same
  * `Sequence`. Handlers run on virtual threads, off the carrier that read the request, so a sleep or a blocking
- * read of an upload holds up no other connection. The JVM needs the flags `UringSupport.FLAGS` names.
+ * read of an upload holds up no other connection. The JVM needs the flags `GannetSupport.FLAGS` names.
  */
-val uringRoutes: List<ServerEndpoint> = listOf(
+val gannetRoutes: List<ServerEndpoint> = listOf(
     greet handledNow { (who, shout) -> greetingOf(who, shout) },
 
     countdown streamedNow { start ->
@@ -77,17 +77,17 @@ val uringRoutes: List<ServerEndpoint> = listOf(
 
 private const val COUNTDOWN_MILLIS = 100L
 
-fun uringApi(
+fun gannetApi(
     outerFilters: List<Filter> = emptyList(),
     refusals: RefusalRenderer = ApiErrorEnvelope,
     onRefusal: RefusalObserver? = null,
-): Api = greetingsApi(uringRoutes, outerFilters = outerFilters, refusals = refusals, onRefusal = onRefusal)
+): Api = greetingsApi(gannetRoutes, outerFilters = outerFilters, refusals = refusals, onRefusal = onRefusal)
 
-object OnUring : Backend {
-    override val name = "uring"
+object OnGannet : Backend {
+    override val name = "gannet"
 
     override fun api(outerFilters: List<Filter>, refusals: RefusalRenderer, onRefusal: RefusalObserver?): Api =
-        uringApi(outerFilters, refusals, onRefusal)
+        gannetApi(outerFilters, refusals, onRefusal)
 
     override fun start(
         port: Int,

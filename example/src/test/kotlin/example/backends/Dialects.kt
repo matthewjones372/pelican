@@ -79,10 +79,10 @@ enum class JettyDifference(val reason: String) {
 }
 
 /**
- * Where the io_uring interpreter answers otherwise than Jetty's, which it was copied from, and why. Everything
+ * Where Gannet answers otherwise than Jetty's, which it was copied from, and why. Everything
  * [JettyDifference] lists that is not here, it answers as Jetty does. `RecordedDifferencesTest` holds these true.
  */
-enum class UringDifference(val reason: String) {
+enum class GannetDifference(val reason: String) {
     /** The paths of [JettyDifference.ESCAPING_PATHS] are a 404, as on Pekko, not Jetty's 400. */
     ESCAPING_PATHS(
         "The runtime hands the interpreter the path as it arrived, and nothing between them refuses one. A path " +

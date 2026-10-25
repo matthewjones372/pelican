@@ -4,15 +4,15 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.formBody
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.or
-import io.github.matthewjones372.pelican.rawBody
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.bytesNow
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.start
 import io.github.matthewjones372.pelican.gannet.toSequence
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jsonBody
+import io.github.matthewjones372.pelican.or
+import io.github.matthewjones372.pelican.rawBody
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -33,7 +33,7 @@ import io.github.matthewjones372.pelican.jetty.toSequence as jettyToSequence
 data class Note(val text: String)
 
 /** Request bodies in and opaque bytes out on both servers, asked the same questions over a socket. */
-@RequiresUring
+@RequiresGannet
 class BodiesReadAsJettyReadsThemTest {
 
     /** What a caller can see of an answer, and so what the two servers are compared on. */
@@ -71,7 +71,7 @@ class BodiesReadAsJettyReadsThemTest {
 
         private fun served(endpoints: List<ServerEndpoint>) = api(endpoints, JacksonCodecs) { maxBodyBytes = 1024 }
 
-        private val uring = served(
+        private val gannet = served(
             listOf(
                 notes handledNow { note -> Note(note.text.reversed()) },
                 either handledNow { note -> "read ${note.text}" },
@@ -95,7 +95,7 @@ class BodiesReadAsJettyReadsThemTest {
         @AfterAll
         fun stopBoth() {
             client.close()
-            uring.stop()
+            gannet.stop()
             jetty.stop()
         }
 
@@ -135,13 +135,13 @@ class BodiesReadAsJettyReadsThemTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("asks")
-    fun `uring reads a body as jetty does`(ask: Ask) {
-        withClue(ask) { send(uring.baseUrl, ask) shouldBe send(jetty.baseUrl, ask) }
+    fun `gannet reads a body as jetty does`(ask: Ask) {
+        withClue(ask) { send(gannet.baseUrl, ask) shouldBe send(jetty.baseUrl, ask) }
     }
 
     @Test
     fun `a chunked body over the limit is refused, though nothing declared its length`() {
-        val seen = send(uring.baseUrl, Ask("/notes", "application/json", """{"text":"$big"}""", chunked = true))
+        val seen = send(gannet.baseUrl, Ask("/notes", "application/json", """{"text":"$big"}""", chunked = true))
 
         seen.status shouldBe 413
         seen.body shouldContain "Payload too large"
@@ -150,7 +150,7 @@ class BodiesReadAsJettyReadsThemTest {
     @Test
     fun `a chunked body past the overrun is refused without being read whole`() {
         val huge = """{"text":"${"x".repeat(200_000)}"}"""
-        val seen = send(uring.baseUrl, Ask("/notes", "application/json", huge, chunked = true))
+        val seen = send(gannet.baseUrl, Ask("/notes", "application/json", huge, chunked = true))
 
         seen.status shouldBe 413
         seen.body shouldContain "Payload too large"
@@ -158,19 +158,19 @@ class BodiesReadAsJettyReadsThemTest {
 
     @Test
     fun `a json body round-trips`() {
-        send(uring.baseUrl, Ask("/notes", "application/json", """{"text":"hello"}""", chunked = false)) shouldBe
+        send(gannet.baseUrl, Ask("/notes", "application/json", """{"text":"hello"}""", chunked = false)) shouldBe
             Seen(200, "application/json", """{"text":"olleh"}""")
     }
 
     @Test
     fun `a raw body arrives whole and unread, past the limit a strict body is held to`() {
-        send(uring.baseUrl, Ask("/echo", "application/octet-stream", big, chunked = true)) shouldBe
+        send(gannet.baseUrl, Ask("/echo", "application/octet-stream", big, chunked = true)) shouldBe
             Seen(200, "application/octet-stream", big)
     }
 
     @Test
     fun `opaque bytes keep their declared media type`() {
-        val seen = get(uring.baseUrl, "/logo")
+        val seen = get(gannet.baseUrl, "/logo")
 
         seen shouldBe get(jetty.baseUrl, "/logo")
         seen.contentType shouldBe "image/png"

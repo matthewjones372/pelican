@@ -1,24 +1,26 @@
 package io.github.matthewjones372.pelican.gannet
 
+import io.github.matthewjones372.gannet.HttpExchange
+import io.github.matthewjones372.gannet.HttpHandler
 import io.github.matthewjones372.pelican.Method
 
 /**
  * One step of serving: answers [HttpExchange] and returns true, or returns false having touched nothing, so the
  * handler after it in a [then] chain is asked. Runs on the carrier, so it must not block: see [HttpHandler].
  */
-fun interface UringHandler {
+fun interface GannetHandler {
     fun handle(exchange: HttpExchange): Boolean
 }
 
 /** This handler, then [next] for whatever it passes on: Jetty's `Handler.Sequence`, Pekko's `concat`. */
-infix fun UringHandler.then(next: UringHandler): UringHandler =
-    UringHandler { exchange -> handle(exchange) || next.handle(exchange) }
+infix fun GannetHandler.then(next: GannetHandler): GannetHandler =
+    GannetHandler { exchange -> handle(exchange) || next.handle(exchange) }
 
 /**
  * This handler, asked only for [method], as Pekko's `method` directive asks its route. Any other method is passed
  * on as a refusal naming [method], so a 405 lists it; a request it passes on despite the method matching is a 404.
  */
-fun UringHandler.onlyFor(method: Method): UringHandler = UringHandler { exchange ->
+fun GannetHandler.onlyFor(method: Method): GannetHandler = GannetHandler { exchange ->
     if (exchange.request.method != method.name) {
         exchange.declineMethods(listOf(method.name))
         false
@@ -58,8 +60,8 @@ internal fun HttpExchange.declinePath() {
     (this as? Asked)?.declinePath()
 }
 
-/** [handler] as the runtime's handler: whatever every step passes on is answered with the merged 404 or 405. */
-internal fun answering(handler: UringHandler): HttpHandler = HttpHandler { exchange ->
+/** [handler] as Gannet's handler: whatever every step passes on is answered with the merged 404 or 405. */
+internal fun answering(handler: GannetHandler): HttpHandler = HttpHandler { exchange ->
     val asked = Asked(exchange)
     if (!handler.handle(asked)) asked.unanswered().writeTo(asked)
 }

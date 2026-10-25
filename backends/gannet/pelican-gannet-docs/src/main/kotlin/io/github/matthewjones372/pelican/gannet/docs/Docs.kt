@@ -1,9 +1,17 @@
 package io.github.matthewjones372.pelican.gannet.docs
 
+import io.github.matthewjones372.gannet.HttpExchange
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.corsPolicy
+import io.github.matthewjones372.pelican.gannet.GannetHandler
+import io.github.matthewjones372.pelican.gannet.Handlers
+import io.github.matthewjones372.pelican.gannet.PelicanServer
+import io.github.matthewjones372.pelican.gannet.onlyFor
+import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.gannet.then
+import io.github.matthewjones372.pelican.gannet.toHandler
 import io.github.matthewjones372.pelican.openapi.DocsUi
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectHtml
@@ -12,14 +20,6 @@ import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.openapi.redocHtml
 import io.github.matthewjones372.pelican.openapi.swaggerUiHtml
 import io.github.matthewjones372.pelican.spi.CorsHeaders
-import io.github.matthewjones372.pelican.gannet.Handlers
-import io.github.matthewjones372.pelican.gannet.HttpExchange
-import io.github.matthewjones372.pelican.gannet.PelicanServer
-import io.github.matthewjones372.pelican.gannet.UringHandler
-import io.github.matthewjones372.pelican.gannet.onlyFor
-import io.github.matthewjones372.pelican.gannet.start
-import io.github.matthewjones372.pelican.gannet.then
-import io.github.matthewjones372.pelican.gannet.toHandler
 
 /** The one docs setting every backend shares, under this module's name so a move from Pekko is an import swap. */
 typealias Docs = io.github.matthewjones372.pelican.openapi.Docs
@@ -29,7 +29,7 @@ private const val HTML = "text/html; charset=UTF-8"
 private const val JSON = "application/json"
 
 /** The document and the pages as a handler, and nothing else: it passes on every request but a GET of one of them. */
-fun Api.docsHandler(docs: Docs = docs()): UringHandler {
+fun Api.docsHandler(docs: Docs = docs()): GannetHandler {
     val specPath = docs.openApiPath?.takeIf { it.isNotBlank() }
     val uiPath = docs.docsPath?.takeIf { it.isNotBlank() }
     if (specPath == null && uiPath == null && docs.referencePath == null) return DocsHandler(emptyMap(), null)
@@ -61,7 +61,7 @@ fun Api.docsHandler(docs: Docs = docs()): UringHandler {
  * The endpoints and the documentation as one handler, the endpoints asked first as on Pekko, so an endpoint at a
  * docs path wins. Served with `api.start(handler = { handlerWithDocs() })`.
  */
-fun Api.handlerWithDocs(handlers: Handlers = Handlers.default, docs: Docs = docs()): UringHandler =
+fun Api.handlerWithDocs(handlers: Handlers = Handlers.default, docs: Docs = docs()): GannetHandler =
     toHandler(handlers).then(docsHandler(docs))
 
 /** [start], with the document and the documentation page served alongside. */
@@ -77,7 +77,7 @@ private class Page(val contentType: String, body: String) {
 }
 
 /** Matched on the whole path, not by segment, because these paths are configuration and may have several. */
-private class DocsHandler(private val pages: Map<String, Page>, private val cors: CorsPolicy?) : UringHandler {
+private class DocsHandler(private val pages: Map<String, Page>, private val cors: CorsPolicy?) : GannetHandler {
 
     override fun handle(exchange: HttpExchange): Boolean {
         val request = exchange.request

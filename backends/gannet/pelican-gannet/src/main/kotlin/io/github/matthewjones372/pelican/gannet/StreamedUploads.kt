@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican.gannet
 
+import io.github.matthewjones372.gannet.RequestBody
 import io.github.matthewjones372.pelican.StreamIn
 import io.github.matthewjones372.pelican.spi.NdjsonFrames
 import java.io.IOException
@@ -10,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Pekko's `StreamConverters.asInputStream` default: a blocking read waits this long for the next bytes. */
 internal const val READ_TIMEOUT_MILLIS = 5_000L
 
-internal class UringFrames<T>(private val body: RequestBody, private val frames: NdjsonFrames) : StreamIn<T> {
+internal class GannetFrames<T>(private val body: RequestBody, private val frames: NdjsonFrames) : StreamIn<T> {
     private val opened = AtomicBoolean(false)
 
     fun open(): FrameReader<T> {
@@ -50,11 +51,11 @@ fun <T> StreamIn<T>.toSequence(): Sequence<T> = Sequence { reader() }.constrainO
 
 /** The same frames as an iterator that can be closed early or woken from another thread. */
 @Suppress("UNCHECKED_CAST")
-fun <T> StreamIn<T>.reader(): FrameReader<T> = (this as UringFrames<T>).open()
+fun <T> StreamIn<T>.reader(): FrameReader<T> = (this as GannetFrames<T>).open()
 
 /**
  * A request body as a stream whose read gives up after [timeoutMillis] with no bytes arriving, as Pekko's does,
- * rather than waiting for the connection's idle timeout. Read off the carrier, where the runtime applies the timeout.
+ * rather than waiting for the connection's idle timeout. Read off the carrier, where Gannet applies the timeout.
  */
 internal class TimedInput(private val body: RequestBody, timeoutMillis: Long) : InputStream() {
     private val timeout = Duration.ofMillis(timeoutMillis)
@@ -80,7 +81,7 @@ internal class TimedInput(private val body: RequestBody, timeoutMillis: Long) : 
     }
 
     /**
-     * Stops reading without failing the body: the runtime drains what is left after the reply, so the connection
+     * Stops reading without failing the body: Gannet drains what is left after the reply, so the connection
      * lives, rather than closing it on unread bytes and resetting the reply on its way out.
      */
     override fun close() {

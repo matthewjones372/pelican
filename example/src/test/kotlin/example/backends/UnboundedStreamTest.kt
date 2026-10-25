@@ -6,8 +6,8 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.StreamOf
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.gannet.assumeGannet
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.gannet.assumeUring
 import io.kotest.assertions.fail
 import io.kotest.assertions.withClue
 import io.kotest.matchers.longs.shouldBeLessThan
@@ -23,12 +23,12 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import io.github.matthewjones372.pelican.gannet.start as startOnGannet
+import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnGannet
 import io.github.matthewjones372.pelican.jetty.start as startOnJetty
 import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
 import io.github.matthewjones372.pelican.pekko.start as startOnPekko
 import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
-import io.github.matthewjones372.pelican.gannet.start as startOnUring
-import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnUring
 
 /**
  * What an endpoint that never ends costs, asked as a question about demand
@@ -134,10 +134,10 @@ class UnboundedStreamTest {
                 .startOnJetty(port = 0)
                 .let { server -> running(server.baseUrl, server::stop) }
 
-            "uring" -> {
-                assumeUring()
-                api(route streamedNowOnUring { ticks(produced, limit) })
-                    .startOnUring(port = 0)
+            "gannet" -> {
+                assumeGannet()
+                api(route streamedNowOnGannet { ticks(produced, limit) })
+                    .startOnGannet(port = 0)
                     .let { server -> running(server.baseUrl, server::stop) }
             }
 
@@ -150,7 +150,7 @@ class UnboundedStreamTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = ["pekko", "jetty", "uring"])
+    @ValueSource(strings = ["pekko", "jetty", "gannet"])
     @Suppress("SleepInsteadOfDelay") // The point is a reader that stopped, measured in wall clock.
     fun `a consumer that stops reading stops the producer`(backend: String) {
         val produced = AtomicLong()
@@ -181,7 +181,7 @@ class UnboundedStreamTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = ["pekko", "jetty", "uring"])
+    @ValueSource(strings = ["pekko", "jetty", "gannet"])
     fun `a consumer that keeps up gets every element, in order`(backend: String) {
         val produced = AtomicLong()
         val server = serve(backend, counted, produced, limit = ELEMENTS)

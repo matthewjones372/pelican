@@ -2,10 +2,10 @@ package io.github.matthewjones372.pelican.gannet.docs
 
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.gannet.RequiresUring
+import io.github.matthewjones372.pelican.gannet.RequiresGannet
 import io.github.matthewjones372.pelican.gannet.handledNow
 import io.github.matthewjones372.pelican.gannet.start
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
@@ -15,7 +15,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 /** The one-argument spellings a service types first: every default in place. */
-@RequiresUring
+@RequiresGannet
 class DefaultsTest {
 
     private val motd = endpoint {

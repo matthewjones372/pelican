@@ -1,5 +1,7 @@
 package io.github.matthewjones372.pelican.gannet
 
+import io.github.matthewjones372.gannet.Headers
+import io.github.matthewjones372.gannet.HttpExchange
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.Pages
 import io.github.matthewjones372.pelican.spi.CorsHeaders
@@ -22,7 +24,7 @@ internal class PagesHandler(
     private val pages: Pages,
     private val cors: CorsPolicy?,
     private val classLoader: ClassLoader,
-) : UringHandler {
+) : GannetHandler {
 
     override fun handle(exchange: HttpExchange): Boolean {
         val request = exchange.request
@@ -47,7 +49,7 @@ internal class PagesHandler(
                 // A page behind a guard is someone's own: a copy kept by the browser would outlive signing out.
                 val private = if (pages.guard != null) listOf(CACHE_CONTROL to "no-store") else emptyList()
                 val url = checkNotNull(classLoader.getResource(resolved.resource)) { resolved.resource }
-                // Reading the file may block, so off the carrier; the runtime answers 500 if it throws.
+                // Reading the file may block, so off the carrier; Gannet answers 500 if it throws.
                 exchange.offload(OFF_CARRIER) { held ->
                     serve(request.headers, url, pageContentType(resolved.resource), allowed + private).writeTo(held)
                 }
