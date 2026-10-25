@@ -570,6 +570,13 @@ has gone interrupts the thread pulling the sequence. `rows.toSequence()`,
 `rows.reader()` and `wake()` read an upload as on Jetty, with the same
 five-second read timeout.
 
+**A body nobody read is read after the response**, as on Jetty, but by Gannet
+itself: a refusal decided before the body arrived, or a handler that stops
+early, leaves the connection open for the next request. Gannet discards up to
+`GannetConfig.drainBytes`, 64 KiB by default where Jetty takes 1 MiB, and
+closes the connection past that; a `Content-Length` already over it is answered
+with `Connection: close`.
+
 **Testing.** `pelican-test-gannet`'s `onLoopback()` is the typed client, as
 `inMemory()` is on Jetty and Pekko. Gannet has no in-memory connector, so it
 starts the API on a loopback port and stops it when the client closes.
