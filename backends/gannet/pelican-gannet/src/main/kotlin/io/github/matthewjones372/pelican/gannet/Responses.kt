@@ -89,8 +89,13 @@ private fun Reply.headWith(contentType: String?): List<Pair<String, String>> {
         is Streamed -> headers
     }
     if (contentType == null) return headers
+    if (headers.isEmpty()) return HEADS[contentType] ?: listOf(CONTENT_TYPE to contentType)
     return headers.filterNot { it.first.equals(CONTENT_TYPE, ignoreCase = true) } + (CONTENT_TYPE to contentType)
 }
+
+/** The head of a reply carrying nothing but its content type, built once for the types Pelican writes itself. */
+private val HEADS: Map<String, List<Pair<String, String>>> =
+    listOf(JSON, TEXT, NDJSON).associateWith { listOf(CONTENT_TYPE to it) }
 
 private val STREAM_WRITERS: Executor =
     Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("pelican-stream-writer-", 0).factory())

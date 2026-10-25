@@ -12,7 +12,9 @@ import io.github.matthewjones372.pelican.UndeclaredResponse
 import io.github.matthewjones372.pelican.chosenSuccess
 import io.github.matthewjones372.pelican.streams
 import io.github.matthewjones372.pelican.wrap
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.Future
 import kotlin.reflect.KClass
 /**
  * The handler with this API's filters wrapped around it, and then the
@@ -21,6 +23,15 @@ import kotlin.reflect.KClass
  */
 fun Api.handlerFor(se: ServerEndpoint): (Params) -> CompletionStage<Any?> =
     (if (se.filters.isEmpty()) filters else filters + se.filters).wrap(se.invoke)
+
+/**
+ * This stage, where it has already succeeded, so a backend reads its value with `resultNow()` instead of chaining a
+ * stage onto it; null otherwise. Only a plain `CompletableFuture`: the minimal stage `completedStage` returns throws
+ * from every query, so it takes the chained path.
+ */
+fun <T> CompletionStage<T>.succeeded(): CompletableFuture<T>? =
+    (this as? CompletableFuture<T>)
+        ?.takeIf { it.javaClass == CompletableFuture::class.java && it.state() == Future.State.SUCCESS }
 
 /**
  * How many values a request will decode, for sizing the bag they go into. A
