@@ -49,6 +49,22 @@ one.
   Gannet is `io.github.matthewjones372:gannet:0.1.0-SNAPSHOT`, resolved from
   Central's snapshot repository.
 
+### Changed
+
+- **Query strings and form bodies are decoded as strict UTF-8** (spec 0089,
+  decision 5). Percent-escapes that do not spell UTF-8 (`?q=%e9`, an
+  overlong `%c0%af`, a surrogate, a truncated sequence) are now a 400,
+  `Illegal query string`, with the fixed detail
+  `The percent-encoded bytes are not UTF-8`, on every backend and the
+  in-memory client; a form body carrying them is a 400 with that detail too.
+  This covers names as well as values, and pairs the endpoint never declared.
+  Before, Pekko and Gannet handed the handler U+FFFD and served it, Jetty
+  answered 500, and a bare `?%f0` was a key named U+FFFD on Pekko and Gannet
+  and dropped on Jetty. `parseFormBody` throws `IllegalArgumentException` for
+  them. Jetty's 400 for an escape that is not two hex digits now carries
+  `URLDecoder`'s message as its detail, as Gannet's does, instead of
+  `400: Bad query`.
+
 ## [1.1.0] — 2026-10-26
 
 ### Changed
@@ -120,20 +136,6 @@ one.
   agreement matrix (spec 0076).
 
 ### Changed
-
-- **Query strings and form bodies are decoded as strict UTF-8** (spec 0089,
-  decision 5). Percent-escapes that do not spell UTF-8 (`?q=%e9`, an
-  overlong `%c0%af`, a surrogate, a truncated sequence) are now a 400,
-  `Illegal query string`, with the fixed detail
-  `The percent-encoded bytes are not UTF-8`, on every backend and the
-  in-memory client; a form body carrying them is a 400 with that detail too.
-  This covers names as well as values, and pairs the endpoint never declared.
-  Before, Pekko and Gannet handed the handler U+FFFD and served it, Jetty
-  answered 500, and a bare `?%f0` was a key named U+FFFD on Pekko and Gannet
-  and dropped on Jetty. `parseFormBody` throws `IllegalArgumentException` for
-  them. Jetty's 400 for an escape that is not two hex digits now carries
-  `URLDecoder`'s message as its detail, as Gannet's does, instead of
-  `400: Bad query`.
 
 - **`openTelemetry(sdk)` continues an inbound trace with no getter**
   (spec 0081). `incomingHeaders` defaults to a getter over
