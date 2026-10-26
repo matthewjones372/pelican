@@ -54,7 +54,7 @@ answered with a 400 before the handler runs. Because the 404 is declared, the
 handler must return `Outcome<NoSuchBookmark, Bookmark>`, and one that forgets
 the failure does not compile.
 
-**Who this is for.** Pelican fits a Kotlin service on JDK 25 or newer whose
+**Who this is for.** Pelican fits a Kotlin service on JDK 21 or newer whose
 HTTP contract is consumed in several ways (a published OpenAPI document,
 clients, tests) and has drifted before, running on Pekko HTTP or free to
 choose its server. It is probably not for a small internal API with one caller
@@ -129,9 +129,9 @@ val routes = listOf(
 )
 ```
 
-The file binds these with the Jetty binders on `main`. On 1.0.0's Pekko
-backend the binders have the same names, and `streamedNow` returns a Pekko
-`Source` where Jetty takes a `Sequence`.
+The file binds these with the Jetty binders. On the Pekko backend the binders
+have the same names, and `streamedNow` returns a Pekko `Source` where Jetty
+takes a `Sequence`.
 
 None of these values holds a handler or does any work. They are data, and four
 things are read from them.
@@ -210,12 +210,12 @@ onto a web server you can mount beside the handlers you already have:
 - **Pekko HTTP** (`pelican-pekko`): the descriptions become a Pekko `Route`.
   `toRoute(system)` concatenates with your existing routes, and
   `start(system, port = 8080)` serves on an actor system the service already
-  runs. This is the backend in the current release, 1.0.0.
+  runs.
 - **Jetty 12** (`pelican-jetty`): the descriptions become a Jetty core
   `Handler`, with no Pekko or Scala on the classpath. `toHandler()` passes on
   any request it does not answer, so it sits in a `Handler.Sequence` beside
-  handlers of your own. It is on `main` and not yet in a release; see
-  [Getting started](#getting-started).
+  handlers of your own. See
+  [Jetty, kotlinx and the BOM](#jetty-kotlinx-and-the-bom).
 
 Because a Pelican route passes on what it does not describe, you can adopt it
 one endpoint at a time in an existing service. A parity suite runs the same
@@ -270,11 +270,14 @@ did not.
 
 ## Getting started
 
-The current release is **1.0.0**, on Maven Central under the group
-`io.github.matthewjones372`. Its library modules are compiled for **Java 25**,
-so a service using them needs JDK 25 or newer. `main` lowers that to Java 21,
-which is not yet released (see below). In 1.0.0 the server backend is
-Pekko HTTP and the JSON codec is Jackson.
+The current release is **1.1.0**, on Maven Central under the group
+`io.github.matthewjones372`. Its library modules are compiled for **Java 21**,
+so a service using them needs JDK 21 or newer; `pelican-streams` and
+`pelican-streams-jetty` need 25. Below JDK 24, synchronous handlers default to
+a pool of platform threads rather than virtual threads; see
+[Where a handler runs](docs/reference.md#where-a-handler-runs). The steps below
+use Pekko HTTP and Jackson; [Jetty, kotlinx and the BOM](#jetty-kotlinx-and-the-bom)
+covers the other backend and codec.
 
 To see it running before writing anything, clone the repository and run the
 greeting example below:
@@ -288,13 +291,13 @@ It serves the endpoint on port 8080, with its Swagger UI at
 
 ### Choose the modules you need
 
-The common case on 1.0.0, and what the first endpoint below needs: the Pekko
+The common case on Pekko, and what the first endpoint below needs: the Pekko
 backend, the Jackson codec, the OpenAPI document with Swagger UI, and the typed
 test client.
 
 ```kotlin
 // build.gradle.kts
-val pelicanVersion = "1.0.0"
+val pelicanVersion = "1.1.0"
 
 dependencies {
     // The backend. Brings pelican-core; compiles against Pekko HTTP.
@@ -321,20 +324,20 @@ build takes only the ones it uses. Every module brings `pelican-core`, which
 holds the endpoint DSL and depends on nothing but the Kotlin standard library
 and `jackson-core`. On top of it a service picks:
 
-- **one backend**, which serves the descriptions (`pelican-pekko` in 1.0.0);
+- **one backend**, which serves the descriptions (`pelican-pekko` or `pelican-jetty`);
 - **one codec**, which any endpoint with a JSON body needs
-  (`pelican-jackson`);
+  (`pelican-jackson` or `pelican-kotlinx`);
 - **anything else only when it is wanted**: the OpenAPI document and Swagger UI
   (`pelican-pekko-docs`), test clients, client transports, metrics, health,
   OIDC, MCP.
 
 No module brings in a server you did not choose, and the backends do not bring
-the OpenAPI generator or a codec. The smallest JSON service on 1.0.0 drops
+the OpenAPI generator or a codec. The smallest JSON service on Pekko drops
 `pelican-pekko-docs` and `pelican-test-pekko` from the block above, and adding
 a capability later is adding its module.
 
-1.0.0 has no BOM, so the one `pelicanVersion` value is what keeps the modules
-at the same version. [Modules](docs/modules.md#choosing-modules) lists every
+The one `pelicanVersion` value keeps the modules at the same version, or
+`pelican-bom` does (below). [Modules](docs/modules.md#choosing-modules) lists every
 module, what each one brings with it, and the minimum set for other setups:
 a generated client, MCP tools, metrics.
 
@@ -419,28 +422,23 @@ pluginManagement {
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.1.0" }
 ```
 
-### Jetty, kotlinx and the BOM: on `main`, not yet released
+### Jetty, kotlinx and the BOM
 
-Four things on `main` are not yet in a release:
+Beside Pekko and Jackson, Pelican has:
 
 - the Jetty 12 family: `pelican-jetty`, `pelican-jetty-docs`,
   `pelican-jetty-mcp`, `pelican-test-jetty`, `pelican-streams-jetty` and
   `pelican-client-jetty`;
 - `pelican-kotlinx`, a codec for `@Serializable` payloads;
-- **Java 21**: the library modules target JDK 21, except `pelican-streams`
-  and `pelican-streams-jetty`, which stay on 25. Below JDK 24, synchronous
-  handlers default to a pool of platform threads rather than virtual threads;
-  see [Where a handler runs](docs/reference.md#where-a-handler-runs);
 - `pelican-bom`, which manages the versions of Pelican's modules so a build
   writes the version once.
 
-The cookbook and the other guides on `main` are written against these, so
-their dependency blocks use the BOM and their imports name
-`io.github.matthewjones372.pelican.jetty`. On 1.0.0, give each module the
-version `1.0.0` and import the binders from
+The cookbook and the other guides are written against these, so their
+dependency blocks use the BOM and their imports name
+`io.github.matthewjones372.pelican.jetty`. On Pekko, import the binders from
 `io.github.matthewjones372.pelican.pekko`: `pelican-jetty` has every binder
 `pelican-pekko` has, under the same name, so only streaming handlers change
 (a Pekko `Source` where Jetty takes a `Sequence`).
@@ -451,7 +449,7 @@ leave out the ones you do not.
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:1.0.1-SNAPSHOT"))
+    implementation(platform("io.github.matthewjones372:pelican-bom:1.1.0"))
     implementation("io.github.matthewjones372:pelican-jetty")
     implementation("io.github.matthewjones372:pelican-jackson")
     testImplementation("io.github.matthewjones372:pelican-test-jetty")
@@ -462,21 +460,9 @@ It covers Pelican's own modules only, not Jackson, Pekko or Jetty, and not the
 Gradle plugin, whose version stays in `plugins { }`. See
 [Version alignment and the BOM](docs/modules.md#version-alignment-and-the-bom).
 
-To try these modules now, use a snapshot. Builds of `main` are published by hand to
-Central's snapshot repository as `1.0.1-SNAPSHOT`, including the BOM and the
-plugin:
-
-```kotlin
-// beside mavenCentral() in your repositories { }, and in
-// pluginManagement { repositories { } } if you use the plugin
-maven("https://central.sonatype.com/repository/maven-snapshots/")
-```
-
-A snapshot is a moving build of `main` with no stability promise, and Central
-drops snapshots after 90 days. To build one yourself instead,
-`./gradlew publishToMavenLocal` installs the library modules and
-`./gradlew -p tooling/pelican-gradle-plugin publishToMavenLocal` installs the
-plugin into `mavenLocal()`, at a `-SNAPSHOT` of the next version.
+A third backend, on Gannet (`pelican-gannet`, `pelican-gannet-docs`,
+`pelican-test-gannet`), is on `main` and in no release; see
+[Gannet backend](docs/modules.md#gannet-backend).
 
 ## What else a description can say
 
@@ -574,7 +560,7 @@ Every example takes a port with `--args=8081`.
 
 - [The docs index](docs/README.md): every guide, with reading orders for
   evaluating, using and going deeper.
-- [Getting started](#getting-started): installing 1.0.0 and a first endpoint.
+- [Getting started](#getting-started): installing 1.1.0 and a first endpoint.
 - [A whole service, in one file](docs/a-whole-service.md): models, inputs,
   endpoints, handlers, server and docs, compiled on every build.
 - [Cookbook](docs/cookbook.md): complete recipes, roughly in the order you

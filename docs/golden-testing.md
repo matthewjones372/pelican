@@ -20,20 +20,20 @@ on the differences that would break them.
 
 ## Setup
 
-`pelican-test-golden` is in 1.0.0:
+`pelican-test-golden` is released:
 
 ```kotlin
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-golden:1.0.0")
-    testImplementation("io.github.matthewjones372:pelican-jackson:1.0.0") // the Codecs requestsOnly takes
+    testImplementation("io.github.matthewjones372:pelican-test-golden:1.1.0")
+    testImplementation("io.github.matthewjones372:pelican-jackson:1.1.0") // the Codecs requestsOnly takes
 }
 ```
 
 It brings `pelican-test` and `pelican-openapi` and no server library, matcher
 library or test framework. Failures are plain `AssertionError`s, so JUnit,
 Kotest and `kotlin.test` all report them. Recording a response (rather than a
-request) needs an in-memory client from `pelican-test-pekko` (in 1.0.0) or
-`pelican-test-jetty` (on `main`, not yet released).
+request) needs an in-memory client from `pelican-test-pekko` or
+`pelican-test-jetty`.
 
 ## Recording every endpoint
 

@@ -31,10 +31,32 @@ one.
 
 ## Unreleased
 
+### Added
+
+- **`pelican-gannet`** (spec 0088): an `Api` served on
+  [Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
+  io_uring, one carrier thread and ring per core, each connection a fiber on
+  the JDK's internal continuation. Linux 6.1+, JDK 25, experimental, and not
+  published while it depends on a Gannet snapshot.
+  `toHandler`, `start` (taking a `GannetConfig`, TLS included) and the
+  thirteen binders, under the names and types Jetty's have;
+  `pelican-gannet-docs` for the document and its pages, and
+  `pelican-test-gannet` for the typed client over loopback. Handlers run on
+  virtual threads by default; `Handlers.onDispatcher` runs them on the carrier.
+  Every suite in `example/backends/` runs on it as a third backend. It differs
+  from Jetty in one recorded place: a path climbing above the root is a 404, as
+  on Pekko. `example` and `benchmarks` now build on JDK 25 to depend on it.
+  Gannet is `io.github.matthewjones372:gannet:0.1.0-SNAPSHOT`, resolved from
+  Central's snapshot repository.
+
+## [1.1.0] — 2026-10-26
+
 ### Changed
 
-- **Lark is now Surefold** (breaking, for `pelican-streams` and
-  `pelican-streams-jetty`). The library their streams come from was renamed:
+- **Lark is now Surefold** (breaking, for `pelican-streams`). It ships in a
+  minor release rather than waiting for 2.0.0 because `pelican-streams` has no
+  users to break; `pelican-streams-jetty` is new in this release. The library
+  their streams come from was renamed:
   `lark-stream` is `surefold-stream`, and the package
   `io.github.matthewjones372.lark.stream` is
   `io.github.matthewjones372.surefold.stream`. `toStream` and `toOutcome` now
@@ -50,20 +72,6 @@ one.
   JSON and media bodies from them without making a `String`. `body` and the
   new `bytes` each convert from the other on first read. The JDK and in-memory
   transports use it. `ApiClient` also resolves each codec once per client.
-- **`pelican-gannet`** (spec 0088): an `Api` served on
-  [Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
-  io_uring, one carrier thread and ring per core, each connection a fiber on
-  the JDK's internal continuation. Linux 6.1+, JDK 25, experimental.
-  `toHandler`, `start` (taking a `GannetConfig`, TLS included) and the
-  thirteen binders, under the names and types Jetty's have;
-  `pelican-gannet-docs` for the document and its pages, and
-  `pelican-test-gannet` for the typed client over loopback. Handlers run on
-  virtual threads by default; `Handlers.onDispatcher` runs them on the carrier.
-  Every suite in `example/backends/` runs on it as a third backend. It differs
-  from Jetty in one recorded place: a path climbing above the root is a 404, as
-  on Pekko. `example` and `benchmarks` now build on JDK 25 to depend on it.
-  Gannet is `io.github.matthewjones372:gannet:0.1.0-SNAPSHOT`, resolved from
-  Central's snapshot repository.
 - **`BodyCodec.encoded`**: bytes the codec already holds, or null to encode as
   today. Jetty wraps the array. Pekko retains it with
   `ByteString.fromArrayUnsafe`. Jackson and kotlinx do not override it
@@ -1088,6 +1096,7 @@ First published release, on Maven Central.
 - **`pelican-test`** — the descriptions interpreted a third way, as a typed
   client, with `shouldBuild` for pinning the URL a caller holds.
 
-[1.0.0]: https://github.com/matthewjones372/pelican/compare/v0.2.0...HEAD
+[1.1.0]: https://github.com/matthewjones372/pelican/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/matthewjones372/pelican/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/matthewjones372/pelican/releases/tag/v0.2.0
 [0.1.0]: https://github.com/matthewjones372/pelican/releases/tag/v0.1.0

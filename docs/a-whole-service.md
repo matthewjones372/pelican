@@ -23,10 +23,9 @@ dependencies {
 }
 ```
 
-`pelican-bom` and the Jetty modules are on `main` and not yet in a release; for
-1.0.0, use the Pekko dependencies with explicit `:1.0.0` versions from
-[Getting started](../README.md#getting-started). The service changes in three
-places for Pekko, listed [after the code](#on-pekko-instead).
+`pelicanVersion` is the release you pin, `1.1.0`. To run on Pekko HTTP, use
+the Pekko dependencies from [Getting started](../README.md#getting-started);
+the service changes in three places, listed [after the code](#on-pekko-instead).
 
 ```kotlin
 import io.github.matthewjones372.pelican.ApiError
@@ -200,7 +199,7 @@ runs on its own; a real service puts its own data access there.
 
 ## On Pekko instead
 
-On 1.0.0, or on a service that already runs Pekko HTTP, three things change:
+On a service that runs Pekko HTTP, three things change:
 
 - The binder imports: `io.github.matthewjones372.pelican.pekko.handledOrFail`
   and `io.github.matthewjones372.pelican.pekko.streamedNow` in place of the
