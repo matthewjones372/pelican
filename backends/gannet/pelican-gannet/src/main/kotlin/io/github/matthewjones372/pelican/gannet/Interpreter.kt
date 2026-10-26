@@ -283,11 +283,12 @@ private class ReadAhead(private val bytes: ByteArray?, private val failure: Thro
 
 /**
  * Where [this] endpoint runs: on [threads]' executor when it may block before it answers, on a virtual thread when
- * it reads a streamed body and [threads] keeps handlers on the carrier, and on the carrier (null) otherwise.
+ * it reads a streamed body and [threads] keeps handlers on the carrier, and on the carrier (null) otherwise. A
+ * [ServerEndpoint.nonBlocking] handler is taken at its word.
  */
 private fun ServerEndpoint.placedBy(threads: Handlers): Executor? {
     val streamed = endpoint.bodyInput.let { it is RawBody || it is NdjsonBody<*> || it is MultipartBody }
-    val mayBlock = invoke is Synchronous || endpoint.caller != null || streamed
+    val mayBlock = (invoke is Synchronous && !isNonBlocking) || endpoint.caller != null || streamed
     return when {
         threads.executor != null && mayBlock -> threads.executor
         streamed -> OFF_CARRIER

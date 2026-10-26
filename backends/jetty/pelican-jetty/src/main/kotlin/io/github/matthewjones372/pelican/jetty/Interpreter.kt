@@ -69,12 +69,15 @@ fun Api.toHandler(handlers: Handlers = Handlers.default): Handler {
     return Handler.Sequence(answered, PagesHandler(files, cors, loader).onlyFor(Method.GET))
 }
 
-/** [handler] on [threads]' executor, when [endpoint] was bound synchronously and there is one to move to. */
+/**
+ * [handler] on [threads]' executor, when [endpoint] was bound synchronously, not [ServerEndpoint.nonBlocking], and
+ * there is one to move to.
+ */
 private fun ((Params) -> CompletionStage<Any?>).on(
     threads: Handlers,
     endpoint: ServerEndpoint,
 ): (Params) -> CompletionStage<Any?> =
-    if (threads.executor == null || endpoint.invoke !is Synchronous) this
+    if (threads.executor == null || endpoint.invoke !is Synchronous || endpoint.isNonBlocking) this
     else { params -> threads.mayBlock { this(params) } }
 
 /**

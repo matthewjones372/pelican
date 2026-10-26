@@ -85,6 +85,10 @@ private fun page(items: List<DatasetItem>, n: Int, mult: Long): JsonPage {
     return JsonPage(first, first.size)
 }
 
+/** Every endpoint `nonBlocking()` for a `-nonblocking` contestant, which keeps `Handlers.default`. */
+private fun List<ServerEndpoint>.nonBlockingFor(backend: String): List<ServerEndpoint> =
+    if (backend.endsWith("-nonblocking")) map { it.nonBlocking() } else this
+
 private fun arenaApi(bind: List<ServerEndpoint>): Api = api(endpoints = bind, codecs = JacksonCodecs)
 
 /**
@@ -112,36 +116,37 @@ fun main(args: Array<String>) {
             bound = s.port
         }
 
-        "jetty", "jetty-dispatcher" -> {
-            val handlers = if (backend == "jetty") JettyHandlers.default else JettyHandlers.onDispatcher
+        "jetty", "jetty-dispatcher", "jetty-nonblocking" -> {
+            val handlers = if (backend == "jetty-dispatcher") JettyHandlers.onDispatcher else JettyHandlers.default
             val s = arenaApi(
                 listOf(
                     getSum onJetty { (x, y) -> (x + y).toString() },
                     postSum onJetty { (x, y, body) -> (x + y + body).toString() },
                     pipeline onJetty { "ok" },
                     jsonItems onJetty { (n, mult) -> page(items, n, mult) },
-                ),
+                ).nonBlockingFor(backend),
             ).startJetty(port = port, handlers = handlers)
             server = AutoCloseable { s.stop() }
             bound = s.port
         }
 
-        "gannet", "gannet-inline" -> {
-            val handlers = if (backend == "gannet") GannetHandlers.default else GannetHandlers.onDispatcher
+        "gannet", "gannet-inline", "gannet-nonblocking" -> {
+            val handlers = if (backend == "gannet-inline") GannetHandlers.onDispatcher else GannetHandlers.default
             val s = arenaApi(
                 listOf(
                     getSum onGannet { (x, y) -> (x + y).toString() },
                     postSum onGannet { (x, y, body) -> (x + y + body).toString() },
                     pipeline onGannet { "ok" },
                     jsonItems onGannet { (n, mult) -> page(items, n, mult) },
-                ),
+                ).nonBlockingFor(backend),
             ).startGannet(port = port, handlers = handlers)
             server = AutoCloseable { s.stop() }
             bound = s.port
         }
 
         else -> error(
-            "Expected pekko, pekko-dispatcher, jetty, jetty-dispatcher, gannet or gannet-inline, got $backend",
+            "Expected pekko, pekko-dispatcher, jetty, jetty-dispatcher, jetty-nonblocking, gannet, gannet-inline " +
+                "or gannet-nonblocking, got $backend",
         )
     }
     println("ARENA $backend ready port=$bound items=${items.size}")

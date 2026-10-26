@@ -290,6 +290,23 @@ so it is never moved, and neither is a stream's: building a `Sequence` or a
 machine has cores. `BlockingHandlerTest` holds sixteen
 half-second handlers to under two seconds on a two-thread dispatcher.
 
+`nonBlocking()` makes the same choice for one binding instead of the whole
+server (spec 0090, unreleased). The marked handler and its filters run on the
+thread the server called Pelican on (Pekko's dispatcher, Jetty's selector,
+Gannet's carrier), and every other endpoint keeps `handlers`:
+
+```kotlin
+val routes = listOf(
+    (getSum handledNow { (a, b) -> a + b }).nonBlocking(),  // on the server's thread
+    getUser handledNow { id -> Store.user(id) },              // moved, as handlers says
+)
+```
+
+It is a promise nothing checks: **a `nonBlocking()` handler that blocks stalls
+every connection on its core.** An authenticator, and the read of a streamed
+body, are not part of the promise, so a backend that moves them first still
+does. `nonBlocking` stays out of the `Endpoint` and the document.
+
 ### What the request line says
 
 Every backend hands the path, as it arrived, to the same router. `RouteIndex`
@@ -559,8 +576,8 @@ api.start(port = 8080) { health.onlyFor(Method.GET) then toHandler() }
 **Where a handler runs.** Routing, 404s, 405s, preflights, refusals and `…By`
 handlers answer on the carrier, in the connection's fiber. A synchronous
 handler moves to a virtual thread with its filters and authenticator under
-`Handlers.default`, or to the service's executor under `Handlers.on`.
-`Handlers.onDispatcher` runs it inline on the carrier: no hop at all, and a
+`Handlers.default`, or to the service's executor under `Handlers.on`, unless
+it is `nonBlocking()`. `Handlers.onDispatcher` runs it inline on the carrier: no hop at all, and a
 handler that blocks there stalls every connection on that core. Reading a
 streamed upload, and pulling a streamed response's `Sequence`, always happen
 off the carrier. A strict body is read on the carrier, which parks only the

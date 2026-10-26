@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
+import org.junit.jupiter.params.provider.ValueSource
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -69,6 +70,11 @@ class HandlersRunWhereJettyRunsThemTest {
             text()
         }
 
+        private val quick = endpoint {
+            get("quick")
+            text()
+        }
+
         private val gated = endpoint {
             get("gated")
             text()
@@ -91,6 +97,7 @@ class HandlersRunWhereJettyRunsThemTest {
                 refusing handledOrFail { refused(Refusal(thread())) },
                 later handledBy { CompletableFuture.completedFuture(thread()) },
                 carrier handledNow { Thread.currentThread().name },
+                (quick handledNow { Thread.currentThread().name }).nonBlocking(),
                 gated handledNow {
                     together.countDown()
                     if (together.await(GATE_SECONDS, TimeUnit.SECONDS)) "together" else "alone"
@@ -158,6 +165,12 @@ class HandlersRunWhereJettyRunsThemTest {
     @Test
     fun `on the dispatcher a synchronous handler runs on the carrier that read its request`() {
         get("${gannet.getValue("dispatcher").baseUrl}/carrier").join().body() shouldStartWith "gannet-"
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = ["virtual", "mine"])
+    fun `a non-blocking handler runs on the carrier that read its request, whatever the handlers`(handlers: String) {
+        get("${gannet.getValue(handlers).baseUrl}/quick").join().body() shouldStartWith "gannet-"
     }
 
     @Test

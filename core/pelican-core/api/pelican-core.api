@@ -1524,6 +1524,8 @@ public final class io/github/matthewjones372/pelican/ServerEndpoint {
 	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
 	public final fun getFilters ()Ljava/util/List;
 	public final fun getInvoke ()Lkotlin/jvm/functions/Function1;
+	public final fun isNonBlocking ()Z
+	public final fun nonBlocking ()Lio/github/matthewjones372/pelican/ServerEndpoint;
 }
 
 public final class io/github/matthewjones372/pelican/SseOutput : io/github/matthewjones372/pelican/Output {

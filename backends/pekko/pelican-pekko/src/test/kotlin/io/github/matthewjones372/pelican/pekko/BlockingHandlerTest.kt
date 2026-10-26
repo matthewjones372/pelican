@@ -61,6 +61,11 @@ class BlockingHandlerTest {
         text()
     }
 
+    private val quick = endpoint {
+        get("quick")
+        text()
+    }
+
     private val pool = endpoint {
         get("pool")
         text()
@@ -90,6 +95,7 @@ class BlockingHandlerTest {
                 "done"
             },
             where handledNow { if (Thread.currentThread().isVirtual) "virtual" else "platform" },
+            (quick handledNow { if (Thread.currentThread().isVirtual) "virtual" else "platform" }).nonBlocking(),
             refusing handledOrFail
                 { refused(BlockingRefusal(if (Thread.currentThread().isVirtual) "virtual" else "platform")) },
             broken handledNow { error("a bug in the handler") },
@@ -162,6 +168,11 @@ class BlockingHandlerTest {
         } finally {
             server.stop()
         }
+    }
+
+    @Test
+    fun `a non-blocking handler runs where the route matched`() = serving { base ->
+        get("$base/quick").join().body() shouldBe "platform"
     }
 
     @Test

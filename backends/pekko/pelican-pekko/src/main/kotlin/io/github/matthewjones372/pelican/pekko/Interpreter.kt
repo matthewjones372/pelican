@@ -115,13 +115,16 @@ fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handler
 @Deprecated("Binary compatibility only: call toRoute(system, handlers).", level = DeprecationLevel.HIDDEN)
 fun Api.toRoute(system: ClassicActorSystemProvider): Route = toRoute(system, Handlers.default)
 
-/** [handler] on [threads]' executor, when [endpoint] was bound synchronously and there is one to move to. */
+/**
+ * [handler] on [threads]' executor, when [endpoint] was bound synchronously, not [ServerEndpoint.nonBlocking], and
+ * there is one to move to.
+ */
 private fun ((Params) -> CompletionStage<Any?>).on(
     threads: Handlers,
     endpoint: ServerEndpoint,
 ): (Params) -> CompletionStage<Any?> {
     val executor = threads.executor
-    return if (executor == null || endpoint.invoke !is Synchronous) {
+    return if (executor == null || endpoint.invoke !is Synchronous || endpoint.isNonBlocking) {
         this
     } else {
         { params -> CompletableFuture.supplyAsync({ this(params) }, executor).thenCompose { it } }
