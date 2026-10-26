@@ -18,6 +18,7 @@ import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.TextOutput
 import io.github.matthewjones372.pelican.mediaType
+import io.github.matthewjones372.pelican.spi.encodedBytes
 import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.renderError
 import io.github.matthewjones372.pelican.spi.selectedFor
@@ -84,8 +85,10 @@ internal fun buildResponse(
     }
 
     val entity: ResponseEntity = when (out) {
-        is JsonOutput<*> -> finished(ContentTypes.APPLICATION_JSON, payload(), value) { text ->
-            HttpEntities.create(ContentTypes.APPLICATION_JSON, text)
+        // `fromArrayUnsafe` wraps without a copy; the send path only reads the array.
+        is JsonOutput<*> -> {
+            val bytes = payload().encodedBytes(value)
+            HttpEntities.create(ContentTypes.APPLICATION_JSON, ByteString.fromArrayUnsafe(bytes))
         }
 
         is TextOutput -> HttpEntities.create(ContentTypes.TEXT_PLAIN_UTF8, value as String)

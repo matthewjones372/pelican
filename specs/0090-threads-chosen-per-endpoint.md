@@ -83,8 +83,17 @@ decided: A. Reading the body before the hop helps every endpoint, marked or not.
       Measured on this branch, five interleaved rounds: `jetty-nonblocking` 82.0k (65.3–88.4k) against `jetty`'s
       67.1k (64.3–68.2k), +22.2% per round (-4.2..+32.3%); `jetty-dispatcher` 94.2k, +40.5%; `raw-gannet` 294k.
       Jetty's spread is wide: two earlier sessions of the same code measured +12.0% and +7.3%.
-- [ ] **`spec-0090-encode`**: `BodyCodec.encodeTo(value, sink)`, which takes over spec 0085's encode entry.
-      Done when: measured on `json` (`gannet-encode` contestant), kept only if faster.
+- [x] **`spec-0090-encode`**: `BodyCodec.encodeTo(value, sink)`, which takes over spec 0085's encode entry.
+      Done when: measured on `json` against its parent, kept only if faster.
+      `BodySink` is core's (decision 6). Gannet's `respond` takes a `byte[]`, so every backend gathers a `json<T>()`
+      success through `spi.encodedBytes` into one array, sized exactly up to 32 KiB; `JacksonCodecs` streams its
+      UTF-8 buffer into it, with surrogate pairs combined so the bytes do not change. A lone surrogate, which the
+      String's UTF-8 wrote as `?`, is now escaped. JMH (`EncodeBenchmark`, 50 items): 13.3 µs and 20.0 KB against
+      14.1 µs and 20.2 KB through the String; into a buffer already there, as a backend's would be, 11.1 µs and 3.7 KB.
+      `json`, five interleaved rounds against `spec-0090-jetty-pool`: `gannet` 57.6k from 51.5k (+11.6% per round,
+      +7.3..+14.8%), `gannet-inline` 75.4k from 73.2k (+2.9%), `jetty` 30.4k from 27.6k (+10.2%), `pekko` 21.9k
+      from 20.1k (+3.9%); `raw-gannet` 284k on `baseline`. Writing into Gannet's own buffer wants a `respond` that
+      takes a writer: a Gannet change, not made here.
 
 Predicted, on top of spec 0089: `-carrier-body` default ~130k; `-nonblocking` any
 endpoint so marked ~245k on Gannet, and on Jetty what `jetty-dispatcher` measured
@@ -103,7 +112,7 @@ Same machine, same day, each contestant warmed 10 s and measured 10 s, median of
 ```bash
 ./gradlew build
 benchmarks/arena.sh baseline raw-gannet gannet-inline gannet gannet-nonblocking jetty jetty-nonblocking
-benchmarks/arena.sh json gannet gannet-encode
+benchmarks/arena.sh json gannet gannet-inline   # against the parent build, interleaved
 ```
 
 - `gannet` (default threads) ≥ 130k.

@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.jackson
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.core.JacksonException
+import com.fasterxml.jackson.core.json.JsonWriteFeature
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonMapperBuilder
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.BodyDecodeFailure
+import io.github.matthewjones372.pelican.BodySink
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.JsonArr
 import io.github.matthewjones372.pelican.JsonBool
@@ -24,6 +26,7 @@ import io.github.matthewjones372.pelican.withNullabilityOf
 import io.swagger.v3.core.converter.AnnotatedType
 import io.swagger.v3.core.converter.ModelConverters
 import io.swagger.v3.oas.models.media.Schema
+import java.io.OutputStream
 import kotlin.reflect.KType
 import kotlin.reflect.jvm.javaType
 import io.swagger.v3.core.util.Json31 as SwaggerJson31
@@ -66,12 +69,18 @@ class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
         // and a codec is built when the Api is assembled and used for the life
         // of the service.
         val reader = mapper.readerFor(javaType)
+        // A character outside the BMP as its four UTF-8 bytes, as encodeToString's String carries it, not as two
+        // escaped surrogates: the bytes on the wire stay what they were (spec 0090).
+        val streaming = writer.with(JsonWriteFeature.COMBINE_UNICODE_SURROGATES_IN_UTF8)
         return object : BodyCodec<T> {
             override fun encodeToString(value: T): String = writer.writeValueAsString(value)
             override fun decodeFromString(text: String): T = reader.readValue(text)
 
             /** `UTF8StreamJsonParser` rather than the char-based reader, on the bytes as they arrived. */
             override fun decodeFrom(bytes: ByteArray): T = reader.readValue(bytes)
+
+            /** `UTF8JsonGenerator`, flushing its own buffer into [sink]: no String, and no copy of it. */
+            override fun encodeTo(value: T, sink: BodySink) = streaming.writeValue(SinkStream(sink), value)
         }
     }
 
@@ -177,4 +186,11 @@ private fun JsonNode.toJsonValue(drop: String? = null): JsonValue = when {
     isNumber -> JsonNum(doubleValue())
 
     else -> JsonNull
+}
+
+/** [BodySink] as the stream Jackson writes to; Jackson closes it when done, which here is nothing to do. */
+private class SinkStream(private val sink: BodySink) : OutputStream() {
+    override fun write(b: Int) = sink.write(byteArrayOf(b.toByte()), 0, 1)
+
+    override fun write(b: ByteArray, off: Int, len: Int) = sink.write(b, off, len)
 }

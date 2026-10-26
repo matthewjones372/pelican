@@ -23,6 +23,20 @@ interface BodyCodec<T> {
 
     /** Bytes this codec already holds, or null to encode as today. The server does not modify the array. */
     fun encoded(value: T): ByteArray? = null
+
+    /**
+     * [value] written into [sink], a backend's output buffer, with no String between (spec 0090). The default
+     * writes [encoded] or [encodeToString]'s UTF-8 in one call; a JSON codec that streams overrides it.
+     */
+    fun encodeTo(value: T, sink: BodySink) {
+        val bytes = encoded(value) ?: encodeToString(value).toByteArray(StandardCharsets.UTF_8)
+        sink.write(bytes, 0, bytes.size)
+    }
+}
+
+/** Where [BodyCodec.encodeTo] writes. Called any number of times, it copies the bytes before it returns. */
+fun interface BodySink {
+    fun write(bytes: ByteArray, offset: Int, length: Int)
 }
 
 /**

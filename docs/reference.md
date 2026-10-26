@@ -639,7 +639,9 @@ interface BodyCodec<T> {
     fun encodeToString(value: T): String
     fun decodeFromString(text: String): T
     fun encoded(value: T): ByteArray? = null
+    fun encodeTo(value: T, sink: BodySink)  // defaults to encodeToString's UTF-8
 }
+fun interface BodySink { fun write(bytes: ByteArray, offset: Int, length: Int) }
 interface CodecFactory   { fun <T> codec(type: KType): BodyCodec<T> }
 interface SchemaSource   { fun schema(type: KType, components: SchemaComponents): JsonObj }
 interface Codecs : CodecFactory, SchemaSource
@@ -647,6 +649,13 @@ interface Codecs : CodecFactory, SchemaSource
 
 `SchemaSource` is deliberately narrower than `Codecs`: generating documentation
 must not require a codec that can actually serialise anything.
+
+Every backend writes a `json<T>()` success through `encodeTo` (spec 0090,
+unreleased), so `JacksonCodecs` streams UTF-8 from its own buffer with no
+`String` between. A codec of your own needs nothing new: the default writes
+`encodeToString`'s bytes. The bytes are the same either way, with one
+exception: a lone surrogate, which a `String`'s UTF-8 writes as `?`, is escaped
+as `\uD83D` and reads back as it was.
 
 Codecs are resolved **once per endpoint when the route is built**, never per
 request: `KType` → `JavaType` reflection is not cheap. It also means a missing
