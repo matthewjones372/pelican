@@ -234,7 +234,9 @@ class HandlersRunWherePekkoRunsThemTest {
     fun `by default a non-blocking handler stays on the thread jetty called it on`() {
         val expected = if (JettyPool.configured() == JettyPool.QUEUED) "platform" else "virtual"
         get("${jetty.getValue("virtual").baseUrl}/quick").join().body() shouldBe expected
-        get("${jetty.getValue("virtual").baseUrl}/where").join().body() shouldBe "virtual"
+        // A synchronous handler still hops: to a virtual thread from JDK 24, to Pelican's platform pool below it.
+        val hopped = if (byDefault() == "virtual") "virtual" else "platform"
+        get("${jetty.getValue("virtual").baseUrl}/where").join().body() shouldBe hopped
     }
 
     @Test
