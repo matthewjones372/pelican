@@ -4,17 +4,17 @@ The guides here are grouped by what you are trying to do: decide whether
 Pelican fits, use it, understand it in depth, or work with one specialised
 feature.
 
-**What is released.** The current release is 1.0.0, with Pekko HTTP as the
-backend and Jackson as the codec. The [cookbook](cookbook.md) and several other
-guides are written against `main`, so their dependency blocks use
-`pelican-bom` and the Jetty modules, which are not yet in a release. On 1.0.0,
-use the Pekko equivalents (`pelican-pekko`, `pelican-pekko-docs`,
-`pelican-test-pekko`) with explicit `:1.0.0` versions and the Pekko
-dependencies your service names itself, as the
-[README's Getting started](../README.md#getting-started) and the cookbook's
+**What is released.** The current release is 1.1.0, with Pekko HTTP and
+Jetty 12 as backends and Jackson and kotlinx.serialization as codecs. The
+[cookbook](cookbook.md) and several other guides are written against Jetty, so
+their dependency blocks use `pelican-bom` and the Jetty modules. On Pekko, use
+the Pekko equivalents (`pelican-pekko`, `pelican-pekko-docs`,
+`pelican-test-pekko`) and the Pekko dependencies your service names itself, as
+the [README's Getting started](../README.md#getting-started) and the cookbook's
 [On Pekko](cookbook.md#on-pekko) show. Every binder has the same name in
 `io.github.matthewjones372.pelican.pekko`; only a streaming handler changes, to
-a Pekko `Source` where Jetty takes a `Sequence`.
+a Pekko `Source` where Jetty takes a `Sequence`. The Gannet backend is on `main`
+and in no release; see [Modules](modules.md#gannet-backend).
 
 ## Evaluating it
 
@@ -30,7 +30,7 @@ a Pekko `Source` where Jetty takes a `Sequence`.
 ## Using it
 
 1. [Getting started](../README.md#getting-started) in the README: installing
-   1.0.0 and a first endpoint.
+   1.1.0 and a first endpoint.
 2. [Cookbook](cookbook.md): complete recipes, one problem each, roughly in the
    order you need them.
 3. [Modules](modules.md): every module, what it brings with it, and the

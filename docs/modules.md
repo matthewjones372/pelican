@@ -3,9 +3,9 @@
 Which modules a build needs, what each one brings with it, and which are in a
 release. Coordinates are `io.github.matthewjones372:<module>`.
 
-The current release is 1.0.0. Modules marked **main only** are built and tested
-on `main` but are in no release yet; to try them, see
-[Jetty, kotlinx and the BOM](../README.md#jetty-kotlinx-and-the-bom-on-main-not-yet-released).
+The current release is 1.1.0. The Availability column gives the first release
+a module is in. Modules marked **main only** are built and tested on `main` but
+are in no release: the three modules of the [Gannet backend](#gannet-backend).
 
 ## Choosing modules
 
@@ -26,7 +26,7 @@ modules it is built on; you declare the leaves, not the tree.
 
 ### Minimum sets for common setups
 
-| Setup | Modules (1.0.0) |
+| Setup | Modules |
 |---|---|
 | Descriptions only, no server | `pelican-core`, plus `pelican-jackson` once a body is JSON |
 | The OpenAPI document in a build task | `pelican-openapi` and a codec; no backend |
@@ -38,18 +38,18 @@ modules it is built on; you declare the leaves, not the tree.
 | MCP tools over HTTP | add `pelican-pekko-mcp` (brings `pelican-mcp-server`, `pelican-mcp`, `pelican-schema`) |
 | MCP tools over stdio | `pelican-mcp-server` and a codec; no backend |
 
-On `main`, swap the Pekko modules for their Jetty counterparts (`pelican-jetty`,
+For a service on Jetty, swap the Pekko modules for their Jetty counterparts (`pelican-jetty`,
 `pelican-jetty-docs`, `pelican-test-jetty`, `pelican-client-jetty`,
 `pelican-jetty-mcp`) and drop the Pekko lines.
 
-### A minimal 1.0.0 build
+### A minimal build
 
 Pelican compiles against Pekko but ships none of it, so the build names the
 Scala cross-build it runs (`_2.13` or `_3`, the same on every Pekko line):
 
 ```kotlin
 // build.gradle.kts
-val pelicanVersion = "1.0.0"
+val pelicanVersion = "1.1.0"
 
 dependencies {
     implementation("io.github.matthewjones372:pelican-pekko:$pelicanVersion")
@@ -76,14 +76,11 @@ An optional module is one more line with the same version:
 Every Pelican module in a build should be the same version. There are two ways
 to get that.
 
-**On 1.0.0: one variable.** `pelican-bom` is not in 1.0.0. Write the version
-once, as `val pelicanVersion = "1.0.0"` above, and use it on every Pelican
-coordinate.
+**One variable.** Write the version once, as `val pelicanVersion = "1.1.0"`
+above, and use it on every Pelican coordinate.
 
-**On `main`: `pelican-bom`** (main only, published as `1.0.1-SNAPSHOT` to
-Central's snapshot repository). It is a Gradle `java-platform` with no
-dependencies of its own, only a version constraint for each of the 33 library
-modules:
+**`pelican-bom`.** It is a Gradle `java-platform` with no dependencies of its
+own, only a version constraint for each of the 31 library modules:
 
 ```kotlin
 dependencies {
@@ -145,7 +142,7 @@ server.
 | Module | Availability | Depends on | Provides |
 |---|---|---|---|
 | `pelican-jackson` | 1.0.0 | core, `jackson-module-kotlin`, `jackson-datatype-jsr310`; `swagger-core` (implementation) | `JacksonCodecs`: bodies, and the schemas the document derives |
-| `pelican-kotlinx` | main only | core, `kotlinx-serialization-json` 1.11.0 | `KotlinxCodecs`, for `@Serializable` payloads |
+| `pelican-kotlinx` | 1.1.0 | core, `kotlinx-serialization-json` 1.11.0 | `KotlinxCodecs`, for `@Serializable` payloads |
 
 Both write the same schemas for tagged failures and `oneOf`, and both are in
 the codec agreement matrix. Choose by the annotations your model already
@@ -181,12 +178,12 @@ since it has no cross-build to choose.
 
 | Module | Availability | Depends on | Provides |
 |---|---|---|---|
-| `pelican-jetty` | main only | core, `jetty-server` 12.1.13, `slf4j-api` | descriptions to a Jetty `Handler` (`toHandler`), and `start` to serve it |
-| `pelican-jetty-docs` | main only | jetty, openapi | the document and a Swagger UI or Redoc page and a Redoc or RapiDoc reference beside it, as a `Handler` |
-| `pelican-jetty-mcp` | main only | jetty, mcp-server | MCP tools over Streamable HTTP on `/mcp`, as a `Handler` |
-| `pelican-test-jetty` | main only | jetty, test | `inMemory(handlers)` through a `LocalConnector`: no socket, but Jetty's own HTTP parsing |
-| `pelican-client-jetty` | main only | core, `jetty-client` | a generated client's transport over Jetty's `HttpClient`. No server |
-| `pelican-streams-jetty` | main only | jetty; `surefold-stream` *provided* | a streamed upload as a surefold `Stream`; runs on any surefold backend. Java 25, as surefold is |
+| `pelican-jetty` | 1.1.0 | core, `jetty-server` 12.1.13, `slf4j-api` | descriptions to a Jetty `Handler` (`toHandler`), and `start` to serve it |
+| `pelican-jetty-docs` | 1.1.0 | jetty, openapi | the document and a Swagger UI or Redoc page and a Redoc or RapiDoc reference beside it, as a `Handler` |
+| `pelican-jetty-mcp` | 1.1.0 | jetty, mcp-server | MCP tools over Streamable HTTP on `/mcp`, as a `Handler` |
+| `pelican-test-jetty` | 1.1.0 | jetty, test | `inMemory(handlers)` through a `LocalConnector`: no socket, but Jetty's own HTTP parsing |
+| `pelican-client-jetty` | 1.1.0 | core, `jetty-client` | a generated client's transport over Jetty's `HttpClient`. No server |
+| `pelican-streams-jetty` | 1.1.0 | jetty; `surefold-stream` *provided* | a streamed upload as a surefold `Stream`; runs on any surefold backend. Java 25, as surefold is |
 
 Typical stack: `pelican-bom`, `pelican-jetty`, `pelican-jackson` or
 `pelican-kotlinx`, `pelican-jetty-docs`, and `pelican-test-jetty` for tests.
@@ -251,7 +248,7 @@ not acquire the OpenTelemetry API, and the reverse.
 | `pelican-codegen` | 1.0.0 | core | descriptions to a Kotlin client, as source |
 | `pelican-import` | 1.0.0 | codegen, `snakeyaml-engine` | an OpenAPI document to descriptions and handler stubs, as source |
 | Gradle plugin `io.github.matthewjones372.pelican` | 1.0.0 | nothing on your classpath | every generator as Gradle tasks: clients, documents, endpoints |
-| `pelican-bom` | main only | nothing | version constraints for the 33 library modules; see [above](#version-alignment-and-the-bom) |
+| `pelican-bom` | 1.1.0 | nothing | version constraints for the 31 library modules; see [above](#version-alignment-and-the-bom) |
 
 Most builds use the generators through the plugin rather than declaring
 `pelican-codegen` or `pelican-import`. The plugin is on Maven Central, not the

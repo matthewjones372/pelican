@@ -22,8 +22,8 @@ that described it then refuses.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-schema:1.0.0")
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
+    implementation("io.github.matthewjones372:pelican-schema:1.1.0")
+    implementation("io.github.matthewjones372:pelican-jackson:1.1.0")
 }
 ```
 
@@ -130,8 +130,8 @@ not, so it is removed from every schema in `$defs`. `{"const": "card"}` is
 
 The property and the value are read from the source's `discriminator`, never
 derived. With `JacksonCodecs` they are `@JsonTypeInfo(property = ...)` and
-`@JsonSubTypes.Type(name = ...)`, as above. `pelican-kotlinx` (on `main` only,
-not yet released) writes the same `oneOf` and `discriminator`, from
+`@JsonSubTypes.Type(name = ...)`, as above. `pelican-kotlinx` writes the
+same `oneOf` and `discriminator`, from
 `@JsonClassDiscriminator` or its `Json`'s class discriminator and each
 branch's serial name, so the same pass covers it.
 

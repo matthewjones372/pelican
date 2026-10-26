@@ -20,11 +20,11 @@ set the spec is compiled in needs `pelican-codegen` as a dependency:
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.1.0" }
 
 dependencies {
-    implementation("io.github.matthewjones372:pelican-core:1.0.0")
-    implementation("io.github.matthewjones372:pelican-codegen:1.0.0") // what the generate task calls
+    implementation("io.github.matthewjones372:pelican-core:1.1.0")
+    implementation("io.github.matthewjones372:pelican-codegen:1.1.0") // what the generate task calls
 }
 
 pelican {
@@ -222,8 +222,7 @@ reads and writes them. `codec` decides which annotations the file carries:
   kotlinx.serialization has no reflective fallback, and a union also carries
   `@JsonClassDiscriminator` and `@SerialName`. The calling build needs the
   `org.jetbrains.kotlin.plugin.serialization` compiler plugin and
-  `kotlinx-serialization-json`. `pelican-kotlinx`, the matching `Codecs`, is on
-  `main` and not yet released.
+  `kotlinx-serialization-json`. `pelican-kotlinx` is the matching `Codecs`.
 
 Choose the library whose `Codecs` the caller will pass. `endpoints` entries
 take the same setting; see [docs/importing.md](importing.md).
@@ -239,10 +238,9 @@ To compile and run, the generated file needs:
 - **A `ClientTransport`**: one adapter module, or your own implementation.
   See [Where the requests go](#where-the-requests-go).
 - **`kotlinx-coroutines-core`**, only for a `suspending` client.
-- **A JDK and Kotlin compiler that can read Pelican's jars.** The 1.0.0
-  library modules are compiled to JDK 25 bytecode with Kotlin 2.4.20, so the
-  caller runs on JDK 25 or newer. On `main`, not yet released, the floor is
-  JDK 21. Pelican is not tested with older Kotlin
+- **A JDK and Kotlin compiler that can read Pelican's jars.** The modules a
+  client needs are compiled to JDK 21 bytecode with Kotlin 2.4.21, so the
+  caller runs on JDK 21 or newer. Pelican is not tested with older Kotlin
   compilers.
 
 The generated file itself only uses the Kotlin standard library, the JDK and
@@ -280,16 +278,16 @@ refuses to choose, and you pass one explicitly.
 
 | Adapter | Status | Constructor |
 |---|---|---|
-| `pelican-client-pekko` | in 1.0.0 | `PekkoHttpTransport(system)` sends on an actor system you already run; `PekkoHttpTransport()` uses one the module starts on first use (daemonic). |
-| `pelican-client-jetty` | on `main`, not yet released | `JettyHttpTransport(httpClient)` borrows a Jetty `HttpClient` you own; `JettyHttpTransport()` starts its own on the first request and stops it on `close()`. |
-| `InMemoryClientTransport(api)` | in 1.0.0, in `pelican-core` | Calls an `Api` in the same process; see [Calling it without a socket](#calling-it-without-a-socket). |
+| `pelican-client-pekko` | released | `PekkoHttpTransport(system)` sends on an actor system you already run; `PekkoHttpTransport()` uses one the module starts on first use (daemonic). |
+| `pelican-client-jetty` | released | `JettyHttpTransport(httpClient)` borrows a Jetty `HttpClient` you own; `JettyHttpTransport()` starts its own on the first request and stops it on `close()`. |
+| `InMemoryClientTransport(api)` | released, in `pelican-core` | Calls an `Api` in the same process; see [Calling it without a socket](#calling-it-without-a-socket). |
 
 `pelican-client-pekko` declares Pekko as `compileOnly`, so the calling build
 declares it, with the Scala suffix it uses:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0")
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.1.0")
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
