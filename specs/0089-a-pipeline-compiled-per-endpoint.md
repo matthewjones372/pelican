@@ -132,8 +132,16 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
       itself, but hands `/items/x/..` over unresolved. Measured against `-strict-utf8`, six interleaved rounds:
       `jetty` 75.9k from 73.8k (+4.2% per round, -1.4..+19.8%), `jetty-dispatcher` 104k from 91k (+14.4%, +7.9..+47.9%);
       4.7 KB a request from 6.3–6.4 (`jetty`), 3.4 KB from 5.2–5.8 (`jetty-dispatcher`); `gannet-inline` unchanged.
-- [ ] **`spec-0089-pekko`**: Pekko on the view and plan, its copies deleted.
+- [x] **`spec-0089-pekko`**: Pekko on the view and plan, its copies deleted.
       Done when: its parity suite passes.
+      Its raw path is still Pekko's parsed path rendered back out (`getPathString`): the request line itself reaches a
+      route only through the `Raw-Request-URI` header, a server setting this entry leaves alone. Its parser still
+      refuses `?q=%zz` in its own words (`ILLEGAL_ESCAPES_IN_QUERY`). `refuseIllegalQuery` is now internal to core,
+      where only the in-memory client calls it. An answer already made is `complete`d as a value, not handed to
+      `completeWithFuture`. Measured against `main`, five interleaved rounds: `pekko` 20.0k from 17.2k (+10.8% per
+      round, +3.9..+39.8%), `pekko-dispatcher` 23.9k from 23.9k (-0.1%, -5.0..+3.3%); 15.3–15.5 KB a request from
+      16.7 (`pekko`), 13.3–13.6 from 14.6–14.9 (`pekko-dispatcher`), most of the rest Pekko's `toStrict`;
+      `gannet-inline` and `jetty` unchanged.
 - [x] **`spec-0089-success`**: a completed stage answered without chaining; reply headers built once.
       Done when: the success path allocates at most two objects of its own (JMH).
       On Gannet; Jetty and Pekko take `spi.succeeded()` with their own entries. Only a plain `CompletableFuture`
