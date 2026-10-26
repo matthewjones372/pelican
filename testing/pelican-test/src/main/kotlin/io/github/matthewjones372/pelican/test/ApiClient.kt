@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican.test
 
+import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.ByteStreamHandle
 import io.github.matthewjones372.pelican.ByteStreamOutput
 import io.github.matthewjones372.pelican.Codecs
@@ -38,6 +39,7 @@ import io.github.matthewjones372.pelican.mediaType
 import io.github.matthewjones372.pelican.payloadType
 import io.github.matthewjones372.pelican.spi.tagIn
 import io.github.matthewjones372.pelican.text
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.KTypeProjection
@@ -75,6 +77,22 @@ class ApiClient(
      * would widen three signatures for the one endpoint that declares a choice.
      */
     fun sending(mediaType: String): ApiClient = ApiClient(transport, codecs, mediaType)
+
+    // Resolved once per type: `JacksonCodecs.codec` builds a reader and a writer each time it is asked.
+    private val byType = ConcurrentHashMap<KType, BodyCodec<Any?>>()
+    private val byMedia = ConcurrentHashMap<Pair<KType, String>, BodyCodec<Any?>>()
+    private val forms = ConcurrentHashMap<KType, BodyCodec<Any?>>()
+
+    private fun codecFor(type: KType): BodyCodec<Any?> =
+        byType[type] ?: byType.computeIfAbsent(type) { codecs.codec(it) }
+
+    private fun codecFor(type: KType, mediaType: String): BodyCodec<Any?> =
+        (type to mediaType).let { key ->
+            byMedia[key] ?: byMedia.computeIfAbsent(key) { codecs.codec(type, mediaType) }
+        }
+
+    private fun formCodecFor(type: KType): BodyCodec<Any?> =
+        forms[type] ?: forms.computeIfAbsent(type) { codecs.formCodec(it) }
 
     /**
      * Builds the request an endpoint call would send, without sending it.
@@ -124,13 +142,13 @@ class ApiClient(
 
             // Left to the transport, which sends application/json by default.
             is JsonBody<*> -> Payload(
-                codecs.codec<Any?>(input.type).encodeToString(
+                codecFor(input.type).encodeToString(
                     values[input] ?: error("No body supplied for $endpoint"),
                 ),
             )
 
             is FormBody<*> -> Payload(
-                codecs.formCodec<Any?>(input.type).encodeToString(
+                formCodecFor(input.type).encodeToString(
                     values[input] ?: error("No body supplied for $endpoint"),
                 ),
                 "application/x-www-form-urlencoded",
@@ -145,8 +163,8 @@ class ApiClient(
                     ?: input.alternatives.first()
                 val value = values[input] ?: error("No body supplied for $endpoint")
                 val text = when (chosen) {
-                    is FormBody<*> -> codecs.formCodec<Any?>(chosen.type).encodeToString(value)
-                    else -> codecs.codec<Any?>(checkNotNull(chosen.payloadType)).encodeToString(value)
+                    is FormBody<*> -> formCodecFor(chosen.type).encodeToString(value)
+                    else -> codecFor(checkNotNull(chosen.payloadType)).encodeToString(value)
                 }
                 Payload(text, chosen.mediaType)
             }
@@ -167,7 +185,7 @@ class ApiClient(
             // tests are where that claim is made, over a socket.
             is NdjsonBody<*> -> when (val frames = values[input]) {
                 is BufferedFrames<*> -> Payload(
-                    frames.values.joinToString("") { codecs.codec<Any?>(input.type).encodeToString(it) + "\n" },
+                    frames.values.joinToString("") { codecFor(input.type).encodeToString(it) + "\n" },
                     "application/x-ndjson",
                 )
 
@@ -282,7 +300,7 @@ class ApiClient(
         return when {
             declared != null -> Outcome.Err(
                 declared,
-                codecs.codec<Any?>(declared.type, declared.mediaType).decodeFromString(res.body) as E,
+                codecFor(declared.type, declared.mediaType).decodeFromString(res.body) as E,
                 declared.headers.mapNotNull { h -> res.header(h.name)?.let { h.name to it } },
             )
 
@@ -325,14 +343,14 @@ class ApiClient(
 
     private fun decodeSuccess(endpoint: Endpoint<*, *>, out: Output<*>, res: ResponseSpec): Any? =
         when (out) {
-            is JsonOutput<*> -> codecs.codec<Any?>(out.type).decodeFromString(res.body)
+            is JsonOutput<*> -> codecFor(out.type).decodeFromString(res.body)
 
             is TextOutput -> res.body
 
             // Read back by the same media type it was written as, which is the
             // one thing a `Codecs` answering that type has to be able to do
             // for a test to assert on the value rather than on the bytes.
-            is MediaOutput<*> -> codecs.codec<Any?>(out.type, out.mediaType).decodeFromString(res.body)
+            is MediaOutput<*> -> codecFor(out.type, out.mediaType).decodeFromString(res.body)
 
             // This client names no `Accept`, so the server sends the first
             // rendering. Which one it sent is on the response, and that is what
@@ -420,7 +438,7 @@ class ApiClient(
 
             // The whole body is one JSON array, so the codec reads List<T>.
             is JsonArrayOutput<*> ->
-                codecs.codec<List<Any?>>(listTypeOf(out.type)).decodeFromString(res.body)
+                codecFor(listTypeOf(out.type)).decodeFromString(res.body) as List<*>
 
             else -> error("$endpoint does not stream; use call(...) rather than collect(...)")
         }
@@ -431,7 +449,7 @@ class ApiClient(
     }
 
     private fun decodeElement(type: KType, text: String): Any? =
-        codecs.codec<Any?>(type).decodeFromString(text)
+        codecFor(type).decodeFromString(text)
 }
 
 /**

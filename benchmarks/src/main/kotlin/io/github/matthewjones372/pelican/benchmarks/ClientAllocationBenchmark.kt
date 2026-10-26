@@ -179,7 +179,7 @@ open class ClientAllocationBenchmark {
         return listCodec.decodeFrom(listBytes)
     }
 
-    /** As above, with the codec looked up per call, as `ApiClient.decodeSuccess` does. */
+    /** As above, with the codec looked up per call: what a client that caches nothing pays. */
     @Benchmark
     fun inMemoryListCodecPerCall(): List<Pet> {
         canned.request(listPets, pets)
