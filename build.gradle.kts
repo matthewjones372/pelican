@@ -194,14 +194,18 @@ tasks.named("check") {
 }
 
 /**
- * Every module but the example, the benchmarks and the Gannet backend is
- * published. The example is a runnable service and a test suite, and the
- * benchmarks are a JMH harness; nobody should be able to depend on either by
- * accident. The Gannet modules are experimental and on main only: they depend
- * on a Gannet snapshot, which a release must not.
+ * Every module but the example, the benchmarks, the Gannet backend and the
+ * streams modules is published. The example is a runnable service and a test
+ * suite, and the benchmarks are a JMH harness; nobody should be able to depend
+ * on either by accident. The Gannet modules depend on a Gannet snapshot and the
+ * streams modules on a surefold-stream one, which a release must not.
  */
 val publishedModules = subprojects.map { it.name } -
-    setOf("example", "benchmarks", "pelican-gannet", "pelican-gannet-docs", "pelican-test-gannet")
+    setOf(
+        "example", "benchmarks",
+        "pelican-gannet", "pelican-gannet-docs", "pelican-test-gannet",
+        "pelican-streams", "pelican-streams-jetty",
+    )
 
 // What `pelican-bom` constrains, so a new module is in it without an edit there.
 extra["libraryModules"] = publishedModules - "pelican-bom"

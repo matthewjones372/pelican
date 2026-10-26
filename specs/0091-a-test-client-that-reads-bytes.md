@@ -74,7 +74,8 @@ cache if `ShopCodecs` does not already cache.
 - [x] **`spec-0091-codec-once`** ([#356](https://github.com/matthewjones372/pelican/pull/356)):
       `ApiClient` resolves a codec once per type and media type.
       Done when: the `inMemoryCall` rows fall by the per-call codec row's excess over the held-codec row.
-- [ ] **`spec-0091-bytes`**: `ResponseSpec(bytes)`, decoding from it, the transports, `.api`, docs, changelog.
+- [x] **`spec-0091-bytes`** ([#357](https://github.com/matthewjones372/pelican/pull/357)):
+      `ResponseSpec(bytes)`, decoding from it, the transports, `.api`, docs, changelog.
       Done when: a bytes-built response decodes without reading `body`.
 
 ## Acceptance

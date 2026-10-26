@@ -41,7 +41,9 @@ one.
   take and return Surefold's `Stream`, so the two `.api` dumps change, and a
   consumer names `surefold-stream` and a Surefold backend in place of the lark
   ones. Both modules build against `surefold-stream` 0.11.1-SNAPSHOT until
-  Surefold's first release.
+  Surefold's first release, and until then neither is published: a release
+  carries no module built on a snapshot, so `pelican-streams` stays at 1.0.0
+  on Central.
 
 ### Added
 
