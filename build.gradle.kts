@@ -210,6 +210,10 @@ subprojects {
     group = "io.github.matthewjones372"
     version = scmVer
 
+    // Gannet's snapshot is the only changing module, and it is republished by hand. Gradle's 24-hour cache, restored
+    // in CI, would otherwise compile against the snapshot before the one just published.
+    configurations.configureEach { resolutionStrategy.cacheChangingModulesFor(0, "seconds") }
+
     if (name in publishedModules) publishWithPom()
     // A `java-platform` has no sources, so none of what follows applies to it.
     if (name == "pelican-bom") return@subprojects
