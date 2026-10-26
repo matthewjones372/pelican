@@ -80,14 +80,14 @@ is a pre-encoded-response SPI each backend writes raw; faster on replay, three w
 ./gradlew spotlessApply && ./gradlew build   # parity suite, goldens, checkOrdersClient, ImportedOrdersTest
 ```
 
-## Open questions
+## Decisions
 
-1. **Which failures does a key store?** Recommended: declared successes and declared failures; a throw (500) releases,
-   so a retry runs the handler again. Stripe stores 500s too, which stops a retry fixing a transient fault.
-2. **Typed failures in the generated client?** Recommended: the 409 and 422 are documented responses and reach a
-   caller as `ApiCallFailed`, so no endpoint's `E` grows a type its handler never returns. The alternative is
-   `orFail(idempotency.conflict)`, typed on the `Err` side, at the cost of every handler's signature.
-3. **Statuses.** Recommended: 422 for a reused key with a new body and 409 while in flight, as the IETF
-   `Idempotency-Key` draft says. An endpoint that already declares its own 409 or 422 gets tagged failures (spec 0063).
-4. **Store calls block?** Recommended: yes, like `Authenticator`; under `Handlers.default` they run on a virtual
-   thread, and a keyed endpoint marked `nonBlocking()` is refused at build time.
+Matt took each recommendation on 2026-10-26.
+
+1. **A throw releases.** Declared successes and declared failures are stored; an undeclared throw (500) releases the
+   reservation, so a retry runs the handler again.
+2. **Documented, not typed.** The 409 and 422 are documented responses and reach a generated client as
+   `ApiCallFailed`; no endpoint's `E` grows a type its handler never returns.
+3. **422 for a reused key with a new body, 409 while in flight**, as the IETF `Idempotency-Key` draft says. An endpoint
+   that declares its own 409 or 422 gets tagged failures (spec 0063).
+4. **Store calls block**, like `Authenticator`. A keyed endpoint marked `nonBlocking()` is refused at build time.
