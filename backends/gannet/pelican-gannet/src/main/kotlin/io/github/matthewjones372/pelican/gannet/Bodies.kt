@@ -35,13 +35,17 @@ fun ByteStreamHandle.toSequence(): Sequence<ByteArray> {
  * the 413 goes down a connection that is still whole. On the carrier the read parks only the connection's fiber.
  * A read that outlives [Api.strictBodyTimeoutMillis] is failed by the sweeper, which wakes it.
  */
-internal fun readStrictBody(request: HttpRequest, api: Api, codec: RequestBodyCodecs): Any? {
+internal fun readStrictBody(request: HttpRequest, api: Api, codec: RequestBodyCodecs): Any? =
+    codec.decode(request.headers[CONTENT_TYPE], readStrictBytes(request, api))
+
+/** [readStrictBody]'s read, undecoded. */
+internal fun readStrictBytes(request: HttpRequest, api: Api): ByteArray {
     val body = request.body
     val declared = body.length
     if (declared != null && declared > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
 
     val deadline = DEADLINES.arm(body, api.strictBodyTimeoutMillis)
-    val bytes = try {
+    return try {
         body.readAll(api.maxBodyBytes)
     } catch (e: BodyTooLargeException) {
         throw PayloadTooLarge(api.maxBodyBytes).apply { addSuppressed(e) }
@@ -60,7 +64,6 @@ internal fun readStrictBody(request: HttpRequest, api: Api, codec: RequestBodyCo
     } finally {
         deadline.settle()
     }
-    return codec.decode(request.headers[CONTENT_TYPE], bytes)
 }
 
 /**
