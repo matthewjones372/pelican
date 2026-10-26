@@ -2233,8 +2233,6 @@ backend that `Stream.from(source)` and `run` are part of.
 
 ```kotlin
 dependencies {
-    // surefold, formerly lark: pelican-streams 1.0.0 was built against lark-stream, so take a snapshot of main
-    // (surefold itself is released, from 0.12.0)
     implementation("io.github.matthewjones372:pelican-streams:$pelicanVersion")
     implementation("io.github.matthewjones372:surefold-stream:0.12.0")
     implementation("io.github.matthewjones372:surefold-stream-pekko:0.12.0")
