@@ -82,11 +82,10 @@ cache if `ShopCodecs` does not already cache.
 ./gradlew :benchmarks:jmh -PbenchmarkArgs=ClientAllocation
 ```
 
-## Open questions
+## Decisions
 
-1. Codec cache in `ApiClient` (a `ConcurrentHashMap`, needing a
-   `FunctionalStyleTest` entry) or in each codec? Recommended: `ApiClient`.
-2. Copy the array on construction? Recommended: no, said in one line of KDoc,
-   as `encoded` does (spec 0086).
-3. A `decodeFrom(ByteBuffer)` spec for Jetty's `toArray`? Recommended: after
-   petshop re-profiles with this in.
+- The codec cache lives in `ApiClient`: a `ConcurrentHashMap`, with its
+  `FunctionalStyleTest` entry.
+- The array is not copied on construction, said in one line of KDoc, as
+  `encoded` does (spec 0086).
+- A `decodeFrom(ByteBuffer)` spec waits until petshop re-profiles with this in.
