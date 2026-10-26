@@ -67,8 +67,8 @@ fun Api.toHandler(handlers: Handlers = Handlers.default): GannetHandler {
 /**
  * Routes on the carrier, which costs no hop for a 404, a refusal or an asynchronous handler. Whatever may block is
  * moved first, with everything that runs before it: a synchronous handler with its filters, an authenticator, and the
- * reading of a streamed body. A strict body is read where the endpoint runs; on the carrier that parks only the
- * connection's fiber.
+ * reading of a streamed body. A strict body is read on the carrier, where waiting parks only the connection's fiber,
+ * and before the hop unless an authenticator has to run first.
  */
 internal class PelicanHandler(
     private val api: Api,
@@ -81,6 +81,12 @@ internal class PelicanHandler(
 ) : GannetHandler {
 
     private val placement: Map<ServerEndpoint, Executor?> = api.endpoints.associateWith { it.placedBy(threads) }
+
+    /** Moved, but with no authenticator to run first: their strict body is read before the hop (spec 0090). */
+    private val readsAhead: Set<ServerEndpoint> = api.endpoints.filter { se ->
+        placement[se] != null && se.endpoint.caller == null &&
+            se.endpoint.bodyInput.let { it is JsonBody<*> || it is FormBody<*> || it is NegotiatedBody<*> }
+    }.toSet()
 
     /** In declaration order, which is the order Pekko's per-method routes name them in a 405. */
     private val methods: List<Method> = api.endpoints.map { it.endpoint.method }.distinct()
@@ -183,14 +189,23 @@ internal class PelicanHandler(
         request: HttpRequest,
         values: Slots,
     ): CompletionStage<Reply> {
-        val executor = placement.getValue(se) ?: return invokeHere(se, request, values)
-        return CompletableFuture.supplyAsync({ invokeHere(se, request, values) }, executor).thenCompose { it }
+        val executor = placement.getValue(se) ?: return invokeHere(se, request, values, null)
+        val ahead = if (se in readsAhead) readAhead(request) else null
+        return CompletableFuture.supplyAsync({ invokeHere(se, request, values, ahead) }, executor).thenCompose { it }
+    }
+
+    /** Whatever the read throws is kept, and thrown where the body is decoded, so refusals keep their order. */
+    private fun readAhead(request: HttpRequest): ReadAhead = try {
+        ReadAhead(readStrictBytes(request, api), null)
+    } catch (t: Throwable) {
+        ReadAhead(null, t)
     }
 
     private fun invokeHere(
         se: ServerEndpoint,
         request: HttpRequest,
         values: Slots,
+        ahead: ReadAhead?,
     ): CompletionStage<Reply> {
         val ep = se.endpoint
         // Built before decoding, so a filter or a failing decode can still put a header on the way out.
@@ -209,7 +224,7 @@ internal class PelicanHandler(
         }
 
         val handled = try {
-            readBody(ep, request, values, codecs.getValue(se))
+            readBody(ep, request, values, codecs.getValue(se), ahead)
             handlers.getValue(se)(params)
         } catch (t: Throwable) {
             CompletableFuture.failedFuture(t)
@@ -236,6 +251,7 @@ internal class PelicanHandler(
         request: HttpRequest,
         values: Slots,
         codecs: EndpointCodecs,
+        ahead: ReadAhead?,
     ) {
         when (val body = ep.bodyInput) {
             null -> Unit
@@ -247,7 +263,8 @@ internal class PelicanHandler(
 
             is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
                 val codec = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
-                values[body] = readStrictBody(request, api, codec)
+                values[body] = if (ahead == null) readStrictBody(request, api, codec)
+                else codec.decode(request.headers[CONTENT_TYPE], ahead.bytes())
             }
 
             // Framed by core as the handler reads, so nothing is held but the frame being read.
@@ -257,6 +274,11 @@ internal class PelicanHandler(
             }
         }
     }
+}
+
+/** A strict body read before the hop: its bytes, or what reading them threw. */
+private class ReadAhead(private val bytes: ByteArray?, private val failure: Throwable?) {
+    fun bytes(): ByteArray = bytes ?: throw checkNotNull(failure)
 }
 
 /**

@@ -563,8 +563,9 @@ handler moves to a virtual thread with its filters and authenticator under
 `Handlers.onDispatcher` runs it inline on the carrier: no hop at all, and a
 handler that blocks there stalls every connection on that core. Reading a
 streamed upload, and pulling a streamed response's `Sequence`, always happen
-off the carrier. A strict body is read where the endpoint runs; on the carrier
-that parks only the fiber. One that has not arrived within
+off the carrier. A strict body is read on the carrier, which parks only the
+fiber, and before the hop unless an authenticator has to run first, so the
+handler's thread starts with the bytes in hand. One that has not arrived within
 `strictBodyTimeoutMillis` is a 408, as on Jetty; the deadline is checked every
 250 ms, so the 408 can come up to 250 ms after it.
 

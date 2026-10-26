@@ -60,8 +60,12 @@ decided: A. Reading the body before the hop helps every endpoint, marked or not.
 
 ## Stack
 
-- [ ] **`spec-0090-carrier-body`**: on Gannet, a strict body read on the carrier before the hop, when there is no authenticator.
+- [x] **`spec-0090-carrier-body`**: on Gannet, a strict body read on the carrier before the hop, when there is no authenticator.
       Done when: default baseline ≥ 130k.
+      Only the read moves: what it throws is kept and raised where the body is decoded, so a 406 or a bad parameter
+      still answers first. Measured against its parent, five interleaved rounds: `gannet` 165k (158–169k) from 135k
+      (132–148k), +25.1% per round (+10.6..+25.5%); `gannet-inline` unchanged (+0.1%); `raw-gannet` 295k (268–298k).
+      4.14–4.32 KB a request from 4.32–4.37.
 - [ ] **`spec-0090-nonblocking`**: `nonBlocking()`, honoured by all three backends.
       Done when: under `Handlers.default` a non-blocking endpoint is within 5% of inline (`gannet-nonblocking` contestant).
 - [ ] **`spec-0090-encode`**: `BodyCodec.encodeTo(value, sink)`, which takes over spec 0085's encode entry.
