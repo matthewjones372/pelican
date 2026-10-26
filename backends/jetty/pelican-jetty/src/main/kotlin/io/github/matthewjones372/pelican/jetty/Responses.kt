@@ -17,6 +17,7 @@ import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.TextOutput
+import io.github.matthewjones372.pelican.spi.encodedBytes
 import io.github.matthewjones372.pelican.spi.failureNamedBy
 import io.github.matthewjones372.pelican.spi.renderError
 import io.github.matthewjones372.pelican.spi.selectedFor
@@ -222,7 +223,7 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs, 
     fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
 
     return when (out) {
-        is JsonOutput<*> -> Strict(out.status, JSON, finished(payload(), value))
+        is JsonOutput<*> -> Strict(out.status, JSON, payload().encodedBytes(value))
 
         is TextOutput -> Strict(out.status, TEXT, (value as String).toByteArray())
 

@@ -33,6 +33,12 @@ one.
 
 ### Added
 
+- **`BodyCodec.encodeTo(value, sink)` and `BodySink`** (spec 0090): a codec
+  writes a body into a backend's buffer instead of returning a `String`.
+  Every backend writes a `json<T>()` success through it, and `JacksonCodecs`
+  overrides it to stream UTF-8 with no `String` between. The default writes
+  `encodeToString`'s bytes, so an existing codec needs no change.
+
 - **`ServerEndpoint.nonBlocking()`** (spec 0090): a binding whose handler and
   filters never block runs on the server's own threads, as under
   `Handlers.onDispatcher`, while the rest of the API keeps `handlers`.
@@ -56,6 +62,10 @@ one.
   Central's snapshot repository.
 
 ### Changed
+
+- **A lone surrogate in a `JacksonCodecs` JSON success body is escaped**
+  (spec 0090): `"\uD83D"`, which reads back as it was, where the body used to
+  carry `?`. Every other character goes out as the same bytes.
 
 - **Query strings and form bodies are decoded as strict UTF-8** (spec 0089,
   decision 5). Percent-escapes that do not spell UTF-8 (`?q=%e9`, an

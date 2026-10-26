@@ -144,6 +144,7 @@ public abstract interface class io/github/matthewjones372/pelican/Authenticator 
 public abstract interface class io/github/matthewjones372/pelican/BodyCodec {
 	public fun decodeFrom ([B)Ljava/lang/Object;
 	public abstract fun decodeFromString (Ljava/lang/String;)Ljava/lang/Object;
+	public fun encodeTo (Ljava/lang/Object;Lio/github/matthewjones372/pelican/BodySink;)V
 	public abstract fun encodeToString (Ljava/lang/Object;)Ljava/lang/String;
 	public fun encoded (Ljava/lang/Object;)[B
 }
@@ -161,6 +162,10 @@ public final class io/github/matthewjones372/pelican/BodyDecodeFailure : java/la
 
 public abstract class io/github/matthewjones372/pelican/BodyInput : io/github/matthewjones372/pelican/ParamKey {
 	public abstract fun getDescription ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/BodySink {
+	public abstract fun write ([BII)V
 }
 
 public final class io/github/matthewjones372/pelican/BooleanCodec : io/github/matthewjones372/pelican/PlainCodec {
@@ -1664,6 +1669,10 @@ public final class io/github/matthewjones372/pelican/spi/CorsHeaders {
 	public static final field INSTANCE Lio/github/matthewjones372/pelican/spi/CorsHeaders;
 	public static final field ORIGIN Ljava/lang/String;
 	public static final field REQUEST_METHOD Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/spi/EncodingKt {
+	public static final fun encodedBytes (Lio/github/matthewjones372/pelican/BodyCodec;Ljava/lang/Object;)[B
 }
 
 public final class io/github/matthewjones372/pelican/spi/EndpointPlan {
