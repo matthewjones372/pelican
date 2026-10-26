@@ -75,6 +75,8 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
 
     motd handledNow { "Be excellent to each other." },
 
+    leaveTip handledNow { tip -> TipJar.tipped(tip) },
+
     forget handledWith { _ -> },
 
     peek handledWith { _ -> },
