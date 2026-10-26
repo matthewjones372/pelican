@@ -10,6 +10,7 @@ import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.UndeclaredResponse
 import io.github.matthewjones372.pelican.chosenSuccess
+import io.github.matthewjones372.pelican.keyed
 import io.github.matthewjones372.pelican.streams
 import io.github.matthewjones372.pelican.wrap
 import java.util.concurrent.CompletableFuture
@@ -21,8 +22,13 @@ import kotlin.reflect.KClass
  * endpoint's own inside them. Called once per endpoint at route-build time, so
  * the chain is folded once, not per request.
  */
-fun Api.handlerFor(se: ServerEndpoint): (Params) -> CompletionStage<Any?> =
-    (if (se.filters.isEmpty()) filters else filters + se.filters).wrap(se.invoke)
+fun Api.handlerFor(se: ServerEndpoint): (Params) -> CompletionStage<Any?> {
+    val key = se.endpoint.idempotency
+    val settings = idempotency
+    // Innermost, so a filter that refuses has refused before a key is reserved.
+    val invoke = if (key == null || settings == null) se.invoke else keyed(se.endpoint, key, settings, se.invoke)
+    return (if (se.filters.isEmpty()) filters else filters + se.filters).wrap(invoke)
+}
 
 /**
  * This stage, where it has already succeeded, so a backend reads its value with `resultNow()` instead of chaining a

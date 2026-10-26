@@ -712,8 +712,12 @@ private fun streamedPart(ep: Endpoint<*, *>): String? {
     val body = ep.bodyInput
     return when {
         body is RawBody || body is NdjsonBody<*> -> "request body"
-        body is MultipartBody && body.streamedFilePart != null -> "request body"
+
+        // A held file part is one live stream too: reading it for the fingerprint would leave the handler none.
+        body is MultipartBody && body.fileParts.isNotEmpty() -> "file part"
+
         ep.output.representations().any { it.streams() } -> "response"
+
         else -> null
     }
 }

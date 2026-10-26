@@ -242,6 +242,9 @@ class Api internal constructor(
      * endpoint needs and none verifies fails here, not on every request.
      */
     val authenticators: Map<SecurityScheme, Authenticator> = emptyMap(),
+
+    /** Where keyed endpoints' responses are kept. An endpoint declaring a key with none set fails here. */
+    val idempotency: Idempotency? = null,
 ) {
     /**
      * The largest single frame of a streamed request body, over which the frame
@@ -275,6 +278,17 @@ class Api internal constructor(
             "Endpoints declare callers under " + unverified.joinToString { "'${it.name}'" } + " and nothing " +
                 "verifies ${if (unverified.size == 1) "it" else "them"}, so every request would be refused. " +
                 "Bind one with authenticate(scheme, by = ...)."
+        }
+
+        val keyed = endpoints.filter { it.endpoint.idempotency != null }
+        require(keyed.isEmpty() || idempotency != null) {
+            "${keyed.joinToString { it.endpoint.toString() }} declare an idempotency key, and nothing keeps the " +
+                "responses a repeat is answered with. Set one with idempotency(store = ...)."
+        }
+        val blocking = keyed.filter { it.isNonBlocking }
+        require(blocking.isEmpty()) {
+            "${blocking.joinToString { it.endpoint.toString() }} declare an idempotency key and are bound " +
+                "nonBlocking(), and an IdempotencyStore blocks. Bind them without it."
         }
 
         val unbound = covers.filter { declared -> bound.none { it === declared } }

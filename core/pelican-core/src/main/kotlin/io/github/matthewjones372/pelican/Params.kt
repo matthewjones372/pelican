@@ -41,6 +41,9 @@ class Params(
 
     operator fun contains(key: ParamKey<*>): Boolean = values.containsKey(key)
 
+    /** What the caller check read, for a second look at who is calling. Null for a hand-built [Params]. */
+    internal val credentials: Credentials? get() = requestHeaders
+
     /** The first value of request header [name], matched without regard to case, whether or not it was declared. */
     fun requestHeader(name: String): String? = requestHeaders?.header(name)
 
