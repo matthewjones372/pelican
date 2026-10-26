@@ -57,7 +57,7 @@ class InMemoryTransport(
         val headers = res.getHeaders().map { it.name() to it.value() } +
             listOf("Content-Type" to strict.contentType.toString())
 
-        return ResponseSpec(res.status().intValue(), headers, strict.data.utf8String())
+        return ResponseSpec(res.status().intValue(), headers, strict.data.toArrayUnsafe())
     }
 
     /**

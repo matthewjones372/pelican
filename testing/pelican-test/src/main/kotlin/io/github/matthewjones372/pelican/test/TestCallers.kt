@@ -47,7 +47,7 @@ fun Api.inMemory(): ApiClient {
             val body = request.body?.let { ClientRequest.Body.Text(it) } ?: ClientRequest.Body.Empty
             val sent = ClientRequest(request.method, "http://in-memory" + request.target, request.headers, body)
             val answer = underneath.send(sent).toCompletableFuture().join()
-            return ResponseSpec(answer.status, answer.headers, answer.text())
+            return ResponseSpec(answer.status, answer.headers, answer.body.use { it.readAllBytes() })
         }
     }
     return ApiClient(transport, codecs)

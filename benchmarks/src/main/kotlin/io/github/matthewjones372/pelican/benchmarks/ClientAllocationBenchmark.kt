@@ -88,6 +88,7 @@ open class ClientAllocationBenchmark {
     private lateinit var http: HttpClient
     private lateinit var base: String
     private lateinit var overJetty: ApiClient
+    private lateinit var overJettyBytes: ApiClient
     private lateinit var pelicanJetty: JettyHttpTransport
 
     @Setup
@@ -133,10 +134,11 @@ open class ClientAllocationBenchmark {
         server.start()
         base = "http://127.0.0.1:${connector.localPort}"
         http = HttpClient().apply { start() }
-        overJetty = ApiClient(StringBodied(http, base), JacksonCodecs)
+        overJetty = ApiClient(OverJetty(http, base, asBytes = false), JacksonCodecs)
+        overJettyBytes = ApiClient(OverJetty(http, base, asBytes = true), JacksonCodecs)
         pelicanJetty = JettyHttpTransport(http)
 
-        check(overJetty.call(listPets, pets).size == pets)
+        check(overJetty.call(listPets, pets).size == pets && overJettyBytes.call(listPets, pets).size == pets)
         check(jettyBytes().size == pets && jettyStream().size == pets)
     }
 
@@ -146,14 +148,20 @@ open class ClientAllocationBenchmark {
         server.stop()
     }
 
-    /** As petshop's `JettyTransport` is written: `ContentResponse`, `getContentAsString`, a `Pair` per header. */
-    private class StringBodied(private val http: HttpClient, private val base: String) : Transport {
+    /** As petshop's `JettyTransport` is written: `ContentResponse`, a `Pair` per header, the body as text or bytes. */
+    private class OverJetty(private val http: HttpClient, private val base: String, private val asBytes: Boolean) :
+        Transport {
         override fun send(request: RequestSpec): ResponseSpec {
             val res = http.newRequest(base + request.target)
                 .method(request.method.name)
                 .headers { fields -> request.headers.forEach { (n, v) -> fields.add(n, v) } }
                 .send()
-            return ResponseSpec(res.status, res.headers.map { it.name to it.value }, res.contentAsString)
+            val headers = res.headers.map { it.name to it.value }
+            return if (asBytes) {
+                ResponseSpec(res.status, headers, res.content)
+            } else {
+                ResponseSpec(res.status, headers, res.contentAsString)
+            }
         }
     }
 
@@ -188,6 +196,10 @@ open class ClientAllocationBenchmark {
 
     @Benchmark
     fun jettyString(): List<Pet> = overJetty.call(listPets, pets)
+
+    /** Petshop's transport with `getContent()` in place of `getContentAsString()`, through `call`. */
+    @Benchmark
+    fun jettyBytesThroughClient(): List<Pet> = overJettyBytes.call(listPets, pets)
 
     /** `ContentResponse.getContent()` handed to `decodeFrom`: no String, Jetty's own `toArray` still there. */
     @Benchmark

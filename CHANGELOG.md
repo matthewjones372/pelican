@@ -45,6 +45,11 @@ one.
 
 ### Added
 
+- **`ResponseSpec(status, headers, bytes)`** (spec 0091): a test `Transport`
+  can hand over the body as the bytes it arrived as, and `ApiClient` decodes
+  JSON and media bodies from them without making a `String`. `body` and the
+  new `bytes` each convert from the other on first read. The JDK and in-memory
+  transports use it. `ApiClient` also resolves each codec once per client.
 - **`pelican-gannet`** (spec 0088): an `Api` served on
   [Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
   io_uring, one carrier thread and ring per core, each connection a fiber on

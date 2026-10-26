@@ -4713,7 +4713,7 @@ what the descriptions already promise:
   case, which is what a declared failure carrying a `Retry-After` needs.
 
 This is also the reason the SPI is not `pelican-test`'s `Transport`. That one is
-blocking and carries a `String` body on purpose, because a test asserts on a
+blocking and sends a `String` request body on purpose, because a test asserts on a
 result it already has, which is exactly why the typed test client
 [cannot upload binary](#what-isnt-here). Right taste, wrong constraints.
 
@@ -5827,6 +5827,12 @@ deployed service, every call in it, including one whose endpoint declares a
 `servers` of its own. See
 [One operation served somewhere else](#one-operation-served-somewhere-else) for
 why the test client is the reading that ignores that.
+
+A `Transport` of your own answers with `ResponseSpec(status, headers, bytes)`
+where it holds the body as bytes (on `main`). `ApiClient` decodes a JSON or
+media body straight from them, and `body` is only decoded into a `String` when
+something reads it. The array is not copied, so do not write to it afterwards. A
+`ResponseSpec` built from a `String` works as before.
 
 ### Pinning the URL
 
