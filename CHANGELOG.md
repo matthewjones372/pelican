@@ -34,9 +34,9 @@ one.
 ### Added
 
 - **`ServerEndpoint.nonBlocking()`** (spec 0090): a binding whose handler and
-  filters never block runs on the thread the server called Pelican on, while
-  the rest of the API keeps `handlers`. Honoured
-  by Pekko, Jetty and Gannet. Nothing checks the promise: a `nonBlocking()`
+  filters never block runs on the server's own threads, as under
+  `Handlers.onDispatcher`, while the rest of the API keeps `handlers`.
+  Honoured by Pekko, Jetty and Gannet. Nothing checks the promise: a `nonBlocking()`
   handler that blocks stalls every connection on its core.
 
 - **`pelican-gannet`** (spec 0088): an `Api` served on

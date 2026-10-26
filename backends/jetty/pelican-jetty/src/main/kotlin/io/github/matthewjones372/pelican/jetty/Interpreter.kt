@@ -70,15 +70,27 @@ fun Api.toHandler(handlers: Handlers = Handlers.default): Handler {
 }
 
 /**
- * [handler] on [threads]' executor, when [endpoint] was bound synchronously, not [ServerEndpoint.nonBlocking], and
- * there is one to move to.
+ * [handler] on [threads]' executor, when [endpoint] was bound synchronously and there is one to move to; on Jetty's
+ * own pool instead when it is [ServerEndpoint.nonBlocking].
  */
 private fun ((Params) -> CompletionStage<Any?>).on(
     threads: Handlers,
     endpoint: ServerEndpoint,
-): (Params) -> CompletionStage<Any?> =
-    if (threads.executor == null || endpoint.invoke !is Synchronous || endpoint.isNonBlocking) this
-    else { params -> threads.mayBlock { this(params) } }
+): (Params) -> CompletionStage<Any?> = when {
+    threads.executor == null || endpoint.invoke !is Synchronous -> this
+    endpoint.isNonBlocking -> { params -> onJettyPool(params) { this(params) } }
+    else -> { params -> threads.mayBlock { this(params) } }
+}
+
+/**
+ * [work] on Jetty's pool, where [Handlers.onDispatcher] has Jetty run it, unless already on a thread that may block.
+ * Left on the selector it would hold one of the few threads every connection is read on (spec 0090).
+ */
+private fun <T> onJettyPool(params: Params, work: () -> CompletionStage<T>): CompletionStage<T> {
+    if (mayBlockHere()) return work()
+    val pool = (params.underlying as Request).connectionMetaData.connector.executor
+    return CompletableFuture.supplyAsync(work, pool).thenCompose { it }
+}
 
 /**
  * [work] where these handlers may block: here under [Handlers.onDispatcher] or where [mayBlockHere], else hopped. A

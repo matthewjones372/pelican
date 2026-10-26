@@ -77,7 +77,12 @@ decided: A. Reading the body before the hop helps every endpoint, marked or not.
       per round, where `jetty-dispatcher` serves 137.7%. Under `Handlers.default` Jetty calls Pelican on its selector,
       so a handler left there runs on it, and at two cores Jetty runs one selector. A throwaway build that hops a
       `nonBlocking()` handler to Jetty's own pool instead served 80.6k (72.0–81.3k), +30% over `jetty`, three rounds.
-      Which of the two Jetty should do is open (question 1).
+- [x] **`spec-0090-jetty-pool`**: decision 3, Jetty hops a `nonBlocking()` handler to its own pool, where
+      `Handlers.onDispatcher` has Jetty run it, instead of running it on the selector.
+      Done when: `jetty-nonblocking` serves more than `jetty`.
+      Measured on this branch, five interleaved rounds: `jetty-nonblocking` 82.0k (65.3–88.4k) against `jetty`'s
+      67.1k (64.3–68.2k), +22.2% per round (-4.2..+32.3%); `jetty-dispatcher` 94.2k, +40.5%; `raw-gannet` 294k.
+      Jetty's spread is wide: two earlier sessions of the same code measured +12.0% and +7.3%.
 - [ ] **`spec-0090-encode`**: `BodyCodec.encodeTo(value, sink)`, which takes over spec 0085's encode entry.
       Done when: measured on `json` (`gannet-encode` contestant), kept only if faster.
 
@@ -105,12 +110,6 @@ benchmarks/arena.sh json gannet gannet-encode
 - A `nonBlocking()` endpoint under `Handlers.default` (`gannet-nonblocking`) ≥ 230k.
 - No backend's parity suite, golden file or document changes.
 
-## Open questions
-
-1. **Where Jetty runs a `nonBlocking()` handler.** (a) Where Pelican was called, Jetty's selector: what is built,
-   and 26% slower than `jetty`. (b) Jetty's own pool, a platform-thread hop: +30% in the throwaway build, near the
-   +26% predicted. (c) Not honoured on Jetty. Recommended: (b).
-
 ## Decisions
 
 Matt took each recommendation on 2026-10-25.
@@ -119,3 +118,15 @@ Matt took each recommendation on 2026-10-25.
    codec output, with its own targets.
 2. **No blocking detection**: `nonBlocking()` does not try to detect a handler that
    blocks (see Not doing).
+
+Matt took each of these on 2026-10-26, after `spec-0090-nonblocking` was measured.
+
+3. **Jetty hops a `nonBlocking()` handler to its own pool**, not its selector: on the
+   selector it served 26% under `jetty`, on the pool +30% over it.
+4. **`nonBlocking()` covers the handler and its filters only.** An authenticator, or a
+   streamed body's read, moves where a backend moves it first.
+5. **Read back as `ServerEndpoint.isNonBlocking`.**
+6. **`encodeTo` writes into a sink interface of pelican-core's own**, not an
+   `OutputStream` or a `ByteBuffer`. If the gain needs Gannet to take more than a
+   `byte[]`, that is a Gannet pull request of its own; Pelican stays on
+   `0.1.0-SNAPSHOT`.
