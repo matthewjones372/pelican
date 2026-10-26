@@ -1,10 +1,5 @@
 package io.github.matthewjones372.pelican.streams.jetty
 
-import io.github.matthewjones372.lark.stream.Exit
-import io.github.matthewjones372.lark.stream.Forks
-import io.github.matthewjones372.lark.stream.mapOrFail
-import io.github.matthewjones372.lark.stream.run
-import io.github.matthewjones372.lark.stream.runFold
 import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.api
@@ -17,6 +12,11 @@ import io.github.matthewjones372.pelican.ndjsonIn
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.test.frames
 import io.github.matthewjones372.pelican.test.jetty.inMemory
+import io.github.matthewjones372.surefold.stream.Exit
+import io.github.matthewjones372.surefold.stream.Forks
+import io.github.matthewjones372.surefold.stream.mapOrFail
+import io.github.matthewjones372.surefold.stream.run
+import io.github.matthewjones372.surefold.stream.runFold
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
@@ -44,7 +44,7 @@ class ToOutcomeTest {
             tally handledByOrFail { rows ->
                 rows.toStream()
                     .mapOrFail<ApiError, Note, String> { note ->
-                        counting(note.text).ifEmpty { raise(ApiError(422, "empty row")) }
+                        counting(note.text).ifEmpty { fail(ApiError(422, "empty row")) }
                     }
                     .runFold(Tally(0)) { seen, _ -> Tally(seen.counted + 1) }
                     .run(Forks())

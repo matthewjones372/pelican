@@ -46,13 +46,13 @@ them is [Version alignment and the BOM](modules.md#version-alignment-and-the-bom
 | `pelican-pekko-docs` | yes | pekko, openapi | serves the document and a page (Swagger UI or Redoc), and a Redoc or RapiDoc reference beside it, over HTTP |
 | `pelican-pekko-mcp` | yes | pekko, mcp-server | serves the tools on `/mcp`, beside the endpoints |
 | `pelican-client-pekko` | yes | core; Pekko HTTP *provided* | where a generated client's requests go: `ClientTransport` over Pekko HTTP's client, for a service that already runs one. Not `pelican-pekko`: calling is not interpreting |
-| `pelican-streams` | yes | pekko; Pekko and lark *provided* | a streamed upload as a lark `Stream` on Pekko, and the run's end as the declared `Outcome` |
+| `pelican-streams` | yes | pekko; Pekko and surefold *provided* | a streamed upload as a surefold `Stream` on Pekko, and the run's end as the declared `Outcome` |
 | `pelican-test-pekko` | yes | test, pekko | the in-memory transport on Pekko, and `PelicanServer.client()` |
 | `pelican-jetty` | `main` | core, jetty-server | descriptions to a Jetty 12 core `Handler`, and `start` to serve it. See [On Jetty](#on-jetty) |
 | `pelican-jetty-docs` | `main` | jetty, openapi | the document and a page, as a `Handler` beside the endpoints: `handlerWithDocs`, `docsHandler`, `startWithDocs` |
 | `pelican-jetty-mcp` | `main` | jetty, mcp-server | the tools on `/mcp`, as a `Handler` beside the endpoints: `handlerWithMcp`, `mcpHandler` |
 | `pelican-client-jetty` | `main` | core, jetty-client | where a generated client's requests go: `ClientTransport` over Jetty's `HttpClient`, for a service on `pelican-jetty` or one that runs no Pekko |
-| `pelican-streams-jetty` | `main` | jetty; lark-stream *provided* | the same as `pelican-streams` on Jetty, over `Stream.blocking`, on any lark backend |
+| `pelican-streams-jetty` | `main` | jetty; surefold-stream *provided* | the same as `pelican-streams` on Jetty, over `Stream.blocking`, on any surefold backend |
 | `pelican-test-jetty` | `main` | test, jetty | the in-memory transport on Jetty, through a `LocalConnector`, and `PelicanServer.client()` |
 | `pelican-gannet` | `main` | core, Gannet | descriptions to a `GannetHandler` on Gannet, an HTTP/1.1 server on io_uring, with `start` to serve them. See [On Gannet](#on-gannet) |
 | `pelican-gannet-docs` | `main` | gannet, openapi | the document and a page, as a `GannetHandler` beside the endpoints: `handlerWithDocs`, `docsHandler`, `startWithDocs` |
@@ -2183,7 +2183,7 @@ exception a materialised stage reports later, which the interpreter has no
 choice but to render as a 500.
 
 `pelican-streams` is two functions. `toStream` hands the upload to
-[lark's](https://github.com/matthewjones372/lark) `Stream<E, A>`, which carries
+[surefold's](https://github.com/matthewjones372/lark) `Stream<E, A>`, which carries
 the failure as a value in the type, and `toOutcome` hands the result back as the
 `Outcome` the endpoint declared:
 
@@ -2218,24 +2218,25 @@ broke. `toOutcome` exists so that decision is made once.
 `system` there is the service's own: a handler receives `Params`, which carries
 no materializer, so the system is the one it started and passed to
 [`start(system)`](#bringing-your-own-actorsystem) and closed over. Pelican does
-materialise on the request's system where it can do so without being handed one (`StreamIn<T>.runWith(sink)` does exactly that) but lark builds its own
+materialise on the request's system where it can do so without being handed one (`StreamIn<T>.runWith(sink)` does exactly that) but surefold builds its own
 runnable graph, so `run` wants the system itself. The service that calls
 `start(port = 8080)` and lets Pelican create a system has none to close over,
 and is the one case that has to create it first.
 
 Two things Pelican does not do. It owns no operators: `mapOrFail`, `catchAll`,
-`mapAsync` and the rest are lark's, and a service that never streams never sees
+`mapAsync` and the rest are surefold's, and a service that never streams never sees
 them. And it ships neither dependency: Pekko is provided in every module that
-speaks it, and `lark-stream-pekko` pins `_2.13` as an `api` dependency of its
-own, so a consumer names them all. lark splits the type from the backend:
-`lark-stream` carries `Stream` and its operators, `lark-stream-pekko` the Pekko
+speaks it, and `surefold-stream-pekko` pins `_2.13` as an `api` dependency of its
+own, so a consumer names them all. surefold splits the type from the backend:
+`surefold-stream` carries `Stream` and its operators, `surefold-stream-pekko` the Pekko
 backend that `Stream.from(source)` and `run` are part of.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-streams:1.0.0")
-    implementation("io.github.matthewjones372:lark-stream:0.9.0")
-    implementation("io.github.matthewjones372:lark-stream-pekko:0.9.0")
+    // surefold, formerly lark: pelican-streams 1.0.0 was built against lark-stream, so take a snapshot of main
+    implementation("io.github.matthewjones372:pelican-streams:$pelicanVersion")
+    implementation("io.github.matthewjones372:surefold-stream:0.11.1-SNAPSHOT")
+    implementation("io.github.matthewjones372:surefold-stream-pekko:0.11.1-SNAPSHOT")
     // plus the Pekko block from Versions, as for any Pekko module here.
 }
 ```
@@ -2250,16 +2251,16 @@ first null frame.
 
 `pelican-streams-jetty` is the same two functions for a service on
 `pelican-jetty`, under `io.github.matthewjones372.pelican.streams.jetty`.
-`toStream` builds the lark `Stream` on lark's own `Stream.blocking` over the
-upload's [`reader()`](#on-jetty), so it needs no lark backend that knows about
-Jetty and no Pekko: the run pulls one frame at a time on whatever lark backend
-the service runs, `lark-stream-forks` for one with no Pekko at all.
+`toStream` builds the surefold `Stream` on surefold's own `Stream.blocking` over the
+upload's [`reader()`](#on-jetty), so it needs no surefold backend that knows about
+Jetty and no Pekko: the run pulls one frame at a time on whatever surefold backend
+the service runs, `surefold-stream-forks` for one with no Pekko at all.
 
 ```kotlin
-import io.github.matthewjones372.lark.stream.Forks
-import io.github.matthewjones372.lark.stream.mapOrFail
-import io.github.matthewjones372.lark.stream.run
-import io.github.matthewjones372.lark.stream.runFold
+import io.github.matthewjones372.surefold.stream.Forks
+import io.github.matthewjones372.surefold.stream.mapOrFail
+import io.github.matthewjones372.surefold.stream.run
+import io.github.matthewjones372.surefold.stream.runFold
 import io.github.matthewjones372.pelican.streams.jetty.toOutcome
 import io.github.matthewjones372.pelican.streams.jetty.toStream
 
@@ -2279,15 +2280,15 @@ however the run ends the upload is closed, so a stopped run never leaves a
 virtual thread parked on a socket. `StoppedRunTest` holds that with a reader
 actually blocked mid-read.
 
-The module ships Jetty and Pelican and neither lark nor Pekko; the consumer
-names `lark-stream` and its backend:
+The module ships Jetty and Pelican and neither surefold nor Pekko; the consumer
+names `surefold-stream` and its backend:
 
 ```kotlin
 dependencies {
     // on main, not yet released: a snapshot of main, or a local publish
     implementation("io.github.matthewjones372:pelican-streams-jetty:$pelicanVersion")
-    implementation("io.github.matthewjones372:lark-stream:0.9.0")
-    implementation("io.github.matthewjones372:lark-stream-forks:0.9.0")
+    implementation("io.github.matthewjones372:surefold-stream:0.11.1-SNAPSHOT")
+    implementation("io.github.matthewjones372:surefold-stream-forks:0.11.1-SNAPSHOT")
 }
 ```
 
@@ -2748,7 +2749,7 @@ api(routes, codecs = JacksonCodecs) { authenticate(bearer, by = myVerifier) }
 **Verifying a provider's tokens** is `pelican-oidc`:
 
 ```kotlin
-val pocketId = oidc(issuer = "https://id.home.arpa", audience = "lark-bank")
+val pocketId = oidc(issuer = "https://id.home.arpa", audience = "surefold-bank")
 val caller = authenticated(pocketId.scheme) { id -> Caller(id.subject, id.groups) }
 
 api(routes, codecs = JacksonCodecs) { authenticate(pocketId.scheme, pocketId) }
@@ -6447,7 +6448,7 @@ The libraries Pelican ships are floors, not pins: Gradle resolves upwards, so a
 service already on a newer Jackson keeps its own. 1.0.0's library
 modules compile to JDK 25 bytecode, so a service on 1.0.0 needs JDK 25 or
 newer. On `main` they compile to JDK 21, except `pelican-streams` and
-`pelican-streams-jetty`, which stay on 25 because `lark-stream` 0.9.0 is
+`pelican-streams-jetty`, which stay on 25 because `surefold-stream` is
 compiled for 25, and the `pelican-gannet` modules, whose Gannet needs the
 foreign-function API and internal continuation; a build on JDK 21 that asks
 for any of them gets a Gradle resolution error rather than a failure at run

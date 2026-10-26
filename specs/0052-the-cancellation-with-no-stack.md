@@ -283,8 +283,8 @@ Every `build` run since the frame cap was raised, swept: 234 runs — 180 green,
 30 cancelled by a newer push, and 24 failed. All 24 have a cause that is not
 this flake. Six failed identically on all three JDKs of the old matrix, which
 makes them deterministic by construction: two Kotlin bumps, two
-`json-schema-validator` bumps, two `lark-stream` bumps. Two died on
-`:pelican-core:detekt`. Two are the `lark-stream` 0.9.0 compile break
+`json-schema-validator` bumps, two `surefold-stream` bumps. Two died on
+`:pelican-core:detekt`. Two are the `surefold-stream` 0.9.0 compile break
 (`Source<T, NotUsed>` where `Iterable<T>` was expected), with byte-identical
 report artifacts across both runs. Fourteen are in-flight work on specs 0062,
 0063 and 0064, each diagnosed when it happened. No second sighting, and no

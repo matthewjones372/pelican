@@ -166,7 +166,7 @@ service. See [Versions](reference.md#versions).
 | `pelican-pekko-mcp` | 1.0.0 | pekko, mcp-server | MCP tools over Streamable HTTP on `/mcp`, as a route |
 | `pelican-test-pekko` | 1.0.0 | pekko, test | `inMemory()` through Pekko's own routing, no socket |
 | `pelican-client-pekko` | 1.0.0 | core; Pekko HTTP *provided* | a generated client's transport over Pekko HTTP's client. No server |
-| `pelican-streams` | 1.0.0 | pekko; Pekko and `lark-stream` *provided* | a streamed body as a lark `Stream`, whose failure is a value. Java 25, as lark 0.9.0 is |
+| `pelican-streams` | 1.0.0 | pekko; Pekko and `surefold-stream` *provided* | a streamed body as a surefold `Stream`, whose failure is a value. Java 25, as surefold is |
 
 Typical stack: `pelican-pekko`, `pelican-jackson`, `pelican-pekko-docs`, the
 four Pekko lines, and `pelican-test-pekko` for tests.
@@ -186,7 +186,7 @@ since it has no cross-build to choose.
 | `pelican-jetty-mcp` | main only | jetty, mcp-server | MCP tools over Streamable HTTP on `/mcp`, as a `Handler` |
 | `pelican-test-jetty` | main only | jetty, test | `inMemory(handlers)` through a `LocalConnector`: no socket, but Jetty's own HTTP parsing |
 | `pelican-client-jetty` | main only | core, `jetty-client` | a generated client's transport over Jetty's `HttpClient`. No server |
-| `pelican-streams-jetty` | main only | jetty; `lark-stream` *provided* | a streamed upload as a lark `Stream`; runs on any lark backend. Java 25, as lark 0.9.0 is |
+| `pelican-streams-jetty` | main only | jetty; `surefold-stream` *provided* | a streamed upload as a surefold `Stream`; runs on any surefold backend. Java 25, as surefold is |
 
 Typical stack: `pelican-bom`, `pelican-jetty`, `pelican-jackson` or
 `pelican-kotlinx`, `pelican-jetty-docs`, and `pelican-test-jetty` for tests.
@@ -288,9 +288,9 @@ mountings, the backend test modules, `pelican-codegen`, `pelican-import` and
   interpreter, since making calls and serving routes are separate decisions.
   `pelican-client-jetty` asserts core plus Jetty's client half and no
   `jetty-server`.
-- `pelican-streams` asserts it ships neither Pekko nor lark: `lark-stream-pekko`
+- `pelican-streams` asserts it ships neither Pekko nor surefold: `surefold-stream-pekko`
   pins `_2.13` as an `api` dependency of its own. `pelican-streams-jetty`
-  asserts no lark and no Pekko.
+  asserts no surefold and no Pekko.
 - The Jetty family is asserted as a whole in `example`'s
   `JettyServiceClasspathTest`: a service built from the Jetty modules, both
   codecs and the health, metrics and OIDC modules has no Pekko and no Scala at

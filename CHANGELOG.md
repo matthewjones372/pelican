@@ -31,6 +31,18 @@ one.
 
 ## Unreleased
 
+### Changed
+
+- **Lark is now Surefold** (breaking, for `pelican-streams` and
+  `pelican-streams-jetty`). The library their streams come from was renamed:
+  `lark-stream` is `surefold-stream`, and the package
+  `io.github.matthewjones372.lark.stream` is
+  `io.github.matthewjones372.surefold.stream`. `toStream` and `toOutcome` now
+  take and return Surefold's `Stream`, so the two `.api` dumps change, and a
+  consumer names `surefold-stream` and a Surefold backend in place of the lark
+  ones. Both modules build against `surefold-stream` 0.11.1-SNAPSHOT until
+  Surefold's first release.
+
 ### Added
 
 - **`pelican-gannet`** (spec 0088): an `Api` served on
