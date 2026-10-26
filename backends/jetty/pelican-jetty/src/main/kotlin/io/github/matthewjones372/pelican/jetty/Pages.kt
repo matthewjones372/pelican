@@ -27,7 +27,7 @@ internal class PagesHandler(
 ) : Handler.Abstract() {
 
     override fun handle(request: Request, response: Response, callback: Callback): Boolean {
-        val path = pekkoPath(request.encodedPathInContext()) ?: return false
+        val path = pekkoPath(request.routedPath() ?: return false) ?: return false
         val below = when {
             pages.at == "/" -> path.removePrefix("/")
             path == pages.at -> ""
@@ -36,7 +36,7 @@ internal class PagesHandler(
         }
         val resolved = below?.let { pages.resolve(it, ::isFile) } ?: return false
         val asked = request.httpURI.query?.let { "$path?$it" } ?: path
-        val sendTo = if (resolved.redirect) null else pages.guard?.redirectFor(asked, request.credentials())
+        val sendTo = if (resolved.redirect) null else pages.guard?.redirectFor(asked, JettyView(request))
         when {
             resolved.redirect -> redirect(MOVED_PERMANENTLY, "$path/").writeTo(response, callback)
 

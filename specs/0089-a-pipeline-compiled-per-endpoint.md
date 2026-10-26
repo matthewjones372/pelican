@@ -126,8 +126,14 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
       Done when: `StrictDecodingTest` gives one 400 for escapes that are not UTF-8 on all three backends.
       One allocation-free scan per pair (`checkFormEncoded`) replaces the escape check; Jetty and Pekko call it through
       `spi.refuseIllegalQuery` until their own entries move them onto the plan.
-- [ ] **`spec-0089-jetty`** / **`spec-0089-pekko`**: each backend on the view and plan, its copies deleted.
+- [x] **`spec-0089-jetty`**: Jetty on the view, the plan, core's dot segments and `spi.succeeded()`; its copies deleted.
       Done when: its parity suite passes and Jetty's baseline does not regress.
+      Jetty's dot-segment copy is core's `withoutDotSegments`, not nothing: Jetty refuses a path climbing above the root
+      itself, but hands `/items/x/..` over unresolved. Measured against `-strict-utf8`, six interleaved rounds:
+      `jetty` 75.9k from 73.8k (+4.2% per round, -1.4..+19.8%), `jetty-dispatcher` 104k from 91k (+14.4%, +7.9..+47.9%);
+      4.7 KB a request from 6.3–6.4 (`jetty`), 3.4 KB from 5.2–5.8 (`jetty-dispatcher`); `gannet-inline` unchanged.
+- [ ] **`spec-0089-pekko`**: Pekko on the view and plan, its copies deleted.
+      Done when: its parity suite passes.
 - [x] **`spec-0089-success`**: a completed stage answered without chaining; reply headers built once.
       Done when: the success path allocates at most two objects of its own (JMH).
       On Gannet; Jetty and Pekko take `spi.succeeded()` with their own entries. Only a plain `CompletableFuture`
