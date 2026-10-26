@@ -50,6 +50,18 @@ internal class Strict(
 ) : Reply
 
 /**
+ * A `json<T>()` payload encoded as it is written: on the carrier straight into Gannet's buffer, elsewhere into one
+ * array first, so a codec that throws is still answered by [failed] before anything is committed (spec 0090).
+ */
+internal class Encoded(
+    val status: Int,
+    val value: Any?,
+    val codec: BodyCodec<Any?>,
+    val failed: (Throwable) -> Reply,
+    val headers: List<Pair<String, String>> = emptyList(),
+) : Reply
+
+/**
  * A body written a frame at a time as [elements] yield them, never held whole. [frames] renders the elements;
  * [keepAlive] fills a gap that long between frames with an SSE comment.
  */
@@ -65,6 +77,7 @@ internal class Streamed(
 
 internal fun Reply.withHeaders(extra: List<Pair<String, String>>): Reply = if (extra.isEmpty()) this else when (this) {
     is Strict -> Strict(status, contentType, body, headers + extra)
+    is Encoded -> Encoded(status, value, codec, { failed(it).withHeaders(extra) }, headers + extra)
     is Streamed -> Streamed(status, contentType, elements, headers + extra, keepAlive, frames)
 }
 
@@ -76,6 +89,8 @@ internal fun Reply.writeTo(exchange: HttpExchange) {
     when (this) {
         is Strict -> exchange.respond(status, headWith(contentType), body)
 
+        is Encoded -> writeEncoded(exchange)
+
         is Streamed -> {
             exchange.detach()
             STREAM_WRITERS.execute { writeFrames(exchange) }
@@ -83,10 +98,39 @@ internal fun Reply.writeTo(exchange: HttpExchange) {
     }
 }
 
+/** Only a throw from the codec is [Encoded.failed]'s to answer; one from the exchange goes to the caller. */
+private fun Encoded.writeEncoded(exchange: HttpExchange) {
+    var thrown: Throwable? = null
+    try {
+        if (exchange.onCarrier) {
+            exchange.respond(status, headWith(JSON)) { out ->
+                try {
+                    codec.encodeTo(value, out::write)
+                } catch (t: Throwable) {
+                    thrown = t
+                    throw t
+                }
+            }
+        } else {
+            val bytes = try {
+                codec.encodedBytes(value)
+            } catch (t: Throwable) {
+                thrown = t
+                throw t
+            }
+            exchange.respond(status, headWith(JSON), bytes)
+        }
+    } catch (t: Throwable) {
+        if (t !== thrown) throw t
+        failed(t).writeTo(exchange)
+    }
+}
+
 /** [headers], with [contentType] replacing any `Content-Type` among them, as Jetty's `put` does. */
 private fun Reply.headWith(contentType: String?): List<Pair<String, String>> {
     val headers = when (this) {
         is Strict -> headers
+        is Encoded -> headers
         is Streamed -> headers
     }
     if (contentType == null) return headers
@@ -242,12 +286,18 @@ internal fun methodNotAllowed(declared: List<String>): Strict {
 }
 
 /** Turns a described [Output] plus a handler's result into a response. */
-internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs, accept: List<String>): Reply {
+internal fun buildResponse(
+    out: Output<*>,
+    value: Any?,
+    codecs: EndpointCodecs,
+    accept: List<String>,
+    failed: (Throwable) -> Reply,
+): Reply {
     // Resolved when the handler was built, so a null is a bug in that resolution.
     fun payload(): BodyCodec<Any?> = checkNotNull(codecs.payloadFor(out)) { "No codec was resolved for $out" }
 
     return when (out) {
-        is JsonOutput<*> -> Strict(out.status, JSON, payload().encodedBytes(value))
+        is JsonOutput<*> -> Encoded(out.status, value, payload(), failed)
 
         is TextOutput -> Strict(out.status, TEXT, (value as String).toByteArray())
 
@@ -284,14 +334,14 @@ internal fun buildResponse(out: Output<*>, value: Any?, codecs: EndpointCodecs, 
         }
 
         is DeclaredResponses<*, *> -> when (val outcome = value as Outcome<*, *>) {
-            is Outcome.Ok<*> -> buildResponse(out.successNamedBy(outcome), outcome.value, codecs, accept)
+            is Outcome.Ok<*> -> buildResponse(out.successNamedBy(outcome), outcome.value, codecs, accept, failed)
                 .withHeaders(outcome.headers)
 
             is Outcome.Err<*> -> failureResponse(out.failureNamedBy(outcome), outcome, codecs)
         }
 
         // Which rendering goes out is core's answer, from the same scoring the 406 was decided with.
-        is NegotiatedOutput<*> -> buildResponse(out.selectedFor(accept), value, codecs, accept)
+        is NegotiatedOutput<*> -> buildResponse(out.selectedFor(accept), value, codecs, accept, failed)
     }
 }
 

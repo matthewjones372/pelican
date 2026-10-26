@@ -655,7 +655,10 @@ unreleased), so `JacksonCodecs` streams UTF-8 from its own buffer with no
 `String` between. A codec of your own needs nothing new: the default writes
 `encodeToString`'s bytes. The bytes are the same either way, with one
 exception: a lone surrogate, which a `String`'s UTF-8 writes as `?`, is escaped
-as `\uD83D` and reads back as it was.
+as `\uD83D` and reads back as it was. On Gannet, a success answered on the
+carrier (under `Handlers.onDispatcher`, or `nonBlocking()`) is encoded straight
+into Gannet's own buffer; one answered from another thread is gathered into one
+array first, so a codec that throws is still a 500.
 
 Codecs are resolved **once per endpoint when the route is built**, never per
 request: `KType` → `JavaType` reflection is not cheap. It also means a missing

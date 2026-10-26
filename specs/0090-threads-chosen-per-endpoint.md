@@ -94,6 +94,16 @@ decided: A. Reading the body before the hop helps every endpoint, marked or not.
       +7.3..+14.8%), `gannet-inline` 75.4k from 73.2k (+2.9%), `jetty` 30.4k from 27.6k (+10.2%), `pekko` 21.9k
       from 20.1k (+3.9%); `raw-gannet` 284k on `baseline`. Writing into Gannet's own buffer wants a `respond` that
       takes a writer: a Gannet change, not made here.
+- [x] **`spec-0090-gannet-writer`**: pelican-gannet answers a `json<T>()` success on the carrier through Gannet's
+      `respond(status, headers) { out -> }` (gannet#10, decision 7), encoding straight into the carrier's buffer.
+      Done when: measured on `json` against its parent, kept only if faster.
+      Off the carrier the payload is still gathered first: there Gannet answers before the writer runs, and a codec
+      that throws would close the connection instead of answering 500. A throw on the carrier reaches Pelican with
+      nothing committed and is answered as before. JMH (`GannetHandlerBenchmark`, the 50-item page through the
+      handler, page built per call): 13.6 µs and 16.8 KB on the carrier against 15.2 µs and 33.0 KB gathered. `json`, five
+      interleaved rounds against `main`: `gannet-nonblocking` 87.2k from 76.8k (+11.8% per round, +9.7..+15.1%),
+      `gannet-inline` 85.0k from 78.9k (+7.8%, +4.7..+15.2%), `gannet` unchanged (58.0k, -1.2%); `raw-gannet` 294k
+      on `baseline`.
 
 Predicted, on top of spec 0089: `-carrier-body` default ~130k; `-nonblocking` any
 endpoint so marked ~245k on Gannet, and on Jetty what `jetty-dispatcher` measured
@@ -139,3 +149,6 @@ Matt took each of these on 2026-10-26, after `spec-0090-nonblocking` was measure
    `OutputStream` or a `ByteBuffer`. If the gain needs Gannet to take more than a
    `byte[]`, that is a Gannet pull request of its own; Pelican stays on
    `0.1.0-SNAPSHOT`.
+7. **Gannet's writer `respond`**: called on the carrier, the writer runs before anything is committed and a
+   throw reaches the caller; called from another thread, a throw after the exchange is answered closes the
+   connection.

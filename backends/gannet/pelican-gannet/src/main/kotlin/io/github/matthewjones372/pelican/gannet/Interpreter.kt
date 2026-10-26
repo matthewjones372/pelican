@@ -88,6 +88,10 @@ internal class PelicanHandler(
             se.endpoint.bodyInput.let { it is JsonBody<*> || it is FormBody<*> || it is NegotiatedBody<*> }
     }.toSet()
 
+    /** How each endpoint answers a codec that throws as its payload is written; made once, not per request. */
+    private val failures: Map<ServerEndpoint, (Throwable) -> Reply> =
+        api.endpoints.associateWith { se -> { t: Throwable -> errorResponse(t, api, se.endpoint) } }
+
     /** In declaration order, which is the order Pekko's per-method routes name them in a 405. */
     private val methods: List<Method> = api.endpoints.map { it.endpoint.method }.distinct()
 
@@ -208,6 +212,7 @@ internal class PelicanHandler(
         ahead: ReadAhead?,
     ): CompletionStage<Reply> {
         val ep = se.endpoint
+        val failed = failures.getValue(se)
         // Built before decoding, so a filter or a failing decode can still put a header on the way out.
         val view = GannetView(request)
         val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep), requestHeaders = view)
@@ -233,14 +238,14 @@ internal class PelicanHandler(
         val now = handled.succeeded()
         if (now != null) {
             val reply = try {
-                buildResponse(ep.output, now.resultNow(), codecs.getValue(se), accept)
+                buildResponse(ep.output, now.resultNow(), codecs.getValue(se), accept, failed)
             } catch (t: Throwable) {
                 errorResponse(t, api, ep)
             }
             return CompletableFuture.completedFuture(reply.withHeaders(params.responseHeaders()))
         }
         return handled
-            .thenApply { result -> buildResponse(ep.output, result, codecs.getValue(se), accept) }
+            .thenApply { result -> buildResponse(ep.output, result, codecs.getValue(se), accept, failed) }
             .exceptionally { t -> errorResponse(t, api, ep) }
             .thenApply { reply -> reply.withHeaders(params.responseHeaders()) }
     }
