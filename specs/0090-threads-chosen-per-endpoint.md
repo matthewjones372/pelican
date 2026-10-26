@@ -66,8 +66,18 @@ decided: A. Reading the body before the hop helps every endpoint, marked or not.
       still answers first. Measured against its parent, five interleaved rounds: `gannet` 165k (158–169k) from 135k
       (132–148k), +25.1% per round (+10.6..+25.5%); `gannet-inline` unchanged (+0.1%); `raw-gannet` 295k (268–298k).
       4.14–4.32 KB a request from 4.32–4.37.
-- [ ] **`spec-0090-nonblocking`**: `nonBlocking()`, honoured by all three backends.
+- [x] **`spec-0090-nonblocking`**: `nonBlocking()`, honoured by all three backends.
       Done when: under `Handlers.default` a non-blocking endpoint is within 5% of inline (`gannet-nonblocking` contestant).
+      Read back as `ServerEndpoint.isNonBlocking`, and kept by `filteredBy`. It covers the handler and its filters:
+      where a backend moves an authenticator or a streamed body's read first (Gannet, Jetty), it still does.
+      Measured against its parent, five interleaved rounds: `gannet-nonblocking` 255k (249–262k), 100.1% of
+      `gannet-inline` per round (95.0..105.7%) and 87.8% of `raw-gannet` (293k); 2.79–2.83 KB a request against
+      `gannet-inline`'s 2.81–2.86 and `gannet`'s 4.07–4.15. Other contestants unchanged.
+      Jetty does not match the prediction: `jetty-nonblocking` serves 47.5k (46.1–50.0k), 73.7% of `jetty` (64.7k)
+      per round, where `jetty-dispatcher` serves 137.7%. Under `Handlers.default` Jetty calls Pelican on its selector,
+      so a handler left there runs on it, and at two cores Jetty runs one selector. A throwaway build that hops a
+      `nonBlocking()` handler to Jetty's own pool instead served 80.6k (72.0–81.3k), +30% over `jetty`, three rounds.
+      Which of the two Jetty should do is open (question 1).
 - [ ] **`spec-0090-encode`**: `BodyCodec.encodeTo(value, sink)`, which takes over spec 0085's encode entry.
       Done when: measured on `json` (`gannet-encode` contestant), kept only if faster.
 
@@ -87,13 +97,19 @@ Same machine, same day, each contestant warmed 10 s and measured 10 s, median of
 
 ```bash
 ./gradlew build
-benchmarks/arena.sh baseline raw-gannet gannet-inline gannet gannet-nonblocking jetty
+benchmarks/arena.sh baseline raw-gannet gannet-inline gannet gannet-nonblocking jetty jetty-nonblocking
 benchmarks/arena.sh json gannet gannet-encode
 ```
 
 - `gannet` (default threads) ≥ 130k.
 - A `nonBlocking()` endpoint under `Handlers.default` (`gannet-nonblocking`) ≥ 230k.
 - No backend's parity suite, golden file or document changes.
+
+## Open questions
+
+1. **Where Jetty runs a `nonBlocking()` handler.** (a) Where Pelican was called, Jetty's selector: what is built,
+   and 26% slower than `jetty`. (b) Jetty's own pool, a platform-thread hop: +30% in the throwaway build, near the
+   +26% predicted. (c) Not honoured on Jetty. Recommended: (b).
 
 ## Decisions
 

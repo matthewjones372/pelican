@@ -2,7 +2,8 @@
 # benchmarks/arena.sh <profile> <contestant>...: HttpArena's closed-model load against each contestant, on one machine.
 #
 #   profile     baseline (GET and POST /baseline11, the POST half by Content-Length and half chunked) or json (/json/50)
-#   contestant  raw-gannet, gannet-inline, gannet, jetty, jetty-dispatcher, pekko or pekko-dispatcher
+#   contestant  raw-gannet, gannet-inline, gannet, gannet-nonblocking, jetty, jetty-dispatcher, jetty-nonblocking, pekko
+#               or pekko-dispatcher
 #
 # Each contestant is a fresh JVM on cores 0-1 with gcannon on 2-3, warmed WARM seconds and measured DURATION, the
 # contestants alternating within each of RUNS runs. Before each measurement the machine must be quiet; a measurement
@@ -14,7 +15,7 @@
 # the classpath already built.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-[[ $# -ge 2 ]] || { sed -n '2,5p' "$0" >&2; exit 2; }
+[[ $# -ge 2 ]] || { sed -n '2,6p' "$0" >&2; exit 2; }
 profile=$1
 shift
 RUNS=${RUNS:-3}
@@ -40,7 +41,7 @@ trap 'exit 130' INT TERM
 server() { # server <contestant>: runs in the foreground, so `server x &` leaves the JVM's own PID in $!
   case $1 in
     raw-gannet) exec taskset -c 0,1 "$java" $flags -cp "$cp" $pkg.RawGannetArenaKt $port ;;
-    gannet | gannet-inline | jetty | jetty-dispatcher | pekko | pekko-dispatcher)
+    gannet | gannet-inline | gannet-nonblocking | jetty | jetty-dispatcher | jetty-nonblocking | pekko | pekko-dispatcher)
       exec taskset -c 0,1 "$java" $flags -cp "$cp" $pkg.ArenaServerKt "$1" $port $arena/dataset.json ;;
     *) echo "unknown contestant $1" >&2; exit 2 ;;
   esac

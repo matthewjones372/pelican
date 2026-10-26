@@ -98,7 +98,7 @@ fun Filter.onlyWhen(predicate: (Endpoint<*, *>) -> Boolean): Filter = Filter { p
  * the description does not distinguish — `onlyWhen` is the answer when it does.
  */
 fun ServerEndpoint.filteredBy(vararg filters: Filter): ServerEndpoint =
-    if (filters.isEmpty()) this else ServerEndpoint(endpoint, invoke, this.filters + filters)
+    if (filters.isEmpty()) this else ServerEndpoint(endpoint, invoke, this.filters + filters, isNonBlocking)
 
 /** The same, over a list, so a group of bound endpoints stays a value. */
 fun List<ServerEndpoint>.filteredBy(vararg filters: Filter): List<ServerEndpoint> =

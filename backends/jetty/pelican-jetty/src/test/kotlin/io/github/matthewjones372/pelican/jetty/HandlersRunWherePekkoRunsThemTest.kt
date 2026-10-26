@@ -66,6 +66,11 @@ class HandlersRunWherePekkoRunsThemTest {
             text()
         }
 
+        private val quick = endpoint {
+            get("quick")
+            text()
+        }
+
         private val gated = endpoint {
             get("gated")
             text()
@@ -115,6 +120,7 @@ class HandlersRunWherePekkoRunsThemTest {
                 where handledNow { thread() },
                 refusing handledOrFail { refused(Refusal(thread())) },
                 later handledBy { CompletableFuture.completedFuture(thread()) },
+                (quick handledNow { thread() }).nonBlocking(),
                 gated handledNow {
                     together.countDown()
                     if (together.await(GATE_SECONDS, TimeUnit.SECONDS)) "together" else "alone"
@@ -137,6 +143,7 @@ class HandlersRunWherePekkoRunsThemTest {
             where pekkoHandledNow { thread() },
             refusing pekkoHandledOrFail { refused(Refusal(thread())) },
             later pekkoHandledBy { CompletableFuture.completedFuture(thread()) },
+            (quick pekkoHandledNow { thread() }).nonBlocking(),
         )
 
         private val mine = Executors.newThreadPerTaskExecutor(Thread.ofPlatform().name("mine-", 0).factory())
@@ -161,9 +168,14 @@ class HandlersRunWherePekkoRunsThemTest {
                 Asked("a synchronous handler, $handlers", "/where", handlers),
                 Asked("a declared failure, $handlers", "/refusing", handlers),
             )
-        } + asyncCases().map { Asked("an asynchronous handler is never moved, $it", "/later", it) }
+        } + asyncCases().flatMap {
+            listOf(
+                Asked("an asynchronous handler is never moved, $it", "/later", it),
+                Asked("a non-blocking handler is never moved, $it", "/quick", it),
+            )
+        }
 
-        /** On [JettyPool.VIRTUAL] Jetty's selector is itself a virtual thread, so a staged handler starts on one. */
+        /** On [JettyPool.VIRTUAL] Jetty's selector is itself a virtual thread, so a handler left there runs on one. */
         private fun asyncCases(): List<String> =
             if (JettyPool.configured() == JettyPool.QUEUED) listOf("virtual", "dispatcher", "mine")
             else listOf("dispatcher", "mine")
@@ -216,6 +228,13 @@ class HandlersRunWherePekkoRunsThemTest {
         val onJetty = asking.ask(jetty.getValue(asked.handlers).baseUrl, "GET", asked.path)
         val onPekko = asking.ask(pekko.getValue(asked.handlers).baseUrl, "GET", asked.path)
         withClue("${asked.name}: jetty $onJetty, pekko $onPekko") { onJetty shouldBe onPekko }
+    }
+
+    @Test
+    fun `by default a non-blocking handler stays on the thread jetty called it on`() {
+        val expected = if (JettyPool.configured() == JettyPool.QUEUED) "platform" else "virtual"
+        get("${jetty.getValue("virtual").baseUrl}/quick").join().body() shouldBe expected
+        get("${jetty.getValue("virtual").baseUrl}/where").join().body() shouldBe "virtual"
     }
 
     @Test

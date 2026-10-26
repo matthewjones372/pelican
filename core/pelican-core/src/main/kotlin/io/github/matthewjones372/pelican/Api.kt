@@ -123,11 +123,21 @@ class ServerEndpoint internal constructor(
     val invoke: (Params) -> CompletionStage<Any?>,
     /** What this endpoint alone runs behind, attached by [filteredBy]. */
     val filters: List<Filter>,
+    /** Set by [nonBlocking]. */
+    val isNonBlocking: Boolean = false,
 ) {
     // Two arguments, as it was: a binder compiled against an earlier release
     // calls this one, and filters are attached afterwards rather than passed.
     constructor(endpoint: Endpoint<*, *>, invoke: (Params) -> CompletionStage<Any?>) :
         this(endpoint, invoke, emptyList())
+
+    /**
+     * This binding, promising its handler and filters never block, so every backend runs them where the request
+     * arrived instead of moving them to the handlers' thread. One that blocks stalls every connection on its core.
+     * Where a backend moves an authenticator or a streamed body's read first, it still does: neither is this
+     * binding's promise.
+     */
+    fun nonBlocking(): ServerEndpoint = ServerEndpoint(endpoint, invoke, filters, isNonBlocking = true)
 }
 
 /**
