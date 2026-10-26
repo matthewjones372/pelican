@@ -7,6 +7,7 @@ import io.github.matthewjones372.gannet.HttpVersion
 import io.github.matthewjones372.gannet.RequestBody
 import io.github.matthewjones372.gannet.ResponseStream
 import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.benchmarks.arena.JsonPage
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.gannet.GannetHandler
 import io.github.matthewjones372.pelican.gannet.Handlers
@@ -24,6 +25,7 @@ import org.openjdk.jmh.annotations.Scope
 import org.openjdk.jmh.annotations.State
 import org.openjdk.jmh.annotations.Warmup
 import java.io.IOException
+import java.io.OutputStream
 import java.time.Duration
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
@@ -67,12 +69,48 @@ open class GannetHandlerBenchmark {
         return exchange.status
     }
 
-    private class Answered(override val request: HttpRequest) : HttpExchange {
+    /** HttpArena's fifty-item `/json` page, encoded into a buffer the exchange keeps, as Gannet's carrier does. */
+    private val jsonHandler: GannetHandler = api(
+        listOf(endpoint { get("json"); json<JsonPage>() } handledNow { EncodeBenchmark.page(FIFTY) }),
+        JacksonCodecs,
+    ).toHandler(Handlers.onDispatcher)
+
+    private val jsonRequest: HttpRequest = HttpRequest::class.java.constructors.single().newInstance(
+        "GET", "/json", "/json", null, HttpVersion.HTTP_1_1, Headers(listOf("Host" to "localhost:8080")), NoBody,
+    ) as HttpRequest
+
+    private val onCarrier = Answered(jsonRequest)
+    private val offCarrier = Answered(jsonRequest, onCarrier = false)
+
+    /** Spec 0090: on the carrier, straight into Gannet's buffer through the writer `respond`. */
+    @Benchmark
+    fun json(): Int {
+        jsonHandler.handle(onCarrier)
+        return onCarrier.size
+    }
+
+    /** The same page from another thread, gathered into one array first: the path before Gannet took a writer. */
+    @Benchmark
+    fun jsonGathered(): Int {
+        jsonHandler.handle(offCarrier)
+        return offCarrier.size
+    }
+
+    private class Answered(override val request: HttpRequest, override val onCarrier: Boolean = true) : HttpExchange {
         var status = 0
-        override val onCarrier = true
+        var size = 0
+        private val buffer = Kept()
 
         override fun respond(status: Int, headers: List<Pair<String, String>>, body: ByteArray) {
             this.status = status
+            size = body.size
+        }
+
+        override fun respond(status: Int, headers: List<Pair<String, String>>, body: (OutputStream) -> Unit) {
+            this.status = status
+            buffer.size = 0
+            body(buffer)
+            size = buffer.size
         }
 
         override fun detach() = Unit
@@ -95,5 +133,24 @@ open class GannetHandlerBenchmark {
         override fun read(into: ByteArray, offset: Int, length: Int, timeout: Duration) = -1
 
         override fun fail(cause: IOException) = Unit
+    }
+
+    /** A buffer kept between replies, as a carrier keeps its own. */
+    private class Kept : OutputStream() {
+        private val bytes = ByteArray(1 shl 20)
+        var size = 0
+
+        override fun write(b: Int) {
+            bytes[size++] = b.toByte()
+        }
+
+        override fun write(b: ByteArray, off: Int, len: Int) {
+            System.arraycopy(b, off, bytes, size, len)
+            size += len
+        }
+    }
+
+    private companion object {
+        const val FIFTY = 50
     }
 }

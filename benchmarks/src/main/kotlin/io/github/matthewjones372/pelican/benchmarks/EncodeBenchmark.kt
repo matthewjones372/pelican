@@ -45,13 +45,7 @@ open class EncodeBenchmark {
     @Setup
     fun setUp() {
         codec = JacksonCodecs.codec(typeOf<JsonPage>())
-        val all = (1..items).map {
-            PricedItem(
-                it.toLong(), "Item $it", "category-${it % 7}", it * 100L, it * 3L, it % 2 == 0,
-                listOf("tag-a", "tag-b"), Rating(it % 5, it * 11), it * 300L,
-            )
-        }
-        page = JsonPage(all, all.size)
+        page = page(items)
     }
 
     /** Before: Jackson's chars to a String, then the String to UTF-8. */
@@ -93,6 +87,19 @@ open class EncodeBenchmark {
         override fun write(bytes: ByteArray, offset: Int, length: Int) {
             System.arraycopy(bytes, offset, this.bytes, size, length)
             size += length
+        }
+    }
+
+    companion object {
+        /** [items] made-up items in HttpArena's shape, so no dataset file is read. */
+        fun page(items: Int): JsonPage {
+            val all = (1..items).map {
+                PricedItem(
+                    it.toLong(), "Item $it", "category-${it % 7}", it * 100L, it * 3L, it % 2 == 0,
+                    listOf("tag-a", "tag-b"), Rating(it % 5, it * 11), it * 300L,
+                )
+            }
+            return JsonPage(all, all.size)
         }
     }
 }
