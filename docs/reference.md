@@ -69,7 +69,7 @@ them is [Version alignment and the BOM](modules.md#version-alignment-and-the-bom
 | `pelican-bom` | `main` | **nothing** | a `java-platform` constraining every library module to the build's version, so a consumer names one version |
 | `pelican-gradle-plugin` | yes | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
 | `example` | not published | core, openapi, codegen, jackson, kotlinx, pekko, jetty and most integrations | the orders, bookmarks, greetings, shop and secured services, among others |
-| `benchmarks` | not published | core, jackson, kotlinx, pekko, jetty, JMH | what the interpreter costs on Pekko and on Jetty against hand-written routes and handlers, plus routing scale, streaming, framing and body decoding (Jackson and kotlinx), and a socket-level driver. Not run by `build`; see [What it costs](what-it-costs.md) |
+| `benchmarks` | not published | core, jackson, kotlinx, pekko, jetty, test, client-jetty, JMH | what the interpreter costs on Pekko and on Jetty against hand-written routes and handlers, plus routing scale, streaming, framing, body decoding (Jackson and kotlinx), what one test-client call allocates, and a socket-level driver. Not run by `build`; see [What it costs](what-it-costs.md) |
 
 The layering is load-bearing, not decorative, and each edge is a test:
 

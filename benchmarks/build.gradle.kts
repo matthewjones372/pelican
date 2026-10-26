@@ -23,6 +23,9 @@ dependencies {
     // The third server in `:benchmarks:wire` (spec 0088).
     implementation(project(":pelican-gannet"))
     implementation(project(":pelican-kotlinx"))
+    // `ClientAllocationBenchmark`: the test client, and the Jetty transport it is measured against.
+    implementation(project(":pelican-test"))
+    implementation(project(":pelican-client-jetty"))
 
     // Pekko is declared here for the reason a consumer declares it: it is
     // `compileOnly` in `pelican-pekko`, which ships no Scala cross-build.
