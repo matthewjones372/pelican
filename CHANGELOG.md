@@ -40,8 +40,8 @@ one.
   `io.github.matthewjones372.surefold.stream`. `toStream` and `toOutcome` now
   take and return Surefold's `Stream`, so the two `.api` dumps change, and a
   consumer names `surefold-stream` and a Surefold backend in place of the lark
-  ones. Both modules build against `surefold-stream` 0.11.1-SNAPSHOT until
-  Surefold's first release.
+  ones. Both modules build against `surefold-stream` 0.12.0, Surefold's first
+  release.
 
 ### Added
 
