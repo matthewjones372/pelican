@@ -98,9 +98,9 @@ one.
 - **`pelican-test-jetty`**: `inMemory(handlers)`, the typed test client
   against a Jetty `Api` through a `LocalConnector`, and `server.client()`
   (spec 0074).
-- **`pelican-streams-jetty`**: a streamed upload on Jetty as a lark `Stream`,
+- **`pelican-streams-jetty`**: a streamed upload on Jetty as a Surefold `Stream`,
   over `Stream.blocking`, and `toOutcome`. A stopped run wakes a blocked read
-  and closes the upload. Runs on any lark backend (spec 0074).
+  and closes the upload. Runs on any Surefold backend (spec 0074).
 - **`pelican-client-jetty`**: `JettyHttpTransport`, a generated client's
   transport over Jetty's `HttpClient`, the release `pelican-jetty` serves with.
   A service on Jetty calls out with no Pekko on its classpath (spec 0075).
@@ -119,7 +119,7 @@ one.
   null still turns extraction off.
 - **The library modules target Java 21** (spec 0079), where 1.0.0 targeted 25.
   `pelican-streams` and `pelican-streams-jetty` stay on 25, because
-  `lark-stream` 0.9.0 is compiled for 25. CI runs the suites on 21 and 25.
+  `surefold-stream` 0.12.0 is compiled for 25. CI runs the suites on 21 and 25.
 - **Synchronous handlers default to `Handlers.default`** (spec 0079): virtual
   threads from JDK 24, and below it a shared pool of 200 daemon platform
   threads named `pelican-handler-N`, because before JDK 24 a virtual thread
