@@ -99,7 +99,7 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
 
 ## Stack
 
-- [ ] **`spec-0089-arena`**: `raw-gannet` (Gannet's API, exact `Content-Length`) and `benchmarks/arena.sh` (gcannon, PIDs, a quiet-machine gate).
+- [x] **`spec-0089-arena`** ([#346](https://github.com/matthewjones372/pelican/pull/346)): `raw-gannet` (Gannet's API, exact `Content-Length`) and `benchmarks/arena.sh` (gcannon, PIDs, a quiet-machine gate).
       Done when: one run prints raw, inline and default in one table.
 - [x] **`spec-0089-deadline`** ([#344](https://github.com/matthewjones372/pelican/pull/344)): pelican-gannet's strict-body deadline kept by a sweeper, its exception made on firing.
       Done when: the 408 test passes and inline baseline ≥ 170k.
@@ -110,11 +110,11 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
       inline is 211k (208–214k) against `raw-gannet`'s 279k (275–285k), 76%. The same build served 238k earlier
       the same day; interleaved with today's, it serves 209–214k, so the machine moved and the 225k is quoted
       against a different day's ceiling. Later entries are judged against `raw-gannet` in the same run.
-- [ ] **`spec-0089-view`**: `RouteIndex` matching in place, and dot segments resolved without a split, in core; Gannet adopts.
+- [x] **`spec-0089-view`** ([#347](https://github.com/matthewjones372/pelican/pull/347)): `RouteIndex` matching in place, and dot segments resolved without a split, in core; Gannet adopts.
       Done when: routing `/baseline11` allocates nothing (JMH `-prof gc`, `RequestPathBenchmark`).
-- [ ] **`spec-0089-view-gannet`**: `RequestView`; Gannet reads the request through it.
+- [x] **`spec-0089-view-gannet`** ([#348](https://github.com/matthewjones372/pelican/pull/348)): `RequestView`; Gannet reads the request through it.
       Done when: building the request allocates only the view, which takes the credentials object's place.
-- [x] **`spec-0089-plan`**: `EndpointPlan` with slot-backed `Params` and the query scanned once; Gannet adopts.
+- [x] **`spec-0089-plan`** ([#349](https://github.com/matthewjones372/pelican/pull/349)): `EndpointPlan` with slot-backed `Params` and the query scanned once; Gannet adopts.
       Done when: plain inputs allocate only the decoded values.
       `Slots` is a `MutableMap` over the plan's array, so `Params`, `decodeCaller`, the multipart reader and the
       index's captures read and write it unchanged, and a key with no slot is absent. The slots belong to the endpoint,
@@ -122,11 +122,11 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
       Measured: `PlainInputsBenchmark` 152 B/op (the slots and the two values) against 1224 B/op for the form
       reading; Pelican on Gannet 3.15 KB a request from 4.40–4.53 KB (`raw-gannet` 2.32–2.35 KB); `gannet-inline`
       +10.6% over its parent, 87% of `raw-gannet` from 79%, five interleaved rounds.
-- [x] **`spec-0089-strict-utf8`**: decision 5, core's query and form decoding strict UTF-8, before Jetty adopts it.
+- [x] **`spec-0089-strict-utf8`** ([#353](https://github.com/matthewjones372/pelican/pull/353)): decision 5, core's query and form decoding strict UTF-8, before Jetty adopts it.
       Done when: `StrictDecodingTest` gives one 400 for escapes that are not UTF-8 on all three backends.
       One allocation-free scan per pair (`checkFormEncoded`) replaces the escape check; Jetty and Pekko call it through
       `spi.refuseIllegalQuery` until their own entries move them onto the plan.
-- [x] **`spec-0089-jetty`**: Jetty on the view, the plan, core's dot segments and `spi.succeeded()`; its copies deleted.
+- [x] **`spec-0089-jetty`** ([#353](https://github.com/matthewjones372/pelican/pull/353)): Jetty on the view, the plan, core's dot segments and `spi.succeeded()`; its copies deleted.
       Done when: its parity suite passes and Jetty's baseline does not regress.
       Jetty's dot-segment copy is core's `withoutDotSegments`, not nothing: Jetty refuses a path climbing above the root
       itself, but hands `/items/x/..` over unresolved. Measured against `-strict-utf8`, six interleaved rounds:
@@ -142,7 +142,7 @@ Option C, a body deadline on Gannet's own tick. Recommended: B now, C as a Ganne
       round, +3.9..+39.8%), `pekko-dispatcher` 23.9k from 23.9k (-0.1%, -5.0..+3.3%); 15.3–15.5 KB a request from
       16.7 (`pekko`), 13.3–13.6 from 14.6–14.9 (`pekko-dispatcher`), most of the rest Pekko's `toStrict`;
       `gannet-inline` and `jetty` unchanged.
-- [x] **`spec-0089-success`**: a completed stage answered without chaining; reply headers built once.
+- [x] **`spec-0089-success`** ([#350](https://github.com/matthewjones372/pelican/pull/350)): a completed stage answered without chaining; reply headers built once.
       Done when: the success path allocates at most two objects of its own (JMH).
       On Gannet; Jetty and Pekko take `spi.succeeded()` with their own entries. Only a plain `CompletableFuture`
       is read in place, since every query on the minimal stage `completedStage` returns throws. "Built once" is
@@ -203,3 +203,33 @@ Matt took each recommendation on 2026-10-25.
    and read `?%f0` as a key named U+FFFD; Jetty answered `?q=%e9` with a 500 and dropped
    `?%f0`. Pekko's own parser still refuses `?q=%zz` in words of its own
    (`JettyDifference.ILLEGAL_ESCAPES_IN_QUERY`); Jetty's detail for it becomes `URLDecoder`'s.
+
+## Closing
+
+Closed 2026-10-26, with every entry built and every acceptance target met by its median. `./gradlew build` passed
+with and without `PELICAN_REQUIRE_URING=1`; then, in one session on the `-pekko` build, `RUNS=5 benchmarks/arena.sh`
+over every contestant, `baseline` and then `json` (`raw-gannet` serves no `/json`). Allocation is async-profiler's
+`alloc --total` over 10 s of `baseline` load, two runs each, the same session.
+
+| target | measured | |
+|---|---|---|
+| `gannet-inline` ≥ 240k | 259k (251–278k) | met |
+| ≥ 82% of `raw-gannet` in the same run | 85.7% of 303k (288–319k); run by run 81.5–87.3%, median 85.8% | met; one run of five under |
+| Pelican's own allocation over `raw-gannet` ≤ 1.5 KB | 0.52–0.55 KB: `gannet-inline` 2.86–2.88 KB, `raw-gannet` 2.31–2.35 KB | met; 3.3 KB when written |
+| `jetty` ≥ 63k | 69.5k (59.7–71.2k) | met; one run of five under |
+| no parity suite, golden file or document changes | none, beyond decision 5's strict UTF-8 | met |
+
+| contestant | `baseline` rps | user µs | sys µs | `json` rps | user µs | sys µs |
+|---|--:|--:|--:|--:|--:|--:|
+| `raw-gannet` | 303k (288–319k) | 1.96 | 4.57 | | | |
+| `gannet-inline` | 259k (251–278k) | 2.79 | 4.74 | 75.1k (73.1–78.2k) | 19.64 | 6.36 |
+| `gannet` | 140k (135–145k) | 6.73 | 7.11 | 50.2k (48.3–53.6k) | 29.67 | 8.18 |
+| `jetty` | 69.5k (59.7–71.2k) | 15.47 | 12.41 | 27.2k (26.6–29.1k) | 50.41 | 19.97 |
+| `jetty-dispatcher` | 92.6k (81.3–102k) | 10.25 | 10.86 | 41.5k (40.5–42.1k) | 32.62 | 14.29 |
+| `pekko` | 20.4k (16.2–21.1k) | 80.97 | 16.74 | 20.8k (20.0–21.2k) | 67.40 | 28.37 |
+| `pekko-dispatcher` | 21.9k (21.7–27.5k) | 76.26 | 13.35 | 36.5k (33.7–37.4k) | 40.36 | 13.41 |
+
+Against the opening profile's 131k inline and 94k by default, Gannet serves 259k and 140k. The default path
+allocates 4.3 KB a request (`gannet`), 1.5 KB more than `gannet-inline` for the same work run on a virtual thread,
+which spec 0090 takes up. Header lines encoded once is still a Gannet issue, as **Not doing** says.
+

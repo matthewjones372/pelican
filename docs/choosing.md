@@ -71,9 +71,9 @@ ways and keeping those in step by hand has become a cost:
   instead, and a reviewer needs to know what each declaration does.
 - **An interpreter between the request and your code.** Measured against
   hand-written routes on the same backend in [What it costs](what-it-costs.md):
-  on Pekko with the handler on the dispatcher, a few hundred nanoseconds and
-  under a kilobyte per request behind the fastest hand-written route; on Jetty,
-  within the benchmark's error in time and 1.1 to 1.3KB more allocated. Running
+  on Pekko with the handler on the dispatcher, under a hundred nanoseconds
+  behind the fastest hand-written route, with less allocated; on Jetty, within
+  the benchmark's error in time and within half a kilobyte in allocation. Running
   synchronous handlers on a virtual thread, the default on JDK 24 and newer,
   is the largest cost measured and can be turned off for handlers that never block. These are
   in-memory measurements on one machine, on two small endpoints.

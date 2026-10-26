@@ -515,11 +515,11 @@ The interpreter is measured with JMH against the same endpoint written
 directly against each backend, and the results, their error bars and their
 limits are in [What it costs](docs/what-it-costs.md). In short: on Pekko,
 Pelican with its handler on the dispatcher is cheaper than an idiomatic
-hand-written route and a few hundred nanoseconds behind the fastest one; on
-Jetty the difference is inside the measurement's error, with about 1.1 to 1.3KB
-more allocated per request. Running a synchronous handler on a virtual thread,
+hand-written route and under a hundred nanoseconds behind the fastest one; on
+Jetty the difference is inside the measurement's error, and allocation is
+within half a kilobyte either way. Running a synchronous handler on a virtual thread,
 the default on both backends on JDK 24 and newer, is the largest cost measured on Pekko
-and adds about 9.5KB per request on Jetty; a handler that never blocks can opt
+and adds about 9.8KB per request on Jetty; a handler that never blocks can opt
 out. These are in-memory measurements on one machine, not a statement
 about production capacity.
 
