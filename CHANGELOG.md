@@ -53,6 +53,8 @@ one.
 
 ### Changed
 
+- **The javadoc jars are empty.** Dokka no longer renders the KDoc into them,
+  so javadoc.io has nothing for 1.1.0; the KDoc ships in each sources jar.
 - **Lark is now Surefold** (breaking, for `pelican-streams`). It ships in a
   minor release rather than waiting for 2.0.0 because `pelican-streams` has no
   users to break; `pelican-streams-jetty` is new in this release. The library

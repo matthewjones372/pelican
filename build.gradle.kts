@@ -1,19 +1,12 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
-// Plugin classpaths carry advisories of their own: Dokka resolves
-// `jackson-databind` 2.15.3, and Kover's coverage reporter `freemarker` 2.3.32.
-// Dependabot can act on neither -- no manifest here names either coordinate, so
-// its security job ends `security_update_dependency_not_found` on every push --
-// and an `ignore` entry is the wrong answer for anything this build also ships:
-// `pelican-jackson` publishes jackson, so ignoring the coordinate would hide an
-// advisory that does reach a released artifact. Constraining databind alone
-// covers the jackson cluster, because it pulls the 2.22.3 BOM, which carries
-// `jackson-module-kotlin` and `jackson-dataformat-xml` with it. Dokka's worker
-// runs on a classpath this block does not reach, pinned separately below.
+// Kover's coverage reporter resolves `freemarker` 2.3.32, which carries an
+// advisory. Dependabot cannot act on it -- no manifest here names the
+// coordinate, so its security job ends `security_update_dependency_not_found`
+// -- so it is pinned here rather than ignored.
 buildscript {
     dependencies {
         constraints {
-            classpath("com.fasterxml.jackson.core:jackson-databind:2.22.3")
             classpath("org.freemarker:freemarker:2.3.35")
         }
     }
@@ -37,7 +30,6 @@ plugins {
     // here directly.
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
     // Renders the KDoc into the javadoc jar the published modules ship.
-    id("org.jetbrains.dokka") version "2.2.0" apply false
     // What each published module's binary surface is, as a file somebody reads
     // in a diff. The golden-file argument, applied to the Kotlin API instead of
     // to the HTTP one.
@@ -347,33 +339,13 @@ subprojects {
     }
 
     if (name in publishedModules) {
-        apply(plugin = "org.jetbrains.dokka")
-
-        // The worker classpath named at the top of this file: the one GitHub's
-        // dependency graph reports, which the plugin classpath's constraints do
-        // not reach. `dokkaHtmlGeneratorRuntime` is the bucket its resolver
-        // extends. Dokka templates with freemarker and parses with jsoup, so
-        // both arrive here as well as on the classpath above.
-        dependencies {
-            add(
-                "dokkaHtmlGeneratorRuntime",
-                platform("com.fasterxml.jackson:jackson-bom:2.22.3"),
-            )
-            constraints {
-                add("dokkaHtmlGeneratorRuntime", "org.jsoup:jsoup:1.23.2")
-                add("dokkaHtmlGeneratorRuntime", "org.freemarker:freemarker:2.3.35")
-            }
-        }
-
         extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
             // Sources are not an optional extra for a library someone else has
-            // to debug, and Maven Central will not accept a release without a
-            // javadoc jar. Dokka fills it: an empty jar leaves javadoc.io
-            // blank, which puts the KDoc out of reach of anyone who has not
-            // cloned the repository.
+            // to debug. Maven Central will not accept a release without a javadoc
+            // jar, and an empty one satisfies it; the KDoc reads from sources.
             configure(
                 com.vanniktech.maven.publish.KotlinJvm(
-                    javadocJar = com.vanniktech.maven.publish.JavadocJar.Dokka("dokkaGeneratePublicationHtml"),
+                    javadocJar = com.vanniktech.maven.publish.JavadocJar.Empty(),
                     sourcesJar = true,
                 ),
             )

@@ -21,10 +21,9 @@ Free, and mostly absent today.
       were actually on the repository, so a search for either found nothing
       while the list here said otherwise — checked against `gh repo view` this
       time rather than against the intention.
-- [x] **Homepage URL.** Set to the published KDoc on javadoc.io, which is what
-      this entry was waiting for: two releases have now shipped a Dokka jar, so
-      there is something to point at that reads as the project's own rather
-      than as a package listing. A real docs site would replace it.
+- [ ] **Homepage URL.** It points at the published KDoc on javadoc.io, which
+      only 1.0.0 fills: from 1.1.0 the javadoc jar is empty. Point it at the
+      repository's docs, or at a real docs site when there is one.
 - [!] **Social preview.** `docs/assets/social-preview.png`, uploaded under
       Settings → General → Social preview. **The only item here with no API** —
       GitHub exposes no endpoint for it, so it has to be done in the browser.
@@ -47,8 +46,6 @@ Free, and mostly absent today.
 - [x] **`docs/cookbook.md`** — complete recipes. Agents copy whole working
       examples, not fragments.
 - [x] **`llms.txt`**, pointing at the files in this repository.
-- [x] **Dokka fills the javadoc jar.** It was `JavadocJar.Empty()`, so
-      javadoc.io showed nothing and the KDoc was unreadable without a clone.
 - [ ] **Error message quality.** A typed DSL suits coding agents because they
       compile, read the error and retry. Audit what the common mistakes
       actually print — an inference failure that names neither the endpoint nor
@@ -64,12 +61,12 @@ ranks below `github.com` for the searches that matter, and the site carried no
 theme, no navigation and no search — everything that would make a site beat a
 repository.
 
-Worth revisiting only as a real one: MkDocs Material or Dokka-integrated docs
+Worth revisiting only as a real one: MkDocs Material
 with sidebar navigation, search and versioning, once there are users asking
 questions the README does not answer.
 
-The one thing GitHub cannot render is API documentation, and that ships through
-javadoc.io from the Dokka javadoc jar, which needs no site.
+The one thing GitHub cannot render is API documentation. The javadoc jar is
+empty, so the KDoc is read from the sources jar or the repository.
 
 ## Announcing — after the above
 
