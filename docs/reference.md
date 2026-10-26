@@ -2235,8 +2235,8 @@ backend that `Stream.from(source)` and `run` are part of.
 dependencies {
     // surefold, formerly lark: pelican-streams 1.0.0 was built against lark-stream, so take a snapshot of main
     implementation("io.github.matthewjones372:pelican-streams:$pelicanVersion")
-    implementation("io.github.matthewjones372:surefold-stream:0.11.1-SNAPSHOT")
-    implementation("io.github.matthewjones372:surefold-stream-pekko:0.11.1-SNAPSHOT")
+    implementation("io.github.matthewjones372:surefold-stream:0.12.0")
+    implementation("io.github.matthewjones372:surefold-stream-pekko:0.12.0")
     // plus the Pekko block from Versions, as for any Pekko module here.
 }
 ```
@@ -2287,8 +2287,8 @@ names `surefold-stream` and its backend:
 dependencies {
     // on main, not yet released: a snapshot of main, or a local publish
     implementation("io.github.matthewjones372:pelican-streams-jetty:$pelicanVersion")
-    implementation("io.github.matthewjones372:surefold-stream:0.11.1-SNAPSHOT")
-    implementation("io.github.matthewjones372:surefold-stream-forks:0.11.1-SNAPSHOT")
+    implementation("io.github.matthewjones372:surefold-stream:0.12.0")
+    implementation("io.github.matthewjones372:surefold-stream-forks:0.12.0")
 }
 ```
 

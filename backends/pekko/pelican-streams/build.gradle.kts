@@ -1,7 +1,7 @@
 val pekkoVersion = "1.7.1"
 val pekkoHttpVersion = "1.4.1"
 val scalaBinary = "2.13"
-val surefoldVersion = "0.11.1-SNAPSHOT"
+val surefoldVersion = "0.12.0"
 
 // The seam between a streaming body and surefold's `Stream`, and nothing else: one
 // function, so that a service that never streams never sees the library and the
