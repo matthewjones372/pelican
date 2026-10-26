@@ -357,8 +357,8 @@ From the Pelican version, the same endpoint values also give:
   hatch is `params.request` (Pekko's `HttpRequest`) or an ordinary Pekko route
   mounted beside `toRoute(system)`.
 - **No interpreter.** On Pekko, with the handler on the dispatcher, Pelican
-  measured a few hundred nanoseconds and under a kilobyte per request behind
-  the fastest hand-written route, and faster than an idiomatic one. Running
+  measured under a hundred nanoseconds behind the fastest hand-written route,
+  allocating less, and faster than an idiomatic one. Running
   synchronous handlers on a virtual thread, its default on JDK 24 and newer,
   costs considerably more and can be turned off with `Handlers.onDispatcher`. See
   [What it costs](what-it-costs.md).

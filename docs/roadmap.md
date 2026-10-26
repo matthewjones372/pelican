@@ -9,10 +9,11 @@ down so it can be disagreed with.
 
 ## 1. One request pipeline, in core
 
-The steps between a matched route and a handler (decoding plain inputs,
-resolving an endpoint's codecs, refusing an oversize body, folding the CORS
-policy) are private to each interpreter, so `pelican-pekko` and `pelican-jetty`
-each carry a copy and a decode fix lands twice. Hoisting them into core is
+Routing and the decoding of path, query, header and cookie inputs are core's,
+through `spi.EndpointPlan`. The rest of the steps between a matched route and a
+handler (resolving an endpoint's codecs, refusing an oversize body, folding the
+CORS policy) are still private to each interpreter, so each backend carries a
+copy and a fix lands once per backend. Hoisting them into core is
 core-side only and leaves each backend with the parts that are genuinely its
 own: route registration, reading the body, writing the response, streaming and
 the async model.

@@ -7,25 +7,27 @@
 <text x="270.0" y="20.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="600">Time per request, µs</text>
 <line x1="270.0" y1="34.0" x2="270.0" y2="118.0" stroke="#e1e0d9" stroke-width="1"/>
 <text x="270.0" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">0</text>
-<line x1="336.7" y1="34.0" x2="336.7" y2="118.0" stroke="#e1e0d9" stroke-width="1"/>
-<text x="336.7" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">50</text>
-<line x1="403.3" y1="34.0" x2="403.3" y2="118.0" stroke="#e1e0d9" stroke-width="1"/>
-<text x="403.3" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">100</text>
+<line x1="320.0" y1="34.0" x2="320.0" y2="118.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="320.0" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">20</text>
+<line x1="370.0" y1="34.0" x2="370.0" y2="118.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="370.0" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">40</text>
+<line x1="420.0" y1="34.0" x2="420.0" y2="118.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="420.0" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">60</text>
 <line x1="470.0" y1="34.0" x2="470.0" y2="118.0" stroke="#e1e0d9" stroke-width="1"/>
-<text x="470.0" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">150</text>
+<text x="470.0" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">80</text>
 <line x1="270.0" y1="34.0" x2="270.0" y2="118.0" stroke="#c3c2b7" stroke-width="1"/>
-<line x1="370.4" y1="53.0" x2="382.4" y2="53.0" stroke="#2a78d6" stroke-width="2"/>
-<line x1="370.4" y1="48.0" x2="370.4" y2="58.0" stroke="#2a78d6" stroke-width="2"/>
-<line x1="382.4" y1="48.0" x2="382.4" y2="58.0" stroke="#2a78d6" stroke-width="2"/>
-<circle cx="376.4" cy="53.0" r="5" fill="#2a78d6" stroke="#ffffff" stroke-width="2"><title>79.8 ± 4.5</title></circle>
-<line x1="402.8" y1="79.0" x2="417.5" y2="79.0" stroke="#1baf7a" stroke-width="2"/>
-<line x1="402.8" y1="74.0" x2="402.8" y2="84.0" stroke="#1baf7a" stroke-width="2"/>
-<line x1="417.5" y1="74.0" x2="417.5" y2="84.0" stroke="#1baf7a" stroke-width="2"/>
-<circle cx="410.1" cy="79.0" r="5" fill="#1baf7a" stroke="#ffffff" stroke-width="2"><title>105.1 ± 5.5</title></circle>
-<line x1="358.3" y1="105.0" x2="441.7" y2="105.0" stroke="#eb6834" stroke-width="2"/>
-<line x1="358.3" y1="100.0" x2="358.3" y2="110.0" stroke="#eb6834" stroke-width="2"/>
-<line x1="441.7" y1="100.0" x2="441.7" y2="110.0" stroke="#eb6834" stroke-width="2"/>
-<circle cx="400.0" cy="105.0" r="5" fill="#eb6834" stroke="#ffffff" stroke-width="2"><title>97.5 ± 31.3</title></circle>
+<line x1="396.2" y1="53.0" x2="405.8" y2="53.0" stroke="#2a78d6" stroke-width="2"/>
+<line x1="396.2" y1="48.0" x2="396.2" y2="58.0" stroke="#2a78d6" stroke-width="2"/>
+<line x1="405.8" y1="48.0" x2="405.8" y2="58.0" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="401.0" cy="53.0" r="5" fill="#2a78d6" stroke="#ffffff" stroke-width="2"><title>52.4 ± 1.9</title></circle>
+<line x1="435.5" y1="79.0" x2="444.5" y2="79.0" stroke="#1baf7a" stroke-width="2"/>
+<line x1="435.5" y1="74.0" x2="435.5" y2="84.0" stroke="#1baf7a" stroke-width="2"/>
+<line x1="444.5" y1="74.0" x2="444.5" y2="84.0" stroke="#1baf7a" stroke-width="2"/>
+<circle cx="440.0" cy="79.0" r="5" fill="#1baf7a" stroke="#ffffff" stroke-width="2"><title>68 ± 1.8</title></circle>
+<line x1="380.8" y1="105.0" x2="389.8" y2="105.0" stroke="#eb6834" stroke-width="2"/>
+<line x1="380.8" y1="100.0" x2="380.8" y2="110.0" stroke="#eb6834" stroke-width="2"/>
+<line x1="389.8" y1="100.0" x2="389.8" y2="110.0" stroke="#eb6834" stroke-width="2"/>
+<circle cx="385.2" cy="105.0" r="5" fill="#eb6834" stroke="#ffffff" stroke-width="2"><title>46.1 ± 1.8</title></circle>
 <text x="506.0" y="20.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="600">Allocated per request, bytes</text>
 <line x1="506.0" y1="34.0" x2="506.0" y2="118.0" stroke="#e1e0d9" stroke-width="1"/>
 <text x="506.0" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">0</text>
@@ -38,7 +40,7 @@
 <line x1="706.0" y1="34.0" x2="706.0" y2="118.0" stroke="#e1e0d9" stroke-width="1"/>
 <text x="706.0" y="134.0" font-size="11" fill="#6b6a65" text-anchor="middle">20k</text>
 <line x1="506.0" y1="34.0" x2="506.0" y2="118.0" stroke="#c3c2b7" stroke-width="1"/>
-<rect x="506.0" y="46.0" width="142.5" height="14" rx="2" fill="#2a78d6"><title>1.425e+04 ± 106</title></rect>
-<rect x="506.0" y="72.0" width="157.0" height="14" rx="2" fill="#1baf7a"><title>1.57e+04 ± 150</title></rect>
-<rect x="506.0" y="98.0" width="122.3" height="14" rx="2" fill="#eb6834"><title>1.223e+04 ± 352</title></rect>
+<rect x="506.0" y="46.0" width="139.8" height="14" rx="2" fill="#2a78d6"><title>1.398e+04 ± 63</title></rect>
+<rect x="506.0" y="72.0" width="153.7" height="14" rx="2" fill="#1baf7a"><title>1.537e+04 ± 96</title></rect>
+<rect x="506.0" y="98.0" width="121.2" height="14" rx="2" fill="#eb6834"><title>1.212e+04 ± 311</title></rect>
 </svg>
