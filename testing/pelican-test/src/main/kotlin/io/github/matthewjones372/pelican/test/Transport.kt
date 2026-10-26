@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican.test
 
+import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.Method
 
 /**
@@ -57,11 +58,32 @@ class RequestSpec(
     override fun toString() = "$method $target"
 }
 
-class ResponseSpec(
+/**
+ * A response as text or as the bytes it arrived as, whichever the transport had. The client decodes the form it
+ * was given; the other is converted on first read, as UTF-8, and a race only converts it twice.
+ */
+class ResponseSpec private constructor(
     val status: Int,
     val headers: List<Pair<String, String>>,
-    val body: String,
+    private var text: String?,
+    private var raw: ByteArray?,
 ) {
+    constructor(status: Int, headers: List<Pair<String, String>>, body: String) : this(status, headers, body, null)
+
+    /** Not copied: the transport hands the array over and does not write to it again. */
+    constructor(status: Int, headers: List<Pair<String, String>>, bytes: ByteArray) :
+        this(status, headers, null, bytes)
+
+    val body: String
+        get() = text ?: String(checkNotNull(raw), Charsets.UTF_8).also { text = it }
+
+    val bytes: ByteArray
+        get() = raw ?: checkNotNull(text).toByteArray(Charsets.UTF_8).also { raw = it }
+
+    /** Read from the bytes when the transport supplied them, so a String is never made just to be parsed. */
+    internal fun <T> decodedBy(codec: BodyCodec<T>): T =
+        raw.let { bytes -> if (bytes != null) codec.decodeFrom(bytes) else codec.decodeFromString(body) }
+
     fun header(name: String): String? =
         headers.firstOrNull { it.first.equals(name, ignoreCase = true) }?.second
 

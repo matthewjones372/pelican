@@ -71,7 +71,8 @@ cache if `ShopCodecs` does not already cache.
 - [x] **`spec-0091-benchmark`** ([#355](https://github.com/matthewjones372/pelican/pull/355)):
       `ClientAllocationBenchmark` in `:benchmarks`.
       Done when: `./gradlew :benchmarks:jmh -PbenchmarkArgs=ClientAllocation` gives the table.
-- [ ] **`spec-0091-codec-once`**: `ApiClient` resolves a codec once per type and media type.
+- [x] **`spec-0091-codec-once`** ([#356](https://github.com/matthewjones372/pelican/pull/356)):
+      `ApiClient` resolves a codec once per type and media type.
       Done when: the `inMemoryCall` rows fall by the per-call codec row's excess over the held-codec row.
 - [ ] **`spec-0091-bytes`**: `ResponseSpec(bytes)`, decoding from it, the transports, `.api`, docs, changelog.
       Done when: a bytes-built response decodes without reading `body`.

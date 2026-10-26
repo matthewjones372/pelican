@@ -300,7 +300,7 @@ class ApiClient(
         return when {
             declared != null -> Outcome.Err(
                 declared,
-                codecFor(declared.type, declared.mediaType).decodeFromString(res.body) as E,
+                res.decodedBy(codecFor(declared.type, declared.mediaType)) as E,
                 declared.headers.mapNotNull { h -> res.header(h.name)?.let { h.name to it } },
             )
 
@@ -343,14 +343,14 @@ class ApiClient(
 
     private fun decodeSuccess(endpoint: Endpoint<*, *>, out: Output<*>, res: ResponseSpec): Any? =
         when (out) {
-            is JsonOutput<*> -> codecFor(out.type).decodeFromString(res.body)
+            is JsonOutput<*> -> res.decodedBy(codecFor(out.type))
 
             is TextOutput -> res.body
 
             // Read back by the same media type it was written as, which is the
             // one thing a `Codecs` answering that type has to be able to do
             // for a test to assert on the value rather than on the bytes.
-            is MediaOutput<*> -> codecFor(out.type, out.mediaType).decodeFromString(res.body)
+            is MediaOutput<*> -> res.decodedBy(codecFor(out.type, out.mediaType))
 
             // This client names no `Accept`, so the server sends the first
             // rendering. Which one it sent is on the response, and that is what
@@ -438,7 +438,7 @@ class ApiClient(
 
             // The whole body is one JSON array, so the codec reads List<T>.
             is JsonArrayOutput<*> ->
-                codecFor(listTypeOf(out.type)).decodeFromString(res.body) as List<*>
+                res.decodedBy(codecFor(listTypeOf(out.type))) as List<*>
 
             else -> error("$endpoint does not stream; use call(...) rather than collect(...)")
         }
