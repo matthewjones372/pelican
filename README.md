@@ -264,7 +264,7 @@ with http4k's contracts, Ktor's OpenAPI plugins, Spring, Micronaut, Quarkus,
 tapir and writing the document first, and ends with the cases where Pelican is
 the wrong choice. For evidence from outside this repository,
 [petshop](https://github.com/matthewjones372/petshop) and
-[tweet-street](https://github.com/matthewjones372/tweet-street) are two larger
+[surefold-bank](https://github.com/matthewjones372/surefold-bank) are two larger
 services that use Pelican; petshop's README says where it helped and where it
 did not.
 
