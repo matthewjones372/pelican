@@ -203,9 +203,16 @@ internal fun Api.keyed(
         } else {
             val scope = IdempotencyScope(endpoint.operationName, subjectOf(endpoint, params), sent)
             when (val held = store.reserve(scope, responses.fingerprint(params, key), settings.lease)) {
-                Reservation.Reserved -> attempt(params, invoke).whenComplete { result, failure ->
-                    if (failure == null) store.complete(scope, responses.kept(params, result), settings.ttl)
-                    else store.release(scope)
+                Reservation.Reserved -> {
+                    // What a filter set before the handler ran, a request id say, belongs to this request alone.
+                    val setByFilters = params.responseHeaders()
+                    attempt(params, invoke).whenComplete { result, failure ->
+                        if (failure == null) {
+                            store.complete(scope, responses.kept(params, result, setByFilters), settings.ttl)
+                        } else {
+                            store.release(scope)
+                        }
+                    }
                 }
 
                 Reservation.InFlight -> throw ApiException(
@@ -241,7 +248,7 @@ private class KeptResponses(private val endpoint: Endpoint<*, *>, private val co
     private val declared = endpoint.output as? DeclaredResponses<*, *>
     private val outputs: List<Any> = declared?.let { it.successes + it.failures } ?: listOf(endpoint.output)
 
-    fun kept(params: Params, result: Any?): StoredResponse {
+    fun kept(params: Params, result: Any?, setByFilters: List<Pair<String, String>>): StoredResponse {
         val (output, value, headers) = when (result) {
             is Outcome.Ok<*> -> Triple(checkNotNull(declared).successNamedBy(result), result.value, result.headers)
             is Outcome.Err<*> -> Triple(checkNotNull(declared).failureNamedBy(result), result.error, result.headers)
@@ -254,11 +261,8 @@ private class KeptResponses(private val endpoint: Endpoint<*, *>, private val co
             typeOf(output) == null -> null
             else -> JSON
         }
-        // Only what the endpoint declares: a filter's own header, a request id, belongs to the request it was set on.
-        val declaredHeaders = params.responseHeaders().filter { (name, _) ->
-            endpoint.responseHeaders.any { it.name.equals(name, ignoreCase = true) }
-        }
-        return StoredResponse(statusOf(output), listOf(position) + declaredHeaders + headers, mediaType, body)
+        val setByHandler = params.responseHeaders().filter { it !in setByFilters }
+        return StoredResponse(statusOf(output), listOf(position) + setByHandler + headers, mediaType, body)
     }
 
     fun replayed(params: Params, response: StoredResponse): Any? {

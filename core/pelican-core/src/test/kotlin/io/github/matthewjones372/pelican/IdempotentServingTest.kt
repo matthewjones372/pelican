@@ -26,13 +26,14 @@ class IdempotentServingTest {
     private val order = jsonBody<String>()
     private val soldOut = errorJson<String>(410, "That product is no longer sold")
     private val receipt = responseHeader<String>("X-Receipt")
+    private val requestId = responseHeader<String>("X-Request-Id")
 
     private val placeOrder = endpoint(order) {
         post("orders")
         operationId = "placeOrder"
         authenticatedBy(caller)
         idempotencyKey()
-        emits(receipt)
+        emits(receipt, requestId)
         json<String>(201).orFail(soldOut)
     }
 
@@ -75,7 +76,8 @@ class IdempotentServingTest {
             authenticate(bearer) { c -> c.bearerToken()?.let { Identity(it) } }
             idempotency(store)
             filter { params, next ->
-                params.setRawHeader("X-Request-Id", "req-${requests.incrementAndGet()}")
+                // Declared on the endpoint, so only when it was set tells it apart from the handler's own.
+                if (params.endpoint === placeOrder) params.setHeader(requestId, "req-${requests.incrementAndGet()}")
                 next(params)
             }
         },
