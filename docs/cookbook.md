@@ -26,25 +26,13 @@ dependencies {
 }
 ```
 
-**These are not in 1.0.0.** `pelican-bom` and the Jetty modules are on `main`
-and not yet in a release. On 1.0.0, use `pelican-pekko`, `pelican-pekko-docs`
-and `pelican-test-pekko` with explicit `:1.0.0` versions, plus the Pekko
-dependencies your service names itself, as in
-[Getting started](../README.md#getting-started). Every binder below exists
-under the same name in `io.github.matthewjones372.pelican.pekko`; a streaming
-handler returns a Pekko `Source` where Jetty takes a `Sequence`.
-[On Pekko](#on-pekko) is the 1.0.0 version of the first recipe. To build
-against `main` before a release, Central's snapshot repository carries
-`-SNAPSHOT` builds of every module, BOM and Jetty family included; a snapshot
-is a moving build with no stability promise:
-
-```kotlin
-// settings.gradle.kts or build.gradle.kts
-repositories {
-    mavenCentral()
-    maven("https://central.sonatype.com/repository/maven-snapshots/")
-}
-```
+`pelicanVersion` is the release you pin, `val pelicanVersion = "1.1.0"`. To
+serve on Pekko HTTP instead, use `pelican-pekko`, `pelican-pekko-docs` and
+`pelican-test-pekko`, plus the Pekko dependencies your service names itself,
+as in [Getting started](../README.md#getting-started). Every binder below
+exists under the same name in `io.github.matthewjones372.pelican.pekko`; a
+streaming handler returns a Pekko `Source` where Jetty takes a `Sequence`.
+[On Pekko](#on-pekko) is the first recipe on Pekko.
 
 A recipe needing a module beyond these carries its own `dependencies` block.
 Imports are written out one name per line, so the import block says where each
@@ -657,9 +645,9 @@ working; read the diff and decide whether the break was intended. See
 
 ## On Pekko
 
-Serve the first recipe's `greet` on Pekko HTTP, the backend released in 1.0.0,
-or on an actor system the service already runs. The description does not
-change; the binders, `startWithDocs` and the dependencies do. This is
+Serve the first recipe's `greet` on Pekko HTTP, or on an actor system the
+service already runs. The description does not change; the binders,
+`startWithDocs` and the dependencies do. This is
 [`example/hello/FirstEndpointOnPekko.kt`](../example/src/main/kotlin/example/hello/FirstEndpointOnPekko.kt),
 verbatim, run with `./gradlew :example:runFirstEndpointOnPekko`.
 
@@ -670,15 +658,15 @@ of `_2.13` on every Pekko line.
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")       // brings pelican-core; compiles against Pekko
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")  // startWithDocs and Swagger UI
+    implementation("io.github.matthewjones372:pelican-pekko:1.1.0")       // brings pelican-core; compiles against Pekko
+    implementation("io.github.matthewjones372:pelican-jackson:1.1.0")
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.1.0")  // startWithDocs and Swagger UI
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
     implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
-    testImplementation("io.github.matthewjones372:pelican-test:1.0.0")
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.0.0") // inMemory() on Pekko
+    testImplementation("io.github.matthewjones372:pelican-test:1.1.0")
+    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.1.0") // inMemory() on Pekko
 }
 ```
 

@@ -57,7 +57,7 @@ sees the library, and the library never learns what an endpoint is.
 
 ## Measured
 
-The library is published: **`io.github.matthewjones372:lark-stream:0.4.0`**, in
+The library is published: **`io.github.matthewjones372:surefold-stream:0.4.0`**, in
 `matthewjones372/lark`, on Maven Central since 2026-09-18. Its own README
 describes it in this spec's words — *"a stream that names its failure"*. The
 block this spec put on itself is lifted.
@@ -82,18 +82,18 @@ decided 2026-09-04, a day later. Its **Shape** here (*"`pelican-pekko` plus the
 library"*) therefore predates that decision, and taken literally would undo it:
 
 ```kotlin
-// lark-stream/build.gradle.kts
+// surefold-stream/build.gradle.kts
 api(platform("org.apache.pekko:pekko-bom_2.13:1.2.1"))
 api("org.apache.pekko:pekko-stream_2.13")
 ```
 
-An `api(lark-stream)` republishes `pekko-stream_2.13` transitively, so a service
+An `api(surefold-stream)` republishes `pekko-stream_2.13` transitively, so a service
 on the Scala 3 cross-build gets both suffixes and refuses to start — exactly the
 bug the other 0037 exists to prevent, arriving through a module that never names
 Pekko.
 
 **Both halves are `compileOnly`,** chosen by the maintainer, 2026-09-22. The
-consumer already declares Pekko; they now declare `lark-stream` beside it, and
+consumer already declares Pekko; they now declare `surefold-stream` beside it, and
 `DependenciesTest` asserts the published runtime classpath holds neither.
 
 ### Two things this spec had slightly wrong
@@ -104,7 +104,7 @@ consumer already declares Pekko; they now declare `lark-stream` beside it, and
 the doc comment show the `when`.
 
 **The system is not supplied at conversion.** This spec says `toStream` is *"on
-the system the request arrived on, as `runWith` is today"*. lark takes it at the
+the system the request arrived on, as `runWith` is today"*. surefold takes it at the
 far end instead, at `run(system)`, so `toStream` takes none and the caller
 chooses. In practice that is the same system: a service starts it and closes
 over it, which is what `ToStreamTest` does.
@@ -118,8 +118,8 @@ attributes and the response headers. No system, no materializer.
 The system is one field away. `PekkoFrames` holds the one the request arrived
 on, `internal`, and the only public door onto it is `runWith(sink)`. So
 exposing it would publish no new *capability*: a handler can already materialise
-whatever graph it likes on that system by handing `runWith` a `Sink`. lark
-cannot use that door only because `Run`'s graph is `internal` to lark, which
+whatever graph it likes on that system by handing `runWith` a `Sink`. surefold
+cannot use that door only because `Run`'s graph is `internal` to surefold, which
 leaves `run(provider)` as the way in.
 
 **Decided by the maintainer, 2026-09-23: nothing is exposed.** Nobody is stuck.
@@ -146,7 +146,7 @@ The question asked whether `Exit` needs an `Outcome` conversion, and named
 `Died` as the case such a conversion would have to decide. `Died` was already
 decided, twice, by parties that are not this spec:
 
-- lark's own `awaitExit` does `Done` → the value, `Failed` → `raise`, `Died` →
+- surefold's own `awaitExit` does `Done` → the value, `Failed` → `raise`, `Died` →
   rethrow the cause.
 - `AGENTS.md`: declared failures are values in the return type, and throwing is
   for what nobody declared.
@@ -176,11 +176,11 @@ On the `CompletionStage` rather than on `Exit`, because `run(system)` returns
 one and `handledByOrFail` takes one; converting at the `Exit` leaves the caller
 a `thenApply` to write, which is exactly where the hand-rolled `else` came from.
 
-Not in `pelican-arrow`, though lark pulls `arrow-core` transitively and
-`awaitExit` is the Arrow-shaped door already: it blocks, through `lark-pekko`'s
+Not in `pelican-arrow`, though surefold pulls `arrow-core` transitively and
+`awaitExit` is the Arrow-shaped door already: it blocks, through `surefold-pekko`'s
 `await`, which a handler returning a `CompletionStage` should not.
 
-The bounds above were compiled against lark 0.4.0 and core rather than sketched,
+The bounds above were compiled against surefold 0.4.0 and core rather than sketched,
 because the last thing this spec sketched was `Exit.getOrElse`.
 
 #### As built, and the one thing that had to be measured
@@ -195,7 +195,7 @@ written by the entry that introduced the seam.
 
 **A defect arrives as `Exit.Died` on a *successful* stage.** Whether a throwable
 raised inside a stage reaches `toOutcome` at all, or fails the stage before it,
-decides whether the conversion can do anything about it — and nothing in lark's
+decides whether the conversion can do anything about it — and nothing in surefold's
 signatures says which. Measured rather than assumed:
 
 ```
@@ -216,10 +216,10 @@ socket, because an end-to-end 500 cannot say which branch produced it.
 
 1. ~~**A module, or one function in `pelican-pekko`?**~~ **Taken: the module.**
    The reasoning got stronger than the draft knew — a function in
-   `pelican-pekko` would have put `lark-stream`'s `_2.13` Pekko on every Pekko
+   `pelican-pekko` would have put `surefold-stream`'s `_2.13` Pekko on every Pekko
    service's classpath, not merely the library.
 2. ~~**Does `Exit` need an `Outcome` conversion?**~~ **Answered: yes**, and its
-   shape is forced rather than chosen — lark and `AGENTS.md` had both already
+   shape is forced rather than chosen — surefold and `AGENTS.md` had both already
    decided `Died`. Drafted as `spec-0037-exit-to-outcome`; see **The
    conversion**.
 3. ~~**Should `pelican-pekko` expose the request's actor system?**~~

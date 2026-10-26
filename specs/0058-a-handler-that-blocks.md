@@ -20,7 +20,7 @@ a generated client joined. Petshop's handlers block for up to three seconds on
 an ask. The dispatcher has as many threads as cores, so a few slow handlers
 stall every request on the server, and the parsing, routing and response
 writing that Pekko runs on those same threads stall with them. It holds at
-petshop's 200 requests a second. At lark-bank's thousands of requests a second,
+petshop's 200 requests a second. At surefold-bank's thousands of requests a second,
 each blocking on an entity ask to another node, it does not hold.
 
 Today a service avoids this by switching to `handledByOrFail` and writing
@@ -93,7 +93,7 @@ Answered 2026-09-27, taking each recommendation:
 1. **The default, or opt-in?** The default. `Handlers.onDispatcher` is the
    opt-out.
 2. **Should the executor be per endpoint?** No. One per route.
-3. **Should a `LarkLocal`/OTel context cross the hop?** Not by capturing it.
+3. **Should a `SurefoldLocal`/OTel context cross the hop?** Not by capturing it.
    The hop is taken before the filter chain, so filters run on the handler's
    thread too and whatever context a filter opens is the handler's. The
    default executor is the JDK's thread-per-task executor, which the OTel

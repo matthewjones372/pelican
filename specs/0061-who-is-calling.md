@@ -7,7 +7,7 @@ verifies a token itself, and throws to refuse; then it has nowhere typed to put 
 header again or reaches for a thread-local. The OpenAPI document says nothing of it unless the service also
 declares a `SecurityRequirement` by hand, which can then disagree with what the filter does.
 
-lark-bank needs this now, for every endpoint: customers, support staff and ops calling the same API, each allowed
+surefold-bank needs this now, for every endpoint: customers, support staff and ops calling the same API, each allowed
 different things, signed in through an OpenID Connect provider (Pocket ID). bank-checks and bank-approvals will need
 the same. Three services writing the same token verification is three chances to get it subtly wrong.
 
@@ -58,7 +58,7 @@ api(routes) { authenticate(oidcScheme, by = bearerOrSession) }
 ```kotlin
 val pocketId = oidc(
     issuer = "https://id.home.arpa",          // discovery, and its signing keys, fetched and cached
-    audience = "lark-bank",
+    audience = "surefold-bank",
     groupsClaim = "groups",
 )
 val oidcScheme = pocketId.scheme              // the document's openIdConnect scheme, from the same value

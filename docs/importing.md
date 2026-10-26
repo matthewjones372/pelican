@@ -14,13 +14,13 @@ off the application's classpath with a configuration of its own:
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.0.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.1.0" }
 
 val pelicanImport = configurations.register("pelicanImport")
 
 dependencies {
-    implementation("io.github.matthewjones372:pelican-core:1.0.0")    // what the generated file compiles against
-    pelicanImport("io.github.matthewjones372:pelican-import:1.0.0")   // what the task runs
+    implementation("io.github.matthewjones372:pelican-core:1.1.0")    // what the generated file compiles against
+    pelicanImport("io.github.matthewjones372:pelican-import:1.1.0")   // what the task runs
 }
 
 pelican {
@@ -111,8 +111,7 @@ operation, in the binder for each output kind. It is written once and never
 overwritten, because after the first run it is your service. Keep it in a
 committed source root: in an `outputDir` inside `build/`, the directory is
 emptied each run and the stub is regenerated. `pekko` stubs compile against
-`pelican-pekko` (in 1.0.0); `jetty` stubs compile against `pelican-jetty`
-(on `main`, not yet released).
+`pelican-pekko`; `jetty` stubs compile against `pelican-jetty`.
 
 `codec` matters for a `oneOf`. With `jackson`, the sealed interface carries
 `@JsonTypeInfo` and `@JsonSubTypes` and nothing else is annotated. With

@@ -3,7 +3,7 @@
 Linked from the [README](../README.md). Two endpoints written twice, once with
 Pelican and once directly against Pekko HTTP with swagger-core annotations, so
 the differences can be read in code rather than taken on trust. Both versions
-run on Pekko HTTP, which is the backend in the 1.0.0 release.
+run on Pekko HTTP.
 
 The endpoints:
 
@@ -202,9 +202,9 @@ in place of the `Reader` call.
 
 ```kotlin
 // dependencies {
-//     implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
-//     implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
-//     implementation("io.github.matthewjones372:pelican-pekko-docs:1.0.0")
+//     implementation("io.github.matthewjones372:pelican-pekko:1.1.0")
+//     implementation("io.github.matthewjones372:pelican-jackson:1.1.0")
+//     implementation("io.github.matthewjones372:pelican-pekko-docs:1.1.0")
 //     // Pekko is compileOnly in Pelican, so the service names its own
 //     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
 //     implementation("org.apache.pekko:pekko-actor-typed_2.13")

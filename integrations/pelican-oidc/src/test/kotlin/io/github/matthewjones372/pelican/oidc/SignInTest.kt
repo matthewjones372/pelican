@@ -36,7 +36,7 @@ class SignInTest {
     private val port = ServerSocket(0).use { it.localPort }
     private val base = "http://127.0.0.1:$port"
 
-    private val pocketId = oidc(provider.issuer, audience = "lark-bank")
+    private val pocketId = oidc(provider.issuer, audience = "surefold-bank")
     private val signIn = pocketId.signIn(
         clientId = "bank-pages",
         callbackUrl = "$base/callback",

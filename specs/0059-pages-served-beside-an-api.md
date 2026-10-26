@@ -3,7 +3,7 @@
 ## Problem
 
 A service built on Pelican often has a few pages of its own next to its endpoints: a small UI, a status page, a
-demo. Pelican serves endpoints and its own documentation page, and nothing else. lark-bank's customer and ops pages
+demo. Pelican serves endpoints and its own documentation page, and nothing else. surefold-bank's customer and ops pages
 (its specs 0006 and 0007) are HTML, JavaScript and CSS from the classpath. To serve them, the bank drops to
 `Api.start(system, port, host) { route }` and concatenates Pekko's `getFromResourceDirectory` with
 `routeWithDocs`. That works, but the files then sit outside everything Pelican does for a route: CORS, the metrics

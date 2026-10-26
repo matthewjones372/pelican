@@ -15,7 +15,7 @@ Billing.subscribe(signup).fold(
 )
 ```
 
-lark-bank wrote a private `answer` helper to stop repeating it. That helper is this module's missing overload.
+surefold-bank wrote a private `answer` helper to stop repeating it. That helper is this module's missing overload.
 
 ## Not doing
 

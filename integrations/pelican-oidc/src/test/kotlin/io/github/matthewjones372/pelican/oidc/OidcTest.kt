@@ -65,10 +65,10 @@ class OidcTest {
         }
     }
 
-    private val verifier = oidc(issuer, audience = "lark-bank", clock = clock, fetch = provider)
+    private val verifier = oidc(issuer, audience = "surefold-bank", clock = clock, fetch = provider)
 
     private fun claims(
-        audience: String = "lark-bank",
+        audience: String = "surefold-bank",
         expires: Instant = now.plusSeconds(300),
         from: String = issuer,
     ) = JWTClaimsSet.Builder()
@@ -120,7 +120,7 @@ class OidcTest {
 
     @Test
     fun `a token for another audience is refused`() {
-        refused(signed(claims(audience = "bank-checks"))) shouldContain "not for lark-bank"
+        refused(signed(claims(audience = "bank-checks"))) shouldContain "not for surefold-bank"
     }
 
     @Test
@@ -169,7 +169,7 @@ class OidcTest {
     @Test
     fun `and HMAC cannot be allowed at all`() {
         shouldThrow<IllegalArgumentException> {
-            oidc(issuer, "lark-bank", algorithms = setOf("RS256", "HS256"), fetch = provider)
+            oidc(issuer, "surefold-bank", algorithms = setOf("RS256", "HS256"), fetch = provider)
         }.message shouldContain "HMAC"
     }
 
@@ -195,7 +195,7 @@ class OidcTest {
 
     @Test
     fun `leeway is configurable`() {
-        val strict = oidc(issuer, "lark-bank", leeway = 0.seconds, clock = clock, fetch = provider)
+        val strict = oidc(issuer, "surefold-bank", leeway = 0.seconds, clock = clock, fetch = provider)
         shouldThrow<Unauthenticated> {
             strict.authenticate(bearing(signed(claims(expires = now.minusSeconds(1)))))
         }

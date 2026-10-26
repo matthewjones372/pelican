@@ -80,7 +80,9 @@ public final class io/github/matthewjones372/pelican/test/RequestSpec {
 
 public final class io/github/matthewjones372/pelican/test/ResponseSpec {
 	public fun <init> (ILjava/util/List;Ljava/lang/String;)V
+	public fun <init> (ILjava/util/List;[B)V
 	public final fun getBody ()Ljava/lang/String;
+	public final fun getBytes ()[B
 	public final fun getContentType ()Ljava/lang/String;
 	public final fun getHeaders ()Ljava/util/List;
 	public final fun getStatus ()I

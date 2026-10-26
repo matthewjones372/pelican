@@ -22,18 +22,18 @@ into tools:
 | `pelican-mcp` | the tool list and a dispatch, as values | `pelican-core`, [`pelican-schema`](schemas.md) | 1.0.0 |
 | `pelican-mcp-server` | the protocol: stdio via `mcpServe`, and the HTTP half a backend mounts | `pelican-mcp` | 1.0.0 |
 | `pelican-pekko-mcp` | `/mcp` on Pekko HTTP | `pelican-pekko`, `pelican-mcp-server` | 1.0.0 |
-| `pelican-jetty-mcp` | `/mcp` on Jetty 12 | `pelican-jetty`, `pelican-mcp-server` | on `main` only |
+| `pelican-jetty-mcp` | `/mcp` on Jetty 12 | `pelican-jetty`, `pelican-mcp-server` | 1.1.0 |
 
-None of them depends on an MCP SDK. On 1.0.0, serving tools over HTTP means
-Pekko, and Pekko itself is yours to declare:
+None of them depends on an MCP SDK. On Pekko, Pekko itself is yours to
+declare:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.0.0")
-    implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
-    implementation("io.github.matthewjones372:pelican-mcp:1.0.0")         // the tools as values
-    implementation("io.github.matthewjones372:pelican-mcp-server:1.0.0")  // spoken over stdio
-    implementation("io.github.matthewjones372:pelican-pekko-mcp:1.0.0")   // and on /mcp
+    implementation("io.github.matthewjones372:pelican-pekko:1.1.0")
+    implementation("io.github.matthewjones372:pelican-jackson:1.1.0")
+    implementation("io.github.matthewjones372:pelican-mcp:1.1.0")         // the tools as values
+    implementation("io.github.matthewjones372:pelican-mcp-server:1.1.0")  // spoken over stdio
+    implementation("io.github.matthewjones372:pelican-pekko-mcp:1.1.0")   // and on /mcp
     // Pelican compiles against Pekko and ships none of it.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
@@ -44,10 +44,9 @@ dependencies {
 
 `pelican-mcp-server` and `pelican-mcp` arrive through `pelican-pekko-mcp` as
 `api` dependencies; they are listed so the block reads the same for a service
-that only wants stdio. `pelican-jetty-mcp` and the rest of the Jetty family are
-not yet in a release; see
-[the README](../README.md#jetty-kotlinx-and-the-bom-on-main-not-yet-released)
-for snapshots.
+that only wants stdio. On Jetty, declare `pelican-jetty` and
+`pelican-jetty-mcp` in place of `pelican-pekko` and `pelican-pekko-mcp`, and
+drop the Pekko lines: `pelican-jetty` brings Jetty.
 
 ```kotlin
 val tools = ordersSpec().mcpTools(options)              // descriptions only
@@ -273,7 +272,7 @@ session over two in-memory streams is a test.
 **Over HTTP**, on the port the endpoints are already served from. This is the
 request/response half of Streamable HTTP: a POST carrying one JSON-RPC message
 is answered `200` with one `application/json` message, or `202` with no body
-for a notification. On Pekko (1.0.0):
+for a notification. On Pekko:
 
 ```kotlin
 import io.github.matthewjones372.pelican.pekko.mcp.routeWithMcp
@@ -282,7 +281,7 @@ import io.github.matthewjones372.pelican.pekko.start
 val server = ordersApi().start(port = 8080) { system -> routeWithMcp(system, toolOptions) }
 ```
 
-On Jetty (`main` only), as `example/src/main/kotlin/example/mcp/Main.kt` does:
+On Jetty, as `example/src/main/kotlin/example/mcp/Main.kt` does:
 
 ```kotlin
 import io.github.matthewjones372.pelican.jetty.mcp.handlerWithMcp

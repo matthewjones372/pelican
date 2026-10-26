@@ -7,19 +7,7 @@ Pelican deliberately does not do are a different list:
 No dates and no version numbers. The order is an argument about value, written
 down so it can be disagreed with.
 
-## 1. Release what is on `main`
-
-`pelican-jetty`, `pelican-jetty-docs`, `pelican-jetty-mcp`, `pelican-test-jetty`,
-`pelican-client-jetty`, `pelican-streams-jetty`, `pelican-kotlinx` and
-`pelican-bom` are built, tested and documented on `main`, and are in no release
-yet. They are listed under "Unreleased" in the [changelog](../CHANGELOG.md).
-Until they are released, a 1.0.0 build uses `pelican-pekko` and Jackson; see
-[Getting started](../README.md#getting-started).
-
-First, because it is finished work that nobody outside the repository can
-depend on yet.
-
-## 2. One request pipeline, in core
+## 1. One request pipeline, in core
 
 The steps between a matched route and a handler (decoding plain inputs,
 resolving an endpoint's codecs, refusing an oversize body, folding the CORS
@@ -32,7 +20,7 @@ the async model.
 This comes before any further backend, because every backend added before it
 is one more copy to keep in step.
 
-## 3. Error messages a retry loop can converge on
+## 2. Error messages a retry loop can converge on
 
 A typed DSL suits coding agents because they compile, read the error and try
 again. That only works if the error says what went wrong. The work is an audit
@@ -40,7 +28,7 @@ of what common mistakes actually print, starting with inference failures that
 name neither the endpoint nor the declared type, and a fix for each one that
 does not point at its cause.
 
-## 4. A filter that can change the response
+## 3. A filter that can change the response
 
 Filters compose, run outermost first, narrow with `onlyWhen` and reject by
 throwing. They cannot transform a response with its type intact: the chain
@@ -54,7 +42,7 @@ acceptable is leaving it undecided.
 **Touches** `Filter.kt` and the [Filters](reference.md#filters) section of the
 reference.
 
-## 5. OpenAPI 3.2.0 as the default
+## 4. OpenAPI 3.2.0 as the default
 
 `pelican-openapi` writes 3.1.0 unless asked for 3.2.0. The default stays there
 because swagger-parser, which `openapi-generator` and most of the JVM ecosystem
@@ -65,7 +53,7 @@ failing, the default moves to 3.2.0.
 Blocked on swagger-parser. See
 [Which version the document says](reference.md#which-version-the-document-says-and-how-to-choose).
 
-## 6. The cover check, at compile time
+## 5. The cover check, at compile time
 
 `api { covers = ... }` fails the `Api` constructor when a described endpoint is
 never bound. That is a runtime check, one test away from useless. A KSP

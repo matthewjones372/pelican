@@ -47,4 +47,4 @@ alternative is one getter per backend in each backend module, which keeps users 
 
 ## Decisions
 
-Matt asked for this on 2026-10-15: users should not write the bridge. Lark spec 0140 is the companion.
+Matt asked for this on 2026-10-15: users should not write the bridge. Surefold spec 0140 is the companion.

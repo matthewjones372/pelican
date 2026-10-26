@@ -35,7 +35,7 @@ class HttpClientTransport(
         }
         request.headers.forEach { (name, value) -> builder.header(name, value) }
 
-        val res = client.send(builder.build(), HttpResponse.BodyHandlers.ofString())
+        val res = client.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray())
         val headers = res.headers().map().flatMap { (name, values) -> values.map { name to it } }
         return ResponseSpec(res.statusCode(), headers, res.body())
     }

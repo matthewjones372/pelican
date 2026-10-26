@@ -88,27 +88,22 @@ ways and keeping those in step by hand has become a cost:
   declared but missing from the path, a missing codec or an unbound endpoint
   listed in `covers` fails when the `Api` is constructed. A test that builds
   the `Api` catches them; the compiler does not.
-- **A young dependency.** 1.0.0 is the first stable release, maintained mainly
-  by one person.
+- **A young dependency.** 1.0.0 was the first stable release, and Pelican is
+  maintained mainly by one person.
 
 ## Before adopting it
 
-A checklist for a team evaluating Pelican 1.0.0:
+A checklist for a team evaluating Pelican 1.1.0:
 
-- **The JDK.** 1.0.0's library modules are compiled for JDK 25, so a
-  service on 1.0.0 must run on 25 or newer. On `main`, not yet released, they
-  target JDK 21, except `pelican-streams`, `pelican-streams-jetty` and the
-  `pelican-gannet` modules (25), and synchronous handlers run on platform
-  threads below JDK 24. The Gradle plugin
+- **The JDK.** The library modules target JDK 21, except `pelican-streams`,
+  `pelican-streams-jetty` and the `pelican-gannet` modules (25), and
+  synchronous handlers run on platform threads below JDK 24. The Gradle plugin
   needs Java 21 or newer for the build. See [Versions](reference.md#versions)
   and [Where a handler runs](reference.md#where-a-handler-runs).
-- **Backend.** `pelican-pekko` is the released backend. Pelican declares
-  Pekko `compileOnly`, so the service names its own Pekko and Pekko HTTP
-  versions and Scala cross-build (`_2.13` or `_3`). The Jetty 12 backend, its
-  docs, MCP, test, client and streams modules, `pelican-kotlinx` and the BOM
-  are on `main` and not in any release; using them today means a snapshot,
-  with no stability promise. See
-  [Getting started](../README.md#getting-started).
+- **Backend.** Two backends are released: `pelican-pekko` and `pelican-jetty`
+  (Jetty 12). Pelican declares Pekko `compileOnly`, so a Pekko service names
+  its own Pekko and Pekko HTTP versions and Scala cross-build (`_2.13` or
+  `_3`). See [Getting started](../README.md#getting-started).
 - **A first stable release.** The API is frozen under the contract described
   [below](#what-the-api-promises-from-10), but it has a short track record.
   Pin exact versions.
@@ -121,8 +116,8 @@ A checklist for a team evaluating Pelican 1.0.0:
 - **Interpreter cost.** Read [What it costs](what-it-costs.md) and decide
   whether the virtual-thread default suits your handlers.
 - **Client transports.** A generated client sends through a `ClientTransport`.
-  In 1.0.0 the shipped adapter is `pelican-client-pekko`; the Jetty adapter is
-  on `main` only. Anything else (OkHttp, the JDK client) is an adapter you
+  The shipped adapters are `pelican-client-pekko` and `pelican-client-jetty`.
+  Anything else (OkHttp, the JDK client) is an adapter you
   write. See [The generated client](generated-client.md).
 - **Escape hatches.** Pelican does not have to own the server.
   `api.toRoute(system)` returns a Pekko `Route` that concatenates with routes
@@ -287,7 +282,7 @@ option without changing server.
 ## Spring Boot, Micronaut and Quarkus
 
 Pelican has no backend for any of these. Choosing Pelican means running the
-web layer on Pekko HTTP (or, from `main`, Jetty) rather than adding a module to
+web layer on Pekko HTTP or Jetty rather than adding a module to
 the framework you have. This section compares two ways of describing an HTTP
 API for a team deciding what to start with, not a migration that can be done
 piecemeal.
@@ -367,22 +362,23 @@ parts of tapir's design that translate to Kotlin and lacks the rest.
 Separately from any comparison, some projects should not use it.
 
 **A first release.** The API is frozen and guarded by the `.api` dumps and
-`StillCompilesTest`, and a break waits for a major release. But 1.0.0 has
-little production history, and it is maintained mainly by one person. A service
+`StillCompilesTest`, and a break waits for a major release. But the 1.x line
+has little production history, and it is maintained mainly by one person. A service
 maintained for years by people who did not choose Pelican takes on more risk
 than one on a mainstream framework.
 
-**Your server is not Pekko HTTP.** Pekko HTTP is the backend in 1.0.0. A Jetty
-12 backend (a Jetty core `Handler`, not a servlet, with no Pekko or Scala on
-the classpath) is on `main` and not yet in a release. On Spring MVC, Ktor,
+**Your server is not Pekko HTTP or Jetty.** The released backends are Pekko
+HTTP and Jetty 12 (a Jetty core `Handler`, not a servlet, with no Pekko or
+Scala on the classpath). On Spring MVC, Ktor,
 Vert.x, Helidon, Armeria, Netty directly, Jakarta REST or Javalin there is no
-module, and writing a backend is a real piece of work. A parity suite on `main`
+module, and writing a backend is a real piece of work. A parity suite
 runs the same descriptions against Pekko and Jetty and asserts identical
 answers and documents, and records the few places they differ; see
 [What differs on Jetty](reference.md#what-differs-on-jetty).
 
-**A JDK older than 25.** 1.0.0's library modules will not load on an older
-runtime.
+**A JDK older than 21.** The library modules will not load on an older
+runtime, and `pelican-streams`, `pelican-streams-jetty` and the Gannet modules
+need 25.
 
 **A refusal you cannot work around.** Each of these is a documented decision
 with its reasoning in [What isn't here](reference.md#what-isnt-here):
@@ -412,8 +408,8 @@ with its reasoning in [What isn't here](reference.md#what-isnt-here):
 client into your build: one method per operation, sealed failure types,
 streamed responses, per-request timeouts, blocking or `suspend` methods, and a
 `ClientTransport` it sends through. There is no published client artifact; you
-own the generated file. In 1.0.0 the shipped transport is
-`pelican-client-pekko`. Retries are a decorator you opt into; circuit breaking
+own the generated file. The shipped transports are `pelican-client-pekko` and
+`pelican-client-jetty`. Retries are a decorator you opt into; circuit breaking
 and per-call metrics are yours to add around the transport. The client that
 `pelican-test` derives is for tests only: blocking, no retries, no pooling to
 speak of, and it cannot upload a binary file part because its `RequestSpec`
@@ -445,8 +441,8 @@ against source, and the suite compiles pinned call sites against the published
 modules.
 
 Outside the promise: anything `internal`, the emitted document's exact bytes,
-and modules that are not in a release (the Jetty family, `pelican-kotlinx` and
-the BOM, which are on `main`). The full statement is under
+and modules that are not in a release (the `pelican-gannet` modules, which are
+on `main`). The full statement is under
 [Stability](reference.md#stability).
 
 Pin an exact version and upgrade deliberately: not a range, not `+`, and not a

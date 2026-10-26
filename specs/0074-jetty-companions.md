@@ -5,15 +5,15 @@
 Spec 0073 serves an API on Jetty. A service that also serves its document,
 its MCP tools, or tests in memory through the server still needs a Pekko
 module for each: `pelican-pekko-docs`, `pelican-pekko-mcp`,
-`pelican-test-pekko`. `pelican-streams` reaches lark through
-`lark-stream-pekko`, and the importer refuses to write handler stubs for any
+`pelican-test-pekko`. `pelican-streams` reaches surefold through
+`surefold-stream-pekko`, and the importer refuses to write handler stubs for any
 backend but Pekko.
 
 ## Not doing
 
 - **New docs or MCP behaviour.** Each module does what its Pekko twin does.
 - **The client.** Spec 0075.
-- **lark on a Jetty runtime.** lark's core `Stream.blocking` is enough.
+- **surefold on a Jetty runtime.** surefold's core `Stream.blocking` is enough.
 
 ## Shape
 

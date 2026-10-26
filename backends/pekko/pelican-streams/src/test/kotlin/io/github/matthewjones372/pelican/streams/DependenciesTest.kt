@@ -15,8 +15,8 @@ import java.io.File
  * and an application on the Scala 3 build that received ours would run both
  * until Pekko's version check stopped it.
  *
- * The lark artifacts are provided for the same reason at one remove:
- * `lark-stream-pekko` pins `_2.13` as an `api` dependency of its own, so
+ * The surefold artifacts are provided for the same reason at one remove:
+ * `surefold-stream-pekko` pins `_2.13` as an `api` dependency of its own, so
  * shipping it would put that suffix back on a consumer's classpath through this
  * module — undoing the decision rather than merely not making it.
  */
@@ -30,7 +30,7 @@ class DependenciesTest {
     private val allowed = listOf("kotlin-stdlib", "annotations-", "jackson-core-", "pelican-", "slf4j-api-")
 
     @Test
-    fun `the published runtime classpath names neither pekko nor lark`() {
+    fun `the published runtime classpath names neither pekko nor surefold`() {
         val raw = System.getProperty("pelican.streams.runtimeClasspath")
         withClue("the build must pass -Dpelican.streams.runtimeClasspath; see build.gradle.kts") {
             raw.shouldNotBeNull()
@@ -40,7 +40,9 @@ class DependenciesTest {
             .filter { it.isNotBlank() }
             .filterNot { entry -> allowed.any { entry.startsWith(it) } }
 
-        withClue("a consumer brings their own Pekko and their own lark, so this module ships neither: $unexpected") {
+        withClue(
+            "a consumer brings their own Pekko and their own surefold, so this module ships neither: $unexpected",
+        ) {
             unexpected.shouldBeEmpty()
         }
     }

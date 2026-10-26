@@ -60,7 +60,7 @@ class InMemoryTransport(handler: Handler) : Transport, AutoCloseable {
         return ResponseSpec(
             res.status,
             res.map { it.name to it.value },
-            res.contentBytes?.toString(Charsets.UTF_8).orEmpty(),
+            res.contentBytes ?: ByteArray(0),
         )
     }
 

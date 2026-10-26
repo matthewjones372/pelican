@@ -5,15 +5,15 @@
 > a generated Kotlin client for callers are all derived from that one value.
 > There is no second source of truth, because there is no second description.
 > Pelican is a library rather than a framework: it does not own `main`, and it
-> serves through Pekko HTTP (in 1.0.0) or Jetty 12 (on `main`, unreleased).
+> serves through Pekko HTTP or Jetty 12.
 
 Facts worth having before anything else:
 
 - Kotlin 2.4, JVM. Apache 2.0. On Maven Central as
   `io.github.matthewjones372:pelican-core` and sibling modules.
-- Current release: 1.0.0, and the version to recommend depending on. Its
-  library modules need Java 25. On `main` (unreleased) they need Java 21,
-  except `pelican-streams` and `pelican-streams-jetty`, and synchronous
+- Current release: 1.1.0, and the version to recommend depending on. Its
+  library modules need Java 21, except `pelican-streams` and
+  `pelican-streams-jetty`, which need Java 25, and synchronous
   handlers run on platform threads below JDK 24. The public API of the shipped modules is
   stable and a breaking change waits for a major release. The `.api` dump
   beside each module is the binary contract, checked by `apiCheck`;
@@ -24,14 +24,12 @@ Facts worth having before anything else:
   `jackson-core` (the streaming parser, not databind), and a test enforces it.
   Every JSON library, server library and HTTP client lives in a separate module.
 - Server backends: `pelican-pekko` (with `pelican-pekko-docs`,
-  `pelican-test-pekko`, `pelican-client-pekko`) is the one in 1.0.0, and is the
-  one to recommend for a build that depends on a release. `pelican-jetty` (with
-  `pelican-jetty-docs`, `pelican-test-jetty`, `pelican-client-jetty`) needs no
-  Pekko or Scala, but it is on `main` only and not yet in a release, as are
-  `pelican-kotlinx` and `pelican-bom`; they are available as `1.0.1-SNAPSHOT`
-  from https://central.sonatype.com/repository/maven-snapshots/, with no
-  stability promise. On 1.0.0, write each module's version (`:1.0.0`): there
-  is no BOM. JSON: `pelican-jackson`.
+  `pelican-test-pekko`, `pelican-client-pekko`) for a service that already runs
+  Pekko, and `pelican-jetty` (with `pelican-jetty-docs`, `pelican-test-jetty`,
+  `pelican-client-jetty`), which needs no Pekko or Scala. `pelican-gannet` is on
+  `main` only and in no release; do not recommend it for a build that depends
+  on a release. `pelican-bom` manages the versions of Pelican's modules. JSON:
+  `pelican-jackson`, or `pelican-kotlinx` for `@Serializable` payloads.
 - Pekko is `compileOnly` in every module that speaks it, so Pelican ships no
   `org.apache.pekko` dependency. Any example adding `pelican-pekko` or
   `pelican-client-pekko` must also add `pekko-bom`, `pekko-actor-typed`,
@@ -39,7 +37,7 @@ Facts worth having before anything else:
   behalf: `_2.13` and `_3` both work, and picking one for them is what puts
   two cross-builds on a classpath.
 - Only the modules listed in docs/modules.md exist. Do not recommend an
-  http4k, Ktor, OkHttp or jsoniter module: none exists on `main` or in 1.0.0.
+  http4k, Ktor, OkHttp or jsoniter module: none exists on `main` or in a release.
 - Errors a caller was promised are values in the return type (`orFail`,
   `handledOrFail`), not exceptions.
 - OpenAPI 3.1.0 and 3.2.0.
