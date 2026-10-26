@@ -152,3 +152,38 @@ Matt took each of these on 2026-10-26, after `spec-0090-nonblocking` was measure
 7. **Gannet's writer `respond`**: called on the carrier, the writer runs before anything is committed and a
    throw reaches the caller; called from another thread, a throw after the exchange is answered closes the
    connection.
+
+## Closing
+
+Closed 2026-10-26, with every entry built and the two throughput targets met by their median. `./gradlew build`
+passed on JDK 21 with and without `PELICAN_REQUIRE_URING=1`; then, in one session on `main` at a6ac437 (Gannet
+`0.1.0-SNAPSHOT` from Central, 20261026.192938), `RUNS=5 benchmarks/arena.sh` over every contestant, `baseline` and
+then `json` (`raw-gannet` serves no `/json`). Allocation is async-profiler's `alloc --total` over 10 s of `baseline`
+load, two runs each, the same session.
+
+| target | measured | |
+|---|---|---|
+| `gannet` (default threads) ≥ 130k | 163k (161–179k) | met; 135k at this spec's start, same measure |
+| `gannet-nonblocking` ≥ 230k | 248k (217–290k) | met; one run of five under |
+| `gannet-nonblocking` within 5% of inline | 97.4% of `gannet-inline` run by run (92.5–107.9%); `json` 99.4% | met by the median |
+| `jetty-nonblocking` over `jetty`, +26% predicted | +12.3% run by run (−10.0..+18.2%) on `baseline`; +30.9% on `json` | half the prediction on `baseline`; `jetty-dispatcher` +28.6% |
+| no parity suite, golden file or document changes | none, beyond the lone surrogate `encodeTo` now escapes | met |
+
+| contestant | `baseline` rps | user µs | sys µs | `json` rps | user µs | sys µs |
+|---|--:|--:|--:|--:|--:|--:|
+| `raw-gannet` | 327k (278–340k) | 1.77 | 4.31 | | | |
+| `gannet-inline` | 255k (234–273k) | 2.75 | 4.87 | 85.3k (82.2–86.4k) | 16.53 | 6.35 |
+| `gannet` | 163k (161–179k) | 4.80 | 6.94 | 59.3k (57.9–59.8k) | 25.56 | 7.15 |
+| `gannet-nonblocking` | 248k (217–290k) | 2.91 | 4.89 | 84.8k (82.3–85.5k) | 16.59 | 6.67 |
+| `jetty` | 61.7k (55.3–71.9k) | 16.53 | 14.77 | 30.9k (30.2–31.8k) | 43.95 | 19.02 |
+| `jetty-dispatcher` | 78.7k (72.0–92.5k) | 11.13 | 13.27 | 41.5k (39.4–41.9k) | 31.54 | 15.21 |
+| `jetty-nonblocking` | 65.2k (62.3–72.9k) | 16.63 | 11.39 | 40.9k (39.4–47.3k) | 31.82 | 14.93 |
+| `pekko` | 25.0k (22.5–27.0k) | 64.15 | 14.68 | 23.8k (23.2–24.1k) | 57.98 | 25.55 |
+| `pekko-dispatcher` | 33.2k (29.4–37.8k) | 48.34 | 10.82 | 38.8k (37.2–43.5k) | 37.34 | 12.22 |
+
+Allocation a request: `raw-gannet` 2.26–2.45 KB, `gannet-inline` 2.76–3.02 KB, `gannet-nonblocking` 2.80–2.85 KB,
+`gannet` 4.05–4.12 KB. Against spec 0089's close, the default path serves 163k from 140k and `json` 59.3k from 50.2k,
+and a `nonBlocking()` endpoint under the default serves what inline does: on `json` 84.8k from 50.2k, where the
+writer `respond` (decision 7) takes it past 0089's inline 75.1k. The default path still allocates 1.2 KB a request
+more than inline, the virtual thread's own; a JSON success answered off the carrier is still gathered into an
+array first, since there Gannet answers before its writer runs.
