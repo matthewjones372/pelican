@@ -170,6 +170,14 @@ class FormBodyTest {
     }
 
     @Test
+    fun `a form whose escapes are not UTF-8 is refused, names and values alike`() {
+        listOf("user=%e9", "%f0=x", "user=%c0%af").forEach { body ->
+            shouldThrow<IllegalArgumentException> { parseFormBody(body) }.message shouldBe
+                "The percent-encoded bytes are not UTF-8"
+        }
+    }
+
+    @Test
     fun `encoding is the same trip backwards`() {
         codec.encodeToString("""{"user":"ada","remember":true,"visits":3,"tags":["red","green"]}""") shouldBe
             "user=ada&remember=true&visits=3&tags=red&tags=green"

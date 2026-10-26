@@ -6,6 +6,7 @@ import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.MultipartBody
 import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.QueryParam
+import io.github.matthewjones372.pelican.checkFormEncoded
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.AbstractMap
@@ -86,9 +87,8 @@ class EndpointPlan internal constructor(val endpoint: Endpoint<*, *>) {
      */
     private fun decodeQueries(query: String, into: Slots) {
         forEachPair(query) { start, equals, end ->
-            // Every pair, declared or not: an illegal escape anywhere in the query is the caller's 400.
-            checkEscapes(query, start, equals)
-            checkEscapes(query, minOf(equals + 1, end), end)
+            // Every pair, declared or not: an illegal escape or bytes not UTF-8 anywhere in the query is a 400.
+            checkPair(query, start, equals, end)
             val q = queries.indexOfFirst { it.listStyle == null && nameIs(query, start, equals, it.name) }
             if (q >= 0 && !into.isSet(firstQuery + q)) into.setAt(firstQuery + q, formDecoded(query, equals + 1, end))
         }
@@ -189,34 +189,18 @@ private fun needsDecoding(query: String, start: Int, end: Int): Boolean {
 }
 
 /**
- * Refuses `query[start, end)` if `URLDecoder` would, without decoding it. An escape of two ASCII hex digits is legal
- * to every JDK's `URLDecoder`; anything else is put to it, and its message is the 400's detail, so the body reads as
- * it did when every pair was decoded.
+ * Throws the 400 a query that will not decode strictly is refused with, for a backend whose own parser reads the
+ * query: an illegal escape is `URLDecoder`'s detail, and bytes that are not UTF-8 one fixed sentence.
  */
-private fun checkEscapes(query: String, start: Int, end: Int) {
-    var i = start
-    while (i < end) {
-        if (query[i] != '%') {
-            i++
-        } else if (i + ESCAPE_LENGTH <= end && isHex(query[i + 1]) && isHex(query[i + 2])) {
-            i += ESCAPE_LENGTH
-        } else {
-            refuseQuery(query.substring(start, end))
-            return
-        }
-    }
+fun refuseIllegalQuery(query: String) {
+    forEachPair(query) { start, equals, end -> checkPair(query, start, equals, end) }
 }
 
-private fun isHex(c: Char): Boolean = c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F'
-
-/** Throws the 400 `URLDecoder` refuses [raw] with; returns where it does not. */
-private fun refuseQuery(raw: String) {
+private fun checkPair(query: String, start: Int, equals: Int, end: Int) {
     try {
-        URLDecoder.decode(raw, StandardCharsets.UTF_8)
+        checkFormEncoded(query, start, equals)
+        checkFormEncoded(query, minOf(equals + 1, end), end)
     } catch (e: IllegalArgumentException) {
         throw ApiException(400, "Illegal query string", e.message, cause = e)
     }
 }
-
-/** `%` and the two characters that have to follow it. */
-private const val ESCAPE_LENGTH = 3

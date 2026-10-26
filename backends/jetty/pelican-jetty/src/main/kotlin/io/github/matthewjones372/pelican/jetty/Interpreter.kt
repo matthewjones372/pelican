@@ -16,22 +16,25 @@ import io.github.matthewjones372.pelican.NegotiatedBody
 import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
 import io.github.matthewjones372.pelican.Pages
-import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.spi.CorsHeaders
+import io.github.matthewjones372.pelican.spi.EndpointPlan
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex
+import io.github.matthewjones372.pelican.spi.Slots
 import io.github.matthewjones372.pelican.spi.acceptable
 import io.github.matthewjones372.pelican.spi.decodeCaller
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.ndjsonFrames
+import io.github.matthewjones372.pelican.spi.plan
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.responseCodecs
 import io.github.matthewjones372.pelican.spi.routeIndex
+import io.github.matthewjones372.pelican.spi.succeeded
 import org.eclipse.jetty.http.HttpHeader
 import org.eclipse.jetty.server.Handler
 import org.eclipse.jetty.server.Request
@@ -55,10 +58,11 @@ fun Api.toHandler(handlers: Handlers = Handlers.default): Handler {
 
     // Once per endpoint rather than per request, so a broken codec is a startup failure.
     val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
+    val plans = endpoints.associateWith { it.endpoint.plan() }
     val bound = endpoints.associateWith { endpoint -> handlerFor(endpoint).on(handlers, endpoint) }
 
     val cors = corsPolicy()
-    val answered = PelicanHandler(this, endpoints.routeIndex(), codecs, bound, cors, handlers)
+    val answered = PelicanHandler(this, endpoints.routeIndex(), plans, codecs, bound, cors, handlers)
     val files = pages ?: return answered
     // The loader that built the handler, as a thread Jetty runs a request on may carry no useful one.
     val loader = Thread.currentThread().contextClassLoader ?: Pages::class.java.classLoader
@@ -120,6 +124,7 @@ private fun ServerEndpoint.blocksBeforeItsHandler(): Boolean {
 internal class PelicanHandler(
     private val api: Api,
     private val index: RouteIndex,
+    private val plans: Map<ServerEndpoint, EndpointPlan>,
     private val codecs: Map<ServerEndpoint, EndpointCodecs>,
     private val handlers: Map<ServerEndpoint, (Params) -> CompletionStage<Any?>>,
     private val cors: CorsPolicy?,
@@ -138,10 +143,15 @@ internal class PelicanHandler(
         val answered = try {
             dispatchedHere(dispatched) { route(request) }
         } catch (t: Throwable) {
-            CompletableFuture.completedStage(errorResponse(t, api))
+            CompletableFuture.completedFuture(errorResponse(t, api))
         } ?: return false
-        answered.whenComplete { reply, failure ->
-            (reply ?: errorResponse(failure, api)).writeTo(response, callback.afterReadingRest(request))
+        val now = answered.succeeded()
+        if (now != null) {
+            now.resultNow().writeTo(response, callback.afterReadingRest(request))
+        } else {
+            answered.whenComplete { reply, failure ->
+                (reply ?: errorResponse(failure, api)).writeTo(response, callback.afterReadingRest(request))
+            }
         }
         return true
     }
@@ -152,25 +162,33 @@ internal class PelicanHandler(
      * describes is passed on as a 404, even where another verb describes that path.
      */
     private fun route(request: Request): CompletionStage<Reply>? {
+        val path = request.routedPath()
+        if (path == null) {
+            request.declinePath()
+            return null
+        }
         val method = methods.firstOrNull { it.name == request.method }
-        val path = request.encodedPathInContext()
         if (method == null) {
             request.declineMethods(methods.map { it.name })
             return preflight(request, path)
         }
-        val values = LinkedHashMap<ParamKey<*>, Any?>()
-
         val matched = try {
-            index.match(method, path, values)
+            index.find(method, path)
         } catch (t: Throwable) {
-            // A capture that would not decode is that route's 400, so the route is looked up again to name it.
-            val refused = index.routeFor(method, path)?.endpoint
-            return CompletableFuture.completedStage(errorResponse(t, api, refused))
+            // A literal segment that would not decode is still the 400 of the route it was meant for.
+            return CompletableFuture.completedFuture(errorResponse(t, api, index.routeFor(method, path)?.endpoint))
         }
-
         if (matched == null) {
             request.declinePath()
             return preflight(request, path)
+        }
+
+        val values = plans.getValue(matched).slots()
+        try {
+            index.decodeCaptures(matched, path, values)
+        } catch (t: Throwable) {
+            // A capture that would not decode is its own route's 400.
+            return CompletableFuture.completedFuture(errorResponse(t, api, matched.endpoint))
         }
         val answered = invoke(matched, request, values)
         return if (cors == null) answered
@@ -196,43 +214,62 @@ internal class PelicanHandler(
             }
 
             is CorsPreflight.Refused ->
-                CompletableFuture.completedStage(errorResponse(ApiException(403, "Forbidden", decision.reason), api))
+                CompletableFuture.completedFuture(errorResponse(ApiException(403, "Forbidden", decision.reason), api))
 
             is CorsPreflight.Allowed ->
-                CompletableFuture.completedStage(Strict(204, null, ByteArray(0), decision.headers))
+                CompletableFuture.completedFuture(Strict(204, null, ByteArray(0), decision.headers))
         }
     }
 
     private fun invoke(
         se: ServerEndpoint,
         request: Request,
-        values: MutableMap<ParamKey<*>, Any?>,
+        values: Slots,
     ): CompletionStage<Reply> =
         if (se in blocking) threads.mayBlock { invokeHere(se, request, values) } else invokeHere(se, request, values)
 
     private fun invokeHere(
         se: ServerEndpoint,
         request: Request,
-        values: MutableMap<ParamKey<*>, Any?>,
+        values: Slots,
     ): CompletionStage<Reply> {
         val ep = se.endpoint
         // Built before decoding, so a filter or a failing decode can still put a header on the way out.
-        val credentials = request.credentials()
-        val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep), requestHeaders = credentials)
+        val view = JettyView(request)
+        val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep), requestHeaders = view)
 
-        val accept = request.headers.getValuesList(HttpHeader.ACCEPT)
+        val accept = view.headers(HttpHeader.ACCEPT.asString())
 
         // Who is calling first, then what they will take, then the inputs: Pekko's order, so a 401 tells nothing else.
         try {
-            api.decodeCaller(ep, credentials, values)
+            api.decodeCaller(ep, view, values)
             negotiate(ep, accept)
-            decodePlainInputs(ep, request, values)
+            plans.getValue(se).decodePlainInputs(view, values)
         } catch (t: Throwable) {
-            return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params.responseHeaders()))
+            return CompletableFuture.completedFuture(errorResponse(t, api, ep).withHeaders(params.responseHeaders()))
         }
 
-        return readBody(ep, request, values, codecs.getValue(se))
-            .thenCompose { handlers.getValue(se)(params) }
+        val read = readBody(ep, request, values, codecs.getValue(se))
+        val handled = if (read.succeeded() == null) {
+            read.thenCompose { handlers.getValue(se)(params) }
+        } else {
+            try {
+                handlers.getValue(se)(params)
+            } catch (t: Throwable) {
+                CompletableFuture.failedFuture(t)
+            }
+        }
+        // A handler that has already answered, as every synchronous one has, is answered without a stage per step.
+        val now = handled.succeeded()
+        if (now != null) {
+            val reply = try {
+                buildResponse(ep.output, now.resultNow(), codecs.getValue(se), accept)
+            } catch (t: Throwable) {
+                errorResponse(t, api, ep)
+            }
+            return CompletableFuture.completedFuture(reply.withHeaders(params.responseHeaders()))
+        }
+        return handled
             .thenApply { result -> buildResponse(ep.output, result, codecs.getValue(se), accept) }
             .exceptionally { t -> errorResponse(t, api, ep) }
             .thenApply { reply -> reply.withHeaders(params.responseHeaders()) }
@@ -242,15 +279,15 @@ internal class PelicanHandler(
     private fun readBody(
         ep: Endpoint<*, *>,
         request: Request,
-        values: MutableMap<ParamKey<*>, Any?>,
+        values: Slots,
         codecs: EndpointCodecs,
     ): CompletionStage<Unit> = when (val body = ep.bodyInput) {
-        null -> CompletableFuture.completedStage(Unit)
+        null -> CompletableFuture.completedFuture(Unit)
 
         // Handed over unconsumed, and exempt from the limit as on Pekko: nothing here holds it whole.
         is RawBody -> {
             values[body] = JettyByteStream(request)
-            CompletableFuture.completedStage(Unit)
+            CompletableFuture.completedFuture(Unit)
         }
 
         is MultipartBody -> readMultipart(request, api, body, values)
@@ -264,7 +301,7 @@ internal class PelicanHandler(
         is NdjsonBody<*> -> {
             val frames = api.ndjsonFrames(ep, codecs.body, request.headers.get(HttpHeader.CONTENT_TYPE))
             values[body] = JettyFrames<Any?>(request, frames)
-            CompletableFuture.completedStage(Unit)
+            CompletableFuture.completedFuture(Unit)
         }
     }
 }

@@ -72,6 +72,32 @@ class EndpointPlanTest {
     }
 
     @Test
+    fun `percent-escapes that are not UTF-8 are a 400 with one fixed detail, wherever they are`() {
+        // Truncated, a stray continuation byte, an overlong `/`, a surrogate, past U+10FFFF, and a split sequence.
+        val bytes = listOf("%e9", "%c3", "%80", "%c0%af", "%ed%a0%80", "%f4%90%80%80", "%c3a%a9")
+        val queries = bytes.flatMap { listOf("q=$it", "other=$it", "$it=x", it, "q=ok&tag=$it") }
+        queries.forEach { query ->
+            withClue("?$query") {
+                val refused = shouldThrow<ApiException> { decoded(search, query) }
+                refused.status shouldBe 400
+                refused.message shouldBe "Illegal query string"
+                refused.detail shouldBe "The percent-encoded bytes are not UTF-8"
+            }
+        }
+    }
+
+    @Test
+    fun `UTF-8 written as escapes reads as the text it spells`() {
+        decoded(search, "q=%C3%A9%E2%82%AC%F0%9F%98%80")[q] shouldBe "é€😀"
+    }
+
+    @Test
+    fun `an illegal escape is still URLDecoder's 400, even beside bytes that are not UTF-8`() {
+        shouldThrow<ApiException> { decoded(search, "q=%e9a%zz") }.detail shouldBe
+            shouldThrow<IllegalArgumentException> { parseFormBody("%zz") }.message
+    }
+
+    @Test
     fun `an endpoint declaring no query never reads it`() {
         decoded(endpoint { get("none"); text() }, "x=%zz").size shouldBe 0
     }
