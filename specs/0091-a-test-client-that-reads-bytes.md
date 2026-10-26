@@ -68,10 +68,11 @@ cache if `ShopCodecs` does not already cache.
 
 ## Stack
 
-- [ ] **`spec-0091-benchmark`**: `ClientAllocationBenchmark` in `:benchmarks`.
+- [x] **`spec-0091-benchmark`** ([#355](https://github.com/matthewjones372/pelican/pull/355)):
+      `ClientAllocationBenchmark` in `:benchmarks`.
       Done when: `./gradlew :benchmarks:jmh -PbenchmarkArgs=ClientAllocation` gives the table.
 - [ ] **`spec-0091-codec-once`**: `ApiClient` resolves a codec once per type and media type.
-      Done when: the per-call codec row matches the held-codec row.
+      Done when: the `inMemoryCall` rows fall by the per-call codec row's excess over the held-codec row.
 - [ ] **`spec-0091-bytes`**: `ResponseSpec(bytes)`, decoding from it, the transports, `.api`, docs, changelog.
       Done when: a bytes-built response decodes without reading `body`.
 
@@ -84,8 +85,8 @@ cache if `ShopCodecs` does not already cache.
 
 ## Decisions
 
-- The codec cache lives in `ApiClient`: a `ConcurrentHashMap`, with its
-  `FunctionalStyleTest` entry.
+- The codec cache lives in `ApiClient`, in a `ConcurrentHashMap`. That is not
+  an accumulator `FunctionalStyleTest` matches, so it needs no entry.
 - The array is not copied on construction, said in one line of KDoc, as
   `encoded` does (spec 0086).
 - A `decodeFrom(ByteBuffer)` spec waits until petshop re-profiles with this in.
