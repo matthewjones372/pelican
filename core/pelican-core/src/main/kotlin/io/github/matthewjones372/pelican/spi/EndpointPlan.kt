@@ -189,10 +189,10 @@ private fun needsDecoding(query: String, start: Int, end: Int): Boolean {
 }
 
 /**
- * Throws the 400 a query that will not decode strictly is refused with, for a backend whose own parser reads the
- * query: an illegal escape is `URLDecoder`'s detail, and bytes that are not UTF-8 one fixed sentence.
+ * Throws the 400 a query that will not decode strictly is refused with, for the in-memory client, which reads no
+ * plan: an illegal escape is `URLDecoder`'s detail, and bytes that are not UTF-8 one fixed sentence.
  */
-fun refuseIllegalQuery(query: String) {
+internal fun refuseIllegalQuery(query: String) {
     forEachPair(query) { start, equals, end -> checkPair(query, start, equals, end) }
 }
 

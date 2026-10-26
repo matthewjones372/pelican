@@ -1672,7 +1672,6 @@ public final class io/github/matthewjones372/pelican/spi/EndpointPlan {
 
 public final class io/github/matthewjones372/pelican/spi/EndpointPlanKt {
 	public static final fun plan (Lio/github/matthewjones372/pelican/Endpoint;)Lio/github/matthewjones372/pelican/spi/EndpointPlan;
-	public static final fun refuseIllegalQuery (Ljava/lang/String;)V
 }
 
 public final class io/github/matthewjones372/pelican/spi/HandlersKt {

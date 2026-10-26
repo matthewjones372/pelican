@@ -5,10 +5,8 @@ import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.BodyInput
 import io.github.matthewjones372.pelican.Codecs
-import io.github.matthewjones372.pelican.Cookies
 import io.github.matthewjones372.pelican.CorsPolicy
 import io.github.matthewjones372.pelican.CorsPreflight
-import io.github.matthewjones372.pelican.Credentials
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.JsonBody
@@ -18,7 +16,6 @@ import io.github.matthewjones372.pelican.NdjsonBody
 import io.github.matthewjones372.pelican.NegotiatedBody
 import io.github.matthewjones372.pelican.NotAcceptable
 import io.github.matthewjones372.pelican.Output
-import io.github.matthewjones372.pelican.ParamKey
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.PathSegment
 import io.github.matthewjones372.pelican.PayloadTooLarge
@@ -27,18 +24,21 @@ import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.SseOutput
 import io.github.matthewjones372.pelican.corsPolicy
 import io.github.matthewjones372.pelican.spi.CorsHeaders
+import io.github.matthewjones372.pelican.spi.EndpointPlan
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
+import io.github.matthewjones372.pelican.spi.RequestView
 import io.github.matthewjones372.pelican.spi.RouteIndex
+import io.github.matthewjones372.pelican.spi.Slots
 import io.github.matthewjones372.pelican.spi.acceptable
 import io.github.matthewjones372.pelican.spi.decode
 import io.github.matthewjones372.pelican.spi.decodeCaller
-import io.github.matthewjones372.pelican.spi.decodeList
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.ndjsonFrames
-import io.github.matthewjones372.pelican.spi.refuseIllegalQuery
+import io.github.matthewjones372.pelican.spi.plan
 import io.github.matthewjones372.pelican.spi.requestBodyCodec
 import io.github.matthewjones372.pelican.spi.responseCodecs
 import io.github.matthewjones372.pelican.spi.routeIndex
+import io.github.matthewjones372.pelican.spi.succeeded
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ClassicActorSystemProvider
 import org.apache.pekko.http.javadsl.model.HttpMethods
@@ -79,6 +79,7 @@ fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handler
     // Once per endpoint, captured by the routes: KType -> JavaType reflection
     // is not free, and a broken codec becomes a startup failure.
     val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
+    val plans = endpoints.associateWith { it.endpoint.plan() }
 
     // Worked out once from the descriptions, as with the codecs above.
     val cors = corsPolicy()
@@ -102,7 +103,7 @@ fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handler
     val routes = endpoints
         .map { it.endpoint.method }
         .distinct()
-        .map { method -> methodRoute(method, this, index, codecs, bound, cors, system) } +
+        .map { method -> methodRoute(method, this, index, plans, codecs, bound, cors, system) } +
         listOfNotNull(cors?.let { preflightRoute(it, this) }) +
         // Last, so an endpoint at a page's path answers as the endpoint (spec 0059).
         listOfNotNull(pages?.let { pagesRoute(it, cors) })
@@ -138,41 +139,48 @@ private fun methodRoute(
     method: Method,
     api: Api,
     index: RouteIndex,
+    plans: Map<ServerEndpoint, EndpointPlan>,
     codecs: Map<ServerEndpoint, EndpointCodecs>,
     handlers: Map<ServerEndpoint, (Params) -> CompletionStage<Any?>>,
     cors: CorsPolicy?,
     system: ClassicActorSystemProvider,
 ): Route = Directives.method(method.toPekko()) {
     Directives.extractRequest { req ->
-        val values = LinkedHashMap<ParamKey<*>, Any?>()
-
-        // A path that decodes into the wrong type is a 400 naming the
-        // parameter, which is what the scan did when it decoded a capture.
-        //
-        // `getPathString` renders Pekko's parsed path back out, so what the
-        // index gets still carries every escape that changes what a segment is
-        // — `%2F` stays `%2F` rather than becoming a separator. The index does
-        // the decoding, once, after splitting.
+        // Pekko's parsed path rendered back out, so it still carries every escape that changes what a segment is:
+        // `%2F` stays inside its segment until the index splits and then decodes, once.
+        val path = req.uri.getPathString()
         val matched = try {
-            index.match(method, req.uri.getPathString(), values)
+            index.find(method, path)
         } catch (t: Throwable) {
-            // A capture that would not decode is that route's 400, so the route
-            // is looked up again to name it: `renderError` reports the refusal
-            // under the template, and a metric tags it with the same.
-            val refused = index.routeFor(method, req.uri.getPathString())?.endpoint
-            return@extractRequest Directives.complete(errorResponse(t, api, refused))
-        }
+            // A literal segment that would not decode is still the 400 of the route it was meant for.
+            return@extractRequest Directives.complete(errorResponse(t, api, index.routeFor(method, path)?.endpoint))
+        } ?: return@extractRequest Directives.reject()
 
-        if (matched == null) {
-            Directives.reject()
-        } else {
-            val answered =
-                invoke(matched, api, codecs.getValue(matched), handlers.getValue(matched), req, values, system)
-            Directives.completeWithFuture(
-                if (cors == null) answered
-                else answered.thenApply { res -> res.withCorsHeaders(cors.actualResponseHeaders(originOf(req))) },
-            )
+        val values = plans.getValue(matched).slots()
+        try {
+            index.decodeCaptures(matched, path, values)
+        } catch (t: Throwable) {
+            // A capture that would not decode is its own route's 400.
+            return@extractRequest Directives.complete(errorResponse(t, api, matched.endpoint))
         }
+        val view = PekkoView(req)
+        val answered = invoke(
+            matched,
+            api,
+            plans.getValue(matched),
+            codecs.getValue(matched),
+            handlers.getValue(matched),
+            view,
+            values,
+            system,
+        )
+        val withCors: (HttpResponse) -> HttpResponse =
+            if (cors == null) { res -> res }
+            else { res -> res.withCorsHeaders(cors.actualResponseHeaders(view.header(CorsHeaders.ORIGIN))) }
+        // An answer already made is completed as a value, not handed to Pekko as a future to wait on.
+        val now = answered.succeeded()
+        if (now != null) Directives.complete(withCors(now.resultNow()))
+        else Directives.completeWithFuture(answered.thenApply(withCors))
     }
 }
 
@@ -247,16 +255,12 @@ internal fun Api.orderedEndpoints(): List<ServerEndpoint> =
  * come from [Output.produces] and the decision from [acceptable], so the three
  * backends answer alike. An endpoint with no body never reads the header.
  */
-private fun negotiate(ep: Endpoint<*, *>, req: HttpRequest) {
+private fun negotiate(ep: Endpoint<*, *>, accept: List<String>) {
     val produced = ep.output.produces
     if (produced.isEmpty()) return
-    val accept = req.acceptLines()
     if (accept.isEmpty()) return
     if (!acceptable(accept, produced)) throw NotAcceptable(produced)
 }
-
-/** Every `Accept` field line: RFC 9110 reads two lines as one field. */
-private fun HttpRequest.acceptLines(): List<String> = headerValues("Accept")
 
 /**
  * The `Last-Event-ID` of a reconnect, read only where the endpoint answers with
@@ -264,88 +268,6 @@ private fun HttpRequest.acceptLines(): List<String> = headerValues("Accept")
  */
 private fun HttpRequest.resumePoint(ep: Endpoint<*, *>): String? =
     if (ep.resumable) getHeader(SseOutput.LAST_EVENT_ID).orElse(null)?.value() else null
-
-private fun originOf(req: HttpRequest): String? =
-    req.getHeader(CorsHeaders.ORIGIN).orElse(null)?.value()
-
-/** Every field line under this name, in the order they arrived. */
-private fun HttpRequest.headerValues(name: String): List<String> =
-    getHeaders().filter { it.name().equals(name, ignoreCase = true) }.map { it.value() }
-
-@Suppress("UNCHECKED_CAST")
-/**
- * Everything decodable before the body arrives.
- */
-private fun decodePlainInputs(
-    ep: Endpoint<*, *>,
-    req: HttpRequest,
-    into: MutableMap<ParamKey<*>, Any?>,
-) = with(into) {
-    // Path captures are already here: the index decoded them as it matched. Pekko's parser refuses an illegal
-    // escape itself, but reads bytes that are not UTF-8 as U+FFFD, so core's strict reading goes first.
-    if (ep.queries.isNotEmpty()) req.uri.rawQueryString().ifPresent(::refuseIllegalQuery)
-    val query = req.uri.query()
-
-    ep.queries.forEach { q ->
-        val style = q.listStyle
-        if (style != null) {
-            // Pekko prepends as it walks, so `getAll` is last-first.
-            put(q, q.decodeList(query.getAll(q.name).reversed()))
-            return@forEach
-        }
-        val raw = query.get(q.name)
-        put(
-            q,
-            when {
-                raw.isPresent -> q.codec.decode(q.name, raw.get())
-                q.required -> throw ApiException(400, "Missing required query parameter '${q.name}'")
-                else -> q.default
-            },
-        )
-    }
-
-    ep.headerParams.forEach { h ->
-        // `getHeader` returns the first line only, and RFC 9110 says two lines
-        // mean one joined field — so a list is the case that reads them all.
-        if (h.listStyle != null) {
-            put(h, h.decodeList(req.headerValues(h.name)))
-            return@forEach
-        }
-        val raw = req.getHeader(h.name)
-        put(
-            h,
-            when {
-                raw.isPresent -> h.codec.decode(h.name, raw.get().value())
-                h.required -> throw ApiException(400, "Missing required header '${h.name}'")
-                else -> h.default
-            },
-        )
-    }
-
-    decodeCookies(ep, req, into)
-}
-
-/**
- * Parsed by core rather than by Pekko's `Cookie` model, so a cookie decodes the
- * same on all three backends. Skipped when nothing declared one.
- */
-private fun decodeCookies(ep: Endpoint<*, *>, req: HttpRequest, into: MutableMap<ParamKey<*>, Any?>) {
-    if (ep.cookieParams.isEmpty()) return
-
-    val cookies = Cookies.parseAll(req.headerValues("Cookie"))
-    ep.cookieParams.forEach { c ->
-        if (c.listStyle != null) {
-            into[c] = c.decodeList(cookies[c.name].orEmpty())
-            return@forEach
-        }
-        val raw = cookies[c.name]?.first()
-        into[c] = when {
-            raw != null -> c.codec.decode(c.name, raw)
-            c.required -> throw ApiException(400, "Missing required cookie '${c.name}'")
-            else -> c.default
-        }
-    }
-}
 
 /**
  * The body, read the way its declaration says to: not at all, as a stream
@@ -357,16 +279,16 @@ private fun readBody(
     api: Api,
     codecs: EndpointCodecs,
     req: HttpRequest,
-    values: MutableMap<ParamKey<*>, Any?>,
+    values: Slots,
     system: ClassicActorSystemProvider,
 ): CompletionStage<Unit> {
     return when (val body = ep.bodyInput) {
-        null -> CompletableFuture.completedStage(Unit)
+        null -> CompletableFuture.completedFuture(Unit)
 
         is RawBody -> {
             // Handed over unconsumed: no buffering, full back-pressure.
             values[body] = PekkoByteStream(req.entity().dataBytes as Source<ByteString, Any>)
-            CompletableFuture.completedStage(Unit)
+            CompletableFuture.completedFuture(Unit)
         }
 
         // Framed by core as the bytes arrive, so nothing is held but the frame
@@ -392,7 +314,7 @@ private fun readBody(
                     .mapMaterializedValue { NotUsed.getInstance() },
                 system,
             )
-            CompletableFuture.completedStage(Unit)
+            CompletableFuture.completedFuture(Unit)
         }
 
         // Core parses the envelope, so this turns a Pekko source into the
@@ -432,13 +354,13 @@ private fun readStrictBody(
     codecs: EndpointCodecs,
     req: HttpRequest,
     body: BodyInput<*>,
-    values: MutableMap<ParamKey<*>, Any?>,
+    values: Slots,
     system: ClassicActorSystemProvider,
 ): CompletionStage<Unit> {
     // Before anything is read, so a declared oversize costs no transfer.
     val declaredLength = req.entity().contentLengthOption
     if (declaredLength.isPresent && declaredLength.asLong > api.maxBodyBytes) {
-        return CompletableFuture.failedStage(PayloadTooLarge(api.maxBodyBytes))
+        return CompletableFuture.failedFuture(PayloadTooLarge(api.maxBodyBytes))
     }
 
     // `toStrict(timeout, maxBytes, system)` materialises a limiting stage in
@@ -500,59 +422,69 @@ private fun readStrictBody(
 private fun invoke(
     se: ServerEndpoint,
     api: Api,
+    plan: EndpointPlan,
     codecs: EndpointCodecs,
     handler: (Params) -> CompletionStage<Any?>,
-    req: HttpRequest,
-    values: MutableMap<ParamKey<*>, Any?>,
+    view: PekkoView,
+    values: Slots,
     system: ClassicActorSystemProvider,
 ): CompletionStage<HttpResponse> {
     val ep = se.endpoint
+    val req = view.request
 
-    // Built before decoding, so a filter or a failing decode can still put a
-    // header on the way out.
-    val credentials = req.credentials()
-    val params = Params(values, req, ep, resumeFrom = req.resumePoint(ep), requestHeaders = credentials)
+    // Built before decoding, so a filter or a failing decode can still put a header on the way out.
+    val params = Params(values, req, ep, resumeFrom = req.resumePoint(ep), requestHeaders = view)
+    val accept = view.headers(ACCEPT)
 
-    // ---- who is calling ----------------------------------------------------
+    // Who is calling, then what they will take, then the inputs: a 401 tells nothing else, and a caller who will not
+    // read what this endpoint sends is refused before a bad query parameter can decide the answer.
     try {
-        api.decodeCaller(ep, credentials, values)
+        api.decodeCaller(ep, view, values)
+        negotiate(ep, accept)
+        plan.decodePlainInputs(view, values)
     } catch (t: Throwable) {
-        return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params))
+        return CompletableFuture.completedFuture(errorResponse(t, api, ep).withHeaders(params))
     }
 
-    // ---- what the caller will take ----------------------------------------
-    //
-    // Before the inputs, and well before the handler: a caller who will not
-    // read what this endpoint sends is refused without the endpoint doing the
-    // work, and without a bad query parameter deciding the answer first.
-    try {
-        negotiate(ep, req)
-    } catch (t: Throwable) {
-        return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params))
+    val read = readBody(ep, api, codecs, req, values, system)
+    val handled = if (read.succeeded() == null) {
+        read.thenCompose { handler(params) }
+    } else {
+        try {
+            handler(params)
+        } catch (t: Throwable) {
+            CompletableFuture.failedFuture(t)
+        }
     }
-
-    // ---- plain inputs: path, query, headers, cookies ----------------------
-    try {
-        decodePlainInputs(ep, req, values)
-    } catch (t: Throwable) {
-        return CompletableFuture.completedStage(errorResponse(t, api, ep).withHeaders(params))
+    // A handler that has already answered, as every synchronous one has, is answered without a stage per step.
+    val now = handled.succeeded()
+    if (now != null) {
+        val res = try {
+            buildResponse(ep.output, now.resultNow(), codecs, accept)
+        } catch (t: Throwable) {
+            errorResponse(t, api, ep)
+        }
+        return CompletableFuture.completedFuture(res.withHeaders(params))
     }
-
-    val bodyReady = readBody(ep, api, codecs, req, values, system)
-
-    return bodyReady
-        .thenCompose { handler(params) }
-        .thenApply { result -> buildResponse(ep.output, result, codecs, req.acceptLines()) }
+    return handled
+        .thenApply { result -> buildResponse(ep.output, result, codecs, accept) }
         .exceptionally { t -> errorResponse(t, api, ep) }
         .thenApply { res -> res.withHeaders(params) }
 }
 
-/** Cookies parsed by core, as [decodeCookies] does, so a session reads the same on every backend. */
-internal fun HttpRequest.credentials(): Credentials = object : Credentials {
-    override fun header(name: String): String? = getHeader(name).orElse(null)?.value()
+/** Pekko's request read in place: what an authenticator, `Params.requestHeader` and the plain inputs read. */
+internal class PekkoView(val request: HttpRequest) : RequestView {
+    override val method: String get() = request.method().name()
+    override val rawPath: String get() = request.uri.getPathString()
+    override val rawQuery: String? get() = request.uri.rawQueryString().orElse(null)
 
-    override fun cookie(name: String): String? = Cookies.parseAll(headerValues("Cookie"))[name]?.firstOrNull()
+    override fun header(name: String): String? = request.getHeader(name).orElse(null)?.value()
+
+    override fun headers(name: String): List<String> =
+        request.getHeaders().filter { it.name().equals(name, ignoreCase = true) }.map { it.value() }
 }
+
+private const val ACCEPT = "Accept"
 
 /** What the handler asked for, on whatever response came back. */
 private fun HttpResponse.withHeaders(params: Params): HttpResponse {
