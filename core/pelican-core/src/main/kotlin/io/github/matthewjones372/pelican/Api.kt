@@ -132,10 +132,10 @@ class ServerEndpoint internal constructor(
         this(endpoint, invoke, emptyList())
 
     /**
-     * This binding, promising its handler and filters never block, so every backend runs them where the request
-     * arrived instead of moving them to the handlers' thread. One that blocks stalls every connection on its core.
-     * Where a backend moves an authenticator or a streamed body's read first, it still does: neither is this
-     * binding's promise.
+     * This binding, promising its handler and filters never block, so every backend runs them on its own threads, as
+     * `Handlers.onDispatcher` would, instead of moving them to the handlers'. One that blocks stalls every connection
+     * on its core. The promise covers the handler and its filters only: where a backend moves an authenticator or a
+     * streamed body's read first, it still does.
      */
     fun nonBlocking(): ServerEndpoint = ServerEndpoint(endpoint, invoke, filters, isNonBlocking = true)
 }

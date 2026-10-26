@@ -292,8 +292,9 @@ half-second handlers to under two seconds on a two-thread dispatcher.
 
 `nonBlocking()` makes the same choice for one binding instead of the whole
 server (spec 0090, unreleased). The marked handler and its filters run on the
-thread the server called Pelican on (Pekko's dispatcher, Jetty's selector,
-Gannet's carrier), and every other endpoint keeps `handlers`:
+server's own threads, where `Handlers.onDispatcher` runs handlers: Pekko's
+dispatcher, Jetty's pool, Gannet's carrier. Every other endpoint keeps
+`handlers`:
 
 ```kotlin
 val routes = listOf(
@@ -473,7 +474,9 @@ Whatever may block moves first. Under `Handlers.onVirtualThreads` (the default
 from JDK 24) a synchronous handler, an authenticator, or a `…By` handler taking
 a streamed body moves to a virtual thread, unless Jetty already called it on
 one; under `Handlers.on(executor)` it moves to the service's own. Mounted by
-hand on any server, `toHandler` makes the same moves. `Handlers.onDispatcher`
+hand on any server, `toHandler` makes the same moves. A `nonBlocking()` handler moves to Jetty's
+own pool rather than run on the selector, which serves every connection.
+`Handlers.onDispatcher`
 has Jetty dispatch to its platform threads and runs the handler on the one that
 matched the request. With pages, or a module beside `toHandler` that may block,
 Jetty dispatches every request to its pool, which `start` has call handlers on

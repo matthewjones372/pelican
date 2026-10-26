@@ -71,6 +71,11 @@ class HandlersRunWherePekkoRunsThemTest {
             text()
         }
 
+        private val quickSame = endpoint {
+            get("quick-same")
+            text()
+        }
+
         private val gated = endpoint {
             get("gated")
             text()
@@ -120,7 +125,7 @@ class HandlersRunWherePekkoRunsThemTest {
                 where handledNow { thread() },
                 refusing handledOrFail { refused(Refusal(thread())) },
                 later handledBy { CompletableFuture.completedFuture(thread()) },
-                (quick handledNow { thread() }).nonBlocking(),
+                (quick handledNow { pool() }).nonBlocking(),
                 gated handledNow {
                     together.countDown()
                     if (together.await(GATE_SECONDS, TimeUnit.SECONDS)) "together" else "alone"
@@ -135,6 +140,11 @@ class HandlersRunWherePekkoRunsThemTest {
                     "done"
                 },
                 same handledNow { if (request.getAttribute(ASKED_ON) === Thread.currentThread()) "same" else "moved" },
+                (
+                    quickSame handledNow {
+                        if (request.getAttribute(ASKED_ON) === Thread.currentThread()) "same" else "moved"
+                    }
+                    ).nonBlocking(),
             ),
             JacksonCodecs,
         )
@@ -143,7 +153,7 @@ class HandlersRunWherePekkoRunsThemTest {
             where pekkoHandledNow { thread() },
             refusing pekkoHandledOrFail { refused(Refusal(thread())) },
             later pekkoHandledBy { CompletableFuture.completedFuture(thread()) },
-            (quick pekkoHandledNow { thread() }).nonBlocking(),
+            (quick pekkoHandledNow { pool() }).nonBlocking(),
         )
 
         private val mine = Executors.newThreadPerTaskExecutor(Thread.ofPlatform().name("mine-", 0).factory())
@@ -171,7 +181,7 @@ class HandlersRunWherePekkoRunsThemTest {
         } + asyncCases().flatMap {
             listOf(
                 Asked("an asynchronous handler is never moved, $it", "/later", it),
-                Asked("a non-blocking handler is never moved, $it", "/quick", it),
+                Asked("a non-blocking handler runs on the server's own threads, $it", "/quick", it),
             )
         }
 
@@ -231,12 +241,19 @@ class HandlersRunWherePekkoRunsThemTest {
     }
 
     @Test
-    fun `by default a non-blocking handler stays on the thread jetty called it on`() {
-        val expected = if (JettyPool.configured() == JettyPool.QUEUED) "platform" else "virtual"
-        get("${jetty.getValue("virtual").baseUrl}/quick").join().body() shouldBe expected
-        // A synchronous handler still hops: to a virtual thread from JDK 24, to Pelican's platform pool below it.
-        val hopped = if (byDefault() == "virtual") "virtual" else "platform"
-        get("${jetty.getValue("virtual").baseUrl}/where").join().body() shouldBe hopped
+    fun `by default a non-blocking handler runs on jetty's own pool, not where pelican was called`() {
+        val server = jettyApi.start(port = 0) { recordingThread(toHandler(Handlers.default)) }
+        try {
+            get("${server.baseUrl}/quick-same").join().body() shouldBe "moved"
+            // Jetty's pool is virtual only where it runs everything on virtual threads, which it does when handlers do.
+            val everything = JettyPool.configured() == JettyPool.VIRTUAL && byDefault() == "virtual"
+            get("${server.baseUrl}/quick").join().body() shouldBe if (everything) "virtual" else "platform"
+            // A synchronous handler still hops: to a virtual thread from JDK 24, to Pelican's platform pool below it.
+            get("${server.baseUrl}/where").join().body() shouldBe
+                if (byDefault() == "virtual") "virtual" else "platform"
+        } finally {
+            server.stop()
+        }
     }
 
     @Test
