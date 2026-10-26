@@ -411,6 +411,7 @@ public final class io/github/matthewjones372/pelican/Endpoint {
 	public final fun getErrors ()Ljava/util/List;
 	public final fun getHeaderParams ()Ljava/util/List;
 	public final fun getHidden ()Z
+	public final fun getIdempotency ()Lio/github/matthewjones372/pelican/IdempotencyKey;
 	public final fun getInputs ()Lio/github/matthewjones372/pelican/Inputs;
 	public final fun getMethod ()Lio/github/matthewjones372/pelican/Method;
 	public final fun getOperationId ()Ljava/lang/String;
@@ -452,6 +453,8 @@ public final class io/github/matthewjones372/pelican/EndpointBuilder {
 	public final fun getOperationId ()Ljava/lang/String;
 	public final fun getSummary ()Ljava/lang/String;
 	public final fun header ([Lio/github/matthewjones372/pelican/HeaderParam;)V
+	public final fun idempotencyKey (Z)V
+	public static synthetic fun idempotencyKey$default (Lio/github/matthewjones372/pelican/EndpointBuilder;ZILjava/lang/Object;)V
 	public final fun noSecurity ()V
 	public final fun part ([Lio/github/matthewjones372/pelican/MultipartPart;Ljava/lang/String;)V
 	public static synthetic fun part$default (Lio/github/matthewjones372/pelican/EndpointBuilder;[Lio/github/matthewjones372/pelican/MultipartPart;Ljava/lang/String;ILjava/lang/Object;)V
@@ -586,6 +589,18 @@ public final class io/github/matthewjones372/pelican/HttpScheme : io/github/matt
 	public fun getDescription ()Ljava/lang/String;
 	public fun getName ()Ljava/lang/String;
 	public final fun getScheme ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/IdempotencyKey {
+	public final fun getHeader ()Lio/github/matthewjones372/pelican/HeaderParam;
+	public final fun getInFlight ()Lio/github/matthewjones372/pelican/ErrorSpec;
+	public final fun getRequired ()Z
+	public final fun getReused ()Lio/github/matthewjones372/pelican/ErrorSpec;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/IdempotencyKt {
+	public static final field IDEMPOTENCY_KEY_HEADER Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/IdempotencyScope {

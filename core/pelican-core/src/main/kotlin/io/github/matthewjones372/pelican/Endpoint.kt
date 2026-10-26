@@ -103,6 +103,9 @@ class Endpoint<I, R> internal constructor(
 
     /** Who is calling, verified before the handler runs; null for an endpoint anyone may call unnamed. */
     val caller: CallerInput<*>? = null,
+
+    /** The idempotency key a repeat of this request is answered by; null where repeats run again. */
+    val idempotency: IdempotencyKey? = null,
 ) {
     /**
      * Whether a request here can carry a resume point. Only an event stream is
@@ -150,6 +153,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     internal val declaredSpecs = mutableMapOf<ErrorOutput<*>, ErrorSpec>()
     internal var securityRequirements: List<SecurityRequirement>? = null
     internal var callerInput: CallerInput<*>? = null
+    internal var idempotencyKey: IdempotencyKey? = null
 
     init {
         // Inputs listed on endpoint(...) register themselves, so each is
@@ -286,6 +290,19 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun authenticatedBy(caller: CallerInput<*>) {
         require(callerInput == null) { "This endpoint already declares $callerInput; a request has one caller." }
         callerInput = caller
+    }
+
+    /**
+     * Answers a repeat of this request carrying the same `Idempotency-Key` with the response the first one got,
+     * rather than running the handler again. The 409 and 422 Pelican answers for the key are declared with it.
+     */
+    fun idempotencyKey(required: Boolean = true) {
+        require(idempotencyKey == null) { "This endpoint already declares an idempotency key; a request has one." }
+        val key = idempotencyKeyOf(required)
+        idempotencyKey = key
+        headerParams += key.header
+        errors += key.inFlight
+        errors += key.reused
     }
 
     fun errorResponse(status: Int, description: String, vararg headers: ResponseHeader<*>) {
@@ -564,6 +581,7 @@ private fun <I, R> build(
         servers = b.serverUrls.toList(),
         webhookName = webhookName,
         caller = b.callerInput,
+        idempotency = b.idempotencyKey,
     ).also(::validate)
 }
 
@@ -628,6 +646,8 @@ private fun validate(ep: Endpoint<*, *>) {
         )
     }
 
+    ep.idempotency?.let { validateIdempotency(ep, it) }
+
     val statusClashes = unpickableStatuses(ep)
     if (statusClashes.isNotEmpty()) {
         error(
@@ -650,6 +670,52 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     validateResponseHeaders(ep)
+}
+
+/**
+ * What an idempotency key cannot cover: a method a repeat of is already safe, a body or a response that streams and
+ * so has no single response to keep, and a failure of the endpoint's own under the key's statuses that a caller
+ * could not tell from the key's.
+ */
+private fun validateIdempotency(ep: Endpoint<*, *>, key: IdempotencyKey) {
+    if (ep.method in IDEMPOTENT_METHODS) {
+        error(
+            "$ep declares an idempotency key, and ${ep.method} is idempotent already: sending it twice does what " +
+                "sending it once did. Keys are for POST and PATCH.",
+        )
+    }
+
+    streamedPart(ep)?.let { part ->
+        error(
+            "$ep declares an idempotency key, and its $part streams: a repeat is answered with the first " +
+                "response, kept whole, and a stream has no whole to keep.",
+        )
+    }
+
+    val statuses = setOf(key.inFlight.status, key.reused.status)
+    val untold = ep.errors
+        .filter { it !== key.inFlight && it !== key.reused && it.status in statuses }
+        .filter { it.tag == null || it.discriminator != key.inFlight.discriminator }
+    if (untold.isNotEmpty()) {
+        val field = key.inFlight.discriminator
+        error(
+            "$ep declares an idempotency key, which answers 409 and 422 with a refusal tagged under " +
+                "\"$field\", and also declares ${untold.joinToString { "error:${it.status}" }}. Tag it under the " +
+                "same field to share the status, errorJson<...>(${untold.first().status}, ...)" +
+                ".tagged(\"...\", field = \"$field\"), or give it a status of its own.",
+        )
+    }
+}
+
+/** Which half of the exchange streams, or null where neither does. */
+private fun streamedPart(ep: Endpoint<*, *>): String? {
+    val body = ep.bodyInput
+    return when {
+        body is RawBody || body is NdjsonBody<*> -> "request body"
+        body is MultipartBody && body.streamedFilePart != null -> "request body"
+        ep.output.representations().any { it.streams() } -> "response"
+        else -> null
+    }
 }
 
 /**

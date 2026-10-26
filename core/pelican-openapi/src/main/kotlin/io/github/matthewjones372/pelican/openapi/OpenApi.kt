@@ -333,7 +333,7 @@ private fun responses(
             // that would have set one.
             responseHeaders(errs.flatMap { it.headers }, alsoSometimes = ep.responseHeaders)
                 ?.let { put("headers", it) }
-            failureBody(errs, schemas, components)?.let { put("content", it) }
+            failureBody(errs, schemas, components, refusedBy(ep, refusals))?.let { put("content", it) }
         })
     }
     if (ep.errors.none { it.status == null }) put("default", refusalResponse(refusals, components))
@@ -349,16 +349,27 @@ private fun responses(
  * envelope that is `ApiError`, which a service describing `errorJson<ApiError>`
  * has already published from the type itself.
  */
-private fun refusalResponse(refusals: RefusalRenderer, components: SchemaComponents): JsonObj {
+private fun refusalResponse(refusals: RefusalRenderer, components: SchemaComponents): JsonObj = jsonObj {
+    "description" to "A refusal: this request was not answered by the operation above."
+    put("content", jsonObj {
+        put(refusals.mediaType, jsonObj { put("schema", refusalSchema(refusals, components)) })
+    })
+}
+
+private fun refusalSchema(refusals: RefusalRenderer, components: SchemaComponents): JsonObj {
     if (!components.isRegistered(refusals.componentName)) {
         components.register(refusals.componentName, refusals.schema)
     }
-    return jsonObj {
-        "description" to "A refusal: this request was not answered by the operation above."
-        put("content", jsonObj {
-            put(refusals.mediaType, jsonObj { put("schema", components.ref(refusals.componentName)) })
-        })
-    }
+    return components.ref(refusals.componentName)
+}
+
+/**
+ * The failures this endpoint declares that Pelican answers rather than the handler: an idempotency key's 409 and
+ * 422, written in the refusal envelope because that is what the wire carries them in.
+ */
+private fun refusedBy(ep: Endpoint<*, *>, refusals: RefusalRenderer): (ErrorSpec) -> RefusalRenderer? {
+    val key = ep.idempotency ?: return { null }
+    return { err -> if (err === key.inFlight || err === key.reused) refusals else null }
 }
 
 /**
@@ -387,13 +398,20 @@ private fun failureBody(
     errs: List<ErrorSpec>,
     schemas: SchemaSource,
     components: SchemaComponents,
+    refusedBy: (ErrorSpec) -> RefusalRenderer?,
 ): JsonObj? {
-    val described = errs.mapNotNull { err -> err.type?.let { err to schemas.schema(it, components) } }
+    val described = errs.mapNotNull { err ->
+        val refusals = refusedBy(err)
+        when {
+            refusals != null -> Triple(refusals.mediaType, err, refusalSchema(refusals, components))
+            else -> err.type?.let { Triple(err.mediaType, err, schemas.schema(it, components)) }
+        }
+    }
     if (described.isEmpty()) return null
 
     // Under the media type each is written as (spec 0070): JSON unless declared with errorMedia.
     return JsonObj(
-        described.groupBy { (err, _) -> err.mediaType }.mapValues { (_, under) ->
+        described.groupBy({ it.first }, { it.second to it.third }).mapValues { (_, under) ->
             jsonObj { put("schema", schemaOf(under)) }
         },
     )

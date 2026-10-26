@@ -1,0 +1,160 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Orders",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/orders": {
+      "post": {
+        "operationId": "placeOrder",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "A key the caller chooses, unique per request. A repeat with the same key is answered with the first response.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "One of:\n\n- `idempotency_key_in_flight`: A request with this Idempotency-Key is still being answered. Retry after the time given.\n- `out_of_stock`: Out of stock",
+            "headers": {
+              "Retry-After": {
+                "required": false,
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OutOfStock"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "error",
+                    "mapping": {
+                      "idempotency_key_in_flight": "#/components/schemas/ApiError",
+                      "out_of_stock": "#/components/schemas/OutOfStock"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "This Idempotency-Key was first sent with a different request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Order": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "quantity",
+          "sku"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "status"
+        ]
+      },
+      "OutOfStock": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "const": "out_of_stock"
+          },
+          "sku": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "sku"
+        ],
+        "description": "Out of stock"
+      }
+    }
+  }
+}

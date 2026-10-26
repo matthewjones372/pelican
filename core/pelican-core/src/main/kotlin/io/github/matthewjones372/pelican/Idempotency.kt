@@ -5,6 +5,59 @@ import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
+/** The header a key arrives in, as the IETF `Idempotency-Key` draft names it. */
+const val IDEMPOTENCY_KEY_HEADER: String = "Idempotency-Key"
+
+/**
+ * An endpoint's idempotency key, declared with `idempotencyKey()`: the header it arrives in, and the two failures
+ * Pelican answers for it, which no handler produces. Both are refusals tagged under the envelope's `error` field, so
+ * a failure of the endpoint's own may share their status.
+ */
+class IdempotencyKey internal constructor(
+    val header: HeaderParam<String?>,
+    /** 409: a request with this key is still being answered. */
+    val inFlight: ErrorSpec,
+    /** 422: this key was first sent with a different request. */
+    val reused: ErrorSpec,
+) {
+    val required: Boolean get() = header.required
+
+    override fun toString() = "idempotencyKey"
+}
+
+internal fun idempotencyKeyOf(required: Boolean): IdempotencyKey = IdempotencyKey(
+    HeaderParam(
+        IDEMPOTENCY_KEY_HEADER,
+        StringCodec,
+        required,
+        default = null,
+        description = "A key the caller chooses, unique per request. A repeat with the same key is answered " +
+            "with the first response.",
+    ),
+    ErrorSpec(
+        409,
+        "A request with this Idempotency-Key is still being answered. Retry after the time given.",
+        type = null,
+        headers = listOf(RETRY_AFTER),
+        tag = "idempotency_key_in_flight",
+        discriminator = REFUSAL_REASON_FIELD,
+    ),
+    ErrorSpec(
+        422,
+        "This Idempotency-Key was first sent with a different request.",
+        type = null,
+        tag = "idempotency_key_reused",
+        discriminator = REFUSAL_REASON_FIELD,
+    ),
+)
+
+/** Where the refusal envelope writes its reason: `ApiError.error`. */
+private const val REFUSAL_REASON_FIELD = "error"
+
+// Optional: a failure of the endpoint's own may share the 409, and it sends none.
+private val RETRY_AFTER =
+    responseHeader<Long>("Retry-After", "Seconds to wait before sending the request again.").optional()
+
 /** What an idempotency key names: one key, on one operation, from one caller. */
 data class IdempotencyScope(
     val operation: String,
