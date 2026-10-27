@@ -1,5 +1,9 @@
 package io.github.matthewjones372.pelican
 
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.toJavaDuration
+
 /**
  * The endpoints this service serves, the codecs that carry their bodies, and
  * the settings shared between them.
@@ -48,6 +52,7 @@ class ApiBuilder internal constructor() {
     private var refusals: RefusalRenderer = ApiErrorEnvelope
     private var onRefusal: RefusalObserver? = null
     private val authenticators = LinkedHashMap<SecurityScheme, Authenticator>()
+    private var idempotency: Idempotency? = null
 
     /** Outermost first: a chain is written a line at a time, in the order it runs. */
     fun filter(filter: Filter) {
@@ -67,6 +72,18 @@ class ApiBuilder internal constructor() {
     /** [Api.authenticators]: what verifies a caller declared under [scheme]. */
     fun authenticate(scheme: SecurityScheme, by: Authenticator) {
         authenticators[scheme] = by
+    }
+
+    /**
+     * [Api.idempotency]: keeps what keyed endpoints answered in [store] for [ttl]. A request still running after
+     * [lease] is taken to have died, and a repeat of it runs in its place.
+     */
+    fun idempotency(
+        store: IdempotencyStore,
+        ttl: kotlin.time.Duration = 24.hours,
+        lease: kotlin.time.Duration = 1.minutes,
+    ) {
+        idempotency = Idempotency(store, ttl.toJavaDuration(), lease.toJavaDuration())
     }
 
     /** [Api.onRefusal] — `onRefusal(refusalCounter(registry))` for the meter. */
@@ -95,6 +112,7 @@ class ApiBuilder internal constructor() {
         onRefusal = onRefusal,
         pages = pages,
         authenticators = authenticators.toMap(),
+        idempotency = idempotency,
     )
 }
 

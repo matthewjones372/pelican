@@ -68,7 +68,10 @@ is a pre-encoded-response SPI each backend writes raw; faster on replay, three w
       refusals, the header and the 409/422 in the document. Done when: an OpenAPI golden pins them and
       `OpenApiSpecQualityTest` reads it.
 - [ ] **`spec-0092-serve`**: `Api { idempotency(store, ttl) }`, the core wrapper, the startup check that a keyed
-      endpoint has a store. Done when: the parity suite asserts replay, 422, 409 and release on every backend.
+      endpoint has a store. Done when: served in process, a repeat is replayed, a reused key is a 422, one in
+      flight a 409, and a throw releases the key.
+- [ ] **`spec-0092-parity`**: a keyed endpoint in the backends example, bound on Pekko, Jetty and Gannet.
+      Done when: the parity suite asserts replay, 422, 409 and release on every backend.
 - [ ] **`spec-0092-client`**: the generated parameter, `RetryPolicy` on keyed requests, the test client sending a
       key. Done when: a `RetryingTransport` that loses the first response gets the stored one, the handler having run once.
 - [ ] **`spec-0092-import-docs`**: the importer reads the header back as `idempotencyKey()`, reference and cookbook,

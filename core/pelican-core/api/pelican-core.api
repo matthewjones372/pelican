@@ -7,6 +7,7 @@ public final class io/github/matthewjones372/pelican/Api {
 	public final fun getEndpoints ()Ljava/util/List;
 	public final fun getExposeInternalErrors ()Z
 	public final fun getFilters ()Ljava/util/List;
+	public final fun getIdempotency ()Lio/github/matthewjones372/pelican/Idempotency;
 	public final fun getMaxBodyBytes ()J
 	public final fun getMaxFrameBytes ()J
 	public final fun getOnRefusal ()Lio/github/matthewjones372/pelican/RefusalObserver;
@@ -38,6 +39,8 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun getTitle ()Ljava/lang/String;
 	public final fun getVersion ()Ljava/lang/String;
 	public final fun getWebhooks ()Ljava/util/List;
+	public final fun idempotency-5qebJ5I (Lio/github/matthewjones372/pelican/IdempotencyStore;JJ)V
+	public static synthetic fun idempotency-5qebJ5I$default (Lio/github/matthewjones372/pelican/ApiBuilder;Lio/github/matthewjones372/pelican/IdempotencyStore;JJILjava/lang/Object;)V
 	public final fun onError (Lkotlin/jvm/functions/Function3;)V
 	public final fun onRefusal (Lio/github/matthewjones372/pelican/RefusalObserver;)V
 	public final fun refusals (Lio/github/matthewjones372/pelican/RefusalRenderer;)V
@@ -589,6 +592,12 @@ public final class io/github/matthewjones372/pelican/HttpScheme : io/github/matt
 	public fun getDescription ()Ljava/lang/String;
 	public fun getName ()Ljava/lang/String;
 	public final fun getScheme ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/Idempotency {
+	public final fun getLease ()Ljava/time/Duration;
+	public final fun getStore ()Lio/github/matthewjones372/pelican/IdempotencyStore;
+	public final fun getTtl ()Ljava/time/Duration;
 }
 
 public final class io/github/matthewjones372/pelican/IdempotencyKey {

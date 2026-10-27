@@ -1,9 +1,17 @@
 package io.github.matthewjones372.pelican
 
+import io.github.matthewjones372.pelican.spi.failureNamedBy
+import io.github.matthewjones372.pelican.spi.successNamedBy
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.util.HexFormat
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.reflect.KType
 
 /** The header a key arrives in, as the IETF `Idempotency-Key` draft names it. */
 const val IDEMPOTENCY_KEY_HEADER: String = "Idempotency-Key"
@@ -35,21 +43,26 @@ internal fun idempotencyKeyOf(required: Boolean): IdempotencyKey = IdempotencyKe
             "with the first response.",
     ),
     ErrorSpec(
-        409,
+        IN_FLIGHT_STATUS,
         "A request with this Idempotency-Key is still being answered. Retry after the time given.",
         type = null,
         headers = listOf(RETRY_AFTER),
-        tag = "idempotency_key_in_flight",
+        tag = IN_FLIGHT_TAG,
         discriminator = REFUSAL_REASON_FIELD,
     ),
     ErrorSpec(
-        422,
+        REUSED_STATUS,
         "This Idempotency-Key was first sent with a different request.",
         type = null,
-        tag = "idempotency_key_reused",
+        tag = REUSED_TAG,
         discriminator = REFUSAL_REASON_FIELD,
     ),
 )
+
+private const val IN_FLIGHT_STATUS = 409
+private const val IN_FLIGHT_TAG = "idempotency_key_in_flight"
+private const val REUSED_STATUS = 422
+private const val REUSED_TAG = "idempotency_key_reused"
 
 /** Where the refusal envelope writes its reason: `ApiError.error`. */
 private const val REFUSAL_REASON_FIELD = "error"
@@ -164,3 +177,161 @@ class InMemoryIdempotencyStore(private val clock: Clock = Clock.systemUTC()) : I
         entries.computeIfPresent(scope) { _, held -> held.takeIf { it.response != null } }
     }
 }
+
+/** Where an [Api] keeps the responses its keyed endpoints answered, and for how long. Set with `idempotency(...)`. */
+class Idempotency internal constructor(
+    val store: IdempotencyStore,
+    /** How long a response is answered to repeats. */
+    val ttl: Duration,
+    /** How long a request may run before a repeat of it may run in its place. */
+    val lease: Duration,
+)
+
+/** The handler behind [key], answering a repeat from [settings]'s store rather than running it again. */
+internal fun Api.keyed(
+    endpoint: Endpoint<*, *>,
+    key: IdempotencyKey,
+    settings: Idempotency,
+    invoke: (Params) -> CompletionStage<Any?>,
+): (Params) -> CompletionStage<Any?> {
+    val responses = KeptResponses(endpoint, codecs)
+    val store = settings.store
+    return { params ->
+        val sent = params[key.header]
+        if (sent == null) {
+            invoke(params)
+        } else {
+            val scope = IdempotencyScope(endpoint.operationName, subjectOf(endpoint, params), sent)
+            when (val held = store.reserve(scope, responses.fingerprint(params, key), settings.lease)) {
+                Reservation.Reserved -> {
+                    // What a filter set before the handler ran, a request id say, belongs to this request alone.
+                    val setByFilters = params.responseHeaders()
+                    attempt(params, invoke).whenComplete { result, failure ->
+                        if (failure == null) {
+                            store.complete(scope, responses.kept(params, result, setByFilters), settings.ttl)
+                        } else {
+                            store.release(scope)
+                        }
+                    }
+                }
+
+                Reservation.InFlight -> throw ApiException(
+                    IN_FLIGHT_STATUS,
+                    IN_FLIGHT_TAG,
+                    key.inFlight.description,
+                    headers = listOf("Retry-After" to IN_FLIGHT_RETRY_SECONDS),
+                )
+
+                Reservation.Mismatch -> throw ApiException(REUSED_STATUS, REUSED_TAG, key.reused.description)
+
+                is Reservation.Done -> completed(responses.replayed(params, held.response))
+            }
+        }
+    }
+}
+
+/**
+ * The verified subject, so one caller's key never answers another's request. Asked of the authenticator again
+ * rather than carried from the caller check, which hands the handler only the service's own type.
+ */
+private fun Api.subjectOf(endpoint: Endpoint<*, *>, params: Params): String? {
+    val caller = endpoint.caller ?: return null
+    val credentials = params.credentials ?: return null
+    return authenticators.getValue(caller.scheme).authenticate(credentials)?.subject
+}
+
+/**
+ * A response as the store keeps it: the declared output it was, by position, the headers it went out with, and its
+ * value written by the endpoint's own codec, so a replay hands the backend the same value the handler did.
+ */
+private class KeptResponses(private val endpoint: Endpoint<*, *>, private val codecs: Codecs) {
+    private val declared = endpoint.output as? DeclaredResponses<*, *>
+    private val outputs: List<Any> = declared?.let { it.successes + it.failures } ?: listOf(endpoint.output)
+
+    fun kept(params: Params, result: Any?, setByFilters: List<Pair<String, String>>): StoredResponse {
+        val (output, value, headers) = when (result) {
+            is Outcome.Ok<*> -> Triple(checkNotNull(declared).successNamedBy(result), result.value, result.headers)
+            is Outcome.Err<*> -> Triple(checkNotNull(declared).failureNamedBy(result), result.error, result.headers)
+            else -> Triple(endpoint.output, result, emptyList())
+        }
+        val position = OUTPUT_HEADER to outputs.indexOfFirst { it === output }.toString()
+        val body = encode(output, value)
+        val mediaType = when {
+            output is TextOutput -> TEXT
+            typeOf(output) == null -> null
+            else -> JSON
+        }
+        val setByHandler = params.responseHeaders().filter { it !in setByFilters }
+        return StoredResponse(statusOf(output), listOf(position) + setByHandler + headers, mediaType, body)
+    }
+
+    fun replayed(params: Params, response: StoredResponse): Any? {
+        val output = outputs[response.headers.first { it.first == OUTPUT_HEADER }.second.toInt()]
+        response.headers
+            .filter { it.first != OUTPUT_HEADER }
+            .forEach { (name, value) -> params.setRawHeader(name, value) }
+        params.setRawHeader(REPLAYED_HEADER, "true")
+        val value = decode(output, response.body)
+        @Suppress("UNCHECKED_CAST")
+        return when {
+            declared == null -> value
+            output is ErrorOutput<*> -> Outcome.Err(output as ErrorOutput<Any?>, value)
+            else -> Outcome.Ok(value, output as Output<Any?>)
+        }
+    }
+
+    /**
+     * The request as the handler read it, so whitespace or field order in what a client sent does not make two
+     * requests of one. The key itself is left out: it is what names the request, not part of it.
+     */
+    fun fingerprint(params: Params, key: IdempotencyKey): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        fun add(part: String) {
+            val bytes = part.toByteArray(StandardCharsets.UTF_8)
+            digest.update(ByteBuffer.allocate(Int.SIZE_BYTES).putInt(bytes.size).array())
+            digest.update(bytes)
+        }
+        add(endpoint.operationName)
+        endpoint.pathSpec.captures.forEach { add(plain(it.codec, params[it])) }
+        endpoint.queries.forEach { add(plain(it.codec, params[it])) }
+        endpoint.headerParams.filter { it !== key.header }.forEach { add(plain(it.codec, params[it])) }
+        endpoint.cookieParams.forEach { add(plain(it.codec, params[it])) }
+        when (val body = endpoint.bodyInput) {
+            is MultipartBody -> body.textParts.forEach { add(plain(it.codec, params[it])) }
+            null -> Unit
+            else -> add(codecs.codec<Any?>(checkNotNull(body.payloadType)).encodeToString(params[body]))
+        }
+        return HexFormat.of().formatHex(digest.digest())
+    }
+
+    private fun encode(output: Any, value: Any?): ByteArray = when (val type = typeOf(output)) {
+        null -> if (output is TextOutput) (value as String).toByteArray(StandardCharsets.UTF_8) else ByteArray(0)
+        else -> codecs.codec<Any?>(type).encodeToString(value).toByteArray(StandardCharsets.UTF_8)
+    }
+
+    private fun decode(output: Any, bytes: ByteArray): Any? = when (val type = typeOf(output)) {
+        null -> if (output is TextOutput) String(bytes, StandardCharsets.UTF_8) else Unit
+        else -> codecs.codec<Any?>(type).decodeFrom(bytes)
+    }
+
+    private fun typeOf(output: Any): KType? =
+        if (output is ErrorOutput<*>) output.type else (output as Output<*>).payloadType
+
+    private fun statusOf(output: Any): Int =
+        if (output is ErrorOutput<*>) output.status else (output as Output<*>).status
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun plain(codec: PlainCodec<*>, value: Any?): String = when (value) {
+    null -> "\u0000"
+    is List<*> -> value.joinToString("\u0000") { plain(codec, it) }
+    else -> (codec as PlainCodec<Any>).encode(value)
+}
+
+/** Which declared output a kept response was. A pseudo-header's name, so no real header can collide with it. */
+private const val OUTPUT_HEADER = ":output"
+
+private const val REPLAYED_HEADER = "Idempotent-Replayed"
+private const val IN_FLIGHT_RETRY_SECONDS = "1"
+private const val JSON = "application/json"
+private const val TEXT = "text/plain"
