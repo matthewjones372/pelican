@@ -92,6 +92,13 @@ class ApiBuilder internal constructor() {
         idempotency = Idempotency(store, ttl.toJavaDuration(), lease.toJavaDuration())
     }
 
+    /** How tenanted endpoints find their tenant, and what says it exists. One per `Api`. */
+    fun tenants(input: TenantInput, directory: TenantDirectory) {
+        tenants = Tenants(input, directory)
+    }
+
+    private var tenants: Tenants? = null
+
     /** [Api.onRefusal] — `onRefusal(refusalCounter(registry))` for the meter. */
     fun onRefusal(observer: RefusalObserver) {
         onRefusal = observer
@@ -120,6 +127,7 @@ class ApiBuilder internal constructor() {
         authenticators = authenticators.toMap(),
         idempotency = idempotency,
         csrf = csrf,
+        tenants = tenants,
     )
 }
 

@@ -52,7 +52,7 @@ check and sign-in page into an exception to remember.
 
 ## Stack
 
-- [ ] **`spec-0095-resolve`**: `TenantResolver`, the three built in, `TenantDirectory`, `tenants(...)`, `tenanted(...)`,
+- [x] **`spec-0095-resolve`** ([#405](https://github.com/matthewjones372/pelican/pull/405)): `TenantResolver`, the three built in, `TenantDirectory`, `tenants(...)`, `tenanted(...)`,
       `this[tenant]`, the 400 and 404. Done when: served in process, each resolver finds its tenant and refuses the rest.
 - [ ] **`spec-0095-document`**: the header parameter, the server variable, the generated client's parameter.
       Done when: a golden pins both and the generated client sends the header.

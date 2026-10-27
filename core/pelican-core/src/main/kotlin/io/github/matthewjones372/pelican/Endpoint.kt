@@ -109,6 +109,9 @@ class Endpoint<I, R> internal constructor(
 
     /** What [caller] must have to be let in; null where being the caller is enough. */
     val requires: Requires? = null,
+
+    /** Which tenant the request is for; null for an endpoint that serves no one tenant. */
+    val tenant: TenantInput? = null,
 ) {
     /**
      * Whether a request here can carry a resume point. Only an event stream is
@@ -158,6 +161,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     internal var callerInput: CallerInput<*>? = null
     internal var idempotencyKey: IdempotencyKey? = null
     internal var requirements: Requires? = null
+    internal var tenantInput: TenantInput? = null
 
     init {
         // Inputs listed on endpoint(...) register themselves, so each is
@@ -195,6 +199,12 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
                 is CallerInput<*> -> throw IllegalArgumentException(
                     "$key is who is calling, not a value a client sends, so it is not listed on endpoint(...). " +
                         "Declare it inside the block with authenticatedBy($key) and read it as this[$key].",
+                )
+
+                // Found by the Api's resolver, so the same: declared inside, not listed as an input.
+                is TenantInput -> throw IllegalArgumentException(
+                    "The tenant is found by the Api's resolver, not listed on endpoint(...). " +
+                        "Declare it inside the block with tenanted(...) and read it as this[tenant].",
                 )
             }
         }
@@ -303,6 +313,15 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun requires(first: Requirement, vararg more: Requirement) {
         require(requirements == null) { "This endpoint already requires $requirements; say it in one requires(...)." }
         requirements = Requires(listOf(first) + more)
+    }
+
+    /**
+     * Resolves which tenant the request is for, after its caller and before any other input: no tenant is a 400 and
+     * one the directory lacks a 404. The handler reads it as `this[tenant]`.
+     */
+    fun tenanted(tenant: TenantInput) {
+        require(tenantInput == null) { "This endpoint is already tenanted; a request is for one tenant." }
+        tenantInput = tenant
     }
 
     /**
@@ -596,6 +615,7 @@ private fun <I, R> build(
         caller = b.callerInput,
         idempotency = b.idempotencyKey,
         requires = b.requirements,
+        tenant = b.tenantInput,
     ).also(::validate)
 }
 
@@ -606,7 +626,12 @@ private fun errorsOf(b: EndpointBuilder): List<ErrorSpec> {
         "This endpoint requires $requires of a caller it never names. Declare one with authenticatedBy(...)."
     }
     val crossSite = b.callerInput?.crossSiteRefused?.takeIf { crossSiteChecked(b.method, b.callerInput) }
-    val answered = listOfNotNull(b.callerInput?.refused, requires?.refused, crossSite)
+    val tenant = b.tenantInput
+    require(tenant == null || !tenant.readsCaller || b.callerInput != null) {
+        "This endpoint finds its tenant in the caller's claim, and names no caller. " +
+            "Declare one with authenticatedBy(...)."
+    }
+    val answered = listOfNotNull(b.callerInput?.refused, requires?.refused, crossSite, tenant?.missing, tenant?.unknown)
     // One per status: an endpoint's own declaration wins, and then the first of Pelican's.
     return answered.fold(b.errors.toList()) { declared, refusal ->
         if (declared.any { it.status == refusal.status }) declared else declared + refusal
