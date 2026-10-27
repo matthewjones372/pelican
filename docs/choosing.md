@@ -93,7 +93,7 @@ ways and keeping those in step by hand has become a cost:
 
 ## Before adopting it
 
-A checklist for a team evaluating Pelican 1.1.0:
+A checklist for a team evaluating Pelican 1.2.0:
 
 - **The JDK.** The library modules target JDK 21, except `pelican-streams`,
   `pelican-streams-jetty` and the `pelican-gannet` modules (25), and

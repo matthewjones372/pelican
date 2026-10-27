@@ -26,7 +26,7 @@ dependencies {
 }
 ```
 
-`pelicanVersion` is the release you pin, `val pelicanVersion = "1.1.0"`. To
+`pelicanVersion` is the release you pin, `val pelicanVersion = "1.2.0"`. To
 serve on Pekko HTTP instead, use `pelican-pekko`, `pelican-pekko-docs` and
 `pelican-test-pekko`, plus the Pekko dependencies your service names itself,
 as in [Getting started](../README.md#getting-started). Every binder below
@@ -658,15 +658,15 @@ of `_2.13` on every Pekko line.
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.1.0")       // brings pelican-core; compiles against Pekko
-    implementation("io.github.matthewjones372:pelican-jackson:1.1.0")
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.1.0")  // startWithDocs and Swagger UI
+    implementation("io.github.matthewjones372:pelican-pekko:1.2.0")       // brings pelican-core; compiles against Pekko
+    implementation("io.github.matthewjones372:pelican-jackson:1.2.0")
+    implementation("io.github.matthewjones372:pelican-pekko-docs:1.2.0")  // startWithDocs and Swagger UI
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
     implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
-    testImplementation("io.github.matthewjones372:pelican-test:1.1.0")
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.1.0") // inMemory() on Pekko
+    testImplementation("io.github.matthewjones372:pelican-test:1.2.0")
+    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.2.0") // inMemory() on Pekko
 }
 ```
 

@@ -14,13 +14,13 @@ off the application's classpath with a configuration of its own:
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.1.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.2.0" }
 
 val pelicanImport = configurations.register("pelicanImport")
 
 dependencies {
-    implementation("io.github.matthewjones372:pelican-core:1.1.0")    // what the generated file compiles against
-    pelicanImport("io.github.matthewjones372:pelican-import:1.1.0")   // what the task runs
+    implementation("io.github.matthewjones372:pelican-core:1.2.0")    // what the generated file compiles against
+    pelicanImport("io.github.matthewjones372:pelican-import:1.2.0")   // what the task runs
 }
 
 pelican {

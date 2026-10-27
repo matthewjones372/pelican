@@ -22,8 +22,8 @@ that described it then refuses.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-schema:1.1.0")
-    implementation("io.github.matthewjones372:pelican-jackson:1.1.0")
+    implementation("io.github.matthewjones372:pelican-schema:1.2.0")
+    implementation("io.github.matthewjones372:pelican-jackson:1.2.0")
 }
 ```
 

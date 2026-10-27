@@ -2,7 +2,7 @@
 
 Every module, how it behaves and where it stops, for the API on `main`. Start
 with the [README](../README.md) if you have not read it yet: it says what the
-1.1.0 release contains and how to install it.
+1.2.0 release contains and how to install it.
 
 Endpoints are values. Interpreters turn them into a Jetty handler or a Pekko
 HTTP route, and into an OpenAPI document (3.1.0 or 3.2.0, whichever the people
@@ -13,7 +13,7 @@ Contents:
 - **Modules and backends:** [Modules](#modules), [The backend](#the-backend) (including [On Jetty](#on-jetty) and [On Gannet](#on-gannet)), [Choosing a JSON library](#choosing-a-json-library)
 - **Defining endpoints and inputs:** [Everything is a value](#everything-is-a-value), [Typechecked endpoints](#typechecked-endpoints), [Refined inputs](#refined-inputs), [More than one value](#more-than-one-value), [Cookies](#cookies), [Form bodies](#form-bodies), [Multipart uploads](#multipart-uploads)
 - **Responses and errors:** [Response headers](#response-headers), [Declared failures](#declared-failures), [More than one successful response](#more-than-one-successful-response), [One response, several renderings](#one-response-several-renderings), [Streaming](#a-whole-list-or-a-stream-of-one) (and the sections after it, through [Streaming behaviour](#streaming-behaviour)), [Errors](#errors-and-what-a-caller-is-told), [Limits and startup checks](#limits-and-startup-checks)
-- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
+- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
 - **Documents and other readings:** [OpenAPI docs](#getting-the-openapi-docs), [Standalone JSON Schema](#a-schema-that-resolves-on-its-own) ([schemas.md](schemas.md)), [MCP tools](#tools-a-model-can-call) ([mcp.md](mcp.md)), [Webhooks](#webhooks-the-calls-the-service-sends)
 - **Generating code:** [The Gradle plugin](#the-gradle-plugin), [Client transports](#the-transport-a-generated-client-sends-with) ([generated-client.md](generated-client.md)), [Importing a document](#importing-an-openapi-document) ([importing.md](importing.md))
 - **Testing:** [Testing](#testing) ([golden-testing.md](golden-testing.md))
@@ -23,13 +23,13 @@ Worked, step-by-step versions of most of this are in the [cookbook](cookbook.md)
 
 ## Modules
 
-The second column says whether a module is in the 1.1.0 release. The ones
+The second column says whether a module is in the 1.2.0 release. The ones
 marked `main` are built and tested on `main` but not yet released: the Gannet
 modules, which depend on a Gannet snapshot. Which modules a service needs is
 [Choosing modules](modules.md#choosing-modules); naming one version for all of
 them is [Version alignment and the BOM](modules.md#version-alignment-and-the-bom).
 
-| Module | 1.1.0 | Depends on | Contains |
+| Module | 1.2.0 | Depends on | Contains |
 |---|---|---|---|
 | `pelican-core` | yes | `jackson-core` *only* | endpoint descriptions, plain-value codecs, a minimal JSON tree and the parser under it. No HTTP library, and no JSON databind. |
 | `pelican-openapi` | yes | core | descriptions to an OpenAPI 3.1.0 or 3.2.0 document, in JSON or YAML, and two documents to what changed for callers |
@@ -291,7 +291,7 @@ machine has cores. `BlockingHandlerTest` holds sixteen
 half-second handlers to under two seconds on a two-thread dispatcher.
 
 `nonBlocking()` makes the same choice for one binding instead of the whole
-server (spec 0090, unreleased). The marked handler and its filters run on the
+server (spec 0090). The marked handler and its filters run on the
 server's own threads, where `Handlers.onDispatcher` runs handlers: Pekko's
 dispatcher, Jetty's pool, Gannet's carrier. Every other endpoint keeps
 `handlers`:
@@ -388,7 +388,7 @@ where Pekko takes a `Source`.
 For which modules a service takes and one version for all of them, see
 [Choosing modules](modules.md#choosing-modules) and
 [Version alignment and the BOM](modules.md#version-alignment-and-the-bom).
-`$pelicanVersion` here and below is the release you pin, `"1.1.0"`:
+`$pelicanVersion` here and below is the release you pin, `"1.2.0"`:
 
 ```kotlin
 dependencies {
@@ -650,8 +650,8 @@ interface Codecs : CodecFactory, SchemaSource
 `SchemaSource` is deliberately narrower than `Codecs`: generating documentation
 must not require a codec that can actually serialise anything.
 
-Every backend writes a `json<T>()` success through `encodeTo` (spec 0090,
-unreleased), so `JacksonCodecs` streams UTF-8 from its own buffer with no
+Every backend writes a `json<T>()` success through `encodeTo` (spec 0090),
+so `JacksonCodecs` streams UTF-8 from its own buffer with no
 `String` between. A codec of your own needs nothing new: the default writes
 `encodeToString`'s bytes. The bytes are the same either way, with one
 exception: a lone surrogate, which a `String`'s UTF-8 writes as `?`, is escaped
@@ -2885,6 +2885,42 @@ rejects a caller who cannot meet them: is
 `example/src/main/kotlin/example/secured/SecuredReports.kt`
 (`./gradlew :example:runSecured`). See [Filters](#filters) for the shape of it.
 
+## A request sent twice, answered once
+
+An endpoint that charges, sends or creates declares `idempotencyKey()`, and a caller that sends the same
+`Idempotency-Key` again gets the first response instead of a second run of the handler
+([spec 0092](../specs/0092-a-request-sent-twice-answered-once.md)):
+
+```kotlin
+val placeOrder = endpoint(order) {
+    post("orders")
+    authenticatedBy(caller)
+    idempotencyKey()                       // required; idempotencyKey(required = false) lets a request omit it
+    json<Order>(201).orFail(outOfStock)
+}
+
+val service = api(routes, JacksonCodecs) {
+    idempotency(store = InMemoryIdempotencyStore(), ttl = 24.hours, lease = 1.minutes)
+}
+```
+
+- **The first request** reserves the key and runs the handler. What it answered, a declared success or a declared
+  failure, is kept for `ttl`: its status, the headers the handler set and the bytes its codec wrote. A handler that
+  throws releases the key instead, so a retry runs it again.
+- **A repeat** of the same request is answered from the store with `Idempotent-Replayed: true`, and the handler does
+  not run.
+- **The same key with a different request** is a 422, and **a repeat while the first is still running** a 409 with
+  `Retry-After: 1`. Both are refusals in the envelope, declared with the key, so the document lists them.
+- **The same request** is a SHA-256 of the operation, the decoded path, query and header inputs, the key aside, and
+  the body re-encoded by its codec, so whitespace or field order a client changes does not count.
+- **A key is scoped** to its operation and, on an endpoint with `authenticatedBy`, to the caller's subject, so one
+  caller's key never answers another's.
+
+Pelican keeps no keys itself: `IdempotencyStore` is the interface, and `InMemoryIdempotencyStore` the one for tests and
+a single node. A service on several nodes needs a store they share. Its calls block, so `api` refuses a keyed endpoint
+bound `nonBlocking()`, and a keyed endpoint with no store set. A request still running after `lease` is taken to have
+died, and a repeat runs in its place.
+
 ## Pages beside the endpoints
 
 A service with a few pages of its own, a small UI or a status page, serves them from a classpath directory with
@@ -4293,7 +4329,7 @@ The document and the client are both readings of the same values, and both are
 build tasks:
 
 ```kotlin
-plugins { id("io.github.matthewjones372.pelican") version "1.1.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.2.0" }
 
 pelican {
     documents {
@@ -4391,7 +4427,7 @@ importer:
 
 ```kotlin
 val pelicanImport: Configuration by configurations.creating
-dependencies { pelicanImport("io.github.matthewjones372:pelican-import:1.1.0") }
+dependencies { pelicanImport("io.github.matthewjones372:pelican-import:1.2.0") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
@@ -5972,7 +6008,7 @@ its OpenAPI document by the plugin's `endpoints` entry:
 
 ```kotlin
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.1.0")
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.2.0")
 }
 ```
 
@@ -6457,10 +6493,10 @@ place they are recorded.
 
 ## Versions
 
-What 1.1.0 is built with. `main` builds with the same versions, plus the
+What 1.2.0 is built with. `main` builds with the same versions, plus the
 library only its unreleased modules use:
 
-| | 1.1.0 |
+| | 1.2.0 |
 |---|---|
 | Kotlin | 2.4.21 |
 | Bytecode | JDK 21 (`pelican-streams`, `pelican-streams-jetty` and the `pelican-gannet` modules: JDK 25) |
@@ -6499,7 +6535,7 @@ already runs:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.1.0")
+    implementation("io.github.matthewjones372:pelican-pekko:1.2.0")
 
     // _2.13 or _3: Pelican compiles against `javadsl` and four names that are
     // identical in both, so it has no opinion.

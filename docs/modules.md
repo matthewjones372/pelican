@@ -3,7 +3,7 @@
 Which modules a build needs, what each one brings with it, and which are in a
 release. Coordinates are `io.github.matthewjones372:<module>`.
 
-The current release is 1.1.0. The Availability column gives the first release
+The current release is 1.2.0. The Availability column gives the first release
 a module is in. Modules marked **main only** are built and tested on `main` but
 are in no release: the three modules of the [Gannet backend](#gannet-backend).
 
@@ -49,7 +49,7 @@ Scala cross-build it runs (`_2.13` or `_3`, the same on every Pekko line):
 
 ```kotlin
 // build.gradle.kts
-val pelicanVersion = "1.1.0"
+val pelicanVersion = "1.2.0"
 
 dependencies {
     implementation("io.github.matthewjones372:pelican-pekko:$pelicanVersion")
@@ -76,7 +76,7 @@ An optional module is one more line with the same version:
 Every Pelican module in a build should be the same version. There are two ways
 to get that.
 
-**One variable.** Write the version once, as `val pelicanVersion = "1.1.0"`
+**One variable.** Write the version once, as `val pelicanVersion = "1.2.0"`
 above, and use it on every Pelican coordinate.
 
 **`pelican-bom`.** It is a Gradle `java-platform` with no dependencies of its
