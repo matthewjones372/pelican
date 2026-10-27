@@ -66,12 +66,14 @@ published; it could come later behind A.
 ./gradlew build
 ```
 
-## Open questions
+## Decisions
 
-1. **`requires(a, b)` means all of them?** Recommended: yes, with `anyOf(a, b)` for either. OpenAPI reads a list of
-   requirements as "any", so the document says it in words where the two disagree.
-2. **Where does `permission` read from?** Recommended: the `scope` claim, then `scp`, as RFC 9068 and most providers
-   write them. A provider that puts them elsewhere maps them in its `Authenticator`.
-3. **A 403 when the caller is optional and absent?** Recommended: 401, since there is nobody to forbid.
-4. **Declaring the 401 changes every document with a caller in it.** Recommended: take it, as a compatible change
-   (a new documented status), with the goldens it moves read and accepted in `spec-0093-refusals`.
+Matt took each recommendation on 2026-10-27.
+
+1. **`requires(a, b)` means all of them**, with `anyOf(a, b)` for either. OpenAPI reads a list of requirements as
+   "any", so the document says it in words where the two disagree.
+2. **`permission` reads the `scope` claim, then `scp`**, as RFC 9068 and most providers write them. A provider that
+   puts them elsewhere maps them in its `Authenticator`.
+3. **An optional caller who is absent is a 401**, not a 403, since there is nobody to forbid.
+4. **Declaring the 401 is taken** as a compatible change (a new documented status) to every document with a caller
+   in it, with the goldens it moves read and accepted in `spec-0093-refusals`.

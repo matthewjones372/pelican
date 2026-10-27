@@ -63,12 +63,12 @@ neither but needs a cookie, a header and client code on every form. Recommended:
 ./gradlew build
 ```
 
-## Open questions
+## Decisions
 
-1. **Hash the id in the store?** Recommended: yes, SHA-256, so a leaked store is not a set of live sessions.
-2. **Slide the idle expiry on every request?** Recommended: at most once a minute per session, so a busy page is not a
-   store write per request.
-3. **CSRF on by default for a session cookie?** Recommended: yes, `csrf(sessions)` implied unless turned off, since a
-   cookie session without it is the bug.
-4. **One spec or two?** This is feature 2's second half; split from 0093 to keep each to a page. Merge them back if
-   you prefer one.
+Matt took each recommendation on 2026-10-27.
+
+1. **The store keeps a SHA-256 of each id**, so a leaked store is not a set of live sessions.
+2. **Idle expiry slides at most once a minute per session**, so a busy page is not a store write per request.
+3. **CSRF is on by default for a session cookie**: `csrf(sessions)` is implied unless turned off, since a cookie
+   session without it is the bug.
+4. **Two specs.** This is feature 2's second half, kept apart from 0093 so each stays a page.
