@@ -13,7 +13,7 @@ Contents:
 - **Modules and backends:** [Modules](#modules), [The backend](#the-backend) (including [On Jetty](#on-jetty) and [On Gannet](#on-gannet)), [Choosing a JSON library](#choosing-a-json-library)
 - **Defining endpoints and inputs:** [Everything is a value](#everything-is-a-value), [Typechecked endpoints](#typechecked-endpoints), [Refined inputs](#refined-inputs), [More than one value](#more-than-one-value), [Cookies](#cookies), [Form bodies](#form-bodies), [Multipart uploads](#multipart-uploads)
 - **Responses and errors:** [Response headers](#response-headers), [Declared failures](#declared-failures), [More than one successful response](#more-than-one-successful-response), [One response, several renderings](#one-response-several-renderings), [Streaming](#a-whole-list-or-a-stream-of-one) (and the sections after it, through [Streaming behaviour](#streaming-behaviour)), [Errors](#errors-and-what-a-caller-is-told), [Limits and startup checks](#limits-and-startup-checks)
-- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Who may call](#what-a-caller-may-do), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
+- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Who may call](#what-a-caller-may-do), [Sessions](#a-session-in-a-cookie), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
 - **Documents and other readings:** [OpenAPI docs](#getting-the-openapi-docs), [Standalone JSON Schema](#a-schema-that-resolves-on-its-own) ([schemas.md](schemas.md)), [MCP tools](#tools-a-model-can-call) ([mcp.md](mcp.md)), [Webhooks](#webhooks-the-calls-the-service-sends)
 - **Generating code:** [The Gradle plugin](#the-gradle-plugin), [Client transports](#the-transport-a-generated-client-sends-with) ([generated-client.md](generated-client.md)), [Importing a document](#importing-an-openapi-document) ([importing.md](importing.md))
 - **Testing:** [Testing](#testing) ([golden-testing.md](golden-testing.md))
@@ -2831,6 +2831,65 @@ sends a bearer token, an API key and a session cookie to every backend on a
 and finds none of them in a body, a header, a span or a log line. What an
 `Authenticator` puts in `Unauthenticated` goes to the caller, so name no key or
 token there.
+
+### A session in a cookie
+
+A browser calls with a cookie rather than a token. `sessionCookie(...)` keeps
+sessions in a store, hands out the cookie that names one, and reads it back as
+an `Authenticator`, so `authenticatedBy` and `requires` work on it unchanged:
+
+```kotlin
+val sessions = sessionCookie(name = "sid", store = InMemorySessionStore(), idle = 30.minutes, absolute = 12.hours)
+val visitor = authenticated(sessions.scheme) { id -> Visitor(id.subject) }
+
+val signIn = endpoint(credentials) {
+    post("sign-in")
+    emits(responseHeader<String>("Set-Cookie"))
+    text()
+}
+
+signIn handledNow { login ->
+    val who = passwords.check(login) ?: unauthorized()      // how a person proves who they are is the service's
+    setCookie(sessions.start(Identity(who)))                // HttpOnly; Secure; SameSite=Lax; Path=/
+    "welcome"
+}
+
+api(routes, codecs = JacksonCodecs) { authenticate(sessions.scheme, by = sessions) }
+```
+
+- **The id** is 256 random bits. The store is keyed by its SHA-256, never the
+  id, so a store that leaks is not a set of live sessions. `SessionStore` is an
+  interface (`create`, `lookup`, `touch`, `revoke`, `revokeAll`);
+  `InMemorySessionStore` is for tests and a single instance, and a persistent
+  one is the service's.
+- **Expiry**: a session ends after `idle` without use or `absolute` after it
+  began, whichever is first. Use slides the idle expiry, writing to the store at
+  most once a minute.
+- **Ending one**: `sessions.end(credentials)` revokes the session the request
+  carries and returns the cookie that clears it; `sessions.endAll(subject)`
+  signs someone out everywhere.
+- **A cookie for a session that has ended reads as nobody**, not as a refusal: a
+  browser keeps sending it. A required caller is still a 401; an optional one is
+  anonymous.
+- **The document** names it as an `apiKey` in the cookie.
+
+**`ResponseCookie`** is any `Set-Cookie` written from a value, with the same safe
+defaults. It refuses `SameSite=None` without `Secure`, a `__Host-` cookie with a
+`Domain` or another path, a `__Host-` or `__Secure-` cookie without `Secure`,
+and a name or value a header cannot carry. `setCookie(...)` sends each as a
+header of its own, so one response can set several; the endpoint declares
+`Set-Cookie` with `emits(...)` like any header. `ResponseCookie.expired(name)`
+clears one. `pelican-oidc`'s cookies are written this way too.
+
+**Cross-site requests.** A browser attaches a cookie to a request another site
+makes it send. So a POST, PUT, PATCH or DELETE whose caller is carried in a
+cookie is refused with 403 unless its `Origin` is this host or one the CORS
+policy lets send credentials, or, with no `Origin`, its `Sec-Fetch-Site` is
+`same-origin` or `none`. A request with neither header is not from a browser and
+goes through. A bearer token or a header API key is never checked, since no
+browser attaches those by itself. The check is on by default; `api { csrf =
+false }` turns it off. The 403 is declared on the endpoints it guards, and
+`onRefusal` hears it as `RefusalReason.FORBIDDEN`.
 
 **Verifying a provider's tokens** is `pelican-oidc`:
 
