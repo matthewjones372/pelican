@@ -53,7 +53,7 @@ neither but needs a cookie, a header and client code on every form. Recommended:
       Done when: the refusals are tested, and oidc's `Set-Cookie` headers are byte-for-byte unchanged.
 - [x] **`spec-0094-sessions`** ([#400](https://github.com/matthewjones372/pelican/pull/400)): `SessionStore`, `InMemorySessionStore`, `sessionCookie`, start, end, idle and
       absolute expiry. Done when: served in process, a revoked or expired session is a 401.
-- [ ] **`spec-0094-sessions-parity`** (split from the entry above, which ran past the soft cap): a session endpoint in
+- [x] **`spec-0094-sessions-parity`** ([#401](https://github.com/matthewjones372/pelican/pull/401); split from the entry above, which ran past the soft cap): a session endpoint in
       the backends example. Done when: a revoked or expired session is a 401 on every backend.
 - [ ] **`spec-0094-csrf`**: `csrf(...)`, the declared 403. Done when: the parity suite refuses a cross-origin
       cookie POST and lets the same POST through with a bearer token, on every backend.

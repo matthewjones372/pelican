@@ -17,6 +17,7 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.Identity
 import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
@@ -78,6 +79,13 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
     leaveTip handledNow { tip -> TipJar.tipped(tip) },
 
     refundTip handledNow { tip -> Receipt(number = 0, amount = -tip.amount) },
+
+    startVisit handledNow { name ->
+        setCookie(visits.start(Identity(name)))
+        "welcome $name"
+    },
+
+    whoIsVisiting handledNow { this[visitor] },
 
     forget handledWith { _ -> },
 
