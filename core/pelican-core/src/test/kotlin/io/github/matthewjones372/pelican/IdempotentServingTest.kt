@@ -4,6 +4,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
+import java.io.IOException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.KType
@@ -191,6 +192,39 @@ class IdempotentServingTest {
         send("5", key = "t-1", path = "tips")
         send("5", key = "t-1", path = "tips").header("Idempotent-Replayed") shouldBe "true"
         calls.get() shouldBe 3
+    }
+
+    @Test
+    fun `a retry after the first answer was lost is answered with it, and the handler runs once`() {
+        val lost = mutableListOf<String>()
+        // The server answers; the answer never reaches the caller. The connection dropped on the way back.
+        val dropsFirstAnswer = ClientTransport { request ->
+            transport.send(request).thenApply { response ->
+                if (lost.isEmpty()) {
+                    lost += response.text()
+                    throw IOException("connection reset after the server answered")
+                }
+                response
+            }
+        }
+        val client = dropsFirstAnswer.retrying(retryPolicy { jitter = 0.0 }) { _, task -> task.run() }
+        val request = ClientRequest(
+            Method.POST,
+            "http://shop.test/orders",
+            listOf(
+                "Idempotency-Key" to IdempotencyKey.random(),
+                "Authorization" to "Bearer ada",
+                "Content-Type" to "application/json",
+            ),
+            ClientRequest.Body.Text("tea"),
+        )
+
+        val answer = client.send(request).toCompletableFuture().join()
+
+        answer.status shouldBe 201
+        answer.header("Idempotent-Replayed") shouldBe "true"
+        answer.text() shouldBe lost.single()
+        calls.get() shouldBe 1
     }
 
     @Test

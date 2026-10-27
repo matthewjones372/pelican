@@ -102,7 +102,13 @@ class IdempotencyAcrossBackendsTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("backends")
     fun `a tip without a key is a 400`(name: String, client: ApiClient) {
-        client.send(client.request(leaveTip, Tip(5))).shouldHaveStatus(400)
+        client.send(client.request(leaveTip, Tip(5)).withoutHeader("Idempotency-Key")).shouldHaveStatus(400)
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("backends")
+    fun `the test client sends a key of its own, a fresh one per call`(name: String, client: ApiClient) {
+        client.call(leaveTip, Tip(5)).number shouldNotBe client.call(leaveTip, Tip(5)).number
     }
 }
 

@@ -322,6 +322,14 @@ pelican {
             specFunction.set("adoptionSpec")
             packageName.set("example.generated.adoption")
         }
+        // Spec 0092: a keyed call. Committed, like `orders`, so `checkTippingClient` pins the key's parameter and
+        // its default as a reviewable file rather than as strings a test searches for.
+        create("tipping") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("tippingSpec")
+            packageName.set("example.generated.tipping")
+            outputDir.set(layout.projectDirectory.dir("src/test/kotlin"))
+        }
     }
     /**
      * The same document, read back the other way.

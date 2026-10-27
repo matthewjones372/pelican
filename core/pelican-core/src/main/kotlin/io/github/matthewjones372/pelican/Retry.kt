@@ -55,9 +55,9 @@ import kotlin.random.Random
  *   answered in time.
  * @param methods the methods safe to send twice, which is HTTP's own list of
  *   the idempotent ones. POST and PATCH are missing because the description
- *   cannot tell us whether a second one would place a second order; a caller
- *   whose POST carries an idempotency key knows that and can say so by naming
- *   the method here.
+ *   cannot tell us whether a second one would place a second order. A request
+ *   carrying an `Idempotency-Key` is sent again whatever its method: the key
+ *   is the server's promise that a repeat is answered, not run.
  * @param retryStreamedBodies whether a request whose body is a
  *   [ClientRequest.Body.Streaming] may be sent again. Off by default, because
  *   whether `open()` can be called a second time is a fact about the function
@@ -140,7 +140,8 @@ class RetryPolicy internal constructor(
      */
     private fun worthRepeating(request: ClientRequest, attempt: Int): Boolean =
         attempt < maxAttempts &&
-            request.method in methods &&
+            // A key is the request saying for itself that a second one does no second thing.
+            (request.method in methods || request.header(IDEMPOTENCY_KEY_HEADER) != null) &&
             (retryStreamedBodies || request.body !is ClientRequest.Body.Streaming)
 
     /**

@@ -9,6 +9,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.util.HexFormat
+import java.util.UUID
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KType
@@ -31,6 +32,12 @@ class IdempotencyKey internal constructor(
     val required: Boolean get() = header.required
 
     override fun toString() = "idempotencyKey"
+
+    companion object {
+        /** A key for one call: what a generated client sends unless its caller names one. */
+        @JvmStatic
+        fun random(): String = UUID.randomUUID().toString()
+    }
 }
 
 internal fun idempotencyKeyOf(required: Boolean): IdempotencyKey = IdempotencyKey(
