@@ -13,6 +13,7 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.InMemoryIdempotencyStore
 import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
@@ -79,6 +80,9 @@ fun greetingsApi(
     this.covers = covers
 
     webhooks = greetingWebhooks
+
+    // One store per Api, so each backend's server keeps its own keys.
+    idempotency(InMemoryIdempotencyStore())
 }
 
 /** What [stamping] worked out, for anything downstream that wants it. */

@@ -45,6 +45,9 @@ import io.github.matthewjones372.pelican.repeated
 import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.textPart
 import io.github.matthewjones372.pelican.webhook
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -425,11 +428,26 @@ val replay = endpoint {
     sse<Tick>(eventName = "tick", id = { it.seq.toString() }, retry = 15.seconds)
 }
 
+data class Tip(val amount: Int)
+
+data class Receipt(val number: Long, val amount: Int)
+
+/** Leaving a tip twice by accident is what a key is for: the repeat gets the first receipt. */
+val leaveTip = endpoint(jsonBody<Tip>(description = "How much, in whole units")) {
+    post("tips")
+    summary = "Leave a tip, once however often it is sent"
+    operationId = "leaveTip"
+    tag("greetings")
+    emits(requestId)
+    idempotencyKey()
+    json<Receipt>(status = 201)
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
-        roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay,
+        roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay, leaveTip,
     )
 
 /**
@@ -549,3 +567,44 @@ internal fun filtersOf(
     features: List<String>?,
     seen: List<String>?,
 ) = Filters(tags.orEmpty(), ids.orEmpty(), features.orEmpty(), seen.orEmpty())
+
+/** The tip that waits for [TipJar.release], so a repeat of it can arrive while it is in flight. */
+internal const val HELD_TIP = 13
+
+/**
+ * Numbers receipts, and holds a tip of [HELD_TIP] until a test lets it go. Shared by every backend in the
+ * process; each one's own store keeps its keys apart.
+ */
+object TipJar {
+    private val numbered = AtomicLong()
+
+    @Volatile private var gate = CountDownLatch(0)
+
+    @Volatile private var held = CountDownLatch(1)
+
+    /** The next tip of [HELD_TIP] waits for [release]. */
+    fun hold() {
+        gate = CountDownLatch(1)
+        held = CountDownLatch(1)
+    }
+
+    /** Returns once a held tip is inside its handler, its key reserved. */
+    fun awaitHeld() {
+        check(held.await(HOLD_SECONDS, TimeUnit.SECONDS)) { "No tip of $HELD_TIP reached its handler" }
+    }
+
+    fun release() = gate.countDown()
+
+    /** Nothing is not a tip: the handler throws, which is what a key gives back. */
+    internal fun tipped(tip: Tip): Receipt {
+        require(tip.amount > 0) { "A tip of nothing" }
+        if (tip.amount == HELD_TIP) {
+            held.countDown()
+            gate.await(HOLD_SECONDS, TimeUnit.SECONDS)
+        }
+        return Receipt(numbered.incrementAndGet(), tip.amount)
+    }
+}
+
+/** Longer than any test holds a tip; reached only if one never lets go. */
+private const val HOLD_SECONDS = 30L
