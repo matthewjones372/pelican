@@ -123,6 +123,8 @@ class RedactionAcrossBackendsTest {
         val lines = logged.list.map { it.formattedMessage }
         lines.any { "refundTip -> 200" in it } shouldBe true
         lines.any { "refused DECODE on /tips/refunds" in it } shouldBe true
+        lines.any { "refused UNAUTHENTICATED on /tips/refunds -> 401" in it } shouldBe true
+        lines.any { "refused FORBIDDEN on /tips/refunds -> 403" in it } shouldBe true
         logged.list.any { it.throwableProxy != null } shouldBe true
 
         val written = responses.flatMap { listOf(it.body) + it.headers.map { (k, v) -> "$k: $v" } } +

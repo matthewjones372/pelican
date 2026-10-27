@@ -3223,7 +3223,7 @@ no existing dashboard changes meaning. Its tags:
 
 | Tag | Where it comes from |
 |---|---|
-| `reason` | `unmatched`, `decode`, `body_limit`, `content_type`, `accept` |
+| `reason` | `unmatched`, `decode`, `body_limit`, `content_type`, `accept`, `unauthenticated`, `forbidden` |
 | `status` | the status the caller was sent |
 | `path` | the refusing route's template, or `_unmatched` where nothing matched |
 

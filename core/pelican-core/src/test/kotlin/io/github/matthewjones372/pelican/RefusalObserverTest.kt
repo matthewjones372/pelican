@@ -7,6 +7,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CompletableFuture
 
 /**
  * A refusal is observed where it is rendered, so the counter cannot fall behind
@@ -66,6 +67,34 @@ class RefusalObserverTest {
         refuse(PayloadTooLarge(limit = 4L), upload)
 
         seen shouldContainExactly listOf(Observed(RefusalReason.BODY_LIMIT, 413, "/users/{userId}/uploads"))
+    }
+
+    /** Decided before the chain, so no filter, access log or span hears of it unless this does. */
+    @Test
+    fun `a caller refused before the chain is observed as unauthenticated or forbidden`() {
+        val bearer = bearerAuth()
+        val caller = authenticated(bearer) { it.subject }
+        val me = endpoint {
+            get("me")
+            authenticatedBy(caller)
+            requires(role("staff"))
+            text()
+        }
+        val served = api(listOf(ServerEndpoint(me) { CompletableFuture.completedStage("me" as Any?) })) {
+            authenticate(bearer, Authenticator { it.bearerToken()?.let(::Identity) })
+            onRefusal { reason, status, pathTemplate -> seen += Observed(reason, status, pathTemplate) }
+        }
+        fun status(vararg headers: Pair<String, String>) = InMemoryClientTransport(served)
+            .send(ClientRequest(Method.GET, "http://test/me", headers.toList()))
+            .toCompletableFuture().join().status
+
+        status() shouldBe 401
+        status("Authorization" to "Bearer ada") shouldBe 403
+
+        seen shouldContainExactly listOf(
+            Observed(RefusalReason.UNAUTHENTICATED, 401, "/me"),
+            Observed(RefusalReason.FORBIDDEN, 403, "/me"),
+        )
     }
 
     // -------------------------------------------------- what is deliberately not one

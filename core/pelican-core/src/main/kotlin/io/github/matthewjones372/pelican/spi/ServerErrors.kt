@@ -68,14 +68,23 @@ private fun described(t: Throwable): ApiError? = when (t) {
  * it would count requests `http.server.requests` has already counted; the 500
  * nobody described is missing for the same reason. Every entry below is a type
  * only Pelican itself raises, and it raises them all before the outermost
- * filter is entered.
+ * filter is entered. The caller's 401 and 403 are among them, which is why
+ * they arrive wrapped rather than as the bare [ApiException] a filter throws.
  */
 private fun reasonOf(t: Throwable): RefusalReason? = when (t) {
+    is CallerRefused ->
+        if (t.refusal.status == UNAUTHENTICATED_STATUS) RefusalReason.UNAUTHENTICATED else RefusalReason.FORBIDDEN
+
     is Unrouted -> RefusalReason.UNMATCHED
+
     is DecodeFailure, is BodyDecodeFailure -> RefusalReason.DECODE
+
     is UnsupportedMediaType -> RefusalReason.CONTENT_TYPE
+
     is NotAcceptable -> RefusalReason.ACCEPT
+
     is PayloadTooLarge -> RefusalReason.BODY_LIMIT
+
     else -> null
 }
 
@@ -98,13 +107,14 @@ class ClassifiedError(val error: ApiError, val unexpected: Throwable?, val refer
  * refusal, so a refusal cannot be answered and left uncounted.
  */
 fun renderError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): RenderedError {
-    val t = unwrapCompletion(raw)
+    val thrown = unwrapCompletion(raw)
+    val t = refusalIn(thrown)
     val renderer = api?.refusals ?: ApiErrorEnvelope
     val template = endpoint?.pathSpec?.template
     val classified = classify(t, api)
 
     val observer = api?.onRefusal
-    if (observer != null) reasonOf(t)?.let { observer.refused(it, classified.error.status, template) }
+    if (observer != null) reasonOf(thrown)?.let { observer.refused(it, classified.error.status, template) }
 
     return RenderedError(
         classified.error,
@@ -126,7 +136,12 @@ fun renderError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): Re
  * not written here, and the call carried no HTTP status that a refusal counter
  * could honestly report.
  */
-fun classifyError(raw: Throwable, api: Api?): ClassifiedError = classify(unwrapCompletion(raw), api)
+fun classifyError(raw: Throwable, api: Api?): ClassifiedError = classify(refusalIn(unwrapCompletion(raw)), api)
+
+/** The response a throwable stands for: the caller's own refusal, where it was wrapped to be named. */
+private fun refusalIn(t: Throwable): Throwable = if (t is CallerRefused) t.refusal else t
+
+private const val UNAUTHENTICATED_STATUS = 401
 
 private fun classify(t: Throwable, api: Api?): ClassifiedError {
     val described = described(t)

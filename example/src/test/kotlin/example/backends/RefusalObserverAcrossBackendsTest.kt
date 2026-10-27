@@ -115,6 +115,23 @@ class RefusalObserverAcrossBackendsTest {
         }
     }
 
+    /** The caller's 401 and 403 are answered before the chain, so this is the only place they are heard. */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("transports")
+    fun `a caller refused is observed as unauthenticated or forbidden`(name: String, client: ApiClient) {
+        observed.getValue(name).clear()
+        val refund = client.request(refundTip, Tip(5))
+
+        client.transport.send(refund).status shouldBe 401
+        client.transport.send(refund.withHeader("Authorization", "Bearer $GUEST_TOKEN")).status shouldBe 403
+
+        withClue("what $name observed") {
+            seen(name) shouldBe listOf("unauthenticated 401 /tips/refunds", "forbidden 403 /tips/refunds")
+        }
+        // The suite above reads the whole list, whichever order the two run in.
+        observed.getValue(name).clear()
+    }
+
     /**
      * The one reason a bound backend cannot report, said out loud rather than
      * left to be noticed as a flat line on a graph.
