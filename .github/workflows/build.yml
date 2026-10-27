@@ -40,6 +40,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      # SignInTest drives Chromium. Fetched here, and cached by the build file that pins Playwright's version,
+      # rather than by the test under its five-minute timeout, where a slow mirror failed unrelated builds.
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('integrations/pelican-oidc/build.gradle.kts') }}
+
+      - name: Chromium for SignInTest
+        run: ./gradlew :pelican-oidc:installChromium --stacktrace
+
       - name: Build and test
         run: ./gradlew build ${{ matrix.gradleArgs }} --stacktrace
 

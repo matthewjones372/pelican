@@ -76,6 +76,16 @@ jobs:
             *-*) echo "$version is not a release; snapshot.yml publishes candidates"; exit 1 ;;
           esac
 
+      # SignInTest drives Chromium. Fetched here, and cached by the build file that pins Playwright's version,
+      # rather than by the test under its five-minute timeout, where a slow mirror failed unrelated builds.
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('integrations/pelican-oidc/build.gradle.kts') }}
+
+      - name: Chromium for SignInTest
+        run: ./gradlew :pelican-oidc:installChromium --stacktrace
+
       # The same gate a pull request goes through. A release that cannot build
       # is worth finding out about before it is on Maven Central for good,
       # which is why this runs the tests rather than skipping them.
