@@ -270,7 +270,7 @@ did not.
 
 ## Getting started
 
-The current release is **1.1.0**, on Maven Central under the group
+The current release is **1.2.0**, on Maven Central under the group
 `io.github.matthewjones372`. Its library modules are compiled for **Java 21**,
 so a service using them needs JDK 21 or newer; `pelican-streams` and
 `pelican-streams-jetty` need 25. Below JDK 24, synchronous handlers default to
@@ -297,7 +297,7 @@ test client.
 
 ```kotlin
 // build.gradle.kts
-val pelicanVersion = "1.1.0"
+val pelicanVersion = "1.2.0"
 
 dependencies {
     // The backend. Brings pelican-core; compiles against Pekko HTTP.
@@ -422,7 +422,7 @@ pluginManagement {
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.1.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.2.0" }
 ```
 
 ### Jetty, kotlinx and the BOM
@@ -449,7 +449,7 @@ leave out the ones you do not.
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:1.1.0"))
+    implementation(platform("io.github.matthewjones372:pelican-bom:1.2.0"))
     implementation("io.github.matthewjones372:pelican-jetty")
     implementation("io.github.matthewjones372:pelican-jackson")
     testImplementation("io.github.matthewjones372:pelican-test-jetty")
@@ -560,7 +560,7 @@ Every example takes a port with `--args=8081`.
 
 - [The docs index](docs/README.md): every guide, with reading orders for
   evaluating, using and going deeper.
-- [Getting started](#getting-started): installing 1.1.0 and a first endpoint.
+- [Getting started](#getting-started): installing 1.2.0 and a first endpoint.
 - [A whole service, in one file](docs/a-whole-service.md): models, inputs,
   endpoints, handlers, server and docs, compiled on every build.
 - [Cookbook](docs/cookbook.md): complete recipes, roughly in the order you

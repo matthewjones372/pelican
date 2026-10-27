@@ -20,11 +20,11 @@ set the spec is compiled in needs `pelican-codegen` as a dependency:
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.1.0" }
+plugins { id("io.github.matthewjones372.pelican") version "1.2.0" }
 
 dependencies {
-    implementation("io.github.matthewjones372:pelican-core:1.1.0")
-    implementation("io.github.matthewjones372:pelican-codegen:1.1.0") // what the generate task calls
+    implementation("io.github.matthewjones372:pelican-core:1.2.0")
+    implementation("io.github.matthewjones372:pelican-codegen:1.2.0") // what the generate task calls
 }
 
 pelican {
@@ -287,7 +287,7 @@ declares it, with the Scala suffix it uses:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.1.0")
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.2.0")
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")

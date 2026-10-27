@@ -4,7 +4,7 @@ The guides here are grouped by what you are trying to do: decide whether
 Pelican fits, use it, understand it in depth, or work with one specialised
 feature.
 
-**What is released.** The current release is 1.1.0, with Pekko HTTP and
+**What is released.** The current release is 1.2.0, with Pekko HTTP and
 Jetty 12 as backends and Jackson and kotlinx.serialization as codecs. The
 [cookbook](cookbook.md) and several other guides are written against Jetty, so
 their dependency blocks use `pelican-bom` and the Jetty modules. On Pekko, use
@@ -30,7 +30,7 @@ and in no release; see [Modules](modules.md#gannet-backend).
 ## Using it
 
 1. [Getting started](../README.md#getting-started) in the README: installing
-   1.1.0 and a first endpoint.
+   1.2.0 and a first endpoint.
 2. [Cookbook](cookbook.md): complete recipes, one problem each, roughly in the
    order you need them.
 3. [Modules](modules.md): every module, what it brings with it, and the

@@ -23,7 +23,7 @@ dependencies {
 }
 ```
 
-`pelicanVersion` is the release you pin, `1.1.0`. To run on Pekko HTTP, use
+`pelicanVersion` is the release you pin, `1.2.0`. To run on Pekko HTTP, use
 the Pekko dependencies from [Getting started](../README.md#getting-started);
 the service changes in three places, listed [after the code](#on-pekko-instead).
 

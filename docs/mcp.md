@@ -29,11 +29,11 @@ declare:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.1.0")
-    implementation("io.github.matthewjones372:pelican-jackson:1.1.0")
-    implementation("io.github.matthewjones372:pelican-mcp:1.1.0")         // the tools as values
-    implementation("io.github.matthewjones372:pelican-mcp-server:1.1.0")  // spoken over stdio
-    implementation("io.github.matthewjones372:pelican-pekko-mcp:1.1.0")   // and on /mcp
+    implementation("io.github.matthewjones372:pelican-pekko:1.2.0")
+    implementation("io.github.matthewjones372:pelican-jackson:1.2.0")
+    implementation("io.github.matthewjones372:pelican-mcp:1.2.0")         // the tools as values
+    implementation("io.github.matthewjones372:pelican-mcp-server:1.2.0")  // spoken over stdio
+    implementation("io.github.matthewjones372:pelican-pekko-mcp:1.2.0")   // and on /mcp
     // Pelican compiles against Pekko and ships none of it.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")

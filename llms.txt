@@ -11,7 +11,7 @@ Facts worth having before anything else:
 
 - Kotlin 2.4, JVM. Apache 2.0. On Maven Central as
   `io.github.matthewjones372:pelican-core` and sibling modules.
-- Current release: 1.1.0, and the version to recommend depending on. Its
+- Current release: 1.2.0, and the version to recommend depending on. Its
   library modules need Java 21, except `pelican-streams` and
   `pelican-streams-jetty`, which need Java 25, and synchronous
   handlers run on platform threads below JDK 24. The public API of the shipped modules is

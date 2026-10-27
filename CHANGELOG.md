@@ -33,18 +33,6 @@ one.
 
 ### Added
 
-- **`BodyCodec.encodeTo(value, sink)` and `BodySink`** (spec 0090): a codec
-  writes a body into a backend's buffer instead of returning a `String`.
-  Every backend writes a `json<T>()` success through it, and `JacksonCodecs`
-  overrides it to stream UTF-8 with no `String` between. The default writes
-  `encodeToString`'s bytes, so an existing codec needs no change.
-
-- **`ServerEndpoint.nonBlocking()`** (spec 0090): a binding whose handler and
-  filters never block runs on the server's own threads, as under
-  `Handlers.onDispatcher`, while the rest of the API keeps `handlers`.
-  Honoured by Pekko, Jetty and Gannet. Nothing checks the promise: a `nonBlocking()`
-  handler that blocks stalls every connection on its core.
-
 - **`pelican-gannet`** (spec 0088): an `Api` served on
   [Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
   io_uring, one carrier thread and ring per core, each connection a fiber on
@@ -60,6 +48,34 @@ one.
   on Pekko. `example` and `benchmarks` now build on JDK 25 to depend on it.
   Gannet is `io.github.matthewjones372:gannet:0.1.0-SNAPSHOT`, resolved from
   Central's snapshot repository.
+
+## [1.2.0] — 2026-10-27
+
+### Added
+
+- **Idempotency keys** (spec 0092): `idempotencyKey()` on an endpoint, and
+  `idempotency(store, ttl, lease)` on the `Api`. A repeat of a request with the
+  same `Idempotency-Key` is answered with the first response, marked
+  `Idempotent-Replayed: true`, and the handler does not run again; the same key
+  with a different request is a 422, and one still running a 409 with
+  `Retry-After: 1`. Both are declared with the key, so the document lists them
+  with the header. A declared success or failure is kept; a throw releases the
+  key. Keys are scoped to the operation and the caller's subject.
+  `IdempotencyStore` is the interface a shared store implements, and
+  `InMemoryIdempotencyStore` the one for tests. The generated client's key
+  parameter and the importer reading the header back are not in this release.
+
+- **`BodyCodec.encodeTo(value, sink)` and `BodySink`** (spec 0090): a codec
+  writes a body into a backend's buffer instead of returning a `String`.
+  Every backend writes a `json<T>()` success through it, and `JacksonCodecs`
+  overrides it to stream UTF-8 with no `String` between. The default writes
+  `encodeToString`'s bytes, so an existing codec needs no change.
+
+- **`ServerEndpoint.nonBlocking()`** (spec 0090): a binding whose handler and
+  filters never block runs on the server's own threads, as under
+  `Handlers.onDispatcher`, while the rest of the API keeps `handlers`.
+  Honoured by Pekko, Jetty and Gannet. Nothing checks the promise: a `nonBlocking()`
+  handler that blocks stalls every connection on its core.
 
 ### Changed
 
@@ -1130,6 +1146,7 @@ First published release, on Maven Central.
 - **`pelican-test`** — the descriptions interpreted a third way, as a typed
   client, with `shouldBuild` for pinning the URL a caller holds.
 
+[1.2.0]: https://github.com/matthewjones372/pelican/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/matthewjones372/pelican/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/matthewjones372/pelican/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/matthewjones372/pelican/releases/tag/v0.2.0
