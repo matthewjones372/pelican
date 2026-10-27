@@ -61,21 +61,23 @@ is a pre-encoded-response SPI each backend writes raw; faster on replay, three w
 
 ## Stack
 
-- [ ] **`spec-0092-store`**: `IdempotencyStore`, `Reservation`, `StoredResponse`, `IdempotencyScope`,
+- [x] **`spec-0092-store`** ([#376](https://github.com/matthewjones372/pelican/pull/376)): `IdempotencyStore`, `Reservation`, `StoredResponse`, `IdempotencyScope`,
       `InMemoryIdempotencyStore` with an injectable clock. Done when: expiry, lease timeout and the four
       `reserve` answers are tested.
-- [ ] **`spec-0092-declare`**: `idempotencyKey()` on `EndpointBuilder`, `Endpoint.idempotency`, build-time
+- [x] **`spec-0092-declare`** ([#377](https://github.com/matthewjones372/pelican/pull/377)): `idempotencyKey()` on `EndpointBuilder`, `Endpoint.idempotency`, build-time
       refusals, the header and the 409/422 in the document. Done when: an OpenAPI golden pins them and
       `OpenApiSpecQualityTest` reads it.
-- [ ] **`spec-0092-serve`**: `Api { idempotency(store, ttl) }`, the core wrapper, the startup check that a keyed
+- [x] **`spec-0092-serve`** ([#378](https://github.com/matthewjones372/pelican/pull/378)): `Api { idempotency(store, ttl) }`, the core wrapper, the startup check that a keyed
       endpoint has a store. Done when: served in process, a repeat is replayed, a reused key is a 422, one in
       flight a 409, and a throw releases the key.
-- [ ] **`spec-0092-parity`**: a keyed endpoint in the backends example, bound on Pekko, Jetty and Gannet.
+- [x] **`spec-0092-parity`** ([#379](https://github.com/matthewjones372/pelican/pull/379)): a keyed endpoint in the backends example, bound on Pekko, Jetty and Gannet.
       Done when: the parity suite asserts replay, 422, 409 and release on every backend.
-- [ ] **`spec-0092-client`**: the generated parameter, `RetryPolicy` on keyed requests, the test client sending a
+- [x] **`spec-0092-client`** ([#380](https://github.com/matthewjones372/pelican/pull/380)): the generated parameter, `RetryPolicy` on keyed requests, the test client sending a
       key. Done when: a `RetryingTransport` that loses the first response gets the stored one, the handler having run once.
 - [ ] **`spec-0092-import-docs`**: the importer reads the header back as `idempotencyKey()`, reference and cookbook,
       changelog. Done when: `ImportedOrdersTest` round-trips an idempotent orders endpoint.
+      Round-tripped through `tippingSpec` instead (`ImportedTippingTest`), so the committed orders golden and
+      client keep their baselines; the keyed endpoint's document, the default response aside, reads back the same.
 
 ## Acceptance
 
