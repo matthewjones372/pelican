@@ -87,17 +87,26 @@ private const val STRICT_READ_BUFFER_BYTES = 4096
 private const val STRICT_DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
 
 /**
- * Who is calling, decoded ahead of every other input so that a request with no
- * caller, or one who lacks what the endpoint requires, learns nothing else about the endpoint: the 401 or 403 is
- * its only answer.
+ * Who is calling and for which tenant, decoded ahead of every other input so that a request with no caller, one who
+ * lacks what the endpoint requires, or one for no tenant learns nothing else about the endpoint: the 401, 403, 400 or
+ * 404 is its only answer.
  */
 fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: MutableMap<ParamKey<*>, Any?>) {
-    val caller = endpoint.caller ?: return
-    into[caller] = try {
-        caller.decode(authenticators.getValue(caller.scheme), credentials, endpoint.requires)
-            ?.also { if (csrf && crossSiteChecked(endpoint.method, caller)) refuseCrossSite(credentials, cors) }
-    } catch (e: ApiException) {
-        throw CallerRefused(e)
+    val caller = endpoint.caller
+    val identity = caller?.let {
+        try {
+            it.identify(authenticators.getValue(it.scheme), credentials, endpoint.requires)
+                ?.also { if (csrf && crossSiteChecked(endpoint.method, caller)) refuseCrossSite(credentials, cors) }
+        } catch (e: ApiException) {
+            throw CallerRefused(e)
+        }
+    }
+    if (caller != null) into[caller] = identity?.let(caller::built)
+    // For whom, once who is known: a claim resolver reads the caller.
+    endpoint.tenant?.let { tenant ->
+        // The Api refused to build with a tenanted endpoint and nothing resolving it, so this is never reached unbound.
+        val directory = checkNotNull(tenants) { "$endpoint is tenanted and the Api resolves no tenants" }.directory
+        into[tenant] = tenant.decode(credentials, identity, directory)
     }
 }
 

@@ -64,7 +64,11 @@ class CallerInput<T> @PublishedApi internal constructor(
     fun decode(authenticator: Authenticator, credentials: Credentials): T? = decode(authenticator, credentials, null)
 
     /** The same, or the 403 for a caller lacking one of [requires]. Nobody is a 401: there is no one to forbid. */
-    fun decode(authenticator: Authenticator, credentials: Credentials, requires: Requires?): T? {
+    fun decode(authenticator: Authenticator, credentials: Credentials, requires: Requires?): T? =
+        identify(authenticator, credentials, requires)?.let(build)
+
+    /** Who the request is from, checked against [requires], before it is built into [T]. */
+    internal fun identify(authenticator: Authenticator, credentials: Credentials, requires: Requires?): Identity? {
         val identity = try {
             authenticator.authenticate(credentials)
         } catch (e: Unauthenticated) {
@@ -81,9 +85,12 @@ class CallerInput<T> @PublishedApi internal constructor(
             requires != null && !requires.metBy(identity) ->
                 throw ApiException(FORBIDDEN, "This endpoint needs $requires")
 
-            else -> build(identity)
+            else -> identity
         }
     }
+
+    /** [T] from a verified [identity]. */
+    internal fun built(identity: Identity): T = build(identity)
 
     private fun unauthorized(message: String, error: String?, cause: Throwable? = null): ApiException = ApiException(
         401,

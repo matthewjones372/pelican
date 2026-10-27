@@ -374,6 +374,8 @@ private fun refusedBy(ep: Endpoint<*, *>, refusals: RefusalRenderer): (ErrorSpec
         ep.caller?.refused,
         ep.requires?.refused,
         ep.caller?.crossSiteRefused,
+        ep.tenant?.missing,
+        ep.tenant?.unknown,
     )
     return { err -> if (answered.any { it === err }) refusals else null }
 }
