@@ -588,6 +588,28 @@ public final class io/github/matthewjones372/pelican/HttpScheme : io/github/matt
 	public final fun getScheme ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/IdempotencyScope {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/IdempotencyScope;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/IdempotencyScope;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/IdempotencyScope;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getOperation ()Ljava/lang/String;
+	public final fun getSubject ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/IdempotencyStore {
+	public abstract fun complete (Lio/github/matthewjones372/pelican/IdempotencyScope;Lio/github/matthewjones372/pelican/StoredResponse;Ljava/time/Duration;)V
+	public abstract fun lookup (Lio/github/matthewjones372/pelican/IdempotencyScope;)Lio/github/matthewjones372/pelican/Reservation;
+	public abstract fun release (Lio/github/matthewjones372/pelican/IdempotencyScope;)V
+	public abstract fun reserve (Lio/github/matthewjones372/pelican/IdempotencyScope;Ljava/lang/String;Ljava/time/Duration;)Lio/github/matthewjones372/pelican/Reservation;
+}
+
 public final class io/github/matthewjones372/pelican/Identity {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -687,6 +709,16 @@ public final class io/github/matthewjones372/pelican/In6 {
 public final class io/github/matthewjones372/pelican/InMemoryClientTransport : io/github/matthewjones372/pelican/ClientTransport {
 	public fun <init> (Lio/github/matthewjones372/pelican/Api;)V
 	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
+}
+
+public final class io/github/matthewjones372/pelican/InMemoryIdempotencyStore : io/github/matthewjones372/pelican/IdempotencyStore {
+	public fun <init> ()V
+	public fun <init> (Ljava/time/Clock;)V
+	public synthetic fun <init> (Ljava/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun complete (Lio/github/matthewjones372/pelican/IdempotencyScope;Lio/github/matthewjones372/pelican/StoredResponse;Ljava/time/Duration;)V
+	public fun lookup (Lio/github/matthewjones372/pelican/IdempotencyScope;)Lio/github/matthewjones372/pelican/Reservation;
+	public fun release (Lio/github/matthewjones372/pelican/IdempotencyScope;)V
+	public fun reserve (Lio/github/matthewjones372/pelican/IdempotencyScope;Ljava/lang/String;Ljava/time/Duration;)Lio/github/matthewjones372/pelican/Reservation;
 }
 
 public final class io/github/matthewjones372/pelican/Inputs {
@@ -1365,6 +1397,36 @@ public abstract interface class io/github/matthewjones372/pelican/RefusalRendere
 	public abstract fun render (Lio/github/matthewjones372/pelican/Refusal;)[B
 }
 
+public abstract interface class io/github/matthewjones372/pelican/Reservation {
+}
+
+public final class io/github/matthewjones372/pelican/Reservation$Done : io/github/matthewjones372/pelican/Reservation {
+	public fun <init> (Lio/github/matthewjones372/pelican/StoredResponse;)V
+	public final fun getResponse ()Lio/github/matthewjones372/pelican/StoredResponse;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/Reservation$InFlight : io/github/matthewjones372/pelican/Reservation {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/Reservation$InFlight;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/Reservation$Mismatch : io/github/matthewjones372/pelican/Reservation {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/Reservation$Mismatch;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/Reservation$Reserved : io/github/matthewjones372/pelican/Reservation {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/Reservation$Reserved;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/matthewjones372/pelican/ResponseHeader {
 	public fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;Z)V
 	public synthetic fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -1553,6 +1615,15 @@ public final class io/github/matthewjones372/pelican/SseOutput : io/github/matth
 }
 
 public final class io/github/matthewjones372/pelican/SseOutput$Companion {
+}
+
+public final class io/github/matthewjones372/pelican/StoredResponse {
+	public fun <init> (ILjava/util/List;Ljava/lang/String;[B)V
+	public final fun getBody ()[B
+	public final fun getHeaders ()Ljava/util/List;
+	public final fun getMediaType ()Ljava/lang/String;
+	public final fun getStatus ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/StreamIn {
