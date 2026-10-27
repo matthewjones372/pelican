@@ -100,6 +100,13 @@ class Params(
     private fun outgoing(): MutableMap<String, String> =
         outgoing ?: LinkedHashMap<String, String>().also { outgoing = it }
 
+    /** Each a `Set-Cookie` of its own, keyed by what a browser tells two cookies apart by. */
+    @Suppress("DoubleMutabilityForCollection") // Allocated only if used.
+    private var cookies: MutableMap<String, String>? = null
+
+    private fun cookies(): MutableMap<String, String> =
+        cookies ?: LinkedHashMap<String, String>().also { cookies = it }
+
     /**
      * Sets a declared response header, encoded by its own codec. One the
      * endpoint never declared throws rather than shipping undocumented.
@@ -121,7 +128,23 @@ class Params(
      * `X-Debug-*`, something a proxy expects. Undocumented on purpose.
      */
     fun setRawHeader(name: String, value: String) {
-        outgoing()[name] = value
+        // A Set-Cookie per cookie, so a second one is another header rather than the first one replaced.
+        if (name.equals(SET_COOKIE, ignoreCase = true)) cookies()[value] = value else outgoing()[name] = value
+    }
+
+    /**
+     * Sets [cookie] as a `Set-Cookie` header of its own. A second with the same name, path and domain replaces the
+     * first, as it would in the browser. The endpoint must declare `Set-Cookie` with `emits(...)`, as any header.
+     */
+    fun setCookie(cookie: ResponseCookie) {
+        val declared = endpoint?.responseHeaders
+        if (declared != null && declared.none { it.name.equals(SET_COOKIE, ignoreCase = true) }) {
+            error(
+                "Cookie ${cookie.name} was set but $endpoint never declared Set-Cookie. " +
+                    "Add responseHeader<String>(\"Set-Cookie\") with emits(...) on the endpoint.",
+            )
+        }
+        cookies()["${cookie.name};${cookie.path};${cookie.domain.orEmpty()}"] = cookie.headerValue
     }
 
     /**
@@ -129,7 +152,7 @@ class Params(
      * came back, errors included: a header set before a failure was deliberate.
      */
     fun responseHeaders(): List<Pair<String, String>> =
-        outgoing?.map { it.key to it.value }.orEmpty()
+        outgoing?.map { it.key to it.value }.orEmpty() + cookies?.values?.map { SET_COOKIE to it }.orEmpty()
 
     /**
      * The headers a required declaration promised but nobody set. Not policed —
@@ -137,8 +160,10 @@ class Params(
      * test can assert on it.
      */
     fun missingRequiredHeaders(): List<ResponseHeader<*>> =
-        endpoint?.responseHeaders.orEmpty().filter { it.required && it.name !in outgoing.orEmpty() }
+        endpoint?.responseHeaders.orEmpty().filter { it.required && it.name !in responseHeaders().map { (n, _) -> n } }
 }
+
+private const val SET_COOKIE = "Set-Cookie"
 
 /**
  * Where a caller reconnecting to an event stream left off — the `Last-Event-ID`

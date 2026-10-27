@@ -1259,6 +1259,7 @@ public final class io/github/matthewjones372/pelican/Params {
 	public final fun requestHeader (Ljava/lang/String;)Ljava/lang/String;
 	public final fun responseHeaders ()Ljava/util/List;
 	public final fun set (Lio/github/matthewjones372/pelican/Attribute;Ljava/lang/Object;)V
+	public final fun setCookie (Lio/github/matthewjones372/pelican/ResponseCookie;)V
 	public final fun setHeader (Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/Object;)V
 	public final fun setRawHeader (Ljava/lang/String;Ljava/lang/String;)V
 }
@@ -1493,6 +1494,27 @@ public final class io/github/matthewjones372/pelican/Reservation$Reserved : io/g
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/ResponseCookie {
+	public static final field Companion Lio/github/matthewjones372/pelican/ResponseCookie$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;Ljava/lang/String;ZZLio/github/matthewjones372/pelican/SameSite;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;Ljava/lang/String;ZZLio/github/matthewjones372/pelican/SameSite;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDomain ()Ljava/lang/String;
+	public final fun getHeaderValue ()Ljava/lang/String;
+	public final fun getHttpOnly ()Z
+	public final fun getMaxAge-FghU774 ()Lkotlin/time/Duration;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getSameSite ()Lio/github/matthewjones372/pelican/SameSite;
+	public final fun getSecure ()Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/ResponseCookie$Companion {
+	public final fun expired (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/ResponseCookie;
+	public static synthetic fun expired$default (Lio/github/matthewjones372/pelican/ResponseCookie$Companion;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/ResponseCookie;
+}
+
 public final class io/github/matthewjones372/pelican/ResponseHeader {
 	public fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;Z)V
 	public synthetic fun <init> (Ljava/lang/String;Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -1585,6 +1607,16 @@ public final class io/github/matthewjones372/pelican/Role : io/github/matthewjon
 	public final fun getName ()Ljava/lang/String;
 	public fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/SameSite : java/lang/Enum {
+	public static final field LAX Lio/github/matthewjones372/pelican/SameSite;
+	public static final field NONE Lio/github/matthewjones372/pelican/SameSite;
+	public static final field STRICT Lio/github/matthewjones372/pelican/SameSite;
+	public final fun getAttribute ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/SameSite;
+	public static fun values ()[Lio/github/matthewjones372/pelican/SameSite;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/SchemaComponents {
