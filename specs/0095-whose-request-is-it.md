@@ -67,12 +67,13 @@ check and sign-in page into an exception to remember.
 ./gradlew build
 ```
 
-## Open questions
+## Decisions
 
-1. **One resolver per `Api`, or one per endpoint?** Recommended: one per `Api` (option A); a service that finds its
-   tenant two ways writes a resolver that tries both.
-2. **No tenant: 400; unknown tenant: 404?** Recommended: yes. A 404 says no more than the subdomain's DNS already does.
-3. **Check the caller's tenant claim by default?** Recommended: yes, with the claim named on `tenants(...)`, since a
-   token for one tenant used against another is the bug this exists to stop.
-4. **Scope idempotency keys and sessions by tenant?** Recommended: yes, both; a session started in one tenant reads as
-   nobody in another, as an ended one does (spec 0094).
+Matt took each recommendation on 2026-10-27.
+
+1. **One resolver per `Api`** (option A); a service that finds its tenant two ways writes a resolver that tries both.
+2. **No tenant is a 400; an unknown tenant is a 404.** A 404 says no more than the subdomain's DNS already does.
+3. **The caller's tenant claim is checked by default**, with the claim named on `tenants(...)`, since a token for one
+   tenant used against another is the bug this exists to stop.
+4. **Idempotency keys and sessions are scoped by tenant**; a session started in one tenant reads as nobody in another,
+   as an ended one does (spec 0094).
