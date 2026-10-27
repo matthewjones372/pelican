@@ -20,3 +20,12 @@ dependencies {
     testImplementation("org.apache.pekko:pekko-http_2.13:1.4.1")
     testImplementation("com.microsoft.playwright:playwright:1.59.0")
 }
+
+// SignInTest's Chromium, fetched ahead of the tests. Left to the test, a slow mirror spends the test's five-minute
+// timeout on the download and fails a build that changed nothing here; CI runs this first and caches what it fetched.
+tasks.register<JavaExec>("installChromium") {
+    description = "Downloads the Chromium build this Playwright expects, unless it is already there."
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.microsoft.playwright.CLI")
+    args("install", "chromium")
+}
