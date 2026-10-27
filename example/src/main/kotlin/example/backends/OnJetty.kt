@@ -72,6 +72,8 @@ val jettyRoutes: List<ServerEndpoint> = listOf(
 
     whoIsVisiting handledNow { this[visitor] },
 
+    leaveNote handledNow { "noted for ${this[visitor]}" },
+
     forget handledWith { _ -> },
 
     peek handledWith { _ -> },

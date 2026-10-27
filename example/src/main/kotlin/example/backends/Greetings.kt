@@ -528,12 +528,23 @@ val whoIsVisiting = endpoint {
     text()
 }
 
+/** A visitor leaving a note: a state-changing request carried by the session cookie, so another site cannot send it. */
+val leaveNote = endpoint {
+    post("visits" / "notes")
+    summary = "Leave a note as the visitor the session names"
+    operationId = "leaveNote"
+    tag("greetings")
+    emits(requestId)
+    authenticatedBy(visitor)
+    text()
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
         roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay, leaveTip, refundTip,
-        startVisit, whoIsVisiting,
+        startVisit, whoIsVisiting, leaveNote,
     )
 
 /**

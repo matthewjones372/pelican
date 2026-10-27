@@ -9,6 +9,7 @@ public final class io/github/matthewjones372/pelican/Api {
 	public final fun getCodecs ()Lio/github/matthewjones372/pelican/Codecs;
 	public final fun getCors ()Lio/github/matthewjones372/pelican/Cors;
 	public final fun getCovers ()Ljava/util/List;
+	public final fun getCsrf ()Z
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getEndpoints ()Ljava/util/List;
 	public final fun getExposeInternalErrors ()Z
@@ -34,6 +35,7 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun filter (Lio/github/matthewjones372/pelican/Filter;)V
 	public final fun getCors ()Lio/github/matthewjones372/pelican/Cors;
 	public final fun getCovers ()Ljava/util/List;
+	public final fun getCsrf ()Z
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getExposeInternalErrors ()Z
 	public final fun getMaxBodyBytes ()J
@@ -52,6 +54,7 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun refusals (Lio/github/matthewjones372/pelican/RefusalRenderer;)V
 	public final fun setCors (Lio/github/matthewjones372/pelican/Cors;)V
 	public final fun setCovers (Ljava/util/List;)V
+	public final fun setCsrf (Z)V
 	public final fun setDescription (Ljava/lang/String;)V
 	public final fun setExposeInternalErrors (Z)V
 	public final fun setMaxBodyBytes (J)V
@@ -202,6 +205,7 @@ public final class io/github/matthewjones372/pelican/CallerInput : io/github/mat
 	public fun <init> (Lio/github/matthewjones372/pelican/SecurityScheme;ZLkotlin/jvm/functions/Function1;)V
 	public final fun decode (Lio/github/matthewjones372/pelican/Authenticator;Lio/github/matthewjones372/pelican/Credentials;)Ljava/lang/Object;
 	public final fun decode (Lio/github/matthewjones372/pelican/Authenticator;Lio/github/matthewjones372/pelican/Credentials;Lio/github/matthewjones372/pelican/Requires;)Ljava/lang/Object;
+	public final fun getCrossSiteRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public final fun getRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public final fun getRequired ()Z
 	public final fun getScheme ()Lio/github/matthewjones372/pelican/SecurityScheme;
