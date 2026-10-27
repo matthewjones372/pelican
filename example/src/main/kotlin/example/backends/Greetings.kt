@@ -10,13 +10,18 @@ package example.backends
  */
 
 import io.github.matthewjones372.pelican.ApiError
+import io.github.matthewjones372.pelican.Authenticator
 import io.github.matthewjones372.pelican.Endpoint
+import io.github.matthewjones372.pelican.Identity
 import io.github.matthewjones372.pelican.LongCodec
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.StringCodec
+import io.github.matthewjones372.pelican.Unauthenticated
 import io.github.matthewjones372.pelican.UploadedFile
 import io.github.matthewjones372.pelican.Webhook
+import io.github.matthewjones372.pelican.authenticated
+import io.github.matthewjones372.pelican.bearerAuth
 import io.github.matthewjones372.pelican.bufferedFile
 import io.github.matthewjones372.pelican.commaSeparated
 import io.github.matthewjones372.pelican.cookieParam
@@ -43,6 +48,7 @@ import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.rawBody
 import io.github.matthewjones372.pelican.repeated
 import io.github.matthewjones372.pelican.responseHeader
+import io.github.matthewjones372.pelican.role
 import io.github.matthewjones372.pelican.textPart
 import io.github.matthewjones372.pelican.webhook
 import java.util.concurrent.CountDownLatch
@@ -443,11 +449,41 @@ val leaveTip = endpoint(jsonBody<Tip>(description = "How much, in whole units"))
     json<Receipt>(status = 201)
 }
 
+/** Who may hand a tip back: a caller with a bearer token, named by the [tellers] that verify it. */
+val tellerToken = bearerAuth(bearerFormat = null, name = "tellerToken")
+
+val teller = authenticated(tellerToken, Identity::subject)
+
+/** Only a teller may hand a tip back, and a caller who is not one is refused before the body is read. */
+val refundTip = endpoint(jsonBody<Tip>(description = "How much to hand back")) {
+    post("tips" / "refunds")
+    summary = "Hand a tip back"
+    operationId = "refundTip"
+    tag("greetings")
+    emits(requestId)
+    authenticatedBy(teller)
+    requires(role("teller"))
+    json<Receipt>()
+}
+
+/** Two callers: one in the teller group, one not. Any other token does not verify. */
+val tellers = Authenticator { credentials ->
+    when (credentials.bearerToken()) {
+        null -> null
+        TELLER_TOKEN -> Identity("tess", groups = setOf("teller"))
+        GUEST_TOKEN -> Identity("gus")
+        else -> throw Unauthenticated("That token is not one this service issued")
+    }
+}
+
+const val TELLER_TOKEN = "teller-token"
+const val GUEST_TOKEN = "guest-token"
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
-        roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay, leaveTip,
+        roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay, leaveTip, refundTip,
     )
 
 /**

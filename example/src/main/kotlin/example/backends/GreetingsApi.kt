@@ -83,6 +83,8 @@ fun greetingsApi(
 
     // One store per Api, so each backend's server keeps its own keys.
     idempotency(InMemoryIdempotencyStore())
+
+    authenticate(tellerToken, tellers)
 }
 
 /** What [stamping] worked out, for anything downstream that wants it. */
