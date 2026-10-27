@@ -59,7 +59,7 @@ published; it could come later behind A.
 - [x] **`spec-0093-requires-parity`** ([#387](https://github.com/matthewjones372/pelican/pull/387); split from the entry above, which ran past the soft cap): a `requires` endpoint
       in the backends example. Done when: the parity suite refuses a caller missing a role on every backend, before
       the body is read.
-- [ ] **`spec-0093-redaction`**: the no-credentials test across backends, spans, the example log and refusal bodies,
+- [x] **`spec-0093-redaction`** ([#389](https://github.com/matthewjones372/pelican/pull/389)): the no-credentials test across backends, spans, the example log and refusal bodies,
       and whatever it finds fixed. Done when: it passes, and fails if a token is put in an `Unauthenticated` message.
 - [ ] **`spec-0093-docs`**: reference, cookbook, changelog; `example/secured` rewritten on `requires`.
 
