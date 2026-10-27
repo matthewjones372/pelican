@@ -164,6 +164,23 @@ private fun ApiSpec.info(): JsonObj = jsonObj {
     putIfNotNull("description", description)
 }
 
+/** `https://{tenant}.<parent>`, the tenant a variable a caller fills in. */
+private fun tenantServer(parent: String): JsonObj = jsonObj {
+    "url" to "https://{tenant}.$parent"
+    put(
+        "variables",
+        jsonObj {
+            put(
+                "tenant",
+                jsonObj {
+                    "default" to "tenant"
+                    "description" to "The tenant this request is for, as the first label of the host."
+                },
+            )
+        },
+    )
+}
+
 /**
  * A `servers` list, the same Server Object at document level and on an
  * operation. One function, so the two cannot disagree.
@@ -589,7 +606,12 @@ private fun operation(
 
     // Where this one operation is served from, in the same shape as the
     // document's own list and from the same function.
-    if (ep.servers.isNotEmpty()) put("servers", serverList(ep.servers))
+    // A tenant in the subdomain is a host the caller fills in, which is what a server variable is.
+    val tenantHost = ep.tenant?.subdomainOf
+    when {
+        tenantHost != null -> put("servers", jsonArr(listOf(tenantServer(tenantHost))))
+        ep.servers.isNotEmpty() -> put("servers", serverList(ep.servers))
+    }
 
     val params = parameters(ep, version)
     if (params.isNotEmpty()) put("parameters", jsonArr(params))

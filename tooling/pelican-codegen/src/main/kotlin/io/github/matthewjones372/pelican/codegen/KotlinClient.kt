@@ -651,6 +651,11 @@ private class KotlinClientEmitter(
         val target = if (ep.webhookName == null) null else unique("url", taken)
         target?.let { required += "$it: String" }
 
+        // A tenant in the subdomain is part of the host, so it is an argument the origin is built from.
+        val tenantHost = ep.tenant?.subdomainOf
+        val tenant = tenantHost?.let { unique("tenant", taken) }
+        tenant?.let { required += "$it: String" }
+
         pathNames.forEach { (param, name) ->
             required += "$name: ${plainType(param.codec, types, param.name)}"
         }
@@ -792,7 +797,9 @@ private class KotlinClientEmitter(
             // offered as a parameter: it is what the description says, the same
             // way the path is, and a caller who wants to point the whole client
             // somewhere else has `baseUrl` for that.
-            if (target == null) {
+            if (tenant != null) {
+                add("origin = ${kotlinString("https://")} + $tenant + ${kotlinString(".$tenantHost")}")
+            } else if (target == null) {
                 operationOrigin(ep)?.let { add("origin = ${kotlinString(it)}") }
             } else {
                 add("origin = $target")
