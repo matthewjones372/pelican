@@ -33,14 +33,6 @@ one.
 
 ### Added
 
-- **Idempotency keys on the calling side** (spec 0092): a generated client's
-  keyed method takes `idempotencyKey: String = IdempotencyKey.random()`, set
-  in the request once so a `RetryingTransport` resends the same key.
-  `RetryPolicy` now retries a request carrying an `Idempotency-Key` whatever
-  its method. `pelican-test`'s client sends a fresh key per request to a keyed
-  endpoint, and `pelican-import` reads the header and Pelican's 409 and 422
-  back as `idempotencyKey()`.
-
 - **`pelican-gannet`** (spec 0088): an `Api` served on
   [Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
   io_uring, one carrier thread and ring per core, each connection a fiber on
@@ -70,8 +62,15 @@ one.
   with the header. A declared success or failure is kept; a throw releases the
   key. Keys are scoped to the operation and the caller's subject.
   `IdempotencyStore` is the interface a shared store implements, and
-  `InMemoryIdempotencyStore` the one for tests. The generated client's key
-  parameter and the importer reading the header back are not in this release.
+  `InMemoryIdempotencyStore` the one for tests.
+
+- **Idempotency keys on the calling side** (spec 0092): a generated client's
+  keyed method takes `idempotencyKey: String = IdempotencyKey.random()`, set
+  in the request once so a `RetryingTransport` resends the same key.
+  `RetryPolicy` now retries a request carrying an `Idempotency-Key` whatever
+  its method. `pelican-test`'s client sends a fresh key per request to a keyed
+  endpoint, and `pelican-import` reads the header and Pelican's 409 and 422
+  back as `idempotencyKey()`.
 
 - **`BodyCodec.encodeTo(value, sink)` and `BodySink`** (spec 0090): a codec
   writes a body into a backend's buffer instead of returning a `String`.
@@ -86,6 +85,10 @@ one.
   handler that blocks stalls every connection on its core.
 
 ### Changed
+
+- **`pelican-streams` and `pelican-streams-jetty` build against
+  `surefold-stream` 0.14.0**, up from 0.12.0. A consumer names the same
+  version for `surefold-stream` and its backend.
 
 - **A lone surrogate in a `JacksonCodecs` JSON success body is escaped**
   (spec 0090): `"\uD83D"`, which reads back as it was, where the body used to
