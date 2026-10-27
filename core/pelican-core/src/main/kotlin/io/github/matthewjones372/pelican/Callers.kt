@@ -58,7 +58,10 @@ class CallerInput<T> @PublishedApi internal constructor(
     val refused: ErrorSpec get() = CALLER_REFUSED
 
     /** The value a handler reads, or the 401 that stops it running. */
-    fun decode(authenticator: Authenticator, credentials: Credentials): T? {
+    fun decode(authenticator: Authenticator, credentials: Credentials): T? = decode(authenticator, credentials, null)
+
+    /** The same, or the 403 for a caller lacking one of [requires]. Nobody is a 401: there is no one to forbid. */
+    fun decode(authenticator: Authenticator, credentials: Credentials, requires: Requires?): T? {
         val identity = try {
             authenticator.authenticate(credentials)
         } catch (e: Unauthenticated) {
@@ -67,9 +70,15 @@ class CallerInput<T> @PublishedApi internal constructor(
             throw unauthorized(e.message ?: "The credential did not verify", error = "invalid_token", cause = e)
         }
         return when {
-            identity != null -> build(identity)
-            required -> throw unauthorized("This endpoint needs a caller, and the request named none", error = null)
-            else -> null
+            identity == null && (required || requires != null) ->
+                throw unauthorized("This endpoint needs a caller, and the request named none", error = null)
+
+            identity == null -> null
+
+            requires != null && !requires.metBy(identity) ->
+                throw ApiException(FORBIDDEN, "This endpoint needs $requires")
+
+            else -> build(identity)
         }
     }
 
@@ -92,6 +101,8 @@ class CallerInput<T> @PublishedApi internal constructor(
 
     override fun toString() = "caller:${scheme.name}"
 }
+
+private const val FORBIDDEN = 403
 
 private val CALLER_REFUSED = ErrorSpec(
     401,

@@ -364,11 +364,12 @@ private fun refusalSchema(refusals: RefusalRenderer, components: SchemaComponent
 }
 
 /**
- * The failures this endpoint declares that Pelican answers rather than the handler: its caller's 401, and an
- * idempotency key's 409 and 422, written in the refusal envelope because that is what the wire carries them in.
+ * The failures this endpoint declares that Pelican answers rather than the handler: its caller's 401 and 403,
+ * and an idempotency key's 409 and 422, written in the refusal envelope because that is what the wire carries them in.
  */
 private fun refusedBy(ep: Endpoint<*, *>, refusals: RefusalRenderer): (ErrorSpec) -> RefusalRenderer? {
-    val answered = listOfNotNull(ep.idempotency?.inFlight, ep.idempotency?.reused, ep.caller?.refused)
+    val answered =
+        listOfNotNull(ep.idempotency?.inFlight, ep.idempotency?.reused, ep.caller?.refused, ep.requires?.refused)
     return { err -> if (answered.any { it === err }) refusals else null }
 }
 
@@ -566,7 +567,7 @@ private fun operation(
     refusals: RefusalRenderer,
 ): JsonObj = jsonObj {
     putIfNotNull("summary", ep.summary)
-    putIfNotNull("description", ep.description)
+    putIfNotNull("description", operationDescription(ep))
     "operationId" to ep.operationName
     if (ep.tags.isNotEmpty()) put("tags", jsonStrings(ep.tags))
     if (ep.deprecated) "deprecated" to true
@@ -716,6 +717,12 @@ private fun multipartEncoding(body: MultipartBody): JsonObj? {
             put(name, jsonObj { "contentType" to contentType })
         }
     }
+}
+
+/** What the author wrote, then what the caller must have: OpenAPI has no field for a role, nor for "all of". */
+private fun operationDescription(ep: Endpoint<*, *>): String? {
+    val requires = ep.requires?.let { "Requires $it." }
+    return listOfNotNull(ep.description, requires).joinToString("\n\n").ifEmpty { null }
 }
 
 private fun successDescription(out: Output<*>): String = out.description ?: impliedDescription(out)

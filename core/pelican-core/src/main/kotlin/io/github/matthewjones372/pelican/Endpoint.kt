@@ -106,6 +106,9 @@ class Endpoint<I, R> internal constructor(
 
     /** The idempotency key a repeat of this request is answered by; null where repeats run again. */
     val idempotency: IdempotencyKey? = null,
+
+    /** What [caller] must have to be let in; null where being the caller is enough. */
+    val requires: Requires? = null,
 ) {
     /**
      * Whether a request here can carry a resume point. Only an event stream is
@@ -154,6 +157,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     internal var securityRequirements: List<SecurityRequirement>? = null
     internal var callerInput: CallerInput<*>? = null
     internal var idempotencyKey: IdempotencyKey? = null
+    internal var requirements: Requires? = null
 
     init {
         // Inputs listed on endpoint(...) register themselves, so each is
@@ -290,6 +294,15 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun authenticatedBy(caller: CallerInput<*>) {
         require(callerInput == null) { "This endpoint already declares $callerInput; a request has one caller." }
         callerInput = caller
+    }
+
+    /**
+     * Refuses a caller who lacks any of [requirements] with 403, after the caller is known and before any other
+     * input is decoded. `anyOf(...)` is one requirement met by either.
+     */
+    fun requires(first: Requirement, vararg more: Requirement) {
+        require(requirements == null) { "This endpoint already requires $requirements; say it in one requires(...)." }
+        requirements = Requires(listOf(first) + more)
     }
 
     /**
@@ -582,17 +595,18 @@ private fun <I, R> build(
         webhookName = webhookName,
         caller = b.callerInput,
         idempotency = b.idempotencyKey,
+        requires = b.requirements,
     ).also(::validate)
 }
 
-/** What the endpoint declares, with its caller's 401 where it declares no 401 of its own. */
+/** What the endpoint declares, with the 401 and 403 Pelican answers for it where it declares neither itself. */
 private fun errorsOf(b: EndpointBuilder): List<ErrorSpec> {
-    val caller = b.callerInput
-    return if (caller == null || b.errors.any { it.status == caller.refused.status }) {
-        b.errors.toList()
-    } else {
-        b.errors + caller.refused
+    val requires = b.requirements
+    require(requires == null || b.callerInput != null) {
+        "This endpoint requires $requires of a caller it never names. Declare one with authenticatedBy(...)."
     }
+    val answered = listOfNotNull(b.callerInput?.refused, requires?.refused)
+    return b.errors + answered.filter { refusal -> b.errors.none { it.status == refusal.status } }
 }
 
 /**
@@ -605,7 +619,9 @@ private fun securityOf(b: EndpointBuilder): List<SecurityRequirement>? {
         "This endpoint declares $caller and also security(...) or noSecurity(). The caller's scheme is " +
             "already its requirement; drop the other."
     }
-    return listOf(SecurityRequirement(caller.scheme, emptyList()))
+    // Permissions every caller needs are scopes where the scheme declares them; the rest the description says.
+    val scopes = b.requirements?.permissions.orEmpty().filter { it in caller.scheme.declaredScopes }
+    return listOf(SecurityRequirement(caller.scheme, scopes))
 }
 
 /**
