@@ -283,6 +283,7 @@ internal class Reader(private val options: ImportOptions) {
 
         if (operation.webhookName != null) checkWebhook(operation, responses)
 
+        val key = idempotencyKeyIn(params, responses.failures)
         val described = IrEndpoint(
             operationId = operation.id,
             method = operation.method.uppercase(),
@@ -291,15 +292,16 @@ internal class Reader(private val options: ImportOptions) {
             description = node.str("description"),
             tags = node.strings("tags"),
             deprecated = node.bool("deprecated"),
-            params = params,
+            params = if (key == null) params else params.filterNot { it === key.header },
             // Named against the operation's own path, so "servers[0] uses
             // {region}" is about this operation's list and not the document's.
             servers = serverUrls(node, "${operation.label} servers"),
             body = Bodies(this, operation).read(),
             successes = responses.successes,
-            failures = responses.failures,
+            failures = if (key == null) responses.failures else responses.failures - key.failures,
             responseHeaders = responses.successHeaders,
             security = if (node["security"] == null) null else requirements(node.arr("security"), path / "security"),
+            idempotencyKey = key?.header?.required,
         )
 
         described.schemas().forEach { Schemas.check(it, path, declared) }

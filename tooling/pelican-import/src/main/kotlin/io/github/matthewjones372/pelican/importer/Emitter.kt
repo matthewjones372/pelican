@@ -306,11 +306,18 @@ internal class Emitter(private val api: IrApi, private val options: ImportOption
         if (ep.deprecated) add("deprecated = true")
         if (webhook || keys.size > TUPLE_LIMIT) addAll(lensInputs(ep))
         addAll(security(ep))
+        addAll(listOfNotNull(idempotencyKey(ep)))
         if (ep.responseHeaders.isNotEmpty()) {
             add("emits(${ep.responseHeaders.joinToString { headerName(it) }})")
         }
         ep.failures.filterNot { it.returnable }.forEach { add(documented(ep, it)) }
         add(output(ep))
+    }
+
+    private fun idempotencyKey(ep: IrEndpoint): String? = when (ep.idempotencyKey) {
+        true -> "idempotencyKey()"
+        false -> "idempotencyKey(required = false)"
+        null -> null
     }
 
     /**

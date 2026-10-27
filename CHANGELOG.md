@@ -33,6 +33,14 @@ one.
 
 ### Added
 
+- **Idempotency keys on the calling side** (spec 0092): a generated client's
+  keyed method takes `idempotencyKey: String = IdempotencyKey.random()`, set
+  in the request once so a `RetryingTransport` resends the same key.
+  `RetryPolicy` now retries a request carrying an `Idempotency-Key` whatever
+  its method. `pelican-test`'s client sends a fresh key per request to a keyed
+  endpoint, and `pelican-import` reads the header and Pelican's 409 and 422
+  back as `idempotencyKey()`.
+
 - **`pelican-gannet`** (spec 0088): an `Api` served on
   [Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
   io_uring, one carrier thread and ring per core, each connection a fiber on

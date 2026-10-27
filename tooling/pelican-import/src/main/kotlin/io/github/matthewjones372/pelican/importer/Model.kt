@@ -46,6 +46,8 @@ internal class IrEndpoint(
     val responseHeaders: List<IrResponseHeader>,
     /** Null means "whatever the document requires"; empty means deliberately public. */
     val security: List<IrRequirement>?,
+    /** Whether a key is required, where the operation declares one; null where it does not. */
+    val idempotencyKey: Boolean? = null,
 ) {
     override fun toString() = "$operationId ($method $path)"
 }
