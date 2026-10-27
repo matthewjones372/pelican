@@ -2921,6 +2921,27 @@ a single node. A service on several nodes needs a store they share. Its calls bl
 bound `nonBlocking()`, and a keyed endpoint with no store set. A request still running after `lease` is taken to have
 died, and a repeat runs in its place.
 
+### On the calling side
+
+A generated client gives a keyed method a key of its own, made when the call is:
+
+```kotlin
+fun leaveTip(body: Tip, idempotencyKey: String = IdempotencyKey.random()): Receipt
+```
+
+The key goes into the request once, so a `RetryingTransport`, which sends that same request again, sends the same
+key, and the retry is answered from the store rather than run. `RetryPolicy` retries a request carrying an
+`Idempotency-Key` whatever its method; one without a key keeps the method rule below. Pass a key of your own to make
+two calls one request, from two processes or across a restart. An optional key is `String?`, and `null` sends none.
+
+`pelican-test`'s client sends a fresh key per request to a keyed endpoint unless the test names one with
+`withHeader("Idempotency-Key", ...)`, so `app.call(placeOrder, ...)` twice is two orders, as two calls from a
+generated client are.
+
+`pelican-import` reads the `Idempotency-Key` header, the 409 and the 422 Pelican writes back as `idempotencyKey()`.
+The same header beside a 409 or 422 that says something else, another service's or one sharing its status with a
+failure of the endpoint's own, is read as the plain header and failures it is.
+
 ## Pages beside the endpoints
 
 A service with a few pages of its own, a small UI or a status page, serves them from a classpath directory with
@@ -4996,7 +5017,7 @@ paid by the server rather than by whoever chose the default:
 | `initialBackoff`, `backoffMultiplier`, `maxBackoff` | `100ms`, `2.0`, `2s` | Doubling reaches a wait that matters within two retries without a first retry a caller would notice. The ceiling is there so that raising `maxAttempts` does not silently put a minute inside somebody's request |
 | `jitter` | `0.5` | Half of each wait is random. Clients that failed together compute the same backoff at the same instant and re-form the same herd; randomising *all* of it would let the wait collapse to nothing |
 | `statuses` | `408, 429, 502, 503, 504` | Each says the request did not get a fair hearing. **Not 500**: the common cause is an unhandled exception in a handler, and sending the same request again produces the same exception with the work done twice |
-| `methods` | `GET, HEAD, PUT, DELETE, OPTIONS` | HTTP's own idempotent set, which is all a description knows about whether a second send does a second thing. A POST that carries an idempotency key is safe and its caller is the one who knows that: name `Method.POST` here |
+| `methods` | `GET, HEAD, PUT, DELETE, OPTIONS` | HTTP's own idempotent set, which is all a description knows about whether a second send does a second thing. A request carrying an `Idempotency-Key` is retried whatever its method, since the key is the server's promise that a repeat is answered rather than run (see [A request sent twice, answered once](#a-request-sent-twice-answered-once)). Name `Method.POST` here only for a POST that is safe twice without one |
 | `retryStreamedBodies` | `false` | Whether `open()` can be called again is a fact about the function that was passed, and nothing here can see it. On, the request is handed to the transport again unchanged and the transport opens a fresh stream for itself |
 | `honourRetryAfter`, `retryAfterCap` | `true`, `10s` | A server that names a number knows something no curve here does, and waiting less than it asked is the one answer that is certainly wrong. Past the cap the policy stops retrying rather than waiting: the server has said it will not be ready inside anything the caller would call a call |
 | `failures` | `it is IOException` | A refused connection, a reset, a request that timed out: the socket-level accidents a second attempt may genuinely not repeat. A bug or a refusal survives being sent again |

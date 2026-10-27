@@ -499,6 +499,41 @@ does.
 
 ---
 
+## A request safe to send twice
+
+A POST that charges or creates declares a key, and a repeat of it is answered
+with the first response:
+
+```kotlin
+import io.github.matthewjones372.pelican.InMemoryIdempotencyStore
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jsonBody
+import kotlin.time.Duration.Companion.hours
+
+data class Tip(val amount: Int)
+data class Receipt(val number: Long, val amount: Int)
+
+val leaveTip = endpoint(jsonBody<Tip>()) {
+    post("tips")
+    idempotencyKey()            // the Idempotency-Key header, and the 409 and 422 answered for it
+    json<Receipt>(status = 201)
+}
+
+val service = api(routes, codecs = JacksonCodecs) {
+    idempotency(store = InMemoryIdempotencyStore(), ttl = 24.hours)
+}
+```
+
+`InMemoryIdempotencyStore` is for tests and one node; several nodes need an
+`IdempotencyStore` they share. A generated client sends a fresh key per call
+and its retries resend it, so wrapping the transport in `retrying()` is now
+safe for this POST. The whole behaviour is under
+[A request sent twice, answered once](reference.md#a-request-sent-twice-answered-once).
+
+---
+
 ## Filters
 
 Run code around every handler: authentication, rate limiting, a timer. Filters

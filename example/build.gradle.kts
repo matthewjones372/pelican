@@ -255,6 +255,12 @@ tasks.register<JavaExec>("runReadmeExample") {
  */
 pelican {
     documents {
+        // Spec 0092's keyed endpoint, written so `importedTipping` below can read it back.
+        create("tipping") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("tippingSpec")
+            outputFile.set(layout.buildDirectory.file("tipping.json"))
+        }
         create("orders") {
             specClass.set("example.GenerateOpenApiKt")
             specFunction.set("ordersSpec")
@@ -362,6 +368,12 @@ pelican {
             packageName.set("example.imported32")
             classpath.setFrom(pelicanImport)
         }
+        /** Spec 0092: a keyed endpoint read back as `idempotencyKey()`, not as a header and two failures. */
+        create("importedTipping") {
+            document.set(layout.buildDirectory.file("tipping.json"))
+            packageName.set("example.importedtipping")
+            classpath.setFrom(pelicanImport)
+        }
     }
 }
 
@@ -369,9 +381,11 @@ pelican {
 // consumer importing a document somebody published has nothing to wait for.
 tasks.named("generateImportedEndpoints") { dependsOn("generateOrdersDocument") }
 tasks.named("generateImported32Endpoints") { dependsOn("generateOrders32Document") }
+tasks.named("generateImportedTippingEndpoints") { dependsOn("generateTippingDocument") }
 
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/imported"))
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/imported32"))
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/importedTipping"))
 
 // The suspending client, which is generated rather than committed: the
 // directory the task defaults to, added to the source set that calls it.
@@ -388,6 +402,7 @@ sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/ad
 tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     exclude("example/imported/**")
     exclude("example/imported32/**")
+    exclude("example/importedtipping/**")
     exclude("example/generated/suspending/**")
     exclude("example/generated/adoption/**")
 }
@@ -396,6 +411,7 @@ tasks.named("compileTestKotlin") {
     dependsOn(
         "generateImportedEndpoints",
         "generateImported32Endpoints",
+        "generateImportedTippingEndpoints",
         "generateOrdersSuspendingClient",
         "generateAdoptionClient",
     )
