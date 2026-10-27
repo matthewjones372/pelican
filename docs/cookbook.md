@@ -492,10 +492,41 @@ val ping = endpoint {
 
 `security(...)` documents the requirement; it does not check a credential. To
 enforce it, declare a caller with `authenticatedBy(...)` (and `pelican-oidc` for
-JWTs), described in [Who is calling](reference.md#who-is-calling), or check it
-in a [filter](#filters), as
+JWTs), as the next section does.
+
+---
+
+## Who may call
+
+A caller under a scheme, what they must have, and the verifier bound once:
+
+```kotlin
+import io.github.matthewjones372.pelican.anyOf
+import io.github.matthewjones372.pelican.authenticated
+import io.github.matthewjones372.pelican.bearerAuth
+import io.github.matthewjones372.pelican.permission
+import io.github.matthewjones372.pelican.role
+
+val bearer = bearerAuth()
+val support = authenticated(bearer) { id -> Staff(id.subject, id.groups) }
+
+val refund = endpoint(orderId) {
+    post("orders" / orderId / "refund")
+    authenticatedBy(support)                                  // 401 without a caller
+    requires(role("support"), permission("orders:refund"))    // 403 without both
+    json<Refund>()
+}
+
+api(routes, codecs = JacksonCodecs) { authenticate(bearer, by = verifier) }
+```
+
+The handler reads `this[support]` and never sees a request that failed either
+check. Both are answered before the body is read, both are declared in the
+document, and a generated client reaches them by status. `anyOf(role("admin"),
+permission("orders:refund"))` is either one. An endpoint that takes several
+schemes at once checks them in a [filter](#filters), as
 [`example/secured`](../example/src/main/kotlin/example/secured/SecuredReports.kt)
-does.
+does. See [What a caller may do](reference.md#what-a-caller-may-do).
 
 ---
 

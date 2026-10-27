@@ -33,6 +33,16 @@ one.
 
 ### Added
 
+- **Who may call** (spec 0093): `requires(...)` on an endpoint names what its `authenticatedBy` caller must have:
+  `role(name)` from `Identity.groups`, `permission(name)` from the `scope` claim (or `scp`), all of them, with
+  `anyOf(...)` for either. A caller missing one is a 403 before any other input or the body is read, and an optional
+  caller who is absent is a 401. The 403 is declared in the refusal envelope, a permission the scheme declares is a
+  scope on the requirement, and the operation's description says the rest.
+- **The caller's 401 is declared** (spec 0093): `authenticatedBy` lists the 401 it answers with, `WWW-Authenticate`
+  and all, in the refusal envelope, unless the endpoint declares a 401 of its own. **Every document with a caller in
+  it gains that response**, a compatible change to what a client reads.
+- **No credential in a span, a log line or a refusal body** (spec 0093): `RedactionAcrossBackendsTest` holds it on
+  Pekko, Jetty and Gannet with OpenTelemetry and an access log wired in.
 - **The caller's 401 and 403 are observed refusals** (spec 0093): `RefusalReason` gains `UNAUTHENTICATED` and
   `FORBIDDEN`, and the 401 `authenticatedBy` answers with and the 403 `requires` answers with are reported to
   `onRefusal` under them, so `refusalCounter` counts them as `http.server.refusals{reason="unauthenticated"}` and
