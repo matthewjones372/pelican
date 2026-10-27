@@ -3185,8 +3185,9 @@ fun enforceDeclaredSecurity(apiWideDefault: List<SecurityRequirement>) = before 
 
 A list of requirements means *any one will do*, which is how OpenAPI reads it
 and therefore how it has to be read here. `example/secured/SecuredReports.kt` is
-this, complete and tested, with an operator basic-auth login and an external
-OAuth provider side by side.
+this, complete and tested, for the endpoint taking an operator basic-auth login
+or an external OAuth provider's token, beside endpoints that declare one caller
+with `authenticatedBy` and `requires`.
 
 ## Metrics
 
