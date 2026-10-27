@@ -1,3 +1,9 @@
+public final class io/github/matthewjones372/pelican/AnyOf : io/github/matthewjones372/pelican/Requirement {
+	public final fun getOptions ()Ljava/util/List;
+	public fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/matthewjones372/pelican/Api {
 	public final fun getAuthenticators ()Ljava/util/Map;
 	public final fun getCodecs ()Lio/github/matthewjones372/pelican/Codecs;
@@ -195,6 +201,7 @@ public final class io/github/matthewjones372/pelican/ByteStreamOutput : io/githu
 public final class io/github/matthewjones372/pelican/CallerInput : io/github/matthewjones372/pelican/ParamKey {
 	public fun <init> (Lio/github/matthewjones372/pelican/SecurityScheme;ZLkotlin/jvm/functions/Function1;)V
 	public final fun decode (Lio/github/matthewjones372/pelican/Authenticator;Lio/github/matthewjones372/pelican/Credentials;)Ljava/lang/Object;
+	public final fun decode (Lio/github/matthewjones372/pelican/Authenticator;Lio/github/matthewjones372/pelican/Credentials;Lio/github/matthewjones372/pelican/Requires;)Ljava/lang/Object;
 	public final fun getRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public final fun getRequired ()Z
 	public final fun getScheme ()Lio/github/matthewjones372/pelican/SecurityScheme;
@@ -422,6 +429,7 @@ public final class io/github/matthewjones372/pelican/Endpoint {
 	public final fun getOutput ()Lio/github/matthewjones372/pelican/Output;
 	public final fun getPathSpec ()Lio/github/matthewjones372/pelican/PathSpec;
 	public final fun getQueries ()Ljava/util/List;
+	public final fun getRequires ()Lio/github/matthewjones372/pelican/Requires;
 	public final fun getResponseHeaders ()Ljava/util/List;
 	public final fun getResumable ()Z
 	public final fun getSecurity ()Ljava/util/List;
@@ -469,6 +477,7 @@ public final class io/github/matthewjones372/pelican/EndpointBuilder {
 	public final fun put (Lio/github/matthewjones372/pelican/PathSpec;)V
 	public final fun put (Ljava/lang/String;)V
 	public final fun query ([Lio/github/matthewjones372/pelican/QueryParam;)V
+	public final fun requires (Lio/github/matthewjones372/pelican/Requirement;[Lio/github/matthewjones372/pelican/Requirement;)V
 	public final fun route (Lio/github/matthewjones372/pelican/Method;Lio/github/matthewjones372/pelican/PathSpec;)V
 	public final fun security (Lio/github/matthewjones372/pelican/SecurityScheme;[Ljava/lang/String;)V
 	public final fun servers ([Ljava/lang/String;)V
@@ -1332,6 +1341,12 @@ public final class io/github/matthewjones372/pelican/PayloadTooLarge : java/lang
 	public final fun getLimit ()J
 }
 
+public final class io/github/matthewjones372/pelican/Permission : io/github/matthewjones372/pelican/Requirement {
+	public final fun getName ()Ljava/lang/String;
+	public fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class io/github/matthewjones372/pelican/PlainCodec {
 	public abstract fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun encode (Ljava/lang/Object;)Ljava/lang/String;
@@ -1426,6 +1441,24 @@ public abstract interface class io/github/matthewjones372/pelican/RefusalRendere
 	public abstract fun getMediaType ()Ljava/lang/String;
 	public abstract fun getSchema ()Lio/github/matthewjones372/pelican/JsonObj;
 	public abstract fun render (Lio/github/matthewjones372/pelican/Refusal;)[B
+}
+
+public abstract interface class io/github/matthewjones372/pelican/Requirement {
+	public abstract fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+}
+
+public final class io/github/matthewjones372/pelican/RequirementsKt {
+	public static final fun anyOf (Lio/github/matthewjones372/pelican/Requirement;Lio/github/matthewjones372/pelican/Requirement;[Lio/github/matthewjones372/pelican/Requirement;)Lio/github/matthewjones372/pelican/Requirement;
+	public static final fun permission (Ljava/lang/String;)Lio/github/matthewjones372/pelican/Requirement;
+	public static final fun role (Ljava/lang/String;)Lio/github/matthewjones372/pelican/Requirement;
+}
+
+public final class io/github/matthewjones372/pelican/Requires {
+	public final fun getAll ()Ljava/util/List;
+	public final fun getPermissions ()Ljava/util/List;
+	public final fun getRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
+	public final fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/Reservation {
@@ -1544,6 +1577,12 @@ public final class io/github/matthewjones372/pelican/RetryingTransport : io/gith
 	public synthetic fun <init> (Lio/github/matthewjones372/pelican/ClientTransport;Lio/github/matthewjones372/pelican/RetryPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lio/github/matthewjones372/pelican/ClientTransport;Lio/github/matthewjones372/pelican/RetryPolicy;Lio/github/matthewjones372/pelican/RetryScheduler;)V
 	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
+}
+
+public final class io/github/matthewjones372/pelican/Role : io/github/matthewjones372/pelican/Requirement {
+	public final fun getName ()Ljava/lang/String;
+	public fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/SchemaComponents {

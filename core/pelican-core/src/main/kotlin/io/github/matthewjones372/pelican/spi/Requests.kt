@@ -86,11 +86,12 @@ private const val STRICT_DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
 
 /**
  * Who is calling, decoded ahead of every other input so that a request with no
- * caller learns nothing else about the endpoint: the 401 is its only answer.
+ * caller, or one who lacks what the endpoint requires, learns nothing else about the endpoint: the 401 or 403 is
+ * its only answer.
  */
 fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: MutableMap<ParamKey<*>, Any?>) {
     val caller = endpoint.caller ?: return
-    into[caller] = caller.decode(authenticators.getValue(caller.scheme), credentials)
+    into[caller] = caller.decode(authenticators.getValue(caller.scheme), credentials, endpoint.requires)
 }
 
 /**

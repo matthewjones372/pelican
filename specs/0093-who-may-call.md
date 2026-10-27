@@ -55,7 +55,10 @@ published; it could come later behind A.
 - [x] **`spec-0093-refusals`** ([#385](https://github.com/matthewjones372/pelican/pull/385)): the 401 that `authenticatedBy` already raises, declared and in the document.
       Done when: a golden shows the 401 with `WWW-Authenticate`, and the generated client reaches it by status.
 - [ ] **`spec-0093-requires`**: `requires`, `role`, `permission`, `anyOf`; the 403, enforced and declared.
-      Done when: the parity suite refuses a caller missing a role on every backend, before the body is read.
+      Done when: served in process, a caller missing one is a 403 before the body is read, and the document says so.
+- [ ] **`spec-0093-requires-parity`** (split from the entry above, which ran past the soft cap): a `requires` endpoint
+      in the backends example. Done when: the parity suite refuses a caller missing a role on every backend, before
+      the body is read.
 - [ ] **`spec-0093-redaction`**: the no-credentials test across backends, spans, the example log and refusal bodies,
       and whatever it finds fixed. Done when: it passes, and fails if a token is put in an `Unauthenticated` message.
 - [ ] **`spec-0093-docs`**: reference, cookbook, changelog; `example/secured` rewritten on `requires`.
