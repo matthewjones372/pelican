@@ -52,7 +52,7 @@ jobs:
 
       # SignInTest drives Chromium. Fetched here, and cached by the build file that pins Playwright's version,
       # rather than by the test under its five-minute timeout, where a slow mirror failed unrelated builds.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('integrations/pelican-oidc/build.gradle.kts') }}
