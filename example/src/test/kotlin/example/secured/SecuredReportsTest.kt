@@ -227,7 +227,14 @@ class SecuredReportsTest {
 
     @Test
     fun `an oauth token is not an operator login`() {
-        send("GET", "/internal/usage", null, bearer("demo-admin")).statusCode() shouldBe 403
+        // A 401 rather than a 403: the endpoint's caller is an operator, and a bearer token names no operator at all.
+        send("GET", "/internal/usage", null, bearer("demo-admin")).statusCode() shouldBe 401
+    }
+
+    @Test
+    fun `an endpoint with a caller says what it requires, in words beside the scope`() {
+        operation("/reports", "post")["description"]!!.jsonPrimitive.content shouldContain
+            "Requires permission `reports:write`."
     }
 
     // -------------------------------------------- what the answer carries
