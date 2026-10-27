@@ -64,7 +64,9 @@ published; it could come later behind A.
 - [x] **`spec-0093-refusal-reasons`** ([#396](https://github.com/matthewjones372/pelican/pull/396); added after `spec-0093-redaction` found the 401 and 403 unobserved):
       `RefusalReason.UNAUTHENTICATED` and `FORBIDDEN`, reported to `onRefusal`. Done when: the refusal observer
       hears both on every backend and the redaction suite reads them in the refusal log.
-- [ ] **`spec-0093-docs`**: reference, cookbook, changelog; `example/secured` rewritten on `requires`.
+- [x] **`spec-0093-docs`** ([#397](https://github.com/matthewjones372/pelican/pull/397)): reference, cookbook, changelog.
+- [ ] **`spec-0093-secured`** (split from the entry above): `example/secured` rewritten on `requires` where one
+      caller under one scheme can say it; the either-scheme endpoint keeps its filter, and says why.
 
 ## Acceptance
 
