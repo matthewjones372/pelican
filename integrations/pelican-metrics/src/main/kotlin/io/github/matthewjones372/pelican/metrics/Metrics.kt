@@ -124,7 +124,7 @@ fun metrics(registry: MeterRegistry, prefix: String = DEFAULT_PREFIX): Filter {
  *
  * | Tag | Where it comes from |
  * |---|---|
- * | `reason` | [RefusalReason.label] — `unmatched`, `decode`, `body_limit`, `content_type`, `accept` |
+ * | `reason` | [RefusalReason.label], one per [RefusalReason]: `unmatched`, `decode`, `forbidden` and the rest |
  * | `status` | the status the caller was sent |
  * | `path` | the refusing route's template, or [UNMATCHED] where nothing matched |
  *

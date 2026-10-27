@@ -91,8 +91,15 @@ private const val STRICT_DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
  */
 fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: MutableMap<ParamKey<*>, Any?>) {
     val caller = endpoint.caller ?: return
-    into[caller] = caller.decode(authenticators.getValue(caller.scheme), credentials, endpoint.requires)
+    into[caller] = try {
+        caller.decode(authenticators.getValue(caller.scheme), credentials, endpoint.requires)
+    } catch (e: ApiException) {
+        throw CallerRefused(e)
+    }
 }
+
+/** The caller's 401 or 403, told apart from the same status thrown by a filter, which the chain already saw. */
+internal class CallerRefused(val refusal: ApiException) : RuntimeException(refusal.message, refusal)
 
 /**
  * How a request body is read, once the request says what it is: one entry per
