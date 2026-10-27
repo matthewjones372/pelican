@@ -245,6 +245,9 @@ class Api internal constructor(
 
     /** Where keyed endpoints' responses are kept. An endpoint declaring a key with none set fails here. */
     val idempotency: Idempotency? = null,
+
+    /** Whether a cookie-carried caller's POST, PUT, PATCH or DELETE from another site is refused with 403. */
+    val csrf: Boolean = true,
 ) {
     /**
      * The largest single frame of a streamed request body, over which the frame

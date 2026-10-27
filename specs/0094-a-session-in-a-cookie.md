@@ -55,7 +55,7 @@ neither but needs a cookie, a header and client code on every form. Recommended:
       absolute expiry. Done when: served in process, a revoked or expired session is a 401.
 - [x] **`spec-0094-sessions-parity`** ([#401](https://github.com/matthewjones372/pelican/pull/401); split from the entry above, which ran past the soft cap): a session endpoint in
       the backends example. Done when: a revoked or expired session is a 401 on every backend.
-- [ ] **`spec-0094-csrf`**: `csrf(...)`, the declared 403. Done when: the parity suite refuses a cross-origin
+- [x] **`spec-0094-csrf`** ([#402](https://github.com/matthewjones372/pelican/pull/402)): `csrf(...)`, the declared 403. Done when: the parity suite refuses a cross-origin
       cookie POST and lets the same POST through with a bearer token, on every backend.
 - [ ] **`spec-0094-docs`**: reference, cookbook, changelog.
 

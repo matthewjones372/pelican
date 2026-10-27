@@ -35,6 +35,12 @@ class ApiBuilder internal constructor() {
     var servers: List<String> = emptyList()
     var security: List<SecurityRequirement> = emptyList()
     var cors: Cors? = null
+
+    /**
+     * Refuses a POST, PUT, PATCH or DELETE from another site whose caller is a cookie, which a browser attaches to
+     * a request another site makes it send. On unless turned off; an origin [cors] lets send credentials is let in.
+     */
+    var csrf: Boolean = true
     var strictBodyTimeoutMillis: Long = DEFAULT_STRICT_BODY_TIMEOUT_MILLIS
     var maxBodyBytes: Long = DEFAULT_MAX_BODY_BYTES
 
@@ -113,6 +119,7 @@ class ApiBuilder internal constructor() {
         pages = pages,
         authenticators = authenticators.toMap(),
         idempotency = idempotency,
+        csrf = csrf,
     )
 }
 

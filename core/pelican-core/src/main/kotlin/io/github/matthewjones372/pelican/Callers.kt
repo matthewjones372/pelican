@@ -57,6 +57,9 @@ class CallerInput<T> @PublishedApi internal constructor(
     /** The 401 [decode] answers with, declared on every endpoint taking this caller unless it declares a 401 itself. */
     val refused: ErrorSpec get() = CALLER_REFUSED
 
+    /** The 403 for a cookie-carried caller's state-changing request from another site; see `Api.csrf`. */
+    val crossSiteRefused: ErrorSpec get() = CROSS_SITE_REFUSED
+
     /** The value a handler reads, or the 401 that stops it running. */
     fun decode(authenticator: Authenticator, credentials: Credentials): T? = decode(authenticator, credentials, null)
 

@@ -599,14 +599,18 @@ private fun <I, R> build(
     ).also(::validate)
 }
 
-/** What the endpoint declares, with the 401 and 403 Pelican answers for it where it declares neither itself. */
+/** What the endpoint declares, with the 401 and 403s Pelican answers for it where it declares none itself. */
 private fun errorsOf(b: EndpointBuilder): List<ErrorSpec> {
     val requires = b.requirements
     require(requires == null || b.callerInput != null) {
         "This endpoint requires $requires of a caller it never names. Declare one with authenticatedBy(...)."
     }
-    val answered = listOfNotNull(b.callerInput?.refused, requires?.refused)
-    return b.errors + answered.filter { refusal -> b.errors.none { it.status == refusal.status } }
+    val crossSite = b.callerInput?.crossSiteRefused?.takeIf { crossSiteChecked(b.method, b.callerInput) }
+    val answered = listOfNotNull(b.callerInput?.refused, requires?.refused, crossSite)
+    // One per status: an endpoint's own declaration wins, and then the first of Pelican's.
+    return answered.fold(b.errors.toList()) { declared, refusal ->
+        if (declared.any { it.status == refusal.status }) declared else declared + refusal
+    }
 }
 
 /**

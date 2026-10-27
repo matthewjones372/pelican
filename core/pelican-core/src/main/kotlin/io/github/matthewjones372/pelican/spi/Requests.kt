@@ -28,10 +28,12 @@ import io.github.matthewjones372.pelican.PlainCodec
 import io.github.matthewjones372.pelican.QueryParam
 import io.github.matthewjones372.pelican.RawBody
 import io.github.matthewjones372.pelican.UnsupportedMediaType
+import io.github.matthewjones372.pelican.crossSiteChecked
 import io.github.matthewjones372.pelican.decodeAll
 import io.github.matthewjones372.pelican.default
 import io.github.matthewjones372.pelican.formCodec
 import io.github.matthewjones372.pelican.mediaType
+import io.github.matthewjones372.pelican.refuseCrossSite
 import io.github.matthewjones372.pelican.representations
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -93,6 +95,7 @@ fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: M
     val caller = endpoint.caller ?: return
     into[caller] = try {
         caller.decode(authenticators.getValue(caller.scheme), credentials, endpoint.requires)
+            ?.also { if (csrf && crossSiteChecked(endpoint.method, caller)) refuseCrossSite(credentials, cors) }
     } catch (e: ApiException) {
         throw CallerRefused(e)
     }
