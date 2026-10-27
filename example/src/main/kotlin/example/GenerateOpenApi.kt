@@ -10,6 +10,7 @@ package example
  */
 
 import example.adoption.adoptPet
+import example.backends.leaveTip
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -46,4 +47,14 @@ fun adoptionSpec(): ApiSpec = apiSpec(listOf(adoptPet), schemas = JacksonCodecs)
     title = "Adoption"
     version = "1.0.0"
     description = "Two failures under one status, told apart by a tag."
+}
+
+/**
+ * Spec 0092's keyed endpoint on its own, so its generated client can be committed and checked without the
+ * greetings service's streams and uploads coming with it.
+ */
+fun tippingSpec(): ApiSpec = apiSpec(listOf(leaveTip), schemas = JacksonCodecs) {
+    title = "Tipping"
+    version = "1.0.0"
+    description = "One call that is answered once, however often it is sent."
 }

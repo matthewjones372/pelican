@@ -530,6 +530,39 @@ class KotlinClientTest {
             "enum class JobState { queued, `in-progress` }"
     }
 
+    // ------------------------------------------------------------ idempotency keys
+
+    private fun keyed(required: Boolean): String = apiSpec(
+        listOf(
+            endpoint(jsonBody<NewWidget>()) {
+                post("widgets")
+                operationId = "createWidget"
+                idempotencyKey(required)
+                json<Widget>(201)
+            },
+        ),
+        WidgetSchemas,
+    ) { title = "Widgets" }.kotlinClient("com.example.widgets")
+
+    @Test
+    fun `a keyed call sends a fresh key unless its caller names one, set once so a retry resends it`() {
+        val client = keyed(required = true)
+
+        client shouldContain "fun createWidget(body: NewWidget, idempotencyKey: String = IdempotencyKey.random())"
+        client shouldContain """headerParams = listOf("Idempotency-Key" to idempotencyKey)"""
+        client shouldContain "import io.github.matthewjones372.pelican.IdempotencyKey"
+    }
+
+    @Test
+    fun `an optional key is still sent by default, and null leaves it off`() {
+        keyed(required = false) shouldContain "idempotencyKey: String? = IdempotencyKey.random()"
+    }
+
+    @Test
+    fun `a client with no keyed call imports nothing for one`() {
+        client shouldNotContain "IdempotencyKey"
+    }
+
     // ------------------------------------------------------------ hidden
 
     @Test

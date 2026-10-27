@@ -403,11 +403,18 @@ private class KotlinClientEmitter(
                     "import kotlinx.coroutines.withContext",
                 )
         }
-        // Only where something is tagged: an unused import is a warning in every
+        // Only where something is tagged or keyed: an unused import is a warning in every
         // file that is not, and a generated file nobody edits is the last place
         // to leave one.
-        if (endpoints.none { ep -> declaredFailures(ep).any { it.tag != null } }) return fixed
-        return fixed.flatMap { if (it == FORM_CODEC_IMPORT) listOf(it, TAG_IMPORT) else listOf(it) }
+        val tagged = endpoints.any { ep -> declaredFailures(ep).any { it.tag != null } }
+        val keyed = endpoints.any { it.idempotency != null }
+        return fixed.flatMap {
+            when {
+                it == FORM_CODEC_IMPORT && tagged -> listOf(it, TAG_IMPORT)
+                it == CODECS_IMPORT && keyed -> listOf(it, KEY_IMPORT)
+                else -> listOf(it)
+            }
+        }
     }
 
     /**
@@ -744,7 +751,19 @@ private class KotlinClientEmitter(
         }
 
         ep.queries.forEach { parameter(it.name, it.codec, it.required, it.listStyle, queryPairs) }
-        ep.headerParams.forEach { parameter(it.name, it.codec, it.required, it.listStyle, headerPairs) }
+        ep.headerParams.forEach { header ->
+            if (header === ep.idempotency?.header) {
+                // A key per call, made when the call is: the request carries it from then on, so a retry of that
+                // request resends the same one. Defaulted even where optional, because a client that sends none
+                // has asked for its retries to run twice.
+                val name = unique(memberName(header.name), taken)
+                val type = if (header.required) "String" else "String?"
+                optional += "$name: $type = IdempotencyKey.random()"
+                headerPairs += "${kotlinString(header.name)} to $name"
+            } else {
+                parameter(header.name, header.codec, header.required, header.listStyle, headerPairs)
+            }
+        }
         // The method is the choice, so the header says what the method asked
         // for. Sent rather than left off: a caller that says nothing gets the
         // first rendering, which is not the one this method decodes.
@@ -1226,6 +1245,11 @@ private val IMPORTS = """
 
 /** Where the tag import goes, which is where it sorts. */
 private const val FORM_CODEC_IMPORT = "import io.github.matthewjones372.pelican.formCodec"
+
+private const val CODECS_IMPORT = "import io.github.matthewjones372.pelican.Codecs"
+
+/** What a keyed call makes its default key with; after [CODECS_IMPORT], which is where it sorts. */
+private const val KEY_IMPORT = "import io.github.matthewjones372.pelican.IdempotencyKey"
 
 /** The reader a client branching on a tag needs, shared with the server that writes it. */
 private const val TAG_IMPORT = "import io.github.matthewjones372.pelican.spi.tagIn"

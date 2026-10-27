@@ -601,11 +601,17 @@ public final class io/github/matthewjones372/pelican/Idempotency {
 }
 
 public final class io/github/matthewjones372/pelican/IdempotencyKey {
+	public static final field Companion Lio/github/matthewjones372/pelican/IdempotencyKey$Companion;
 	public final fun getHeader ()Lio/github/matthewjones372/pelican/HeaderParam;
 	public final fun getInFlight ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public final fun getRequired ()Z
 	public final fun getReused ()Lio/github/matthewjones372/pelican/ErrorSpec;
+	public static final fun random ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/IdempotencyKey$Companion {
+	public final fun random ()Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/IdempotencyKt {

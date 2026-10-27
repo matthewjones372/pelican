@@ -105,6 +105,21 @@ class RetryTest {
     }
 
     @Test
+    fun `a request carrying an idempotency key is safe to send twice whatever its method`() {
+        val keyed = post.withHeader("Idempotency-Key", "k-1")
+
+        exact.retryDelay(keyed, response(503), attempt = 1) shouldBe Duration.ofMillis(100)
+        exact.retryDelay(keyed, IOException("reset"), attempt = 1) shouldBe Duration.ofMillis(100)
+    }
+
+    @Test
+    fun `a random key is a fresh one each time`() {
+        val keys = (1..100).map { IdempotencyKey.random() }.toSet()
+
+        keys.size shouldBe 100
+    }
+
+    @Test
     fun `a streamed body is left alone until its owner says it can be opened again`() {
         val streamed = ClientRequest(
             Method.PUT,

@@ -11,6 +11,7 @@ import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.ErrorOutput
 import io.github.matthewjones372.pelican.FilePart
 import io.github.matthewjones372.pelican.FormBody
+import io.github.matthewjones372.pelican.IdempotencyKey
 import io.github.matthewjones372.pelican.JsonArrayOutput
 import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.JsonOutput
@@ -126,7 +127,11 @@ class ApiClient(
 
         val payload = payload(endpoint, values)
 
-        val headers = endpoint.headerParams.flatMap { h -> wire(h.name, h.codec, h.listStyle, values[h]) } +
+        // A keyed endpoint gets a fresh key per request, as a generated client sends one; withHeader names one.
+        val key = endpoint.idempotency?.header
+        val headers = endpoint.headerParams.flatMap { h ->
+            wire(h.name, h.codec, h.listStyle, values[h] ?: if (h === key) IdempotencyKey.random() else null)
+        } +
             (if (cookies.isEmpty()) emptyList() else listOf("Cookie" to Cookies.render(cookies))) +
             listOfNotNull(payload.contentType?.let { "Content-Type" to it })
 
