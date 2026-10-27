@@ -85,6 +85,7 @@ fun greetingsApi(
     idempotency(InMemoryIdempotencyStore())
 
     authenticate(tellerToken, tellers)
+    authenticate(visits.scheme, visits)
 }
 
 /** What [stamping] worked out, for anything downstream that wants it. */

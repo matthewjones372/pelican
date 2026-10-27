@@ -13,6 +13,7 @@ import io.github.matthewjones372.pelican.ApiError
 import io.github.matthewjones372.pelican.Authenticator
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Identity
+import io.github.matthewjones372.pelican.InMemorySessionStore
 import io.github.matthewjones372.pelican.LongCodec
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.Outcome
@@ -49,12 +50,20 @@ import io.github.matthewjones372.pelican.rawBody
 import io.github.matthewjones372.pelican.repeated
 import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.role
+import io.github.matthewjones372.pelican.sessionCookie
 import io.github.matthewjones372.pelican.textPart
 import io.github.matthewjones372.pelican.webhook
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 
 /**
  * One description, whichever server ends up serving it.
@@ -479,11 +488,52 @@ val tellers = Authenticator { credentials ->
 const val TELLER_TOKEN = "teller-token"
 const val GUEST_TOKEN = "guest-token"
 
+/** The clock visits are timed by, which a test moves on to expire a session without waiting half an hour. */
+object VisitClock : Clock() {
+    @Volatile
+    private var ahead: kotlin.time.Duration = kotlin.time.Duration.ZERO
+
+    override fun instant(): Instant = Instant.now().plus(ahead.toJavaDuration())
+    override fun getZone(): ZoneId = ZoneOffset.UTC
+    override fun withZone(zone: ZoneId?): Clock = this
+
+    fun advance(by: kotlin.time.Duration) { ahead += by }
+    fun reset() { ahead = kotlin.time.Duration.ZERO }
+}
+
+/** A visitor's session, in a cookie. One store for every backend here, so a session one starts another can read. */
+val visits = sessionCookie("sid", InMemorySessionStore(VisitClock), idle = 30.minutes, absolute = 12.hours, VisitClock)
+
+val visitor = authenticated(visits.scheme, Identity::subject)
+
+val sessionSet = responseHeader<String>("Set-Cookie", "The visitor's session")
+
+/** Starts a session for whoever the query names: the sign-in a real service does after checking a password. */
+val startVisit = endpoint(queryParam<String>("name", description = "Who is visiting")) {
+    post("visits")
+    summary = "Start a visit, and the session cookie that carries it"
+    operationId = "startVisit"
+    tag("greetings")
+    emits(requestId, sessionSet)
+    text()
+}
+
+val whoIsVisiting = endpoint {
+    get("visits" / "me")
+    summary = "Who the session cookie names"
+    operationId = "whoIsVisiting"
+    tag("greetings")
+    emits(requestId)
+    authenticatedBy(visitor)
+    text()
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
         roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay, leaveTip, refundTip,
+        startVisit, whoIsVisiting,
     )
 
 /**
