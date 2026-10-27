@@ -2271,8 +2271,8 @@ backend that `Stream.from(source)` and `run` are part of.
 ```kotlin
 dependencies {
     implementation("io.github.matthewjones372:pelican-streams:$pelicanVersion")
-    implementation("io.github.matthewjones372:surefold-stream:0.12.0")
-    implementation("io.github.matthewjones372:surefold-stream-pekko:0.12.0")
+    implementation("io.github.matthewjones372:surefold-stream:0.14.0")
+    implementation("io.github.matthewjones372:surefold-stream-pekko:0.14.0")
     // plus the Pekko block from Versions, as for any Pekko module here.
 }
 ```
@@ -2322,8 +2322,8 @@ names `surefold-stream` and its backend:
 ```kotlin
 dependencies {
     implementation("io.github.matthewjones372:pelican-streams-jetty:$pelicanVersion")
-    implementation("io.github.matthewjones372:surefold-stream:0.12.0")
-    implementation("io.github.matthewjones372:surefold-stream-forks:0.12.0")
+    implementation("io.github.matthewjones372:surefold-stream:0.14.0")
+    implementation("io.github.matthewjones372:surefold-stream-forks:0.14.0")
 }
 ```
 
