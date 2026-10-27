@@ -61,7 +61,7 @@ published; it could come later behind A.
       the body is read.
 - [x] **`spec-0093-redaction`** ([#395](https://github.com/matthewjones372/pelican/pull/395)): the no-credentials test across backends, spans, the example log and refusal bodies,
       and whatever it finds fixed. Done when: it passes, and fails if a token is put in an `Unauthenticated` message.
-- [x] **`spec-0093-refusal-reasons`** (added after `spec-0093-redaction` found the 401 and 403 unobserved):
+- [x] **`spec-0093-refusal-reasons`** ([#396](https://github.com/matthewjones372/pelican/pull/396); added after `spec-0093-redaction` found the 401 and 403 unobserved):
       `RefusalReason.UNAUTHENTICATED` and `FORBIDDEN`, reported to `onRefusal`. Done when: the refusal observer
       hears both on every backend and the redaction suite reads them in the refusal log.
 - [ ] **`spec-0093-docs`**: reference, cookbook, changelog; `example/secured` rewritten on `requires`.
