@@ -569,7 +569,7 @@ private fun <I, R> build(
         cookieParams = b.cookieParams.toList(),
         bodyInput = b.bodyInput,
         output = out,
-        errors = b.errors.toList(),
+        errors = errorsOf(b),
         responseHeaders = b.responseHeaders.toList(),
         summary = b.summary,
         description = b.description,
@@ -583,6 +583,16 @@ private fun <I, R> build(
         caller = b.callerInput,
         idempotency = b.idempotencyKey,
     ).also(::validate)
+}
+
+/** What the endpoint declares, with its caller's 401 where it declares no 401 of its own. */
+private fun errorsOf(b: EndpointBuilder): List<ErrorSpec> {
+    val caller = b.callerInput
+    return if (caller == null || b.errors.any { it.status == caller.refused.status }) {
+        b.errors.toList()
+    } else {
+        b.errors + caller.refused
+    }
 }
 
 /**

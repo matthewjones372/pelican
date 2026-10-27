@@ -195,6 +195,7 @@ public final class io/github/matthewjones372/pelican/ByteStreamOutput : io/githu
 public final class io/github/matthewjones372/pelican/CallerInput : io/github/matthewjones372/pelican/ParamKey {
 	public fun <init> (Lio/github/matthewjones372/pelican/SecurityScheme;ZLkotlin/jvm/functions/Function1;)V
 	public final fun decode (Lio/github/matthewjones372/pelican/Authenticator;Lio/github/matthewjones372/pelican/Credentials;)Ljava/lang/Object;
+	public final fun getRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public final fun getRequired ()Z
 	public final fun getScheme ()Lio/github/matthewjones372/pelican/SecurityScheme;
 	public fun toString ()Ljava/lang/String;

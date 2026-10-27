@@ -11,6 +11,7 @@ package example
 
 import example.adoption.adoptPet
 import example.backends.leaveTip
+import example.whoami.whoAmI
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -57,4 +58,11 @@ fun tippingSpec(): ApiSpec = apiSpec(listOf(leaveTip), schemas = JacksonCodecs) 
     title = "Tipping"
     version = "1.0.0"
     description = "One call that is answered once, however often it is sent."
+}
+
+/** Spec 0093's caller on its own, so its generated client is refused with the 401 it was told about. */
+fun whoAmISpec(): ApiSpec = apiSpec(listOf(whoAmI), schemas = JacksonCodecs) {
+    title = "Who am I"
+    version = "1.0.0"
+    description = "One call that needs a caller, and the 401 for one that names nobody."
 }
