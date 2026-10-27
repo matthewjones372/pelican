@@ -14,6 +14,7 @@ import io.github.matthewjones372.pelican.Authenticator
 import io.github.matthewjones372.pelican.Credentials
 import io.github.matthewjones372.pelican.Identity
 import io.github.matthewjones372.pelican.PageGuard
+import io.github.matthewjones372.pelican.ResponseCookie
 import io.github.matthewjones372.pelican.ServerEndpoint
 import io.github.matthewjones372.pelican.Unauthenticated
 import io.github.matthewjones372.pelican.cookieParam
@@ -30,6 +31,7 @@ import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
+import kotlin.time.toKotlinDuration
 
 /**
  * People signing in to a service's pages through the provider: the
@@ -89,7 +91,7 @@ class SignIn internal constructor(
     val endpoints: List<ServerEndpoint> = listOf(
         ServerEndpoint(login) { p ->
             val flow = Flow(token(), token(), token(), safeReturn(p[returnTo]))
-            p.setHeader(setCookie, cookie(LOGIN_COOKIE, seal(flow.toString()), LOGIN_LIFETIME))
+            p.setCookie(cookie(LOGIN_COOKIE, seal(flow.toString()), LOGIN_LIFETIME))
             p.setHeader(location, authorizeUrl(flow))
             done()
         },
@@ -102,13 +104,13 @@ class SignIn internal constructor(
                 }
                 val (idToken, identity) = exchange(p[code], flow)
                 val lifetime = Duration.between(provider.now, (identity.claims["exp"] as java.util.Date).toInstant())
-                p.setHeader(setCookie, cookie(SESSION_COOKIE, seal(idToken), lifetime))
+                p.setCookie(cookie(SESSION_COOKIE, seal(idToken), lifetime))
                 p.setHeader(location, flow.returnTo)
                 Unit as Any?
             }, exchanges)
         },
         ServerEndpoint(logout) { p ->
-            p.setHeader(setCookie, cookie(SESSION_COOKIE, "", Duration.ZERO))
+            p.setCookie(cookie(SESSION_COOKIE, "", Duration.ZERO))
             p.setHeader(location, afterSignOut)
             done()
         },
@@ -166,13 +168,13 @@ class SignIn internal constructor(
     fun actAs(credentials: Credentials, subject: String, until: Instant): String? {
         val held = held(credentials) ?: return null
         val sealed = seal("${held.idToken} ${URLEncoder.encode(subject, Charsets.UTF_8)} ${until.epochSecond}")
-        return cookie(SESSION_COOKIE, sealed, held.lifetime())
+        return cookie(SESSION_COOKIE, sealed, held.lifetime()).headerValue
     }
 
     /** The `Set-Cookie` that ends acting and leaves the person signed in as themselves; null when nobody is. */
     fun stopActing(credentials: Credentials): String? {
         val held = held(credentials) ?: return null
-        return cookie(SESSION_COOKIE, seal(held.idToken), held.lifetime())
+        return cookie(SESSION_COOKIE, seal(held.idToken), held.lifetime()).headerValue
     }
 
     private fun Held.lifetime(): Duration =
@@ -294,8 +296,8 @@ private val LOGIN_LIFETIME: Duration = Duration.ofMinutes(10)
 private fun safeReturn(asked: String?): String =
     asked?.takeIf { it.startsWith("/") && !it.startsWith("//") && '\\' !in it } ?: "/"
 
-private fun cookie(name: String, value: String, lifetime: Duration): String =
-    "$name=$value; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${lifetime.seconds.coerceAtLeast(0)}"
+private fun cookie(name: String, value: String, lifetime: Duration): ResponseCookie =
+    ResponseCookie(name, value, maxAge = lifetime.toKotlinDuration())
 
 private fun bearer(token: String) = object : Credentials {
     override fun header(name: String): String? =

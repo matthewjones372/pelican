@@ -49,7 +49,7 @@ neither but needs a cookie, a header and client code on every form. Recommended:
 
 ## Stack
 
-- [ ] **`spec-0094-cookies`**: `ResponseCookie` and `setCookie`; the oidc module moved onto it.
+- [x] **`spec-0094-cookies`** ([#399](https://github.com/matthewjones372/pelican/pull/399)): `ResponseCookie` and `setCookie`; the oidc module moved onto it.
       Done when: the refusals are tested, and oidc's `Set-Cookie` headers are byte-for-byte unchanged.
 - [ ] **`spec-0094-sessions`**: `SessionStore`, `InMemorySessionStore`, `sessionCookie`, start, end, idle and
       absolute expiry. Done when: a revoked or expired session is a 401 on every backend.

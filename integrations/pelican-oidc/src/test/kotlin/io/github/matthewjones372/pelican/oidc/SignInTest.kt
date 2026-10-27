@@ -16,6 +16,7 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldMatch
 import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
@@ -181,6 +182,18 @@ class SignInTest {
         val state = login.headers().firstValue("Location").get().substringAfter("state=").substringBefore('&')
 
         get("/callback?code=never-issued&state=$state", "Cookie" to cookie).statusCode() shouldBe 400
+    }
+
+    /** Pinned whole, so moving them onto `ResponseCookie` cannot change a byte a browser reads. */
+    @Test
+    fun `the three cookies sign-in writes are exactly what they were`() {
+        val attributes = "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age="
+
+        get("/login").headers().firstValue("Set-Cookie").get() shouldMatch
+            Regex("pelican_sign_in=[A-Za-z0-9_.-]+" + Regex.escape(attributes) + "600")
+        signInWithoutABrowser("/").headers().firstValue("Set-Cookie").get() shouldMatch
+            Regex("pelican_session=[A-Za-z0-9_.-]+" + Regex.escape(attributes) + "[0-9]+")
+        get("/logout").headers().firstValue("Set-Cookie").get() shouldBe "pelican_session=" + attributes + "0"
     }
 
     @Test
