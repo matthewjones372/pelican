@@ -761,6 +761,17 @@ public final class io/github/matthewjones372/pelican/InMemoryIdempotencyStore : 
 	public fun reserve (Lio/github/matthewjones372/pelican/IdempotencyScope;Ljava/lang/String;Ljava/time/Duration;)Lio/github/matthewjones372/pelican/Reservation;
 }
 
+public final class io/github/matthewjones372/pelican/InMemorySessionStore : io/github/matthewjones372/pelican/SessionStore {
+	public fun <init> ()V
+	public fun <init> (Ljava/time/Clock;)V
+	public synthetic fun <init> (Ljava/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun create (Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;)V
+	public fun lookup (Ljava/lang/String;)Lio/github/matthewjones372/pelican/StoredSession;
+	public fun revoke (Ljava/lang/String;)V
+	public fun revokeAll (Ljava/lang/String;)V
+	public fun touch (Ljava/lang/String;Ljava/time/Instant;)V
+}
+
 public final class io/github/matthewjones372/pelican/Inputs {
 	public fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
 	public final fun getExtract ()Lkotlin/jvm/functions/Function1;
@@ -1699,6 +1710,31 @@ public final class io/github/matthewjones372/pelican/ServerEndpoint {
 	public final fun nonBlocking ()Lio/github/matthewjones372/pelican/ServerEndpoint;
 }
 
+public final class io/github/matthewjones372/pelican/SessionCookie : io/github/matthewjones372/pelican/Authenticator {
+	public fun authenticate (Lio/github/matthewjones372/pelican/Credentials;)Lio/github/matthewjones372/pelican/Identity;
+	public final fun end (Lio/github/matthewjones372/pelican/Credentials;)Lio/github/matthewjones372/pelican/ResponseCookie;
+	public final fun endAll (Ljava/lang/String;)V
+	public final fun getAbsolute-UwyO8pc ()J
+	public final fun getIdle-UwyO8pc ()J
+	public final fun getName ()Ljava/lang/String;
+	public final fun getScheme ()Lio/github/matthewjones372/pelican/ApiKeyScheme;
+	public final fun start (Lio/github/matthewjones372/pelican/Identity;)Lio/github/matthewjones372/pelican/ResponseCookie;
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/SessionStore {
+	public abstract fun create (Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;)V
+	public abstract fun lookup (Ljava/lang/String;)Lio/github/matthewjones372/pelican/StoredSession;
+	public abstract fun revoke (Ljava/lang/String;)V
+	public abstract fun revokeAll (Ljava/lang/String;)V
+	public abstract fun touch (Ljava/lang/String;Ljava/time/Instant;)V
+}
+
+public final class io/github/matthewjones372/pelican/SessionsKt {
+	public static final fun sessionCookie-ck1zr5g (Ljava/lang/String;Lio/github/matthewjones372/pelican/SessionStore;JJLjava/time/Clock;)Lio/github/matthewjones372/pelican/SessionCookie;
+	public static synthetic fun sessionCookie-ck1zr5g$default (Ljava/lang/String;Lio/github/matthewjones372/pelican/SessionStore;JJLjava/time/Clock;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/SessionCookie;
+}
+
 public final class io/github/matthewjones372/pelican/SseOutput : io/github/matthewjones372/pelican/Output {
 	public static final field Companion Lio/github/matthewjones372/pelican/SseOutput$Companion;
 	public static final field KEEP_ALIVE_FRAME Ljava/lang/String;
@@ -1728,6 +1764,13 @@ public final class io/github/matthewjones372/pelican/StoredResponse {
 	public final fun getMediaType ()Ljava/lang/String;
 	public final fun getStatus ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/StoredSession {
+	public fun <init> (Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/time/Instant;)V
+	public final fun getCreated ()Ljava/time/Instant;
+	public final fun getExpires ()Ljava/time/Instant;
+	public final fun getIdentity ()Lio/github/matthewjones372/pelican/Identity;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/StreamIn {
