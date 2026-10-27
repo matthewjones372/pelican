@@ -33,6 +33,19 @@ one.
 
 ### Added
 
+- **A session in a cookie** (spec 0094): `sessionCookie(...)` starts a session as a cookie carrying 256 random bits,
+  keeps it in a `SessionStore` keyed by the id's SHA-256, ends one or every one of a subject, and is an
+  `Authenticator`. A session ends after its idle or absolute lifetime, and use slides the idle expiry at most once a
+  minute. `InMemorySessionStore` is the in-process store.
+- **`ResponseCookie` and `setCookie`** (spec 0094): a `Set-Cookie` written from a value with safe defaults, refusing
+  the combinations a browser mishandles, and sent as a header of its own so one response can set several.
+  `pelican-oidc` writes its cookies through it, byte for byte as before. `setRawHeader("Set-Cookie", ...)` now adds a
+  header rather than replacing the last one.
+- **Cross-site requests are refused** (spec 0094): a POST, PUT, PATCH or DELETE whose caller is carried in a cookie
+  is a 403 unless `Origin` or `Sec-Fetch-Site` says it came from this site or an origin CORS lets send credentials.
+  **On by default**, so an `apiKeyCookie` caller already in use gains the check; `api { csrf = false }` turns it off.
+  The 403 is declared and reported to `onRefusal` as `forbidden`.
+
 - **Who may call** (spec 0093): `requires(...)` on an endpoint names what its `authenticatedBy` caller must have:
   `role(name)` from `Identity.groups`, `permission(name)` from the `scope` claim (or `scp`), all of them, with
   `anyOf(...)` for either. A caller missing one is a 403 before any other input or the body is read, and an optional

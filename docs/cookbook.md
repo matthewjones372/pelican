@@ -530,6 +530,51 @@ does. See [What a caller may do](reference.md#what-a-caller-may-do).
 
 ---
 
+## Signing someone in with a session
+
+A cookie for a browser, a session in a store behind it, and the same
+`authenticatedBy` as a token:
+
+```kotlin
+import io.github.matthewjones372.pelican.Identity
+import io.github.matthewjones372.pelican.InMemorySessionStore
+import io.github.matthewjones372.pelican.authenticated
+import io.github.matthewjones372.pelican.responseHeader
+import io.github.matthewjones372.pelican.sessionCookie
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+
+val sessions = sessionCookie("sid", InMemorySessionStore(), idle = 30.minutes, absolute = 12.hours)
+val visitor = authenticated(sessions.scheme) { it.subject }
+
+val signIn = endpoint(login) {
+    post("sign-in")
+    emits(responseHeader<String>("Set-Cookie"))
+    text()
+}
+
+val notes = endpoint(newNote) {
+    post("notes")
+    authenticatedBy(visitor)        // 401 without a live session
+    text()
+}
+
+signIn handledNow { form ->
+    setCookie(sessions.start(Identity(checkPassword(form))))
+    "welcome"
+}
+
+api(routes, codecs = JacksonCodecs) { authenticate(sessions.scheme, by = sessions) }
+```
+
+The store keeps a hash of each session id, not the id. A session left idle
+for 30 minutes, or 12 hours old, is over. `sessions.endAll(subject)` signs
+someone out everywhere. A POST to `/notes` that another site makes the browser
+send is a 403 without any code here, since the check is on by default; see
+[A session in a cookie](reference.md#a-session-in-a-cookie).
+
+---
+
 ## A request safe to send twice
 
 A POST that charges or creates declares a key, and a repeat of it is answered
