@@ -62,6 +62,8 @@ val jettyRoutes: List<ServerEndpoint> = listOf(
 
     leaveTip handledNow { tip -> TipJar.tipped(tip) },
 
+    refundTip handledNow { tip -> Receipt(number = 0, amount = -tip.amount) },
+
     forget handledWith { _ -> },
 
     peek handledWith { _ -> },
