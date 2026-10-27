@@ -336,6 +336,13 @@ pelican {
             packageName.set("example.generated.tipping")
             outputDir.set(layout.projectDirectory.dir("src/test/kotlin"))
         }
+        // Spec 0093: a call that needs a caller, generated into `build/` like `adoption`, since what is under test is
+        // the client being refused with the 401 the document declares.
+        create("whoAmI") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("whoAmISpec")
+            packageName.set("example.generated.whoami")
+        }
     }
     /**
      * The same document, read back the other way.
@@ -393,6 +400,7 @@ sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/or
 
 // Spec 0063's client, generated the same way and for the same reason.
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/adoption"))
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/whoAmI"))
 
 // Generated source compiled here but written by another module's tests. detekt
 // filters by the path *inside* the source root, so this is that path rather
@@ -405,6 +413,7 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     exclude("example/importedtipping/**")
     exclude("example/generated/suspending/**")
     exclude("example/generated/adoption/**")
+    exclude("example/generated/whoami/**")
 }
 
 tasks.named("compileTestKotlin") {
@@ -414,6 +423,7 @@ tasks.named("compileTestKotlin") {
         "generateImportedTippingEndpoints",
         "generateOrdersSuspendingClient",
         "generateAdoptionClient",
+        "generateWhoAmIClient",
     )
 }
 

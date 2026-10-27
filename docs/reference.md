@@ -2772,7 +2772,8 @@ api(routes, codecs = JacksonCodecs) { authenticate(bearer, by = myVerifier) }
 
 - No credential, or one whose `Authenticator` throws `Unauthenticated`, is a 401
   with `WWW-Authenticate`, in the API's refusal envelope, before any other input
-  is decoded and before the handler runs.
+  is decoded and before the handler runs. The 401 is declared on the operation,
+  header and all, unless the endpoint declares a 401 of its own.
 - `caller.optional()` hands over `Caller?`: null for nobody, the caller for
   someone. A credential that fails is still a 401. The document reads it as
   `security: [{}, {bearerAuth: []}]`.

@@ -54,6 +54,9 @@ class CallerInput<T> @PublishedApi internal constructor(
     val required: Boolean,
     internal val build: (Identity) -> T,
 ) : ParamKey<T> {
+    /** The 401 [decode] answers with, declared on every endpoint taking this caller unless it declares a 401 itself. */
+    val refused: ErrorSpec get() = CALLER_REFUSED
+
     /** The value a handler reads, or the 401 that stops it running. */
     fun decode(authenticator: Authenticator, credentials: Credentials): T? {
         val identity = try {
@@ -89,6 +92,18 @@ class CallerInput<T> @PublishedApi internal constructor(
 
     override fun toString() = "caller:${scheme.name}"
 }
+
+private val CALLER_REFUSED = ErrorSpec(
+    401,
+    "No caller, or a credential that did not verify.",
+    type = null,
+    headers = listOf(
+        responseHeader<String>(
+            "WWW-Authenticate",
+            "The scheme to authenticate with, and why the credential was refused where one was sent.",
+        ),
+    ),
+)
 
 /**
  * A caller authenticated under [scheme], handed to the handler as [build]

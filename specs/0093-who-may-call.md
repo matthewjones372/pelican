@@ -52,7 +52,7 @@ published; it could come later behind A.
 
 ## Stack
 
-- [ ] **`spec-0093-refusals`**: the 401 that `authenticatedBy` already raises, declared and in the document.
+- [x] **`spec-0093-refusals`** ([#385](https://github.com/matthewjones372/pelican/pull/385)): the 401 that `authenticatedBy` already raises, declared and in the document.
       Done when: a golden shows the 401 with `WWW-Authenticate`, and the generated client reaches it by status.
 - [ ] **`spec-0093-requires`**: `requires`, `role`, `permission`, `anyOf`; the 403, enforced and declared.
       Done when: the parity suite refuses a caller missing a role on every backend, before the body is read.

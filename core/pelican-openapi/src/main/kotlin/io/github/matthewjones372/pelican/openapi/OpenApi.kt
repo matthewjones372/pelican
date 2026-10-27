@@ -364,12 +364,12 @@ private fun refusalSchema(refusals: RefusalRenderer, components: SchemaComponent
 }
 
 /**
- * The failures this endpoint declares that Pelican answers rather than the handler: an idempotency key's 409 and
- * 422, written in the refusal envelope because that is what the wire carries them in.
+ * The failures this endpoint declares that Pelican answers rather than the handler: its caller's 401, and an
+ * idempotency key's 409 and 422, written in the refusal envelope because that is what the wire carries them in.
  */
 private fun refusedBy(ep: Endpoint<*, *>, refusals: RefusalRenderer): (ErrorSpec) -> RefusalRenderer? {
-    val key = ep.idempotency ?: return { null }
-    return { err -> if (err === key.inFlight || err === key.reused) refusals else null }
+    val answered = listOfNotNull(ep.idempotency?.inFlight, ep.idempotency?.reused, ep.caller?.refused)
+    return { err -> if (answered.any { it === err }) refusals else null }
 }
 
 /**

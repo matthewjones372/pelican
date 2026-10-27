@@ -59,6 +59,7 @@ class OpenApiSpecQualityTest {
         spec("orders", ordersSpec()),
         spec("secured-reports", securedSpec()),
         spec("bookmarks", bookmarksSpec()),
+        spec("who-am-i", whoAmISpec()),
     )
 
     private fun parse(json: String) = OpenAPIV3Parser().readContents(
