@@ -13,6 +13,7 @@ import io.github.matthewjones372.pelican.Refusal
 import io.github.matthewjones372.pelican.RefusalBody
 import io.github.matthewjones372.pelican.RefusalReason
 import io.github.matthewjones372.pelican.RefusalRenderer
+import io.github.matthewjones372.pelican.SignatureRefused
 import io.github.matthewjones372.pelican.Unrouted
 import io.github.matthewjones372.pelican.UnsupportedMediaType
 import io.github.matthewjones372.pelican.unwrapCompletion
@@ -76,6 +77,8 @@ private fun reasonOf(t: Throwable): RefusalReason? = when (t) {
         if (t.refusal.status == UNAUTHENTICATED_STATUS) RefusalReason.UNAUTHENTICATED else RefusalReason.FORBIDDEN
 
     is RateLimitRefused -> RefusalReason.RATE_LIMITED
+
+    is SignatureRefused -> RefusalReason.SIGNATURE
 
     is Unrouted -> RefusalReason.UNMATCHED
 
@@ -144,6 +147,7 @@ fun classifyError(raw: Throwable, api: Api?): ClassifiedError = classify(refusal
 private fun refusalIn(t: Throwable): Throwable = when (t) {
     is CallerRefused -> t.refusal
     is RateLimitRefused -> t.refusal
+    is SignatureRefused -> t.refusal
     else -> t
 }
 

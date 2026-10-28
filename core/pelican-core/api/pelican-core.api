@@ -444,6 +444,7 @@ public final class io/github/matthewjones372/pelican/Endpoint {
 	public final fun getResumable ()Z
 	public final fun getSecurity ()Ljava/util/List;
 	public final fun getServers ()Ljava/util/List;
+	public final fun getSignedBy ()Lio/github/matthewjones372/pelican/HmacScheme;
 	public final fun getSummary ()Ljava/lang/String;
 	public final fun getTags ()Ljava/util/List;
 	public final fun getTenant ()Lio/github/matthewjones372/pelican/TenantInput;
@@ -499,6 +500,7 @@ public final class io/github/matthewjones372/pelican/EndpointBuilder {
 	public final fun setHidden (Z)V
 	public final fun setOperationId (Ljava/lang/String;)V
 	public final fun setSummary (Ljava/lang/String;)V
+	public final fun signedBy (Lio/github/matthewjones372/pelican/HmacScheme;)V
 	public final fun tag ([Ljava/lang/String;)V
 	public final fun tenanted (Lio/github/matthewjones372/pelican/TenantInput;)V
 	public final fun text (I[Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/String;)Lio/github/matthewjones372/pelican/TextOutput;
@@ -618,6 +620,7 @@ public final class io/github/matthewjones372/pelican/HmacScheme {
 	public final fun sign (Ljava/lang/String;[BLjava/time/Instant;Ljava/lang/String;)Ljava/util/List;
 	public static synthetic fun sign$default (Lio/github/matthewjones372/pelican/HmacScheme;Ljava/lang/String;[BLjava/time/Instant;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
 	public fun toString ()Ljava/lang/String;
+	public final fun verify (Lkotlin/jvm/functions/Function1;[B)Lio/github/matthewjones372/pelican/SignatureCheck;
 	public final fun verify (Lkotlin/jvm/functions/Function1;[BLjava/time/Instant;)Lio/github/matthewjones372/pelican/SignatureCheck;
 }
 
@@ -1509,6 +1512,7 @@ public final class io/github/matthewjones372/pelican/RefusalReason : java/lang/E
 	public static final field DECODE Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field FORBIDDEN Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field RATE_LIMITED Lio/github/matthewjones372/pelican/RefusalReason;
+	public static final field SIGNATURE Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field UNAUTHENTICATED Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field UNMATCHED Lio/github/matthewjones372/pelican/RefusalReason;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
@@ -1835,11 +1839,16 @@ public final class io/github/matthewjones372/pelican/SignatureFailure : java/lan
 	public static fun values ()[Lio/github/matthewjones372/pelican/SignatureFailure;
 }
 
+public final class io/github/matthewjones372/pelican/SignatureRefused : java/lang/RuntimeException {
+	public final fun getReason ()Lio/github/matthewjones372/pelican/SignatureFailure;
+	public final fun getRefusal ()Lio/github/matthewjones372/pelican/ApiException;
+}
+
 public final class io/github/matthewjones372/pelican/SignaturesKt {
-	public static final fun standardWebhooks-VtjQ1oo (JLkotlin/jvm/functions/Function0;)Lio/github/matthewjones372/pelican/HmacScheme;
-	public static synthetic fun standardWebhooks-VtjQ1oo$default (JLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/HmacScheme;
-	public static final fun stripeSignature-VtjQ1oo (JLkotlin/jvm/functions/Function0;)Lio/github/matthewjones372/pelican/HmacScheme;
-	public static synthetic fun stripeSignature-VtjQ1oo$default (JLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/HmacScheme;
+	public static final fun standardWebhooks-KLykuaI (JLjava/time/Clock;Lkotlin/jvm/functions/Function0;)Lio/github/matthewjones372/pelican/HmacScheme;
+	public static synthetic fun standardWebhooks-KLykuaI$default (JLjava/time/Clock;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/HmacScheme;
+	public static final fun stripeSignature-KLykuaI (JLjava/time/Clock;Lkotlin/jvm/functions/Function0;)Lio/github/matthewjones372/pelican/HmacScheme;
+	public static synthetic fun stripeSignature-KLykuaI$default (JLjava/time/Clock;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/HmacScheme;
 }
 
 public final class io/github/matthewjones372/pelican/SseOutput : io/github/matthewjones372/pelican/Output {
@@ -2131,6 +2140,7 @@ public final class io/github/matthewjones372/pelican/spi/RenderedError {
 public final class io/github/matthewjones372/pelican/spi/RequestBodyCodecs {
 	public final fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public final fun decode (Ljava/lang/String;[B)Ljava/lang/Object;
+	public final fun decode (Ljava/lang/String;[BLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
 }
 
 public final class io/github/matthewjones372/pelican/spi/RequestPathsKt {
@@ -2156,6 +2166,7 @@ public final class io/github/matthewjones372/pelican/spi/RequestsKt {
 	public static final fun ndjsonFrames (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/Endpoint;Lio/github/matthewjones372/pelican/spi/RequestBodyCodecs;Ljava/lang/String;)Lio/github/matthewjones372/pelican/spi/NdjsonFrames;
 	public static final fun readStrictBody (Ljava/io/InputStream;J)Ljava/lang/String;
 	public static final fun requestBodyCodec (Lio/github/matthewjones372/pelican/Codecs;Lio/github/matthewjones372/pelican/BodyInput;)Lio/github/matthewjones372/pelican/spi/RequestBodyCodecs;
+	public static final fun requestBodyCodec (Lio/github/matthewjones372/pelican/Codecs;Lio/github/matthewjones372/pelican/Endpoint;)Lio/github/matthewjones372/pelican/spi/RequestBodyCodecs;
 	public static final fun responseCodecs (Lio/github/matthewjones372/pelican/Codecs;Lio/github/matthewjones372/pelican/Output;)Ljava/util/Map;
 	public static final fun selectedFor (Lio/github/matthewjones372/pelican/NegotiatedOutput;Ljava/util/List;)Lio/github/matthewjones372/pelican/Output;
 }

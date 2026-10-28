@@ -344,7 +344,7 @@ internal class EndpointCodecs(
 }
 
 private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = EndpointCodecs(
-    body = codecs.requestBodyCodec(bodyInput),
+    body = codecs.requestBodyCodec(this),
     payload = output.payloadType?.let { codecs.codec(it) },
     alternatives = codecs.responseCodecs(output),
 )

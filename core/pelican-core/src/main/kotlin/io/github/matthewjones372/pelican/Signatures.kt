@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican
 
 import java.security.MessageDigest
+import java.time.Clock
 import java.time.Instant
 import java.util.Base64
 import java.util.HexFormat
@@ -41,6 +42,7 @@ class HmacScheme internal constructor(
     private val format: SignatureFormat,
     /** How far the timestamp may be from now, either way, before the request is refused as a replay. */
     val tolerance: Duration,
+    private val clock: Clock,
     private val secrets: () -> List<String>,
 ) {
     /** The headers the signature arrives in, which an endpoint declares and a sender sends. */
@@ -48,6 +50,9 @@ class HmacScheme internal constructor(
 
     /** What the signature is over, in words, for the document. */
     val description: String get() = format.description
+
+    /** Whether [body], sent with [header]s, was signed with one of the secrets within [tolerance] of now. */
+    fun verify(header: (String) -> String?, body: ByteArray): SignatureCheck = verify(header, body, clock.instant())
 
     /** Whether [body], sent with [header]s, was signed with one of the secrets within [tolerance] of [now]. */
     fun verify(header: (String) -> String?, body: ByteArray, now: Instant): SignatureCheck {
@@ -87,15 +92,49 @@ class HmacScheme internal constructor(
  * Stripe's `Stripe-Signature: t=<unix>,v1=<hex>[,v1=...]`, over `t.body`, keyed by the endpoint's signing secret as
  * Stripe shows it. [secrets] are the current ones; during a rotation, name the old one too.
  */
-fun stripeSignature(tolerance: Duration = 5.minutes, secrets: () -> List<String>): HmacScheme =
-    HmacScheme(StripeFormat, tolerance, secrets)
+fun stripeSignature(
+    tolerance: Duration = 5.minutes,
+    clock: Clock = Clock.systemUTC(),
+    secrets: () -> List<String>,
+): HmacScheme = HmacScheme(StripeFormat, tolerance, clock, secrets)
 
 /**
  * The Standard Webhooks headers `webhook-id`, `webhook-timestamp` and `webhook-signature: v1,<base64> ...`, over
  * `id.timestamp.body`, keyed by a `whsec_` secret whose rest is the key in base64.
  */
-fun standardWebhooks(tolerance: Duration = 5.minutes, secrets: () -> List<String>): HmacScheme =
-    HmacScheme(StandardWebhooksFormat, tolerance, secrets)
+fun standardWebhooks(
+    tolerance: Duration = 5.minutes,
+    clock: Clock = Clock.systemUTC(),
+    secrets: () -> List<String>,
+): HmacScheme = HmacScheme(StandardWebhooksFormat, tolerance, clock, secrets)
+
+/**
+ * The 400 a request whose signature does not verify is answered with: one tag for every cause, so a caller learns
+ * nothing of which check it failed. Tagged under the envelope's `error`, so a 400 of the endpoint's own may share it.
+ */
+internal fun signatureRefusal(): ErrorSpec = ErrorSpec(
+    BAD_REQUEST,
+    "The request's signature did not verify.",
+    type = null,
+    tag = SIGNATURE_TAG,
+    discriminator = "error",
+)
+
+/** [scheme]'s check of [bytes] as [header]s present them, thrown as the declared 400 where it fails. */
+internal fun refuseUnsigned(scheme: HmacScheme, header: (String) -> String?, bytes: ByteArray) {
+    val checked = scheme.verify(header, bytes)
+    if (checked is SignatureCheck.Failed) {
+        val refusal = ApiException(BAD_REQUEST, SIGNATURE_TAG, "The request's signature did not verify.")
+        throw SignatureRefused(refusal, checked.reason)
+    }
+}
+
+/** A signature's 400, told apart from a decode's, so `onRefusal` hears it as one; [reason] is never in the body. */
+class SignatureRefused internal constructor(val refusal: ApiException, val reason: SignatureFailure) :
+    RuntimeException(refusal.message, refusal)
+
+private const val BAD_REQUEST = 400
+private const val SIGNATURE_TAG = "signature_invalid"
 
 /** What a scheme read from a request's headers: the timestamp, the event id where the scheme has one, the MACs. */
 internal sealed interface Read {
