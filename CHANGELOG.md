@@ -33,6 +33,16 @@ one.
 
 ### Added
 
+- **Whose request it is** (spec 0095): `tenanted(tenantFrom(resolver))` on an endpoint finds the tenant a request is
+  for, from a header, a subdomain or the caller's claim, checks it against a `TenantDirectory` bound with
+  `tenants(...)`, and hands the handler a `Tenant`. No tenant is a 400, an unknown one a 404, and a caller whose
+  `tenant` claim names another a 403, all declared in the refusal envelope. A header tenant is a required header
+  parameter of the document and the generated client; a subdomain tenant is a `{tenant}` server variable and a
+  `tenant` parameter of the client. `InMemoryTenantDirectory` is the in-process directory.
+- **An idempotency key and a session are each the tenant's own** (spec 0095): `IdempotencyScope` gains `tenant`, and
+  `SessionCookie.start(identity, tenant)` keeps the tenant with the session, which reads as nobody in another.
+  `SessionStore.create` and `StoredSession` gain `tenant`, so a persistent store keeps it.
+
 - **A session in a cookie** (spec 0094): `sessionCookie(...)` starts a session as a cookie carrying 256 random bits,
   keeps it in a `SessionStore` keyed by the id's SHA-256, ends one or every one of a subject, and is an
   `Authenticator`. A session ends after its idle or absolute lifetime, and use slides the idle expiry at most once a
