@@ -44,7 +44,7 @@ api(routes, JacksonCodecs) { rateLimits(InMemoryRateLimitStore()) }
   `Retry-After` in whole seconds, rounded up, and the refusal envelope tag `rate_limited`. `onRefusal` hears it as
   `RefusalReason.RATE_LIMITED`.
 - **Document and client:** the 429 is declared with its `Retry-After` header, and the operation's description says
-  the limit ("100 requests a minute per caller"). The generated client's failure gains `retryAfter: Long`.
+  the limit ("Rate limited per caller to 100 every 1m"). The generated client's `ApiCallFailed` gains `retryAfter`.
 
 ## Why this shape
 
@@ -62,10 +62,12 @@ B, one limit on the whole `Api`, is simpler but cannot tell a cheap read from an
 - [x] **`spec-0096-take`** ([#413](https://github.com/matthewjones372/pelican/pull/413), added): the store takes
       Surefold's shape, `take(key, bucket, cost)`, with a burst.
       Done when: a bucket allows its burst, says what is left, and a denial takes nothing.
-- [ ] **`spec-0096-refusal`**: `RefusalReason.RATE_LIMITED`, and the 429 declared in the refusal envelope.
+- [x] **`spec-0096-refusal`** ([#414](https://github.com/matthewjones372/pelican/pull/414)):
+      `RefusalReason.RATE_LIMITED`, and the 429 declared in the refusal envelope.
       Done when: `onRefusal` hears it, and the endpoint's errors list it, tagged, beside a tagged 429 of its own.
-- [ ] **`spec-0096-document`**: the 429 and its header in the document, the limit in the description, `retryAfter` on
-      the generated client's failure. Done when: a golden pins it and `RetryingClientTest` waits what it names.
+- [ ] **`spec-0096-document`**: the limit in the operation's description, and `retryAfter` on the generated
+      client's `ApiCallFailed`, which is how a 429 the endpoint never typed arrives. Done when: a golden pins the 429,
+      its header and the sentence, and a retrying client waits what `Retry-After` names.
 - [ ] **`spec-0096-parity`**: a limited endpoint in the backends example. Done when: every backend answers alike.
 - [ ] **`spec-0096-docs`**: reference, cookbook, changelog.
 
