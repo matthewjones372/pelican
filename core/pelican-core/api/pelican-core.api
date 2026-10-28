@@ -1436,7 +1436,9 @@ public abstract interface class io/github/matthewjones372/pelican/RateLimitStore
 }
 
 public final class io/github/matthewjones372/pelican/RateLimited {
+	public final fun getKeyed ()Z
 	public final fun getLimit ()Lio/github/matthewjones372/pelican/RateLimit;
+	public final fun getRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -1497,6 +1499,7 @@ public final class io/github/matthewjones372/pelican/RefusalReason : java/lang/E
 	public static final field CONTENT_TYPE Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field DECODE Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field FORBIDDEN Lio/github/matthewjones372/pelican/RefusalReason;
+	public static final field RATE_LIMITED Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field UNAUTHENTICATED Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field UNMATCHED Lio/github/matthewjones372/pelican/RefusalReason;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;

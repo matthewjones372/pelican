@@ -54,6 +54,9 @@ enum class RefusalReason(val label: String) {
 
     /** A caller missing what the endpoint `requires`: the 403. */
     FORBIDDEN("forbidden"),
+
+    /** A request over its endpoint's rate limit: the 429. */
+    RATE_LIMITED("rate_limited"),
 }
 
 /**

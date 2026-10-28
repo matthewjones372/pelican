@@ -336,7 +336,9 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
      */
     fun rateLimited(limit: RateLimit, key: (RateLimitRequest.() -> String?)? = null) {
         require(rateLimited == null) { "This endpoint is already rate limited; a request spends from one budget." }
-        rateLimited = RateLimited(limit, key)
+        val limited = RateLimited(limit, key)
+        rateLimited = limited
+        errors += limited.refused
     }
 
     /**

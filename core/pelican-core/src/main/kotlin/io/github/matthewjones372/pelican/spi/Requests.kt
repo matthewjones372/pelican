@@ -146,6 +146,9 @@ private fun Api.decodeTenant(
 /** The caller's 401 or 403, told apart from the same status thrown by a filter, which the chain already saw. */
 internal class CallerRefused(val refusal: ApiException) : RuntimeException(refusal.message, refusal)
 
+/** A spent budget's 429, told apart from a 429 a handler or filter throws, so `onRefusal` hears it as one. */
+internal class RateLimitRefused(val refusal: ApiException) : RuntimeException(refusal.message, refusal)
+
 /**
  * How a request body is read, once the request says what it is: one entry per
  * media type the endpoint declared. The choosing and the 415 live here so that
