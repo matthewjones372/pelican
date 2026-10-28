@@ -1,4 +1,4 @@
-# 0095 — A session kept elsewhere
+# 0098 — A session kept elsewhere
 
 Builds on 0093 (who may call) and 0094 (a session in a cookie), both on their `spec-0093-*` branches and not
 yet on `main`. It changes 0094's store before `spec-0094-sessions` is built.
@@ -64,16 +64,16 @@ check, not replacing it.
 
 ## Stack
 
-- [ ] **`spec-0095-store`**: `SessionStore` as above, `StartedSession`, `InMemorySessionStore` with an injectable
+- [ ] **`spec-0098-store`**: `SessionStore` as above, `StartedSession`, `InMemorySessionStore` with an injectable
       clock; 0094's `spec-0094-sessions` builds on it. Done when: rotate kills the old token, and end, endAll and
       expiry are tested against a contract suite a store in another repository can run.
-- [ ] **`spec-0095-rotate`**: `sessions.rotate`, `setCookies`, the `__Host-` default; on 0096's repeated `Set-Cookie`.
+- [ ] **`spec-0098-rotate`**: `sessions.rotate`, `setCookies`, the `__Host-` default; on 0101's repeated `Set-Cookie`.
       Done when: on every backend a rotated session answers two `Set-Cookie` headers, and the old cookie is a 401.
-- [ ] **`spec-0095-csrf-token`**: the signed token, `csrfKey`, the `X-CSRF-Token` check and its declared 403.
+- [ ] **`spec-0098-csrf-token`**: the signed token, `csrfKey`, the `X-CSRF-Token` check and its declared 403.
       Done when: the parity suite refuses a cookie POST with no token, or another session's, and passes a bearer POST.
-- [ ] **`spec-0095-document`**: permissions in the requirement array, the CSRF header parameter.
+- [ ] **`spec-0098-document`**: permissions in the requirement array, the CSRF header parameter.
       Done when: a golden pins both and `OpenApiSpecQualityTest` reads it.
-- [ ] **`spec-0095-docs`**: reference, cookbook, changelog; how a Surefold `Sessions` plugs in.
+- [ ] **`spec-0098-docs`**: reference, cookbook, changelog; how a Surefold `Sessions` plugs in.
 
 ## Acceptance
 
