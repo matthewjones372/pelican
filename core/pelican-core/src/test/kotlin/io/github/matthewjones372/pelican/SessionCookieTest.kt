@@ -34,9 +34,9 @@ class SessionCookieTest {
 
         private val inner = InMemorySessionStore(clock)
 
-        override fun create(key: String, identity: Identity, expires: Instant) {
+        override fun create(key: String, identity: Identity, expires: Instant, tenant: String?) {
             keys += key
-            inner.create(key, identity, expires)
+            inner.create(key, identity, expires, tenant)
         }
 
         override fun lookup(key: String) = inner.lookup(key)

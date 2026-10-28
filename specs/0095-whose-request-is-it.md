@@ -56,7 +56,7 @@ check and sign-in page into an exception to remember.
       `this[tenant]`, the 400 and 404. Done when: served in process, each resolver finds its tenant and refuses the rest.
 - [x] **`spec-0095-document`** ([#406](https://github.com/matthewjones372/pelican/pull/406)): the header parameter, the server variable, the generated client's parameter.
       Done when: a golden pins both and the generated client sends the header.
-- [ ] **`spec-0095-scope`**: the caller's tenant claim checked, idempotency keys scoped by tenant.
+- [x] **`spec-0095-scope`** ([#407](https://github.com/matthewjones372/pelican/pull/407)): the caller's tenant claim checked, idempotency keys scoped by tenant.
       Done when: a caller or a key from one tenant is neither let in nor replayed in another.
 - [ ] **`spec-0095-sessions`** (split from scope, past the size cap): sessions scoped by tenant. Done when: a session
       started in one tenant reads as nobody in another.
@@ -78,4 +78,5 @@ Matt took each recommendation on 2026-10-27.
 3. **The caller's tenant claim is checked by default**, with the claim named on `tenants(...)`, since a token for one
    tenant used against another is the bug this exists to stop.
 4. **Idempotency keys and sessions are scoped by tenant**; a session started in one tenant reads as nobody in another,
-   as an ended one does (spec 0094).
+   as an ended one does (spec 0094). A session started in no tenant, as an untenanted sign-in starts one, is read
+   in every tenant; Matt took this recommendation on 2026-10-28.

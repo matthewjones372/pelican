@@ -63,8 +63,15 @@ class TenantInput internal constructor(val resolver: TenantResolver) : ParamKey<
     /** Whether [resolver] reads the caller, so the endpoint must declare one. */
     internal val readsCaller: Boolean get() = resolver is ClaimTenant
 
+    /** The tenant the request names before its caller is known; null for none, or a resolver that reads the caller. */
+    internal fun named(credentials: Credentials): String? =
+        if (readsCaller) null else resolve(credentials, caller = null)
+
+    private fun resolve(credentials: Credentials, caller: Identity?): String? =
+        resolver.resolve(TenantRequest(credentials, caller))?.takeIf { it.isNotBlank() }
+
     internal fun decode(credentials: Credentials, caller: Identity?, directory: TenantDirectory): Tenant {
-        val id = resolver.resolve(TenantRequest(credentials, caller))?.takeIf { it.isNotBlank() }
+        val id = resolve(credentials, caller)
             ?: throw ApiException(BAD_REQUEST, "This endpoint is for one tenant, and the request names none")
         if (!directory.exists(id)) throw ApiException(NOT_FOUND, "No tenant by that name")
         return Tenant(id)
@@ -81,6 +88,9 @@ class TenantInput internal constructor(val resolver: TenantResolver) : ParamKey<
 
 /** A tenant found by [resolver]. */
 fun tenantFrom(resolver: TenantResolver): TenantInput = TenantInput(resolver)
+
+/** A request's credentials with the tenant it names, so a session started in another can read as nobody. */
+internal class TenantNamed(credentials: Credentials, val tenant: String) : Credentials by credentials
 
 /** What an `Api` resolves tenants with, and the caller's claim naming theirs; null where none is checked. */
 class Tenants internal constructor(val input: TenantInput, val directory: TenantDirectory, val claim: String?)
