@@ -100,10 +100,11 @@ its own.
 - [x] **`spec-0102-service`** ([#424](https://github.com/matthewjones372/pelican/pull/424)): `example.payments`
       with its three endpoints, the ledger, merchant keys and `PaymentsTest` on Jetty. Done when: the idempotency,
       auth and signature claims above each pass as a test.
-- [ ] **`spec-0102-client`**: `generatePaymentsClient`, `golden/payments/openapi.json`, and `PaymentsClientTest`, in
-      which a merchant retries through `retrying()` and the processor signs with `signer`. Done when: the golden
-      document is accepted and both sides go through the generated client.
-- [ ] **`spec-0102-docs`**: a "Payments: the three together" section in `docs/a-whole-service.md`, a pointer from
+- [x] **`spec-0102-client`** ([#425](https://github.com/matthewjones372/pelican/pull/425)): `generatePaymentsClient`,
+      `golden/payments/openapi.json`, and `PaymentsClientTest`, in which a merchant retries through `retrying()` and
+      the processor signs with `signer`. Done when: the golden document is accepted and both sides go through the
+      generated client.
+- [x] **`spec-0102-docs`**: a "Payments: the three together" section in `docs/a-whole-service.md`, a pointer from
       the three cookbook entries, and the changelog. Done when: each link resolves to the example's code.
 
 ## Acceptance
