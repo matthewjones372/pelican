@@ -1,8 +1,15 @@
+public final class io/github/matthewjones372/pelican/AnyOf : io/github/matthewjones372/pelican/Requirement {
+	public final fun getOptions ()Ljava/util/List;
+	public fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/matthewjones372/pelican/Api {
 	public final fun getAuthenticators ()Ljava/util/Map;
 	public final fun getCodecs ()Lio/github/matthewjones372/pelican/Codecs;
 	public final fun getCors ()Lio/github/matthewjones372/pelican/Cors;
 	public final fun getCovers ()Ljava/util/List;
+	public final fun getCsrf ()Z
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getEndpoints ()Ljava/util/List;
 	public final fun getExposeInternalErrors ()Z
@@ -13,10 +20,12 @@ public final class io/github/matthewjones372/pelican/Api {
 	public final fun getOnRefusal ()Lio/github/matthewjones372/pelican/RefusalObserver;
 	public final fun getOnServerError ()Lkotlin/jvm/functions/Function3;
 	public final fun getPages ()Lio/github/matthewjones372/pelican/Pages;
+	public final fun getRateLimits ()Lio/github/matthewjones372/pelican/RateLimitStore;
 	public final fun getRefusals ()Lio/github/matthewjones372/pelican/RefusalRenderer;
 	public final fun getSecurity ()Ljava/util/List;
 	public final fun getServers ()Ljava/util/List;
 	public final fun getStrictBodyTimeoutMillis ()J
+	public final fun getTenants ()Lio/github/matthewjones372/pelican/Tenants;
 	public final fun getTitle ()Ljava/lang/String;
 	public final fun getVersion ()Ljava/lang/String;
 	public final fun getWebhooks ()Ljava/util/List;
@@ -28,6 +37,7 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun filter (Lio/github/matthewjones372/pelican/Filter;)V
 	public final fun getCors ()Lio/github/matthewjones372/pelican/Cors;
 	public final fun getCovers ()Ljava/util/List;
+	public final fun getCsrf ()Z
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getExposeInternalErrors ()Z
 	public final fun getMaxBodyBytes ()J
@@ -43,9 +53,11 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public static synthetic fun idempotency-5qebJ5I$default (Lio/github/matthewjones372/pelican/ApiBuilder;Lio/github/matthewjones372/pelican/IdempotencyStore;JJILjava/lang/Object;)V
 	public final fun onError (Lkotlin/jvm/functions/Function3;)V
 	public final fun onRefusal (Lio/github/matthewjones372/pelican/RefusalObserver;)V
+	public final fun rateLimits (Lio/github/matthewjones372/pelican/RateLimitStore;)V
 	public final fun refusals (Lio/github/matthewjones372/pelican/RefusalRenderer;)V
 	public final fun setCors (Lio/github/matthewjones372/pelican/Cors;)V
 	public final fun setCovers (Ljava/util/List;)V
+	public final fun setCsrf (Z)V
 	public final fun setDescription (Ljava/lang/String;)V
 	public final fun setExposeInternalErrors (Z)V
 	public final fun setMaxBodyBytes (J)V
@@ -57,6 +69,8 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun setTitle (Ljava/lang/String;)V
 	public final fun setVersion (Ljava/lang/String;)V
 	public final fun setWebhooks (Ljava/util/List;)V
+	public final fun tenants (Lio/github/matthewjones372/pelican/TenantInput;Lio/github/matthewjones372/pelican/TenantDirectory;Ljava/lang/String;)V
+	public static synthetic fun tenants$default (Lio/github/matthewjones372/pelican/ApiBuilder;Lio/github/matthewjones372/pelican/TenantInput;Lio/github/matthewjones372/pelican/TenantDirectory;Ljava/lang/String;ILjava/lang/Object;)V
 }
 
 public final class io/github/matthewjones372/pelican/ApiBuilderKt {
@@ -195,6 +209,9 @@ public final class io/github/matthewjones372/pelican/ByteStreamOutput : io/githu
 public final class io/github/matthewjones372/pelican/CallerInput : io/github/matthewjones372/pelican/ParamKey {
 	public fun <init> (Lio/github/matthewjones372/pelican/SecurityScheme;ZLkotlin/jvm/functions/Function1;)V
 	public final fun decode (Lio/github/matthewjones372/pelican/Authenticator;Lio/github/matthewjones372/pelican/Credentials;)Ljava/lang/Object;
+	public final fun decode (Lio/github/matthewjones372/pelican/Authenticator;Lio/github/matthewjones372/pelican/Credentials;Lio/github/matthewjones372/pelican/Requires;)Ljava/lang/Object;
+	public final fun getCrossSiteRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
+	public final fun getRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public final fun getRequired ()Z
 	public final fun getScheme ()Lio/github/matthewjones372/pelican/SecurityScheme;
 	public fun toString ()Ljava/lang/String;
@@ -421,12 +438,15 @@ public final class io/github/matthewjones372/pelican/Endpoint {
 	public final fun getOutput ()Lio/github/matthewjones372/pelican/Output;
 	public final fun getPathSpec ()Lio/github/matthewjones372/pelican/PathSpec;
 	public final fun getQueries ()Ljava/util/List;
+	public final fun getRateLimit ()Lio/github/matthewjones372/pelican/RateLimited;
+	public final fun getRequires ()Lio/github/matthewjones372/pelican/Requires;
 	public final fun getResponseHeaders ()Ljava/util/List;
 	public final fun getResumable ()Z
 	public final fun getSecurity ()Ljava/util/List;
 	public final fun getServers ()Ljava/util/List;
 	public final fun getSummary ()Ljava/lang/String;
 	public final fun getTags ()Ljava/util/List;
+	public final fun getTenant ()Lio/github/matthewjones372/pelican/TenantInput;
 	public final fun getWebhookName ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
@@ -468,6 +488,9 @@ public final class io/github/matthewjones372/pelican/EndpointBuilder {
 	public final fun put (Lio/github/matthewjones372/pelican/PathSpec;)V
 	public final fun put (Ljava/lang/String;)V
 	public final fun query ([Lio/github/matthewjones372/pelican/QueryParam;)V
+	public final fun rateLimited (Lio/github/matthewjones372/pelican/RateLimit;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun rateLimited$default (Lio/github/matthewjones372/pelican/EndpointBuilder;Lio/github/matthewjones372/pelican/RateLimit;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun requires (Lio/github/matthewjones372/pelican/Requirement;[Lio/github/matthewjones372/pelican/Requirement;)V
 	public final fun route (Lio/github/matthewjones372/pelican/Method;Lio/github/matthewjones372/pelican/PathSpec;)V
 	public final fun security (Lio/github/matthewjones372/pelican/SecurityScheme;[Ljava/lang/String;)V
 	public final fun servers ([Ljava/lang/String;)V
@@ -477,6 +500,7 @@ public final class io/github/matthewjones372/pelican/EndpointBuilder {
 	public final fun setOperationId (Ljava/lang/String;)V
 	public final fun setSummary (Ljava/lang/String;)V
 	public final fun tag ([Ljava/lang/String;)V
+	public final fun tenanted (Lio/github/matthewjones372/pelican/TenantInput;)V
 	public final fun text (I[Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/String;)Lio/github/matthewjones372/pelican/TextOutput;
 	public static synthetic fun text$default (Lio/github/matthewjones372/pelican/EndpointBuilder;I[Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/TextOutput;
 }
@@ -619,16 +643,19 @@ public final class io/github/matthewjones372/pelican/IdempotencyKt {
 }
 
 public final class io/github/matthewjones372/pelican/IdempotencyScope {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/IdempotencyScope;
-	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/IdempotencyScope;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/IdempotencyScope;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/IdempotencyScope;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/IdempotencyScope;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/IdempotencyScope;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getKey ()Ljava/lang/String;
 	public final fun getOperation ()Ljava/lang/String;
 	public final fun getSubject ()Ljava/lang/String;
+	public final fun getTenant ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -749,6 +776,29 @@ public final class io/github/matthewjones372/pelican/InMemoryIdempotencyStore : 
 	public fun lookup (Lio/github/matthewjones372/pelican/IdempotencyScope;)Lio/github/matthewjones372/pelican/Reservation;
 	public fun release (Lio/github/matthewjones372/pelican/IdempotencyScope;)V
 	public fun reserve (Lio/github/matthewjones372/pelican/IdempotencyScope;Ljava/lang/String;Ljava/time/Duration;)Lio/github/matthewjones372/pelican/Reservation;
+}
+
+public final class io/github/matthewjones372/pelican/InMemoryRateLimitStore : io/github/matthewjones372/pelican/RateLimitStore {
+	public fun <init> ()V
+	public fun <init> (Ljava/time/Clock;)V
+	public synthetic fun <init> (Ljava/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun take (Ljava/lang/String;Lio/github/matthewjones372/pelican/TokenBucket;I)Lio/github/matthewjones372/pelican/Taken;
+}
+
+public final class io/github/matthewjones372/pelican/InMemorySessionStore : io/github/matthewjones372/pelican/SessionStore {
+	public fun <init> ()V
+	public fun <init> (Ljava/time/Clock;)V
+	public synthetic fun <init> (Ljava/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun create (Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/lang/String;)V
+	public fun lookup (Ljava/lang/String;)Lio/github/matthewjones372/pelican/StoredSession;
+	public fun revoke (Ljava/lang/String;)V
+	public fun revokeAll (Ljava/lang/String;)V
+	public fun touch (Ljava/lang/String;Ljava/time/Instant;)V
+}
+
+public final class io/github/matthewjones372/pelican/InMemoryTenantDirectory : io/github/matthewjones372/pelican/TenantDirectory {
+	public fun <init> (Ljava/util/Set;)V
+	public fun exists (Ljava/lang/String;)Z
 }
 
 public final class io/github/matthewjones372/pelican/Inputs {
@@ -1249,6 +1299,7 @@ public final class io/github/matthewjones372/pelican/Params {
 	public final fun requestHeader (Ljava/lang/String;)Ljava/lang/String;
 	public final fun responseHeaders ()Ljava/util/List;
 	public final fun set (Lio/github/matthewjones372/pelican/Attribute;Ljava/lang/Object;)V
+	public final fun setCookie (Lio/github/matthewjones372/pelican/ResponseCookie;)V
 	public final fun setHeader (Lio/github/matthewjones372/pelican/ResponseHeader;Ljava/lang/Object;)V
 	public final fun setRawHeader (Ljava/lang/String;Ljava/lang/String;)V
 }
@@ -1331,6 +1382,12 @@ public final class io/github/matthewjones372/pelican/PayloadTooLarge : java/lang
 	public final fun getLimit ()J
 }
 
+public final class io/github/matthewjones372/pelican/Permission : io/github/matthewjones372/pelican/Requirement {
+	public final fun getName ()Ljava/lang/String;
+	public fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class io/github/matthewjones372/pelican/PlainCodec {
 	public abstract fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun encode (Ljava/lang/Object;)Ljava/lang/String;
@@ -1360,6 +1417,32 @@ public final class io/github/matthewjones372/pelican/QueryParam : io/github/matt
 	public final fun getName ()Ljava/lang/String;
 	public final fun getRequired ()Z
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/RateLimit {
+	public final fun getBucket ()Lio/github/matthewjones372/pelican/TokenBucket;
+	public final fun getName ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/RateLimitRequest {
+	public final fun getCaller ()Lio/github/matthewjones372/pelican/Identity;
+	public final fun getTenant ()Lio/github/matthewjones372/pelican/Tenant;
+	public final fun header (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/RateLimitStore {
+	public abstract fun take (Ljava/lang/String;Lio/github/matthewjones372/pelican/TokenBucket;I)Lio/github/matthewjones372/pelican/Taken;
+}
+
+public final class io/github/matthewjones372/pelican/RateLimited {
+	public final fun getLimit ()Lio/github/matthewjones372/pelican/RateLimit;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/RateLimitsKt {
+	public static final fun rateLimit-exY8QGI (Ljava/lang/String;IJI)Lio/github/matthewjones372/pelican/RateLimit;
+	public static synthetic fun rateLimit-exY8QGI$default (Ljava/lang/String;IJIILjava/lang/Object;)Lio/github/matthewjones372/pelican/RateLimit;
 }
 
 public final class io/github/matthewjones372/pelican/RawBody : io/github/matthewjones372/pelican/BodyInput {
@@ -1413,6 +1496,8 @@ public final class io/github/matthewjones372/pelican/RefusalReason : java/lang/E
 	public static final field BODY_LIMIT Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field CONTENT_TYPE Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field DECODE Lio/github/matthewjones372/pelican/RefusalReason;
+	public static final field FORBIDDEN Lio/github/matthewjones372/pelican/RefusalReason;
+	public static final field UNAUTHENTICATED Lio/github/matthewjones372/pelican/RefusalReason;
 	public static final field UNMATCHED Lio/github/matthewjones372/pelican/RefusalReason;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getLabel ()Ljava/lang/String;
@@ -1425,6 +1510,24 @@ public abstract interface class io/github/matthewjones372/pelican/RefusalRendere
 	public abstract fun getMediaType ()Ljava/lang/String;
 	public abstract fun getSchema ()Lio/github/matthewjones372/pelican/JsonObj;
 	public abstract fun render (Lio/github/matthewjones372/pelican/Refusal;)[B
+}
+
+public abstract interface class io/github/matthewjones372/pelican/Requirement {
+	public abstract fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+}
+
+public final class io/github/matthewjones372/pelican/RequirementsKt {
+	public static final fun anyOf (Lio/github/matthewjones372/pelican/Requirement;Lio/github/matthewjones372/pelican/Requirement;[Lio/github/matthewjones372/pelican/Requirement;)Lio/github/matthewjones372/pelican/Requirement;
+	public static final fun permission (Ljava/lang/String;)Lio/github/matthewjones372/pelican/Requirement;
+	public static final fun role (Ljava/lang/String;)Lio/github/matthewjones372/pelican/Requirement;
+}
+
+public final class io/github/matthewjones372/pelican/Requires {
+	public final fun getAll ()Ljava/util/List;
+	public final fun getPermissions ()Ljava/util/List;
+	public final fun getRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
+	public final fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/Reservation {
@@ -1455,6 +1558,27 @@ public final class io/github/matthewjones372/pelican/Reservation$Reserved : io/g
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/ResponseCookie {
+	public static final field Companion Lio/github/matthewjones372/pelican/ResponseCookie$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;Ljava/lang/String;ZZLio/github/matthewjones372/pelican/SameSite;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;Ljava/lang/String;ZZLio/github/matthewjones372/pelican/SameSite;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDomain ()Ljava/lang/String;
+	public final fun getHeaderValue ()Ljava/lang/String;
+	public final fun getHttpOnly ()Z
+	public final fun getMaxAge-FghU774 ()Lkotlin/time/Duration;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getSameSite ()Lio/github/matthewjones372/pelican/SameSite;
+	public final fun getSecure ()Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/ResponseCookie$Companion {
+	public final fun expired (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/ResponseCookie;
+	public static synthetic fun expired$default (Lio/github/matthewjones372/pelican/ResponseCookie$Companion;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/ResponseCookie;
 }
 
 public final class io/github/matthewjones372/pelican/ResponseHeader {
@@ -1545,6 +1669,22 @@ public final class io/github/matthewjones372/pelican/RetryingTransport : io/gith
 	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
 }
 
+public final class io/github/matthewjones372/pelican/Role : io/github/matthewjones372/pelican/Requirement {
+	public final fun getName ()Ljava/lang/String;
+	public fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/SameSite : java/lang/Enum {
+	public static final field LAX Lio/github/matthewjones372/pelican/SameSite;
+	public static final field NONE Lio/github/matthewjones372/pelican/SameSite;
+	public static final field STRICT Lio/github/matthewjones372/pelican/SameSite;
+	public final fun getAttribute ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/SameSite;
+	public static fun values ()[Lio/github/matthewjones372/pelican/SameSite;
+}
+
 public abstract interface class io/github/matthewjones372/pelican/SchemaComponents {
 	public abstract fun isRegistered (Ljava/lang/String;)Z
 	public abstract fun ref (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonObj;
@@ -1625,6 +1765,33 @@ public final class io/github/matthewjones372/pelican/ServerEndpoint {
 	public final fun nonBlocking ()Lio/github/matthewjones372/pelican/ServerEndpoint;
 }
 
+public final class io/github/matthewjones372/pelican/SessionCookie : io/github/matthewjones372/pelican/Authenticator {
+	public fun authenticate (Lio/github/matthewjones372/pelican/Credentials;)Lio/github/matthewjones372/pelican/Identity;
+	public final fun end (Lio/github/matthewjones372/pelican/Credentials;)Lio/github/matthewjones372/pelican/ResponseCookie;
+	public final fun endAll (Ljava/lang/String;)V
+	public final fun getAbsolute-UwyO8pc ()J
+	public final fun getIdle-UwyO8pc ()J
+	public final fun getName ()Ljava/lang/String;
+	public final fun getScheme ()Lio/github/matthewjones372/pelican/ApiKeyScheme;
+	public final fun start (Lio/github/matthewjones372/pelican/Identity;Lio/github/matthewjones372/pelican/Tenant;)Lio/github/matthewjones372/pelican/ResponseCookie;
+	public static synthetic fun start$default (Lio/github/matthewjones372/pelican/SessionCookie;Lio/github/matthewjones372/pelican/Identity;Lio/github/matthewjones372/pelican/Tenant;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/ResponseCookie;
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/SessionStore {
+	public abstract fun create (Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/lang/String;)V
+	public static synthetic fun create$default (Lio/github/matthewjones372/pelican/SessionStore;Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/lang/String;ILjava/lang/Object;)V
+	public abstract fun lookup (Ljava/lang/String;)Lio/github/matthewjones372/pelican/StoredSession;
+	public abstract fun revoke (Ljava/lang/String;)V
+	public abstract fun revokeAll (Ljava/lang/String;)V
+	public abstract fun touch (Ljava/lang/String;Ljava/time/Instant;)V
+}
+
+public final class io/github/matthewjones372/pelican/SessionsKt {
+	public static final fun sessionCookie-ck1zr5g (Ljava/lang/String;Lio/github/matthewjones372/pelican/SessionStore;JJLjava/time/Clock;)Lio/github/matthewjones372/pelican/SessionCookie;
+	public static synthetic fun sessionCookie-ck1zr5g$default (Ljava/lang/String;Lio/github/matthewjones372/pelican/SessionStore;JJLjava/time/Clock;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/SessionCookie;
+}
+
 public final class io/github/matthewjones372/pelican/SseOutput : io/github/matthewjones372/pelican/Output {
 	public static final field Companion Lio/github/matthewjones372/pelican/SseOutput$Companion;
 	public static final field KEEP_ALIVE_FRAME Ljava/lang/String;
@@ -1656,6 +1823,15 @@ public final class io/github/matthewjones372/pelican/StoredResponse {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/StoredSession {
+	public fun <init> (Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/time/Instant;Ljava/lang/String;)V
+	public synthetic fun <init> (Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/time/Instant;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCreated ()Ljava/time/Instant;
+	public final fun getExpires ()Ljava/time/Instant;
+	public final fun getIdentity ()Lio/github/matthewjones372/pelican/Identity;
+	public final fun getTenant ()Ljava/lang/String;
+}
+
 public abstract interface class io/github/matthewjones372/pelican/StreamIn {
 }
 
@@ -1667,6 +1843,82 @@ public final class io/github/matthewjones372/pelican/StringCodec : io/github/mat
 	public synthetic fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public fun decode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 	public fun getOpenApiType ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/Taken {
+}
+
+public final class io/github/matthewjones372/pelican/Taken$Allowed : io/github/matthewjones372/pelican/Taken {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lio/github/matthewjones372/pelican/Taken$Allowed;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/Taken$Allowed;IILjava/lang/Object;)Lio/github/matthewjones372/pelican/Taken$Allowed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRemaining ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/Taken$Denied : io/github/matthewjones372/pelican/Taken {
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun copy-LRDsOJo (J)Lio/github/matthewjones372/pelican/Taken$Denied;
+	public static synthetic fun copy-LRDsOJo$default (Lio/github/matthewjones372/pelican/Taken$Denied;JILjava/lang/Object;)Lio/github/matthewjones372/pelican/Taken$Denied;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRetryAfter-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/Tenant {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lio/github/matthewjones372/pelican/Tenant;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/Tenant;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/Tenant;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/TenantDirectory {
+	public abstract fun exists (Ljava/lang/String;)Z
+}
+
+public final class io/github/matthewjones372/pelican/TenantInput : io/github/matthewjones372/pelican/ParamKey {
+	public final fun getForeign ()Lio/github/matthewjones372/pelican/ErrorSpec;
+	public final fun getHeaderName ()Ljava/lang/String;
+	public final fun getMissing ()Lio/github/matthewjones372/pelican/ErrorSpec;
+	public final fun getResolver ()Lio/github/matthewjones372/pelican/TenantResolver;
+	public final fun getSubdomainOf ()Ljava/lang/String;
+	public final fun getUnknown ()Lio/github/matthewjones372/pelican/ErrorSpec;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/TenantRequest {
+	public final fun getCaller ()Lio/github/matthewjones372/pelican/Identity;
+	public final fun header (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/TenantResolver {
+	public static final field Companion Lio/github/matthewjones372/pelican/TenantResolver$Companion;
+	public abstract fun resolve (Lio/github/matthewjones372/pelican/TenantRequest;)Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/TenantResolver$Companion {
+	public final fun claim (Ljava/lang/String;)Lio/github/matthewjones372/pelican/TenantResolver;
+	public final fun header (Ljava/lang/String;)Lio/github/matthewjones372/pelican/TenantResolver;
+	public final fun subdomain (Ljava/lang/String;)Lio/github/matthewjones372/pelican/TenantResolver;
+}
+
+public final class io/github/matthewjones372/pelican/Tenants {
+	public final fun getClaim ()Ljava/lang/String;
+	public final fun getDirectory ()Lio/github/matthewjones372/pelican/TenantDirectory;
+	public final fun getInput ()Lio/github/matthewjones372/pelican/TenantInput;
+}
+
+public final class io/github/matthewjones372/pelican/TenantsKt {
+	public static final fun tenantFrom (Lio/github/matthewjones372/pelican/TenantResolver;)Lio/github/matthewjones372/pelican/TenantInput;
 }
 
 public final class io/github/matthewjones372/pelican/TextOutput : io/github/matthewjones372/pelican/Output {
@@ -1686,6 +1938,16 @@ public final class io/github/matthewjones372/pelican/TextPart : io/github/matthe
 	public fun getDescription ()Ljava/lang/String;
 	public fun getName ()Ljava/lang/String;
 	public final fun getRequired ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/TokenBucket {
+	public synthetic fun <init> (IJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (IJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBurst ()I
+	public final fun getInterval-UwyO8pc ()J
+	public final fun getPer-UwyO8pc ()J
+	public final fun getPermits ()I
 	public fun toString ()Ljava/lang/String;
 }
 

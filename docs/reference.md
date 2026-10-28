@@ -13,7 +13,7 @@ Contents:
 - **Modules and backends:** [Modules](#modules), [The backend](#the-backend) (including [On Jetty](#on-jetty) and [On Gannet](#on-gannet)), [Choosing a JSON library](#choosing-a-json-library)
 - **Defining endpoints and inputs:** [Everything is a value](#everything-is-a-value), [Typechecked endpoints](#typechecked-endpoints), [Refined inputs](#refined-inputs), [More than one value](#more-than-one-value), [Cookies](#cookies), [Form bodies](#form-bodies), [Multipart uploads](#multipart-uploads)
 - **Responses and errors:** [Response headers](#response-headers), [Declared failures](#declared-failures), [More than one successful response](#more-than-one-successful-response), [One response, several renderings](#one-response-several-renderings), [Streaming](#a-whole-list-or-a-stream-of-one) (and the sections after it, through [Streaming behaviour](#streaming-behaviour)), [Errors](#errors-and-what-a-caller-is-told), [Limits and startup checks](#limits-and-startup-checks)
-- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
+- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Who may call](#what-a-caller-may-do), [Sessions](#a-session-in-a-cookie), [Tenants](#whose-request-it-is), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
 - **Documents and other readings:** [OpenAPI docs](#getting-the-openapi-docs), [Standalone JSON Schema](#a-schema-that-resolves-on-its-own) ([schemas.md](schemas.md)), [MCP tools](#tools-a-model-can-call) ([mcp.md](mcp.md)), [Webhooks](#webhooks-the-calls-the-service-sends)
 - **Generating code:** [The Gradle plugin](#the-gradle-plugin), [Client transports](#the-transport-a-generated-client-sends-with) ([generated-client.md](generated-client.md)), [Importing a document](#importing-an-openapi-document) ([importing.md](importing.md))
 - **Testing:** [Testing](#testing) ([golden-testing.md](golden-testing.md))
@@ -2772,7 +2772,8 @@ api(routes, codecs = JacksonCodecs) { authenticate(bearer, by = myVerifier) }
 
 - No credential, or one whose `Authenticator` throws `Unauthenticated`, is a 401
   with `WWW-Authenticate`, in the API's refusal envelope, before any other input
-  is decoded and before the handler runs.
+  is decoded and before the handler runs. The 401 is declared on the operation,
+  header and all, unless the endpoint declares a 401 of its own.
 - `caller.optional()` hands over `Caller?`: null for nobody, the caller for
   someone. A credential that fails is still a 401. The document reads it as
   `security: [{}, {bearerAuth: []}]`.
@@ -2780,6 +2781,115 @@ api(routes, codecs = JacksonCodecs) { authenticate(bearer, by = myVerifier) }
   no client has a value to put in that slot. Listing it there is refused.
 - An endpoint whose scheme nothing verifies fails when the `Api` is built.
 - `Identity.actor` is who is really there when the subject is someone they act as.
+- The 401 is answered before the filter chain, so no filter sees it.
+  `onRefusal` hears it as `RefusalReason.UNAUTHENTICATED`.
+
+### What a caller may do
+
+`requires(...)` names what the caller must have, beside the `authenticatedBy` it
+qualifies:
+
+```kotlin
+val refund = endpoint(orderId) {
+    post("orders" / orderId / "refund")
+    authenticatedBy(caller)
+    requires(role("support"), permission("orders:refund"))   // all of them
+    json<Refund>()
+}
+
+val audit = endpoint {
+    get("audit")
+    authenticatedBy(caller)
+    requires(anyOf(role("admin"), permission("orders:audit"))) // either
+    json<AuditLog>()
+}
+```
+
+- `role(name)` matches `Identity.groups`. `permission(name)` matches a word of
+  the credential's `scope` claim, or, where it has none, an entry of `scp`, as
+  RFC 9068 and most providers write them. A provider that puts them elsewhere
+  maps them in its `Authenticator`.
+- `requires(a, b)` means all of them, and `anyOf(a, b)` is one requirement met
+  by either. Say it in one `requires`: a second is refused, as is a `requires`
+  on an endpoint with no `authenticatedBy`.
+- A caller missing one is a 403 naming what it needs, after the caller is known
+  and before any other input or the body is read, so a forbidden caller learns
+  nothing else about the endpoint. An optional caller who is absent is a 401:
+  there is nobody to forbid. `onRefusal` hears the 403 as
+  `RefusalReason.FORBIDDEN`.
+- The 403 is declared in the refusal envelope unless the endpoint declares a
+  403 of its own. A permission every caller needs is a scope on the security
+  requirement where the scheme declares that scope. Everything else, roles and
+  "all of" among them, has no OpenAPI field, so the operation's description
+  ends with it: "Requires role `support` and permission `orders:refund`."
+- What depends on the resource (does this caller own order 7?) stays in the
+  handler, which has `forbidden(...)` for it.
+
+**No credential reaches what Pelican writes.** `RedactionAcrossBackendsTest`
+sends a bearer token, an API key and a session cookie to every backend on a
+200, 400, 401, 403, 404 and 500, with OpenTelemetry and an access log wired in,
+and finds none of them in a body, a header, a span or a log line. What an
+`Authenticator` puts in `Unauthenticated` goes to the caller, so name no key or
+token there.
+
+### A session in a cookie
+
+A browser calls with a cookie rather than a token. `sessionCookie(...)` keeps
+sessions in a store, hands out the cookie that names one, and reads it back as
+an `Authenticator`, so `authenticatedBy` and `requires` work on it unchanged:
+
+```kotlin
+val sessions = sessionCookie(name = "sid", store = InMemorySessionStore(), idle = 30.minutes, absolute = 12.hours)
+val visitor = authenticated(sessions.scheme) { id -> Visitor(id.subject) }
+
+val signIn = endpoint(credentials) {
+    post("sign-in")
+    emits(responseHeader<String>("Set-Cookie"))
+    text()
+}
+
+signIn handledNow { login ->
+    val who = passwords.check(login) ?: unauthorized()      // how a person proves who they are is the service's
+    setCookie(sessions.start(Identity(who)))                // HttpOnly; Secure; SameSite=Lax; Path=/
+    "welcome"
+}
+
+api(routes, codecs = JacksonCodecs) { authenticate(sessions.scheme, by = sessions) }
+```
+
+- **The id** is 256 random bits. The store is keyed by its SHA-256, never the
+  id, so a store that leaks is not a set of live sessions. `SessionStore` is an
+  interface (`create`, `lookup`, `touch`, `revoke`, `revokeAll`);
+  `InMemorySessionStore` is for tests and a single instance, and a persistent
+  one is the service's.
+- **Expiry**: a session ends after `idle` without use or `absolute` after it
+  began, whichever is first. Use slides the idle expiry, writing to the store at
+  most once a minute.
+- **Ending one**: `sessions.end(credentials)` revokes the session the request
+  carries and returns the cookie that clears it; `sessions.endAll(subject)`
+  signs someone out everywhere.
+- **A cookie for a session that has ended reads as nobody**, not as a refusal: a
+  browser keeps sending it. A required caller is still a 401; an optional one is
+  anonymous.
+- **The document** names it as an `apiKey` in the cookie.
+
+**`ResponseCookie`** is any `Set-Cookie` written from a value, with the same safe
+defaults. It refuses `SameSite=None` without `Secure`, a `__Host-` cookie with a
+`Domain` or another path, a `__Host-` or `__Secure-` cookie without `Secure`,
+and a name or value a header cannot carry. `setCookie(...)` sends each as a
+header of its own, so one response can set several; the endpoint declares
+`Set-Cookie` with `emits(...)` like any header. `ResponseCookie.expired(name)`
+clears one. `pelican-oidc`'s cookies are written this way too.
+
+**Cross-site requests.** A browser attaches a cookie to a request another site
+makes it send. So a POST, PUT, PATCH or DELETE whose caller is carried in a
+cookie is refused with 403 unless its `Origin` is this host or one the CORS
+policy lets send credentials, or, with no `Origin`, its `Sec-Fetch-Site` is
+`same-origin` or `none`. A request with neither header is not from a browser and
+goes through. A bearer token or a header API key is never checked, since no
+browser attaches those by itself. The check is on by default; `api { csrf =
+false }` turns it off. The 403 is declared on the endpoints it guards, and
+`onRefusal` hears it as `RefusalReason.FORBIDDEN`.
 
 **Verifying a provider's tokens** is `pelican-oidc`:
 
@@ -2884,6 +2994,57 @@ provider with scopes side by side, the redirect URL printed at start-up, and
 rejects a caller who cannot meet them: is
 `example/src/main/kotlin/example/secured/SecuredReports.kt`
 (`./gradlew :example:runSecured`). See [Filters](#filters) for the shape of it.
+
+## Whose request it is
+
+A service for many tenants finds out which one a request is for once, ahead of
+the body, and hands it to the handler typed
+([spec 0095](../specs/0095-whose-request-is-it.md)):
+
+```kotlin
+val shop = tenantFrom(TenantResolver.header("X-Shop"))     // or subdomain(of = "example.com"), or claim("tenant")
+
+val listOrders = endpoint {
+    get("orders")
+    authenticatedBy(caller)
+    tenanted(shop)
+    jsonArray<Order>()
+}
+
+listOrders handledNow { orders.of(this[shop].id) }          // a Tenant, never a raw string
+
+api(routes, codecs = JacksonCodecs) {
+    tenants(shop, directory = InMemoryTenantDirectory(setOf("acme", "globex")))
+}
+```
+
+- **Where it is found**: `TenantResolver.header(name)`, `subdomain(of)` (the one
+  label in front of the domain, so `acme.example.com` is `acme` and
+  `a.b.example.com` is none), or `claim(name)` on the caller, which needs the
+  endpoint to name one. A `TenantResolver` of your own is a function from the
+  request's headers and caller to an id. One is bound per `Api`; endpoints opt in
+  with `tenanted(...)`, so a health check or sign-in page is not tenanted.
+- **Whether it exists** is the `TenantDirectory`'s to say. `InMemoryTenantDirectory`
+  is for tests; a persistent one is the service's.
+- **Refusals**, after the caller and before any other input: no tenant is a 400,
+  one the directory does not know a 404, and a caller whose `tenant` claim names
+  another tenant a 403. A caller with no such claim is not checked; name another
+  claim with `tenants(..., claim = "org")`, or none with `claim = null`. All three
+  are declared in the refusal envelope, and `onRefusal` hears the 403 as
+  `RefusalReason.FORBIDDEN`.
+- **What keys on a caller keys on the tenant too.** An idempotency key replays
+  only in the tenant it was sent in; `IdempotencyScope` carries `tenant`. A
+  session started with `sessions.start(identity, tenant)` reads as nobody in
+  another tenant. One started in none, as an untenanted sign-in starts one, is
+  read in every tenant.
+- **The document and the client**: a header resolver is a required header
+  parameter, and a parameter of the generated client. A subdomain resolver is the
+  operation's server, `https://{tenant}.example.com`, and the generated client
+  takes `tenant: String` and calls that host. A claim resolver adds nothing a
+  caller sends.
+
+Which rows a tenant may read is still the service's query. Pelican says whose
+request it is, not what they may see.
 
 ## A request sent twice, answered once
 
@@ -3114,9 +3275,10 @@ read for a filter that is genuinely optional.
 
 ### Enforcing what the document already says
 
-`authenticatedBy` checks that a credential verifies; it does not check the
-scopes `security(...)` names. A filter can, because the requirement is a value
-on the endpoint:
+`authenticatedBy` with `requires(permission(...))` is the way to check a scope
+(see [What a caller may do](#what-a-caller-may-do)). Where an endpoint takes
+several schemes at once, which one caller under one scheme cannot say, a filter
+can read the requirement back off the endpoint instead:
 
 ```kotlin
 fun enforceDeclaredSecurity(apiWideDefault: List<SecurityRequirement>) = before { p ->
@@ -3133,8 +3295,9 @@ fun enforceDeclaredSecurity(apiWideDefault: List<SecurityRequirement>) = before 
 
 A list of requirements means *any one will do*, which is how OpenAPI reads it
 and therefore how it has to be read here. `example/secured/SecuredReports.kt` is
-this, complete and tested, with an operator basic-auth login and an external
-OAuth provider side by side.
+this, complete and tested, for the endpoint taking an operator basic-auth login
+or an external OAuth provider's token, beside endpoints that declare one caller
+with `authenticatedBy` and `requires`.
 
 ## Metrics
 
@@ -3222,7 +3385,7 @@ no existing dashboard changes meaning. Its tags:
 
 | Tag | Where it comes from |
 |---|---|
-| `reason` | `unmatched`, `decode`, `body_limit`, `content_type`, `accept` |
+| `reason` | `unmatched`, `decode`, `body_limit`, `content_type`, `accept`, `unauthenticated`, `forbidden` |
 | `status` | the status the caller was sent |
 | `path` | the refusing route's template, or `_unmatched` where nothing matched |
 
@@ -6423,10 +6586,11 @@ and it will not write 3.0. The reasoning, and what to do if your tooling
 - **Per-endpoint CORS, and the newer preflight extensions.** The policy is one
   value on the `Api`; `Access-Control-Allow-Private-Network` and friends are not
   emitted.
-- **Scope checks.** `authenticatedBy` and `pelican-oidc` verify who is calling
-  (see [Who is calling](#who-is-calling)); nothing checks the scopes
-  `security(...)` names. `example/secured/SecuredReports.kt` is a filter that
-  reads `endpoint.security` and enforces it with no second list.
+- **A caller under several schemes.** `authenticatedBy` takes one caller under
+  one scheme, so "an admin token or an operator login" is not one declaration.
+  `example/secured/SecuredReports.kt` is a filter that reads `endpoint.security`
+  and enforces that, with no second list. One scheme is
+  [`requires`](#what-a-caller-may-do).
 - **Two shapes where `pelican-jackson` and `pelican-kotlinx` describe a type
   differently.** Neither is about nullability:
   - **`Set<T>`.** swagger-core knows it is a set and emits `uniqueItems: true`;

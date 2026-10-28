@@ -33,6 +33,55 @@ one.
 
 ### Added
 
+- **Whose request it is** (spec 0095): `tenanted(tenantFrom(resolver))` on an endpoint finds the tenant a request is
+  for, from a header, a subdomain or the caller's claim, checks it against a `TenantDirectory` bound with
+  `tenants(...)`, and hands the handler a `Tenant`. No tenant is a 400, an unknown one a 404, and a caller whose
+  `tenant` claim names another a 403, all declared in the refusal envelope. A header tenant is a required header
+  parameter of the document and the generated client; a subdomain tenant is a `{tenant}` server variable and a
+  `tenant` parameter of the client. `InMemoryTenantDirectory` is the in-process directory.
+- **An idempotency key and a session are each the tenant's own** (spec 0095): `IdempotencyScope` gains `tenant`, and
+  `SessionCookie.start(identity, tenant)` keeps the tenant with the session, which reads as nobody in another.
+  `SessionStore.create` and `StoredSession` gain `tenant`, so a persistent store keeps it.
+
+- **A session in a cookie** (spec 0094): `sessionCookie(...)` starts a session as a cookie carrying 256 random bits,
+  keeps it in a `SessionStore` keyed by the id's SHA-256, ends one or every one of a subject, and is an
+  `Authenticator`. A session ends after its idle or absolute lifetime, and use slides the idle expiry at most once a
+  minute. `InMemorySessionStore` is the in-process store.
+- **`ResponseCookie` and `setCookie`** (spec 0094): a `Set-Cookie` written from a value with safe defaults, refusing
+  the combinations a browser mishandles, and sent as a header of its own so one response can set several.
+  `pelican-oidc` writes its cookies through it, byte for byte as before. `setRawHeader("Set-Cookie", ...)` now adds a
+  header rather than replacing the last one.
+- **Cross-site requests are refused** (spec 0094): a POST, PUT, PATCH or DELETE whose caller is carried in a cookie
+  is a 403 unless `Origin` or `Sec-Fetch-Site` says it came from this site or an origin CORS lets send credentials.
+  **On by default**, so an `apiKeyCookie` caller already in use gains the check; `api { csrf = false }` turns it off.
+  The 403 is declared and reported to `onRefusal` as `forbidden`.
+
+- **Who may call** (spec 0093): `requires(...)` on an endpoint names what its `authenticatedBy` caller must have:
+  `role(name)` from `Identity.groups`, `permission(name)` from the `scope` claim (or `scp`), all of them, with
+  `anyOf(...)` for either. A caller missing one is a 403 before any other input or the body is read, and an optional
+  caller who is absent is a 401. The 403 is declared in the refusal envelope, a permission the scheme declares is a
+  scope on the requirement, and the operation's description says the rest.
+- **The caller's 401 is declared** (spec 0093): `authenticatedBy` lists the 401 it answers with, `WWW-Authenticate`
+  and all, in the refusal envelope, unless the endpoint declares a 401 of its own. **Every document with a caller in
+  it gains that response**, a compatible change to what a client reads.
+- **No credential in a span, a log line or a refusal body** (spec 0093): `RedactionAcrossBackendsTest` holds it on
+  Pekko, Jetty and Gannet with OpenTelemetry and an access log wired in.
+- **The caller's 401 and 403 are observed refusals** (spec 0093): `RefusalReason` gains `UNAUTHENTICATED` and
+  `FORBIDDEN`, and the 401 `authenticatedBy` answers with and the 403 `requires` answers with are reported to
+  `onRefusal` under them, so `refusalCounter` counts them as `http.server.refusals{reason="unauthenticated"}` and
+  `reason="forbidden"`. They are answered before the filter chain, so until now no filter, access log, span or
+  counter heard of them. A 401 or 403 a filter throws is still not a refusal here, as before.
+  **A `when` over `RefusalReason` with no `else`** stops compiling until it names the two, and one already compiled
+  throws `NoWhenBranchMatchedException` when either arrives, so give such an observer an `else`.
+
+- **Idempotency keys on the calling side** (spec 0092): a generated client's
+  keyed method takes `idempotencyKey: String = IdempotencyKey.random()`, set
+  in the request once so a `RetryingTransport` resends the same key.
+  `RetryPolicy` now retries a request carrying an `Idempotency-Key` whatever
+  its method. `pelican-test`'s client sends a fresh key per request to a keyed
+  endpoint, and `pelican-import` reads the header and Pelican's 409 and 422
+  back as `idempotencyKey()`.
+
 - **`pelican-gannet`** (spec 0088): an `Api` served on
   [Gannet](https://github.com/matthewjones372/gannet), an HTTP/1.1 server on
   io_uring, one carrier thread and ring per core, each connection a fiber on

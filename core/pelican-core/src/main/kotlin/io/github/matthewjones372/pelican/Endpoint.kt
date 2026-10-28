@@ -106,6 +106,15 @@ class Endpoint<I, R> internal constructor(
 
     /** The idempotency key a repeat of this request is answered by; null where repeats run again. */
     val idempotency: IdempotencyKey? = null,
+
+    /** What [caller] must have to be let in; null where being the caller is enough. */
+    val requires: Requires? = null,
+
+    /** Which tenant the request is for; null for an endpoint that serves no one tenant. */
+    val tenant: TenantInput? = null,
+
+    /** The budget each request here spends from; null for an endpoint called as often as callers like. */
+    val rateLimit: RateLimited? = null,
 ) {
     /**
      * Whether a request here can carry a resume point. Only an event stream is
@@ -154,6 +163,9 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     internal var securityRequirements: List<SecurityRequirement>? = null
     internal var callerInput: CallerInput<*>? = null
     internal var idempotencyKey: IdempotencyKey? = null
+    internal var requirements: Requires? = null
+    internal var tenantInput: TenantInput? = null
+    internal var rateLimited: RateLimited? = null
 
     init {
         // Inputs listed on endpoint(...) register themselves, so each is
@@ -191,6 +203,12 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
                 is CallerInput<*> -> throw IllegalArgumentException(
                     "$key is who is calling, not a value a client sends, so it is not listed on endpoint(...). " +
                         "Declare it inside the block with authenticatedBy($key) and read it as this[$key].",
+                )
+
+                // Found by the Api's resolver, so the same: declared inside, not listed as an input.
+                is TenantInput -> throw IllegalArgumentException(
+                    "The tenant is found by the Api's resolver, not listed on endpoint(...). " +
+                        "Declare it inside the block with tenanted(...) and read it as this[tenant].",
                 )
             }
         }
@@ -290,6 +308,35 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun authenticatedBy(caller: CallerInput<*>) {
         require(callerInput == null) { "This endpoint already declares $callerInput; a request has one caller." }
         callerInput = caller
+    }
+
+    /**
+     * Refuses a caller who lacks any of [requirements] with 403, after the caller is known and before any other
+     * input is decoded. `anyOf(...)` is one requirement met by either.
+     */
+    fun requires(first: Requirement, vararg more: Requirement) {
+        require(requirements == null) { "This endpoint already requires $requirements; say it in one requires(...)." }
+        requirements = Requires(listOf(first) + more)
+    }
+
+    /**
+     * Resolves which tenant the request is for, after its caller and before any other input: no tenant is a 400 and
+     * one the directory lacks a 404. The handler reads it as `this[tenant]`.
+     */
+    fun tenanted(tenant: TenantInput) {
+        require(tenantInput == null) { "This endpoint is already tenanted; a request is for one tenant." }
+        tenantInput = tenant
+        tenant.header?.let { headerParams += it }
+    }
+
+    /**
+     * Spends a permit from [limit] per request, after the caller and tenant are known and before any other input:
+     * a request over it is a 429 naming when to come back. The budget is the caller's and tenant's own; [key] adds a
+     * key of the endpoint's own, which an endpoint with neither must name.
+     */
+    fun rateLimited(limit: RateLimit, key: (RateLimitRequest.() -> String?)? = null) {
+        require(rateLimited == null) { "This endpoint is already rate limited; a request spends from one budget." }
+        rateLimited = RateLimited(limit, key)
     }
 
     /**
@@ -569,7 +616,7 @@ private fun <I, R> build(
         cookieParams = b.cookieParams.toList(),
         bodyInput = b.bodyInput,
         output = out,
-        errors = b.errors.toList(),
+        errors = errorsOf(b),
         responseHeaders = b.responseHeaders.toList(),
         summary = b.summary,
         description = b.description,
@@ -582,7 +629,31 @@ private fun <I, R> build(
         webhookName = webhookName,
         caller = b.callerInput,
         idempotency = b.idempotencyKey,
+        requires = b.requirements,
+        tenant = b.tenantInput,
+        rateLimit = b.rateLimited,
     ).also(::validate)
+}
+
+/** What the endpoint declares, with the 401 and 403s Pelican answers for it where it declares none itself. */
+private fun errorsOf(b: EndpointBuilder): List<ErrorSpec> {
+    val requires = b.requirements
+    require(requires == null || b.callerInput != null) {
+        "This endpoint requires $requires of a caller it never names. Declare one with authenticatedBy(...)."
+    }
+    val crossSite = b.callerInput?.crossSiteRefused?.takeIf { crossSiteChecked(b.method, b.callerInput) }
+    val tenant = b.tenantInput
+    require(tenant == null || !tenant.readsCaller || b.callerInput != null) {
+        "This endpoint finds its tenant in the caller's claim, and names no caller. " +
+            "Declare one with authenticatedBy(...)."
+    }
+    val foreign = tenant?.foreign?.takeIf { b.callerInput != null }
+    val answered =
+        listOfNotNull(b.callerInput?.refused, requires?.refused, crossSite, tenant?.missing, tenant?.unknown, foreign)
+    // One per status: an endpoint's own declaration wins, and then the first of Pelican's.
+    return answered.fold(b.errors.toList()) { declared, refusal ->
+        if (declared.any { it.status == refusal.status }) declared else declared + refusal
+    }
 }
 
 /**
@@ -595,7 +666,9 @@ private fun securityOf(b: EndpointBuilder): List<SecurityRequirement>? {
         "This endpoint declares $caller and also security(...) or noSecurity(). The caller's scheme is " +
             "already its requirement; drop the other."
     }
-    return listOf(SecurityRequirement(caller.scheme, emptyList()))
+    // Permissions every caller needs are scopes where the scheme declares them; the rest the description says.
+    val scopes = b.requirements?.permissions.orEmpty().filter { it in caller.scheme.declaredScopes }
+    return listOf(SecurityRequirement(caller.scheme, scopes))
 }
 
 /**
@@ -647,6 +720,7 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     ep.idempotency?.let { validateIdempotency(ep, it) }
+    validateRateLimit(ep)
 
     val statusClashes = unpickableStatuses(ep)
     if (statusClashes.isNotEmpty()) {
@@ -670,6 +744,15 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     validateResponseHeaders(ep)
+}
+
+/** A limit with nothing to key it on but its name would be one budget for every caller there is. */
+private fun validateRateLimit(ep: Endpoint<*, *>) {
+    val limited = ep.rateLimit ?: return
+    require(ep.caller != null || ep.tenant != null || limited.key != null) {
+        "$ep is rate limited with no caller, no tenant and no key of its own, so every request would share one " +
+            "budget. Name the key: rateLimited(limit) { header(\"X-Forwarded-For\") }."
+    }
 }
 
 /**

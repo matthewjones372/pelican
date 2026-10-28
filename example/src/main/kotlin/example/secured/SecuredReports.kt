@@ -15,18 +15,22 @@ package example.secured
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiSpec
+import io.github.matthewjones372.pelican.Authenticator
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.EndpointBuilder
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.Identity
 import io.github.matthewjones372.pelican.IntCodec
 import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.SecurityRequirement
 import io.github.matthewjones372.pelican.ServerEndpoint
+import io.github.matthewjones372.pelican.Unauthenticated
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.attribute
+import io.github.matthewjones372.pelican.authenticated
 import io.github.matthewjones372.pelican.basicAuth
 import io.github.matthewjones372.pelican.before
 import io.github.matthewjones372.pelican.between
@@ -54,6 +58,7 @@ import io.github.matthewjones372.pelican.openapi.openApiJson
 import io.github.matthewjones372.pelican.optional
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
+import io.github.matthewjones372.pelican.permission
 import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.requires
 import io.github.matthewjones372.pelican.responseHeader
@@ -157,10 +162,53 @@ private fun EndpointBuilder.rejectsBadCredentials() {
     errorResponse(429, "Too many requests", retryAfter)
 }
 
-// =========================================================== 4. the endpoints
+// ================================== 4. the callers, where one scheme says it
+
+/** A company-account caller, its token's scopes read as its permissions by `requires`. */
+val employee = authenticated(companyIdp) { id ->
+    Caller(id.subject, (id.claims["scope"] as? String).orEmpty().split(' ').filter { it.isNotEmpty() }.toSet())
+}
+
+/** An operator with a password. */
+val operator = authenticated(staffLogin) { id -> Caller(id.subject, emptySet(), staff = true) }
+
+/** A bearer token, turned by the provider's introspection into who it names and the scopes it grants. */
+val introspected = Authenticator { credentials ->
+    credentials.bearerToken()?.let { token ->
+        val who = Introspection.introspect(token) ?: throw Unauthenticated("That token is not one the provider issued")
+        Identity(who.subject, claims = mapOf("scope" to who.scopes.joinToString(" ")))
+    }
+}
+
+/** An `Authorization: Basic` login, checked against [StaffDirectory]. */
+val operators = Authenticator { credentials ->
+    basicLogin(credentials.header("Authorization"))?.let { (user, password) ->
+        val who = StaffDirectory.check(user, password)
+            ?: throw Unauthenticated("Unknown operator, or the wrong password")
+        Identity(who.subject)
+    }
+}
+
+/** The user and password of a `Basic` header, or null for any other header or none. */
+private fun basicLogin(header: String?): Pair<String, String>? {
+    val (kind, credential) = header?.split(' ', limit = 2)?.takeIf { it.size == 2 } ?: return null
+    if (!kind.equals("basic", ignoreCase = true)) return null
+    val decoded = try {
+        String(Base64.getDecoder().decode(credential))
+    } catch (_: IllegalArgumentException) {
+        return null
+    }
+    val (user, password) = decoded.split(':', limit = 2).takeIf { it.size == 2 } ?: return null
+    return user to password
+}
+
+// =========================================================== 5. the endpoints
 //
-// This section describes; it does not check. Each `security(...)` line is a
-// promise the next section has to keep.
+// This section describes, and two ways of checking are named in it. An
+// `authenticatedBy(...)` with its `requires(...)` is checked by Pelican before
+// the handler runs. A `security(...)` line, or none, is a promise the filter in
+// section 7 keeps: that is the endpoint taking either of two schemes, which one
+// caller under one scheme cannot say, and the one inheriting the API's default.
 
 /** Open, and documented as open — `security: []` overrides the API-wide default. */
 val health = endpoint {
@@ -172,7 +220,7 @@ val health = endpoint {
     text()
 }
 
-/** No `security(...)` line, so this inherits the API-wide `reports:read`. */
+/** No `security(...)` line and no caller, so this inherits the API-wide `reports:read`, which the filter keeps. */
 val listReports = endpoint(lensInputs) {
     get("reports")
     summary = "List reports"
@@ -188,7 +236,8 @@ val getReport = endpoint(reportId) {
     summary = "Fetch one report"
     operationId = "getReport"
     tag("reports")
-    security(companyIdp, "reports:read")
+    authenticatedBy(employee)
+    requires(permission("reports:read"))
     rejectsBadCredentials()
     json<Report>() orFail reportMissing
 }
@@ -203,7 +252,8 @@ val exportReport = endpoint(reportId) {
     summary = "Fetch one report, as JSON or as CSV"
     operationId = "exportReport"
     tag("reports")
-    security(companyIdp, "reports:read")
+    authenticatedBy(employee)
+    requires(permission("reports:read"))
     rejectsBadCredentials()
     negotiated(json<Report>(), media<Report>("text/csv")) orFail reportMissing
 }
@@ -213,7 +263,8 @@ val fileReport = endpoint(lensInputs) {
     summary = "File a report"
     operationId = "fileReport"
     tag("reports")
-    security(companyIdp, "reports:write")
+    authenticatedBy(employee)
+    requires(permission("reports:write"))
     rejectsBadCredentials()
     body(newReport)
     emits(reportLocation)
@@ -242,7 +293,7 @@ val usage = endpoint {
     summary = "Service counters"
     operationId = "usage"
     tag("meta")
-    security(staffLogin)
+    authenticatedBy(operator)
     rejectsBadCredentials()
     json<Usage>()
 }
@@ -250,7 +301,7 @@ val usage = endpoint {
 val allSecuredEndpoints: List<Endpoint<*, *>> =
     listOf(health, listReports, getReport, exportReport, fileReport, withdrawReport, usage)
 
-// =============================================== 5. the store and the "IdP"
+// =============================================== 6. the store and the "IdP"
 
 object Reports {
     private val filed = mutableListOf(
@@ -300,11 +351,12 @@ object Introspection {
     fun introspect(token: String): Caller? = issued[token]
 }
 
-// ============================================================== 6. the checks
+// ============================================================== 7. the checks
 //
-// One filter, registered once on the Api. It reads the requirement the endpoint
-// already declares for the document, so there is no second list of who may call
-// what — and no handler that can forget to ask.
+// One filter, registered once on the Api, for the endpoints section 4 cannot
+// say. It reads the requirement the endpoint already declares for the
+// document, so there is no second list of who may call what — and no handler
+// that can forget to ask. An endpoint with a caller has been checked already.
 
 /** Who a request turned out to be. Set by the filter, read by the handlers. */
 val caller = attribute<Caller>("caller")
@@ -322,17 +374,7 @@ private fun callerOf(p: Params): Caller? {
     val (kind, credential) = header.split(' ', limit = 2).takeIf { it.size == 2 } ?: return null
     return when (kind.lowercase()) {
         "bearer" -> Introspection.introspect(credential)
-
-        "basic" -> {
-            val decoded = try {
-                String(Base64.getDecoder().decode(credential))
-            } catch (_: IllegalArgumentException) {
-                null
-            }
-            val (user, password) = decoded?.split(':', limit = 2)?.takeIf { it.size == 2 } ?: return null
-            StaffDirectory.check(user, password)
-        }
-
+        "basic" -> basicLogin(header)?.let { (user, password) -> StaffDirectory.check(user, password) }
         else -> null
     }
 }
@@ -355,6 +397,7 @@ private fun Caller.satisfies(requirement: SecurityRequirement): Boolean =
  * to be read here.
  */
 fun enforceDeclaredSecurity(apiWideDefault: List<SecurityRequirement>): Filter = before { p ->
+    if (p.endpoint?.caller != null) return@before
     // Null means the endpoint said nothing and inherits the API's default;
     // an empty list is `noSecurity()`, and deliberate.
     val required = p.endpoint?.security ?: apiWideDefault
@@ -378,7 +421,7 @@ private fun describe(requirement: SecurityRequirement): String =
     if (requirement.scopes.isEmpty()) requirement.scheme.name
     else requirement.scopes.joinToString(", ") + " from " + requirement.scheme.name
 
-// ============================================================= 7. the server
+// ============================================================= 8. the server
 
 val securedRoutes: List<ServerEndpoint> = listOf(
 
@@ -395,7 +438,7 @@ val securedRoutes: List<ServerEndpoint> = listOf(
     },
 
     fileReport handledNow { p ->
-        val filed = Reports.file(p[caller].subject, p[newReport])
+        val filed = Reports.file(p[employee].subject, p[newReport])
         setHeader(reportLocation, "/reports/${filed.id}")
         filed
     },
@@ -453,9 +496,13 @@ fun securedApi(): Api = api(
     description = "Reports, behind an operator login and a company identity provider."
     security = apiWideSecurity
 
-    // The one line that turns the padlocks above into a rule. Registered on the
-    // Api rather than written into each handler, so an endpoint added later is
-    // covered by default rather than by remembering.
+    // What verifies each caller, bound once beside the codecs.
+    authenticate(companyIdp, introspected)
+    authenticate(staffLogin, operators)
+
+    // The one line that turns the remaining padlocks into a rule. Registered on
+    // the Api rather than written into each handler, so an endpoint added later
+    // without a caller is covered by default rather than by remembering.
     filter(enforceDeclaredSecurity(apiWideSecurity))
 
     // And the one line that says these seven endpoints are all of them. Leaving
@@ -515,7 +562,7 @@ fun main(args: Array<String>) {
     server.block()
 }
 
-// ======================================================== 8. the docs, alone
+// ======================================================== 9. the docs, alone
 //
 // Same descriptions, no server and no handler — the security schemes reach the
 // document without anything being started.

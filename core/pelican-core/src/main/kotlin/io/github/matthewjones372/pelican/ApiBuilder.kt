@@ -35,6 +35,12 @@ class ApiBuilder internal constructor() {
     var servers: List<String> = emptyList()
     var security: List<SecurityRequirement> = emptyList()
     var cors: Cors? = null
+
+    /**
+     * Refuses a POST, PUT, PATCH or DELETE from another site whose caller is a cookie, which a browser attaches to
+     * a request another site makes it send. On unless turned off; an origin [cors] lets send credentials is let in.
+     */
+    var csrf: Boolean = true
     var strictBodyTimeoutMillis: Long = DEFAULT_STRICT_BODY_TIMEOUT_MILLIS
     var maxBodyBytes: Long = DEFAULT_MAX_BODY_BYTES
 
@@ -86,6 +92,23 @@ class ApiBuilder internal constructor() {
         idempotency = Idempotency(store, ttl.toJavaDuration(), lease.toJavaDuration())
     }
 
+    /**
+     * How tenanted endpoints find their tenant, and what says it exists. One per `Api`. A caller whose [claim] names
+     * another tenant is a 403; null checks no claim.
+     */
+    fun tenants(input: TenantInput, directory: TenantDirectory, claim: String? = "tenant") {
+        tenants = Tenants(input, directory, claim)
+    }
+
+    private var tenants: Tenants? = null
+
+    /** [Api.rateLimits]: where the budgets rate-limited endpoints spend are counted. */
+    fun rateLimits(store: RateLimitStore) {
+        rateLimits = store
+    }
+
+    private var rateLimits: RateLimitStore? = null
+
     /** [Api.onRefusal] — `onRefusal(refusalCounter(registry))` for the meter. */
     fun onRefusal(observer: RefusalObserver) {
         onRefusal = observer
@@ -113,6 +136,9 @@ class ApiBuilder internal constructor() {
         pages = pages,
         authenticators = authenticators.toMap(),
         idempotency = idempotency,
+        csrf = csrf,
+        tenants = tenants,
+        rateLimits = rateLimits,
     )
 }
 

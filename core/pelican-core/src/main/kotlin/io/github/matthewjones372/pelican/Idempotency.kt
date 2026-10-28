@@ -78,12 +78,14 @@ private const val REFUSAL_REASON_FIELD = "error"
 private val RETRY_AFTER =
     responseHeader<Long>("Retry-After", "Seconds to wait before sending the request again.").optional()
 
-/** What an idempotency key names: one key, on one operation, from one caller. */
+/** What an idempotency key names: one key, on one operation, from one caller, in one tenant. */
 data class IdempotencyScope(
     val operation: String,
     /** The caller's subject, or null on an endpoint anyone may call unnamed. */
     val subject: String?,
     val key: String,
+    /** The tenant's id, or null on an endpoint that serves no one tenant. */
+    val tenant: String? = null,
 )
 
 /** A response as it was answered, kept to answer a repeat with. Plain fields, so a store can persist it as it likes. */
@@ -208,7 +210,8 @@ internal fun Api.keyed(
         if (sent == null) {
             invoke(params)
         } else {
-            val scope = IdempotencyScope(endpoint.operationName, subjectOf(endpoint, params), sent)
+            val tenant = endpoint.tenant?.let { params[it].id }
+            val scope = IdempotencyScope(endpoint.operationName, subjectOf(endpoint, params), sent, tenant)
             when (val held = store.reserve(scope, responses.fingerprint(params, key), settings.lease)) {
                 Reservation.Reserved -> {
                     // What a filter set before the handler ran, a request id say, belongs to this request alone.

@@ -492,10 +492,120 @@ val ping = endpoint {
 
 `security(...)` documents the requirement; it does not check a credential. To
 enforce it, declare a caller with `authenticatedBy(...)` (and `pelican-oidc` for
-JWTs), described in [Who is calling](reference.md#who-is-calling), or check it
-in a [filter](#filters), as
+JWTs), as the next section does.
+
+---
+
+## Who may call
+
+A caller under a scheme, what they must have, and the verifier bound once:
+
+```kotlin
+import io.github.matthewjones372.pelican.anyOf
+import io.github.matthewjones372.pelican.authenticated
+import io.github.matthewjones372.pelican.bearerAuth
+import io.github.matthewjones372.pelican.permission
+import io.github.matthewjones372.pelican.role
+
+val bearer = bearerAuth()
+val support = authenticated(bearer) { id -> Staff(id.subject, id.groups) }
+
+val refund = endpoint(orderId) {
+    post("orders" / orderId / "refund")
+    authenticatedBy(support)                                  // 401 without a caller
+    requires(role("support"), permission("orders:refund"))    // 403 without both
+    json<Refund>()
+}
+
+api(routes, codecs = JacksonCodecs) { authenticate(bearer, by = verifier) }
+```
+
+The handler reads `this[support]` and never sees a request that failed either
+check. Both are answered before the body is read, both are declared in the
+document, and a generated client reaches them by status. `anyOf(role("admin"),
+permission("orders:refund"))` is either one. An endpoint that takes several
+schemes at once checks them in a [filter](#filters), as
 [`example/secured`](../example/src/main/kotlin/example/secured/SecuredReports.kt)
-does.
+does. See [What a caller may do](reference.md#what-a-caller-may-do).
+
+---
+
+## Signing someone in with a session
+
+A cookie for a browser, a session in a store behind it, and the same
+`authenticatedBy` as a token:
+
+```kotlin
+import io.github.matthewjones372.pelican.Identity
+import io.github.matthewjones372.pelican.InMemorySessionStore
+import io.github.matthewjones372.pelican.authenticated
+import io.github.matthewjones372.pelican.responseHeader
+import io.github.matthewjones372.pelican.sessionCookie
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+
+val sessions = sessionCookie("sid", InMemorySessionStore(), idle = 30.minutes, absolute = 12.hours)
+val visitor = authenticated(sessions.scheme) { it.subject }
+
+val signIn = endpoint(login) {
+    post("sign-in")
+    emits(responseHeader<String>("Set-Cookie"))
+    text()
+}
+
+val notes = endpoint(newNote) {
+    post("notes")
+    authenticatedBy(visitor)        // 401 without a live session
+    text()
+}
+
+signIn handledNow { form ->
+    setCookie(sessions.start(Identity(checkPassword(form))))
+    "welcome"
+}
+
+api(routes, codecs = JacksonCodecs) { authenticate(sessions.scheme, by = sessions) }
+```
+
+The store keeps a hash of each session id, not the id. A session left idle
+for 30 minutes, or 12 hours old, is over. `sessions.endAll(subject)` signs
+someone out everywhere. A POST to `/notes` that another site makes the browser
+send is a 403 without any code here, since the check is on by default; see
+[A session in a cookie](reference.md#a-session-in-a-cookie).
+
+---
+
+## Serving many tenants
+
+The tenant in a header, checked against the tenants there are, and handed to
+the handler:
+
+```kotlin
+import io.github.matthewjones372.pelican.InMemoryTenantDirectory
+import io.github.matthewjones372.pelican.TenantResolver
+import io.github.matthewjones372.pelican.tenantFrom
+
+val shop = tenantFrom(TenantResolver.header("X-Shop"))
+
+val openTill = endpoint {
+    get("till")
+    authenticatedBy(teller)
+    tenanted(shop)                  // 400 without X-Shop, 404 for a shop there is not
+    text()
+}
+
+openTill handledNow { "${this[teller]} at ${this[shop].id}" }
+
+api(routes, codecs = JacksonCodecs) {
+    authenticate(tellerToken, tellers)
+    tenants(shop, InMemoryTenantDirectory(setOf("acme", "globex")))
+}
+```
+
+A teller whose token says `tenant: acme` is a 403 at globex, with nothing more
+to write. The generated client takes `xShop: String`, and an idempotency key or
+a session from one shop is no use in another; see
+[Whose request it is](reference.md#whose-request-it-is).
 
 ---
 

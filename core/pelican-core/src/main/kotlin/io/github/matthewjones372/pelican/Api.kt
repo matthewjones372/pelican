@@ -245,6 +245,15 @@ class Api internal constructor(
 
     /** Where keyed endpoints' responses are kept. An endpoint declaring a key with none set fails here. */
     val idempotency: Idempotency? = null,
+
+    /** Whether a cookie-carried caller's POST, PUT, PATCH or DELETE from another site is refused with 403. */
+    val csrf: Boolean = true,
+
+    /** How tenanted endpoints find their tenant; null where no endpoint is tenanted. */
+    val tenants: Tenants? = null,
+
+    /** Where rate-limited endpoints' budgets are counted. An endpoint declaring a limit with none set fails here. */
+    val rateLimits: RateLimitStore? = null,
 ) {
     /**
      * The largest single frame of a streamed request body, over which the frame
@@ -278,6 +287,18 @@ class Api internal constructor(
             "Endpoints declare callers under " + unverified.joinToString { "'${it.name}'" } + " and nothing " +
                 "verifies ${if (unverified.size == 1) "it" else "them"}, so every request would be refused. " +
                 "Bind one with authenticate(scheme, by = ...)."
+        }
+
+        val tenanted = bound.mapNotNull { it.tenant }.distinct()
+        require(tenanted.all { it === tenants?.input }) {
+            "Endpoints are tenanted, and the Api resolves " +
+                (if (tenants == null) "no tenants" else "another tenant input") +
+                ". Bind the one they declare with tenants(input, directory)."
+        }
+
+        val limited = bound.filter { it.rateLimit != null }
+        require(limited.isEmpty() || rateLimits != null) {
+            "${limited.joinToString()} declare a rate limit, and nothing counts it. Set one with rateLimits(...)."
         }
 
         val keyed = endpoints.filter { it.endpoint.idempotency != null }
