@@ -105,8 +105,14 @@ fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: M
     // For whom, once who is known: a claim resolver reads the caller.
     endpoint.tenant?.let { tenant ->
         // The Api refused to build with a tenanted endpoint and nothing resolving it, so this is never reached unbound.
-        val directory = checkNotNull(tenants) { "$endpoint is tenanted and the Api resolves no tenants" }.directory
-        into[tenant] = tenant.decode(credentials, identity, directory)
+        val bound = checkNotNull(tenants) { "$endpoint is tenanted and the Api resolves no tenants" }
+        val found = tenant.decode(credentials, identity, bound.directory)
+        try {
+            tenant.refuseForeign(identity, bound.claim, found)
+        } catch (e: ApiException) {
+            throw CallerRefused(e)
+        }
+        into[tenant] = found
     }
 }
 

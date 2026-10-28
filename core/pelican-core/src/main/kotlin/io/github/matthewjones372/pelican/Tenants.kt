@@ -46,6 +46,9 @@ class TenantInput internal constructor(val resolver: TenantResolver) : ParamKey<
     /** The 404 for a tenant the directory does not know. */
     val unknown: ErrorSpec = ErrorSpec(NOT_FOUND, "No tenant by that name.", type = null)
 
+    /** The 403 for a caller whose tenant claim names another tenant. */
+    val foreign: ErrorSpec = ErrorSpec(FORBIDDEN, "The caller belongs to another tenant.", type = null)
+
     /** The header the tenant is read from, which a tenanted endpoint declares; null for any other resolver. */
     val headerName: String? get() = (resolver as? HeaderTenant)?.name
 
@@ -67,14 +70,20 @@ class TenantInput internal constructor(val resolver: TenantResolver) : ParamKey<
         return Tenant(id)
     }
 
+    /** Refuses [caller] with a 403 when their [claim], where they carry it, names other than [tenant]. */
+    internal fun refuseForeign(caller: Identity?, claim: String?, tenant: Tenant) {
+        val claimed = claim?.let { caller?.claims?.get(it) } ?: return
+        if (claimed != tenant.id) throw ApiException(FORBIDDEN, "The caller belongs to another tenant")
+    }
+
     override fun toString() = "tenant"
 }
 
 /** A tenant found by [resolver]. */
 fun tenantFrom(resolver: TenantResolver): TenantInput = TenantInput(resolver)
 
-/** What an `Api` resolves tenants with. */
-class Tenants internal constructor(val input: TenantInput, val directory: TenantDirectory)
+/** What an `Api` resolves tenants with, and the caller's claim naming theirs; null where none is checked. */
+class Tenants internal constructor(val input: TenantInput, val directory: TenantDirectory, val claim: String?)
 
 private class HeaderTenant(val name: String) : TenantResolver {
     override fun resolve(request: TenantRequest) = request.header(name)?.trim()
@@ -96,3 +105,4 @@ private const val TENANT_HEADER = "The tenant this request is for."
 
 private const val BAD_REQUEST = 400
 private const val NOT_FOUND = 404
+private const val FORBIDDEN = 403

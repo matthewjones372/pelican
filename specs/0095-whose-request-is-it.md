@@ -56,8 +56,10 @@ check and sign-in page into an exception to remember.
       `this[tenant]`, the 400 and 404. Done when: served in process, each resolver finds its tenant and refuses the rest.
 - [x] **`spec-0095-document`** ([#406](https://github.com/matthewjones372/pelican/pull/406)): the header parameter, the server variable, the generated client's parameter.
       Done when: a golden pins both and the generated client sends the header.
-- [ ] **`spec-0095-scope`**: the caller's tenant claim checked, idempotency and sessions scoped by tenant.
-      Done when: a key or a session from one tenant is neither replayed nor accepted in another.
+- [ ] **`spec-0095-scope`**: the caller's tenant claim checked, idempotency keys scoped by tenant.
+      Done when: a caller or a key from one tenant is neither let in nor replayed in another.
+- [ ] **`spec-0095-sessions`** (split from scope, past the size cap): sessions scoped by tenant. Done when: a session
+      started in one tenant reads as nobody in another.
 - [ ] **`spec-0095-parity`**: a tenanted endpoint in the backends example. Done when: every backend answers alike.
 - [ ] **`spec-0095-docs`**: reference, cookbook, changelog.
 

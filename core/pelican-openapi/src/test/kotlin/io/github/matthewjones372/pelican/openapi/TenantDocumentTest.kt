@@ -10,7 +10,7 @@ import io.github.matthewjones372.pelican.tenantFrom
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-/** What a tenanted endpoint publishes: the header to send, or the host to send to, and the 400 and 404. Spec 0095. */
+/** What a tenanted endpoint publishes: the header or the host to send to, and the 400, 403 and 404. Spec 0095. */
 class TenantDocumentTest {
 
     private val caller = authenticated(bearerAuth()) { it.subject }
@@ -52,12 +52,13 @@ class TenantDocumentTest {
     }
 
     @Test
-    fun `the 400 and 404 are in the refusal envelope`() {
+    fun `the 400, 403 and 404 are in the refusal envelope`() {
         val responses = operation(TenantResolver.header("X-Tenant")) / "responses"
 
-        (responses / "400" / "content" / "application/json" / "schema" / "\$ref").str() shouldBe
-            "#/components/schemas/ApiError"
-        (responses / "404" / "content" / "application/json" / "schema" / "\$ref").str() shouldBe
-            "#/components/schemas/ApiError"
+        listOf("400", "403", "404").forEach { status ->
+            (responses / status / "content" / "application/json" / "schema" / "\$ref").str() shouldBe
+                "#/components/schemas/ApiError"
+        }
+        (responses / "403" / "description").str() shouldBe "The caller belongs to another tenant."
     }
 }
