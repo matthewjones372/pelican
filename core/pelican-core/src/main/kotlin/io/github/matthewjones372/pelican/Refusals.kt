@@ -57,6 +57,9 @@ enum class RefusalReason(val label: String) {
 
     /** A request over its endpoint's rate limit: the 429. */
     RATE_LIMITED("rate_limited"),
+
+    /** A body whose signature did not verify: the 400. */
+    SIGNATURE("signature"),
 }
 
 /**

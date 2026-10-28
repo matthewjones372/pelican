@@ -237,7 +237,7 @@ internal class EndpointCodecs(
 }
 
 private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = EndpointCodecs(
-    body = codecs.requestBodyCodec(bodyInput),
+    body = codecs.requestBodyCodec(this),
     payload = output.payloadType?.let { codecs.codec(it) },
     alternatives = codecs.responseCodecs(output),
 )
@@ -417,7 +417,9 @@ private fun readStrictBody(
                 // `toArrayUnsafe`: the entity is strict and already whole, so this
                 // hands over the bytes rather than copying them into UTF-16 for a
                 // parser that reads UTF-8. See spec 0046.
-                .decode(req.entity().contentType.toString(), strict.data.toArrayUnsafe())
+                .decode(req.entity().contentType.toString(), strict.data.toArrayUnsafe()) {
+                    req.getHeader(it).orElse(null)?.value()
+                }
             Unit
         }
 }

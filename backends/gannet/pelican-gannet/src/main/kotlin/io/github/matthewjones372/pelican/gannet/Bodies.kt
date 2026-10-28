@@ -36,7 +36,7 @@ fun ByteStreamHandle.toSequence(): Sequence<ByteArray> {
  * A read that outlives [Api.strictBodyTimeoutMillis] is failed by the sweeper, which wakes it.
  */
 internal fun readStrictBody(request: HttpRequest, api: Api, codec: RequestBodyCodecs): Any? =
-    codec.decode(request.headers[CONTENT_TYPE], readStrictBytes(request, api))
+    codec.decode(request.headers[CONTENT_TYPE], readStrictBytes(request, api)) { request.headers[it] }
 
 /** [readStrictBody]'s read, undecoded. */
 internal fun readStrictBytes(request: HttpRequest, api: Api): ByteArray {

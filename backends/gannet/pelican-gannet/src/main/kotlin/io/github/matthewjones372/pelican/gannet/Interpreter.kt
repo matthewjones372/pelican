@@ -269,7 +269,7 @@ internal class PelicanHandler(
             is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
                 val codec = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
                 values[body] = if (ahead == null) readStrictBody(request, api, codec)
-                else codec.decode(request.headers[CONTENT_TYPE], ahead.bytes())
+                else codec.decode(request.headers[CONTENT_TYPE], ahead.bytes()) { request.headers[it] }
             }
 
             // Framed by core as the handler reads, so nothing is held but the frame being read.
@@ -326,7 +326,7 @@ internal class EndpointCodecs(
 }
 
 private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = EndpointCodecs(
-    body = codecs.requestBodyCodec(bodyInput),
+    body = codecs.requestBodyCodec(this),
     payload = output.payloadType?.let { codecs.codec(it) },
     alternatives = codecs.responseCodecs(output),
 )

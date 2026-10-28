@@ -115,6 +115,9 @@ class Endpoint<I, R> internal constructor(
 
     /** The budget each request here spends from; null for an endpoint called as often as callers like. */
     val rateLimit: RateLimited? = null,
+
+    /** The signature a request's body is checked against before it is decoded; null where none is. */
+    val signedBy: HmacScheme? = null,
 ) {
     /**
      * Whether a request here can carry a resume point. Only an event stream is
@@ -166,6 +169,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     internal var requirements: Requires? = null
     internal var tenantInput: TenantInput? = null
     internal var rateLimited: RateLimited? = null
+    internal var signatureScheme: HmacScheme? = null
 
     init {
         // Inputs listed on endpoint(...) register themselves, so each is
@@ -327,6 +331,16 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
         require(tenantInput == null) { "This endpoint is already tenanted; a request is for one tenant." }
         tenantInput = tenant
         tenant.header?.let { headerParams += it }
+    }
+
+    /**
+     * Checks the body's signature with [scheme] over the exact bytes received, before it is decoded: one that does
+     * not verify is a 400, declared here, and the handler never runs.
+     */
+    fun signedBy(scheme: HmacScheme) {
+        require(signatureScheme == null) { "This endpoint is already signedBy a scheme; a body carries one signature." }
+        signatureScheme = scheme
+        errors += signatureRefusal()
     }
 
     /**
@@ -634,6 +648,7 @@ private fun <I, R> build(
         requires = b.requirements,
         tenant = b.tenantInput,
         rateLimit = b.rateLimited,
+        signedBy = b.signatureScheme,
     ).also(::validate)
 }
 
@@ -723,6 +738,7 @@ private fun validate(ep: Endpoint<*, *>) {
 
     ep.idempotency?.let { validateIdempotency(ep, it) }
     validateRateLimit(ep)
+    validateSignature(ep)
 
     val statusClashes = unpickableStatuses(ep)
     if (statusClashes.isNotEmpty()) {
@@ -746,6 +762,16 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     validateResponseHeaders(ep)
+}
+
+/** A signature is over bytes held whole, which only a body a codec reads whole is. */
+private fun validateSignature(ep: Endpoint<*, *>) {
+    if (ep.signedBy == null) return
+    require(ep.bodyInput is JsonBody<*> || ep.bodyInput is FormBody<*> || ep.bodyInput is NegotiatedBody<*>) {
+        "$ep is signedBy a scheme, and its body is ${ep.bodyInput ?: "absent"}. A signature is checked over the " +
+            "whole body before it is decoded, so signedBy needs a JSON, form or negotiated body; a streamed one " +
+            "is never held whole."
+    }
 }
 
 /** A limit with nothing to key it on but its name would be one budget for every caller there is. */

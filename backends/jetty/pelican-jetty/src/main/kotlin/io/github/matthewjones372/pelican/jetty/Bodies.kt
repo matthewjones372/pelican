@@ -68,7 +68,7 @@ internal fun readStrictBody(request: Request, api: Api, codec: RequestBodyCodecs
         .thenApply { bytes ->
             // Against the limit itself, not the ceiling the read was given.
             if (bytes.size > api.maxBodyBytes) throw PayloadTooLarge(api.maxBodyBytes)
-            codec.decode(request.headers.get(HttpHeader.CONTENT_TYPE), bytes)
+            codec.decode(request.headers.get(HttpHeader.CONTENT_TYPE), bytes) { request.headers.get(it) }
         }
 }
 
