@@ -22,12 +22,17 @@ class RateLimitDocumentTest {
         text()
     }
 
+    private fun operation(): JsonObj =
+        (apiSpec(listOf(orders), SecurityTest.Schemas).openApi() / "paths" / "/orders" / "get") as JsonObj
+
     @Test
     fun `the 429 is in the refusal envelope`() {
-        val document = apiSpec(listOf(orders), SecurityTest.Schemas).openApi()
-        val operation = (document / "paths" / "/orders" / "get") as JsonObj
-
-        (operation / "responses" / "429" / "content" / "application/json" / "schema" / "\$ref").str() shouldBe
+        (operation() / "responses" / "429" / "content" / "application/json" / "schema" / "\$ref").str() shouldBe
             "#/components/schemas/ApiError"
+    }
+
+    @Test
+    fun `the description says the limit, and whose it is`() {
+        (operation() / "description").str() shouldBe "Rate limited per caller to 100 every 1m, as `orders`."
     }
 }
