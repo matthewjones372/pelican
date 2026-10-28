@@ -273,6 +273,7 @@ class KotlinClientTest {
             "import io.github.matthewjones372.pelican.Codecs",
             "import io.github.matthewjones372.pelican.Method",
             "import io.github.matthewjones372.pelican.UploadedFile",
+            "import io.github.matthewjones372.pelican.WebhookSigner",
             "import io.github.matthewjones372.pelican.formCodec",
         )
     }
