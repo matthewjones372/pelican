@@ -74,6 +74,8 @@ val gannetRoutes: List<ServerEndpoint> = listOf(
 
     leaveNote handledNow { "noted for ${this[visitor]}" },
 
+    openTill handledNow { "${this[teller]} at ${this[shop].id}" },
+
     forget handledWith { _ -> },
 
     peek handledWith { _ -> },

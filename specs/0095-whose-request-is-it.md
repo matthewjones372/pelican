@@ -58,8 +58,9 @@ check and sign-in page into an exception to remember.
       Done when: a golden pins both and the generated client sends the header.
 - [x] **`spec-0095-scope`** ([#407](https://github.com/matthewjones372/pelican/pull/407)): the caller's tenant claim checked, idempotency keys scoped by tenant.
       Done when: a caller or a key from one tenant is neither let in nor replayed in another.
-- [ ] **`spec-0095-sessions`** (split from scope, past the size cap): sessions scoped by tenant. Done when: a session
-      started in one tenant reads as nobody in another.
+- [x] **`spec-0095-sessions`** ([#408](https://github.com/matthewjones372/pelican/pull/408)), split from scope
+      past the size cap: sessions scoped by tenant. Done when: a session started in one tenant reads as nobody in
+      another.
 - [ ] **`spec-0095-parity`**: a tenanted endpoint in the backends example. Done when: every backend answers alike.
 - [ ] **`spec-0095-docs`**: reference, cookbook, changelog.
 

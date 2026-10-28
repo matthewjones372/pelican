@@ -14,10 +14,12 @@ import io.github.matthewjones372.pelican.Authenticator
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Identity
 import io.github.matthewjones372.pelican.InMemorySessionStore
+import io.github.matthewjones372.pelican.InMemoryTenantDirectory
 import io.github.matthewjones372.pelican.LongCodec
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.StringCodec
+import io.github.matthewjones372.pelican.TenantResolver
 import io.github.matthewjones372.pelican.Unauthenticated
 import io.github.matthewjones372.pelican.UploadedFile
 import io.github.matthewjones372.pelican.Webhook
@@ -51,6 +53,7 @@ import io.github.matthewjones372.pelican.repeated
 import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.role
 import io.github.matthewjones372.pelican.sessionCookie
+import io.github.matthewjones372.pelican.tenantFrom
 import io.github.matthewjones372.pelican.textPart
 import io.github.matthewjones372.pelican.webhook
 import java.time.Clock
@@ -479,7 +482,7 @@ val refundTip = endpoint(jsonBody<Tip>(description = "How much to hand back")) {
 val tellers = Authenticator { credentials ->
     when (credentials.bearerToken()) {
         null -> null
-        TELLER_TOKEN -> Identity("tess", groups = setOf("teller"))
+        TELLER_TOKEN -> Identity("tess", groups = setOf("teller"), claims = mapOf("tenant" to "acme"))
         GUEST_TOKEN -> Identity("gus")
         else -> throw Unauthenticated("That token is not one this service issued")
     }
@@ -539,12 +542,29 @@ val leaveNote = endpoint {
     text()
 }
 
+/** The shop a request is for, named in a header, and the shops there are. */
+val shop = tenantFrom(TenantResolver.header("X-Shop"))
+
+val shops = InMemoryTenantDirectory(setOf("acme", "globex"))
+
+/** Whose till this is, in the shop the request names; tess works at acme, so globex refuses her. */
+val openTill = endpoint {
+    get("till")
+    summary = "Open the till of the shop the request is for"
+    operationId = "openTill"
+    tag("greetings")
+    emits(requestId)
+    authenticatedBy(teller)
+    tenanted(shop)
+    text()
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
         roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay, leaveTip, refundTip,
-        startVisit, whoIsVisiting, leaveNote,
+        startVisit, whoIsVisiting, leaveNote, openTill,
     )
 
 /**
