@@ -33,6 +33,26 @@ one.
 
 ### Added
 
+- **A webhook that proves who sent it** (spec 0097): `signedBy(scheme)` on an endpoint checks an HMAC-SHA256
+  signature over the exact bytes received, before the body decodes, within a timestamp tolerance (5 minutes by
+  default) and in constant time. `stripeSignature { secrets }` reads `Stripe-Signature`, and `standardWebhooks {
+  secrets }` the `webhook-id`, `webhook-timestamp` and `webhook-signature` headers; any of the secrets passes, so a
+  rotation overlaps. A failure is a 400 tagged `signature_invalid` in the refusal envelope, one tag for every cause,
+  and the handler never runs. The headers are required header parameters of the document, described with what is
+  signed. `signedBy` on a body not held whole, or on none, is refused when the endpoint is built.
+- **A signature refusal is an observed refusal** (spec 0097): `RefusalReason` gains `SIGNATURE`, with the cause in
+  `SignatureRefused.reason` and never the body. **A `when` over `RefusalReason` with no `else`** stops compiling until
+  it names it.
+- **Signing on the sending side** (spec 0097): `HmacScheme.sign(secret, body, at)` returns the headers a sender
+  sends, and `signer(secret)` a `WebhookSigner`. A generated client's method for a signed endpoint or `webhook(...)`
+  takes a `signer`, and `request(...)` in the client runtime signs the bytes it sends. Regenerate a committed client
+  to pick it up. `pelican-test`'s `RequestSpec.signedWith(scheme, secret, at)` signs a test request.
+- **MCP refuses a signed endpoint** (spec 0097): a model has no secret to sign with, so `mcpTools` names the endpoint
+  to leave out with `include`.
+- **A backend reads a signed body through `decode(contentType, bytes, header)`** (spec 0097): `RequestBodyCodecs`
+  gains the overload, and `Codecs.requestBodyCodec(endpoint)` carries the endpoint's scheme. A backend of your own
+  calling the older `decode` overloads on a signed endpoint fails rather than skipping the check.
+
 - **How often a caller may call** (spec 0096): `rateLimited(rateLimit(name, permits, per, burst))` on an endpoint
   spends a permit per request from a budget named once and shared by every endpoint naming it, counted per caller,
   per tenant, and per a key of the endpoint's own. A spent budget is a 429 tagged `rate_limited` with `Retry-After`

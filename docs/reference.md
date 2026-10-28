@@ -13,7 +13,7 @@ Contents:
 - **Modules and backends:** [Modules](#modules), [The backend](#the-backend) (including [On Jetty](#on-jetty) and [On Gannet](#on-gannet)), [Choosing a JSON library](#choosing-a-json-library)
 - **Defining endpoints and inputs:** [Everything is a value](#everything-is-a-value), [Typechecked endpoints](#typechecked-endpoints), [Refined inputs](#refined-inputs), [More than one value](#more-than-one-value), [Cookies](#cookies), [Form bodies](#form-bodies), [Multipart uploads](#multipart-uploads)
 - **Responses and errors:** [Response headers](#response-headers), [Declared failures](#declared-failures), [More than one successful response](#more-than-one-successful-response), [One response, several renderings](#one-response-several-renderings), [Streaming](#a-whole-list-or-a-stream-of-one) (and the sections after it, through [Streaming behaviour](#streaming-behaviour)), [Errors](#errors-and-what-a-caller-is-told), [Limits and startup checks](#limits-and-startup-checks)
-- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Who may call](#what-a-caller-may-do), [Sessions](#a-session-in-a-cookie), [Tenants](#whose-request-it-is), [Rate limits](#how-often-a-caller-may-call), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
+- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Who may call](#what-a-caller-may-do), [Sessions](#a-session-in-a-cookie), [Tenants](#whose-request-it-is), [Rate limits](#how-often-a-caller-may-call), [Signed webhooks](#a-webhook-that-proves-who-sent-it), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
 - **Documents and other readings:** [OpenAPI docs](#getting-the-openapi-docs), [Standalone JSON Schema](#a-schema-that-resolves-on-its-own) ([schemas.md](schemas.md)), [MCP tools](#tools-a-model-can-call) ([mcp.md](mcp.md)), [Webhooks](#webhooks-the-calls-the-service-sends)
 - **Generating code:** [The Gradle plugin](#the-gradle-plugin), [Client transports](#the-transport-a-generated-client-sends-with) ([generated-client.md](generated-client.md)), [Importing a document](#importing-an-openapi-document) ([importing.md](importing.md))
 - **Testing:** [Testing](#testing) ([golden-testing.md](golden-testing.md))
@@ -3084,6 +3084,50 @@ api(routes, codecs = JacksonCodecs) { rateLimits(InMemoryRateLimitStore()) }
   `ApiCallFailed` carries `retryAfter`, and a `RetryingTransport` already waits what a 429 names before sending a
   safe request again.
 
+## A webhook that proves who sent it
+
+An endpoint that receives a provider's events names the signature it is sent with, and checks it over the exact bytes
+received before anything decodes them ([spec 0097](../specs/0097-a-webhook-that-proves-who-sent-it.md)):
+
+```kotlin
+val stripe = stripeSignature(tolerance = 5.minutes) { listOf(current, previous) }   // read on every request
+
+val stripeEvent = endpoint(jsonBody<StripeEvent>()) {
+    post("hooks" / "stripe")
+    signedBy(stripe)                          // checked over the bytes received, then the body decodes as usual
+    empty(200)
+}
+```
+
+- **Two schemes**, both HMAC-SHA256 in core with no dependency:
+  - `stripeSignature` reads `Stripe-Signature: t=<unix>,v1=<hex>[,v1=...]`, signed over `t.body` with the endpoint's
+    signing secret as Stripe shows it.
+  - `standardWebhooks` reads `webhook-id`, `webhook-timestamp` and `webhook-signature: v1,<base64> ...`, signed over
+    `id.timestamp.body` with a `whsec_` key.
+- **The check**: the strict body is read as bytes, the timestamp must be within `tolerance` of the scheme's clock
+  either way, and each signature presented is compared with each secret's in constant time (`MessageDigest.isEqual`).
+  Only then is the body decoded. A failure never reaches the handler.
+- **Rotation**: the secrets are a function read per request, and any secret matching any signature passes, so an old
+  and a new secret overlap for as long as both are named.
+- **The answer**: a 400 tagged `signature_invalid` in the refusal envelope, the same for a missing header, a malformed
+  one, a stale timestamp and a mismatch. `onRefusal` hears it as `RefusalReason.SIGNATURE`; the cause is
+  `SignatureRefused.reason`, never the body. A tagged 400 of the endpoint's own may sit beside it.
+- **What can be signed**: a body held whole, which is `jsonBody`, a form or a negotiated body. `signedBy` on a
+  `rawBody()`, a multipart or streamed input, or no body at all is refused when the endpoint is built, since nothing
+  holds the bytes to check.
+- **A scheme as a value**: `stripe.verify(header, body)` answers `SignatureCheck.Valid` or
+  `Failed(SignatureFailure)`, and `stripe.sign(secret, body, at)` the headers a sender sends, for code that checks a
+  signature outside an endpoint.
+- **The document**: the scheme's headers are required header parameters, described with what is signed
+  ("HMAC-SHA256 over `t.body`, as Stripe signs: ..."), and the 400 is declared. OpenAPI has no security scheme for an
+  HMAC, so none is invented.
+- **The sender**: `signedBy` on a `webhook(...)` documents the same headers, and the generated client's sender, like
+  a signed endpoint's method, takes a `signer: WebhookSigner`. `hooks.signer(secret)` makes one, and it signs the
+  bytes the request sends.
+- **MCP**: a `signedBy` endpoint is refused as a tool. A model has no secret to sign with.
+- **Testing**: `request(stripeEvent, event).signedWith(stripe, secret, at = ...)` in `pelican-test` signs a request
+  as the sender would, so a test sends a valid, stale or forged event without computing an HMAC by hand.
+
 ## A request sent twice, answered once
 
 An endpoint that charges, sends or creates declares `idempotencyKey()`, and a caller that sends the same
@@ -4440,7 +4484,8 @@ An `Endpoint` was already a description rather than a route: a method, inputs,
 outputs, and no mention of a server. A webhook is that same description read in
 the other direction, which is why the block is the same block: the same
 `body(...)`, `header(...)`, `query(...)`, the same declared failures, the same
-`security(...)`. What it is not is a route.
+`security(...)`. What it is not is a route. A signed one says `signedBy(hooks)` rather than declaring the header
+by hand; see [A webhook that proves who sent it](#a-webhook-that-proves-who-sent-it).
 
 ### A webhook has no path, and that is the whole design
 
