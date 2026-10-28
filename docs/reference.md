@@ -13,7 +13,7 @@ Contents:
 - **Modules and backends:** [Modules](#modules), [The backend](#the-backend) (including [On Jetty](#on-jetty) and [On Gannet](#on-gannet)), [Choosing a JSON library](#choosing-a-json-library)
 - **Defining endpoints and inputs:** [Everything is a value](#everything-is-a-value), [Typechecked endpoints](#typechecked-endpoints), [Refined inputs](#refined-inputs), [More than one value](#more-than-one-value), [Cookies](#cookies), [Form bodies](#form-bodies), [Multipart uploads](#multipart-uploads)
 - **Responses and errors:** [Response headers](#response-headers), [Declared failures](#declared-failures), [More than one successful response](#more-than-one-successful-response), [One response, several renderings](#one-response-several-renderings), [Streaming](#a-whole-list-or-a-stream-of-one) (and the sections after it, through [Streaming behaviour](#streaming-behaviour)), [Errors](#errors-and-what-a-caller-is-told), [Limits and startup checks](#limits-and-startup-checks)
-- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Who may call](#what-a-caller-may-do), [Sessions](#a-session-in-a-cookie), [Tenants](#whose-request-it-is), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
+- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Who may call](#what-a-caller-may-do), [Sessions](#a-session-in-a-cookie), [Tenants](#whose-request-it-is), [Rate limits](#how-often-a-caller-may-call), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
 - **Documents and other readings:** [OpenAPI docs](#getting-the-openapi-docs), [Standalone JSON Schema](#a-schema-that-resolves-on-its-own) ([schemas.md](schemas.md)), [MCP tools](#tools-a-model-can-call) ([mcp.md](mcp.md)), [Webhooks](#webhooks-the-calls-the-service-sends)
 - **Generating code:** [The Gradle plugin](#the-gradle-plugin), [Client transports](#the-transport-a-generated-client-sends-with) ([generated-client.md](generated-client.md)), [Importing a document](#importing-an-openapi-document) ([importing.md](importing.md))
 - **Testing:** [Testing](#testing) ([golden-testing.md](golden-testing.md))
@@ -3045,6 +3045,44 @@ api(routes, codecs = JacksonCodecs) {
 
 Which rows a tenant may read is still the service's query. Pelican says whose
 request it is, not what they may see.
+
+## How often a caller may call
+
+An endpoint names the budget it spends from, and a request over it is a 429 that says when to come back
+([spec 0096](../specs/0096-how-often-a-caller-may-call.md)):
+
+```kotlin
+val orders = rateLimit("orders", 100, per = 1.minutes, burst = 20)    // shared by every endpoint naming it
+
+val placeOrder = endpoint(orderBody) {
+    post("orders")
+    authenticatedBy(caller)
+    tenanted(shop)
+    rateLimited(orders)
+    json<Order>(201)
+}
+
+api(routes, codecs = JacksonCodecs) { rateLimits(InMemoryRateLimitStore()) }
+```
+
+- **The budget** is a `TokenBucket`: `permits` every `per`, up to `burst` at once, one permit back every
+  `per / permits`. Endpoints naming the same limit spend from one bucket.
+- **Whose bucket**: the limit's name, the caller's subject and the tenant's id, so each caller in each tenant has its
+  own. An endpoint with neither caller nor tenant names a key of its own, `rateLimited(limit) {
+  header("X-Forwarded-For") }`, and one that names none is refused when it is built.
+- **When**: after the caller, `requires`, cross-site and tenant checks and before the body is read, so a request they
+  refuse spends nothing and a refused one costs no decoding.
+- **The answer**: a 429 tagged `rate_limited` in the refusal envelope, with `Retry-After` in whole seconds, rounded
+  up. `onRefusal` hears it as `RefusalReason.RATE_LIMITED`. A tagged 429 of the endpoint's own may sit beside it.
+- **The store**: `RateLimitStore.take(key, bucket, cost)` answers `Taken.Allowed(remaining)` or
+  `Taken.Denied(retryAfter)`, atomically across the nodes sharing it, and a denial takes nothing. It is the shape of
+  `surefold-ratelimit`'s `RateLimits`. `InMemoryRateLimitStore` counts by GCRA, for tests and one node.
+- **A store that cannot answer** lets the request through and is reported to `onServerError`: a limit guards
+  capacity, so its outage should not become the service's.
+- **The document and the client**: the 429 and its `Retry-After` are declared, and the operation's description says
+  the limit ("Rate limited per caller to 100 every 1m, bursts of 20, as `orders`."). A generated client's
+  `ApiCallFailed` carries `retryAfter`, and a `RetryingTransport` already waits what a 429 names before sending a
+  safe request again.
 
 ## A request sent twice, answered once
 

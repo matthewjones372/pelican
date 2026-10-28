@@ -609,6 +609,36 @@ a session from one shop is no use in another; see
 
 ---
 
+## Limiting how often a caller may call
+
+Two tickets a minute for each teller, the third a 429 saying when to come back:
+
+```kotlin
+import io.github.matthewjones372.pelican.InMemoryRateLimitStore
+import io.github.matthewjones372.pelican.rateLimit
+import kotlin.time.Duration.Companion.minutes
+
+val tickets = rateLimit("tickets", 2, per = 1.minutes)
+
+val stampTicket = endpoint {
+    post("tickets")
+    authenticatedBy(teller)
+    rateLimited(tickets)            // 429 with Retry-After: 30 once the two are spent
+    text()
+}
+
+api(routes, codecs = JacksonCodecs) {
+    authenticate(tellerToken, tellers)
+    rateLimits(InMemoryRateLimitStore())
+}
+```
+
+Each teller has a budget of their own, and in a tenanted service each tenant too. A client wrapped in `retrying()`
+waits the `Retry-After` before sending a GET again; see
+[How often a caller may call](reference.md#how-often-a-caller-may-call).
+
+---
+
 ## A request safe to send twice
 
 A POST that charges or creates declares a key, and a repeat of it is answered

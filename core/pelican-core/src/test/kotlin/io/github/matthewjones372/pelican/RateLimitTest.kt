@@ -2,9 +2,11 @@ package io.github.matthewjones372.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeSameInstanceAs
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
@@ -13,6 +15,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 
@@ -29,6 +32,7 @@ class RateLimitTest {
     private val clock = SteppedClock()
     private val ran = AtomicInteger()
     private val reported = mutableListOf<String>()
+    private val observed = mutableListOf<String>()
 
     private val bearer = bearerAuth()
     private val caller = authenticated(bearer) { it.subject }
@@ -70,6 +74,7 @@ class RateLimitTest {
         tenants(shop, InMemoryTenantDirectory(setOf("acme", "globex")))
         rateLimits(store)
         onError { _, _, error -> reported += error.message.orEmpty() }
+        onRefusal { reason, status, _ -> observed += "${reason.label} $status" }
     }
 
     private val served = api()
@@ -209,5 +214,63 @@ class RateLimitTest {
         keyOf("orders", "a/1:b", null, null) shouldNotBe keyOf("orders", "a", "b", null)
         keyOf("orders", null, "acme", null) shouldNotBe keyOf("orders", "acme", null, null)
         keyOf("orders", "ada", "acme", null) shouldBe "6:orders/3:ada/4:acme/-"
+    }
+
+    // ------------------------------------------------------------------ declaring it
+
+    @Test
+    fun `onRefusal hears the 429 as rate_limited`() {
+        repeat(3) { orders() }
+        orders()
+
+        observed shouldContainExactly listOf("rate_limited 429")
+    }
+
+    @Test
+    fun `the 429 is declared, tagged, with its Retry-After`() {
+        val declared = listOrders.errors.single { it.status == 429 }
+
+        declared shouldBeSameInstanceAs listOrders.rateLimit?.refused
+        declared.tag shouldBe "rate_limited"
+        declared.headers.map { it.name } shouldContainExactly listOf("Retry-After")
+    }
+
+    @Test
+    fun `an endpoint's own 429 is declared beside it, the two told apart by tag`() {
+        val busy = errorJson<ApiError>(429, "The warehouse is busy").tagged("warehouse_busy", field = "error")
+        val own = endpoint {
+            get("own")
+            authenticatedBy(caller)
+            rateLimited(orders)
+            json<String>().orFail(busy)
+        }
+
+        own.errors.filter { it.status == 429 }.map { it.description } shouldContainExactly listOf(
+            "Too many requests. Send again after the time Retry-After gives.",
+            "The warehouse is busy",
+        )
+    }
+
+    // ------------------------------------------------------------- a client that waits
+
+    @Test
+    fun `a retrying client waits the Retry-After a spent budget names, and gets in`() {
+        val oncePerSecond = endpoint {
+            get("tick")
+            rateLimited(rateLimit("tick", 1, per = 1.seconds)) { "everyone" }
+            text()
+        }
+        val served = api(listOf(ServerEndpoint(oncePerSecond) { CompletableFuture.completedStage("tick" as Any?) })) {
+            rateLimits(InMemoryRateLimitStore())
+        }
+        val client = InMemoryClientTransport(served).retrying(retryPolicy { initialBackoff = java.time.Duration.ZERO })
+        fun tick() = client.send(ClientRequest(Method.GET, "http://api.example/tick", emptyList()))
+            .toCompletableFuture().join()
+
+        tick().status shouldBe 200
+        val started = System.nanoTime()
+
+        tick().status shouldBe 200
+        (System.nanoTime() - started).nanoseconds shouldBeGreaterThanOrEqualTo 1.seconds
     }
 }
