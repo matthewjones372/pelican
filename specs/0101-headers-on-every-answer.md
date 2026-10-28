@@ -1,4 +1,4 @@
-# 0096 — Headers on every answer
+# 0101 — Headers on every answer
 
 Answers roadmap item 3, "A filter that can change the response".
 
@@ -56,14 +56,14 @@ a filter sees (and run filters on a request that failed to decode).
 
 ## Stack
 
-- [ ] **`spec-0096-set-cookie`**: repeated `Set-Cookie` through `Params`, `addRawHeader`, the in-memory and test
+- [ ] **`spec-0101-set-cookie`**: repeated `Set-Cookie` through `Params`, `addRawHeader`, the in-memory and test
       clients. Done when: a handler setting two cookies answers both, in order, on every backend.
-- [ ] **`spec-0096-policy`**: `responseHeaders { }`, `Answer`, applied by all three backends to endpoints and refusals.
+- [ ] **`spec-0101-policy`**: `responseHeaders { }`, `Answer`, applied by all three backends to endpoints and refusals.
       Done when: the parity suite sees the policy's header on a 200, a declared failure, a filter's 401, a decode
       400, a 404 for no route and a 405.
-- [ ] **`spec-0096-docs-mcp`**: the docs modules and both MCP handlers apply it.
+- [ ] **`spec-0101-docs-mcp`**: the docs modules and both MCP handlers apply it.
       Done when: `/openapi.json`, the reference page and `/mcp` carry it on every backend.
-- [ ] **`spec-0096-reference`**: roadmap item 3 removed; Filters states where body rewriting goes; cookbook entry
+- [ ] **`spec-0101-reference`**: roadmap item 3 removed; Filters states where body rewriting goes; cookbook entry
       for security headers; changelog.
 
 ## Acceptance
@@ -80,5 +80,5 @@ a filter sees (and run filters on a request that failed to decode).
    `Cache-Control` the policy set; the policy can read `answer` to stay off it instead.
 3. **Does the policy see the status?** A refusal's status is known; a streamed response's is too, before its first
    byte. Recommended: yes, as `Answer.status`, since `Cache-Control` on an error is a common rule.
-4. **Does this land before 0094 and 0095?** Both write more than one `Set-Cookie`. Recommended: `spec-0096-set-cookie`
+4. **Does this land before 0094 and 0098?** Both write more than one `Set-Cookie`. Recommended: `spec-0101-set-cookie`
    first, and 0094's `spec-0094-cookies` on it.
