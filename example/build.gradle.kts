@@ -58,11 +58,11 @@ dependencies {
     // Live and ready probes: `example.health` is what they look like.
     implementation(project(":pelican-health"))
     implementation("io.opentelemetry:opentelemetry-sdk:1.67.0")
-    runtimeOnly("ch.qos.logback:logback-classic:1.6.4")
+    runtimeOnly("ch.qos.logback:logback-classic:1.6.5")
     // `example.logging` claims a level per status and a template rather than a
     // path; RequestLogTest reads the lines back through logback's own appender
     // rather than trusting the source, which needs it at compile scope there.
-    testImplementation("ch.qos.logback:logback-classic:1.6.4")
+    testImplementation("ch.qos.logback:logback-classic:1.6.5")
 
     // The OpenAPI documents this repository emits are checked by a parser that
     // is not the one that wrote them — swagger-parser reads the document back
