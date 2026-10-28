@@ -51,6 +51,11 @@ class ApiCallFailed(
     val path: String,
     body: String,
     cause: Throwable? = null,
+    /**
+     * The seconds a `Retry-After` asked the caller to wait, as a rate limit's
+     * 429 sends; null where it named none, or named a date rather than a wait.
+     */
+    val retryAfter: Long? = null,
 ) : RuntimeException("$method $path -> $status: ${body.take(MESSAGE_BODY_CHARS)}", cause) {
 
     /**
@@ -520,7 +525,7 @@ class TippingClient(
     private fun ClientResponse.succeeded(): Boolean = status in 200..299
 
     private fun failed(method: Method, path: String, response: TextResponse): Nothing =
-        throw ApiCallFailed(response.status, method.name, path, response.body)
+        throw ApiCallFailed(response.status, method.name, path, response.body, retryAfter = response.retryAfter())
 
     /**
      * The body decoded, or a refusal naming the call it came back on.
@@ -542,7 +547,12 @@ class TippingClient(
     private fun drain(response: ClientResponse): String = response.text()
 
     private fun failedStream(method: Method, path: String, response: ClientResponse): Nothing =
-        throw ApiCallFailed(response.status, method.name, path, drain(response))
+        throw ApiCallFailed(response.status, method.name, path, drain(response), retryAfter = response.retryAfter())
+
+    /** A `Retry-After` in seconds, the one form a wait can be read from without this machine's clock. */
+    private fun TextResponse.retryAfter(): Long? = header("Retry-After")?.trim()?.toLongOrNull()?.takeIf { it >= 0 }
+
+    private fun ClientResponse.retryAfter(): Long? = header("Retry-After")?.trim()?.toLongOrNull()?.takeIf { it >= 0 }
 
     /**
      * The exchange, waited for.
