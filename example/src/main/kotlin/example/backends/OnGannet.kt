@@ -78,6 +78,8 @@ val gannetRoutes: List<ServerEndpoint> = listOf(
 
     stampTicket handledNow { "stamped for ${this[teller]}" },
 
+    tipNoticed handledNow { tip -> "noticed a tip of ${tip.amount}" },
+
     forget handledWith { _ -> },
 
     peek handledWith { _ -> },

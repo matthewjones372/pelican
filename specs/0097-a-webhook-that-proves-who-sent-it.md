@@ -60,12 +60,12 @@ Recommended: A.
 
 ## Stack
 
-- [ ] **`spec-0097-schemes`**: `HmacScheme`, Stripe and Standard Webhooks parsing, signing and verifying, as values.
-      Done when: Stripe's and the Standard Webhooks spec's published test vectors verify, and a stale or altered one
-      does not, with a fixed clock.
-- [ ] **`spec-0097-verify`**: `signedBy` on an endpoint, checked in core before decode on every backend's read, the
-      declared 400, `RefusalReason.SIGNATURE`. Done when: in process, a forged, stale or unsigned request is a 400,
-      `onRefusal` hears it, and the handler did not run.
+- [x] **`spec-0097-schemes`** ([#418](https://github.com/matthewjones372/pelican/pull/418)): `HmacScheme`, Stripe
+      and Standard Webhooks parsing, signing and verifying, as values. Done when: Stripe's and the Standard Webhooks
+      spec's published test vectors verify, and a stale or altered one does not, with a fixed clock.
+- [x] **`spec-0097-verify`** ([#419](https://github.com/matthewjones372/pelican/pull/419)): `signedBy` on an endpoint,
+      checked in core before decode on every backend's read, the declared 400, `RefusalReason.SIGNATURE`. Done when:
+      in process, a forged, stale or unsigned request is a 400, `onRefusal` hears it, and the handler did not run.
 - [ ] **`spec-0097-parity`** (split from verify, past the size cap): `signedWith` in `pelican-test`, and a signed
       endpoint in the backends example. Done when: every backend answers a signed, forged and stale delivery alike.
 - [ ] **`spec-0097-sign`**: `signedBy` on a `webhook(...)`, the generated sender's `signer` parameter, the document's

@@ -91,6 +91,11 @@ public final class io/github/matthewjones372/pelican/test/ResponseSpec {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/matthewjones372/pelican/test/SigningKt {
+	public static final fun signedWith (Lio/github/matthewjones372/pelican/test/RequestSpec;Lio/github/matthewjones372/pelican/HmacScheme;Ljava/lang/String;Ljava/time/Instant;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public static synthetic fun signedWith$default (Lio/github/matthewjones372/pelican/test/RequestSpec;Lio/github/matthewjones372/pelican/HmacScheme;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+}
+
 public final class io/github/matthewjones372/pelican/test/TestCallers : io/github/matthewjones372/pelican/Authenticator {
 	public static final field Companion Lio/github/matthewjones372/pelican/test/TestCallers$Companion;
 	public fun <init> (Ljava/util/Map;)V
