@@ -51,6 +51,22 @@ class HmacScheme internal constructor(
     /** What the signature is over, in words, for the document. */
     val description: String get() = format.description
 
+    /**
+     * The 400 a request whose signature does not verify is answered with: one tag for every cause, so a caller
+     * learns nothing of which check it failed. Tagged under the envelope's `error`, so a 400 of the endpoint's own
+     * may share it.
+     */
+    val refused: ErrorSpec = ErrorSpec(
+        BAD_REQUEST,
+        "The request's signature did not verify.",
+        type = null,
+        tag = SIGNATURE_TAG,
+        discriminator = "error",
+    )
+
+    /** What signs a body with [secret] as a sender does, now by this scheme's clock: a generated client's signer. */
+    fun signer(secret: String): WebhookSigner = WebhookSigner { body -> sign(secret, body, clock.instant()) }
+
     /** Whether [body], sent with [header]s, was signed with one of the secrets within [tolerance] of now. */
     fun verify(header: (String) -> String?, body: ByteArray): SignatureCheck = verify(header, body, clock.instant())
 
@@ -108,17 +124,10 @@ fun standardWebhooks(
     secrets: () -> List<String>,
 ): HmacScheme = HmacScheme(StandardWebhooksFormat, tolerance, clock, secrets)
 
-/**
- * The 400 a request whose signature does not verify is answered with: one tag for every cause, so a caller learns
- * nothing of which check it failed. Tagged under the envelope's `error`, so a 400 of the endpoint's own may share it.
- */
-internal fun signatureRefusal(): ErrorSpec = ErrorSpec(
-    BAD_REQUEST,
-    "The request's signature did not verify.",
-    type = null,
-    tag = SIGNATURE_TAG,
-    discriminator = "error",
-)
+/** The headers a signed request carries for [body], as [HmacScheme.signer] makes them. */
+fun interface WebhookSigner {
+    fun headers(body: ByteArray): List<Pair<String, String>>
+}
 
 /** [scheme]'s check of [bytes] as [header]s present them, thrown as the declared 400 where it fails. */
 internal fun refuseUnsigned(scheme: HmacScheme, header: (String) -> String?, bytes: ByteArray) {

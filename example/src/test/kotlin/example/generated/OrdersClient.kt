@@ -21,6 +21,7 @@ import io.github.matthewjones372.pelican.ClientTransport
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.UploadedFile
+import io.github.matthewjones372.pelican.WebhookSigner
 import io.github.matthewjones372.pelican.formCodec
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
@@ -650,6 +651,7 @@ class OrdersClient(
         origin: String = base,
         standingHeaders: Map<String, String> = headers(),
         deadline: Duration? = timeout,
+        signer: WebhookSigner? = null,
     ): ClientRequest {
         val search = query
             .flatMap { (name, value) -> occurrences(name, value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
@@ -664,7 +666,9 @@ class OrdersClient(
             listOfNotNull((multipart?.contentType ?: contentType)?.let { "Content-Type" to it }) +
                 standingHeaders.map { (name, value) -> name to value } +
                 headerParams.mapNotNull { (name, value) -> plain(value)?.let { name to it } } +
-                (if (jar.isEmpty()) emptyList() else listOf("Cookie" to jar.joinToString("; ")))
+                (if (jar.isEmpty()) emptyList() else listOf("Cookie" to jar.joinToString("; "))) +
+                // Over the exact bytes sent; a signed body is always text, since a streamed one cannot be signed.
+                signer?.headers((body as ClientRequest.Body.Text).content.toByteArray(Charsets.UTF_8)).orEmpty()
 
         return ClientRequest(
             method = method,

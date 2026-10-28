@@ -616,9 +616,11 @@ public final class io/github/matthewjones372/pelican/HeaderValue {
 public final class io/github/matthewjones372/pelican/HmacScheme {
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getHeaders ()Ljava/util/List;
+	public final fun getRefused ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public final fun getTolerance-UwyO8pc ()J
 	public final fun sign (Ljava/lang/String;[BLjava/time/Instant;Ljava/lang/String;)Ljava/util/List;
 	public static synthetic fun sign$default (Lio/github/matthewjones372/pelican/HmacScheme;Ljava/lang/String;[BLjava/time/Instant;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
+	public final fun signer (Ljava/lang/String;)Lio/github/matthewjones372/pelican/WebhookSigner;
 	public fun toString ()Ljava/lang/String;
 	public final fun verify (Lkotlin/jvm/functions/Function1;[B)Lio/github/matthewjones372/pelican/SignatureCheck;
 	public final fun verify (Lkotlin/jvm/functions/Function1;[BLjava/time/Instant;)Lio/github/matthewjones372/pelican/SignatureCheck;
@@ -2073,6 +2075,10 @@ public final class io/github/matthewjones372/pelican/Webhook {
 	public final fun getName ()Ljava/lang/String;
 	public final fun getOperation ()Lio/github/matthewjones372/pelican/Endpoint;
 	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/WebhookSigner {
+	public abstract fun headers ([B)Ljava/util/List;
 }
 
 public final class io/github/matthewjones372/pelican/WebhooksKt {

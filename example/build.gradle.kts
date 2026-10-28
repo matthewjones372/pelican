@@ -343,6 +343,13 @@ pelican {
             specFunction.set("whoAmISpec")
             packageName.set("example.generated.whoami")
         }
+        // Spec 0097: a signed endpoint's client, generated into `build/` so what is under test is that its signer's
+        // headers verify at the endpoint the client was generated from.
+        create("tipHooks") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("tipHooksSpec")
+            packageName.set("example.generated.tiphooks")
+        }
     }
     /**
      * The same document, read back the other way.
@@ -401,6 +408,7 @@ sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/or
 // Spec 0063's client, generated the same way and for the same reason.
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/adoption"))
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/whoAmI"))
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/tipHooks"))
 
 // Generated source compiled here but written by another module's tests. detekt
 // filters by the path *inside* the source root, so this is that path rather
@@ -414,6 +422,7 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     exclude("example/generated/suspending/**")
     exclude("example/generated/adoption/**")
     exclude("example/generated/whoami/**")
+    exclude("example/generated/tiphooks/**")
 }
 
 tasks.named("compileTestKotlin") {
@@ -424,6 +433,7 @@ tasks.named("compileTestKotlin") {
         "generateOrdersSuspendingClient",
         "generateAdoptionClient",
         "generateWhoAmIClient",
+        "generateTipHooksClient",
     )
 }
 
