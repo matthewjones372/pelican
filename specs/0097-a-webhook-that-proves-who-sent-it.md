@@ -37,7 +37,8 @@ client.orderPlaced(url, order, signer = hooks.signer(secret))   // the generated
 
 - **Two schemes, both HMAC-SHA256 in core** (`javax.crypto`, no dependency). Stripe: `t=<unix>,v1=<hex>[,v1=...]`
   over `t.body`. Standard Webhooks: `webhook-id`, `webhook-timestamp`, `webhook-signature: v1,<base64> ...` over
-  `id.timestamp.body`, with a `whsec_` base64 key. `hmacSignature(...)` builds another of the same family.
+  `id.timestamp.body`, with a `whsec_` base64 key. `hmacSignature(...)` building another of the same
+  family is left for when a third sender needs one; the format is internal until then.
 - **Order:** the strict body is read as bytes (core already decodes from a `ByteArray`), the timestamp checked
   against the API's clock within `tolerance`, each presented signature compared with each secret's using
   `MessageDigest.isEqual`, and only then is the body decoded. A failure never reaches the handler.
@@ -69,9 +70,11 @@ Recommended: A.
 - [x] **`spec-0097-parity`** ([#420](https://github.com/matthewjones372/pelican/pull/420), split from verify):
       `signedWith` in `pelican-test`, and a signed endpoint in the backends example. Done when: every backend answers
       a signed, forged and stale delivery alike.
-- [ ] **`spec-0097-sign`**: `signedBy` on a `webhook(...)`, the generated sender's `signer` parameter, the document's
-      headers. Done when: a generated sender's request verifies against the receiving endpoint, in process.
-- [ ] **`spec-0097-docs`**: reference, cookbook (Stripe end to end), changelog.
+- [x] **`spec-0097-sign`** ([#421](https://github.com/matthewjones372/pelican/pull/421)): `signedBy` on a
+      `webhook(...)`, the generated sender's `signer` parameter, the document's headers. Done when: a generated
+      sender's request verifies against the receiving endpoint, in process.
+- [x] **`spec-0097-docs`**: reference, cookbook (Stripe end to end), changelog, and MCP's refusal of a signed
+      endpoint.
 
 ## Acceptance
 

@@ -639,6 +639,60 @@ waits the `Retry-After` before sending a GET again; see
 
 ---
 
+## A Stripe webhook, end to end
+
+Stripe signs each event it sends with `Stripe-Signature`. The endpoint names the scheme, and an event that was
+forged, replayed later than five minutes or sent without the header never reaches the handler:
+
+```kotlin
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jsonBody
+import io.github.matthewjones372.pelican.stripeSignature
+
+data class StripeEvent(val id: String, val type: String)
+
+// Read per request: during a rotation, name the old secret too until Stripe stops using it.
+val stripe = stripeSignature { listOfNotNull(System.getenv("STRIPE_WEBHOOK_SECRET")) }
+
+val stripeEvent = endpoint(jsonBody<StripeEvent>()) {
+    post("hooks" / "stripe")
+    signedBy(stripe)                // a 400 tagged signature_invalid unless the bytes received verify
+    text()
+}
+
+val service = api(listOf(stripeEvent handledNow { event -> "received ${event.type}" }), codecs = JacksonCodecs)
+```
+
+The handler gets the decoded event, checked first over the exact bytes Stripe sent. `onRefusal` hears a refused one
+as `RefusalReason.SIGNATURE`. The document lists `Stripe-Signature` as a required header, and the 400 beside the
+endpoint's own answers.
+
+A test signs a delivery as Stripe would, with `signedWith` from `pelican-test`, and sends a stale or forged one the
+same way:
+
+```kotlin
+val secret = "whsec_test"
+val stripe = stripeSignature { listOf(secret) }
+val event = StripeEvent("evt_1", "payment_intent.succeeded")
+
+client.transport.send(client.request(stripeEvent, event).signedWith(stripe, secret))
+    .shouldHaveStatus(200)
+
+val sixMinutesAgo = Instant.now().minus(Duration.ofMinutes(6))
+val stale = client.request(stripeEvent, event).signedWith(stripe, secret, at = sixMinutesAgo)
+client.transport.send(stale).shouldHaveStatus(400)
+```
+
+A service sending events of its own declares `signedBy(standardWebhooks { secrets })` on its `webhook(...)`, and the
+generated sender takes a `signer`; see
+[A webhook that proves who sent it](reference.md#a-webhook-that-proves-who-sent-it).
+
+---
+
 ## A request safe to send twice
 
 A POST that charges or creates declares a key, and a repeat of it is answered
