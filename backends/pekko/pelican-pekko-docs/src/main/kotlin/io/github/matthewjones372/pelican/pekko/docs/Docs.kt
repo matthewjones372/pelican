@@ -14,6 +14,7 @@ import io.github.matthewjones372.pelican.pekko.Handlers
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.start
 import io.github.matthewjones372.pelican.pekko.toRoute
+import io.github.matthewjones372.pelican.pekko.withResponseHeaders
 import io.github.matthewjones372.pelican.spi.CorsHeaders
 import org.apache.pekko.actor.ClassicActorSystemProvider
 import org.apache.pekko.actor.typed.ActorSystem
@@ -73,7 +74,7 @@ fun Api.docsRoutes(docs: Docs = docs()): List<Route> {
         docs.referencePage(title, specPath.orEmpty(), document)?.let { (path, page) ->
             add(staticRoute(path, ContentTypes.TEXT_HTML_UTF8, page, cors))
         }
-    }
+    }.map { it.withResponseHeaders(this, isDocs = true) }
 }
 
 /** The endpoints and the documentation, as one route. */
