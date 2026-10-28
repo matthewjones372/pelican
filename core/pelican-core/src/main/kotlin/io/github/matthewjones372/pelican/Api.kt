@@ -257,6 +257,12 @@ class Api internal constructor(
 
     /** Headers on every response this Api's backend writes, refusals and unmatched routes included; null adds none. */
     val responseHeaders: ResponseHeaderPolicy? = null,
+
+    /**
+     * The header the proxy in front of this service writes the client's address in, which [Params.callerAddress]
+     * then reads before the socket peer. Null trusts no header: any client can send one.
+     */
+    val callerAddressHeader: String? = null,
 ) {
     /**
      * The largest single frame of a streamed request body, over which the frame

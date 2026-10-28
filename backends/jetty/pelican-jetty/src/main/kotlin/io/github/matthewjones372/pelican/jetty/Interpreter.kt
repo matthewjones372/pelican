@@ -27,6 +27,7 @@ import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.RouteIndex
 import io.github.matthewjones372.pelican.spi.Slots
 import io.github.matthewjones372.pelican.spi.acceptable
+import io.github.matthewjones372.pelican.spi.callerAddress
 import io.github.matthewjones372.pelican.spi.decodeCaller
 import io.github.matthewjones372.pelican.spi.handlerFor
 import io.github.matthewjones372.pelican.spi.ndjsonFrames
@@ -263,7 +264,14 @@ internal class PelicanHandler(
         val ep = se.endpoint
         // Built before decoding, so a filter or a failing decode can still put a header on the way out.
         val view = JettyView(request)
-        val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep), requestHeaders = view)
+        val params = Params(
+            values,
+            request,
+            ep,
+            resumeFrom = request.resumePoint(ep),
+            requestHeaders = view,
+            callerAddress = api.callerAddress(Request.getRemoteAddr(request), view),
+        )
 
         val accept = view.headers(HttpHeader.ACCEPT.asString())
 

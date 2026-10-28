@@ -119,6 +119,17 @@ class ApiBuilder internal constructor() {
 
     private var responseHeaders: ResponseHeaderPolicy? = null
 
+    /**
+     * [Api.callerAddressHeader]: [Params.callerAddress] is the first entry of [trustHeader] where a request carries
+     * it, and the socket peer where it does not. Name only the header your own proxy writes.
+     */
+    fun callerAddress(trustHeader: String) {
+        require(trustHeader.isNotBlank()) { "Name the header your proxy writes the client's address in" }
+        callerAddressHeader = trustHeader
+    }
+
+    private var callerAddressHeader: String? = null
+
     /** [Api.onRefusal] — `onRefusal(refusalCounter(registry))` for the meter. */
     fun onRefusal(observer: RefusalObserver) {
         onRefusal = observer
@@ -150,6 +161,7 @@ class ApiBuilder internal constructor() {
         tenants = tenants,
         rateLimits = rateLimits,
         responseHeaders = responseHeaders,
+        callerAddressHeader = callerAddressHeader,
     )
 }
 

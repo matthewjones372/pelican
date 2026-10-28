@@ -18,6 +18,7 @@ public final class io/github/matthewjones372/pelican/AnyOf : io/github/matthewjo
 
 public final class io/github/matthewjones372/pelican/Api {
 	public final fun getAuthenticators ()Ljava/util/Map;
+	public final fun getCallerAddressHeader ()Ljava/lang/String;
 	public final fun getCodecs ()Lio/github/matthewjones372/pelican/Codecs;
 	public final fun getCors ()Lio/github/matthewjones372/pelican/Cors;
 	public final fun getCovers ()Ljava/util/List;
@@ -47,6 +48,7 @@ public final class io/github/matthewjones372/pelican/Api {
 
 public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun authenticate (Lio/github/matthewjones372/pelican/SecurityScheme;Lio/github/matthewjones372/pelican/Authenticator;)V
+	public final fun callerAddress (Ljava/lang/String;)V
 	public final fun filter (Lio/github/matthewjones372/pelican/Filter;)V
 	public final fun getCors ()Lio/github/matthewjones372/pelican/Cors;
 	public final fun getCovers ()Ljava/util/List;
@@ -794,6 +796,7 @@ public final class io/github/matthewjones372/pelican/In6 {
 
 public final class io/github/matthewjones372/pelican/InMemoryClientTransport : io/github/matthewjones372/pelican/ClientTransport {
 	public fun <init> (Lio/github/matthewjones372/pelican/Api;)V
+	public fun <init> (Lio/github/matthewjones372/pelican/Api;Ljava/lang/String;)V
 	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
 }
 
@@ -1315,14 +1318,17 @@ public abstract interface class io/github/matthewjones372/pelican/ParamKey {
 public final class io/github/matthewjones372/pelican/Params {
 	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;Lio/github/matthewjones372/pelican/Credentials;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;Lio/github/matthewjones372/pelican/Credentials;)V
 	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;Lio/github/matthewjones372/pelican/Credentials;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;Lio/github/matthewjones372/pelican/Credentials;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/Object;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/String;Lio/github/matthewjones372/pelican/Credentials;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun addRawHeader (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun contains (Lio/github/matthewjones372/pelican/Attribute;)Z
 	public final fun contains (Lio/github/matthewjones372/pelican/ParamKey;)Z
 	public final fun find (Lio/github/matthewjones372/pelican/Attribute;)Ljava/lang/Object;
 	public final fun get (Lio/github/matthewjones372/pelican/Attribute;)Ljava/lang/Object;
 	public final fun get (Lio/github/matthewjones372/pelican/ParamKey;)Ljava/lang/Object;
+	public final fun getCallerAddress ()Ljava/lang/String;
 	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
 	public final fun getUnderlying ()Ljava/lang/Object;
 	public final fun missingRequiredHeaders ()Ljava/util/List;
@@ -2105,6 +2111,10 @@ public final class io/github/matthewjones372/pelican/WebhooksKt {
 	public static final fun getOperationName (Lio/github/matthewjones372/pelican/Webhook;)Ljava/lang/String;
 	public static final fun webhook (Ljava/lang/String;Lio/github/matthewjones372/pelican/Method;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/Webhook;
 	public static synthetic fun webhook$default (Ljava/lang/String;Lio/github/matthewjones372/pelican/Method;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/Webhook;
+}
+
+public final class io/github/matthewjones372/pelican/spi/CallerAddressKt {
+	public static final fun callerAddress (Lio/github/matthewjones372/pelican/Api;Ljava/lang/String;Lio/github/matthewjones372/pelican/Credentials;)Ljava/lang/String;
 }
 
 public final class io/github/matthewjones372/pelican/spi/ClassifiedError {

@@ -19,7 +19,21 @@ class Params(
     internal val resumeFrom: String? = null,
     /** The request's headers, as the interpreter read them for the caller check. Null for a hand-built [Params]. */
     private val requestHeaders: Credentials? = null,
+    /**
+     * Where the request came from: the socket peer, or the first entry of the header `callerAddress(trustHeader =
+     * ...)` names where the request carries it. No brackets and no port. Null for a hand-built [Params].
+     */
+    val callerAddress: String? = null,
 ) {
+    @Deprecated("Kept so code compiled against 1.2 still links.", level = DeprecationLevel.HIDDEN)
+    constructor(
+        values: Map<ParamKey<*>, Any?>,
+        underlying: Any?,
+        endpoint: Endpoint<*, *>? = null,
+        resumeFrom: String? = null,
+        requestHeaders: Credentials? = null,
+    ) : this(values, underlying, endpoint, resumeFrom, requestHeaders, null)
+
     @Deprecated("Kept so code compiled against 1.0 still links.", level = DeprecationLevel.HIDDEN)
     constructor(
         values: Map<ParamKey<*>, Any?>,

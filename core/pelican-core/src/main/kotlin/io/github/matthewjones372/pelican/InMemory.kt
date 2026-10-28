@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican
 
 import io.github.matthewjones372.pelican.spi.RequestBodyCodecs
 import io.github.matthewjones372.pelican.spi.acceptable
+import io.github.matthewjones372.pelican.spi.callerAddress
 import io.github.matthewjones372.pelican.spi.decode
 import io.github.matthewjones372.pelican.spi.decodeCaller
 import io.github.matthewjones372.pelican.spi.decodeList
@@ -44,7 +45,14 @@ import java.util.concurrent.CompletionStage
  * `Flow`. An http4k-bound API streams its *responses* as a `Sequence` and those
  * cross whole.
  */
-class InMemoryClientTransport(private val api: Api) : ClientTransport {
+class InMemoryClientTransport(
+    private val api: Api,
+    /** The socket peer a served request would have: what `Params.callerAddress` reads unless a trusted header says. */
+    private val callerAddress: String,
+) : ClientTransport {
+
+    /** From a loopback client, as a test calling a server on this machine would be. */
+    constructor(api: Api) : this(api, LOOPBACK)
 
     private val index = api.endpoints.routeIndex()
 
@@ -90,6 +98,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
             endpoint,
             resumeFrom = if (endpoint.resumable) request.header(SseOutput.LAST_EVENT_ID) else null,
             requestHeaders = credentials,
+            callerAddress = api.callerAddress(callerAddress, credentials),
         )
         val resolved = codecs.getValue(matched)
 
@@ -488,3 +497,5 @@ private class FrameStream(frames: Sequence<String>) : InputStream() {
 
 /** A Kotlin Byte is signed; `InputStream.read` promises 0..255. */
 private const val BYTE_MASK = 0xFF
+
+private const val LOOPBACK = "127.0.0.1"

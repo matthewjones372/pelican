@@ -48,7 +48,7 @@ Jetty request. It keeps services backend-specific, and fakes a type Pelican does
 
 ## Stack
 
-- [ ] **`spec-0103-core`**: `Params.callerAddress` and `callerAddress(trustHeader)` on the `Api`, filled by Jetty and
+- [x] **`spec-0103-core`**: `Params.callerAddress` and `callerAddress(trustHeader)` on the `Api`, filled by Jetty and
       the in-memory transport. Done when: a filter reading it answers the same on both, and a hand-built `Params`
       reads null.
 - [ ] **`spec-0103-backends`**: Pekko and Gannet fill it, and the cross-backend suite checks a trusted header and its
