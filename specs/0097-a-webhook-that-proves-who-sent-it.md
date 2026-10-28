@@ -87,3 +87,13 @@ Recommended: A.
 4. **Does `pelican-import` read the scheme back?** Recommended: not in this spec; it reads the headers as plain headers.
 5. **Does `onRefusal` hear a bad signature?** Specs 0093 to 0096 report every refusal Pelican answers. Recommended: yes,
    as a new `RefusalReason.SIGNATURE` (`signature`), with the cause (missing, stale, mismatch) in the log only.
+
+## Decisions
+
+Matt took each recommendation on 2026-10-28.
+
+1. **A bad signature is a 400**, in the refusal envelope; no 401, since there is no challenge to name.
+2. **The tolerance is 5 minutes by default**, and a timestamp that far in the future is refused the same way.
+3. **The handler gets the decoded body**; a service that wants the raw bytes declares `rawBody()` without `signedBy`.
+4. **`pelican-import` reads the headers as plain headers**, not back into a scheme.
+5. **`onRefusal` hears a bad signature** as `RefusalReason.SIGNATURE`, with the cause in the log only.
