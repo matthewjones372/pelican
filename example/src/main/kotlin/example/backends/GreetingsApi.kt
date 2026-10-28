@@ -14,6 +14,7 @@ import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.Filter
 import io.github.matthewjones372.pelican.InMemoryIdempotencyStore
+import io.github.matthewjones372.pelican.InMemoryRateLimitStore
 import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
@@ -87,6 +88,8 @@ fun greetingsApi(
     authenticate(tellerToken, tellers)
     authenticate(visits.scheme, visits)
     tenants(shop, shops)
+    // One store per Api, as for idempotency keys, so each backend's server counts its own.
+    rateLimits(InMemoryRateLimitStore())
 }
 
 /** What [stamping] worked out, for anything downstream that wants it. */
