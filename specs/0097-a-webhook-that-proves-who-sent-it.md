@@ -47,6 +47,8 @@ client.orderPlaced(url, order, signer = hooks.signer(secret))   // the generated
 - **The document:** the scheme's headers as required header parameters, described ("HMAC-SHA256 over ..."), on the
   endpoint or the webhook. OpenAPI has no security scheme for an HMAC, so none is invented.
 - **MCP:** a `signedBy` endpoint is refused as a tool; a model cannot sign.
+- **Testing:** `pelican-test` signs a request as the sender would, `request(stripeEvent, event).signedWith(stripe,
+  secret, at = clock.instant())`, so a test sends a valid, stale or altered event without computing an HMAC by hand.
 
 ## Why this shape
 
@@ -61,8 +63,9 @@ Recommended: A.
 - [ ] **`spec-0097-schemes`**: `HmacScheme`, Stripe and Standard Webhooks parsing, signing and verifying, as values.
       Done when: Stripe's and the Standard Webhooks spec's published test vectors verify, and a stale or altered one
       does not, with a fixed clock.
-- [ ] **`spec-0097-verify`**: `signedBy` on an endpoint, checked in core before decode, the declared 400, refusals.
-      Done when: on every backend a forged, stale or unsigned request is a 400 and the handler did not run.
+- [ ] **`spec-0097-verify`**: `signedBy` on an endpoint, checked in core before decode, the declared 400, refusals,
+      and `signedWith` in `pelican-test`. Done when: on every backend a forged, stale or unsigned request is a 400,
+      `onRefusal` hears it, and the handler did not run.
 - [ ] **`spec-0097-sign`**: `signedBy` on a `webhook(...)`, the generated sender's `signer` parameter, the document's
       headers. Done when: a generated sender's request verifies against the receiving endpoint, in process.
 - [ ] **`spec-0097-docs`**: reference, cookbook (Stripe end to end), changelog.
@@ -82,3 +85,5 @@ Recommended: A.
 3. **Should the handler see the raw bytes as well?** Stripe's SDK wants them to build its own event. Recommended: no;
    the handler gets the decoded body, and a service that prefers the SDK declares `rawBody()` without `signedBy`.
 4. **Does `pelican-import` read the scheme back?** Recommended: not in this spec; it reads the headers as plain headers.
+5. **Does `onRefusal` hear a bad signature?** Specs 0093 to 0096 report every refusal Pelican answers. Recommended: yes,
+   as a new `RefusalReason.SIGNATURE` (`signature`), with the cause (missing, stale, mismatch) in the log only.
