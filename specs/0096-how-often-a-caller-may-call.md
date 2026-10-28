@@ -59,10 +59,11 @@ B, one limit on the whole `Api`, is simpler but cannot tell a cheap read from an
       `rateLimited(...)`, the store, `rateLimits(...)`, the key, the 429 and `Retry-After`. Done when: served in
       process, the 101st call in a minute is a 429 naming when to come back, and another caller or tenant is
       unaffected.
-- [ ] **`spec-0096-take`** (added): the store takes Surefold's shape, `take(key, bucket, cost)`, with a burst.
+- [x] **`spec-0096-take`** ([#413](https://github.com/matthewjones372/pelican/pull/413), added): the store takes
+      Surefold's shape, `take(key, bucket, cost)`, with a burst.
       Done when: a bucket allows its burst, says what is left, and a denial takes nothing.
 - [ ] **`spec-0096-refusal`**: `RefusalReason.RATE_LIMITED`, and the 429 declared in the refusal envelope.
-      Done when: `onRefusal` hears it, and the endpoint's errors list it unless it declares its own 429.
+      Done when: `onRefusal` hears it, and the endpoint's errors list it, tagged, beside a tagged 429 of its own.
 - [ ] **`spec-0096-document`**: the 429 and its header in the document, the limit in the description, `retryAfter` on
       the generated client's failure. Done when: a golden pins it and `RetryingClientTest` waits what it names.
 - [ ] **`spec-0096-parity`**: a limited endpoint in the backends example. Done when: every backend answers alike.

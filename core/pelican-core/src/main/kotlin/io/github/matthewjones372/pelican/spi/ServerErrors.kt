@@ -75,6 +75,8 @@ private fun reasonOf(t: Throwable): RefusalReason? = when (t) {
     is CallerRefused ->
         if (t.refusal.status == UNAUTHENTICATED_STATUS) RefusalReason.UNAUTHENTICATED else RefusalReason.FORBIDDEN
 
+    is RateLimitRefused -> RefusalReason.RATE_LIMITED
+
     is Unrouted -> RefusalReason.UNMATCHED
 
     is DecodeFailure, is BodyDecodeFailure -> RefusalReason.DECODE
@@ -139,7 +141,11 @@ fun renderError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): Re
 fun classifyError(raw: Throwable, api: Api?): ClassifiedError = classify(refusalIn(unwrapCompletion(raw)), api)
 
 /** The response a throwable stands for: the caller's own refusal, where it was wrapped to be named. */
-private fun refusalIn(t: Throwable): Throwable = if (t is CallerRefused) t.refusal else t
+private fun refusalIn(t: Throwable): Throwable = when (t) {
+    is CallerRefused -> t.refusal
+    is RateLimitRefused -> t.refusal
+    else -> t
+}
 
 private const val UNAUTHENTICATED_STATUS = 401
 
