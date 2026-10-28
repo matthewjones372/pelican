@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.awaitTerminated
+import io.github.matthewjones372.pelican.pekko.sealedWith
 import io.github.matthewjones372.pelican.pekko.toRoute
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.RequestSpec
@@ -34,7 +35,7 @@ class InMemoryTransport(
     private val ownsSystem: Boolean,
 ) : Transport, AutoCloseable {
 
-    private val handler = api.toRoute(system).function(system)
+    private val handler = api.toRoute(system).sealedWith(api).function(system)
 
     /** How long [close] waits for the system to actually terminate. */
     var shutdownTimeoutSeconds: Long = 10

@@ -1,13 +1,21 @@
 package io.github.matthewjones372.pelican.jetty
 
 import io.github.matthewjones372.pelican.Method
+import io.github.matthewjones372.pelican.ResponseHeaderPolicy
 import org.eclipse.jetty.server.Handler
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.server.Response
 import org.eclipse.jetty.util.Callback
 
-/** What the handlers that passed on one request said about it, merged as Pekko merges its routes' rejections. */
-private data class Declines(val methods: List<String> = emptyList(), val methodTaken: Boolean = false)
+/**
+ * What the handlers that passed on one request said about it, merged as Pekko merges its routes' rejections, and the
+ * `responseHeaders { }` of an Api whose handler passed it on, for the 404 or 405.
+ */
+private data class Declines(
+    val methods: List<String> = emptyList(),
+    val methodTaken: Boolean = false,
+    val policy: ResponseHeaderPolicy? = null,
+)
 
 private const val DECLINES = "io.github.matthewjones372.pelican.jetty.declines"
 
@@ -22,6 +30,11 @@ internal fun Request.declineMethods(methods: List<String>) {
 /** Passed on by a handler that takes this method but not this path. As Pekko's does, it makes the answer a 404. */
 internal fun Request.declinePath() {
     setAttribute(DECLINES, declines().copy(methodTaken = true))
+}
+
+/** Passed on by a handler serving an Api with `responseHeaders { }`, which the 404 or 405 then carries. */
+internal fun Request.declinedUnder(policy: ResponseHeaderPolicy) {
+    setAttribute(DECLINES, declines().copy(policy = policy))
 }
 
 /**
@@ -47,7 +60,9 @@ class Unanswered : Handler.Abstract.NonBlocking() {
     override fun handle(request: Request, response: Response, callback: Callback): Boolean {
         val seen = request.declines()
         val reply = if (seen.methodTaken || seen.methods.isEmpty()) NOT_FOUND else methodNotAllowed(seen.methods)
-        reply.writeTo(response, callback.afterReadingRest(request))
+        val policy = seen.policy
+        val answering = if (policy == null) response else AnsweringResponse(request, response, policy, false) { null }
+        reply.writeTo(answering, callback.afterReadingRest(request))
         return true
     }
 }

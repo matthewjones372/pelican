@@ -56,9 +56,9 @@ a filter sees (and run filters on a request that failed to decode).
 
 ## Stack
 
-- [x] **`spec-0101-set-cookie`**: repeated `Set-Cookie` through `Params`, `addRawHeader`, the in-memory and test
-      clients. Done when: a handler setting two cookies answers both, in order, on every backend.
-- [ ] **`spec-0101-policy`**: `responseHeaders { }`, `Answer`, applied by all three backends to endpoints and refusals.
+- [x] **`spec-0101-set-cookie`** ([#428](https://github.com/matthewjones372/pelican/pull/428)): repeated `Set-Cookie` through
+      `Params`, `addRawHeader`, the in-memory and test clients. Done when: a handler setting two cookies answers both, in order, on every backend.
+- [x] **`spec-0101-policy`**: `responseHeaders { }`, `Answer`, applied by all three backends to endpoints and refusals.
       Done when: the parity suite sees the policy's header on a 200, a declared failure, a filter's 401, a decode
       400, a 404 for no route and a 405.
 - [ ] **`spec-0101-docs-mcp`**: the docs modules and both MCP handlers apply it.

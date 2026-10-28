@@ -55,6 +55,16 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
     private val codecs = api.endpoints.associateWith { it.endpoint.resolveCodecs(api.codecs) }
 
     override fun send(request: ClientRequest): CompletionStage<ClientResponse> {
+        val answered = answer(request)
+        val policy = api.responseHeaders ?: return answered
+        val path = target(request.url).first
+        val endpoint = index.routeFor(request.method, path)?.endpoint
+        return answered.thenApply { res ->
+            res.plus(policy.headersFor(path, endpoint, res.status) { name -> res.header(name) != null })
+        }
+    }
+
+    private fun answer(request: ClientRequest): CompletionStage<ClientResponse> {
         val (path, query) = target(request.url)
 
         // The per-request bag the index writes captures into and the handler

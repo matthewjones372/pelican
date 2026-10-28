@@ -109,6 +109,16 @@ class ApiBuilder internal constructor() {
 
     private var rateLimits: RateLimitStore? = null
 
+    /**
+     * [Api.responseHeaders]: [rule] is called for each response as it goes out, and what it [AnswerHeaders.add]s is
+     * sent unless the response already carries that name.
+     */
+    fun responseHeaders(rule: AnswerHeaders.(Answer) -> Unit) {
+        responseHeaders = ResponseHeaderPolicy(rule)
+    }
+
+    private var responseHeaders: ResponseHeaderPolicy? = null
+
     /** [Api.onRefusal] — `onRefusal(refusalCounter(registry))` for the meter. */
     fun onRefusal(observer: RefusalObserver) {
         onRefusal = observer
@@ -139,6 +149,7 @@ class ApiBuilder internal constructor() {
         csrf = csrf,
         tenants = tenants,
         rateLimits = rateLimits,
+        responseHeaders = responseHeaders,
     )
 }
 

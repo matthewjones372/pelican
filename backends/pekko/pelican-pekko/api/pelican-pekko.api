@@ -50,6 +50,12 @@ public final class io/github/matthewjones372/pelican/pekko/PelicanServer : java/
 	public final fun stopAsync ()Ljava/util/concurrent/CompletionStage;
 }
 
+public final class io/github/matthewjones372/pelican/pekko/ResponseHeadersKt {
+	public static final fun sealedWith (Lorg/apache/pekko/http/javadsl/server/Route;Lio/github/matthewjones372/pelican/Api;)Lorg/apache/pekko/http/javadsl/server/Route;
+	public static final fun withResponseHeaders (Lorg/apache/pekko/http/javadsl/server/Route;Lio/github/matthewjones372/pelican/Api;Z)Lorg/apache/pekko/http/javadsl/server/Route;
+	public static synthetic fun withResponseHeaders$default (Lorg/apache/pekko/http/javadsl/server/Route;Lio/github/matthewjones372/pelican/Api;ZILjava/lang/Object;)Lorg/apache/pekko/http/javadsl/server/Route;
+}
+
 public final class io/github/matthewjones372/pelican/pekko/ServerKt {
 	public static final fun awaitTerminated (Ljava/util/concurrent/CompletionStage;Ljava/time/Duration;)V
 	public static final fun start (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/pekko/Handlers;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/pekko/PelicanServer;

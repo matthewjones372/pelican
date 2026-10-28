@@ -42,6 +42,8 @@ class FunctionalStyleTest {
             "EndpointBuilder collects declarations as they are made and freezes them into an Endpoint",
         "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/JsonValue.kt" to
             "the jsonObj/jsonArr DSL, which is an accumulate-then-render builder by definition",
+        "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Answers.kt" to
+            "AnswerHeaders collects what one responseHeaders { } call adds, and the backend is handed a copy",
         "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Cors.kt" to
             "the allowed-headers set is built once per Api and read from every request after",
         "core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/Forms.kt" to

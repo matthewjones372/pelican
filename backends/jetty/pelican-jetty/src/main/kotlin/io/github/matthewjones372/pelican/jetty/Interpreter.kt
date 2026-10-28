@@ -62,11 +62,23 @@ fun Api.toHandler(handlers: Handlers = Handlers.default): Handler {
     val bound = endpoints.associateWith { endpoint -> handlerFor(endpoint).on(handlers, endpoint) }
 
     val cors = corsPolicy()
-    val answered = PelicanHandler(this, endpoints.routeIndex(), plans, codecs, bound, cors, handlers)
-    val files = pages ?: return answered
-    // The loader that built the handler, as a thread Jetty runs a request on may carry no useful one.
-    val loader = Thread.currentThread().contextClassLoader ?: Pages::class.java.classLoader
-    return Handler.Sequence(answered, PagesHandler(files, cors, loader).onlyFor(Method.GET))
+    val index = endpoints.routeIndex()
+    val answered = PelicanHandler(this, index, plans, codecs, bound, cors, handlers)
+    val files = pages
+    val served = if (files == null) {
+        answered
+    } else {
+        // The loader that built the handler, as a thread Jetty runs a request on may carry no useful one.
+        val loader = Thread.currentThread().contextClassLoader ?: Pages::class.java.classLoader
+        Handler.Sequence(answered, PagesHandler(files, cors, loader).onlyFor(Method.GET))
+    }
+    val policy = responseHeaders ?: return served
+    val methods = endpoints.map { it.endpoint.method }
+    return served.answeredUnder(policy, isDocs = false) { request ->
+        val method = methods.firstOrNull { it.name == request.method }
+        val path = request.routedPath()
+        if (method == null || path == null) null else index.routeFor(method, path)?.endpoint
+    }
 }
 
 /**
