@@ -169,7 +169,8 @@ private fun PlainCodec<*>.described(description: String?): JsonObj =
  *
  * MCP answers one call with one result: there is nowhere to put a second row,
  * an event or a byte stream, and nothing on the way in to carry an upload. A
- * cookie is a browser's, and a required header a model would have to invent.
+ * cookie is a browser's, a required header a model would have to invent, and a
+ * signature one it has no secret to make.
  * Each of these is an endpoint to leave out of `include`, or a decision to
  * make — never a tool that half works.
  */
@@ -192,6 +193,10 @@ private fun Endpoint<*, *>.refuseWhatMcpCannotCarry(options: McpOptions) {
         "$operationName reads the cookie(s) ${cookieParams.joinToString { it.name }}, and a tool call has " +
             "no browser behind it. Leave it out with mcpOptions { include = { ... } }, or read the value " +
             "from somewhere a caller without cookies can supply it."
+    }
+    require(signedBy == null) {
+        "$operationName is signedBy $signedBy, and a model has no secret to sign a body with. " +
+            "Leave it out with mcpOptions { include = { ... } }."
     }
     val missing = headerParams.filter { it.required && it.name !in options.headers }
     require(missing.isEmpty()) {

@@ -196,9 +196,9 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
             )
 
             is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
-                val text = readStrictBody(request.body.stream(), api.maxBodyBytes)
+                val bytes = readStrictBody(request.body.stream(), api.maxBodyBytes).toByteArray(StandardCharsets.UTF_8)
                 into[body] = checkNotNull(resolved.body) { "No codec was resolved for the body of $endpoint" }
-                    .decode(request.header("Content-Type"), text)
+                    .decode(request.header("Content-Type"), bytes, request::header)
             }
         }
     }
@@ -308,7 +308,7 @@ private class ResolvedCodecs(
 }
 
 private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): ResolvedCodecs = ResolvedCodecs(
-    body = codecs.requestBodyCodec(bodyInput),
+    body = codecs.requestBodyCodec(this),
     payload = output.payloadType?.let { codecs.codec(it) },
     alternatives = codecs.responseCodecs(output),
 )

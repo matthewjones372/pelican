@@ -124,4 +124,20 @@ class EndpointPlanTest {
     fun `the bag walks as a map, in declaration order`() {
         decoded(search, "tag=a&q=x").entries.map { it.key to it.value } shouldBe listOf(q to "x", tags to listOf("a"))
     }
+
+    @Test
+    fun `a tenanted endpoint has a slot for its tenant, and its queries still land in their own`() {
+        val tenant = tenantFrom(TenantResolver.subdomain(of = "example.com"))
+        val tenanted = endpoint(n) {
+            get("orders")
+            tenanted(tenant)
+            text()
+        }
+
+        val slots = decoded(tenanted, "n=3")
+        slots[tenant] = Tenant("acme")
+
+        slots[tenant] shouldBe Tenant("acme")
+        slots[n] shouldBe 3L
+    }
 }

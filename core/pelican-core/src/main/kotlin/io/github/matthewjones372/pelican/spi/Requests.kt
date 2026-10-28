@@ -12,6 +12,8 @@ import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.HeaderParam
+import io.github.matthewjones372.pelican.HmacScheme
+import io.github.matthewjones372.pelican.Identity
 import io.github.matthewjones372.pelican.JSON_MEDIA_TYPE
 import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.ListStyle
@@ -27,12 +29,19 @@ import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.PlainCodec
 import io.github.matthewjones372.pelican.QueryParam
 import io.github.matthewjones372.pelican.RawBody
+import io.github.matthewjones372.pelican.Tenant
+import io.github.matthewjones372.pelican.TenantInput
+import io.github.matthewjones372.pelican.TenantNamed
 import io.github.matthewjones372.pelican.UnsupportedMediaType
+import io.github.matthewjones372.pelican.crossSiteChecked
 import io.github.matthewjones372.pelican.decodeAll
 import io.github.matthewjones372.pelican.default
 import io.github.matthewjones372.pelican.formCodec
 import io.github.matthewjones372.pelican.mediaType
+import io.github.matthewjones372.pelican.refuseCrossSite
+import io.github.matthewjones372.pelican.refuseUnsigned
 import io.github.matthewjones372.pelican.representations
+import io.github.matthewjones372.pelican.spend
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
@@ -85,34 +94,102 @@ private const val STRICT_READ_BUFFER_BYTES = 4096
 private const val STRICT_DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
 
 /**
- * Who is calling, decoded ahead of every other input so that a request with no
- * caller learns nothing else about the endpoint: the 401 is its only answer.
+ * Who is calling and for which tenant, decoded ahead of every other input so that a request with no caller, one who
+ * lacks what the endpoint requires, or one for no tenant learns nothing else about the endpoint: the 401, 403, 400 or
+ * 404 is its only answer.
  */
 fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: MutableMap<ParamKey<*>, Any?>) {
-    val caller = endpoint.caller ?: return
-    into[caller] = caller.decode(authenticators.getValue(caller.scheme), credentials)
+    val caller = endpoint.caller
+    val presented = endpoint.tenant?.named(credentials)?.let { TenantNamed(credentials, it) } ?: credentials
+    val identity = caller?.let {
+        try {
+            it.identify(authenticators.getValue(it.scheme), presented, endpoint.requires)
+                ?.also { if (csrf && crossSiteChecked(endpoint.method, caller)) refuseCrossSite(credentials, cors) }
+        } catch (e: ApiException) {
+            throw CallerRefused(e)
+        }
+    }
+    if (caller != null) into[caller] = identity?.let(caller::built)
+    decodeTenantAndSpend(endpoint, credentials, identity, into)
 }
+
+/** For whom, once who is known, since a claim resolver reads the caller; then the rate limit, which keys on both. */
+private fun Api.decodeTenantAndSpend(
+    endpoint: Endpoint<*, *>,
+    credentials: Credentials,
+    identity: Identity?,
+    into: MutableMap<ParamKey<*>, Any?>,
+) {
+    val tenant = endpoint.tenant?.let { input ->
+        decodeTenant(endpoint, input, credentials, identity).also { into[input] = it }
+    }
+    // Last, so only a request every check before it let through spends from the budget.
+    endpoint.rateLimit?.let { spend(endpoint, it, credentials, identity, tenant) }
+}
+
+/** The tenant [input] finds, known to the directory and not refused for [identity]'s claim. */
+private fun Api.decodeTenant(
+    endpoint: Endpoint<*, *>,
+    input: TenantInput,
+    credentials: Credentials,
+    identity: Identity?,
+): Tenant {
+    // The Api refused to build with a tenanted endpoint and nothing resolving it, so this is never reached unbound.
+    val bound = checkNotNull(tenants) { "$endpoint is tenanted and the Api resolves no tenants" }
+    val found = input.decode(credentials, identity, bound.directory)
+    try {
+        input.refuseForeign(identity, bound.claim, found)
+    } catch (e: ApiException) {
+        throw CallerRefused(e)
+    }
+    return found
+}
+
+/** The caller's 401 or 403, told apart from the same status thrown by a filter, which the chain already saw. */
+internal class CallerRefused(val refusal: ApiException) : RuntimeException(refusal.message, refusal)
+
+/** A spent budget's 429, told apart from a 429 a handler or filter throws, so `onRefusal` hears it as one. */
+internal class RateLimitRefused(val refusal: ApiException) : RuntimeException(refusal.message, refusal)
 
 /**
  * How a request body is read, once the request says what it is: one entry per
  * media type the endpoint declared. The choosing and the 415 live here so that
  * three backends cannot answer a `Content-Type` three ways.
  */
-class RequestBodyCodecs internal constructor(private val byMediaType: Map<String, BodyCodec<Any?>>) {
+class RequestBodyCodecs internal constructor(
+    private val byMediaType: Map<String, BodyCodec<Any?>>,
+    /** The signature the body is checked against first; null where the endpoint is not signedBy one. */
+    private val signedBy: HmacScheme? = null,
+) {
 
     /**
      * The body as the value it decodes to.
      */
     fun decode(contentType: String?, text: String): Any? =
-        decoded(contentType) { it.decodeFromString(text) }
+        decoded(contentType) { it.decodeFromString(text) }.also { refuseUnchecked() }
 
     /**
      * The same, for a backend that already holds the body as bytes. A sibling
      * rather than an interpreter reaching past this class: every backend has to
      * be able to find the faster path, not only the one this repository ships.
      */
-    fun decode(contentType: String?, bytes: ByteArray): Any? =
-        decoded(contentType) { it.decodeFrom(bytes) }
+    fun decode(contentType: String?, bytes: ByteArray): Any? {
+        refuseUnchecked()
+        return decoded(contentType) { it.decodeFrom(bytes) }
+    }
+
+    /**
+     * The body decoded once its signature, where the endpoint is signedBy one, verifies over [bytes] as [header]
+     * presents it. The one a backend calls, since only it holds the headers beside the bytes.
+     */
+    fun decode(contentType: String?, bytes: ByteArray, header: (String) -> String?): Any? {
+        signedBy?.let { refuseUnsigned(it, header, bytes) }
+        return decoded(contentType) { it.decodeFrom(bytes) }
+    }
+
+    // A backend that reaches for the overloads without the headers must not decode a signed body unchecked.
+    private fun refuseUnchecked() =
+        check(signedBy == null) { "This body is signed; decode it with decode(contentType, bytes, header)." }
 
     private inline fun decoded(contentType: String?, read: (BodyCodec<Any?>) -> Any?): Any? {
         val codec = select(contentType)
@@ -141,17 +218,24 @@ class RequestBodyCodecs internal constructor(private val byMediaType: Map<String
  * raw stream, a multipart envelope, no body. A decision about descriptions
  * rather than about a server, so it is here and not in each interpreter.
  */
-fun Codecs.requestBodyCodec(input: BodyInput<*>?): RequestBodyCodecs? = when (input) {
+fun Codecs.requestBodyCodec(endpoint: Endpoint<*, *>): RequestBodyCodecs? =
+    requestBodyCodec(endpoint.bodyInput, endpoint.signedBy)
+
+/** [requestBodyCodec] for a body alone, with no signature to check. */
+fun Codecs.requestBodyCodec(input: BodyInput<*>?): RequestBodyCodecs? = requestBodyCodec(input, signedBy = null)
+
+private fun Codecs.requestBodyCodec(input: BodyInput<*>?, signedBy: HmacScheme?): RequestBodyCodecs? = when (input) {
     // A streamed body is here because a frame of it is read exactly as a strict
     // body is — one document, one codec, wrapped the same way when it will not
     // decode. What differs is how many times, which is `NdjsonFrames`' business.
     is JsonBody<*>, is FormBody<*>, is NdjsonBody<*> ->
-        RequestBodyCodecs(mapOf(input.mediaType to oneBodyCodec(input)))
+        RequestBodyCodecs(mapOf(input.mediaType to oneBodyCodec(input)), signedBy)
 
     // Resolved here rather than on the request that picks one, so an unreadable
     // encoding is a startup failure and not a 500 for whoever chose it.
     is NegotiatedBody<*> -> RequestBodyCodecs(
         input.alternatives.associate { it.mediaType to oneBodyCodec(it) },
+        signedBy,
     )
 
     null, is RawBody, is MultipartBody -> null

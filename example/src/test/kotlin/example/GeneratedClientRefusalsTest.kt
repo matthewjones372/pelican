@@ -28,16 +28,41 @@ class GeneratedClientRefusalsTest {
     )
 
     /** Answers every request the same way, whatever it was for. */
-    private fun answering(status: Int, body: String, contentType: String = "text/html"): OrdersClient =
+    private fun answering(
+        status: Int,
+        body: String,
+        contentType: String = "text/html",
+        vararg headers: Pair<String, String>,
+    ): OrdersClient =
         OrdersClient(
             baseUrl = "http://orders.example",
             codecs = codecs,
             transport = ClientTransport {
                 CompletableFuture.completedStage(
-                    ClientResponse(status, listOf("Content-Type" to contentType), body.byteInputStream()),
+                    ClientResponse(status, listOf("Content-Type" to contentType) + headers, body.byteInputStream()),
                 )
             },
         )
+
+    @Test
+    fun `a 429 the endpoint never declared still says when to come back`() {
+        val limited = """{"status":429,"error":"rate_limited","detail":"Send again in 20 seconds."}"""
+
+        val failed = shouldThrow<ApiCallFailed> {
+            answering(429, limited, "application/json", "Retry-After" to "20").getUser(1L)
+        }
+
+        failed.status shouldBe 429
+        failed.retryAfter shouldBe 20L
+    }
+
+    @Test
+    fun `a failure with no Retry-After, or one in the date form, names no wait`() {
+        shouldThrow<ApiCallFailed> { answering(503, "down").getUser(1L) }.retryAfter shouldBe null
+        shouldThrow<ApiCallFailed> {
+            answering(503, "down", "text/plain", "Retry-After" to "Wed, 28 Oct 2026 12:00:00 GMT").getUser(1L)
+        }.retryAfter shouldBe null
+    }
 
     @Test
     fun `a declared status carrying a body the codec cannot read names the call, not the codec`() {

@@ -54,8 +54,21 @@ class CallerInput<T> @PublishedApi internal constructor(
     val required: Boolean,
     internal val build: (Identity) -> T,
 ) : ParamKey<T> {
+    /** The 401 [decode] answers with, declared on every endpoint taking this caller unless it declares a 401 itself. */
+    val refused: ErrorSpec get() = CALLER_REFUSED
+
+    /** The 403 for a cookie-carried caller's state-changing request from another site; see `Api.csrf`. */
+    val crossSiteRefused: ErrorSpec get() = CROSS_SITE_REFUSED
+
     /** The value a handler reads, or the 401 that stops it running. */
-    fun decode(authenticator: Authenticator, credentials: Credentials): T? {
+    fun decode(authenticator: Authenticator, credentials: Credentials): T? = decode(authenticator, credentials, null)
+
+    /** The same, or the 403 for a caller lacking one of [requires]. Nobody is a 401: there is no one to forbid. */
+    fun decode(authenticator: Authenticator, credentials: Credentials, requires: Requires?): T? =
+        identify(authenticator, credentials, requires)?.let(build)
+
+    /** Who the request is from, checked against [requires], before it is built into [T]. */
+    internal fun identify(authenticator: Authenticator, credentials: Credentials, requires: Requires?): Identity? {
         val identity = try {
             authenticator.authenticate(credentials)
         } catch (e: Unauthenticated) {
@@ -64,11 +77,20 @@ class CallerInput<T> @PublishedApi internal constructor(
             throw unauthorized(e.message ?: "The credential did not verify", error = "invalid_token", cause = e)
         }
         return when {
-            identity != null -> build(identity)
-            required -> throw unauthorized("This endpoint needs a caller, and the request named none", error = null)
-            else -> null
+            identity == null && (required || requires != null) ->
+                throw unauthorized("This endpoint needs a caller, and the request named none", error = null)
+
+            identity == null -> null
+
+            requires != null && !requires.metBy(identity) ->
+                throw ApiException(FORBIDDEN, "This endpoint needs $requires")
+
+            else -> identity
         }
     }
+
+    /** [T] from a verified [identity]. */
+    internal fun built(identity: Identity): T = build(identity)
 
     private fun unauthorized(message: String, error: String?, cause: Throwable? = null): ApiException = ApiException(
         401,
@@ -89,6 +111,20 @@ class CallerInput<T> @PublishedApi internal constructor(
 
     override fun toString() = "caller:${scheme.name}"
 }
+
+private const val FORBIDDEN = 403
+
+private val CALLER_REFUSED = ErrorSpec(
+    401,
+    "No caller, or a credential that did not verify.",
+    type = null,
+    headers = listOf(
+        responseHeader<String>(
+            "WWW-Authenticate",
+            "The scheme to authenticate with, and why the credential was refused where one was sent.",
+        ),
+    ),
+)
 
 /**
  * A caller authenticated under [scheme], handed to the handler as [build]

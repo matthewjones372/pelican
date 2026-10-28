@@ -12,6 +12,7 @@ package example.backends
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiErrorEnvelope
 import io.github.matthewjones372.pelican.Filter
+import io.github.matthewjones372.pelican.Identity
 import io.github.matthewjones372.pelican.RefusalObserver
 import io.github.matthewjones372.pelican.RefusalRenderer
 import io.github.matthewjones372.pelican.ServerEndpoint
@@ -61,6 +62,23 @@ val gannetRoutes: List<ServerEndpoint> = listOf(
     motd handledNow { "Be excellent to each other." },
 
     leaveTip handledNow { tip -> TipJar.tipped(tip) },
+
+    refundTip handledNow { tip -> Receipt(number = 0, amount = -tip.amount) },
+
+    startVisit handledNow { name ->
+        setCookie(visits.start(Identity(name)))
+        "welcome $name"
+    },
+
+    whoIsVisiting handledNow { this[visitor] },
+
+    leaveNote handledNow { "noted for ${this[visitor]}" },
+
+    openTill handledNow { "${this[teller]} at ${this[shop].id}" },
+
+    stampTicket handledNow { "stamped for ${this[teller]}" },
+
+    tipNoticed handledNow { tip -> "noticed a tip of ${tip.amount}" },
 
     forget handledWith { _ -> },
 

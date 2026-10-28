@@ -2,11 +2,13 @@ package io.github.matthewjones372.pelican.openapi
 
 import io.github.matthewjones372.pelican.Identity
 import io.github.matthewjones372.pelican.JsonObj
+import io.github.matthewjones372.pelican.ProblemDetails
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.authenticated
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.openIdConnect
 import io.github.matthewjones372.pelican.optional
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -57,5 +59,24 @@ class CallerDocumentTest {
     @Test
     fun `an endpoint without one requires nothing`() {
         (doc / "paths" / "/health" / "get").keys().contains("security") shouldBe false
+    }
+
+    @Test
+    fun `the 401 a caller is refused with is documented, in the refusal envelope, with its challenge`() {
+        val refused = doc / "paths" / "/me" / "get" / "responses" / "401"
+
+        (refused / "content" / "application/json" / "schema" / "\$ref").str() shouldBe "#/components/schemas/ApiError"
+        (refused / "headers" / "WWW-Authenticate" / "required").bool() shouldBe true
+        (doc / "paths" / "/hello" / "get" / "responses").keys().toList() shouldContainExactly
+            listOf("200", "401", "default")
+        (doc / "paths" / "/health" / "get" / "responses").keys().toList() shouldContainExactly listOf("200", "default")
+    }
+
+    @Test
+    fun `under another envelope the 401 is written in that one`() {
+        val problems = apiSpec(listOf(mine), SecurityTest.Schemas) { refusals(ProblemDetails) }.openApi()
+        val content = problems / "paths" / "/me" / "get" / "responses" / "401" / "content"
+
+        content.keys().toList() shouldContainExactly listOf("application/problem+json")
     }
 }

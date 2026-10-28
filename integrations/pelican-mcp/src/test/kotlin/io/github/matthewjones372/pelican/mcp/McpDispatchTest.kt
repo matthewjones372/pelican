@@ -23,6 +23,7 @@ import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.queryParam
 import io.github.matthewjones372.pelican.rawBody
+import io.github.matthewjones372.pelican.stripeSignature
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.booleans.shouldBeFalse
@@ -224,6 +225,19 @@ class McpDispatchTest {
         }
 
         refusalFor(whoami) shouldContain "session"
+    }
+
+    @Test
+    fun `a signed endpoint is refused, since a model cannot sign`() {
+        val stripe = stripeSignature { listOf("whsec_test") }
+        val stripeEvent = endpoint(jsonBody<Order>()) {
+            post("hooks" / "stripe")
+            operationId = "stripeEvent"
+            signedBy(stripe)
+            json<Order>()
+        }
+
+        refusalFor(stripeEvent) shouldContain "signedBy"
     }
 
     @Test

@@ -336,6 +336,27 @@ pelican {
             packageName.set("example.generated.tipping")
             outputDir.set(layout.projectDirectory.dir("src/test/kotlin"))
         }
+        // Spec 0093: a call that needs a caller, generated into `build/` like `adoption`, since what is under test is
+        // the client being refused with the 401 the document declares.
+        create("whoAmI") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("whoAmISpec")
+            packageName.set("example.generated.whoami")
+        }
+        // Spec 0097: a signed endpoint's client, generated into `build/` so what is under test is that its signer's
+        // headers verify at the endpoint the client was generated from.
+        create("tipHooks") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("tipHooksSpec")
+            packageName.set("example.generated.tiphooks")
+        }
+        // Spec 0102: the three together, generated into `build/` so the merchant retries and the processor signs
+        // through the client the service's own document generates.
+        create("payments") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("paymentsSpec")
+            packageName.set("example.generated.payments")
+        }
     }
     /**
      * The same document, read back the other way.
@@ -393,6 +414,9 @@ sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/or
 
 // Spec 0063's client, generated the same way and for the same reason.
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/adoption"))
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/whoAmI"))
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/tipHooks"))
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/payments"))
 
 // Generated source compiled here but written by another module's tests. detekt
 // filters by the path *inside* the source root, so this is that path rather
@@ -405,6 +429,9 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     exclude("example/importedtipping/**")
     exclude("example/generated/suspending/**")
     exclude("example/generated/adoption/**")
+    exclude("example/generated/whoami/**")
+    exclude("example/generated/tiphooks/**")
+    exclude("example/generated/payments/**")
 }
 
 tasks.named("compileTestKotlin") {
@@ -414,6 +441,9 @@ tasks.named("compileTestKotlin") {
         "generateImportedTippingEndpoints",
         "generateOrdersSuspendingClient",
         "generateAdoptionClient",
+        "generateWhoAmIClient",
+        "generateTipHooksClient",
+        "generatePaymentsClient",
     )
 }
 

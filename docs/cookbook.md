@@ -492,10 +492,208 @@ val ping = endpoint {
 
 `security(...)` documents the requirement; it does not check a credential. To
 enforce it, declare a caller with `authenticatedBy(...)` (and `pelican-oidc` for
-JWTs), described in [Who is calling](reference.md#who-is-calling), or check it
-in a [filter](#filters), as
+JWTs), as the next section does.
+
+---
+
+## Who may call
+
+A caller under a scheme, what they must have, and the verifier bound once:
+
+```kotlin
+import io.github.matthewjones372.pelican.anyOf
+import io.github.matthewjones372.pelican.authenticated
+import io.github.matthewjones372.pelican.bearerAuth
+import io.github.matthewjones372.pelican.permission
+import io.github.matthewjones372.pelican.role
+
+val bearer = bearerAuth()
+val support = authenticated(bearer) { id -> Staff(id.subject, id.groups) }
+
+val refund = endpoint(orderId) {
+    post("orders" / orderId / "refund")
+    authenticatedBy(support)                                  // 401 without a caller
+    requires(role("support"), permission("orders:refund"))    // 403 without both
+    json<Refund>()
+}
+
+api(routes, codecs = JacksonCodecs) { authenticate(bearer, by = verifier) }
+```
+
+The handler reads `this[support]` and never sees a request that failed either
+check. Both are answered before the body is read, both are declared in the
+document, and a generated client reaches them by status. `anyOf(role("admin"),
+permission("orders:refund"))` is either one. An endpoint that takes several
+schemes at once checks them in a [filter](#filters), as
 [`example/secured`](../example/src/main/kotlin/example/secured/SecuredReports.kt)
-does.
+does. See [What a caller may do](reference.md#what-a-caller-may-do).
+For a caller, an idempotency key and a signed webhook in one service, see
+[the payments example](a-whole-service.md#payments-the-three-together).
+
+---
+
+## Signing someone in with a session
+
+A cookie for a browser, a session in a store behind it, and the same
+`authenticatedBy` as a token:
+
+```kotlin
+import io.github.matthewjones372.pelican.Identity
+import io.github.matthewjones372.pelican.InMemorySessionStore
+import io.github.matthewjones372.pelican.authenticated
+import io.github.matthewjones372.pelican.responseHeader
+import io.github.matthewjones372.pelican.sessionCookie
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+
+val sessions = sessionCookie("sid", InMemorySessionStore(), idle = 30.minutes, absolute = 12.hours)
+val visitor = authenticated(sessions.scheme) { it.subject }
+
+val signIn = endpoint(login) {
+    post("sign-in")
+    emits(responseHeader<String>("Set-Cookie"))
+    text()
+}
+
+val notes = endpoint(newNote) {
+    post("notes")
+    authenticatedBy(visitor)        // 401 without a live session
+    text()
+}
+
+signIn handledNow { form ->
+    setCookie(sessions.start(Identity(checkPassword(form))))
+    "welcome"
+}
+
+api(routes, codecs = JacksonCodecs) { authenticate(sessions.scheme, by = sessions) }
+```
+
+The store keeps a hash of each session id, not the id. A session left idle
+for 30 minutes, or 12 hours old, is over. `sessions.endAll(subject)` signs
+someone out everywhere. A POST to `/notes` that another site makes the browser
+send is a 403 without any code here, since the check is on by default; see
+[A session in a cookie](reference.md#a-session-in-a-cookie).
+
+---
+
+## Serving many tenants
+
+The tenant in a header, checked against the tenants there are, and handed to
+the handler:
+
+```kotlin
+import io.github.matthewjones372.pelican.InMemoryTenantDirectory
+import io.github.matthewjones372.pelican.TenantResolver
+import io.github.matthewjones372.pelican.tenantFrom
+
+val shop = tenantFrom(TenantResolver.header("X-Shop"))
+
+val openTill = endpoint {
+    get("till")
+    authenticatedBy(teller)
+    tenanted(shop)                  // 400 without X-Shop, 404 for a shop there is not
+    text()
+}
+
+openTill handledNow { "${this[teller]} at ${this[shop].id}" }
+
+api(routes, codecs = JacksonCodecs) {
+    authenticate(tellerToken, tellers)
+    tenants(shop, InMemoryTenantDirectory(setOf("acme", "globex")))
+}
+```
+
+A teller whose token says `tenant: acme` is a 403 at globex, with nothing more
+to write. The generated client takes `xShop: String`, and an idempotency key or
+a session from one shop is no use in another; see
+[Whose request it is](reference.md#whose-request-it-is).
+
+---
+
+## Limiting how often a caller may call
+
+Two tickets a minute for each teller, the third a 429 saying when to come back:
+
+```kotlin
+import io.github.matthewjones372.pelican.InMemoryRateLimitStore
+import io.github.matthewjones372.pelican.rateLimit
+import kotlin.time.Duration.Companion.minutes
+
+val tickets = rateLimit("tickets", 2, per = 1.minutes)
+
+val stampTicket = endpoint {
+    post("tickets")
+    authenticatedBy(teller)
+    rateLimited(tickets)            // 429 with Retry-After: 30 once the two are spent
+    text()
+}
+
+api(routes, codecs = JacksonCodecs) {
+    authenticate(tellerToken, tellers)
+    rateLimits(InMemoryRateLimitStore())
+}
+```
+
+Each teller has a budget of their own, and in a tenanted service each tenant too. A client wrapped in `retrying()`
+waits the `Retry-After` before sending a GET again; see
+[How often a caller may call](reference.md#how-often-a-caller-may-call).
+
+---
+
+## A Stripe webhook, end to end
+
+Stripe signs each event it sends with `Stripe-Signature`. The endpoint names the scheme, and an event that was
+forged, replayed later than five minutes or sent without the header never reaches the handler:
+
+```kotlin
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jsonBody
+import io.github.matthewjones372.pelican.stripeSignature
+
+data class StripeEvent(val id: String, val type: String)
+
+// Read per request: during a rotation, name the old secret too until Stripe stops using it.
+val stripe = stripeSignature { listOfNotNull(System.getenv("STRIPE_WEBHOOK_SECRET")) }
+
+val stripeEvent = endpoint(jsonBody<StripeEvent>()) {
+    post("hooks" / "stripe")
+    signedBy(stripe)                // a 400 tagged signature_invalid unless the bytes received verify
+    text()
+}
+
+val service = api(listOf(stripeEvent handledNow { event -> "received ${event.type}" }), codecs = JacksonCodecs)
+```
+
+The handler gets the decoded event, checked first over the exact bytes Stripe sent. `onRefusal` hears a refused one
+as `RefusalReason.SIGNATURE`. The document lists `Stripe-Signature` as a required header, and the 400 beside the
+endpoint's own answers.
+
+A test signs a delivery as Stripe would, with `signedWith` from `pelican-test`, and sends a stale or forged one the
+same way:
+
+```kotlin
+val secret = "whsec_test"
+val stripe = stripeSignature { listOf(secret) }
+val event = StripeEvent("evt_1", "payment_intent.succeeded")
+
+client.transport.send(client.request(stripeEvent, event).signedWith(stripe, secret))
+    .shouldHaveStatus(200)
+
+val sixMinutesAgo = Instant.now().minus(Duration.ofMinutes(6))
+val stale = client.request(stripeEvent, event).signedWith(stripe, secret, at = sixMinutesAgo)
+client.transport.send(stale).shouldHaveStatus(400)
+```
+
+A service sending events of its own declares `signedBy(standardWebhooks { secrets })` on its `webhook(...)`, and the
+generated sender takes a `signer`; see
+[A webhook that proves who sent it](reference.md#a-webhook-that-proves-who-sent-it).
+[The payments example](a-whole-service.md#payments-the-three-together) puts a signed webhook beside
+merchant keys and a retry-safe charge.
 
 ---
 
@@ -531,6 +729,8 @@ val service = api(routes, codecs = JacksonCodecs) {
 and its retries resend it, so wrapping the transport in `retrying()` is now
 safe for this POST. The whole behaviour is under
 [A request sent twice, answered once](reference.md#a-request-sent-twice-answered-once).
+[The payments example](a-whole-service.md#payments-the-three-together)
+shows a key kept per caller.
 
 ---
 

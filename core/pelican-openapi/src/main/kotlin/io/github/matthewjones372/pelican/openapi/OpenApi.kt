@@ -47,6 +47,7 @@ import io.github.matthewjones372.pelican.SchemaSource
 import io.github.matthewjones372.pelican.SecurityRequirement
 import io.github.matthewjones372.pelican.SecurityScheme
 import io.github.matthewjones372.pelican.SseOutput
+import io.github.matthewjones372.pelican.StringCodec
 import io.github.matthewjones372.pelican.TextOutput
 import io.github.matthewjones372.pelican.TextPart
 import io.github.matthewjones372.pelican.Webhook
@@ -164,6 +165,23 @@ private fun ApiSpec.info(): JsonObj = jsonObj {
     putIfNotNull("description", description)
 }
 
+/** `https://{tenant}.<parent>`, the tenant a variable a caller fills in. */
+private fun tenantServer(parent: String): JsonObj = jsonObj {
+    "url" to "https://{tenant}.$parent"
+    put(
+        "variables",
+        jsonObj {
+            put(
+                "tenant",
+                jsonObj {
+                    "default" to "tenant"
+                    "description" to "The tenant this request is for, as the first label of the host."
+                },
+            )
+        },
+    )
+}
+
 /**
  * A `servers` list, the same Server Object at document level and on an
  * operation. One function, so the two cannot disagree.
@@ -201,6 +219,10 @@ private fun parameters(ep: Endpoint<*, *>, version: OpenApiVersion): List<JsonVa
     }
     ep.headerParams.forEach { h ->
         add(parameter(h.name, "header", h.required, h.codec, h.description, version, h.listStyle, h.default))
+    }
+    // Read by the signature check rather than declared as inputs, so a missing one is a signature refusal.
+    ep.signedBy?.let { scheme ->
+        scheme.headers.forEach { add(parameter(it, "header", true, StringCodec, scheme.description, version)) }
     }
     ep.cookieParams.forEach { c ->
         add(parameter(c.name, "cookie", c.required, c.codec, c.description, version, c.listStyle, c.default))
@@ -364,12 +386,23 @@ private fun refusalSchema(refusals: RefusalRenderer, components: SchemaComponent
 }
 
 /**
- * The failures this endpoint declares that Pelican answers rather than the handler: an idempotency key's 409 and
- * 422, written in the refusal envelope because that is what the wire carries them in.
+ * The failures this endpoint declares that Pelican answers rather than the handler: its caller's 401 and 403s,
+ * and an idempotency key's 409 and 422, written in the refusal envelope because that is what the wire carries them in.
  */
 private fun refusedBy(ep: Endpoint<*, *>, refusals: RefusalRenderer): (ErrorSpec) -> RefusalRenderer? {
-    val key = ep.idempotency ?: return { null }
-    return { err -> if (err === key.inFlight || err === key.reused) refusals else null }
+    val answered = listOfNotNull(
+        ep.idempotency?.inFlight,
+        ep.idempotency?.reused,
+        ep.caller?.refused,
+        ep.requires?.refused,
+        ep.caller?.crossSiteRefused,
+        ep.tenant?.missing,
+        ep.tenant?.unknown,
+        ep.tenant?.foreign,
+        ep.rateLimit?.refused,
+        ep.signedBy?.refused,
+    )
+    return { err -> if (answered.any { it === err }) refusals else null }
 }
 
 /**
@@ -566,7 +599,7 @@ private fun operation(
     refusals: RefusalRenderer,
 ): JsonObj = jsonObj {
     putIfNotNull("summary", ep.summary)
-    putIfNotNull("description", ep.description)
+    putIfNotNull("description", operationDescription(ep))
     "operationId" to ep.operationName
     if (ep.tags.isNotEmpty()) put("tags", jsonStrings(ep.tags))
     if (ep.deprecated) "deprecated" to true
@@ -581,7 +614,12 @@ private fun operation(
 
     // Where this one operation is served from, in the same shape as the
     // document's own list and from the same function.
-    if (ep.servers.isNotEmpty()) put("servers", serverList(ep.servers))
+    // A tenant in the subdomain is a host the caller fills in, which is what a server variable is.
+    val tenantHost = ep.tenant?.subdomainOf
+    when {
+        tenantHost != null -> put("servers", jsonArr(listOf(tenantServer(tenantHost))))
+        ep.servers.isNotEmpty() -> put("servers", serverList(ep.servers))
+    }
 
     val params = parameters(ep, version)
     if (params.isNotEmpty()) put("parameters", jsonArr(params))
@@ -716,6 +754,20 @@ private fun multipartEncoding(body: MultipartBody): JsonObj? {
             put(name, jsonObj { "contentType" to contentType })
         }
     }
+}
+
+/** What the author wrote, then what the caller must have: OpenAPI has no field for a role, nor for "all of". */
+private fun operationDescription(ep: Endpoint<*, *>): String? {
+    val requires = ep.requires?.let { "Requires $it." }
+    val limited = ep.rateLimit?.let { limited ->
+        val whose = listOfNotNull(
+            "caller".takeIf { ep.caller != null },
+            "tenant".takeIf { ep.tenant != null },
+            "key".takeIf { limited.keyed },
+        )
+        "Rate limited per ${whose.joinToString(" and ")} to ${limited.limit.bucket}, as `${limited.limit.name}`."
+    }
+    return listOfNotNull(ep.description, requires, limited).joinToString("\n\n").ifEmpty { null }
 }
 
 private fun successDescription(out: Output<*>): String = out.description ?: impliedDescription(out)

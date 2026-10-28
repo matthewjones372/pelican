@@ -11,6 +11,11 @@ package example
 
 import example.adoption.adoptPet
 import example.backends.leaveTip
+import example.backends.tipNoticed
+import example.payments.createCharge
+import example.payments.getCharge
+import example.payments.processorEvent
+import example.whoami.whoAmI
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.apiSpec
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -57,4 +62,25 @@ fun tippingSpec(): ApiSpec = apiSpec(listOf(leaveTip), schemas = JacksonCodecs) 
     title = "Tipping"
     version = "1.0.0"
     description = "One call that is answered once, however often it is sent."
+}
+
+/** Spec 0093's caller on its own, so its generated client is refused with the 401 it was told about. */
+fun whoAmISpec(): ApiSpec = apiSpec(listOf(whoAmI), schemas = JacksonCodecs) {
+    title = "Who am I"
+    version = "1.0.0"
+    description = "One call that needs a caller, and the 401 for one that names nobody."
+}
+
+/** Spec 0097's signed endpoint on its own, so its generated client signs what it sends. */
+fun tipHooksSpec(): ApiSpec = apiSpec(listOf(tipNoticed), schemas = JacksonCodecs) {
+    title = "Tip hooks"
+    version = "1.0.0"
+    description = "One call that is read only once its signature verifies."
+}
+
+/** Spec 0102's service: a merchant's key, a charge safe to retry, and a processor's signed word. */
+fun paymentsSpec(): ApiSpec = apiSpec(listOf(createCharge, getCharge, processorEvent), schemas = JacksonCodecs) {
+    title = "Payments"
+    version = "1.0.0"
+    description = "Charges a merchant takes with its key, safe to retry, settled by the processor's signed word."
 }

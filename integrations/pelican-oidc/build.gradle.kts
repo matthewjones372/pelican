@@ -29,3 +29,10 @@ tasks.register<JavaExec>("installChromium") {
     mainClass.set("com.microsoft.playwright.CLI")
     args("install", "chromium")
 }
+
+// Playwright's driver otherwise fetches Firefox and WebKit as well on its first `create()`, which the test never
+// launches and which is the download that ran out the clock. Chromium comes from the task above, so it is there.
+tasks.named<Test>("test") {
+    dependsOn("installChromium")
+    environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
+}

@@ -212,3 +212,41 @@ On a service that runs Pekko HTTP, three things change:
 Sections 1 to 4 and 6 are unchanged.
 [On Pekko](cookbook.md#on-pekko) in the cookbook shows the same switch on the
 one-endpoint example.
+
+## Payments: the three together
+
+[`Payments.kt`](../example/src/main/kotlin/example/payments/Payments.kt) is a second whole service, smaller than this
+one, for the three features a service taking money needs at once
+([spec 0102](../specs/0102-a-service-that-takes-payments.md)):
+
+```kotlin
+val createCharge = endpoint(jsonBody<NewCharge>()) {
+    post("charges")
+    authenticatedBy(merchant)                 // a merchant's key: 401 without one
+    requires(permission("charges:write"))     // 403 for a key that may only read
+    idempotencyKey()                          // a retried POST is answered with the first charge
+    json<Charge>(status = 201)
+}
+
+val processorEvent = endpoint(jsonBody<ProcessorEvent>()) {
+    post("hooks" / "processor")
+    signedBy(processor)                       // no caller: the signature is who sent it
+    empty(status = 204)
+}
+```
+
+Each endpoint declares one feature, and the tests show where they meet:
+
+- **A refused caller spends no key.** The caller and its permissions are checked before the idempotency key is
+  reserved, so a 401 or 403 is never stored as the key's answer, and the same key works once the right key is used.
+- **A key is the caller's own.** Two merchants sending the same `Idempotency-Key` make two charges, because the key
+  is kept under the caller's subject.
+- **A webhook has a signature where a caller would be.** The processor's endpoint declares no caller, and a merchant's
+  key on it is refused like no signature at all.
+- **Both sides use the generated client.**
+  [`PaymentsClientTest`](../example/src/test/kotlin/example/payments/PaymentsClientTest.kt) shows two things:
+  - A merchant whose answer was lost retries through `retrying()` and is charged once.
+  - The processor signs with `processor.signer(secret)`.
+
+The document, `golden/payments/openapi.json`, shows all three: the bearer scheme with its 401 and 403, the
+`Idempotency-Key` header with its 409 and 422, and the signature headers with their 400.

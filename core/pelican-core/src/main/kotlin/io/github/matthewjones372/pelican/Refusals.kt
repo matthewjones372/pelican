@@ -48,6 +48,18 @@ enum class RefusalReason(val label: String) {
 
     /** An `Accept` that takes nothing the endpoint produces. */
     ACCEPT("accept"),
+
+    /** No caller where `authenticatedBy` needs one, or a credential that did not verify: the 401. */
+    UNAUTHENTICATED("unauthenticated"),
+
+    /** A caller missing what the endpoint `requires`: the 403. */
+    FORBIDDEN("forbidden"),
+
+    /** A request over its endpoint's rate limit: the 429. */
+    RATE_LIMITED("rate_limited"),
+
+    /** A body whose signature did not verify: the 400. */
+    SIGNATURE("signature"),
 }
 
 /**

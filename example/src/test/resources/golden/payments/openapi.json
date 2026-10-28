@@ -1,0 +1,388 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Payments",
+    "version": "1.0.0",
+    "description": "Charges a merchant takes with its key, safe to retry, settled by the processor's signed word."
+  },
+  "paths": {
+    "/charges": {
+      "post": {
+        "summary": "Charge a card",
+        "description": "Requires permission `charges:write`.",
+        "operationId": "createCharge",
+        "security": [
+          {
+            "merchantKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "A key the caller chooses, unique per request. A repeat with the same key is answered with the first response.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "How much, in minor units, and in what",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCharge"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Charge"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A request with this Idempotency-Key is still being answered. Retry after the time given.",
+            "headers": {
+              "Retry-After": {
+                "required": false,
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "This Idempotency-Key was first sent with a different request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No caller, or a credential that did not verify.",
+            "headers": {
+              "WWW-Authenticate": {
+                "required": true,
+                "description": "The scheme to authenticate with, and why the credential was refused where one was sent.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller does not have permission `charges:write`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/charges/{chargeId}": {
+      "get": {
+        "summary": "A charge, as it stands",
+        "description": "Requires permission `charges:read`.",
+        "operationId": "getCharge",
+        "security": [
+          {
+            "merchantKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chargeId",
+            "in": "path",
+            "required": true,
+            "description": "The charge, as createCharge answered it",
+            "schema": {
+              "type": "string",
+              "pattern": "ch_[0-9]+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Charge"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No charge with that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeNotFound"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No caller, or a credential that did not verify.",
+            "headers": {
+              "WWW-Authenticate": {
+                "required": true,
+                "description": "The scheme to authenticate with, and why the credential was refused where one was sent.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller does not have permission `charges:read`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hooks/processor": {
+      "post": {
+        "summary": "The processor says a charge settled or was declined",
+        "operationId": "processorEvent",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "description": "HMAC-SHA256 over `id.timestamp.body`, as Standard Webhooks signs: `v1,<base64>`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "description": "HMAC-SHA256 over `id.timestamp.body`, as Standard Webhooks signs: `v1,<base64>`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "description": "HMAC-SHA256 over `id.timestamp.body`, as Standard Webhooks signs: `v1,<base64>`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "What became of a charge",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessorEvent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No content."
+          },
+          "400": {
+            "description": "The request's signature did not verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "NewCharge": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currency": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "currency"
+        ]
+      },
+      "Charge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SETTLED",
+              "DECLINED"
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "currency",
+          "id",
+          "status"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "status"
+        ]
+      },
+      "ChargeNotFound": {
+        "type": "object",
+        "properties": {
+          "chargeId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "chargeId",
+          "message"
+        ]
+      },
+      "ProcessorEvent": {
+        "type": "object",
+        "properties": {
+          "chargeId": {
+            "type": "string"
+          },
+          "settled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "chargeId",
+          "settled"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "merchantKey": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

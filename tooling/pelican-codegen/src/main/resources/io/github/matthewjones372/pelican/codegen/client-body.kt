@@ -34,6 +34,7 @@ private fun request(
     origin: String = base,
     standingHeaders: Map<String, String> = headers(),
     deadline: Duration? = timeout,
+    signer: WebhookSigner? = null,
 ): ClientRequest {
     val search = query
         .flatMap { (name, value) -> occurrences(name, value).map { "${urlEncode(name)}=${urlEncode(it)}" } }
@@ -48,7 +49,9 @@ private fun request(
         listOfNotNull((multipart?.contentType ?: contentType)?.let { "Content-Type" to it }) +
             standingHeaders.map { (name, value) -> name to value } +
             headerParams.mapNotNull { (name, value) -> plain(value)?.let { name to it } } +
-            (if (jar.isEmpty()) emptyList() else listOf("Cookie" to jar.joinToString("; ")))
+            (if (jar.isEmpty()) emptyList() else listOf("Cookie" to jar.joinToString("; "))) +
+            // Over the exact bytes sent; a signed body is always text, since a streamed one cannot be signed.
+            signer?.headers((body as ClientRequest.Body.Text).content.toByteArray(Charsets.UTF_8)).orEmpty()
 
     return ClientRequest(
         method = method,
@@ -63,7 +66,7 @@ private fun TextResponse.succeeded(): Boolean = status in 200..299
 private fun ClientResponse.succeeded(): Boolean = status in 200..299
 
 private fun failed(method: Method, path: String, response: TextResponse): Nothing =
-    throw ApiCallFailed(response.status, method.name, path, response.body)
+    throw ApiCallFailed(response.status, method.name, path, response.body, retryAfter = response.retryAfter())
 
 /**
  * The body decoded, or a refusal naming the call it came back on.
@@ -85,4 +88,9 @@ private fun <T> BodyCodec<T>.decoded(raw: String, method: Method, path: String, 
 private fun drain(response: ClientResponse): String = response.text()
 
 private fun failedStream(method: Method, path: String, response: ClientResponse): Nothing =
-    throw ApiCallFailed(response.status, method.name, path, drain(response))
+    throw ApiCallFailed(response.status, method.name, path, drain(response), retryAfter = response.retryAfter())
+
+/** A `Retry-After` in seconds, the one form a wait can be read from without this machine's clock. */
+private fun TextResponse.retryAfter(): Long? = header("Retry-After")?.trim()?.toLongOrNull()?.takeIf { it >= 0 }
+
+private fun ClientResponse.retryAfter(): Long? = header("Retry-After")?.trim()?.toLongOrNull()?.takeIf { it >= 0 }
