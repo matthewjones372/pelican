@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican
 
+import io.github.matthewjones372.pelican.spi.RateLimitRefused
 import io.github.matthewjones372.pelican.spi.newReference
 import java.time.Clock
 import java.time.Instant
@@ -99,6 +100,19 @@ class RateLimitRequest internal constructor(
 
 /** An endpoint's rate limit, declared with `rateLimited(...)`, and the key of its own it adds, if any. */
 class RateLimited internal constructor(val limit: RateLimit, internal val key: (RateLimitRequest.() -> String?)?) {
+    /**
+     * 429: the budget is spent. A refusal tagged under the envelope's `error` field, so a 429 of the endpoint's own
+     * may share the status.
+     */
+    val refused: ErrorSpec = ErrorSpec(
+        TOO_MANY_REQUESTS,
+        "Too many requests. Send again after the time Retry-After gives.",
+        type = null,
+        headers = listOf(RETRY_AFTER),
+        tag = RATE_LIMITED_TAG,
+        discriminator = REFUSAL_REASON_FIELD,
+    )
+
     override fun toString() = "rateLimited($limit)"
 }
 
@@ -127,18 +141,26 @@ internal fun Api.spend(
     }
     if (decision is Taken.Denied) {
         val seconds = decision.retryAfter.inWholeMilliseconds.let { (it + MILLIS - 1) / MILLIS }.coerceAtLeast(1)
-        throw ApiException(
+        val refusal = ApiException(
             TOO_MANY_REQUESTS,
             RATE_LIMITED_TAG,
             "Too many requests; send again in $seconds seconds.",
             headers = listOf("Retry-After" to seconds.toString()),
         )
+        throw RateLimitRefused(refusal)
     }
 }
 
 private const val TOO_MANY_REQUESTS = 429
 private const val RATE_LIMITED_TAG = "rate_limited"
 private const val MILLIS = 1000L
+
+/** Where the refusal envelope writes its reason: `ApiError.error`. */
+private const val REFUSAL_REASON_FIELD = "error"
+
+// Optional: a 429 of the endpoint's own may share the status, and it may send none.
+private val RETRY_AFTER =
+    responseHeader<Long>("Retry-After", "Seconds to wait before sending the request again.").optional()
 
 /**
  * Whose bucket a request takes from: the limit's name, the caller, the tenant and the endpoint's own key, each
