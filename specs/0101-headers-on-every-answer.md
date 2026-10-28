@@ -9,9 +9,9 @@ that wraps a body sees `Any?` and casts. The roadmap asks for a decision. What s
 is narrower: headers. A filter can already call `p.setRawHeader(...)`, but only on a request that reached the chain.
 A 404 for no route, a 405, a 400 for an input that did not decode, a 413, a CORS preflight, the docs pages, the
 OpenAPI document and `/mcp` never run a filter, so they go out bare. And headers are kept one per name, so a response
-carries one `Set-Cookie`. Doorlist wraps Pelican's Jetty handler in its own (`Edge`) to put CSP, HSTS,
+carries one `Set-Cookie`. A service today wraps Pelican's Jetty handler in its own to put CSP, HSTS,
 `X-Frame-Options`, `Cache-Control` and the rest on every answer, and its handlers choose which one cookie to send
-when two are due ("One Set-Cookie per answer (Pelican keeps headers by name)", dependencies.md item 9).
+when two are due.
 
 ## Not doing
 
@@ -56,7 +56,7 @@ a filter sees (and run filters on a request that failed to decode).
 
 ## Stack
 
-- [ ] **`spec-0101-set-cookie`**: repeated `Set-Cookie` through `Params`, `addRawHeader`, the in-memory and test
+- [x] **`spec-0101-set-cookie`**: repeated `Set-Cookie` through `Params`, `addRawHeader`, the in-memory and test
       clients. Done when: a handler setting two cookies answers both, in order, on every backend.
 - [ ] **`spec-0101-policy`**: `responseHeaders { }`, `Answer`, applied by all three backends to endpoints and refusals.
       Done when: the parity suite sees the policy's header on a 200, a declared failure, a filter's 401, a decode
@@ -72,13 +72,14 @@ a filter sees (and run filters on a request that failed to decode).
 ./gradlew build   # AllBackendsTest, the docs modules' tests, the MCP handlers' tests
 ```
 
-## Open questions
+## Decisions
 
-1. **Which headers repeat?** Recommended: `Set-Cookie` only by default (RFC 6265 forbids folding it), and
-   `addRawHeader` for anything else a service wants twice. A `repeated()` flag on `responseHeader` is the other way.
-2. **Who wins on a clash** between the policy and a handler? Recommended: the handler, so an endpoint can loosen a
-   `Cache-Control` the policy set; the policy can read `answer` to stay off it instead.
-3. **Does the policy see the status?** A refusal's status is known; a streamed response's is too, before its first
-   byte. Recommended: yes, as `Answer.status`, since `Cache-Control` on an error is a common rule.
-4. **Does this land before 0094 and 0098?** Both write more than one `Set-Cookie`. Recommended: `spec-0101-set-cookie`
-   first, and 0094's `spec-0094-cookies` on it.
+Each recommendation was taken on 2026-10-28.
+
+1. **`Set-Cookie` alone repeats by default**, since RFC 6265 forbids folding it. `addRawHeader` appends any other
+   name a service wants twice.
+2. **The handler wins a clash** with the policy, so an endpoint can loosen a `Cache-Control` the policy set; the
+   policy can read `answer` to stay off it instead.
+3. **The policy sees the status**, as `Answer.status`.
+4. **`spec-0101-set-cookie` lands first in this stack.** 0094's `spec-0094-cookies` (#399) had already merged, with
+   `setCookie` and a repeated raw `Set-Cookie`; this entry adds what it left out.

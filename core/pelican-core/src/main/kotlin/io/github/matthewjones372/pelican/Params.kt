@@ -100,16 +100,30 @@ class Params(
     private fun outgoing(): MutableMap<String, String> =
         outgoing ?: LinkedHashMap<String, String>().also { outgoing = it }
 
-    /** Each a `Set-Cookie` of its own, keyed by what a browser tells two cookies apart by. */
+    /**
+     * Headers that repeat, in the order they were set: every `Set-Cookie`, and whatever [addRawHeader] appended. A
+     * key set again replaces its header where it stands; an appended header has a key nothing else equals.
+     */
     @Suppress("DoubleMutabilityForCollection") // Allocated only if used.
-    private var cookies: MutableMap<String, String>? = null
+    private var repeated: MutableMap<Any, Pair<String, String>>? = null
 
-    private fun cookies(): MutableMap<String, String> =
-        cookies ?: LinkedHashMap<String, String>().also { cookies = it }
+    private fun repeated(): MutableMap<Any, Pair<String, String>> =
+        repeated ?: LinkedHashMap<Any, Pair<String, String>>().also { repeated = it }
+
+    private fun append(name: String, value: String) {
+        repeated()[Any()] = name to value
+    }
+
+    /** [name] set to one [value], replacing whatever was set or appended under it. */
+    private fun replace(name: String, value: String) {
+        repeated?.values?.removeAll { it.first.equals(name, ignoreCase = true) }
+        outgoing()[name] = value
+    }
 
     /**
      * Sets a declared response header, encoded by its own codec. One the
      * endpoint never declared throws rather than shipping undocumented.
+     * A `Set-Cookie` is appended, as each cookie is a header of its own.
      */
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> setHeader(header: ResponseHeader<T>, value: T) {
@@ -120,7 +134,12 @@ class Params(
                     "Add it with emits(${header.name.substringAfterLast('-')}) on the endpoint.",
             )
         }
-        outgoing()[header.name] = (header.codec as PlainCodec<Any>).encode(value)
+        val encoded = (header.codec as PlainCodec<Any>).encode(value)
+        if (header.name.equals(SET_COOKIE, ignoreCase = true)) {
+            append(SET_COOKIE, encoded)
+        } else {
+            replace(header.name, encoded)
+        }
     }
 
     /**
@@ -129,7 +148,13 @@ class Params(
      */
     fun setRawHeader(name: String, value: String) {
         // A Set-Cookie per cookie, so a second one is another header rather than the first one replaced.
-        if (name.equals(SET_COOKIE, ignoreCase = true)) cookies()[value] = value else outgoing()[name] = value
+        if (name.equals(SET_COOKIE, ignoreCase = true)) repeated()[RawCookie(value)] = SET_COOKIE to value
+        else replace(name, value)
+    }
+
+    /** As [setRawHeader], but another header under [name] rather than the last one replaced. */
+    fun addRawHeader(name: String, value: String) {
+        append(if (name.equals(SET_COOKIE, ignoreCase = true)) SET_COOKIE else name, value)
     }
 
     /**
@@ -144,7 +169,7 @@ class Params(
                     "Add responseHeader<String>(\"Set-Cookie\") with emits(...) on the endpoint.",
             )
         }
-        cookies()["${cookie.name};${cookie.path};${cookie.domain.orEmpty()}"] = cookie.headerValue
+        repeated()[CookieSlot(cookie.name, cookie.path, cookie.domain)] = SET_COOKIE to cookie.headerValue
     }
 
     /**
@@ -152,7 +177,7 @@ class Params(
      * came back, errors included: a header set before a failure was deliberate.
      */
     fun responseHeaders(): List<Pair<String, String>> =
-        outgoing?.map { it.key to it.value }.orEmpty() + cookies?.values?.map { SET_COOKIE to it }.orEmpty()
+        outgoing?.map { it.key to it.value }.orEmpty() + repeated?.values.orEmpty()
 
     /**
      * The headers a required declaration promised but nobody set. Not policed —
@@ -164,6 +189,12 @@ class Params(
 }
 
 private const val SET_COOKIE = "Set-Cookie"
+
+/** What a browser tells two cookies apart by, so a second [Params.setCookie] of one replaces the first. */
+private data class CookieSlot(val name: String, val path: String, val domain: String?)
+
+/** A raw `Set-Cookie` sent twice is sent once. */
+private data class RawCookie(val value: String)
 
 /**
  * Where a caller reconnecting to an event stream left off — the `Last-Event-ID`
