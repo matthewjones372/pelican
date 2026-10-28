@@ -33,6 +33,15 @@ one.
 
 ### Added
 
+- **Headers on every answer** (spec 0101): `api { responseHeaders { answer -> add(name, value) } }` puts headers on
+  every response Pekko, Jetty, Gannet and the in-memory client write. That covers endpoints and their refusals, the
+  CORS preflight, pages, the 404 or 405 for a request nothing took, the docs modules and the MCP handler.
+  `Answer` carries the path, the endpoint that answered or null, the status, and `isDocs`. A name the response
+  already carries wins. `withResponseHeaders(api)` applies it to a route or handler of a service's own. On Pekko,
+  `sealedWith(api)` seals a route with it, as `start` now does. See
+  [Headers on every answer](docs/reference.md#headers-on-every-answer).
+- **`Params.addRawHeader(name, value)`** (spec 0101) appends a header rather than replacing it.
+
 - **A service that takes payments** (spec 0102): `example.payments` puts a merchant's key, a retry-safe charge and
   a signed processor webhook in one small service, tested on Jetty and through its generated `PaymentsClient`, with
   its document pinned as `golden/payments/openapi.json`. See
@@ -135,6 +144,14 @@ one.
   on Pekko. `example` and `benchmarks` now build on JDK 25 to depend on it.
   Gannet is `io.github.matthewjones372:gannet:0.1.0-SNAPSHOT`, resolved from
   Central's snapshot repository.
+
+### Changed
+
+- **Every `Set-Cookie` goes out** (spec 0101): a second `setHeader` of a declared `Set-Cookie` adds a cookie where
+  it used to replace the first. Cookies go out in the order they were set, whichever call set them. An idempotent
+  replay repeats a header as often as it first went out.
+- **Body rewriting is the handler's** (spec 0101): the reference's [Filters](docs/reference.md#filters) section
+  says where it goes and why, and the roadmap item asking for a decision is closed.
 
 ## [1.2.0] — 2026-10-27
 

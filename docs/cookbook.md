@@ -331,6 +331,38 @@ above. See [Response headers](reference.md#response-headers).
 
 ---
 
+## Security headers on every answer
+
+Put `nosniff`, a CSP, HSTS and a `Cache-Control` on errors on every response,
+including the 404s, 405s and 400s no filter sees and the docs pages. On `main`,
+in no release yet:
+
+```kotlin
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+
+const val API_CSP = "default-src 'none'; frame-ancestors 'none'"
+const val DOCS_CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net"
+
+val service = api(routes, JacksonCodecs) {
+    responseHeaders { answer ->
+        add("X-Content-Type-Options", "nosniff")
+        add("X-Frame-Options", "DENY")
+        add("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+        add("Content-Security-Policy", if (answer.isDocs) DOCS_CSP else API_CSP)
+        if (answer.status >= 400) add("Cache-Control", "no-store")
+    }
+}
+```
+
+A header the handler set wins, so an endpoint that sends its own
+`Cache-Control` keeps it. To send a header twice, `add` it twice; in a handler
+or filter, `addRawHeader` appends where `setRawHeader` replaces, and every
+`Set-Cookie` is a header of its own. See
+[Headers on every answer](reference.md#headers-on-every-answer).
+
+---
+
 ## A form body
 
 Accept an `application/x-www-form-urlencoded` body as a typed value:
