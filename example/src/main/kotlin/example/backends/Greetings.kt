@@ -54,6 +54,7 @@ import io.github.matthewjones372.pelican.repeated
 import io.github.matthewjones372.pelican.responseHeader
 import io.github.matthewjones372.pelican.role
 import io.github.matthewjones372.pelican.sessionCookie
+import io.github.matthewjones372.pelican.standardWebhooks
 import io.github.matthewjones372.pelican.tenantFrom
 import io.github.matthewjones372.pelican.textPart
 import io.github.matthewjones372.pelican.webhook
@@ -574,12 +575,30 @@ val stampTicket = endpoint {
     text()
 }
 
+/** The secret the tip jar's notifier signs with: a Standard Webhooks `whsec_` key, the rest of it base64. */
+const val TIP_HOOK_SECRET = "whsec_dGlwIGphciBzaWduaW5nIHNlY3JldA=="
+
+val tipHooks = standardWebhooks { listOf(TIP_HOOK_SECRET) }
+
+val tipNotice = jsonBody<Tip>(description = "The tip the jar was handed")
+
+/** A notification from the tip jar, read only once its signature verifies over the bytes that arrived. */
+val tipNoticed = endpoint(tipNotice) {
+    post("hooks" / "tips")
+    summary = "Hear from the tip jar that a tip was left"
+    operationId = "tipNoticed"
+    tag("greetings")
+    emits(requestId)
+    signedBy(tipHooks)
+    text()
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
         roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay, leaveTip, refundTip,
-        startVisit, whoIsVisiting, leaveNote, openTill, stampTicket,
+        startVisit, whoIsVisiting, leaveNote, openTill, stampTicket, tipNoticed,
     )
 
 /**
