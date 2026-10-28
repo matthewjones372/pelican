@@ -92,9 +92,12 @@ class ApiBuilder internal constructor() {
         idempotency = Idempotency(store, ttl.toJavaDuration(), lease.toJavaDuration())
     }
 
-    /** How tenanted endpoints find their tenant, and what says it exists. One per `Api`. */
-    fun tenants(input: TenantInput, directory: TenantDirectory) {
-        tenants = Tenants(input, directory)
+    /**
+     * How tenanted endpoints find their tenant, and what says it exists. One per `Api`. A caller whose [claim] names
+     * another tenant is a 403; null checks no claim.
+     */
+    fun tenants(input: TenantInput, directory: TenantDirectory, claim: String? = "tenant") {
+        tenants = Tenants(input, directory, claim)
     }
 
     private var tenants: Tenants? = null

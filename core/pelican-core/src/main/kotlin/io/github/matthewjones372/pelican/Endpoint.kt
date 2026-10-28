@@ -632,7 +632,9 @@ private fun errorsOf(b: EndpointBuilder): List<ErrorSpec> {
         "This endpoint finds its tenant in the caller's claim, and names no caller. " +
             "Declare one with authenticatedBy(...)."
     }
-    val answered = listOfNotNull(b.callerInput?.refused, requires?.refused, crossSite, tenant?.missing, tenant?.unknown)
+    val foreign = tenant?.foreign?.takeIf { b.callerInput != null }
+    val answered =
+        listOfNotNull(b.callerInput?.refused, requires?.refused, crossSite, tenant?.missing, tenant?.unknown, foreign)
     // One per status: an endpoint's own declaration wins, and then the first of Pelican's.
     return answered.fold(b.errors.toList()) { declared, refusal ->
         if (declared.any { it.status == refusal.status }) declared else declared + refusal
