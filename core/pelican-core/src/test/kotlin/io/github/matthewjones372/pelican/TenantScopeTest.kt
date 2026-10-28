@@ -114,4 +114,58 @@ class TenantScopeTest {
         send(api, Method.POST, "globex", "ada", key = "k-1").text() shouldBe "order 2 for globex"
         ran.get() shouldBe 2
     }
+
+    // ----------------------------------------------------------------------- sessions
+
+    private val sessions = sessionCookie("sid")
+    private val visitor = authenticated(sessions.scheme) { it.subject }.optional()
+
+    private val notes = endpoint {
+        get("notes")
+        authenticatedBy(visitor)
+        tenanted(tenant)
+        text()
+    }
+
+    private val home = endpoint {
+        get("home")
+        authenticatedBy(visitor)
+        text()
+    }
+
+    private val visited = api(
+        listOf(notes, home).map { ep ->
+            ServerEndpoint(ep) { p -> CompletableFuture.completedStage((p[visitor] ?: "nobody") as Any?) }
+        },
+    ) {
+        authenticate(sessions.scheme, sessions)
+        tenants(tenant, directory)
+    }
+
+    private fun visit(path: String, cookie: ResponseCookie, tenantId: String? = null): String {
+        val headers = listOfNotNull("Cookie" to "sid=${cookie.value}", tenantId?.let { "X-Tenant" to it })
+        return InMemoryClientTransport(visited).send(ClientRequest(Method.GET, "http://api.example$path", headers))
+            .toCompletableFuture().join().text()
+    }
+
+    @Test
+    fun `a session started in one tenant is someone there and nobody in another`() {
+        val cookie = sessions.start(Identity("ada"), Tenant("acme"))
+
+        visit("/notes", cookie, "acme") shouldBe "ada"
+        visit("/notes", cookie, "globex") shouldBe "nobody"
+    }
+
+    @Test
+    fun `a session started in no tenant, as an untenanted sign-in does, is someone in every one`() {
+        val cookie = sessions.start(Identity("ada"))
+
+        visit("/notes", cookie, "acme") shouldBe "ada"
+        visit("/notes", cookie, "globex") shouldBe "ada"
+    }
+
+    @Test
+    fun `a tenant's session is someone on an endpoint that serves no one tenant`() {
+        visit("/home", sessions.start(Identity("ada"), Tenant("acme"))) shouldBe "ada"
+    }
 }

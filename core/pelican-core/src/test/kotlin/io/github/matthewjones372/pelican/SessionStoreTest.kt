@@ -34,9 +34,18 @@ class SessionStoreTest {
         held.identity.subject shouldBe "ada"
         held.created shouldBe clock.now
         held.expires shouldBe inMinutes(30)
+        held.tenant shouldBe null
 
         clock.advance(30.minutes)
         store.lookup("k1").shouldBeNull()
+    }
+
+    @Test
+    fun `a session keeps the tenant it was started in, through a touch`() {
+        store.create("k1", Identity("ada"), expires = inMinutes(30), tenant = "acme")
+        store.touch("k1", expires = inMinutes(45))
+
+        store.lookup("k1").shouldNotBeNull().tenant shouldBe "acme"
     }
 
     @Test

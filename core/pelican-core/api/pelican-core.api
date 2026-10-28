@@ -777,7 +777,7 @@ public final class io/github/matthewjones372/pelican/InMemorySessionStore : io/g
 	public fun <init> ()V
 	public fun <init> (Ljava/time/Clock;)V
 	public synthetic fun <init> (Ljava/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun create (Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;)V
+	public fun create (Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/lang/String;)V
 	public fun lookup (Ljava/lang/String;)Lio/github/matthewjones372/pelican/StoredSession;
 	public fun revoke (Ljava/lang/String;)V
 	public fun revokeAll (Ljava/lang/String;)V
@@ -1735,12 +1735,14 @@ public final class io/github/matthewjones372/pelican/SessionCookie : io/github/m
 	public final fun getIdle-UwyO8pc ()J
 	public final fun getName ()Ljava/lang/String;
 	public final fun getScheme ()Lio/github/matthewjones372/pelican/ApiKeyScheme;
-	public final fun start (Lio/github/matthewjones372/pelican/Identity;)Lio/github/matthewjones372/pelican/ResponseCookie;
+	public final fun start (Lio/github/matthewjones372/pelican/Identity;Lio/github/matthewjones372/pelican/Tenant;)Lio/github/matthewjones372/pelican/ResponseCookie;
+	public static synthetic fun start$default (Lio/github/matthewjones372/pelican/SessionCookie;Lio/github/matthewjones372/pelican/Identity;Lio/github/matthewjones372/pelican/Tenant;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/ResponseCookie;
 	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/SessionStore {
-	public abstract fun create (Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;)V
+	public abstract fun create (Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/lang/String;)V
+	public static synthetic fun create$default (Lio/github/matthewjones372/pelican/SessionStore;Ljava/lang/String;Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/lang/String;ILjava/lang/Object;)V
 	public abstract fun lookup (Ljava/lang/String;)Lio/github/matthewjones372/pelican/StoredSession;
 	public abstract fun revoke (Ljava/lang/String;)V
 	public abstract fun revokeAll (Ljava/lang/String;)V
@@ -1784,10 +1786,12 @@ public final class io/github/matthewjones372/pelican/StoredResponse {
 }
 
 public final class io/github/matthewjones372/pelican/StoredSession {
-	public fun <init> (Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/time/Instant;)V
+	public fun <init> (Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/time/Instant;Ljava/lang/String;)V
+	public synthetic fun <init> (Lio/github/matthewjones372/pelican/Identity;Ljava/time/Instant;Ljava/time/Instant;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCreated ()Ljava/time/Instant;
 	public final fun getExpires ()Ljava/time/Instant;
 	public final fun getIdentity ()Lio/github/matthewjones372/pelican/Identity;
+	public final fun getTenant ()Ljava/lang/String;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/StreamIn {

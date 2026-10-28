@@ -27,6 +27,7 @@ import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.PlainCodec
 import io.github.matthewjones372.pelican.QueryParam
 import io.github.matthewjones372.pelican.RawBody
+import io.github.matthewjones372.pelican.TenantNamed
 import io.github.matthewjones372.pelican.UnsupportedMediaType
 import io.github.matthewjones372.pelican.crossSiteChecked
 import io.github.matthewjones372.pelican.decodeAll
@@ -93,9 +94,10 @@ private const val STRICT_DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
  */
 fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: MutableMap<ParamKey<*>, Any?>) {
     val caller = endpoint.caller
+    val presented = endpoint.tenant?.named(credentials)?.let { TenantNamed(credentials, it) } ?: credentials
     val identity = caller?.let {
         try {
-            it.identify(authenticators.getValue(it.scheme), credentials, endpoint.requires)
+            it.identify(authenticators.getValue(it.scheme), presented, endpoint.requires)
                 ?.also { if (csrf && crossSiteChecked(endpoint.method, caller)) refuseCrossSite(credentials, cors) }
         } catch (e: ApiException) {
             throw CallerRefused(e)
