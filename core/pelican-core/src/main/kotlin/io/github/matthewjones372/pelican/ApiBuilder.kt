@@ -102,6 +102,13 @@ class ApiBuilder internal constructor() {
 
     private var tenants: Tenants? = null
 
+    /** [Api.rateLimiter]: what counts the budgets rate-limited endpoints spend. */
+    fun rateLimits(limiter: RateLimiter) {
+        rateLimiter = limiter
+    }
+
+    private var rateLimiter: RateLimiter? = null
+
     /** [Api.onRefusal] — `onRefusal(refusalCounter(registry))` for the meter. */
     fun onRefusal(observer: RefusalObserver) {
         onRefusal = observer
@@ -131,6 +138,7 @@ class ApiBuilder internal constructor() {
         idempotency = idempotency,
         csrf = csrf,
         tenants = tenants,
+        rateLimiter = rateLimiter,
     )
 }
 

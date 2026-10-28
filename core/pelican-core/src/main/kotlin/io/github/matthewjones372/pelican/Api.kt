@@ -251,6 +251,9 @@ class Api internal constructor(
 
     /** How tenanted endpoints find their tenant; null where no endpoint is tenanted. */
     val tenants: Tenants? = null,
+
+    /** Where rate-limited endpoints' budgets are counted. An endpoint declaring a limit with none set fails here. */
+    val rateLimiter: RateLimiter? = null,
 ) {
     /**
      * The largest single frame of a streamed request body, over which the frame
@@ -291,6 +294,11 @@ class Api internal constructor(
             "Endpoints are tenanted, and the Api resolves " +
                 (if (tenants == null) "no tenants" else "another tenant input") +
                 ". Bind the one they declare with tenants(input, directory)."
+        }
+
+        val limited = bound.filter { it.rateLimit != null }
+        require(limited.isEmpty() || rateLimiter != null) {
+            "${limited.joinToString()} declare a rate limit, and nothing counts it. Set one with rateLimits(...)."
         }
 
         val keyed = endpoints.filter { it.endpoint.idempotency != null }

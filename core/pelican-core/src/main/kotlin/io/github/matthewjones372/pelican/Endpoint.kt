@@ -112,6 +112,9 @@ class Endpoint<I, R> internal constructor(
 
     /** Which tenant the request is for; null for an endpoint that serves no one tenant. */
     val tenant: TenantInput? = null,
+
+    /** The budget each request here spends from; null for an endpoint called as often as callers like. */
+    val rateLimit: RateLimited? = null,
 ) {
     /**
      * Whether a request here can carry a resume point. Only an event stream is
@@ -162,6 +165,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     internal var idempotencyKey: IdempotencyKey? = null
     internal var requirements: Requires? = null
     internal var tenantInput: TenantInput? = null
+    internal var rateLimited: RateLimited? = null
 
     init {
         // Inputs listed on endpoint(...) register themselves, so each is
@@ -323,6 +327,16 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
         require(tenantInput == null) { "This endpoint is already tenanted; a request is for one tenant." }
         tenantInput = tenant
         tenant.header?.let { headerParams += it }
+    }
+
+    /**
+     * Spends a permit from [limit] per request, after the caller and tenant are known and before any other input:
+     * a request over it is a 429 naming when to come back. The budget is the caller's and tenant's own; [key] adds a
+     * key of the endpoint's own, which an endpoint with neither must name.
+     */
+    fun rateLimited(limit: RateLimit, key: (RateLimitRequest.() -> String?)? = null) {
+        require(rateLimited == null) { "This endpoint is already rate limited; a request spends from one budget." }
+        rateLimited = RateLimited(limit, key)
     }
 
     /**
@@ -617,6 +631,7 @@ private fun <I, R> build(
         idempotency = b.idempotencyKey,
         requires = b.requirements,
         tenant = b.tenantInput,
+        rateLimit = b.rateLimited,
     ).also(::validate)
 }
 
@@ -705,6 +720,7 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     ep.idempotency?.let { validateIdempotency(ep, it) }
+    validateRateLimit(ep)
 
     val statusClashes = unpickableStatuses(ep)
     if (statusClashes.isNotEmpty()) {
@@ -728,6 +744,15 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     validateResponseHeaders(ep)
+}
+
+/** A limit with nothing to key it on but its name would be one budget for every caller there is. */
+private fun validateRateLimit(ep: Endpoint<*, *>) {
+    val limited = ep.rateLimit ?: return
+    require(ep.caller != null || ep.tenant != null || limited.key != null) {
+        "$ep is rate limited with no caller, no tenant and no key of its own, so every request would share one " +
+            "budget. Name the key: rateLimited(limit) { header(\"X-Forwarded-For\") }."
+    }
 }
 
 /**

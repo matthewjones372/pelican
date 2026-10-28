@@ -12,6 +12,7 @@ import io.github.matthewjones372.pelican.DeclaredResponses
 import io.github.matthewjones372.pelican.Endpoint
 import io.github.matthewjones372.pelican.FormBody
 import io.github.matthewjones372.pelican.HeaderParam
+import io.github.matthewjones372.pelican.Identity
 import io.github.matthewjones372.pelican.JSON_MEDIA_TYPE
 import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.ListStyle
@@ -27,6 +28,8 @@ import io.github.matthewjones372.pelican.PayloadTooLarge
 import io.github.matthewjones372.pelican.PlainCodec
 import io.github.matthewjones372.pelican.QueryParam
 import io.github.matthewjones372.pelican.RawBody
+import io.github.matthewjones372.pelican.Tenant
+import io.github.matthewjones372.pelican.TenantInput
 import io.github.matthewjones372.pelican.TenantNamed
 import io.github.matthewjones372.pelican.UnsupportedMediaType
 import io.github.matthewjones372.pelican.crossSiteChecked
@@ -36,6 +39,7 @@ import io.github.matthewjones372.pelican.formCodec
 import io.github.matthewjones372.pelican.mediaType
 import io.github.matthewjones372.pelican.refuseCrossSite
 import io.github.matthewjones372.pelican.representations
+import io.github.matthewjones372.pelican.spend
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
@@ -104,18 +108,39 @@ fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: M
         }
     }
     if (caller != null) into[caller] = identity?.let(caller::built)
-    // For whom, once who is known: a claim resolver reads the caller.
-    endpoint.tenant?.let { tenant ->
-        // The Api refused to build with a tenanted endpoint and nothing resolving it, so this is never reached unbound.
-        val bound = checkNotNull(tenants) { "$endpoint is tenanted and the Api resolves no tenants" }
-        val found = tenant.decode(credentials, identity, bound.directory)
-        try {
-            tenant.refuseForeign(identity, bound.claim, found)
-        } catch (e: ApiException) {
-            throw CallerRefused(e)
-        }
-        into[tenant] = found
+    decodeTenantAndSpend(endpoint, credentials, identity, into)
+}
+
+/** For whom, once who is known, since a claim resolver reads the caller; then the rate limit, which keys on both. */
+private fun Api.decodeTenantAndSpend(
+    endpoint: Endpoint<*, *>,
+    credentials: Credentials,
+    identity: Identity?,
+    into: MutableMap<ParamKey<*>, Any?>,
+) {
+    val tenant = endpoint.tenant?.let { input ->
+        decodeTenant(endpoint, input, credentials, identity).also { into[input] = it }
     }
+    // Last, so only a request every check before it let through spends from the budget.
+    endpoint.rateLimit?.let { spend(endpoint, it, credentials, identity, tenant) }
+}
+
+/** The tenant [input] finds, known to the directory and not refused for [identity]'s claim. */
+private fun Api.decodeTenant(
+    endpoint: Endpoint<*, *>,
+    input: TenantInput,
+    credentials: Credentials,
+    identity: Identity?,
+): Tenant {
+    // The Api refused to build with a tenanted endpoint and nothing resolving it, so this is never reached unbound.
+    val bound = checkNotNull(tenants) { "$endpoint is tenanted and the Api resolves no tenants" }
+    val found = input.decode(credentials, identity, bound.directory)
+    try {
+        input.refuseForeign(identity, bound.claim, found)
+    } catch (e: ApiException) {
+        throw CallerRefused(e)
+    }
+    return found
 }
 
 /** The caller's 401 or 403, told apart from the same status thrown by a filter, which the chain already saw. */

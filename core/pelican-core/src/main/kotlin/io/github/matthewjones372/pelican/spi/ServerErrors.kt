@@ -184,7 +184,7 @@ private const val INTERNAL_SERVER_ERROR = 500
  * Short, unique enough to find in a log, and not sequential — a counter would
  * tell a caller how much traffic the service takes.
  */
-private fun newReference(): String =
+internal fun newReference(): String =
     java.util.UUID.randomUUID().toString().replace("-", "").take(REFERENCE_LENGTH)
 
 /** Long enough to be unique in a log, short enough to read out over a phone. */
