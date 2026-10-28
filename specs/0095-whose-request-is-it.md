@@ -62,7 +62,7 @@ check and sign-in page into an exception to remember.
       past the size cap: sessions scoped by tenant. Done when: a session started in one tenant reads as nobody in
       another.
 - [x] **`spec-0095-parity`** ([#409](https://github.com/matthewjones372/pelican/pull/409)): a tenanted endpoint in the backends example. Done when: every backend answers alike.
-- [ ] **`spec-0095-docs`**: reference, cookbook, changelog.
+- [x] **`spec-0095-docs`** ([#410](https://github.com/matthewjones372/pelican/pull/410)): reference, cookbook, changelog.
 
 ## Acceptance
 
