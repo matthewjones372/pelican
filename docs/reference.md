@@ -13,7 +13,7 @@ Contents:
 - **Modules and backends:** [Modules](#modules), [The backend](#the-backend) (including [On Jetty](#on-jetty) and [On Gannet](#on-gannet)), [Choosing a JSON library](#choosing-a-json-library)
 - **Defining endpoints and inputs:** [Everything is a value](#everything-is-a-value), [Typechecked endpoints](#typechecked-endpoints), [Refined inputs](#refined-inputs), [More than one value](#more-than-one-value), [Cookies](#cookies), [Form bodies](#form-bodies), [Multipart uploads](#multipart-uploads)
 - **Responses and errors:** [Response headers](#response-headers), [Declared failures](#declared-failures), [More than one successful response](#more-than-one-successful-response), [One response, several renderings](#one-response-several-renderings), [Streaming](#a-whole-list-or-a-stream-of-one) (and the sections after it, through [Streaming behaviour](#streaming-behaviour)), [Errors](#errors-and-what-a-caller-is-told), [Limits and startup checks](#limits-and-startup-checks)
-- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Who may call](#what-a-caller-may-do), [Sessions](#a-session-in-a-cookie), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
+- **Security and the service around the endpoints:** [Hiding an endpoint](#hiding-an-endpoint), [Security schemes](#security-schemes), [Who may call](#what-a-caller-may-do), [Sessions](#a-session-in-a-cookie), [Tenants](#whose-request-it-is), [Idempotency keys](#a-request-sent-twice-answered-once), [Pages](#pages-beside-the-endpoints), [Filters](#filters), [Metrics](#metrics), [Health checks](#health-checks), [CORS](#cors)
 - **Documents and other readings:** [OpenAPI docs](#getting-the-openapi-docs), [Standalone JSON Schema](#a-schema-that-resolves-on-its-own) ([schemas.md](schemas.md)), [MCP tools](#tools-a-model-can-call) ([mcp.md](mcp.md)), [Webhooks](#webhooks-the-calls-the-service-sends)
 - **Generating code:** [The Gradle plugin](#the-gradle-plugin), [Client transports](#the-transport-a-generated-client-sends-with) ([generated-client.md](generated-client.md)), [Importing a document](#importing-an-openapi-document) ([importing.md](importing.md))
 - **Testing:** [Testing](#testing) ([golden-testing.md](golden-testing.md))
@@ -2994,6 +2994,57 @@ provider with scopes side by side, the redirect URL printed at start-up, and
 rejects a caller who cannot meet them: is
 `example/src/main/kotlin/example/secured/SecuredReports.kt`
 (`./gradlew :example:runSecured`). See [Filters](#filters) for the shape of it.
+
+## Whose request it is
+
+A service for many tenants finds out which one a request is for once, ahead of
+the body, and hands it to the handler typed
+([spec 0095](../specs/0095-whose-request-is-it.md)):
+
+```kotlin
+val shop = tenantFrom(TenantResolver.header("X-Shop"))     // or subdomain(of = "example.com"), or claim("tenant")
+
+val listOrders = endpoint {
+    get("orders")
+    authenticatedBy(caller)
+    tenanted(shop)
+    jsonArray<Order>()
+}
+
+listOrders handledNow { orders.of(this[shop].id) }          // a Tenant, never a raw string
+
+api(routes, codecs = JacksonCodecs) {
+    tenants(shop, directory = InMemoryTenantDirectory(setOf("acme", "globex")))
+}
+```
+
+- **Where it is found**: `TenantResolver.header(name)`, `subdomain(of)` (the one
+  label in front of the domain, so `acme.example.com` is `acme` and
+  `a.b.example.com` is none), or `claim(name)` on the caller, which needs the
+  endpoint to name one. A `TenantResolver` of your own is a function from the
+  request's headers and caller to an id. One is bound per `Api`; endpoints opt in
+  with `tenanted(...)`, so a health check or sign-in page is not tenanted.
+- **Whether it exists** is the `TenantDirectory`'s to say. `InMemoryTenantDirectory`
+  is for tests; a persistent one is the service's.
+- **Refusals**, after the caller and before any other input: no tenant is a 400,
+  one the directory does not know a 404, and a caller whose `tenant` claim names
+  another tenant a 403. A caller with no such claim is not checked; name another
+  claim with `tenants(..., claim = "org")`, or none with `claim = null`. All three
+  are declared in the refusal envelope, and `onRefusal` hears the 403 as
+  `RefusalReason.FORBIDDEN`.
+- **What keys on a caller keys on the tenant too.** An idempotency key replays
+  only in the tenant it was sent in; `IdempotencyScope` carries `tenant`. A
+  session started with `sessions.start(identity, tenant)` reads as nobody in
+  another tenant. One started in none, as an untenanted sign-in starts one, is
+  read in every tenant.
+- **The document and the client**: a header resolver is a required header
+  parameter, and a parameter of the generated client. A subdomain resolver is the
+  operation's server, `https://{tenant}.example.com`, and the generated client
+  takes `tenant: String` and calls that host. A claim resolver adds nothing a
+  caller sends.
+
+Which rows a tenant may read is still the service's query. Pelican says whose
+request it is, not what they may see.
 
 ## A request sent twice, answered once
 

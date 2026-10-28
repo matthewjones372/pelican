@@ -575,6 +575,40 @@ send is a 403 without any code here, since the check is on by default; see
 
 ---
 
+## Serving many tenants
+
+The tenant in a header, checked against the tenants there are, and handed to
+the handler:
+
+```kotlin
+import io.github.matthewjones372.pelican.InMemoryTenantDirectory
+import io.github.matthewjones372.pelican.TenantResolver
+import io.github.matthewjones372.pelican.tenantFrom
+
+val shop = tenantFrom(TenantResolver.header("X-Shop"))
+
+val openTill = endpoint {
+    get("till")
+    authenticatedBy(teller)
+    tenanted(shop)                  // 400 without X-Shop, 404 for a shop there is not
+    text()
+}
+
+openTill handledNow { "${this[teller]} at ${this[shop].id}" }
+
+api(routes, codecs = JacksonCodecs) {
+    authenticate(tellerToken, tellers)
+    tenants(shop, InMemoryTenantDirectory(setOf("acme", "globex")))
+}
+```
+
+A teller whose token says `tenant: acme` is a 403 at globex, with nothing more
+to write. The generated client takes `xShop: String`, and an idempotency key or
+a session from one shop is no use in another; see
+[Whose request it is](reference.md#whose-request-it-is).
+
+---
+
 ## A request safe to send twice
 
 A POST that charges or creates declares a key, and a repeat of it is answered
