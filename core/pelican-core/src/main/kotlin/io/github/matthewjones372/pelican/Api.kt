@@ -253,7 +253,7 @@ class Api internal constructor(
     val tenants: Tenants? = null,
 
     /** Where rate-limited endpoints' budgets are counted. An endpoint declaring a limit with none set fails here. */
-    val rateLimiter: RateLimiter? = null,
+    val rateLimits: RateLimitStore? = null,
 ) {
     /**
      * The largest single frame of a streamed request body, over which the frame
@@ -297,7 +297,7 @@ class Api internal constructor(
         }
 
         val limited = bound.filter { it.rateLimit != null }
-        require(limited.isEmpty() || rateLimiter != null) {
+        require(limited.isEmpty() || rateLimits != null) {
             "${limited.joinToString()} declare a rate limit, and nothing counts it. Set one with rateLimits(...)."
         }
 
