@@ -48,6 +48,7 @@ import io.github.matthewjones372.pelican.path
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.positive
 import io.github.matthewjones372.pelican.queryParam
+import io.github.matthewjones372.pelican.rateLimit
 import io.github.matthewjones372.pelican.rawBody
 import io.github.matthewjones372.pelican.repeated
 import io.github.matthewjones372.pelican.responseHeader
@@ -559,12 +560,26 @@ val openTill = endpoint {
     text()
 }
 
+/** Two tickets a minute for each teller, so a third is a 429 saying to come back in thirty seconds. */
+val tickets = rateLimit("tickets", 2, per = 1.minutes)
+
+val stampTicket = endpoint {
+    post("tickets")
+    summary = "Stamp a ticket, as often as the teller's budget allows"
+    operationId = "stampTicket"
+    tag("greetings")
+    emits(requestId)
+    authenticatedBy(teller)
+    rateLimited(tickets)
+    text()
+}
+
 /** Every endpoint, so a server and a document cannot be built from different lists. */
 val greetingEndpoints: List<Endpoint<*, *>> =
     listOf(
         greet, countdown, echo, remember, preferences, signIn, uploadFile, filters, strict,
         roundtrip, motd, forget, peek, everyone, logo, echoRaw, tally, ticker, replay, leaveTip, refundTip,
-        startVisit, whoIsVisiting, leaveNote, openTill,
+        startVisit, whoIsVisiting, leaveNote, openTill, stampTicket,
     )
 
 /**

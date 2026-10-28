@@ -91,6 +91,8 @@ val pekkoRoutes: List<ServerEndpoint> = listOf(
 
     openTill handledNow { "${this[teller]} at ${this[shop].id}" },
 
+    stampTicket handledNow { "stamped for ${this[teller]}" },
+
     forget handledWith { _ -> },
 
     peek handledWith { _ -> },

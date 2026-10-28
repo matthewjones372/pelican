@@ -100,6 +100,9 @@ class RateLimitRequest internal constructor(
 
 /** An endpoint's rate limit, declared with `rateLimited(...)`, and the key of its own it adds, if any. */
 class RateLimited internal constructor(val limit: RateLimit, internal val key: (RateLimitRequest.() -> String?)?) {
+    /** Whether the endpoint adds a key of its own to the caller's and tenant's. */
+    val keyed: Boolean get() = key != null
+
     /**
      * 429: the budget is spent. A refusal tagged under the envelope's `error` field, so a 429 of the endpoint's own
      * may share the status.

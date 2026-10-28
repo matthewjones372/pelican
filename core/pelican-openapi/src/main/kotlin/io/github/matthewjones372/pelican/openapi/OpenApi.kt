@@ -753,7 +753,15 @@ private fun multipartEncoding(body: MultipartBody): JsonObj? {
 /** What the author wrote, then what the caller must have: OpenAPI has no field for a role, nor for "all of". */
 private fun operationDescription(ep: Endpoint<*, *>): String? {
     val requires = ep.requires?.let { "Requires $it." }
-    return listOfNotNull(ep.description, requires).joinToString("\n\n").ifEmpty { null }
+    val limited = ep.rateLimit?.let { limited ->
+        val whose = listOfNotNull(
+            "caller".takeIf { ep.caller != null },
+            "tenant".takeIf { ep.tenant != null },
+            "key".takeIf { limited.keyed },
+        )
+        "Rate limited per ${whose.joinToString(" and ")} to ${limited.limit.bucket}, as `${limited.limit.name}`."
+    }
+    return listOfNotNull(ep.description, requires, limited).joinToString("\n\n").ifEmpty { null }
 }
 
 private fun successDescription(out: Output<*>): String = out.description ?: impliedDescription(out)

@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
@@ -14,6 +15,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 
@@ -247,5 +249,28 @@ class RateLimitTest {
             "Too many requests. Send again after the time Retry-After gives.",
             "The warehouse is busy",
         )
+    }
+
+    // ------------------------------------------------------------- a client that waits
+
+    @Test
+    fun `a retrying client waits the Retry-After a spent budget names, and gets in`() {
+        val oncePerSecond = endpoint {
+            get("tick")
+            rateLimited(rateLimit("tick", 1, per = 1.seconds)) { "everyone" }
+            text()
+        }
+        val served = api(listOf(ServerEndpoint(oncePerSecond) { CompletableFuture.completedStage("tick" as Any?) })) {
+            rateLimits(InMemoryRateLimitStore())
+        }
+        val client = InMemoryClientTransport(served).retrying(retryPolicy { initialBackoff = java.time.Duration.ZERO })
+        fun tick() = client.send(ClientRequest(Method.GET, "http://api.example/tick", emptyList()))
+            .toCompletableFuture().join()
+
+        tick().status shouldBe 200
+        val started = System.nanoTime()
+
+        tick().status shouldBe 200
+        (System.nanoTime() - started).nanoseconds shouldBeGreaterThanOrEqualTo 1.seconds
     }
 }

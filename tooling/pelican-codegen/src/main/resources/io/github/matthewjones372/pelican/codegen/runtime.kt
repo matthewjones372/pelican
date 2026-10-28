@@ -14,6 +14,11 @@ class ApiCallFailed(
     val path: String,
     body: String,
     cause: Throwable? = null,
+    /**
+     * The seconds a `Retry-After` asked the caller to wait, as a rate limit's
+     * 429 sends; null where it named none, or named a date rather than a wait.
+     */
+    val retryAfter: Long? = null,
 ) : RuntimeException("$method $path -> $status: ${body.take(MESSAGE_BODY_CHARS)}", cause) {
 
     /**
