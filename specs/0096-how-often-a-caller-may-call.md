@@ -71,7 +71,7 @@ B, one limit on the whole `Api`, is simpler but cannot tell a cheap read from an
       client waits what `Retry-After` names.
 - [x] **`spec-0096-parity`** ([#416](https://github.com/matthewjones372/pelican/pull/416)): a limited endpoint in the
       backends example. Done when: every backend answers alike.
-- [ ] **`spec-0096-docs`**: reference, cookbook, changelog.
+- [x] **`spec-0096-docs`** ([#417](https://github.com/matthewjones372/pelican/pull/417)): reference, cookbook, changelog.
 
 ## Acceptance
 
