@@ -1418,6 +1418,71 @@ and `errorJson<T>(429, "...", retryAfter)` for one the handler returns. See
 where no endpoint description is to hand, which is what `unauthorized(challenge
 = ...)` and `tooManyRequests(retryAfterSeconds = ...)` use.
 
+### A header sent more than once
+
+`setHeader` and `setRawHeader` replace: a second call for the same name sends
+the second value. `Set-Cookie` is the exception. RFC 6265 forbids folding it,
+so each `setHeader` of a declared `Set-Cookie`, each `setCookie(...)` and each
+raw `Set-Cookie` is a header of its own. For any other name a service wants
+twice, `addRawHeader(name, value)` appends rather than replaces, and a later
+`setRawHeader` of that name replaces every value appended. Headers go out in the
+order they were set, and the in-memory client, the test clients and every
+backend keep the repeats.
+
+### Headers on every answer
+
+Some headers belong on every response a service writes, whatever answered:
+`X-Content-Type-Options`, a `Content-Security-Policy`, `Strict-Transport-Security`,
+a `Cache-Control` on errors. (On `main`, in no release yet.) A filter cannot set
+them all. A 404 for a path
+nobody described, a 405, a 400 for an input that did not decode, a 413, a CORS
+preflight, the docs pages and `/mcp` never reach the filter chain. So these
+headers are a policy on the `Api` instead:
+
+```kotlin
+api(routes, JacksonCodecs) {
+    responseHeaders { answer ->
+        add("X-Content-Type-Options", "nosniff")
+        add("Content-Security-Policy", if (answer.isDocs) DOCS_CSP else API_CSP)
+        if (answer.status >= 400) add("Cache-Control", "no-store")
+        if (answer.endpoint?.output is SseOutput<*>) add("X-Accel-Buffering", "no")
+    }
+}
+```
+
+The rule is called for each response as it goes out. `Answer` carries:
+
+- `path`, as the request arrived;
+- `endpoint`, the one that answered, or null where none matched, or where pages,
+  the docs modules or the MCP handler answered;
+- `status`, which a stream has decided before its first byte;
+- `isDocs`, true for the document and the documentation pages.
+
+**What the response already carries wins.** A name the endpoint, a filter or the
+handler set is not added again, so an endpoint can loosen a `Cache-Control` the
+policy sets. A policy that should stay off one endpoint can read `answer`
+instead. A name the policy adds twice goes out twice. One the server writes
+itself from the response (`Content-Type`, `Content-Length` and the rest) is
+refused.
+
+Pekko, Jetty and Gannet apply it to everything their own route or handler
+writes:
+
+- the endpoints and their refusals, before or after the chain;
+- the CORS preflight and [pages](#pages-beside-the-endpoints);
+- the 404 or 405 for a request nothing took;
+- the docs modules' document and pages;
+- the MCP handler.
+
+The in-memory client applies it too. On Pekko, `toRoute` covers what it
+completes. The 404 and 405 are rendered by whoever seals the route: `start` and
+`pelican-test-pekko` seal with `sealedWith(api)`, and a route bound by hand
+should do the same. A route, handler or `GannetHandler` of a service's own takes
+the policy with `withResponseHeaders(api)`.
+
+The document does not describe these headers. They say nothing about any one
+operation, and a header an operation promises is still `emits(...)`.
+
 ## Declared failures
 
 A failure described only in the document is a promise nothing checks: an
@@ -3261,6 +3326,25 @@ val timing = Filter { params, next ->
 `after { params, result, error -> ... }` covers the log-what-happened case
 without the fold, and `onlyWhen { endpoint -> ... }` narrows a filter to the
 endpoints it applies to.
+
+**A filter does not rewrite the body.** The chain carries `CompletionStage<Any?>`,
+because one chain runs around every endpoint and each endpoint returns a type of
+its own. A filter typed over one endpoint's output would apply to that endpoint
+alone, which is what wrapping the handler where it is bound already does, with
+the types intact:
+
+```kotlin
+fun <I> redacted(handler: Params.(I) -> Order): Params.(I) -> Order = { input -> handler(input).redacted() }
+
+getOrder handledNow redacted { id: Long -> Store.find(id) }
+```
+
+So a change to the body belongs in the handler, or in a function like this one
+that wraps a typed handler. A body rewritten after the handler would also be a
+body the document does not describe. What a filter can change is headers:
+`setHeader`, `setRawHeader` and `addRawHeader` on the way in or out. A header on
+every answer, refusals included, is the `Api`'s
+[`responseHeaders { }`](#headers-on-every-answer), not a filter's.
 
 ### A filter over some of the endpoints
 

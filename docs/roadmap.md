@@ -29,21 +29,7 @@ of what common mistakes actually print, starting with inference failures that
 name neither the endpoint nor the declared type, and a fix for each one that
 does not point at its cause.
 
-## 3. A filter that can change the response
-
-Filters compose, run outermost first, narrow with `onlyWhen` and reject by
-throwing. They cannot transform a response with its type intact: the chain
-carries `CompletionStage<Any?>`, so a filter that wraps a body sees `Any?` and
-has to cast.
-
-Two acceptable answers: give filters a typed view of the output, or state in the
-reference that response rewriting belongs in the handler, and why. What is not
-acceptable is leaving it undecided.
-
-**Touches** `Filter.kt` and the [Filters](reference.md#filters) section of the
-reference.
-
-## 4. OpenAPI 3.2.0 as the default
+## 3. OpenAPI 3.2.0 as the default
 
 `pelican-openapi` writes 3.1.0 unless asked for 3.2.0. The default stays there
 because swagger-parser, which `openapi-generator` and most of the JVM ecosystem
@@ -54,7 +40,7 @@ failing, the default moves to 3.2.0.
 Blocked on swagger-parser. See
 [Which version the document says](reference.md#which-version-the-document-says-and-how-to-choose).
 
-## 5. The cover check, at compile time
+## 4. The cover check, at compile time
 
 `api { covers = ... }` fails the `Api` constructor when a described endpoint is
 never bound. That is a runtime check, one test away from useless. A KSP
