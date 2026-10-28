@@ -611,6 +611,16 @@ public final class io/github/matthewjones372/pelican/HeaderParam : io/github/mat
 public final class io/github/matthewjones372/pelican/HeaderValue {
 }
 
+public final class io/github/matthewjones372/pelican/HmacScheme {
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getHeaders ()Ljava/util/List;
+	public final fun getTolerance-UwyO8pc ()J
+	public final fun sign (Ljava/lang/String;[BLjava/time/Instant;Ljava/lang/String;)Ljava/util/List;
+	public static synthetic fun sign$default (Lio/github/matthewjones372/pelican/HmacScheme;Ljava/lang/String;[BLjava/time/Instant;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
+	public fun toString ()Ljava/lang/String;
+	public final fun verify (Lkotlin/jvm/functions/Function1;[BLjava/time/Instant;)Lio/github/matthewjones372/pelican/SignatureCheck;
+}
+
 public final class io/github/matthewjones372/pelican/HttpScheme : io/github/matthewjones372/pelican/SecurityScheme {
 	public final fun getBearerFormat ()Ljava/lang/String;
 	public fun getDescription ()Ljava/lang/String;
@@ -1793,6 +1803,44 @@ public abstract interface class io/github/matthewjones372/pelican/SessionStore {
 public final class io/github/matthewjones372/pelican/SessionsKt {
 	public static final fun sessionCookie-ck1zr5g (Ljava/lang/String;Lio/github/matthewjones372/pelican/SessionStore;JJLjava/time/Clock;)Lio/github/matthewjones372/pelican/SessionCookie;
 	public static synthetic fun sessionCookie-ck1zr5g$default (Ljava/lang/String;Lio/github/matthewjones372/pelican/SessionStore;JJLjava/time/Clock;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/SessionCookie;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/SignatureCheck {
+}
+
+public final class io/github/matthewjones372/pelican/SignatureCheck$Failed : io/github/matthewjones372/pelican/SignatureCheck {
+	public fun <init> (Lio/github/matthewjones372/pelican/SignatureFailure;)V
+	public final fun component1 ()Lio/github/matthewjones372/pelican/SignatureFailure;
+	public final fun copy (Lio/github/matthewjones372/pelican/SignatureFailure;)Lio/github/matthewjones372/pelican/SignatureCheck$Failed;
+	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/SignatureCheck$Failed;Lio/github/matthewjones372/pelican/SignatureFailure;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/SignatureCheck$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lio/github/matthewjones372/pelican/SignatureFailure;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/SignatureCheck$Valid : io/github/matthewjones372/pelican/SignatureCheck {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/SignatureCheck$Valid;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/SignatureFailure : java/lang/Enum {
+	public static final field MALFORMED Lio/github/matthewjones372/pelican/SignatureFailure;
+	public static final field MISMATCH Lio/github/matthewjones372/pelican/SignatureFailure;
+	public static final field MISSING Lio/github/matthewjones372/pelican/SignatureFailure;
+	public static final field STALE Lio/github/matthewjones372/pelican/SignatureFailure;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/SignatureFailure;
+	public static fun values ()[Lio/github/matthewjones372/pelican/SignatureFailure;
+}
+
+public final class io/github/matthewjones372/pelican/SignaturesKt {
+	public static final fun standardWebhooks-VtjQ1oo (JLkotlin/jvm/functions/Function0;)Lio/github/matthewjones372/pelican/HmacScheme;
+	public static synthetic fun standardWebhooks-VtjQ1oo$default (JLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/HmacScheme;
+	public static final fun stripeSignature-VtjQ1oo (JLkotlin/jvm/functions/Function0;)Lio/github/matthewjones372/pelican/HmacScheme;
+	public static synthetic fun stripeSignature-VtjQ1oo$default (JLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/HmacScheme;
 }
 
 public final class io/github/matthewjones372/pelican/SseOutput : io/github/matthewjones372/pelican/Output {
