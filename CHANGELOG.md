@@ -33,6 +33,19 @@ one.
 
 ### Added
 
+- **How often a caller may call** (spec 0096): `rateLimited(rateLimit(name, permits, per, burst))` on an endpoint
+  spends a permit per request from a budget named once and shared by every endpoint naming it, counted per caller,
+  per tenant, and per a key of the endpoint's own. A spent budget is a 429 tagged `rate_limited` with `Retry-After`
+  in whole seconds, declared in the refusal envelope with the limit in the operation's description. The store is
+  `RateLimitStore.take(key, bucket, cost)`, the shape of `surefold-ratelimit`, bound with `rateLimits(...)`;
+  `InMemoryRateLimitStore` counts by GCRA. A store that throws lets the request through and is reported to
+  `onServerError`.
+- **A rate limit's 429 is an observed refusal** (spec 0096): `RefusalReason` gains `RATE_LIMITED`, so
+  `refusalCounter` counts it as `reason="rate_limited"`. **A `when` over `RefusalReason` with no `else`** stops
+  compiling until it names it, as for `UNAUTHENTICATED` and `FORBIDDEN` below.
+- **`ApiCallFailed.retryAfter`** (spec 0096): a generated client's `ApiCallFailed` carries the seconds a
+  `Retry-After` asked for, or null. Regenerate a committed client to pick it up.
+
 - **Whose request it is** (spec 0095): `tenanted(tenantFrom(resolver))` on an endpoint finds the tenant a request is
   for, from a header, a subdomain or the caller's claim, checks it against a `TenantDirectory` bound with
   `tenants(...)`, and hands the handler a `Tenant`. No tenant is a 400, an unknown one a 404, and a caller whose

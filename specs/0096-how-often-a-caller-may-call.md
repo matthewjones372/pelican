@@ -69,8 +69,9 @@ B, one limit on the whole `Api`, is simpler but cannot tell a cheap read from an
       operation's description, and `retryAfter` on the generated client's `ApiCallFailed`, which is how a 429 the
       endpoint never typed arrives. Done when: a golden pins the 429, its header and the sentence, and a retrying
       client waits what `Retry-After` names.
-- [ ] **`spec-0096-parity`**: a limited endpoint in the backends example. Done when: every backend answers alike.
-- [ ] **`spec-0096-docs`**: reference, cookbook, changelog.
+- [x] **`spec-0096-parity`** ([#416](https://github.com/matthewjones372/pelican/pull/416)): a limited endpoint in the
+      backends example. Done when: every backend answers alike.
+- [x] **`spec-0096-docs`** ([#417](https://github.com/matthewjones372/pelican/pull/417)): reference, cookbook, changelog.
 
 ## Acceptance
 
