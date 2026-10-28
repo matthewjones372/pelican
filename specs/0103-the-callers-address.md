@@ -62,11 +62,12 @@ Jetty request. It keeps services backend-specific, and fakes a type Pelican does
 ./gradlew build
 ```
 
-## Open questions
+## Decisions
 
-1. **What does the in-memory transport answer by default?** Recommended: `127.0.0.1`, as a loopback client would be.
-   The alternative, null, makes every address-keyed filter handle a case no served request has.
-2. **IPv6 brackets and ports.** Recommended: no brackets and no port, so a key is the same however it arrived.
-3. **More than one trusted header**, for a service behind two proxies. Recommended: one, until a service needs two.
-4. **Does the trusted header replace the peer in access logs too?** Recommended: yes, since it is the caller's
-   address, with the peer still available on the backend's own request.
+Each recommendation was taken on 2026-10-28.
+
+1. **The in-memory transport answers `127.0.0.1`** by default, as a loopback client would be.
+2. **No brackets and no port**, so a key is the same however it arrived.
+3. **One trusted header**, until a service needs two.
+4. **The trusted header's address is the caller's address** wherever Pelican reads one; the peer is still on the
+   backend's own request.
