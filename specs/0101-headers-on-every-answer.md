@@ -56,7 +56,7 @@ a filter sees (and run filters on a request that failed to decode).
 
 ## Stack
 
-- [ ] **`spec-0101-set-cookie`**: repeated `Set-Cookie` through `Params`, `addRawHeader`, the in-memory and test
+- [x] **`spec-0101-set-cookie`**: repeated `Set-Cookie` through `Params`, `addRawHeader`, the in-memory and test
       clients. Done when: a handler setting two cookies answers both, in order, on every backend.
 - [ ] **`spec-0101-policy`**: `responseHeaders { }`, `Answer`, applied by all three backends to endpoints and refusals.
       Done when: the parity suite sees the policy's header on a 200, a declared failure, a filter's 401, a decode

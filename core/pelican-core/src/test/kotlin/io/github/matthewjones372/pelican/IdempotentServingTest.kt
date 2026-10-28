@@ -1,6 +1,7 @@
 package io.github.matthewjones372.pelican
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
@@ -59,6 +60,8 @@ class IdempotentServingTest {
 
             else -> {
                 p.setHeader(receipt, "r-$n")
+                p.addRawHeader("Link", "</orders/$n>; rel=self")
+                p.addRawHeader("Link", "</orders>; rel=collection")
                 held ?: CompletableFuture.completedFuture(ok("order $n of ${p[order]} for ${p[caller]}"))
             }
         }
@@ -114,6 +117,15 @@ class IdempotentServingTest {
         again.header("Idempotent-Replayed") shouldBe "true"
         first.header("Idempotent-Replayed") shouldBe null
         calls.get() shouldBe 1
+    }
+
+    @Test
+    fun `a header the handler repeated is repeated on the replay`() {
+        send("tea")
+        val again = send("tea")
+
+        again.headers.filter { it.first == "Link" }.map { it.second } shouldContainExactly
+            listOf("</orders/1>; rel=self", "</orders>; rel=collection")
     }
 
     @Test

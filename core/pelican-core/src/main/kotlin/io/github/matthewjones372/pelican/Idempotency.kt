@@ -277,9 +277,14 @@ private class KeptResponses(private val endpoint: Endpoint<*, *>, private val co
 
     fun replayed(params: Params, response: StoredResponse): Any? {
         val output = outputs[response.headers.first { it.first == OUTPUT_HEADER }.second.toInt()]
+        // The first under each name replaces what a filter set on this request; the rest repeat, as they went out.
         response.headers
             .filter { it.first != OUTPUT_HEADER }
-            .forEach { (name, value) -> params.setRawHeader(name, value) }
+            .groupBy({ it.first }, { it.second })
+            .forEach { (name, values) ->
+                params.setRawHeader(name, values.first())
+                values.drop(1).forEach { params.addRawHeader(name, it) }
+            }
         params.setRawHeader(REPLAYED_HEADER, "true")
         val value = decode(output, response.body)
         @Suppress("UNCHECKED_CAST")

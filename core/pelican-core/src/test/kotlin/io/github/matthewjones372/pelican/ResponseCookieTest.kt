@@ -131,6 +131,50 @@ class ResponseCookieTest {
     }
 
     @Test
+    fun `a declared Set-Cookie set twice is two headers`() {
+        val answered = send(signIn) {
+            setHeader(setCookieHeader, "a=1; Path=/")
+            setHeader(setCookieHeader, "b=2; Path=/")
+        }
+
+        answered.headers.filter { it.first == "Set-Cookie" }.map { it.second } shouldContainExactly
+            listOf("a=1; Path=/", "b=2; Path=/")
+    }
+
+    @Test
+    fun `cookies go out in the order they were set, whichever call set them`() {
+        val answered = send(signIn) {
+            addRawHeader("Set-Cookie", "device=d1; Path=/")
+            setCookie(ResponseCookie("sid", "abc"))
+            setHeader(setCookieHeader, "theme=dark; Path=/")
+        }
+
+        answered.headers.filter { it.first == "Set-Cookie" }.map { it.second } shouldContainExactly listOf(
+            "device=d1; Path=/",
+            "sid=abc; Path=/; HttpOnly; Secure; SameSite=Lax",
+            "theme=dark; Path=/",
+        )
+    }
+
+    @Test
+    fun `addRawHeader appends under any name, and setRawHeader replaces every value of it`() {
+        val appended = send(undeclared) {
+            setRawHeader("Link", "</a>; rel=preload")
+            addRawHeader("Link", "</b>; rel=preload")
+        }
+        appended.headers.filter { it.first == "Link" }.map { it.second } shouldContainExactly
+            listOf("</a>; rel=preload", "</b>; rel=preload")
+
+        val replaced = send(undeclared) {
+            addRawHeader("Link", "</a>; rel=preload")
+            addRawHeader("Link", "</b>; rel=preload")
+            setRawHeader("link", "</c>; rel=preload")
+        }
+        replaced.headers.filter { it.first.equals("Link", ignoreCase = true) }.map { it.second } shouldContainExactly
+            listOf("</c>; rel=preload")
+    }
+
+    @Test
     fun `an endpoint that never declared Set-Cookie cannot send one`() {
         send(undeclared) { setCookie(ResponseCookie("sid", "abc")) }.status shouldBe 500
     }
