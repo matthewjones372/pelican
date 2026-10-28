@@ -527,6 +527,8 @@ permission("orders:refund"))` is either one. An endpoint that takes several
 schemes at once checks them in a [filter](#filters), as
 [`example/secured`](../example/src/main/kotlin/example/secured/SecuredReports.kt)
 does. See [What a caller may do](reference.md#what-a-caller-may-do).
+For a caller, an idempotency key and a signed webhook in one service, see
+[the payments example](a-whole-service.md#payments-the-three-together).
 
 ---
 
@@ -690,6 +692,8 @@ client.transport.send(stale).shouldHaveStatus(400)
 A service sending events of its own declares `signedBy(standardWebhooks { secrets })` on its `webhook(...)`, and the
 generated sender takes a `signer`; see
 [A webhook that proves who sent it](reference.md#a-webhook-that-proves-who-sent-it).
+[The payments example](a-whole-service.md#payments-the-three-together) puts a signed webhook beside
+merchant keys and a retry-safe charge.
 
 ---
 
@@ -725,6 +729,8 @@ val service = api(routes, codecs = JacksonCodecs) {
 and its retries resend it, so wrapping the transport in `retrying()` is now
 safe for this POST. The whole behaviour is under
 [A request sent twice, answered once](reference.md#a-request-sent-twice-answered-once).
+[The payments example](a-whole-service.md#payments-the-three-together)
+shows a key kept per caller.
 
 ---
 

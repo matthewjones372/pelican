@@ -33,6 +33,11 @@ one.
 
 ### Added
 
+- **A service that takes payments** (spec 0102): `example.payments` puts a merchant's key, a retry-safe charge and
+  a signed processor webhook in one small service, tested on Jetty and through its generated `PaymentsClient`, with
+  its document pinned as `golden/payments/openapi.json`. See
+  [Payments: the three together](docs/a-whole-service.md#payments-the-three-together).
+
 - **A webhook that proves who sent it** (spec 0097): `signedBy(scheme)` on an endpoint checks an HMAC-SHA256
   signature over the exact bytes received, before the body decodes, within a timestamp tolerance (5 minutes by
   default) and in constant time. `stripeSignature { secrets }` reads `Stripe-Signature`, and `standardWebhooks {
