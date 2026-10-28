@@ -755,6 +755,11 @@ private class KotlinClientEmitter(
             null -> null
         }
 
+        // A signed body is signed over the bytes that go out, which only the request being built holds; the caller
+        // hands over what signs them, a `HmacScheme.signer(secret)`.
+        val signer = ep.signedBy?.let { unique("signer", taken) }
+        signer?.let { required += "$it: WebhookSigner" }
+
         ep.queries.forEach { parameter(it.name, it.codec, it.required, it.listStyle, queryPairs) }
         ep.headerParams.forEach { header ->
             if (header === ep.idempotency?.header) {
@@ -815,6 +820,7 @@ private class KotlinClientEmitter(
             if (headerPairs.isNotEmpty()) add("headerParams = listOf(${headerPairs.joinToString(", ")})")
             if (cookiePairs.isNotEmpty()) add("cookies = listOf(${cookiePairs.joinToString(", ")})")
             bodyArgument?.let { add(it) }
+            signer?.let { add("signer = $it") }
             // A stream is meant to stay open, and the client's deadline bounds
             // the whole exchange on one of the three transports.
             if (streams(ep)) add("deadline = null")
@@ -1234,6 +1240,7 @@ private val IMPORTS = """
     import io.github.matthewjones372.pelican.Codecs
     import io.github.matthewjones372.pelican.Method
     import io.github.matthewjones372.pelican.UploadedFile
+    import io.github.matthewjones372.pelican.WebhookSigner
     import io.github.matthewjones372.pelican.formCodec
     import java.io.BufferedReader
     import java.io.ByteArrayInputStream

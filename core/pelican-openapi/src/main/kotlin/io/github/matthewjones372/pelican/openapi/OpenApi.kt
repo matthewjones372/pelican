@@ -47,6 +47,7 @@ import io.github.matthewjones372.pelican.SchemaSource
 import io.github.matthewjones372.pelican.SecurityRequirement
 import io.github.matthewjones372.pelican.SecurityScheme
 import io.github.matthewjones372.pelican.SseOutput
+import io.github.matthewjones372.pelican.StringCodec
 import io.github.matthewjones372.pelican.TextOutput
 import io.github.matthewjones372.pelican.TextPart
 import io.github.matthewjones372.pelican.Webhook
@@ -218,6 +219,10 @@ private fun parameters(ep: Endpoint<*, *>, version: OpenApiVersion): List<JsonVa
     }
     ep.headerParams.forEach { h ->
         add(parameter(h.name, "header", h.required, h.codec, h.description, version, h.listStyle, h.default))
+    }
+    // Read by the signature check rather than declared as inputs, so a missing one is a signature refusal.
+    ep.signedBy?.let { scheme ->
+        scheme.headers.forEach { add(parameter(it, "header", true, StringCodec, scheme.description, version)) }
     }
     ep.cookieParams.forEach { c ->
         add(parameter(c.name, "cookie", c.required, c.codec, c.description, version, c.listStyle, c.default))
@@ -395,6 +400,7 @@ private fun refusedBy(ep: Endpoint<*, *>, refusals: RefusalRenderer): (ErrorSpec
         ep.tenant?.unknown,
         ep.tenant?.foreign,
         ep.rateLimit?.refused,
+        ep.signedBy?.refused,
     )
     return { err -> if (answered.any { it === err }) refusals else null }
 }

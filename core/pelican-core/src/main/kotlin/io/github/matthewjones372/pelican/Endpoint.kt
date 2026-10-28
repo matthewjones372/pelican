@@ -340,7 +340,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun signedBy(scheme: HmacScheme) {
         require(signatureScheme == null) { "This endpoint is already signedBy a scheme; a body carries one signature." }
         signatureScheme = scheme
-        errors += signatureRefusal()
+        errors += scheme.refused
     }
 
     /**
