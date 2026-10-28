@@ -350,6 +350,13 @@ pelican {
             specFunction.set("tipHooksSpec")
             packageName.set("example.generated.tiphooks")
         }
+        // Spec 0102: the three together, generated into `build/` so the merchant retries and the processor signs
+        // through the client the service's own document generates.
+        create("payments") {
+            specClass.set("example.GenerateOpenApiKt")
+            specFunction.set("paymentsSpec")
+            packageName.set("example.generated.payments")
+        }
     }
     /**
      * The same document, read back the other way.
@@ -409,6 +416,7 @@ sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/or
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/adoption"))
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/whoAmI"))
 sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/tipHooks"))
+sourceSets["test"].kotlin.srcDir(layout.buildDirectory.dir("generated/pelican/payments"))
 
 // Generated source compiled here but written by another module's tests. detekt
 // filters by the path *inside* the source root, so this is that path rather
@@ -423,6 +431,7 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     exclude("example/generated/adoption/**")
     exclude("example/generated/whoami/**")
     exclude("example/generated/tiphooks/**")
+    exclude("example/generated/payments/**")
 }
 
 tasks.named("compileTestKotlin") {
@@ -434,6 +443,7 @@ tasks.named("compileTestKotlin") {
         "generateAdoptionClient",
         "generateWhoAmIClient",
         "generateTipHooksClient",
+        "generatePaymentsClient",
     )
 }
 

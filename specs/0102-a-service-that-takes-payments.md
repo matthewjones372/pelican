@@ -97,8 +97,9 @@ its own.
 
 ## Stack
 
-- [ ] **`spec-0102-service`**: `example.payments` with its three endpoints, the ledger, merchant keys and
-      `PaymentsTest` on Jetty. Done when: the idempotency, auth and signature claims above each pass as a test.
+- [x] **`spec-0102-service`** ([#424](https://github.com/matthewjones372/pelican/pull/424)): `example.payments`
+      with its three endpoints, the ledger, merchant keys and `PaymentsTest` on Jetty. Done when: the idempotency,
+      auth and signature claims above each pass as a test.
 - [ ] **`spec-0102-client`**: `generatePaymentsClient`, `golden/payments/openapi.json`, and `PaymentsClientTest`, in
       which a merchant retries through `retrying()` and the processor signs with `signer`. Done when: the golden
       document is accepted and both sides go through the generated client.
@@ -108,7 +109,7 @@ its own.
 ## Acceptance
 
 ```bash
-./gradlew build   # PaymentsTest, PaymentsClientTest, PaymentsGoldenTest, checkPaymentsClient
+./gradlew build   # PaymentsTest, PaymentsClientTest, PaymentsGoldenTest
 ```
 
 ## Decisions
