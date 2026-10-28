@@ -108,7 +108,13 @@ fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handler
         // Last, so an endpoint at a page's path answers as the endpoint (spec 0059).
         listOfNotNull(pages?.let { pagesRoute(it, cors) })
 
-    return routes.reduce { left, right -> Directives.concat(left, right) }
+    val route = routes.reduce { left, right -> Directives.concat(left, right) }
+    val policy = responseHeaders ?: return route
+    val methods = endpoints.map { it.endpoint.method }
+    return route.answeredUnder(policy, isDocs = false) { req ->
+        val method = methods.firstOrNull { it.name == req.method().name() }
+        method?.let { index.routeFor(it, req.uri.getPathString()) }?.endpoint
+    }
 }
 
 /** The route as it was built before spec 0058, kept so a caller compiled against RC2 still links. */

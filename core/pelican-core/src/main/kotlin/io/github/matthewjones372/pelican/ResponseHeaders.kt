@@ -14,7 +14,7 @@ class ResponseHeader<T> @PublishedApi internal constructor(
 ) {
     init {
         require(name.isNotBlank()) { "A response header needs a name" }
-        require(name.lowercase() !in RESERVED) {
+        require(!isServerOwned(name)) {
             "$name is set by the server from the response itself, not declared as a header. " +
                 "Every backend either drops it or sends a second, conflicting copy: " +
                 "Pekko logs it and renders nothing. Content type comes from the output " +
@@ -24,6 +24,9 @@ class ResponseHeader<T> @PublishedApi internal constructor(
 
     override fun toString() = "responseHeader:$name"
 }
+
+/** Whether [name] is one of the headers the server underneath writes from the response itself. */
+internal fun isServerOwned(name: String): Boolean = name.lowercase() in RESERVED
 
 /**
  * Headers no description may claim, because the server underneath owns them.

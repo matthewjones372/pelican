@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican.gannet
 import io.github.matthewjones372.gannet.HttpExchange
 import io.github.matthewjones372.gannet.HttpHandler
 import io.github.matthewjones372.pelican.Method
+import io.github.matthewjones372.pelican.ResponseHeaderPolicy
 
 /**
  * One step of serving: answers [HttpExchange] and returns true, or returns false having touched nothing, so the
@@ -52,16 +53,28 @@ internal class Asked(private val exchange: HttpExchange) : HttpExchange by excha
 
 /** Passed on by a handler answering only [methods]: one Pekko `MethodRejection` each. */
 internal fun HttpExchange.declineMethods(methods: List<String>) {
-    (this as? Asked)?.declineMethods(methods)
+    asked()?.declineMethods(methods)
 }
 
 /** Passed on by a handler that takes this method but not this path. As Pekko's does, it makes the answer a 404. */
 internal fun HttpExchange.declinePath() {
-    (this as? Asked)?.declinePath()
+    asked()?.declinePath()
 }
 
-/** [handler] as Gannet's handler: whatever every step passes on is answered with the merged 404 or 405. */
-internal fun answering(handler: GannetHandler): HttpHandler = HttpHandler { exchange ->
+private fun HttpExchange.asked(): Asked? = when (this) {
+    is Asked -> this
+    is AnsweringExchange -> asked.asked()
+    else -> null
+}
+
+/**
+ * [handler] as Gannet's handler: whatever every step passes on is answered with the merged 404 or 405, carrying
+ * [policy]'s headers.
+ */
+internal fun answering(handler: GannetHandler, policy: ResponseHeaderPolicy?): HttpHandler = HttpHandler { exchange ->
     val asked = Asked(exchange)
-    if (!handler.handle(asked)) asked.unanswered().writeTo(asked)
+    if (!handler.handle(asked)) {
+        val unanswered = if (policy == null) asked else AnsweringExchange(asked, policy, isDocs = false) { null }
+        asked.unanswered().writeTo(unanswered)
+    }
 }

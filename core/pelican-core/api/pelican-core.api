@@ -1,3 +1,15 @@
+public final class io/github/matthewjones372/pelican/Answer {
+	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getStatus ()I
+	public final fun isDocs ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/AnswerHeaders {
+	public final fun add (Ljava/lang/String;Ljava/lang/String;)V
+}
+
 public final class io/github/matthewjones372/pelican/AnyOf : io/github/matthewjones372/pelican/Requirement {
 	public final fun getOptions ()Ljava/util/List;
 	public fun metBy (Lio/github/matthewjones372/pelican/Identity;)Z
@@ -22,6 +34,7 @@ public final class io/github/matthewjones372/pelican/Api {
 	public final fun getPages ()Lio/github/matthewjones372/pelican/Pages;
 	public final fun getRateLimits ()Lio/github/matthewjones372/pelican/RateLimitStore;
 	public final fun getRefusals ()Lio/github/matthewjones372/pelican/RefusalRenderer;
+	public final fun getResponseHeaders ()Lio/github/matthewjones372/pelican/ResponseHeaderPolicy;
 	public final fun getSecurity ()Ljava/util/List;
 	public final fun getServers ()Ljava/util/List;
 	public final fun getStrictBodyTimeoutMillis ()J
@@ -55,6 +68,7 @@ public final class io/github/matthewjones372/pelican/ApiBuilder {
 	public final fun onRefusal (Lio/github/matthewjones372/pelican/RefusalObserver;)V
 	public final fun rateLimits (Lio/github/matthewjones372/pelican/RateLimitStore;)V
 	public final fun refusals (Lio/github/matthewjones372/pelican/RefusalRenderer;)V
+	public final fun responseHeaders (Lkotlin/jvm/functions/Function2;)V
 	public final fun setCors (Lio/github/matthewjones372/pelican/Cors;)V
 	public final fun setCovers (Ljava/util/List;)V
 	public final fun setCsrf (Z)V
@@ -1609,6 +1623,11 @@ public final class io/github/matthewjones372/pelican/ResponseHeader {
 	public final fun getName ()Ljava/lang/String;
 	public final fun getRequired ()Z
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/ResponseHeaderPolicy {
+	public final fun headersFor (Ljava/lang/String;Lio/github/matthewjones372/pelican/Endpoint;IZLkotlin/jvm/functions/Function1;)Ljava/util/List;
+	public static synthetic fun headersFor$default (Lio/github/matthewjones372/pelican/ResponseHeaderPolicy;Ljava/lang/String;Lio/github/matthewjones372/pelican/Endpoint;IZLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/util/List;
 }
 
 public final class io/github/matthewjones372/pelican/ResponseHeadersKt {

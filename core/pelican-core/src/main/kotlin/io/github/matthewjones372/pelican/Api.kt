@@ -254,6 +254,9 @@ class Api internal constructor(
 
     /** Where rate-limited endpoints' budgets are counted. An endpoint declaring a limit with none set fails here. */
     val rateLimits: RateLimitStore? = null,
+
+    /** Headers on every response this Api's backend writes, refusals and unmatched routes included; null adds none. */
+    val responseHeaders: ResponseHeaderPolicy? = null,
 ) {
     /**
      * The largest single frame of a streamed request body, over which the frame

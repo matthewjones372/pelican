@@ -165,7 +165,7 @@ private fun Api.bind(
 ): PelicanServer {
     val binding = Http.get(system)
         .newServerAt(host, port)
-        .bind(route(system))
+        .bind(route(system).sealedWith(this))
         .toCompletableFuture()
         .join()
     return PelicanServer(this, system, binding, host, ownsSystem)

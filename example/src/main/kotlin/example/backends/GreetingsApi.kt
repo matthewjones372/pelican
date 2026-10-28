@@ -70,6 +70,12 @@ fun greetingsApi(
 
     cors = cors("https://console.example.com")
 
+    // On every answer, a refusal or an unmatched path as much as an endpoint's.
+    responseHeaders { answer ->
+        add("X-Content-Type-Options", "nosniff")
+        if (answer.status >= 400) add("Cache-Control", "no-store")
+    }
+
     outerFilters.forEach { filter(it) }
     filter(stamping)
     filter(gate)
