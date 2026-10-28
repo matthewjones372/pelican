@@ -3,6 +3,7 @@ package io.github.matthewjones372.pelican
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -60,14 +61,14 @@ class RateLimitTest {
         text()
     }
 
-    private fun api(limiter: RateLimiter = InMemoryRateLimiter(clock)) = api(
+    private fun api(store: RateLimitStore = InMemoryRateLimitStore(clock)) = api(
         listOf(listOrders, countOrders, status).map { ep ->
             ServerEndpoint(ep) { CompletableFuture.completedStage("ok ${ran.incrementAndGet()}" as Any?) }
         },
     ) {
         authenticate(bearer, tokens)
         tenants(shop, InMemoryTenantDirectory(setOf("acme", "globex")))
-        rateLimits(limiter)
+        rateLimits(store)
         onError { _, _, error -> reported += error.message.orEmpty() }
     }
 
@@ -138,11 +139,11 @@ class RateLimitTest {
     }
 
     @Test
-    fun `a limiter that cannot answer lets the request through, and says so`() {
-        val down = RateLimiter { _, _ -> error("the limiter is down") }
+    fun `a store that cannot answer lets the request through, and says so`() {
+        val down = RateLimitStore { _, _, _ -> error("the store is down") }
 
         orders(api = api(down)).status shouldBe 200
-        reported shouldContainExactly listOf("the limiter is down")
+        reported shouldContainExactly listOf("the store is down")
     }
 
     @Test
@@ -167,6 +168,46 @@ class RateLimitTest {
     fun `a limit is a positive count over a positive time`() {
         shouldThrow<IllegalArgumentException> { rateLimit("none", 0, per = 1.minutes) }
         shouldThrow<IllegalArgumentException> { rateLimit("never", 1, per = Duration.ZERO) }
+        shouldThrow<IllegalArgumentException> { rateLimit("empty", 1, per = 1.minutes, burst = 0) }
         shouldThrow<IllegalArgumentException> { rateLimit(" ", 1, per = 1.minutes) }
+    }
+
+    // ------------------------------------------------------------------- the store itself
+
+    private val store = InMemoryRateLimitStore(clock)
+    private val tenAMinute = TokenBucket(10, per = 1.minutes, burst = 3)
+
+    @Test
+    fun `a bucket allows its burst at once, says what is left, and refills one interval at a time`() {
+        store.take("k", tenAMinute, cost = 1) shouldBe Taken.Allowed(remaining = 2)
+        store.take("k", tenAMinute, cost = 1) shouldBe Taken.Allowed(remaining = 1)
+        store.take("k", tenAMinute, cost = 1) shouldBe Taken.Allowed(remaining = 0)
+        store.take("k", tenAMinute, cost = 1) shouldBe Taken.Denied(6.seconds)
+
+        clock.advance(6.seconds)
+        store.take("k", tenAMinute, cost = 1) shouldBe Taken.Allowed(remaining = 0)
+    }
+
+    @Test
+    fun `a denial takes nothing, so waiting as told is enough`() {
+        repeat(3) { store.take("k", tenAMinute, cost = 1) }
+        repeat(5) { store.take("k", tenAMinute, cost = 1) shouldBe Taken.Denied(6.seconds) }
+
+        clock.advance(6.seconds)
+        store.take("k", tenAMinute, cost = 1) shouldBe Taken.Allowed(remaining = 0)
+    }
+
+    @Test
+    fun `a cost takes that many at once, or none`() {
+        store.take("k", tenAMinute, cost = 2) shouldBe Taken.Allowed(remaining = 1)
+        store.take("k", tenAMinute, cost = 2) shouldBe Taken.Denied(6.seconds)
+        store.take("k", tenAMinute, cost = 1) shouldBe Taken.Allowed(remaining = 0)
+    }
+
+    @Test
+    fun `no part of a key can pass for another`() {
+        keyOf("orders", "a/1:b", null, null) shouldNotBe keyOf("orders", "a", "b", null)
+        keyOf("orders", null, "acme", null) shouldNotBe keyOf("orders", "acme", null, null)
+        keyOf("orders", "ada", "acme", null) shouldBe "6:orders/3:ada/4:acme/-"
     }
 }

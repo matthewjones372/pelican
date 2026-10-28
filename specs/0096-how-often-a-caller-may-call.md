@@ -32,11 +32,12 @@ val placeOrder = endpoint(orderBody) {
     json<Order>(201)
 }
 
-api(routes, JacksonCodecs) { rateLimits(InMemoryRateLimiter()) }
+api(routes, JacksonCodecs) { rateLimits(InMemoryRateLimitStore()) }
 ```
 
-- **`RateLimiter`** answers one question atomically: may `key` spend one from `limit` now, and if not, how long until
-  it may. `InMemoryRateLimiter(clock)` is for tests and one node.
+- **`RateLimitStore`** answers one question atomically, in the shape of Surefold's `RateLimits.take`: may `key` take
+  `cost` permits from a `TokenBucket(permits, per, burst)` now, and if not, how long until it could.
+  `InMemoryRateLimitStore(clock)` is for tests and one node.
 - **The key** is the limit's name, the caller's subject and the tenant's id, whichever the endpoint declares. An
   endpoint with neither names its own key: `rateLimited(perAddress) { header("X-Forwarded-For") }`.
 - **Checked after the caller and tenant, before the body**, so a refused request costs no decoding. A 429 carries
@@ -54,9 +55,12 @@ B, one limit on the whole `Api`, is simpler but cannot tell a cheap read from an
 
 ## Stack
 
-- [ ] **`spec-0096-limit`**: `rateLimit(...)`, `rateLimited(...)`, `RateLimiter`, `InMemoryRateLimiter`,
-      `rateLimits(...)`, the key, the 429 and `Retry-After`. Done when: served in process, the 101st call in a minute
-      is a 429 naming when to come back, and another caller or tenant is unaffected.
+- [x] **`spec-0096-limit`** ([#412](https://github.com/matthewjones372/pelican/pull/412)): `rateLimit(...)`,
+      `rateLimited(...)`, the store, `rateLimits(...)`, the key, the 429 and `Retry-After`. Done when: served in
+      process, the 101st call in a minute is a 429 naming when to come back, and another caller or tenant is
+      unaffected.
+- [ ] **`spec-0096-take`** (added): the store takes Surefold's shape, `take(key, bucket, cost)`, with a burst.
+      Done when: a bucket allows its burst, says what is left, and a denial takes nothing.
 - [ ] **`spec-0096-refusal`**: `RefusalReason.RATE_LIMITED`, and the 429 declared in the refusal envelope.
       Done when: `onRefusal` hears it, and the endpoint's errors list it unless it declares its own 429.
 - [ ] **`spec-0096-document`**: the 429 and its header in the document, the limit in the description, `retryAfter` on
@@ -93,3 +97,5 @@ Matt took each recommendation on 2026-10-28.
 2. **A limiter that cannot answer lets the request through**, and the failure goes to `onServerError`.
 3. **An endpoint with no caller and no tenant names its own key**, or is refused when it is built.
 4. **Only requests that reach the check spend**: it runs after the caller, `requires`, cross-site and tenant checks.
+5. **The store is Surefold's shape** (added 2026-10-28, from the draft 0098 in #392): `RateLimitStore.take(key,
+   bucket, cost)` with a `TokenBucket` that has a burst, so `surefold-ratelimit`'s `RateLimits` adapts in a few lines.
