@@ -14,7 +14,7 @@ import kotlin.time.toKotlinDuration
  */
 class TokenBucket(val permits: Int, val per: Duration, val burst: Int = permits) {
     init {
-        require(permits > 0 && per.isPositive()) { "A bucket refills a positive number of permits over a positive time." }
+        require(permits > 0 && per.isPositive()) { "A bucket refills some permits over some time." }
         require(burst > 0) { "A bucket holds at least one permit." }
     }
 
