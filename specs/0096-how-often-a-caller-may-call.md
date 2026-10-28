@@ -62,7 +62,8 @@ B, one limit on the whole `Api`, is simpler but cannot tell a cheap read from an
 - [x] **`spec-0096-take`** ([#413](https://github.com/matthewjones372/pelican/pull/413), added): the store takes
       Surefold's shape, `take(key, bucket, cost)`, with a burst.
       Done when: a bucket allows its burst, says what is left, and a denial takes nothing.
-- [x] **`spec-0096-refusal`** ([#414](https://github.com/matthewjones372/pelican/pull/414)): `RefusalReason.RATE_LIMITED`, and the 429 declared in the refusal envelope.
+- [x] **`spec-0096-refusal`** ([#414](https://github.com/matthewjones372/pelican/pull/414)):
+      `RefusalReason.RATE_LIMITED`, and the 429 declared in the refusal envelope.
       Done when: `onRefusal` hears it, and the endpoint's errors list it, tagged, beside a tagged 429 of its own.
 - [ ] **`spec-0096-document`**: the limit in the operation's description, and `retryAfter` on the generated
       client's `ApiCallFailed`, which is how a 429 the endpoint never typed arrives. Done when: a golden pins the 429,

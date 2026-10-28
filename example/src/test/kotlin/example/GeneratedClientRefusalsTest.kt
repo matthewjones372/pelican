@@ -46,7 +46,7 @@ class GeneratedClientRefusalsTest {
 
     @Test
     fun `a 429 the endpoint never declared still says when to come back`() {
-        val limited = """{"status":429,"error":"rate_limited","detail":"Too many requests; send again in 20 seconds."}"""
+        val limited = """{"status":429,"error":"rate_limited","detail":"Send again in 20 seconds."}"""
 
         val failed = shouldThrow<ApiCallFailed> {
             answering(429, limited, "application/json", "Retry-After" to "20").getUser(1L)
