@@ -36,6 +36,7 @@ import io.github.matthewjones372.pelican.formCodec
 import io.github.matthewjones372.pelican.mediaType
 import io.github.matthewjones372.pelican.refuseCrossSite
 import io.github.matthewjones372.pelican.representations
+import io.github.matthewjones372.pelican.spend
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
@@ -105,17 +106,20 @@ fun Api.decodeCaller(endpoint: Endpoint<*, *>, credentials: Credentials, into: M
     }
     if (caller != null) into[caller] = identity?.let(caller::built)
     // For whom, once who is known: a claim resolver reads the caller.
-    endpoint.tenant?.let { tenant ->
+    val tenant = endpoint.tenant?.let { input ->
         // The Api refused to build with a tenanted endpoint and nothing resolving it, so this is never reached unbound.
         val bound = checkNotNull(tenants) { "$endpoint is tenanted and the Api resolves no tenants" }
-        val found = tenant.decode(credentials, identity, bound.directory)
+        val found = input.decode(credentials, identity, bound.directory)
         try {
-            tenant.refuseForeign(identity, bound.claim, found)
+            input.refuseForeign(identity, bound.claim, found)
         } catch (e: ApiException) {
             throw CallerRefused(e)
         }
-        into[tenant] = found
+        into[input] = found
+        found
     }
+    // Last, so only a request every check above let through spends from the budget.
+    endpoint.rateLimit?.let { spend(endpoint, it, credentials, identity, tenant) }
 }
 
 /** The caller's 401 or 403, told apart from the same status thrown by a filter, which the chain already saw. */

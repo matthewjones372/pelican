@@ -84,3 +84,12 @@ B, one limit on the whole `Api`, is simpler but cannot tell a cheap read from an
    Exposing the socket address through every backend is the alternative, and a spec of its own.
 4. **Does the limit count refused requests?** Recommend only requests that reach the check, which is after the
    caller, tenant, `requires` and cross-site checks, so a 401 flood cannot spend a real caller's budget.
+
+## Decisions
+
+Matt took each recommendation on 2026-10-28.
+
+1. **GCRA**: one instant per key, the time its budget is next whole, so permits come back one interval at a time.
+2. **A limiter that cannot answer lets the request through**, and the failure goes to `onServerError`.
+3. **An endpoint with no caller and no tenant names its own key**, or is refused when it is built.
+4. **Only requests that reach the check spend**: it runs after the caller, `requires`, cross-site and tenant checks.
