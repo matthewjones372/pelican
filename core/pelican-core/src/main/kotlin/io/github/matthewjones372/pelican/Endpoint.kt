@@ -720,11 +720,7 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     ep.idempotency?.let { validateIdempotency(ep, it) }
-
-    require(ep.rateLimit == null || ep.caller != null || ep.tenant != null || ep.rateLimit.key != null) {
-        "$ep is rate limited with no caller, no tenant and no key of its own, so every request would share one " +
-            "budget. Name the key: rateLimited(limit) { header(\"X-Forwarded-For\") }."
-    }
+    validateRateLimit(ep)
 
     val statusClashes = unpickableStatuses(ep)
     if (statusClashes.isNotEmpty()) {
@@ -748,6 +744,15 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     validateResponseHeaders(ep)
+}
+
+/** A limit with nothing to key it on but its name would be one budget for every caller there is. */
+private fun validateRateLimit(ep: Endpoint<*, *>) {
+    val limited = ep.rateLimit ?: return
+    require(ep.caller != null || ep.tenant != null || limited.key != null) {
+        "$ep is rate limited with no caller, no tenant and no key of its own, so every request would share one " +
+            "budget. Name the key: rateLimited(limit) { header(\"X-Forwarded-For\") }."
+    }
 }
 
 /**
