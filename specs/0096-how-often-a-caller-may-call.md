@@ -65,9 +65,10 @@ B, one limit on the whole `Api`, is simpler but cannot tell a cheap read from an
 - [x] **`spec-0096-refusal`** ([#414](https://github.com/matthewjones372/pelican/pull/414)):
       `RefusalReason.RATE_LIMITED`, and the 429 declared in the refusal envelope.
       Done when: `onRefusal` hears it, and the endpoint's errors list it, tagged, beside a tagged 429 of its own.
-- [ ] **`spec-0096-document`**: the limit in the operation's description, and `retryAfter` on the generated
-      client's `ApiCallFailed`, which is how a 429 the endpoint never typed arrives. Done when: a golden pins the 429,
-      its header and the sentence, and a retrying client waits what `Retry-After` names.
+- [x] **`spec-0096-document`** ([#415](https://github.com/matthewjones372/pelican/pull/415)): the limit in the
+      operation's description, and `retryAfter` on the generated client's `ApiCallFailed`, which is how a 429 the
+      endpoint never typed arrives. Done when: a golden pins the 429, its header and the sentence, and a retrying
+      client waits what `Retry-After` names.
 - [ ] **`spec-0096-parity`**: a limited endpoint in the backends example. Done when: every backend answers alike.
 - [ ] **`spec-0096-docs`**: reference, cookbook, changelog.
 
