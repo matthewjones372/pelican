@@ -12,6 +12,9 @@ package example
 import example.adoption.adoptPet
 import example.backends.leaveTip
 import example.backends.tipNoticed
+import example.payments.createCharge
+import example.payments.getCharge
+import example.payments.processorEvent
 import example.whoami.whoAmI
 import io.github.matthewjones372.pelican.ApiSpec
 import io.github.matthewjones372.pelican.apiSpec
@@ -73,4 +76,11 @@ fun tipHooksSpec(): ApiSpec = apiSpec(listOf(tipNoticed), schemas = JacksonCodec
     title = "Tip hooks"
     version = "1.0.0"
     description = "One call that is read only once its signature verifies."
+}
+
+/** Spec 0102's service: a merchant's key, a charge safe to retry, and a processor's signed word. */
+fun paymentsSpec(): ApiSpec = apiSpec(listOf(createCharge, getCharge, processorEvent), schemas = JacksonCodecs) {
+    title = "Payments"
+    version = "1.0.0"
+    description = "Charges a merchant takes with its key, safe to retry, settled by the processor's signed word."
 }
