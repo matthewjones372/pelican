@@ -111,11 +111,12 @@ its own.
 ./gradlew build   # PaymentsTest, PaymentsClientTest, PaymentsGoldenTest, checkPaymentsClient
 ```
 
-## Open questions
+## Decisions
 
-1. **Jetty only, or every backend?** Recommended: Jetty only. Every backend's handling of each feature is already
-   covered by the backends suite; this example shows the features together, not the backends.
-2. **Should the webhook's event id be deduplicated by the idempotency store?** Recommended: no. 0097 left that to a
-   later spec, and settling twice already leaves a charge settled. The example says so in a comment.
-3. **Should the viewer key's 403 be shown through the generated client?** Recommended: yes, as an `ApiCallFailed`
-   with status 403. That is how a merchant integrating with the service would meet the refusal.
+Matt took each recommendation on 2026-10-28.
+
+1. **Jetty only.** Every backend's handling of each feature is already covered by the backends suite.
+2. **No deduplication of the webhook's event id.** Settling twice leaves a charge settled, and the example says so
+   in a comment.
+3. **The viewer key's 403 is shown through the generated client** as an `ApiCallFailed` with status 403, as well as
+   on the wire.
