@@ -5,6 +5,7 @@ import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.jetty.onlyFor
 import io.github.matthewjones372.pelican.jetty.toHandler
+import io.github.matthewjones372.pelican.jetty.withResponseHeaders
 import io.github.matthewjones372.pelican.mcp.McpOptions
 import io.github.matthewjones372.pelican.mcp.mcpOptions
 import io.github.matthewjones372.pelican.mcp.server.MCP_PATH
@@ -32,7 +33,7 @@ fun Api.mcpHandler(options: McpOptions = mcpOptions(), path: String = MCP_PATH):
     return Handler.Sequence(
         McpPost(server, wanted, strictBodyTimeoutMillis).onlyFor(Method.POST),
         McpGet(wanted).onlyFor(Method.GET),
-    )
+    ).withResponseHeaders(this)
 }
 
 /**

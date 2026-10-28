@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.jetty.onlyFor
 import io.github.matthewjones372.pelican.jetty.start
 import io.github.matthewjones372.pelican.jetty.toHandler
+import io.github.matthewjones372.pelican.jetty.withResponseHeaders
 import io.github.matthewjones372.pelican.openapi.DocsUi
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.openapi.oauth2RedirectHtml
@@ -57,7 +58,7 @@ fun Api.docsHandler(docs: Docs = docs()): Handler {
         }
     }
     // The API's own CORS setting covers the document as well; reading it is a plain GET, so nothing to preflight.
-    return DocsHandler(pages, corsPolicy()).onlyFor(Method.GET)
+    return DocsHandler(pages, corsPolicy()).onlyFor(Method.GET).withResponseHeaders(this, isDocs = true)
 }
 
 /**

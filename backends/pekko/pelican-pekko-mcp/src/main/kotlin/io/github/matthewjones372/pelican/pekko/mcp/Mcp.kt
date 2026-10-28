@@ -10,6 +10,7 @@ import io.github.matthewjones372.pelican.mcp.server.mcpMethodNotAllowed
 import io.github.matthewjones372.pelican.mcp.server.mcpServer
 import io.github.matthewjones372.pelican.mcp.server.post
 import io.github.matthewjones372.pelican.pekko.toRoute
+import io.github.matthewjones372.pelican.pekko.withResponseHeaders
 import org.apache.pekko.actor.ClassicActorSystemProvider
 import org.apache.pekko.http.javadsl.model.ContentTypes
 import org.apache.pekko.http.javadsl.model.HttpEntities
@@ -36,7 +37,7 @@ fun Api.mcpRoutes(options: McpOptions = mcpOptions(), path: String = MCP_PATH): 
     return listOf(
         Directives.post { at(wanted) { postRoute(server, timeout) } },
         Directives.get { at(wanted) { Directives.complete(response(mcpMethodNotAllowed())) } },
-    )
+    ).map { it.withResponseHeaders(this) }
 }
 
 /**
