@@ -1815,8 +1815,10 @@ public abstract interface class io/github/matthewjones372/pelican/TenantDirector
 }
 
 public final class io/github/matthewjones372/pelican/TenantInput : io/github/matthewjones372/pelican/ParamKey {
+	public final fun getHeaderName ()Ljava/lang/String;
 	public final fun getMissing ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public final fun getResolver ()Lio/github/matthewjones372/pelican/TenantResolver;
+	public final fun getSubdomainOf ()Ljava/lang/String;
 	public final fun getUnknown ()Lio/github/matthewjones372/pelican/ErrorSpec;
 	public fun toString ()Ljava/lang/String;
 }

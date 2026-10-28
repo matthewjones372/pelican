@@ -322,6 +322,7 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun tenanted(tenant: TenantInput) {
         require(tenantInput == null) { "This endpoint is already tenanted; a request is for one tenant." }
         tenantInput = tenant
+        tenant.header?.let { headerParams += it }
     }
 
     /**

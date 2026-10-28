@@ -46,6 +46,17 @@ class TenantInput internal constructor(val resolver: TenantResolver) : ParamKey<
     /** The 404 for a tenant the directory does not know. */
     val unknown: ErrorSpec = ErrorSpec(NOT_FOUND, "No tenant by that name.", type = null)
 
+    /** The header the tenant is read from, which a tenanted endpoint declares; null for any other resolver. */
+    val headerName: String? get() = (resolver as? HeaderTenant)?.name
+
+    /** The domain the tenant is the subdomain of, which the document writes as a server variable; else null. */
+    val subdomainOf: String? get() = (resolver as? SubdomainTenant)?.parent
+
+    /** The header parameter a header resolver reads, so the document and a client know to send it. */
+    internal val header: HeaderParam<String>? by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        headerName?.let { HeaderParam(it, StringCodec, required = true, default = null, description = TENANT_HEADER) }
+    }
+
     /** Whether [resolver] reads the caller, so the endpoint must declare one. */
     internal val readsCaller: Boolean get() = resolver is ClaimTenant
 
@@ -80,6 +91,8 @@ private class SubdomainTenant(val parent: String) : TenantResolver {
 private class ClaimTenant(val name: String) : TenantResolver {
     override fun resolve(request: TenantRequest) = request.caller?.claims?.get(name) as? String
 }
+
+private const val TENANT_HEADER = "The tenant this request is for."
 
 private const val BAD_REQUEST = 400
 private const val NOT_FOUND = 404
