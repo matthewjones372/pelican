@@ -86,6 +86,7 @@ fun greetingsApi(
 
     authenticate(tellerToken, tellers)
     authenticate(visits.scheme, visits)
+    tenants(shop, shops)
 }
 
 /** What [stamping] worked out, for anything downstream that wants it. */

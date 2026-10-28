@@ -17,10 +17,11 @@ import java.util.AbstractMap
  */
 class EndpointPlan internal constructor(val endpoint: Endpoint<*, *>) {
 
-    /** In the order Pekko decodes them: captures, the caller, the plain inputs, then the body. */
+    /** In the order Pekko decodes them: captures, the caller and tenant, the plain inputs, then the body. */
     internal val keys: Array<ParamKey<*>> = buildList {
         addAll(endpoint.pathSpec.captures)
         endpoint.caller?.let(::add)
+        endpoint.tenant?.let(::add)
         addAll(endpoint.queries)
         addAll(endpoint.headerParams)
         addAll(endpoint.cookieParams)
@@ -31,7 +32,7 @@ class EndpointPlan internal constructor(val endpoint: Endpoint<*, *>) {
     }.toTypedArray()
 
     private val queries: List<QueryParam<*>> = endpoint.queries
-    private val firstQuery = endpoint.pathSpec.captures.size + if (endpoint.caller == null) 0 else 1
+    private val firstQuery = endpoint.pathSpec.captures.size + listOfNotNull(endpoint.caller, endpoint.tenant).size
     private val firstHeader = firstQuery + queries.size
     private val firstCookie = firstHeader + endpoint.headerParams.size
 
