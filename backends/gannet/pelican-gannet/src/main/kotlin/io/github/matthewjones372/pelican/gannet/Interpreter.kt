@@ -49,6 +49,7 @@ import java.util.concurrent.Executor
  * next; [start] answers whatever every handler passed on with the 404 or 405 Pekko would.
  */
 fun Api.toHandler(handlers: Handlers = Handlers.default): GannetHandler {
+    require(admission == null) { "This interpreter does not support operation admission." }
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
 
     // Once per endpoint rather than per request, so a broken codec is a startup failure.

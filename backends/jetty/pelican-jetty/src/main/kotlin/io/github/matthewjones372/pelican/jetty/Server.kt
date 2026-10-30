@@ -84,6 +84,7 @@ fun Api.start(
     handlers: Handlers = Handlers.default,
     handler: Api.() -> Handler = { toHandler(handlers) },
 ): PelicanServer {
+    require(admission == null) { "This interpreter does not support operation admission." }
     val server = Server(pelicanPool(handlers))
     server.addConnector(
         pelicanConnector(server, ConnectorSettings.configured()).apply {

@@ -78,6 +78,14 @@ hook; reuse native response/refusal handling and keep host decisions in the serv
 - [ ] **`codex/i01-admission-config`**: optional Api/Builder setting and binary bridges; unsupported interpreters
       reject non-null admission. The new 26-parameter primary retains hidden 25/21-parameter secondary constructors
       with their original defaults, delegating admission=null; hidden bridges avoid Kotlin overload ambiguity.
+      Before constructing codecs, handlers or owned runtime resources, reject configured admission in:
+      `InMemoryClientTransport`; Jetty `toHandler`/`start` and owned `inMemory` (custom callbacks included);
+      Pekko `toRoute`, owned `start`/`inMemory` and borrowed `bind`; Gannet `toHandler`/`start`.
+      The same unsupported-interpreter rule covers MCP's direct dispatch:
+      add the first guard in `integrations/pelican-mcp/src/main/kotlin/io/github/matthewjones372/pelican/mcp/McpDispatch.kt`
+      before filtering tools, constructing schemas/codecs or calling `handlerFor`.
+      Add direct `mcpDispatch` and HTTP MCP wrapper rejection cases beside the shared backend configuration tests.
+      No MCP admission, dependency, transport or absent-hook behaviour changes.
 - [ ] **`codex/i01-admission-core`**: core in-memory ordering, native selection and refusal rendering; no duplicate
       matcher; gated decoders/callers/reservation/handler prove rejection runs none and callback runs once.
 - [ ] **`codex/i01-admission-jetty`**: same contract on Jetty; parity tests for captures, JSON, hidden/raw/SSE routes,

@@ -94,7 +94,10 @@ private fun RequestSpec.toJetty(): HttpTester.Request {
 fun Api.inMemory(
     handlers: Handlers = Handlers.default,
     handler: Api.() -> Handler = { toHandler(handlers) },
-): ApiClient = ApiClient(InMemoryTransport(handler()), codecs)
+): ApiClient {
+    require(admission == null) { "This interpreter does not support operation admission." }
+    return ApiClient(InMemoryTransport(handler()), codecs)
+}
 
 /** A client for a server this process started; the codecs come from the [Api] it serves. */
 fun PelicanServer.client(): ApiClient = apiClient(baseUrl, api.codecs)

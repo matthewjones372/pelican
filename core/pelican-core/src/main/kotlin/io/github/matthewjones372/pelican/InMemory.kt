@@ -46,6 +46,10 @@ import java.util.concurrent.CompletionStage
  */
 class InMemoryClientTransport(private val api: Api) : ClientTransport {
 
+    init {
+        require(api.admission == null) { "This interpreter does not support operation admission." }
+    }
+
     private val index = api.endpoints.routeIndex()
 
     /** Folded once when the transport is built, as a route-building server folds them. */

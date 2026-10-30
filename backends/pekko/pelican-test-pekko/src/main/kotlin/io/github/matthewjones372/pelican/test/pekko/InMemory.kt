@@ -111,11 +111,13 @@ private fun Method.toPekkoMethod(): HttpMethod = when (this) {
  * when the suite is done; pass an existing one to share it across classes,
  * which is the main cost left in an in-memory suite.
  */
-fun Api.inMemory(systemName: String = "pelican-test"): ApiClient =
-    ApiClient(
+fun Api.inMemory(systemName: String = "pelican-test"): ApiClient {
+    require(admission == null) { "This interpreter does not support operation admission." }
+    return ApiClient(
         InMemoryTransport(this, ActorSystem.create(Behaviors.empty(), systemName), ownsSystem = true),
         codecs,
     )
+}
 
 fun Api.inMemory(system: ActorSystem<Void>): ApiClient =
     ApiClient(InMemoryTransport(this, system, ownsSystem = false), codecs)

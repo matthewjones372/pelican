@@ -56,6 +56,7 @@ fun Api.start(
     config: GannetConfig = GannetConfig(),
     handler: Api.() -> GannetHandler = { toHandler(handlers) },
 ): PelicanServer {
+    require(admission == null) { "This interpreter does not support operation admission." }
     val server = GannetServer.start(config.copy(host = host, port = port), answering(handler(), responseHeaders))
     return PelicanServer(this, server, host, tls = config.tls != null)
 }
