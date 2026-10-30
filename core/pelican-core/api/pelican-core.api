@@ -2185,6 +2185,10 @@ public final class io/github/matthewjones372/pelican/spi/NdjsonFrames {
 	public final fun readFrom (Ljava/io/InputStream;)Lkotlin/sequences/Sequence;
 }
 
+public final class io/github/matthewjones372/pelican/spi/OperationAdmissionKt {
+	public static final fun check (Lio/github/matthewjones372/pelican/OperationAdmission;Lio/github/matthewjones372/pelican/Endpoint;Lio/github/matthewjones372/pelican/spi/RequestView;)Lio/github/matthewjones372/pelican/AdmissionDecision;
+}
+
 public final class io/github/matthewjones372/pelican/spi/RenderedError {
 	public fun <init> (Lio/github/matthewjones372/pelican/ApiError;Ljava/util/List;Ljava/lang/Throwable;Ljava/lang/String;Lio/github/matthewjones372/pelican/RefusalBody;)V
 	public final fun getBody ()Lio/github/matthewjones372/pelican/RefusalBody;
