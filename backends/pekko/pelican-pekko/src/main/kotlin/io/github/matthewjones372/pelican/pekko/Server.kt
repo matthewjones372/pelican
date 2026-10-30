@@ -117,6 +117,7 @@ fun Api.start(
     handlers: Handlers = Handlers.default,
     route: Api.(ActorSystem<Void>) -> Route = { toRoute(it, handlers) },
 ): PelicanServer {
+    require(admission == null) { "This interpreter does not support operation admission." }
     val system = ActorSystem.create(Behaviors.empty<Void>(), systemName)
     return try {
         bind(system, host, port, ownsSystem = true, route = route)
@@ -163,6 +164,7 @@ private fun Api.bind(
     ownsSystem: Boolean,
     route: Api.(ActorSystem<Void>) -> Route,
 ): PelicanServer {
+    require(admission == null) { "This interpreter does not support operation admission." }
     val binding = Http.get(system)
         .newServerAt(host, port)
         .bind(route(system).sealedWith(this))

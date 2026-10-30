@@ -86,6 +86,7 @@ class McpDispatch internal constructor(private val bound: Map<String, BoundTool>
 
 /** Descriptions and dispatch come from one place, so a tool list cannot advertise a call this refuses. */
 fun Api.mcpDispatch(options: McpOptions = mcpOptions()): McpDispatch {
+    require(admission == null) { "This interpreter does not support operation admission." }
     val included = endpoints.filter { options.include(it.endpoint) }
     val schemas = StandaloneSchemas(codecs)
     val bound = included.associate { se ->

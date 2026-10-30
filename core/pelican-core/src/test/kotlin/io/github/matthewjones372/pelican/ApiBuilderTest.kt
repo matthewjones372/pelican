@@ -141,6 +141,18 @@ class ApiBuilderTest {
         api.onServerError.shouldBeNull()
     }
 
+    @Test
+    fun `admission is absent until configured`() {
+        api(routes).admission.shouldBeNull()
+    }
+
+    @Test
+    fun `one admission callback is retained and a second is refused`() {
+        val check = OperationAdmission { AdmissionDecision.Continue }
+        api(routes) { admission(check) }.admission shouldBe check
+        shouldThrow<IllegalArgumentException> { api(routes) { admission(check); admission(check) } }
+    }
+
     /** The checks the constructor made are the factory's too. */
     @Test
     fun `the startup checks still run`() {

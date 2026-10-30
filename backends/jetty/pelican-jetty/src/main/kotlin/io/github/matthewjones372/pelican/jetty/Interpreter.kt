@@ -54,6 +54,7 @@ import java.util.concurrent.CompletionStage
  * with its own 400 before this handler sees it.
  */
 fun Api.toHandler(handlers: Handlers = Handlers.default): Handler {
+    require(admission == null) { "This interpreter does not support operation admission." }
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
 
     // Once per endpoint rather than per request, so a broken codec is a startup failure.

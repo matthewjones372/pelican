@@ -76,6 +76,7 @@ private const val DRAIN_OVERRUN_BYTES: Long = 64L * 1024L
  * `pelican-pekko-docs`.
  */
 fun Api.toRoute(system: ClassicActorSystemProvider, handlers: Handlers = Handlers.default): Route {
+    require(admission == null) { "This interpreter does not support operation admission." }
     // Once per endpoint, captured by the routes: KType -> JavaType reflection
     // is not free, and a broken codec becomes a startup failure.
     val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }

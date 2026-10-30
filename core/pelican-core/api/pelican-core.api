@@ -41,6 +41,7 @@ public final class io/github/matthewjones372/pelican/AnyOf : io/github/matthewjo
 }
 
 public final class io/github/matthewjones372/pelican/Api {
+	public final fun getAdmission ()Lio/github/matthewjones372/pelican/OperationAdmission;
 	public final fun getAuthenticators ()Ljava/util/Map;
 	public final fun getCodecs ()Lio/github/matthewjones372/pelican/Codecs;
 	public final fun getCors ()Lio/github/matthewjones372/pelican/Cors;
@@ -70,6 +71,7 @@ public final class io/github/matthewjones372/pelican/Api {
 }
 
 public final class io/github/matthewjones372/pelican/ApiBuilder {
+	public final fun admission (Lio/github/matthewjones372/pelican/OperationAdmission;)V
 	public final fun authenticate (Lio/github/matthewjones372/pelican/SecurityScheme;Lio/github/matthewjones372/pelican/Authenticator;)V
 	public final fun filter (Lio/github/matthewjones372/pelican/Filter;)V
 	public final fun getCors ()Lio/github/matthewjones372/pelican/Cors;

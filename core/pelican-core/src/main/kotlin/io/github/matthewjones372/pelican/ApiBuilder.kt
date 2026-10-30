@@ -59,6 +59,13 @@ class ApiBuilder internal constructor() {
     private var onRefusal: RefusalObserver? = null
     private val authenticators = LinkedHashMap<SecurityScheme, Authenticator>()
     private var idempotency: Idempotency? = null
+    private var operationAdmission: OperationAdmission? = null
+
+    /** The matched-operation gate; configuring another would silently replace the first. */
+    fun admission(check: OperationAdmission) {
+        require(operationAdmission == null) { "Operation admission is already configured." }
+        operationAdmission = check
+    }
 
     /** Outermost first: a chain is written a line at a time, in the order it runs. */
     fun filter(filter: Filter) {
@@ -150,6 +157,7 @@ class ApiBuilder internal constructor() {
         tenants = tenants,
         rateLimits = rateLimits,
         responseHeaders = responseHeaders,
+        admission = operationAdmission,
     )
 }
 
