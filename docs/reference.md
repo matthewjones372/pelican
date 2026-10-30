@@ -3548,6 +3548,10 @@ callback or owned resources are constructed. Combined `handlerWithDocs`,
 `startWithDocs` and `handlerWithMcp` also fail closed; standalone documentation
 serves no described operation and is unchanged. A service using custom/docs startup
 composition needs a separately reviewed adoption change before enabling the hook.
+Doorlist's `app/src/main/kotlin/doorlist/app/Wiring.kt` uses an explicit start callback around its
+native endpoints, local documentation and request/edge wrappers. That composition
+needs its own reviewed adoption change before admission is configured; this
+library support does not enable it.
 MCP, Pekko and Gannet admission remain unsupported, including their direct and
 owned construction paths. These limits do not change when the hook is absent.
 
