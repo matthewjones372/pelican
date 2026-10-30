@@ -113,3 +113,26 @@ Keep I01 incomplete; no Doorlist pins/adoption/release, no new generic framework
 O02/I01 final-response telemetry remains a prelaunch obligation; the measured core streaming ownership gap remains
 a separate reviewed follow-up. If a native baseline exposes another defect, record it and obtain review before
 expanding this feature; do not quietly change existing ownership, cleanup or authentication counts.
+
+## Closed-input fixture precondition
+
+At reviewed head `b89dceecc7c8e8b1b303f45b667e43867cd905da`, PR CI 41138923095 and push CI 41138907715
+failed their JDK 21 jobs on the same CLOSED rows for both native caller refusal and admission: completion
+occurred but no failed read chunk was observed. JDK 25 passed. The earlier local warm pass does not establish
+the complete CI matrix. Running the original four EOF/CLOSED rows once on macOS Temurin 21.0.9 also passed;
+that does not reproduce Linux CI's Temurin 21.0.13 or confirm an original race cause.
+
+Checked Jetty 12.1.13 source: HttpChannelState.java:1087-1130 registers `_onContentAvailable` before
+`stream.demand()`. Its onFailure:512-550 arranges a failed read chunk and invokes registered demand, and
+separately fails a pending write. Pelican UnreadBodies.kt:22-24 forwards a failed write without entering
+Drain; a successful write enters Drain, which releases each chunk before registering its next demand.
+The original fixture had not proved which of these paths it selected before closing the endpoint.
+
+Root independently approved a fixture-only stronger precondition: feed one actual three-byte nonterminal
+chunk, await native demand registration after observing those bytes, assert bytes=3 and completion=0, then
+inject EOF/close. The wrapper signals only after `super.demand` returns. Keep the failed-chunk, once-only
+completion, every observed chunk's single release, zero handler and closed-connection assertions unchanged.
+No sleep, elapsed performance budget, native cleanup/runtime change or assertion suppression is introduced.
+
+With that precondition, the same 73 focused cases pass on local Temurin 21.0.9 and 25.0.4.1, zero failures,
+errors or skips. Fresh exact-head CI remains mandatory; these local results do not replace it.
