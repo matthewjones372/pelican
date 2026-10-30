@@ -2,7 +2,7 @@
 
 Approved under delegated root technical review on 30 October 2026, after the all-values header clarification.
 Root reviewed initial draft `5c04a618` and compatibility refinement `c05eb2f`; the initial five-entry stack is
-expanded to the approved six entries below. This is delegated review, not a claim of human editing. Each revised
+expanded to the approved entries below. This is delegated review, not a claim of human editing. Each revised
 entry waits for this approved spec on main and successful main CI before implementation.
 Source: main `ac81a0f15e5c1abd231ae87ff5e3bb36f6e7b3f8`, published 1.2.0; Doorlist I01 reserves this need.
 
@@ -95,8 +95,31 @@ hook; reuse native response/refusal handling and keep host decisions in the serv
 - [ ] **`codex/i01-admission-core`**: core in-memory ordering, native selection and refusal rendering; no duplicate
       matcher; gated decoders/callers/reservation/handler prove rejection runs none and callback runs once.
       Tests: `core/pelican-core/src/test/kotlin/io/github/matthewjones372/pelican/AdmissionInMemoryTest.kt`.
-- [ ] **`codex/i01-admission-jetty`**: same contract on Jetty; parity tests for captures, JSON, hidden/raw/SSE routes,
-      all header values/body-free replies, interruption/cancellation, defects, limits and once-only cleanup.
+- [ ] **`codex/i01-admission-jetty-spi`**: additive core
+      `core/pelican-core/src/main/kotlin/io/github/matthewjones372/pelican/spi/OperationAdmission.kt` exposes
+      `fun OperationAdmission.check(endpoint: Endpoint<*, *>, view: RequestView): AdmissionDecision`.
+      It creates the core-owned AdmissionRequest using `view::headers`; no interpreter/configuration behaviour changes.
+      Extend `core/pelican-core/src/test/kotlin/io/github/matthewjones372/pelican/OperationAdmissionTest.kt`
+      and `core/pelican-core/api/pelican-core.api`; prove selected identity, complete native fields, immutable snapshots,
+      one callback, exact decision/defect propagation and unchanged frozen consumers. Merge and verify main first.
+- [ ] **`codex/i01-admission-jetty`**: one complete feature, with all safety proof before dispatch support merges.
+      Change Jetty `Interpreter.kt`/`Responses.kt`/`Server.kt`, test-jetty `InMemory.kt`, jetty-mcp `Mcp.kt`,
+      jetty-docs `Docs.kt` (combined handler entry) and
+      `example/src/test/kotlin/example/backends/AdmissionConfigurationTest.kt`.
+      Reuse native find, mayBlock, caller/capture/input/body/handler execution, error responses, CORS/global headers
+      and bounded unread-body cleanup; do not change UnreadBodies.kt or introduce another parser/executor.
+      Private identity sentinels distinguish default native owned construction from explicit custom callbacks.
+      Admitted custom callbacks and docs composition stay rejected before callback/resources; preserve every existing
+      JVM/default-mask descriptor and absent-hook path. Combined MCP/docs construction rejects admission first; MCP stays
+      unsupported; standalone docsHandler is unchanged. Document any required Doorlist custom/docs adoption tail in
+      `docs/reference.md`; add no HTTP/2 transport or dependency.
+      New tests in `backends/jetty/pelican-jetty/src/test/kotlin/io/github/matthewjones372/pelican/jetty/`:
+      `AdmissionJettyTest.kt`, `AdmissionJettyExecutionTest.kt`, `AdmissionJettyCleanupTest.kt`.
+      Prove malformed captures/JSON, hidden/raw/SSE, all values/native duplicate-Host and authority/framing refusals,
+      empty/exact-body replies, native cancellation/interruption/defects, limits, selector-free callback execution,
+      bounded once-only cleanup and connection reuse. Existing construction tests retain unsupported/MCP/custom proof,
+      pin direct combined docs/startWithDocs rejection, and add default owned paths; run frozen consumers,
+      formatting/full build and exact PR/main CI.
 - [ ] **`codex/i01-admission-docs`**: reference/cookbook/changelog, API/binary and absent-hook backend proof; mark
       unreleased availability. Each entry stays near 200 changed lines; split before code if its concrete plan exceeds it.
 
