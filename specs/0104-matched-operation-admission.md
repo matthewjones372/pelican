@@ -1,10 +1,10 @@
 # 0104 - Matched-operation admission before decoding
 
 Approved under delegated root technical review on 30 October 2026, after the all-values header clarification.
-Root reviewed draft `5c04a618`; the five-entry stack and recommendations below are agreed. This is delegated
-review, not a claim of human editing. No implementation before the approved spec lands on main and its CI passes.
+Root reviewed initial draft `5c04a618` and compatibility refinement `c05eb2f`; the initial five-entry stack is
+expanded to the approved six entries below. This is delegated review, not a claim of human editing. Each revised
+entry waits for this approved spec on main and successful main CI before implementation.
 Source: main `ac81a0f15e5c1abd231ae87ff5e3bb36f6e7b3f8`, published 1.2.0; Doorlist I01 reserves this need.
-The compatibility/configuration stack refinement below awaits delegated root review and a committed approval.
 
 ## Problem
 
@@ -113,4 +113,3 @@ Resolved under delegated root review: real ApiBuilder member/read-only Api setti
 RefusalBody/native status/header validation; native cancellation/defect propagation; immutable all-values headers.
 Concrete source and deterministic tests remain independently reviewed per stack entry. No unresolved policy choice
 grants permission to change absent-hook behaviour, weaken transport parsing, or guess a service's authority rules.
-Pending: root review of the six-entry split, released/current constructor bridges and frozen-consumer proof above.
