@@ -1,3 +1,27 @@
+public abstract interface class io/github/matthewjones372/pelican/AdmissionDecision {
+}
+
+public final class io/github/matthewjones372/pelican/AdmissionDecision$Continue : io/github/matthewjones372/pelican/AdmissionDecision {
+	public static final field INSTANCE Lio/github/matthewjones372/pelican/AdmissionDecision$Continue;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/matthewjones372/pelican/AdmissionDecision$Refuse : io/github/matthewjones372/pelican/AdmissionDecision {
+	public fun <init> (ILio/github/matthewjones372/pelican/RefusalBody;Ljava/util/List;)V
+	public synthetic fun <init> (ILio/github/matthewjones372/pelican/RefusalBody;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBody ()Lio/github/matthewjones372/pelican/RefusalBody;
+	public final fun getHeaders ()Ljava/util/List;
+	public final fun getStatus ()I
+}
+
+public final class io/github/matthewjones372/pelican/AdmissionRequest {
+	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
+	public final fun header (Ljava/lang/String;)Ljava/lang/String;
+	public final fun headers (Ljava/lang/String;)Ljava/util/List;
+}
+
 public final class io/github/matthewjones372/pelican/Answer {
 	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
 	public final fun getPath ()Ljava/lang/String;
@@ -1203,6 +1227,10 @@ public final class io/github/matthewjones372/pelican/OpenIdConnectScheme : io/gi
 	public fun getDescription ()Ljava/lang/String;
 	public fun getName ()Ljava/lang/String;
 	public final fun getOpenIdConnectUrl ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/matthewjones372/pelican/OperationAdmission {
+	public abstract fun check (Lio/github/matthewjones372/pelican/AdmissionRequest;)Lio/github/matthewjones372/pelican/AdmissionDecision;
 }
 
 public abstract interface class io/github/matthewjones372/pelican/Outcome {
