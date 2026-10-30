@@ -26,13 +26,15 @@ dependencies {
 }
 ```
 
-`pelicanVersion` is the release you pin, `val pelicanVersion = "1.2.0"`. To
+`pelicanVersion` is the release you pin, `val pelicanVersion = "1.2.0"`.
+The explicitly unreleased admission recipe below requires a pinned build containing spec 0104, not 1.2.0. To
 serve on Pekko HTTP instead, use `pelican-pekko`, `pelican-pekko-docs` and
 `pelican-test-pekko`, plus the Pekko dependencies your service names itself,
 as in [Getting started](../README.md#getting-started). Every binder below
 exists under the same name in `io.github.matthewjones372.pelican.pekko`; a
 streaming handler returns a Pekko `Source` where Jetty takes a `Sequence`.
-[On Pekko](#on-pekko) is the first recipe on Pekko.
+[On Pekko](#on-pekko) is the first recipe on Pekko. The explicitly core/native-Jetty admission recipe is the
+exception to this binder parity; it does not support Pekko admission.
 
 A recipe needing a module beyond these carries its own `dependencies` block.
 Imports are written out one name per line, so the import block says where each
@@ -525,6 +527,51 @@ val ping = endpoint {
 `security(...)` documents the requirement; it does not check a credential. To
 enforce it, declare a caller with `authenticatedBy(...)` (and `pelican-oidc` for
 JWTs), as the next section does.
+
+---
+
+## Admit a matched operation before decoding (unreleased)
+
+Reject a selected operation before caller checks or typed input decoding. This
+complete recipe is also the `admission` fixture compiled by `StillCompilesTest`:
+
+```kotlin
+import io.github.matthewjones372.pelican.AdmissionDecision
+import io.github.matthewjones372.pelican.OperationAdmission
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jetty.toHandler
+
+val restricted = endpoint { get("restricted"); text() }
+val open = endpoint { get("open"); text() }
+val admitted = api(
+    listOf(restricted handledNow { "restricted" }, open handledNow { "open" }),
+    JacksonCodecs,
+) {
+    admission(OperationAdmission { request ->
+        if (request.endpoint === restricted) AdmissionDecision.Refuse(403)
+        else AdmissionDecision.Continue
+    })
+}
+val nativeHandler = admitted.toHandler()
+```
+
+The interpreter supplies the actual selected description; the recipe does no
+matching. Continue resumes native caller checks and decoding. It does not
+authenticate the caller. A policy inspecting fields uses `request.headers(name)`
+for every immutable field line in arrival order; `header(name)` selects only the
+first. This recipe chooses by endpoint identity and defines no host trust policy.
+
+This feature is unreleased. The shared dependencies above need a pinned build
+containing spec 0104; published 1.2.0 has no admission API. Core `Api.inMemory()`
+and native Jetty `toHandler`, default `start` and owned `inMemory` support it.
+Admitted explicit custom callbacks, combined docs/startWithDocs and MCP remain
+fail-closed; Pekko and Gannet admission remain unsupported. A service using
+custom startup composition needs a separately reviewed adoption change.
+Explicit refusals require final-response telemetry beyond `RefusalObserver` and
+handler-chain metrics. See [Matched operation admission](reference.md#matched-operation-admission-unreleased).
 
 ---
 

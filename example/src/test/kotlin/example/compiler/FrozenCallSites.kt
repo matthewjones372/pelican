@@ -236,6 +236,29 @@ internal val frozenCallSites: Map<String, String> = mapOf(
         }
     """,
 
+    "admission" to """
+        import io.github.matthewjones372.pelican.AdmissionDecision
+        import io.github.matthewjones372.pelican.OperationAdmission
+        import io.github.matthewjones372.pelican.api
+        import io.github.matthewjones372.pelican.endpoint
+        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+        import io.github.matthewjones372.pelican.jetty.handledNow
+        import io.github.matthewjones372.pelican.jetty.toHandler
+
+        val restricted = endpoint { get("restricted"); text() }
+        val open = endpoint { get("open"); text() }
+        val admitted = api(
+            listOf(restricted handledNow { "restricted" }, open handledNow { "open" }),
+            JacksonCodecs,
+        ) {
+            admission(OperationAdmission { request ->
+                if (request.endpoint === restricted) AdmissionDecision.Refuse(403)
+                else AdmissionDecision.Continue
+            })
+        }
+        val nativeHandler = admitted.toHandler()
+    """,
+
     // --------------------------------------------------------- construction
 
     "construction" to """

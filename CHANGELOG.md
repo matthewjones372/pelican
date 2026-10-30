@@ -33,6 +33,13 @@ one.
 
 ### Added
 
+- **Matched-operation admission** (spec 0104, unreleased): optional `ApiBuilder.admission` runs once on the selected
+  description before caller checks and typed decoding. Core in-memory and native/default-owned Jetty support
+  Continue or an exact supplied Refuse response. Admitted explicit custom/docs/MCP composition remains fail-closed;
+  Pekko and Gannet admission remain unsupported. Existing binary entry points are retained. See the
+  [compiled recipe](docs/cookbook.md#admit-a-matched-operation-before-decoding-unreleased) and
+  [support boundaries](docs/reference.md#matched-operation-admission-unreleased).
+
 - **Headers on every answer** (spec 0101): `api { responseHeaders { answer -> add(name, value) } }` puts headers on
   every response Pekko, Jetty, Gannet and the in-memory client write. That covers endpoints and their refusals, the
   CORS preflight, pages, the 404 or 405 for a request nothing took, the docs modules and the MCP handler.

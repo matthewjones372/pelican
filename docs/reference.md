@@ -3528,6 +3528,9 @@ Two things to know before drawing conclusions from the numbers:
 
 ### Matched operation admission (unreleased)
 
+The [compiled cookbook recipe](cookbook.md#admit-a-matched-operation-before-decoding-unreleased) shows the
+public configuration and selected-endpoint identity without defining an application's authority policy.
+
 `ApiBuilder.admission(OperationAdmission)` installs one synchronous access decision
 for a matched endpoint. Its `AdmissionRequest` contains the actual selected endpoint
 and complete, case-insensitive header-line snapshots, including repeated fields.
