@@ -29,7 +29,9 @@ class AdmissionRequest internal constructor(
 sealed interface AdmissionDecision {
     data object Continue : AdmissionDecision
     class Refuse(val status: Int, val body: RefusalBody? = null,
-                 val headers: List<Pair<String, String>> = emptyList()) : AdmissionDecision
+                 headers: List<Pair<String, String>> = emptyList()) : AdmissionDecision {
+        val headers: List<Pair<String, String>>
+    }
 }
 ```
 
