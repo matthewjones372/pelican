@@ -258,6 +258,36 @@ class Api internal constructor(
     /** Headers on every response this Api's backend writes, refusals and unmatched routes included; null adds none. */
     val responseHeaders: ResponseHeaderPolicy? = null,
 ) {
+    @Deprecated("Retained for binary compatibility with Pelican 1.2.0.", level = DeprecationLevel.HIDDEN)
+    internal constructor(
+        endpoints: List<ServerEndpoint>,
+        codecs: Codecs = NoCodecs,
+        title: String = DEFAULT_TITLE,
+        version: String = DEFAULT_VERSION,
+        description: String? = null,
+        servers: List<String> = emptyList(),
+        security: List<SecurityRequirement> = emptyList(),
+        cors: Cors? = null,
+        strictBodyTimeoutMillis: Long = DEFAULT_STRICT_BODY_TIMEOUT_MILLIS,
+        maxBodyBytes: Long = DEFAULT_MAX_BODY_BYTES,
+        maxFrameBytes: Long? = null,
+        filters: List<Filter> = emptyList(),
+        exposeInternalErrors: Boolean = false,
+        onServerError: ((reference: String, endpoint: Endpoint<*, *>?, error: Throwable) -> Unit)? = null,
+        covers: List<Endpoint<*, *>> = emptyList(),
+        webhooks: List<Webhook> = emptyList(),
+        refusals: RefusalRenderer = ApiErrorEnvelope,
+        onRefusal: RefusalObserver? = null,
+        pages: Pages? = null,
+        authenticators: Map<SecurityScheme, Authenticator> = emptyMap(),
+        idempotency: Idempotency? = null,
+    ) : this(
+        endpoints, codecs, title, version, description, servers, security, cors, strictBodyTimeoutMillis,
+        maxBodyBytes, maxFrameBytes, filters, exposeInternalErrors, onServerError, covers, webhooks,
+        refusals, onRefusal, pages, authenticators, idempotency,
+        csrf = true, tenants = null, rateLimits = null, responseHeaders = null,
+    )
+
     /**
      * The largest single frame of a streamed request body, over which the frame
      * is a 413 naming it.
