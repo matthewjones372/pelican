@@ -1,9 +1,9 @@
 package example.backends
 
+import io.github.matthewjones372.pelican.AdmissionDecision
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.Codecs
-import io.github.matthewjones372.pelican.InMemoryClientTransport
 import io.github.matthewjones372.pelican.NoCodecs
 import io.github.matthewjones372.pelican.OperationAdmission
 import io.github.matthewjones372.pelican.ServerEndpoint
@@ -43,8 +43,6 @@ class AdmissionConfigurationTest {
     @TestFactory
     fun `unsupported construction refuses admission before codecs callbacks or owned resources`(): List<DynamicTest> =
         listOf<Pair<String, () -> Any?>>(
-            "core transport" to { InMemoryClientTransport(configured) },
-            "core test client" to { configured.inCore() },
             "Jetty handler" to { configured.toJetty() },
             "Jetty native custom handler" to { configured.startOnJetty(handler = { error("handler called") }) },
             "Jetty owned custom handler" to { configured.inJetty(handler = { error("handler called") }) },
@@ -60,6 +58,15 @@ class AdmissionConfigurationTest {
             "Jetty HTTP and MCP handler" to { configured.handlerWithMcp(options = options) },
             "Pekko HTTP and MCP route" to { configured.routeWithMcp(unusedSystem, options) },
         ).map { (name, construct) -> DynamicTest.dynamicTest(name) { refuses(construct) } }
+
+    @Test
+    fun `the core test client applies supported admission before dispatch`() {
+        val endpoint = endpoint { get("core"); empty() }
+        val api = api(listOf(ServerEndpoint(endpoint) { error("handler called") })) {
+            admission(OperationAdmission { AdmissionDecision.Refuse(403) })
+        }
+        api.inCore().use { it.response(endpoint, Unit).status shouldBe 403 }
+    }
 
     @Test
     fun `borrowed systems remain alive when construction is refused`() {

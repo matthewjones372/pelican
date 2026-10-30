@@ -45,6 +45,12 @@ library-selected endpoint and native read-only header lookup, never raw URL, dec
 request. Refuse is a 4xx/5xx status with optional existing RefusalBody and defensively copied, validated headers;
 null body means no body, not a rendered generic error. Configured codecs produce any promised JSON error bytes.
 
+Explicit Refuse writes its supplied status/body/headers through native responses; a null body remains empty.
+It is not a RefusalObserver event: that observer retains only its existing native classifications.
+Api.responseHeaders still apply; callback cancellation/defects use the native failure path/reporting once.
+This does not establish complete refused-request traffic accounting. Final-response admission telemetry remains
+an O02/I01 pre-launch obligation; no callback-side counters/spans or new observer API are added here.
+
 `headers(name)` returns an immutable snapshot of every field line in arrival order with native case-insensitive
 lookup, reusing RequestView.headers semantics or the in-memory ClientRequest's complete field list. No joining,
 deduplication or first-value collapse. `header(name)` remains a documented first-value convenience; authority policy
@@ -88,6 +94,7 @@ hook; reuse native response/refusal handling and keep host decisions in the serv
       No MCP admission, dependency, transport or absent-hook behaviour changes.
 - [ ] **`codex/i01-admission-core`**: core in-memory ordering, native selection and refusal rendering; no duplicate
       matcher; gated decoders/callers/reservation/handler prove rejection runs none and callback runs once.
+      Tests: `core/pelican-core/src/test/kotlin/io/github/matthewjones372/pelican/AdmissionInMemoryTest.kt`.
 - [ ] **`codex/i01-admission-jetty`**: same contract on Jetty; parity tests for captures, JSON, hidden/raw/SSE routes,
       all header values/body-free replies, interruption/cancellation, defects, limits and once-only cleanup.
 - [ ] **`codex/i01-admission-docs`**: reference/cookbook/changelog, API/binary and absent-hook backend proof; mark
