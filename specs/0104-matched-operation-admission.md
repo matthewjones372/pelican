@@ -1,6 +1,8 @@
 # 0104 - Matched-operation admission before decoding
 
-Draft for delegated technical peer review; no implementation before reviewed spec lands on main.
+Approved under delegated root technical review on 30 October 2026, after the all-values header clarification.
+Root reviewed draft `5c04a618`; the five-entry stack and recommendations below are agreed. This is delegated
+review, not a claim of human editing. No implementation before the approved spec lands on main and its CI passes.
 Source: main `ac81a0f15e5c1abd231ae87ff5e3bb36f6e7b3f8`, published 1.2.0; Doorlist I01 reserves this need.
 
 ## Problem
@@ -22,9 +24,10 @@ Proposed public shape in the existing core package, not APIs available in 1.2.0:
 ```kotlin
 fun interface OperationAdmission { fun check(request: AdmissionRequest): AdmissionDecision }
 class AdmissionRequest internal constructor(
-    val endpoint: Endpoint<*, *>, private val credentials: Credentials,
+    val endpoint: Endpoint<*, *>, private val fieldLines: (String) -> List<String>,
 ) {
     fun header(name: String): String?
+    fun headers(name: String): List<String>
 }
 sealed interface AdmissionDecision {
     data object Continue : AdmissionDecision
@@ -40,6 +43,12 @@ One optional callback per Api; a second configuration is rejected. Request views
 library-selected endpoint and native read-only header lookup, never raw URL, decoded inputs, caller bag or backend
 request. Refuse is a 4xx/5xx status with optional existing RefusalBody and defensively copied, validated headers;
 null body means no body, not a rendered generic error. Configured codecs produce any promised JSON error bytes.
+
+`headers(name)` returns an immutable snapshot of every field line in arrival order with native case-insensitive
+lookup, reusing RequestView.headers semantics or the in-memory ClientRequest's complete field list. No joining,
+deduplication or first-value collapse. `header(name)` remains a documented first-value convenience; authority policy
+must inspect all values. Credentials.header and ClientRequest.header alone cannot supply this view. Preserve native
+HTTP/1 and supported HTTP/2 authority mapping/ambiguity rejection; never invent a second parser or expose raw URI.
 
 For an opted-in Api, native untyped selection precedes admission; Continue runs the native caller/tenant checks
 before typed captures/plain/body decoding, filters, idempotency and the handler. Reject invokes none of those and
@@ -67,7 +76,7 @@ hook; reuse native response/refusal handling and keep host decisions in the serv
 - [ ] **`codex/i01-admission-core`**: core in-memory ordering, native selection and refusal rendering; no duplicate
       matcher; gated decoders/callers/reservation/handler prove rejection runs none and callback runs once.
 - [ ] **`codex/i01-admission-jetty`**: same contract on Jetty; parity tests for captures, JSON, hidden/raw/SSE routes,
-      headers/body-free replies, interruption/cancellation, defects, transport limits and once-only cleanup.
+      all header values/body-free replies, interruption/cancellation, defects, limits and once-only cleanup.
 - [ ] **`codex/i01-admission-docs`**: reference/cookbook/changelog, API/binary and absent-hook backend proof; mark
       unreleased availability. Each entry stays near 200 changed lines; split before code if its concrete plan exceeds it.
 
@@ -77,6 +86,9 @@ Reject with malformed UUID/JSON or missing/invalid credentials before applicatio
 Continue retains native access-first failures; no-header/body/frame limits weaken. Compare synchronous cancellation
 and Error propagation with the native failure boundary; no swallowed defect, duplicate report or leaked raw data.
 Compile old consumers and run absent-hook contracts across all supported backends; core/Jetty admitted/refused parity.
+Pin duplicate Host field lines, case variants, and Host/:authority ambiguity under native HTTP/1 and supported
+HTTP/2 semantics: either native transport refusal or complete values reach admission, never an admissible first value.
+Prove returned header lists cannot be mutated and later source-list mutation cannot change their earlier contents.
 
 ```bash
 ./gradlew :pelican-core:test :pelican-jetty:test
@@ -85,9 +97,7 @@ Compile old consumers and run absent-hook contracts across all supported backend
 
 ## Open questions
 
-1. Configuration member or extension? Recommend a real ApiBuilder member and read-only Api property, with explicit
-   binary bridges and no changed old constructor entry points; the sketch denotes that public surface.
-2. Refusal body model? Recommend reusing RefusalBody plus native header/status validation; do not add a second JSON
-   renderer. Body-free refusal and declared JSON bytes need core/Jetty equality tests before implementation.
-3. Callback defects/cancellation? Recommend native failure/cancellation propagation, never a declared refusal;
-   pin both causes and no later stage/extra cleanup with deterministic tests before accepting the API.
+Resolved under delegated root review: real ApiBuilder member/read-only Api setting with binary bridges; existing
+RefusalBody/native status/header validation; native cancellation/defect propagation; immutable all-values headers.
+Concrete source and deterministic tests remain independently reviewed per stack entry. No unresolved policy choice
+grants permission to change absent-hook behaviour, weaken transport parsing, or guess a service's authority rules.
