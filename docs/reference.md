@@ -3562,14 +3562,14 @@ attack surface. `reason` is a closed set for the same reason: a `RefusalReason`
 is an enum, so the number of series is a property of the library rather than of
 the traffic.
 
-The hook is called from `spi.renderError`, the one function that turns a refusal
-into a response, so a refusal cannot be answered and left uncounted, and every
-backend and the in-memory transport report identically because they report
-through one implementation rather than one of their own each.
+The hook is called from `spi.renderError` for its closed set of native failure
+classifications. Every backend and the in-memory transport use that classifier;
+explicit operation-admission decisions (unreleased) and unclassified failures
+are outside it. These meters do not establish complete refused-request traffic accounting.
 `RefusalObserver` is an interface on the `Api` rather than a `Filter` precisely
 because a filter is the thing these requests never reach.
 
-Three things it does not count, each on purpose:
+Cases outside the observer include:
 
 - **A 404 or 405 for a path nothing describes**, when a bound server answered
   it. Pelican hands an unmatched request back to the server library's own
@@ -3582,10 +3582,12 @@ Three things it does not count, each on purpose:
   each interpreter, indistinguishable from a 400 a filter throws, and counting
   it would mean counting requests `http.server.requests` already has. A
   parameter that arrived and would not *decode* is counted, under `decode`.
-- **A 500 nobody described, and any status a filter or a handler chose.** Those
-  reached the chain, so the request counter has them. The two counters are
-  disjoint by construction, which is what makes adding their 4xx rates
-  meaningful.
+- **An unclassified failure, or a status a filter or handler chose.** Where
+  these reach the chain, ordinary request metrics apply. A failure before that
+  chain is outside both counters.
+- **An explicit operation-admission refusal (unreleased).** It writes the
+  supplied response without exception classification. It needs final-response
+  telemetry rather than a callback-side traffic counter.
 
 An MCP tool call is not counted either. It is answered in JSON-RPC over a 200,
 so the status a refusal would report never reached a caller; `spi.classifyError`

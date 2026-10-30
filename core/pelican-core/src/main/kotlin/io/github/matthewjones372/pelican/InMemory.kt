@@ -46,10 +46,6 @@ import java.util.concurrent.CompletionStage
  */
 class InMemoryClientTransport(private val api: Api) : ClientTransport {
 
-    init {
-        require(api.admission == null) { "This interpreter does not support operation admission." }
-    }
-
     private val index = api.endpoints.routeIndex()
 
     /** Folded once when the transport is built, as a route-building server folds them. */
@@ -74,8 +70,20 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
         // The per-request bag the index writes captures into and the handler
         // reads its inputs from, exactly as each interpreter's.
         val values = LinkedHashMap<ParamKey<*>, Any?>()
+        val admission = api.admission
         val matched = try {
-            index.match(request.method, path, values)
+            val selected = if (admission == null) index.match(request.method, path, values)
+            else index.find(request.method, path)
+            if (admission != null && selected != null) {
+                val view = AdmissionRequest(selected.endpoint) { name ->
+                    request.headers.filter { it.first.equals(name, ignoreCase = true) }.map { it.second }
+                }
+                when (val decision = admission.check(view)) {
+                    AdmissionDecision.Continue -> Unit
+                    is AdmissionDecision.Refuse -> return completed(decision.response())
+                }
+            }
+            selected
         } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
             // A capture the trie will not decode is that endpoint's 400 rather
             // than a path nobody described, which is the distinction the
@@ -99,6 +107,7 @@ class InMemoryClientTransport(private val api: Api) : ClientTransport {
 
         return try {
             api.decodeCaller(endpoint, credentials, values)
+            if (admission != null) index.decodeCaptures(matched, path, values)
             negotiate(endpoint, request)
             decodeInputs(endpoint, request, query, values)
             decodeBody(endpoint, request, resolved, values)
@@ -347,6 +356,9 @@ private fun body(status: Int, contentType: String, text: String): ClientResponse
     listOf(CONTENT_TYPE to contentType),
     ByteArrayInputStream(text.toByteArray(StandardCharsets.UTF_8)),
 )
+
+private fun AdmissionDecision.Refuse.response(): ClientResponse =
+    (body?.let { refusalBody(status, it) } ?: ClientResponse(status, emptyList(), empty())).plus(headers)
 
 /** A refusal as its renderer wrote it, byte for byte and under its own media type. */
 private fun refusalBody(status: Int, refusal: RefusalBody): ClientResponse =

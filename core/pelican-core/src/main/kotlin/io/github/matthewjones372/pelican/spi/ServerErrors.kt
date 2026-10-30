@@ -108,8 +108,9 @@ class ClassifiedError(val error: ApiError, val unexpected: Throwable?, val refer
  *
  * [Api.onRefusal] is told here rather than at the point each refusal is raised,
  * because a raised refusal is not yet one that went out: a filter can catch it,
- * and only this function is on the way to the wire. Nothing else may report a
- * refusal, so a refusal cannot be answered and left uncounted.
+ * and only this function classifies native failures on the way to the wire.
+ * Explicit admission decisions carry their own response and do not enter this
+ * exception path; unclassified failures have no observer reason.
  */
 fun renderError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): RenderedError {
     val thrown = unwrapCompletion(raw)

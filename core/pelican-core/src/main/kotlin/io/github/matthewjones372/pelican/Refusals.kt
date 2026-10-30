@@ -63,14 +63,14 @@ enum class RefusalReason(val label: String) {
 }
 
 /**
- * Told about each request refused before any filter ran.
+ * Told about classified native refusals before any filter ran.
  *
  * `http.server.requests` counts what reached the chain, and by construction
  * cannot count what did not: a 413 is answered where the body is read, several
  * layers outside the outermost filter. That gap is the traffic a dashboard is
- * least able to do without, because it widens exactly during an attack or a
- * broken-client rollout. This is where it is reported, and `pelican-metrics`
- * turns it into a counter.
+ * least able to do without. This observes the closed [RefusalReason] set;
+ * explicit admission decisions and unclassified failures are outside it.
+ * `pelican-metrics` turns the observed reasons into a counter.
  *
  * It is handed the classification and nothing else. Not the request, not the
  * throwable, and not the detail that goes in the body: every one of those
