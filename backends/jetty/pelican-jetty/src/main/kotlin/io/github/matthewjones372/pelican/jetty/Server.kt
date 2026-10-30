@@ -74,6 +74,9 @@ val PELICAN_URI_COMPLIANCE: UriCompliance = UriCompliance.DEFAULT.with(
     SUSPICIOUS_PATH_CHARACTERS,
 )
 
+/** Identifies native construction before custom code or runtime allocation. */
+private val nativeHandler: Api.() -> Handler = { toHandler() }
+
 /**
  * Binds this API on [host]:[port]; port 0 lets the OS choose. [handler] is how a module knowing more than this
  * one, such as one serving an OpenAPI document, adds to it; a request it passes on is answered by [Unanswered].
@@ -82,9 +85,9 @@ fun Api.start(
     port: Int = 8080,
     host: String = "127.0.0.1",
     handlers: Handlers = Handlers.default,
-    handler: Api.() -> Handler = { toHandler(handlers) },
+    handler: Api.() -> Handler = nativeHandler,
 ): PelicanServer {
-    require(admission == null) { "This interpreter does not support operation admission." }
+    require(admission == null || handler === nativeHandler) { "This interpreter does not support operation admission." }
     val server = Server(pelicanPool(handlers))
     server.addConnector(
         pelicanConnector(server, ConnectorSettings.configured()).apply {
@@ -92,7 +95,7 @@ fun Api.start(
             this.port = port
         },
     )
-    server.handler = handler()
+    server.handler = if (handler === nativeHandler) toHandler(handlers) else handler()
     server.defaultHandler = Unanswered()
     try {
         server.start()

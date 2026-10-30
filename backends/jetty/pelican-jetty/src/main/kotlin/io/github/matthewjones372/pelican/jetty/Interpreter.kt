@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican.jetty
 
+import io.github.matthewjones372.pelican.AdmissionDecision
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.ApiException
 import io.github.matthewjones372.pelican.BodyCodec
@@ -43,6 +44,7 @@ import org.eclipse.jetty.util.Callback
 import org.eclipse.jetty.util.thread.Invocable.InvocationType
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import io.github.matthewjones372.pelican.spi.check as checkOperationAdmission
 
 /**
  * Interprets an [Api] as a Jetty handler. Endpoints only: nothing here generates an OpenAPI document.
@@ -54,7 +56,6 @@ import java.util.concurrent.CompletionStage
  * with its own 400 before this handler sees it.
  */
 fun Api.toHandler(handlers: Handlers = Handlers.default): Handler {
-    require(admission == null) { "This interpreter does not support operation admission." }
     require(endpoints.isNotEmpty()) { "This API has no endpoints." }
 
     // Once per endpoint rather than per request, so a broken codec is a startup failure.
@@ -159,7 +160,9 @@ internal class PelicanHandler(
     private val threads: Handlers,
 ) : Handler.Abstract(if (threads.executor == null) InvocationType.BLOCKING else InvocationType.NON_BLOCKING) {
 
-    private val blocking: Set<ServerEndpoint> = api.endpoints.filterTo(HashSet()) { it.blocksBeforeItsHandler() }
+    private val blocking: Set<ServerEndpoint> = api.endpoints.filterTo(HashSet()) {
+        api.admission != null || it.blocksBeforeItsHandler()
+    }
 
     /** In declaration order, which is the order Pekko's per-method routes name them in a 405. */
     private val methods: List<Method> = api.endpoints.map { it.endpoint.method }.distinct()
@@ -212,13 +215,15 @@ internal class PelicanHandler(
         }
 
         val values = plans.getValue(matched).slots()
-        try {
-            index.decodeCaptures(matched, path, values)
-        } catch (t: Throwable) {
-            // A capture that would not decode is its own route's 400.
-            return CompletableFuture.completedFuture(errorResponse(t, api, matched.endpoint))
+        if (api.admission == null) {
+            try {
+                index.decodeCaptures(matched, path, values)
+            } catch (t: Throwable) {
+                // A capture that would not decode is its own route's 400.
+                return CompletableFuture.completedFuture(errorResponse(t, api, matched.endpoint))
+            }
         }
-        val answered = invoke(matched, request, values)
+        val answered = invoke(matched, request, values, path)
         return if (cors == null) answered
         else answered.thenApply { it.withHeaders(cors.actualResponseHeaders(request.headers.get(CorsHeaders.ORIGIN))) }
     }
@@ -253,13 +258,17 @@ internal class PelicanHandler(
         se: ServerEndpoint,
         request: Request,
         values: Slots,
+        path: String,
     ): CompletionStage<Reply> =
-        if (se in blocking) threads.mayBlock { invokeHere(se, request, values) } else invokeHere(se, request, values)
+        if (se in
+            blocking
+        ) threads.mayBlock { invokeHere(se, request, values, path) } else invokeHere(se, request, values, path)
 
     private fun invokeHere(
         se: ServerEndpoint,
         request: Request,
         values: Slots,
+        path: String,
     ): CompletionStage<Reply> {
         val ep = se.endpoint
         // Built before decoding, so a filter or a failing decode can still put a header on the way out.
@@ -267,10 +276,18 @@ internal class PelicanHandler(
         val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep), requestHeaders = view)
 
         val accept = view.headers(HttpHeader.ACCEPT.asString())
+        val admission = api.admission
 
-        // Who is calling first, then what they will take, then the inputs: Pekko's order, so a 401 tells nothing else.
+        // An access refusal must reveal nothing about the opted-in operation's typed inputs.
         try {
+            if (admission != null) {
+                when (val decision = admission.checkOperationAdmission(ep, view)) {
+                    AdmissionDecision.Continue -> Unit
+                    is AdmissionDecision.Refuse -> return CompletableFuture.completedFuture(decision.reply())
+                }
+            }
             api.decodeCaller(ep, view, values)
+            if (admission != null) index.decodeCaptures(se, path, values)
             negotiate(ep, accept)
             plans.getValue(se).decodePlainInputs(view, values)
         } catch (t: Throwable) {
