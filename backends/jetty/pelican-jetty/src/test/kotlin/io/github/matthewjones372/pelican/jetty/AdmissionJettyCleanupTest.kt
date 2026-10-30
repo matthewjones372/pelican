@@ -94,6 +94,10 @@ class AdmissionJettyCleanupTest {
             val connection = connector.executeRequest(CLEANUP_HEADERS)
             try {
                 HttpTester.parseResponse(connection.getResponse()).status shouldBe world.status
+                connection.addInput("3\r\none\r\n")
+                world.reads.waitingAfterData.await(CLEANUP_GATE_SECONDS, TimeUnit.SECONDS) shouldBe true
+                world.reads.bytes.get() shouldBe 3
+                world.reads.completions.get() shouldBe 0
                 if (failure == "EOF") connection.addInputEOF() else connection.close()
                 world.reads.finished.await(CLEANUP_GATE_SECONDS, TimeUnit.SECONDS) shouldBe true
                 world.reads.failures.get() shouldBeGreaterThan 0
@@ -142,12 +146,18 @@ private class CleanupReads {
     val failures = AtomicInteger()
     val completions = AtomicInteger()
     val finished = CountDownLatch(1)
+    val waitingAfterData = CountDownLatch(1)
     private val releases = ConcurrentLinkedQueue<AtomicInteger>()
 
     fun wrap(handler: Handler): Handler = object : Handler.Wrapper(handler) {
         override fun handle(request: Request, response: Response, callback: Callback): Boolean {
             if (request.httpURI.path != "/blocked") return super.handle(request, response, callback)
             val observed = object : Request.Wrapper(request) {
+                override fun demand(demandCallback: Runnable) {
+                    super.demand(demandCallback)
+                    if (bytes.get() > 0) waitingAfterData.countDown()
+                }
+
                 override fun read(): Content.Chunk? {
                     val chunk = super.read() ?: return null
                     val released = AtomicInteger()
