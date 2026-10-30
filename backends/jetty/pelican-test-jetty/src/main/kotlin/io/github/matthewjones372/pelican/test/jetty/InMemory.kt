@@ -87,16 +87,20 @@ private fun RequestSpec.toJetty(): HttpTester.Request {
     return req
 }
 
+/** Identifies native construction before custom code or runtime allocation. */
+private val nativeHandler: Api.() -> Handler = { toHandler() }
+
 /**
  * A client that talks to this API through Jetty in memory. Owns a started `Server`, so close it when the suite is
  * done. [handler] is how a module serving more than the endpoints, such as the document, is tested the same way.
  */
 fun Api.inMemory(
     handlers: Handlers = Handlers.default,
-    handler: Api.() -> Handler = { toHandler(handlers) },
+    handler: Api.() -> Handler = nativeHandler,
 ): ApiClient {
-    require(admission == null) { "This interpreter does not support operation admission." }
-    return ApiClient(InMemoryTransport(handler()), codecs)
+    require(admission == null || handler === nativeHandler) { "This interpreter does not support operation admission." }
+    val served = if (handler === nativeHandler) toHandler(handlers) else handler()
+    return ApiClient(InMemoryTransport(served), codecs)
 }
 
 /** A client for a server this process started; the codecs come from the [Api] it serves. */

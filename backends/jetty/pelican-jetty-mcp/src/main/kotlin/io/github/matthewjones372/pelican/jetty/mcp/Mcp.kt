@@ -44,7 +44,10 @@ fun Api.handlerWithMcp(
     handlers: Handlers = Handlers.default,
     options: McpOptions = mcpOptions(),
     path: String = MCP_PATH,
-): Handler = Handler.Sequence(toHandler(handlers), mcpHandler(options, path))
+): Handler {
+    require(admission == null) { "This interpreter does not support operation admission." }
+    return Handler.Sequence(toHandler(handlers), mcpHandler(options, path))
+}
 
 private class McpPost(
     private val server: McpServer,

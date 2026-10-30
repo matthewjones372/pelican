@@ -65,8 +65,10 @@ fun Api.docsHandler(docs: Docs = docs()): Handler {
  * The endpoints and the documentation as one handler, the endpoints asked first as on Pekko, so an endpoint at a
  * docs path wins. Served with `api.start(handler = { handlerWithDocs() })`.
  */
-fun Api.handlerWithDocs(handlers: Handlers = Handlers.default, docs: Docs = docs()): Handler =
-    Handler.Sequence(toHandler(handlers), docsHandler(docs))
+fun Api.handlerWithDocs(handlers: Handlers = Handlers.default, docs: Docs = docs()): Handler {
+    require(admission == null) { "This interpreter does not support operation admission." }
+    return Handler.Sequence(toHandler(handlers), docsHandler(docs))
+}
 
 /** [start], with the document and the documentation page served alongside. */
 fun Api.startWithDocs(

@@ -1,5 +1,6 @@
 package io.github.matthewjones372.pelican.jetty
 
+import io.github.matthewjones372.pelican.AdmissionDecision
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.BodyCodec
 import io.github.matthewjones372.pelican.ByteStreamOutput
@@ -51,6 +52,9 @@ internal class Strict(
     val body: ByteArray,
     val headers: List<Pair<String, String>> = emptyList(),
 ) : Reply
+
+internal fun AdmissionDecision.Refuse.reply(): Reply =
+    Strict(status, body?.mediaType, body?.bytes ?: ByteArray(0), headers)
 
 /**
  * A body written a frame at a time as [elements] yield them, never held whole. [frames] renders the elements;

@@ -3526,6 +3526,36 @@ Two things to know before drawing conclusions from the numbers:
   *handled* 4xx, and it always will be. Those requests are counted under a name
   of their own instead: see below.
 
+### Matched operation admission (unreleased)
+
+`ApiBuilder.admission(OperationAdmission)` installs one synchronous access decision
+for a matched endpoint. Its `AdmissionRequest` contains the actual selected endpoint
+and complete, case-insensitive header-line snapshots, including repeated fields.
+The decision runs once before caller authentication, typed captures, other inputs,
+body decoding, filters, idempotency reservation and the handler. `Continue` resumes
+the native interpreter; `Refuse` writes its supplied 4xx/5xx status, exact bytes,
+media type and headers. A null body is empty. Configured response headers still apply.
+
+Support is limited to core `Api.inMemory()` and native Jetty `toHandler()`, default
+Jetty `start()` and owned Jetty `inMemory()`. Jetty runs admission using the supplied
+`Handlers` policy, including its existing blocking dispatch and unread-body cleanup.
+Transport framing checks still precede admission. Unmatched requests and native
+CORS preflight do not acquire an operation decision. An API without the hook keeps
+its native matching and execution order.
+
+Admitted APIs with an explicit custom Jetty handler callback fail before the
+callback or owned resources are constructed. Combined `handlerWithDocs`,
+`startWithDocs` and `handlerWithMcp` also fail closed; standalone documentation
+serves no described operation and is unchanged. A service using custom/docs startup
+composition needs a separately reviewed adoption change before enabling the hook.
+MCP, Pekko and Gannet admission remain unsupported, including their direct and
+owned construction paths. These limits do not change when the hook is absent.
+
+An explicit decision is outside `RefusalObserver` and ordinary handler-chain
+metrics. Complete admission traffic accounting needs final-response telemetry;
+counting inside the callback does not establish it. Callback defects use the
+native failure path, including its cancellation and selected-endpoint reporting.
+
 ### Refusals, which no filter can see
 
 Outermost is not outside enough. A 413 is decided while the body is being read,
