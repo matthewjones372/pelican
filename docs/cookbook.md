@@ -575,6 +575,51 @@ handler-chain metrics. See [Matched operation admission](reference.md#matched-op
 
 ---
 
+## Decorate a native Jetty server before binding (unreleased)
+
+Use a verified pinned development build containing `startDecorated`; published 1.2.0 and the
+admission snapshot at source 125b do not contain it. Supply that version explicitly:
+
+```kotlin
+val pelicanVersion: String by project
+dependencies {
+    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
+    implementation("io.github.matthewjones372:pelican-jetty")
+    implementation("io.github.matthewjones372:pelican-jackson")
+    implementation("io.github.matthewjones372:pelican-jetty-docs")
+}
+```
+
+This complete recipe is the separately compiled `nativeDecoration` fixture:
+
+```kotlin
+import io.github.matthewjones372.pelican.AdmissionDecision
+import io.github.matthewjones372.pelican.OperationAdmission
+import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.jetty.docs.docsHandler
+import io.github.matthewjones372.pelican.jetty.handledNow
+import io.github.matthewjones372.pelican.jetty.startDecorated
+import io.github.matthewjones372.pelican.openapi.docs
+import org.eclipse.jetty.server.Handler
+
+val greeting = endpoint { get("greeting"); text() }
+val service = api(listOf(greeting handledNow { "hello" }), JacksonCodecs) {
+    admission(OperationAdmission { AdmissionDecision.Continue })
+}
+fun serve(local: Boolean, outer: (Handler) -> Handler) = service.startDecorated(port = 0) { native ->
+    outer(if (local) Handler.Sequence(native, service.docsHandler(docs { docsPath = "/api-docs" })) else native)
+}
+```
+
+The native handler is built once; decoration finishes once before the connector binds. The same API serves
+its local document after its endpoints. Use standalone `docsHandler`, retaining the combined docs/custom-start guards.
+`outer` is trusted to forward described operations and owns resources it creates until returning its tree.
+The caller owns the returned server and closes/stops it as for native `start`. Continue supplies no host or identity policy.
+Native cleanup and lifecycle limits still apply; this adds no Doorlist activation, complete admission telemetry or
+broader core streamed-input ownership guarantee. See the [admission limits](reference.md#matched-operation-admission-unreleased).
+
 ## Who may call
 
 A caller under a scheme, what they must have, and the verifier bound once:

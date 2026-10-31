@@ -3540,11 +3540,23 @@ the native interpreter; `Refuse` writes its supplied 4xx/5xx status, exact bytes
 media type and headers. A null body is empty. Configured response headers still apply.
 
 Support is limited to core `Api.inMemory()` and native Jetty `toHandler()`, default
-Jetty `start()` and owned Jetty `inMemory()`. Jetty runs admission using the supplied
+Jetty `start()`, `startDecorated()` and owned Jetty `inMemory()`. Jetty runs admission using the supplied
 `Handlers` policy, including its existing blocking dispatch and unread-body cleanup.
 Transport framing checks still precede admission. Unmatched requests and native
 CORS preflight do not acquire an operation decision. An API without the hook keeps
 its native matching and execution order.
+
+Jetty's unreleased `Api.startDecorated` takes `port = 8080`, `host = "127.0.0.1"`,
+`handlers = Handlers.default` and a required `(Handler) -> Handler` decorator. It builds
+one native handler and decorates it once before binding, returning the existing `PelicanServer`.
+The acquired server owns assembly/start failures; the original throwable is retained with any distinct
+cleanup failure suppressed. Successful cleanup closes listeners; a cleanup failure is not proof of release.
+The existing stop/close/block limits and native pool, connector, dispatch and body cleanup remain.
+Decoration is trusted composition: it must forward described operations to that handler, not replace routing.
+It owns resources it creates until returning the Jetty-managed tree; arbitrary code is not sandboxed.
+Standalone `docsHandler` can follow the native handler in a sequence, with application wrappers outside it.
+The documented manually owned `Server`/`toHandler` alternative remains supported. See the
+[compiled decoration recipe](cookbook.md#decorate-a-native-jetty-server-before-binding-unreleased).
 
 Admitted APIs with an explicit custom Jetty handler callback fail before the
 callback or owned resources are constructed. Combined `handlerWithDocs`,
