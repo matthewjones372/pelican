@@ -106,6 +106,35 @@ fun Api.start(
     return PelicanServer(this, server, host)
 }
 
+/** Owns native assembly before connector, codec or decoration failures can leave a server behind. */
+internal fun Api.ownedNativeServer(
+    server: Server,
+    port: Int,
+    host: String,
+    handlers: Handlers,
+    decorate: (Handler) -> Handler,
+): PelicanServer {
+    try {
+        server.addConnector(
+            pelicanConnector(server, ConnectorSettings.configured()).apply {
+                this.host = host
+                this.port = port
+            },
+        )
+        server.handler = decorate(toHandler(handlers))
+        server.defaultHandler = Unanswered()
+        server.start()
+        return PelicanServer(this, server, host)
+    } catch (failure: Throwable) {
+        try {
+            server.stop()
+        } catch (cleanup: Throwable) {
+            if (cleanup !== failure) failure.addSuppressed(cleanup)
+        }
+        throw failure
+    }
+}
+
 /**
  * Jetty's own pool, calling handlers on virtual threads when [handlers] runs them on one anyway; any other choice
  * keeps Jetty's platform threads, which is where [Handlers.onDispatcher] promises a handler runs. A connection resumed
