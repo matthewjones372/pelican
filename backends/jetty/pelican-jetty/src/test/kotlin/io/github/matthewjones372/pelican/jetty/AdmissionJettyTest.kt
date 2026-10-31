@@ -360,7 +360,7 @@ class AdmissionJettyTest {
 private const val ADMISSION_ID = "019f1285-6500-7000-8000-000000000001"
 private val ADMISSION_HEADERS = listOf("Content-Type" to "application/json", IDEMPOTENCY_KEY_HEADER to "synthetic")
 
-private class AdmissionWorld {
+internal class AdmissionWorld {
     val events = mutableListOf<String>()
     var poison = false
     var identity: Identity? = Identity("synthetic")

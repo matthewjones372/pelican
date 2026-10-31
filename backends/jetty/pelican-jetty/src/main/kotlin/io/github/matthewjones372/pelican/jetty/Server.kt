@@ -106,6 +106,14 @@ fun Api.start(
     return PelicanServer(this, server, host)
 }
 
+/** Decorates the native handler before its owned server binds. */
+fun Api.startDecorated(
+    port: Int = 8080,
+    host: String = "127.0.0.1",
+    handlers: Handlers = Handlers.default,
+    decorate: (Handler) -> Handler,
+): PelicanServer = ownedNativeServer(Server(pelicanPool(handlers)), port, host, handlers, decorate)
+
 /** Owns native assembly before connector, codec or decoration failures can leave a server behind. */
 internal fun Api.ownedNativeServer(
     server: Server,
