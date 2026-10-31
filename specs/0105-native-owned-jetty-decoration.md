@@ -53,8 +53,8 @@ No raw custom callback is reclassified as native; local docs compose via standal
       backends/jetty/pelican-jetty/src/test/kotlin/io/github/matthewjones372/pelican/jetty/OwnedNativeServerTest.kt;
       <=190 lines INCLUDING this amendment and tests; no public entry.
 - [ ] `codex/i01-native-owned-jetty`: public entry/native integration on reviewed owner, <=200 changed non-generated lines: Server.kt,
-      NEW backends/jetty/pelican-jetty/src/test/kotlin/io/github/matthewjones372/pelican/jetty/NativeDecorationTest.kt,
-      existing backends/jetty/pelican-jetty/api/pelican-jetty.api; all acceptance below before support merges.
+      NEW backends/jetty/pelican-jetty/src/test/kotlin/io/github/matthewjones372/pelican/jetty/NativeDecorationTest.kt, existing backends/jetty/pelican-jetty/api/pelican-jetty.api;
+      existing backends/jetty/pelican-jetty/src/test/kotlin/io/github/matthewjones372/pelican/jetty/AdmissionJettyTest.kt: only AdmissionWorld internal visibility; all acceptance below before support merges.
 - [ ] `codex/i01-native-owned-jetty-docs`: docs/reference.md, docs/cookbook.md, CHANGELOG.md; explicit-import compiled
       NEW example/src/test/kotlin/example/compiler/NativeDecorationCallSites.kt holds nativeDecorationCallSites
       with a unique nativeDecoration key. Existing example/src/test/kotlin/example/compiler/StillCompilesTest.kt
