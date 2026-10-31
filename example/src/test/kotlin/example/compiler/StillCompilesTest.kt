@@ -2,6 +2,7 @@ package example.compiler
 
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContain
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
@@ -37,6 +38,11 @@ import java.io.File
  */
 class StillCompilesTest {
 
+    @Test
+    fun `native decoration call sites are registered`() {
+        areas() shouldContain "nativeDecoration"
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("areas")
     fun `the frozen call sites still compile`(area: String) {
@@ -63,8 +69,12 @@ class StillCompilesTest {
 
     companion object {
 
+        private val callSites = frozenCallSites + nativeDecorationCallSites.also { added ->
+            require(added.keys.none { it in frozenCallSites }) { "Compiler fixture areas overlap" }
+        }
+
         @JvmStatic
-        fun areas(): List<String> = frozenCallSites.keys.toList()
+        fun areas(): List<String> = callSites.keys.toList()
 
         @JvmField
         @TempDir
@@ -82,7 +92,7 @@ class StillCompilesTest {
         private val failures: Map<String, List<String>> by lazy { compileAll() }
 
         private fun compileAll(): Map<String, List<String>> {
-            val files = frozenCallSites.map { (area, source) -> area to write(area, source) }
+            val files = callSites.map { (area, source) -> area to write(area, source) }
             val reported = mutableListOf<Pair<String, String>>()
 
             val collector = object : MessageCollector {
@@ -116,7 +126,7 @@ class StillCompilesTest {
             )
 
             val byArea = reported.groupBy({ it.first }, { it.second })
-            return (frozenCallSites.keys + UNATTRIBUTED).associateWith { byArea[it].orEmpty() }
+            return (callSites.keys + UNATTRIBUTED).associateWith { byArea[it].orEmpty() }
         }
 
         private fun describe(message: String, location: CompilerMessageSourceLocation?): String =

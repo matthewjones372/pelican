@@ -33,6 +33,8 @@ one.
 
 ### Added
 
+- Jetty native-owned `Api.startDecorated` composes trusted wrappers before binding, retaining native admission and lifecycle.
+
 - **Matched-operation admission** (spec 0104, unreleased): optional `ApiBuilder.admission` runs once on the selected
   description before caller checks and typed decoding. Core in-memory and native/default-owned Jetty support
   Continue or an exact supplied Refuse response. Admitted explicit custom/docs/MCP composition remains fail-closed;
