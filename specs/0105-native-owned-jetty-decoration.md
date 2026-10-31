@@ -49,16 +49,17 @@ No raw custom callback is reclassified as native; local docs compose via standal
 
 ## Stack
 - [ ] `codex/i01-native-owned-jetty-contract`: this spec only, independent review and committed contract before source.
-- [ ] `codex/i01-native-owned-jetty`: one complete additive feature, <=200 changed non-generated lines: Server.kt,
+- [ ] `codex/i01-native-owned-jetty-owner`: internal owned assembly in Server.kt, NEW
+      backends/jetty/pelican-jetty/src/test/kotlin/io/github/matthewjones372/pelican/jetty/OwnedNativeServerTest.kt;
+      <=190 lines INCLUDING this amendment and tests; no public entry.
+- [ ] `codex/i01-native-owned-jetty`: public entry/native integration on reviewed owner, <=200 changed non-generated lines: Server.kt,
       NEW backends/jetty/pelican-jetty/src/test/kotlin/io/github/matthewjones372/pelican/jetty/NativeDecorationTest.kt,
       existing backends/jetty/pelican-jetty/api/pelican-jetty.api; all acceptance below before support merges.
 - [ ] `codex/i01-native-owned-jetty-docs`: docs/reference.md, docs/cookbook.md, CHANGELOG.md; explicit-import compiled
       NEW example/src/test/kotlin/example/compiler/NativeDecorationCallSites.kt holds nativeDecorationCallSites
       with a unique nativeDecoration key. Existing example/src/test/kotlin/example/compiler/StillCompilesTest.kt
-      explicitly combines frozenCallSites + nativeDecorationCallSites and uses that map for areas/write/report;
-      no automatic file discovery is claimed. Existing FrozenCallSites.kt is byte-identical; <=200 lines, unreleased.
-If complete feature proof exceeds 200 lines INCLUDING tests, review a concrete split BEFORE source: private owned
-assembly without public activation first, then public entry plus complete safety matrix; no partial support claim.
+      explicitly combines frozenCallSites + nativeDecorationCallSites and uses that map for areas/write/report; no automatic file discovery is claimed. Existing FrozenCallSites.kt is byte-identical; <=200 lines, unreleased.
+If complete feature proof exceeds 200 lines INCLUDING tests, review a concrete split BEFORE source: private owned assembly without public activation first, then public entry plus complete safety matrix; no partial support claim.
 
 ## Acceptance
 New tests pin once-only native construction/decoration, unbound server during decoration, same selected native operation,
