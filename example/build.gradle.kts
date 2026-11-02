@@ -88,7 +88,7 @@ dependencies {
     testImplementation(project(":pelican-client-pekko"))
 
     // What the suspending client generated below is written against.
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.12.0")
 
     // The parser the assertions read responses back with. Deliberately not the
     // library under test: a suite that checked Jackson's bytes by handing them
@@ -96,7 +96,7 @@ dependencies {
     // swagger-parser sits in front of the emitted document above. Only the
     // runtime is here — there is no serializer and no compiler plugin, because
     // `parseToJsonElement` needs neither.
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
     // The in-memory metric reader `TracedOrdersTest` collects the histogram
     // through. The in-memory *span* exporter lives in the same artifact, but
