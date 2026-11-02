@@ -95,9 +95,21 @@ jobs:
       # Uploads a bundle to the Central Portal and leaves it staged. Releasing
       # it is a click there: a staged bundle can be dropped, a released one is
       # permanent. Set `mavenCentralAutomaticPublishing` to skip the click.
+      #
+      # One namespace per upload: the Portal refuses a deployment with files
+      # for two, and a Gradle run uploads one, so `centralNamespace` picks which
+      # publications a run sends. dev.surefold is the default; the relocation
+      # POMs and the old plugin ID's marker at io.github.matthewjones372
+      # (spec 0107) go in runs of their own.
       - name: Publish the modules to Maven Central
         if: inputs.targets != 'portal'
         run: ./gradlew publishToMavenCentral --no-configuration-cache
+
+      - name: Publish the modules' relocation POMs to Maven Central
+        if: inputs.targets != 'portal'
+        run: >
+          ./gradlew publishToMavenCentral --no-configuration-cache
+          -PcentralNamespace=io.github.matthewjones372
 
       # The Gradle plugin is a build of its own, so the root build's publish
       # tasks do not reach it.
@@ -106,6 +118,12 @@ jobs:
         run: >
           ./gradlew -p tooling/pelican-gradle-plugin publishToMavenCentral
           --no-configuration-cache
+
+      - name: Publish the Gradle plugin's relocation POM and old ID to Maven Central
+        if: inputs.targets != 'portal'
+        run: >
+          ./gradlew -p tooling/pelican-gradle-plugin publishToMavenCentral
+          --no-configuration-cache -PcentralNamespace=io.github.matthewjones372
 
       # The Plugin Portal is where `plugins { id(...) }` resolves from without
       # a `pluginManagement` block. It needs an account the library release

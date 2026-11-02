@@ -31,6 +31,23 @@ one.
 
 ## Unreleased
 
+## [2.0.0] — 2026-11-02
+
+### Changed — breaking
+
+- **Pelican is `dev.surefold` now** (spec 0107). The group is `dev.surefold` (was `io.github.matthewjones372`), the
+  packages are `dev.surefold.pelican.*` (were `io.github.matthewjones372.pelican.*`), and the Gradle plugin's ID is
+  `dev.surefold.pelican`. Moving over is a rename of the dependency group, each import's prefix and the plugin ID.
+  It is not binary compatible: code compiled against 1.2.0 names the old packages and has to be recompiled, which
+  is why this is a major release. `ApiBinaryCompatibilityTest` and its frozen 1.2.0 consumers are retired with it.
+  The OpenTelemetry instrumentation scope is `dev.surefold.pelican` too.
+- **The old coordinates relocate.** Every module, the BOM and the Gradle plugin are also published at
+  `io.github.matthewjones372:<module>:2.0.0` as a POM whose `<relocation>` names `dev.surefold`, so a build still on
+  the old group resolves the new modules. The old plugin ID `io.github.matthewjones372.pelican` is published once
+  more at 2.0.0, applying the same plugin, and not again.
+- **Snapshots** come from GitHub Packages, `https://maven.pkg.github.com/surefold/pelican`, on every push to `main`
+  (surefold spec 0281); reading one takes a token with `read:packages`. Releases stay on Central.
+
 ### Added
 
 - **HTTP `QUERY`** (spec 0106, unreleased): `Method.QUERY` and `query(path)` for RFC 10008 safe, idempotent reads with a
@@ -1275,6 +1292,7 @@ First published release, on Maven Central.
 - **`pelican-test`** — the descriptions interpreted a third way, as a typed
   client, with `shouldBuild` for pinning the URL a caller holds.
 
+[2.0.0]: https://github.com/surefold/pelican/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/matthewjones372/pelican/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/matthewjones372/pelican/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/matthewjones372/pelican/compare/v0.2.0...v1.0.0
