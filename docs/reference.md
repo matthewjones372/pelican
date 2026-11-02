@@ -3250,6 +3250,26 @@ generated client are.
 The same header beside a 409 or 422 that says something else, another service's or one sharing its status with a
 failure of the endpoint's own, is read as the plain header and failures it is.
 
+## A read with a body (unreleased)
+
+`query(path)` declares a `Method.QUERY` operation (RFC 10008): a safe, idempotent read whose criteria travel in the
+request content, where a `GET` would put them in the URL and a `POST` would tell caches and retries it may change
+something. It is declared like any other verb, with a decoded body (`jsonBody<T>()`, `formBody<T>()` or a negotiated
+body); a `QUERY` with no body, a raw body or a multipart body is refused when the endpoint is built.
+
+- **Content-Type is required and checked**, on every backend and the in-memory client. Content with no
+  `Content-Type` is a 400, and a media type the endpoint does not read is a 415, even where it reads only one. Other
+  methods keep ignoring the header when there is one codec. Pekko cannot tell an absent header from
+  `application/octet-stream`, so it answers 415 for the first case.
+- **Idempotent**: `RetryPolicy` retries it by default and `idempotencyKey()` is refused on it, as on `GET`. It is not
+  state changing, so the cross-site cookie check does not apply.
+- **`contentLocation`** is a ready-made optional `Content-Location` response header. Declare it with `emits` and set
+  it from the handler; RFC 10008 uses it to say where the answer can be fetched again. Nothing is set for you.
+- **OpenAPI** 3.2 writes the operation under `query`. 3.1 has no such field, so the operation is written under the
+  `x-query` extension. The importer reads a 3.2 `query` operation back as `Method.QUERY`.
+- **Not done**: Pelican caches nothing, derives no MCP read-only hint (none exist for any method), and does not
+  rewrite a `GET` into a `QUERY`. Code with an exhaustive `when` over `Method` needs a `QUERY` branch.
+
 ## Pages beside the endpoints
 
 A service with a few pages of its own, a small UI or a status page, serves them from a classpath directory with
@@ -5398,7 +5418,7 @@ paid by the server rather than by whoever chose the default:
 | `initialBackoff`, `backoffMultiplier`, `maxBackoff` | `100ms`, `2.0`, `2s` | Doubling reaches a wait that matters within two retries without a first retry a caller would notice. The ceiling is there so that raising `maxAttempts` does not silently put a minute inside somebody's request |
 | `jitter` | `0.5` | Half of each wait is random. Clients that failed together compute the same backoff at the same instant and re-form the same herd; randomising *all* of it would let the wait collapse to nothing |
 | `statuses` | `408, 429, 502, 503, 504` | Each says the request did not get a fair hearing. **Not 500**: the common cause is an unhandled exception in a handler, and sending the same request again produces the same exception with the work done twice |
-| `methods` | `GET, HEAD, PUT, DELETE, OPTIONS` | HTTP's own idempotent set, which is all a description knows about whether a second send does a second thing. A request carrying an `Idempotency-Key` is retried whatever its method, since the key is the server's promise that a repeat is answered rather than run (see [A request sent twice, answered once](#a-request-sent-twice-answered-once)). Name `Method.POST` here only for a POST that is safe twice without one |
+| `methods` | `GET, HEAD, PUT, DELETE, OPTIONS, QUERY` | HTTP's own idempotent set, which is all a description knows about whether a second send does a second thing. A request carrying an `Idempotency-Key` is retried whatever its method, since the key is the server's promise that a repeat is answered rather than run (see [A request sent twice, answered once](#a-request-sent-twice-answered-once)). Name `Method.POST` here only for a POST that is safe twice without one |
 | `retryStreamedBodies` | `false` | Whether `open()` can be called again is a fact about the function that was passed, and nothing here can see it. On, the request is handed to the transport again unchanged and the transport opens a fresh stream for itself |
 | `honourRetryAfter`, `retryAfterCap` | `true`, `10s` | A server that names a number knows something no curve here does, and waiting less than it asked is the one answer that is certainly wrong. Past the cap the policy stops retrying rather than waiting: the server has said it will not be ready inside anything the caller would call a call |
 | `failures` | `it is IOException` | A refused connection, a reset, a request that timed out: the socket-level accidents a second attempt may genuinely not repeat. A bug or a refusal survives being sent again |

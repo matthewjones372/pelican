@@ -63,6 +63,12 @@ class InMemoryClientTransportTest {
         json<String>(status = 201)
     }
 
+    private val searchThings = endpoint(newThing) {
+        query("lookups" / "search")
+        operationId = "searchThings"
+        json<String>()
+    }
+
     private val streamThings = endpoint {
         get("ticks")
         operationId = "streamThings"
@@ -111,6 +117,7 @@ class InMemoryClientTransportTest {
             CompletableFuture.completedStage(found as Any?)
         },
         ServerEndpoint(createThing) { p -> CompletableFuture.completedStage("made ${p[newThing]}" as Any?) },
+        ServerEndpoint(searchThings) { p -> CompletableFuture.completedStage("found ${p[newThing]}" as Any?) },
         ServerEndpoint(getTag) { p -> CompletableFuture.completedStage("tag ${p[tag]}" as Any?) },
         ServerEndpoint(streamThings) { _ ->
             val ticks = generateSequence(1) { it + 1 }
@@ -355,5 +362,49 @@ class InMemoryClientTransportTest {
         }
 
         withClue(failure.message) { failure.message shouldContain "ndjsonIn(" }
+    }
+
+    // ------------------------------------------------------------ QUERY
+
+    @Test
+    fun `a QUERY with its Content-Type reaches the handler, body and all`() {
+        val response = send(
+            InMemoryClientTransport(api()),
+            Method.QUERY,
+            "http://things.test/lookups/search",
+            headers = listOf("Content-Type" to "application/json"),
+            body = ClientRequest.Body.Text("anvil"),
+        )
+
+        response.status shouldBe 200
+        response.text() shouldBe "found anvil"
+    }
+
+    @Test
+    fun `a QUERY with no Content-Type is a 400 and one the endpoint does not read is a 415`() {
+        val transport = InMemoryClientTransport(api())
+        val url = "http://things.test/lookups/search"
+
+        send(transport, Method.QUERY, url, body = ClientRequest.Body.Text("anvil")).status shouldBe 400
+        send(
+            transport, Method.QUERY, url,
+            headers = listOf("Content-Type" to "text/plain"),
+            body = ClientRequest.Body.Text("anvil"),
+        ).status shouldBe 415
+    }
+
+    @Test
+    fun `a POST to a one-codec endpoint still ignores the Content-Type, as before`() {
+        send(
+            InMemoryClientTransport(api()),
+            Method.POST,
+            "http://things.test/things",
+            body = ClientRequest.Body.Text("anvil"),
+        ).status shouldBe 201
+    }
+
+    @Test
+    fun `a GET at a QUERY path is a 405`() {
+        send(InMemoryClientTransport(api()), Method.GET, "http://things.test/lookups/search").status shouldBe 405
     }
 }

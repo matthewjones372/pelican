@@ -18,6 +18,7 @@ import io.github.matthewjones372.pelican.JSON_MEDIA_TYPE
 import io.github.matthewjones372.pelican.JsonBody
 import io.github.matthewjones372.pelican.ListStyle
 import io.github.matthewjones372.pelican.MediaOutput
+import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.MultipartBody
 import io.github.matthewjones372.pelican.NdjsonBody
 import io.github.matthewjones372.pelican.NegotiatedBody
@@ -160,6 +161,8 @@ class RequestBodyCodecs internal constructor(
     private val byMediaType: Map<String, BodyCodec<Any?>>,
     /** The signature the body is checked against first; null where the endpoint is not signedBy one. */
     private val signedBy: HmacScheme? = null,
+    /** Set for `QUERY` (RFC 10008): a missing `Content-Type` is a 400 and an unread one a 415 even with one codec. */
+    private val contentTypeRequired: Boolean = false,
 ) {
 
     /**
@@ -203,9 +206,17 @@ class RequestBodyCodecs internal constructor(
     }
 
     private fun select(contentType: String?): BodyCodec<Any?> {
-        byMediaType.values.singleOrNull()?.let { return it }
-
         val declared = contentType?.substringBefore(';')?.trim()?.lowercase()
+        if (contentTypeRequired && declared.isNullOrEmpty()) {
+            throw ApiException(
+                400,
+                "Missing Content-Type",
+                "A QUERY names the media type of its content. Send one of ${byMediaType.keys.joinToString(" or ")} " +
+                    "in Content-Type.",
+            )
+        }
+        if (!contentTypeRequired) byMediaType.values.singleOrNull()?.let { return it }
+
         return byMediaType[declared] ?: throw UnsupportedMediaType(
             "The request body arrived as ${declared ?: "no media type at all"}, and this endpoint " +
                 "reads ${byMediaType.keys.joinToString(" or ")}. Send one of those in Content-Type.",
@@ -219,23 +230,28 @@ class RequestBodyCodecs internal constructor(
  * rather than about a server, so it is here and not in each interpreter.
  */
 fun Codecs.requestBodyCodec(endpoint: Endpoint<*, *>): RequestBodyCodecs? =
-    requestBodyCodec(endpoint.bodyInput, endpoint.signedBy)
+    requestBodyCodec(endpoint.bodyInput, endpoint.signedBy, contentTypeRequired = endpoint.method == Method.QUERY)
 
 /** [requestBodyCodec] for a body alone, with no signature to check. */
 fun Codecs.requestBodyCodec(input: BodyInput<*>?): RequestBodyCodecs? = requestBodyCodec(input, signedBy = null)
 
-private fun Codecs.requestBodyCodec(input: BodyInput<*>?, signedBy: HmacScheme?): RequestBodyCodecs? = when (input) {
+private fun Codecs.requestBodyCodec(
+    input: BodyInput<*>?,
+    signedBy: HmacScheme?,
+    contentTypeRequired: Boolean = false,
+): RequestBodyCodecs? = when (input) {
     // A streamed body is here because a frame of it is read exactly as a strict
     // body is — one document, one codec, wrapped the same way when it will not
     // decode. What differs is how many times, which is `NdjsonFrames`' business.
     is JsonBody<*>, is FormBody<*>, is NdjsonBody<*> ->
-        RequestBodyCodecs(mapOf(input.mediaType to oneBodyCodec(input)), signedBy)
+        RequestBodyCodecs(mapOf(input.mediaType to oneBodyCodec(input)), signedBy, contentTypeRequired)
 
     // Resolved here rather than on the request that picks one, so an unreadable
     // encoding is a startup failure and not a 500 for whoever chose it.
     is NegotiatedBody<*> -> RequestBodyCodecs(
         input.alternatives.associate { it.mediaType to oneBodyCodec(it) },
         signedBy,
+        contentTypeRequired,
     )
 
     null, is RawBody, is MultipartBody -> null

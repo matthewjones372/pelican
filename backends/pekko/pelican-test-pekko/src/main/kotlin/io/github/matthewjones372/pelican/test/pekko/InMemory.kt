@@ -104,6 +104,7 @@ private fun Method.toPekkoMethod(): HttpMethod = when (this) {
     Method.DELETE -> HttpMethods.DELETE
     Method.HEAD -> HttpMethods.HEAD
     Method.OPTIONS -> HttpMethods.OPTIONS
+    Method.QUERY -> HttpMethods.custom("QUERY", true, true, HttpMethods.POST.requestEntityAcceptance())
 }
 
 /**

@@ -240,7 +240,10 @@ class PekkoHttpTransport @JvmOverloads constructor(
         bytes.via(DrainOnCancel(DRAIN_BYTES, DRAIN_TIME)).runWith(StreamConverters.asInputStream(READ_LIMIT), running)
 
     private fun pekkoMethod(method: Method): HttpMethod =
-        HttpMethods.lookup(method.name).orElseThrow { IllegalArgumentException("Pekko knows no method ${method.name}") }
+        HttpMethods.lookup(method.name).orElseGet {
+            require(method == Method.QUERY) { "Pekko knows no method ${method.name}" }
+            HttpMethods.custom("QUERY", true, true, HttpMethods.POST.requestEntityAcceptance())
+        }
 }
 
 /**

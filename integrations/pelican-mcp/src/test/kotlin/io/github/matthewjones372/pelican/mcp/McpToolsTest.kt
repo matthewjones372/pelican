@@ -83,6 +83,19 @@ class McpToolsTest {
     }
 
     @Test
+    fun `a QUERY endpoint is a tool with its body as an argument, like any other method`() {
+        val search = endpoint(newOrder) {
+            query("orders" / "search")
+            operationId = "searchOrders"
+            json<Order>()
+        }
+
+        val tool = toolsFor(search).single()
+        tool.name shouldBe "searchOrders"
+        tool.inputSchema.property("body").shouldNotBeNull()
+    }
+
+    @Test
     fun `a hidden endpoint is no more a tool than it is an operation`() {
         toolsFor(getOrder, secret).map { it.name } shouldContainExactly listOf("listOrders")
     }

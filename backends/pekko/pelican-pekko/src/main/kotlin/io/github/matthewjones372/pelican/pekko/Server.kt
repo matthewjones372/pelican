@@ -6,6 +6,7 @@ import org.apache.pekko.actor.typed.javadsl.Behaviors
 import org.apache.pekko.http.javadsl.Http
 import org.apache.pekko.http.javadsl.ServerBinding
 import org.apache.pekko.http.javadsl.server.Route
+import org.apache.pekko.http.javadsl.settings.ServerSettings
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -167,8 +168,13 @@ private fun Api.bind(
     require(admission == null) { "This interpreter does not support operation admission." }
     val binding = Http.get(system)
         .newServerAt(host, port)
+        .withSettings(withQuery(ServerSettings.create(system.classicSystem())))
         .bind(route(system).sealedWith(this))
         .toCompletableFuture()
         .join()
     return PelicanServer(this, system, binding, host, ownsSystem)
 }
+
+/** Pekko's parser answers 501 to a method it has not been told about. */
+private fun withQuery(settings: ServerSettings): ServerSettings =
+    settings.withParserSettings(settings.parserSettings.withCustomMethods(PEKKO_QUERY))
