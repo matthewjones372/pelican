@@ -105,6 +105,12 @@ publishing {
             name = "local"
             url = file("../../build/repo").toURI()
         }
+        // Snapshots, beside the root build's (surefold spec 0281).
+        maven {
+            name = "githubPackages"
+            url = uri("https://maven.pkg.github.com/surefold/pelican")
+            credentials(PasswordCredentials::class)
+        }
     }
 }
 
