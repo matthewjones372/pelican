@@ -50,7 +50,7 @@ class RedactionAcrossBackendsTest {
         private val logged = ListAppender<ILoggingEvent>().also { it.start() }
 
         /** Pelican's own loggers and the example's access log, at the level that writes the most. */
-        private val watched = listOf("io.github.matthewjones372", "example.logging.access")
+        private val watched = listOf("dev.surefold", "io.github.matthewjones372", "example.logging.access")
             .map { LoggerFactory.getLogger(it) as LogbackLogger }
 
         private val levels = watched.associateWith { it.level }

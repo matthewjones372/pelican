@@ -4,13 +4,13 @@ package example.hello
  * To run this in a project of your own:
  *
  *     dependencies {
- *         implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
+ *         implementation(platform("dev.surefold:pelican-bom:$pelicanVersion"))
  *         // the interpreter; brings pelican-core and Jetty's server
- *         implementation("io.github.matthewjones372:pelican-jetty")
+ *         implementation("dev.surefold:pelican-jetty")
  *         // JacksonCodecs, and the schemas the document derives
- *         implementation("io.github.matthewjones372:pelican-jackson")
+ *         implementation("dev.surefold:pelican-jackson")
  *         // startWithDocs, /openapi.json and Swagger UI
- *         implementation("io.github.matthewjones372:pelican-jetty-docs")
+ *         implementation("dev.surefold:pelican-jetty-docs")
  *     }
  */
 

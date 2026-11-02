@@ -10,9 +10,9 @@
 Typed HTTP endpoints for Kotlin. Describe an endpoint once; serve it, document
 it, test it and generate its client from that one description.
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.matthewjones372/pelican-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core)
+[![Maven Central](https://img.shields.io/maven-central/v/dev.surefold/pelican-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/dev.surefold/pelican-core)
 [![build](https://github.com/surefold/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/surefold/pelican/actions/workflows/build.yml)
-[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmatthewjones372%2Fpelican%2Fbadges%2Fcoverage.json)](https://github.com/surefold/pelican/actions/workflows/build.yml)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsurefold%2Fpelican%2Fbadges%2Fcoverage.json)](https://github.com/surefold/pelican/actions/workflows/build.yml)
 [![Kotlin 2.4.20](https://img.shields.io/badge/kotlin-2.4.20-7f52ff)](docs/reference.md#versions)
 [![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
@@ -271,7 +271,10 @@ did not.
 ## Getting started
 
 The current release is **1.2.0**, on Maven Central under the group
-`io.github.matthewjones372`. Its library modules are compiled for **Java 21**,
+`io.github.matthewjones372`; from 1.3.0 the group is `dev.surefold`, the
+packages are `dev.surefold.pelican`, the Gradle plugin is `dev.surefold.pelican`,
+and the old coordinates relocate to the new ones. Code compiled against 1.2.0
+has to be recompiled. Its library modules are compiled for **Java 21**,
 so a service using them needs JDK 21 or newer; `pelican-streams` and
 `pelican-streams-jetty` need 25. Below JDK 24, synchronous handlers default to
 a pool of platform threads rather than virtual threads; see
@@ -301,18 +304,18 @@ val pelicanVersion = "1.2.0"
 
 dependencies {
     // The backend. Brings pelican-core; compiles against Pekko HTTP.
-    implementation("io.github.matthewjones372:pelican-pekko:$pelicanVersion")
+    implementation("dev.surefold:pelican-pekko:$pelicanVersion")
     // The codec: JSON bodies with Jackson, and the schemas the document derives.
-    implementation("io.github.matthewjones372:pelican-jackson:$pelicanVersion")
+    implementation("dev.surefold:pelican-jackson:$pelicanVersion")
     // /openapi.json and Swagger UI beside the endpoints. Brings pelican-openapi.
-    implementation("io.github.matthewjones372:pelican-pekko-docs:$pelicanVersion")
+    implementation("dev.surefold:pelican-pekko-docs:$pelicanVersion")
     // Pekko itself. Pelican ships none, so name the Scala build you run.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
     implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
     // The typed test client run against a Pekko Api. Brings pelican-test.
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:$pelicanVersion")
+    testImplementation("dev.surefold:pelican-test-pekko:$pelicanVersion")
 }
 ```
 
@@ -449,10 +452,10 @@ leave out the ones you do not.
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:1.2.0"))
-    implementation("io.github.matthewjones372:pelican-jetty")
-    implementation("io.github.matthewjones372:pelican-jackson")
-    testImplementation("io.github.matthewjones372:pelican-test-jetty")
+    implementation(platform("dev.surefold:pelican-bom:1.2.0"))
+    implementation("dev.surefold:pelican-jetty")
+    implementation("dev.surefold:pelican-jackson")
+    testImplementation("dev.surefold:pelican-test-jetty")
 }
 ```
 

@@ -392,7 +392,7 @@ For which modules a service takes and one version for all of them, see
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-jetty:$pelicanVersion")
+    implementation("dev.surefold:pelican-jetty:$pelicanVersion")
 }
 ```
 
@@ -2285,7 +2285,7 @@ exception a materialised stage reports later, which the interpreter has no
 choice but to render as a 500.
 
 `pelican-streams` is two functions. `toStream` hands the upload to
-[surefold's](https://github.com/matthewjones372/lark) `Stream<E, A>`, which carries
+[surefold's](https://github.com/surefold/surefold) `Stream<E, A>`, which carries
 the failure as a value in the type, and `toOutcome` hands the result back as the
 `Outcome` the endpoint declared:
 
@@ -2335,7 +2335,7 @@ backend that `Stream.from(source)` and `run` are part of.
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-streams:$pelicanVersion")
+    implementation("dev.surefold:pelican-streams:$pelicanVersion")
     implementation("io.github.matthewjones372:surefold-stream:0.14.0")
     implementation("io.github.matthewjones372:surefold-stream-pekko:0.14.0")
     // plus the Pekko block from Versions, as for any Pekko module here.
@@ -2386,7 +2386,7 @@ names `surefold-stream` and its backend:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-streams-jetty:$pelicanVersion")
+    implementation("dev.surefold:pelican-streams-jetty:$pelicanVersion")
     implementation("io.github.matthewjones372:surefold-stream:0.14.0")
     implementation("io.github.matthewjones372:surefold-stream-forks:0.14.0")
 }
@@ -4854,7 +4854,7 @@ importer:
 
 ```kotlin
 val pelicanImport: Configuration by configurations.creating
-dependencies { pelicanImport("io.github.matthewjones372:pelican-import:1.2.0") }
+dependencies { pelicanImport("dev.surefold:pelican-import:1.2.0") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
@@ -5055,7 +5055,7 @@ classpath without being told:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-client-jetty:$pelicanVersion")
+    implementation("dev.surefold:pelican-client-jetty:$pelicanVersion")
 }
 
 val client = OrdersClient("https://orders.internal", JacksonCodecs)
@@ -6435,7 +6435,7 @@ its OpenAPI document by the plugin's `endpoints` entry:
 
 ```kotlin
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.2.0")
+    testImplementation("dev.surefold:pelican-test-wiremock:1.2.0")
 }
 ```
 
@@ -6964,7 +6964,7 @@ already runs:
 
 ```kotlin
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.2.0")
+    implementation("dev.surefold:pelican-pekko:1.2.0")
 
     // _2.13 or _3: Pelican compiles against `javadsl` and four names that are
     // identical in both, so it has no opinion.

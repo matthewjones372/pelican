@@ -18,11 +18,11 @@ The recipes share one set of Gradle dependencies:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
-    implementation("io.github.matthewjones372:pelican-jetty")         // brings pelican-core and Jetty's server
-    implementation("io.github.matthewjones372:pelican-jackson")       // JacksonCodecs
-    implementation("io.github.matthewjones372:pelican-jetty-docs")    // startWithDocs and Swagger UI
-    testImplementation("io.github.matthewjones372:pelican-test-jetty") // inMemory(); brings pelican-test
+    implementation(platform("dev.surefold:pelican-bom:$pelicanVersion"))
+    implementation("dev.surefold:pelican-jetty")         // brings pelican-core and Jetty's server
+    implementation("dev.surefold:pelican-jackson")       // JacksonCodecs
+    implementation("dev.surefold:pelican-jetty-docs")    // startWithDocs and Swagger UI
+    testImplementation("dev.surefold:pelican-test-jetty") // inMemory(); brings pelican-test
 }
 ```
 
@@ -583,10 +583,10 @@ admission snapshot at source 125b do not contain it. Supply that version explici
 ```kotlin
 val pelicanVersion: String by project
 dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
-    implementation("io.github.matthewjones372:pelican-jetty")
-    implementation("io.github.matthewjones372:pelican-jackson")
-    implementation("io.github.matthewjones372:pelican-jetty-docs")
+    implementation(platform("dev.surefold:pelican-bom:$pelicanVersion"))
+    implementation("dev.surefold:pelican-jetty")
+    implementation("dev.surefold:pelican-jackson")
+    implementation("dev.surefold:pelican-jetty-docs")
 }
 ```
 
@@ -915,7 +915,7 @@ Serve liveness and readiness probes for an orchestrator.
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-health")
+    implementation("dev.surefold:pelican-health")
 }
 ```
 
@@ -1017,15 +1017,15 @@ of `_2.13` on every Pekko line.
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:1.2.0")       // brings pelican-core; compiles against Pekko
-    implementation("io.github.matthewjones372:pelican-jackson:1.2.0")
-    implementation("io.github.matthewjones372:pelican-pekko-docs:1.2.0")  // startWithDocs and Swagger UI
+    implementation("dev.surefold:pelican-pekko:1.2.0")       // brings pelican-core; compiles against Pekko
+    implementation("dev.surefold:pelican-jackson:1.2.0")
+    implementation("dev.surefold:pelican-pekko-docs:1.2.0")  // startWithDocs and Swagger UI
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
     implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
-    testImplementation("io.github.matthewjones372:pelican-test:1.2.0")
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:1.2.0") // inMemory() on Pekko
+    testImplementation("dev.surefold:pelican-test:1.2.0")
+    testImplementation("dev.surefold:pelican-test-pekko:1.2.0") // inMemory() on Pekko
 }
 ```
 

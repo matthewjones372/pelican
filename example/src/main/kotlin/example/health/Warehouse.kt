@@ -5,9 +5,9 @@ package example.health
  *
  *     dependencies {
  *         // JacksonCodecs, which writes the health+json body
- *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
+ *         implementation("dev.surefold:pelican-jackson:1.0.0")
  *         // health { }, the probes and the built-in checks
- *         implementation("io.github.matthewjones372:pelican-health:1.0.0")
+ *         implementation("dev.surefold:pelican-health:1.0.0")
  *     }
  */
 

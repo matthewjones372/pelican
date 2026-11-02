@@ -1,7 +1,7 @@
 # Modules
 
 Which modules a build needs, what each one brings with it, and which are in a
-release. Coordinates are `io.github.matthewjones372:<module>`.
+release. Coordinates are `dev.surefold:<module>` (`io.github.matthewjones372` up to 1.2.0).
 
 The current release is 1.2.0. The Availability column gives the first release
 a module is in. Modules marked **main only** are built and tested on `main` but
@@ -52,23 +52,23 @@ Scala cross-build it runs (`_2.13` or `_3`, the same on every Pekko line):
 val pelicanVersion = "1.2.0"
 
 dependencies {
-    implementation("io.github.matthewjones372:pelican-pekko:$pelicanVersion")
-    implementation("io.github.matthewjones372:pelican-jackson:$pelicanVersion")
+    implementation("dev.surefold:pelican-pekko:$pelicanVersion")
+    implementation("dev.surefold:pelican-jackson:$pelicanVersion")
 
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
     implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
 
-    testImplementation("io.github.matthewjones372:pelican-test-pekko:$pelicanVersion")
+    testImplementation("dev.surefold:pelican-test-pekko:$pelicanVersion")
 }
 ```
 
 An optional module is one more line with the same version:
 
 ```kotlin
-    implementation("io.github.matthewjones372:pelican-pekko-docs:$pelicanVersion")
-    implementation("io.github.matthewjones372:pelican-metrics:$pelicanVersion")
+    implementation("dev.surefold:pelican-pekko-docs:$pelicanVersion")
+    implementation("dev.surefold:pelican-metrics:$pelicanVersion")
 ```
 
 ## Version alignment and the BOM
@@ -84,10 +84,10 @@ own, only a version constraint for each of the 31 library modules:
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
-    implementation("io.github.matthewjones372:pelican-jetty")
-    implementation("io.github.matthewjones372:pelican-jackson")
-    testImplementation("io.github.matthewjones372:pelican-test-jetty")
+    implementation(platform("dev.surefold:pelican-bom:$pelicanVersion"))
+    implementation("dev.surefold:pelican-jetty")
+    implementation("dev.surefold:pelican-jackson")
+    testImplementation("dev.surefold:pelican-test-jetty")
 }
 ```
 
@@ -109,7 +109,7 @@ Maven reads the same BOM through `dependencyManagement`:
 <dependencyManagement>
   <dependencies>
     <dependency>
-      <groupId>io.github.matthewjones372</groupId>
+      <groupId>dev.surefold</groupId>
       <artifactId>pelican-bom</artifactId>
       <version>${pelican.version}</version>
       <type>pom</type>

@@ -5,7 +5,7 @@ package example.backends
  *
  *     dependencies {
  *         // startWithDocs, /openapi.json and Swagger UI
- *         implementation("io.github.matthewjones372:pelican-jetty-docs:1.0.0")
+ *         implementation("dev.surefold:pelican-jetty-docs:1.0.0")
  *     }
  */
 
