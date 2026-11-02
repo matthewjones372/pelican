@@ -32,7 +32,7 @@ scmVersion {
 // The namespace verified on the Central Portal. The Plugin Portal holds a
 // plugin id to the same standard, so the id below shares the prefix rather
 // than claiming one this account cannot prove it owns.
-group = "io.github.matthewjones372"
+group = "dev.surefold"
 
 version = scmVersion.version
 
@@ -84,7 +84,7 @@ gradlePlugin {
     vcsUrl.set("https://github.com/surefold/pelican.git")
     plugins {
         create("pelican") {
-            id = "io.github.matthewjones372.pelican"
+            id = "dev.surefold.pelican"
             implementationClass = "io.github.matthewjones372.pelican.gradle.PelicanPlugin"
             displayName = "Pelican"
             description = "Generates a Kotlin client and an OpenAPI document from endpoint descriptions, " +

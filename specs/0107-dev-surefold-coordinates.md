@@ -13,6 +13,8 @@ depend on `dev.surefold` artifacts while still publishing under the old name.
 - Not renaming modules or changing any API beyond the package name.
 - Not deleting or rewriting anything already on Central.
 - Not changing specs' text, the changelog's history or review notes.
+- Not keeping binary compatibility with code compiled against 1.2.0 or earlier: its bytecode names the old packages.
+  `ApiBinaryCompatibilityTest` and its frozen 1.2.0 consumer jars are retired for good (owner, 2 Nov 2026).
 
 ## Shape
 

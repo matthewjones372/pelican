@@ -207,7 +207,7 @@ val floor25 = setOf(
 subprojects {
     // The namespace verified on the Central Portal, against the GitHub
     // account it names.
-    group = "io.github.matthewjones372"
+    group = "dev.surefold"
     version = scmVer
 
     // Gannet's snapshot is the only changing module, and it is republished by hand. Gradle's 24-hour cache, restored

@@ -7,7 +7,7 @@ plugins {
     // The build's own plugin, included from pluginManagement in settings.gradle.kts.
     // The example applies it by id exactly as a consumer would, which is what
     // keeps the plugin honest: if generation breaks, this build breaks.
-    id("io.github.matthewjones372.pelican")
+    id("dev.surefold.pelican")
 }
 
 dependencies {
@@ -569,7 +569,7 @@ val libraryModules = rootProject.extra["libraryModules"] as List<String>
 
 dependencies {
     throughTheBom(platform(project(":pelican-bom")))
-    libraryModules.forEach { throughTheBom("io.github.matthewjones372:$it") }
+    libraryModules.forEach { throughTheBom("dev.surefold:$it") }
 }
 
 val checkBom = tasks.register("checkBom") {
