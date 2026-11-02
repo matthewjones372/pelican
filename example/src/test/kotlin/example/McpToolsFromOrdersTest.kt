@@ -1,16 +1,16 @@
 package example
 
-import io.github.matthewjones372.pelican.JsonArr
-import io.github.matthewjones372.pelican.JsonObj
-import io.github.matthewjones372.pelican.JsonStr
-import io.github.matthewjones372.pelican.jsonArr
-import io.github.matthewjones372.pelican.jsonObj
-import io.github.matthewjones372.pelican.mcp.mcpDispatch
-import io.github.matthewjones372.pelican.mcp.mcpOptions
-import io.github.matthewjones372.pelican.mcp.mcpTools
-import io.github.matthewjones372.pelican.mcp.toJson
-import io.github.matthewjones372.pelican.renderPretty
-import io.github.matthewjones372.pelican.test.golden.Golden
+import dev.surefold.pelican.JsonArr
+import dev.surefold.pelican.JsonObj
+import dev.surefold.pelican.JsonStr
+import dev.surefold.pelican.jsonArr
+import dev.surefold.pelican.jsonObj
+import dev.surefold.pelican.mcp.mcpDispatch
+import dev.surefold.pelican.mcp.mcpOptions
+import dev.surefold.pelican.mcp.mcpTools
+import dev.surefold.pelican.mcp.toJson
+import dev.surefold.pelican.renderPretty
+import dev.surefold.pelican.test.golden.Golden
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.booleans.shouldBeTrue

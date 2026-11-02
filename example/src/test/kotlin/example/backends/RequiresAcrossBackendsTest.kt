@@ -1,12 +1,12 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.RequestSpec
-import io.github.matthewjones372.pelican.test.ResponseSpec
-import io.github.matthewjones372.pelican.test.apiClient
-import io.github.matthewjones372.pelican.test.shouldHaveHeader
-import io.github.matthewjones372.pelican.test.shouldHaveStatus
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.test.ApiClient
+import dev.surefold.pelican.test.RequestSpec
+import dev.surefold.pelican.test.ResponseSpec
+import dev.surefold.pelican.test.apiClient
+import dev.surefold.pelican.test.shouldHaveHeader
+import dev.surefold.pelican.test.shouldHaveStatus
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.params.ParameterizedTest

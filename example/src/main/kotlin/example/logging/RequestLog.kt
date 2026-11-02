@@ -15,33 +15,33 @@ package example.logging
  *     }
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.Endpoint
-import io.github.matthewjones372.pelican.Filter
-import io.github.matthewjones372.pelican.RefusalObserver
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.afterStatus
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.attribute
-import io.github.matthewjones372.pelican.bearerAuth
-import io.github.matthewjones372.pelican.before
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.err
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.jetty.request
-import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
-import io.github.matthewjones372.pelican.metrics.otel.refusalCounter
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.unauthorized
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.Endpoint
+import dev.surefold.pelican.Filter
+import dev.surefold.pelican.RefusalObserver
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.afterStatus
+import dev.surefold.pelican.api
+import dev.surefold.pelican.attribute
+import dev.surefold.pelican.bearerAuth
+import dev.surefold.pelican.before
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.err
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jetty.handledOrFail
+import dev.surefold.pelican.jetty.request
+import dev.surefold.pelican.metrics.otel.openTelemetry
+import dev.surefold.pelican.metrics.otel.refusalCounter
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.orFail
+import dev.surefold.pelican.pathParam
+import dev.surefold.pelican.unauthorized
 import io.opentelemetry.api.OpenTelemetry
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -64,10 +64,10 @@ import org.slf4j.LoggerFactory
 /*
  * One thing, and it is the one a service must not lose: an exception nobody
  * declared. The caller gets an opaque reference and the log gets the stack
- * trace under `io.github.matthewjones372.pelican.jetty`, with the same
+ * trace under `dev.surefold.pelican.jetty`, with the same
  * reference in both so they join up:
  *
- *     ERROR io.github.matthewjones372.pelican.jetty - Unhandled failure in GET /widgets/9 [ref f3ef2be]
+ *     ERROR dev.surefold.pelican.jetty - Unhandled failure in GET /widgets/9 [ref f3ef2be]
  *     java.lang.IllegalStateException: the widget shelf fell over
  *
  * Everything else — which requests arrived, how long they took, what statuses

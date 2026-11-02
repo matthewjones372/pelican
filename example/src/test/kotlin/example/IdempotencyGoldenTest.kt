@@ -1,12 +1,12 @@
 package example
 
-import io.github.matthewjones372.pelican.apiSpec
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.test.golden.Golden
+import dev.surefold.pelican.apiSpec
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jsonBody
+import dev.surefold.pelican.orFail
+import dev.surefold.pelican.test.golden.Golden
 import org.junit.jupiter.api.Test
 import java.nio.file.Paths
 

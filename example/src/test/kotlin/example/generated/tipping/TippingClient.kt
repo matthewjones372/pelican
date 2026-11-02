@@ -12,16 +12,16 @@
 
 package example.generated.tipping
 
-import io.github.matthewjones372.pelican.BodyCodec
-import io.github.matthewjones372.pelican.ClientRequest
-import io.github.matthewjones372.pelican.ClientResponse
-import io.github.matthewjones372.pelican.ClientTransport
-import io.github.matthewjones372.pelican.Codecs
-import io.github.matthewjones372.pelican.IdempotencyKey
-import io.github.matthewjones372.pelican.Method
-import io.github.matthewjones372.pelican.UploadedFile
-import io.github.matthewjones372.pelican.WebhookSigner
-import io.github.matthewjones372.pelican.formCodec
+import dev.surefold.pelican.BodyCodec
+import dev.surefold.pelican.ClientRequest
+import dev.surefold.pelican.ClientResponse
+import dev.surefold.pelican.ClientTransport
+import dev.surefold.pelican.Codecs
+import dev.surefold.pelican.IdempotencyKey
+import dev.surefold.pelican.Method
+import dev.surefold.pelican.UploadedFile
+import dev.surefold.pelican.WebhookSigner
+import dev.surefold.pelican.formCodec
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.InputStream

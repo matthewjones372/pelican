@@ -1,11 +1,11 @@
 package example
 
-import io.github.matthewjones372.pelican.TenantResolver
-import io.github.matthewjones372.pelican.apiSpec
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.tenantFrom
-import io.github.matthewjones372.pelican.test.golden.Golden
+import dev.surefold.pelican.TenantResolver
+import dev.surefold.pelican.apiSpec
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.tenantFrom
+import dev.surefold.pelican.test.golden.Golden
 import org.junit.jupiter.api.Test
 import java.nio.file.Paths
 

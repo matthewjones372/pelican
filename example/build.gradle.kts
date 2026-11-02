@@ -1,4 +1,4 @@
-import io.github.matthewjones372.pelican.gradle.DocumentFormat
+import dev.surefold.pelican.gradle.DocumentFormat
 
 plugins {
     application

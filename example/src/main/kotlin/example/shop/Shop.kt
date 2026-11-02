@@ -13,35 +13,35 @@ package example.shop
  *     }
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiSpec
-import io.github.matthewjones372.pelican.Endpoint
-import io.github.matthewjones372.pelican.IntCodec
-import io.github.matthewjones372.pelican.Outcome
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.StringCodec
-import io.github.matthewjones372.pelican.Webhook
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.apiSpec
-import io.github.matthewjones372.pelican.between
-import io.github.matthewjones372.pelican.default
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.matching
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.openapi.openApiJson
-import io.github.matthewjones372.pelican.optional
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.queryParam
-import io.github.matthewjones372.pelican.webhook
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiSpec
+import dev.surefold.pelican.Endpoint
+import dev.surefold.pelican.IntCodec
+import dev.surefold.pelican.Outcome
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.StringCodec
+import dev.surefold.pelican.Webhook
+import dev.surefold.pelican.api
+import dev.surefold.pelican.apiSpec
+import dev.surefold.pelican.between
+import dev.surefold.pelican.default
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jetty.handledOrFail
+import dev.surefold.pelican.jsonBody
+import dev.surefold.pelican.matching
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.openapi.openApiJson
+import dev.surefold.pelican.optional
+import dev.surefold.pelican.orFail
+import dev.surefold.pelican.pathParam
+import dev.surefold.pelican.queryParam
+import dev.surefold.pelican.webhook
 
 /*
  * A bookshop: a shelf to browse, a till that prices a basket, and an order.

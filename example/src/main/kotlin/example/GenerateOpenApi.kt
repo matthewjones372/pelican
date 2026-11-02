@@ -9,6 +9,9 @@ package example
  *     }
  */
 
+import dev.surefold.pelican.ApiSpec
+import dev.surefold.pelican.apiSpec
+import dev.surefold.pelican.jackson.JacksonCodecs
 import example.adoption.adoptPet
 import example.backends.leaveTip
 import example.backends.tipNoticed
@@ -16,9 +19,6 @@ import example.payments.createCharge
 import example.payments.getCharge
 import example.payments.processorEvent
 import example.whoami.whoAmI
-import io.github.matthewjones372.pelican.ApiSpec
-import io.github.matthewjones372.pelican.apiSpec
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 
 /**
  * The spec, as a value. Note what this file does not import: no server, no

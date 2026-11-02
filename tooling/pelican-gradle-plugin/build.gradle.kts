@@ -85,7 +85,7 @@ gradlePlugin {
     plugins {
         create("pelican") {
             id = "dev.surefold.pelican"
-            implementationClass = "io.github.matthewjones372.pelican.gradle.PelicanPlugin"
+            implementationClass = "dev.surefold.pelican.gradle.PelicanPlugin"
             displayName = "Pelican"
             description = "Generates a Kotlin client and an OpenAPI document from endpoint descriptions, " +
                 "and endpoint descriptions from a document."

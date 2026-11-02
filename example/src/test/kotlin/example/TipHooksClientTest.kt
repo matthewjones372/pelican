@@ -1,16 +1,16 @@
 package example
 
+import dev.surefold.pelican.InMemoryClientTransport
+import dev.surefold.pelican.api
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.standardWebhooks
 import example.backends.TIP_HOOK_SECRET
 import example.backends.tipHooks
 import example.backends.tipNoticed
 import example.generated.tiphooks.ApiCallFailed
 import example.generated.tiphooks.Tip
 import example.generated.tiphooks.TipHooksClient
-import io.github.matthewjones372.pelican.InMemoryClientTransport
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.standardWebhooks
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

@@ -1,0 +1,20 @@
+package dev.surefold.pelican.oldest.importer
+
+import java.io.File
+
+fun importEndpoints(
+    document: File,
+    sourceRoot: File,
+    packageName: String,
+    name: String,
+    exclude: Set<String>,
+    handlers: String?,
+): List<File> {
+    val directory = packageName.split('.').fold(sourceRoot) { path, part -> File(path, part) }
+    directory.mkdirs()
+    return listOf(
+        File(directory, "${name.replaceFirstChar { it.uppercase() }}Endpoints.kt").apply {
+            writeText("${document.name}|$packageName|$name|${exclude.sorted().joinToString("+")}|$handlers\n")
+        },
+    )
+}

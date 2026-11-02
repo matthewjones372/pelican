@@ -257,7 +257,7 @@ so its depth and size limits apply to them.
 **Over stdio**, which is what a desktop client launches as a subprocess:
 
 ```kotlin
-import io.github.matthewjones372.pelican.mcp.server.mcpServe
+import dev.surefold.pelican.mcp.server.mcpServe
 
 fun main() = mcpServe(ordersApi(), toolOptions)
 ```
@@ -275,8 +275,8 @@ is answered `200` with one `application/json` message, or `202` with no body
 for a notification. On Pekko:
 
 ```kotlin
-import io.github.matthewjones372.pelican.pekko.mcp.routeWithMcp
-import io.github.matthewjones372.pelican.pekko.start
+import dev.surefold.pelican.pekko.mcp.routeWithMcp
+import dev.surefold.pelican.pekko.start
 
 val server = ordersApi().start(port = 8080) { system -> routeWithMcp(system, toolOptions) }
 ```
@@ -284,8 +284,8 @@ val server = ordersApi().start(port = 8080) { system -> routeWithMcp(system, too
 On Jetty, as `example/src/main/kotlin/example/mcp/Main.kt` does:
 
 ```kotlin
-import io.github.matthewjones372.pelican.jetty.mcp.handlerWithMcp
-import io.github.matthewjones372.pelican.jetty.start
+import dev.surefold.pelican.jetty.mcp.handlerWithMcp
+import dev.surefold.pelican.jetty.start
 
 val server = ordersApi().start(port = 8080) { handlerWithMcp(options = toolOptions) }
 ```

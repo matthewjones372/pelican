@@ -1,15 +1,15 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.BodyCodec
-import io.github.matthewjones372.pelican.Codecs
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.gannet.RequiresGannet
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.negotiated
-import io.github.matthewjones372.pelican.orFail
+import dev.surefold.pelican.BodyCodec
+import dev.surefold.pelican.Codecs
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.api
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.gannet.RequiresGannet
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.negotiated
+import dev.surefold.pelican.orFail
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -20,15 +20,15 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlin.reflect.KType
-import io.github.matthewjones372.pelican.gannet.handledNow as handledNowOnGannet
-import io.github.matthewjones372.pelican.gannet.handledOrFail as handledOrFailOnGannet
-import io.github.matthewjones372.pelican.gannet.start as startOnGannet
-import io.github.matthewjones372.pelican.jetty.handledNow as handledNowOnJetty
-import io.github.matthewjones372.pelican.jetty.handledOrFail as handledOrFailOnJetty
-import io.github.matthewjones372.pelican.jetty.start as startOnJetty
-import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
-import io.github.matthewjones372.pelican.pekko.handledOrFail as handledOrFailOnPekko
-import io.github.matthewjones372.pelican.pekko.start as startOnPekko
+import dev.surefold.pelican.gannet.handledNow as handledNowOnGannet
+import dev.surefold.pelican.gannet.handledOrFail as handledOrFailOnGannet
+import dev.surefold.pelican.gannet.start as startOnGannet
+import dev.surefold.pelican.jetty.handledNow as handledNowOnJetty
+import dev.surefold.pelican.jetty.handledOrFail as handledOrFailOnJetty
+import dev.surefold.pelican.jetty.start as startOnJetty
+import dev.surefold.pelican.pekko.handledNow as handledNowOnPekko
+import dev.surefold.pelican.pekko.handledOrFail as handledOrFailOnPekko
+import dev.surefold.pelican.pekko.start as startOnPekko
 
 /**
  * Pelican resolves its own codecs and never goes through a `Marshaller`, a

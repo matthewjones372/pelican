@@ -1,13 +1,13 @@
 package example
 
+import dev.surefold.pelican.ClientTransport
+import dev.surefold.pelican.client.jetty.JettyHttpTransport
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.retryPolicy
+import dev.surefold.pelican.retrying
 import example.backends.OnJetty
 import example.generated.tipping.Tip
 import example.generated.tipping.TippingClient
-import io.github.matthewjones372.pelican.ClientTransport
-import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.retryPolicy
-import io.github.matthewjones372.pelican.retrying
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.AfterAll

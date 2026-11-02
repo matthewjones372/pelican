@@ -34,9 +34,9 @@ type described does not mean a document generator on the classpath.
 `outputSchema`.
 
 ```kotlin
-import io.github.matthewjones372.pelican.JsonObj
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.schema.StandaloneSchemas
+import dev.surefold.pelican.JsonObj
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.schema.StandaloneSchemas
 import kotlin.reflect.typeOf
 
 val schema: JsonObj = StandaloneSchemas(JacksonCodecs).schema(typeOf<PaymentMethod>())

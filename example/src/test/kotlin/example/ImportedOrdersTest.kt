@@ -1,14 +1,14 @@
 package example
 
+import dev.surefold.pelican.JsonArr
+import dev.surefold.pelican.JsonObj
+import dev.surefold.pelican.JsonStr
+import dev.surefold.pelican.JsonValue
+import dev.surefold.pelican.codegen.writeKotlinClient
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.openapi.openApi
 import example.imported.importedSpec
 import example.imported32.imported32Spec
-import io.github.matthewjones372.pelican.JsonArr
-import io.github.matthewjones372.pelican.JsonObj
-import io.github.matthewjones372.pelican.JsonStr
-import io.github.matthewjones372.pelican.JsonValue
-import io.github.matthewjones372.pelican.codegen.writeKotlinClient
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.openapi.openApi
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.io.TempDir

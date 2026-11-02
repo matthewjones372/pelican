@@ -9,22 +9,22 @@ package example.backends
  *     }
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiErrorEnvelope
-import io.github.matthewjones372.pelican.Filter
-import io.github.matthewjones372.pelican.Identity
-import io.github.matthewjones372.pelican.RefusalObserver
-import io.github.matthewjones372.pelican.RefusalRenderer
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.jetty.bytesNow
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jetty.handledOneOf
-import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.jetty.handledWith
-import io.github.matthewjones372.pelican.jetty.start
-import io.github.matthewjones372.pelican.jetty.streamedNow
-import io.github.matthewjones372.pelican.jetty.toSequence
-import io.github.matthewjones372.pelican.lastEventId
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiErrorEnvelope
+import dev.surefold.pelican.Filter
+import dev.surefold.pelican.Identity
+import dev.surefold.pelican.RefusalObserver
+import dev.surefold.pelican.RefusalRenderer
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.jetty.bytesNow
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jetty.handledOneOf
+import dev.surefold.pelican.jetty.handledOrFail
+import dev.surefold.pelican.jetty.handledWith
+import dev.surefold.pelican.jetty.start
+import dev.surefold.pelican.jetty.streamedNow
+import dev.surefold.pelican.jetty.toSequence
+import dev.surefold.pelican.lastEventId
 
 /**
  * The Jetty binding of [greetingEndpoints].

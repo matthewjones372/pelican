@@ -350,14 +350,14 @@ with the Pekko binders of
 [`FirstEndpointOnPekko.kt`](example/src/main/kotlin/example/hello/FirstEndpointOnPekko.kt).
 
 ```kotlin
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledNow
+import dev.surefold.pelican.api
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.pathParam
+import dev.surefold.pelican.pekko.docs.startWithDocs
+import dev.surefold.pelican.pekko.handledNow
 
 data class Greeting(val message: String)
 
@@ -390,8 +390,8 @@ clone-and-run command [above](#getting-started) serves the same thing.
 And its test, with no socket:
 
 ```kotlin
-import io.github.matthewjones372.pelican.test.pekko.inMemory
-import io.github.matthewjones372.pelican.test.shouldBuild
+import dev.surefold.pelican.test.pekko.inMemory
+import dev.surefold.pelican.test.shouldBuild
 
 private val app = greetings().inMemory("first-endpoint")   // starts an actor system of that name
 
@@ -404,7 +404,7 @@ actor system you already run and the Scala 3 cross-build.
 
 ### The Gradle plugin
 
-The optional plugin, `io.github.matthewjones372.pelican`, runs the generators
+The optional plugin, `dev.surefold.pelican`, runs the generators
 as Gradle tasks: OpenAPI documents, Kotlin clients, endpoints imported from
 someone else's document, and the checks against committed copies. It is
 published to Maven Central rather than the Gradle Plugin Portal, so the build
@@ -422,7 +422,7 @@ pluginManagement {
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.2.0" }
+plugins { id("dev.surefold.pelican") version "1.2.0" }
 ```
 
 ### Jetty, kotlinx and the BOM
@@ -438,8 +438,8 @@ Beside Pekko and Jackson, Pelican has:
 
 The cookbook and the other guides are written against these, so their
 dependency blocks use the BOM and their imports name
-`io.github.matthewjones372.pelican.jetty`. On Pekko, import the binders from
-`io.github.matthewjones372.pelican.pekko`: `pelican-jetty` has every binder
+`dev.surefold.pelican.jetty`. On Pekko, import the binders from
+`dev.surefold.pelican.pekko`: `pelican-jetty` has every binder
 `pelican-pekko` has, under the same name, so only streaming handlers change
 (a Pekko `Source` where Jetty takes a `Sequence`).
 

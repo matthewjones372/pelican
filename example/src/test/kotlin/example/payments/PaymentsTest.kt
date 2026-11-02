@@ -1,12 +1,12 @@
 package example.payments
 
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.start
-import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.RequestSpec
-import io.github.matthewjones372.pelican.test.apiClient
-import io.github.matthewjones372.pelican.test.shouldHaveStatus
-import io.github.matthewjones372.pelican.test.signedWith
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.start
+import dev.surefold.pelican.test.ApiClient
+import dev.surefold.pelican.test.RequestSpec
+import dev.surefold.pelican.test.apiClient
+import dev.surefold.pelican.test.shouldHaveStatus
+import dev.surefold.pelican.test.signedWith
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain

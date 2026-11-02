@@ -1,7 +1,7 @@
 package example.health
 
-import io.github.matthewjones372.pelican.test.inMemory
-import io.github.matthewjones372.pelican.test.shouldBeError
+import dev.surefold.pelican.test.inMemory
+import dev.surefold.pelican.test.shouldBeError
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.Test

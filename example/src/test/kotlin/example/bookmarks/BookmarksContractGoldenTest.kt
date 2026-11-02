@@ -1,9 +1,9 @@
 package example.bookmarks
 
-import io.github.matthewjones372.pelican.In2
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.test.golden.Golden
-import io.github.matthewjones372.pelican.test.golden.requestsOnly
+import dev.surefold.pelican.In2
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.test.golden.Golden
+import dev.surefold.pelican.test.golden.requestsOnly
 import org.junit.jupiter.api.Test
 import java.nio.file.Paths
 

@@ -1,0 +1,196 @@
+package dev.surefold.pelican.jackson
+
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.core.JacksonException
+import com.fasterxml.jackson.core.json.JsonWriteFeature
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.jacksonMapperBuilder
+import dev.surefold.pelican.BodyCodec
+import dev.surefold.pelican.BodyDecodeFailure
+import dev.surefold.pelican.BodySink
+import dev.surefold.pelican.Codecs
+import dev.surefold.pelican.JsonArr
+import dev.surefold.pelican.JsonBool
+import dev.surefold.pelican.JsonNull
+import dev.surefold.pelican.JsonNum
+import dev.surefold.pelican.JsonObj
+import dev.surefold.pelican.JsonStr
+import dev.surefold.pelican.JsonValue
+import dev.surefold.pelican.SchemaComponents
+import dev.surefold.pelican.jsonObj
+import dev.surefold.pelican.withNullabilityOf
+import io.swagger.v3.core.converter.AnnotatedType
+import io.swagger.v3.core.converter.ModelConverters
+import io.swagger.v3.oas.models.media.Schema
+import java.io.OutputStream
+import kotlin.reflect.KType
+import kotlin.reflect.jvm.javaType
+import io.swagger.v3.core.util.Json31 as SwaggerJson31
+/**
+ * Reads and writes bodies with Jackson, and describes types with swagger-core.
+ * Use the object for the defaults, or construct one with your own mapper.
+ *
+ * swagger-core rather than a walk over Kotlin reflection because it reads
+ * Jackson's own annotations, so `@JsonProperty`, `@JsonIgnore` and
+ * `@JsonTypeInfo` shape the document without being declared twice.
+ */
+class JacksonCodecs(private val mapper: ObjectMapper) : Codecs {
+
+    /**
+     * swagger-core introspects with its own mapper, which knows nothing about
+     * Kotlin, so a resolver backed by [mapper] goes at the front of the chain.
+     */
+    private val describer = KotlinAwareModelResolver(mapper).apply { openapi31(true) }
+
+    /**
+     * The chain a type is resolved through, with [describer] at the front. The
+     * resolver is a value of its own because it is also read directly: it knows
+     * which class each component came from, which the union rewrite needs.
+     */
+    private val converters = ModelConverters().apply { addConverter(describer) }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> codec(type: KType): BodyCodec<T> {
+        // Once, when the Api is assembled: KType -> JavaType is reflection.
+        val javaType = mapper.constructType(type.javaType)
+        // `writerFor`, not `writeValueAsString`. The latter serialises against
+        // the value's runtime class, and for the *elements* of a collection
+        // that leaves the declared element type as `Object` — which carries no
+        // `@JsonTypeInfo`, so a `List<PaymentMethod>` went out with no
+        // discriminator on any of its members and could not be read back.
+        val writer = mapper.writerFor(javaType)
+        // `readerFor`, for the reason `writerFor` is here: resolved once with
+        // the codec rather than once per request. `mapper.readValue` looks up a
+        // root deserializer and builds a DeserializationContext on every call,
+        // and a codec is built when the Api is assembled and used for the life
+        // of the service.
+        val reader = mapper.readerFor(javaType)
+        // A character outside the BMP as its four UTF-8 bytes, as encodeToString's String carries it, not as two
+        // escaped surrogates: the bytes on the wire stay what they were (spec 0090).
+        val streaming = writer.with(JsonWriteFeature.COMBINE_UNICODE_SURROGATES_IN_UTF8)
+        return object : BodyCodec<T> {
+            override fun encodeToString(value: T): String = writer.writeValueAsString(value)
+            override fun decodeFromString(text: String): T = reader.readValue(text)
+
+            /** `UTF8StreamJsonParser` rather than the char-based reader, on the bytes as they arrived. */
+            override fun decodeFrom(bytes: ByteArray): T = reader.readValue(bytes)
+
+            /** `UTF8JsonGenerator`, flushing its own buffer into [sink]: no String, and no copy of it. */
+            override fun encodeTo(value: T, sink: BodySink) = streaming.writeValue(SinkStream(sink), value)
+        }
+    }
+
+    /**
+     * Jackson's parser, with the `StreamReadConstraints` its mapper carries —
+     * a depth and a document size this never has to state, and core's own
+     * reader has no equivalent of.
+     */
+    override fun readTree(text: String): JsonValue =
+        try {
+            mapper.readTree(text).toJsonValue()
+        } catch (e: JacksonException) {
+            throw BodyDecodeFailure(e.originalMessage ?: "The text is not JSON", e)
+        }
+
+    override fun schema(type: KType, components: SchemaComponents): JsonObj {
+        describer.freshPass()
+        val resolved = converters.resolveAsResolvedSchema(
+            AnnotatedType(type.javaType).resolveAsRef(true),
+        )
+
+        // Every model swagger touched becomes a component, so a shared type is
+        // written down once. Rewritten on the way, because a sealed hierarchy
+        // is the one shape swagger-core describes lossily — see
+        // `unionsRewritten`, which runs over the whole batch since a hierarchy
+        // is a parent and its branches together.
+        val described = resolved?.referencedSchemas.orEmpty().mapValues { (_, schema) -> schema.toJsonObj() }
+        unionsRewritten(described, describer.described).forEach { (name, schema) ->
+            if (!components.isRegistered(name)) components.register(name, schema)
+        }
+
+        val root = resolved?.schema ?: return jsonObj { "type" to "object" }
+        val json = root.toJsonObj()
+
+        // swagger-core resolved this from an erased Java type, so a nullable
+        // element inside a `List` or `Map` is gone and only [type] still knows.
+        // Nullability inside a model is `KotlinAwareModelResolver`'s problem.
+        return json.withNullabilityOf(type)
+    }
+
+    /**
+     * One instance for the whole process, so two threads describing schemas
+     * concurrently through it share resolver state: generate documents once at
+     * startup — what the `-docs` modules do — or construct a `JacksonCodecs`
+     * per thread for concurrent `schema()` calls.
+     */
+    companion object Default : Codecs by JacksonCodecs(defaultMapper())
+}
+
+/**
+ * The mapper used when none is supplied: Kotlin- and `java.time`-aware, lenient
+ * about unknown fields, and writing dates as strings.
+ */
+fun defaultMapper(): ObjectMapper = jacksonMapperBuilder()
+    .addModule(JavaTimeModule())
+    .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+    .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+    // A null property is dropped, which is the one spelling all three codec
+    // modules write: the schema marks a nullable property optional, and every
+    // one of the three reads an absent one back as null. `NON_NULL` rather than
+    // `NON_ABSENT` because kotlinx.serialization's `explicitNulls = false` is
+    // the rule being matched and it has no notion of an absent Optional.
+    // Content stays `ALWAYS` for the same reason: a null *inside* a list or a
+    // map is a value there, and all three write it.
+    .defaultPropertyInclusion(JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.ALWAYS))
+    .build()
+
+// ------------------------------------------------- swagger Schema -> JsonObj
+
+/**
+ * `Json31` and not `Json`: the serializer decides the dialect. The 3.0 mapper
+ * emits `nullable` and a scalar `type`; this one emits a `type` array, which is
+ * the 3.1 spelling — so a half-converted pipeline loses nullability silently.
+ */
+private fun Schema<*>.toJsonObj(): JsonObj =
+    SwaggerJson31.mapper().convertValue(this, JsonNode::class.java)
+        .toJsonValue(drop = SWAGGER_BOOKKEEPING) as? JsonObj
+        ?: jsonObj { "type" to "object" }
+
+/** An artefact of swagger's object model, not part of the schema. */
+private const val SWAGGER_BOOKKEEPING = "exampleSetFlag"
+
+/**
+ * [drop] is named by the caller rather than baked in: only the schema pass has
+ * a key that is bookkeeping, and a document read through `readTree` may hold a
+ * field of that name meaning it.
+ */
+private fun JsonNode.toJsonValue(drop: String? = null): JsonValue = when {
+    isObject -> JsonObj(
+        properties()
+            .filter { (name, _) -> name != drop }
+            .associate { (name, value) -> name to value.toJsonValue(drop) },
+    )
+
+    isArray -> JsonArr(map { it.toJsonValue(drop) })
+
+    isTextual -> JsonStr(textValue())
+
+    isBoolean -> JsonBool(booleanValue())
+
+    isIntegralNumber -> JsonNum(longValue())
+
+    isNumber -> JsonNum(doubleValue())
+
+    else -> JsonNull
+}
+
+/** [BodySink] as the stream Jackson writes to; Jackson closes it when done, which here is nothing to do. */
+private class SinkStream(private val sink: BodySink) : OutputStream() {
+    override fun write(b: Int) = sink.write(byteArrayOf(b.toByte()), 0, 1)
+
+    override fun write(b: ByteArray, off: Int, len: Int) = sink.write(b, off, len)
+}

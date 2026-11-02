@@ -1,25 +1,25 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.AdmissionDecision
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.BodyCodec
-import io.github.matthewjones372.pelican.Codecs
-import io.github.matthewjones372.pelican.NoCodecs
-import io.github.matthewjones372.pelican.OperationAdmission
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jetty.Handlers
-import io.github.matthewjones372.pelican.jetty.docs.handlerWithDocs
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.jetty.mcp.handlerWithMcp
-import io.github.matthewjones372.pelican.jetty.mcp.mcpHandler
-import io.github.matthewjones372.pelican.mcp.mcpDispatch
-import io.github.matthewjones372.pelican.mcp.mcpOptions
-import io.github.matthewjones372.pelican.mcp.server.mcpServer
-import io.github.matthewjones372.pelican.pekko.mcp.mcpRoutes
-import io.github.matthewjones372.pelican.pekko.mcp.routeWithMcp
-import io.github.matthewjones372.pelican.test.jetty.client
+import dev.surefold.pelican.AdmissionDecision
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.BodyCodec
+import dev.surefold.pelican.Codecs
+import dev.surefold.pelican.NoCodecs
+import dev.surefold.pelican.OperationAdmission
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.api
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jetty.Handlers
+import dev.surefold.pelican.jetty.docs.handlerWithDocs
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.jetty.mcp.handlerWithMcp
+import dev.surefold.pelican.jetty.mcp.mcpHandler
+import dev.surefold.pelican.mcp.mcpDispatch
+import dev.surefold.pelican.mcp.mcpOptions
+import dev.surefold.pelican.mcp.server.mcpServer
+import dev.surefold.pelican.pekko.mcp.mcpRoutes
+import dev.surefold.pelican.pekko.mcp.routeWithMcp
+import dev.surefold.pelican.test.jetty.client
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -32,15 +32,15 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.reflect.KType
-import io.github.matthewjones372.pelican.gannet.start as startOnGannet
-import io.github.matthewjones372.pelican.gannet.toHandler as toGannet
-import io.github.matthewjones372.pelican.jetty.start as startOnJetty
-import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.pekko.toRoute as toPekko
-import io.github.matthewjones372.pelican.test.inMemory as inCore
-import io.github.matthewjones372.pelican.test.jetty.inMemory as inJetty
-import io.github.matthewjones372.pelican.test.pekko.InMemoryTransport as PekkoTransport
-import io.github.matthewjones372.pelican.test.pekko.inMemory as inPekko
+import dev.surefold.pelican.gannet.start as startOnGannet
+import dev.surefold.pelican.gannet.toHandler as toGannet
+import dev.surefold.pelican.jetty.start as startOnJetty
+import dev.surefold.pelican.pekko.start as startOnPekko
+import dev.surefold.pelican.pekko.toRoute as toPekko
+import dev.surefold.pelican.test.inMemory as inCore
+import dev.surefold.pelican.test.jetty.inMemory as inJetty
+import dev.surefold.pelican.test.pekko.InMemoryTransport as PekkoTransport
+import dev.surefold.pelican.test.pekko.inMemory as inPekko
 
 class AdmissionConfigurationTest {
     private val configured = unsupportedApi()

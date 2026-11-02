@@ -18,21 +18,21 @@ package example.codecs
 
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiSpec
-import io.github.matthewjones372.pelican.Codecs
-import io.github.matthewjones372.pelican.SchemaSource
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.apiSpec
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pathParam
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiSpec
+import dev.surefold.pelican.Codecs
+import dev.surefold.pelican.SchemaSource
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.api
+import dev.surefold.pelican.apiSpec
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jsonBody
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.pathParam
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

@@ -9,8 +9,8 @@ package example.backends
  *     }
  */
 
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.openapi.docs
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.openapi.docs
 
 /**
  * The backend-agnostic endpoints, served by Jetty.

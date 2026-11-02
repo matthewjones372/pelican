@@ -1,0 +1,345 @@
+package dev.surefold.pelican.gannet
+
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiException
+import dev.surefold.pelican.BodyCodec
+import dev.surefold.pelican.Codecs
+import dev.surefold.pelican.CorsPolicy
+import dev.surefold.pelican.CorsPreflight
+import dev.surefold.pelican.Endpoint
+import dev.surefold.pelican.FormBody
+import dev.surefold.pelican.JsonBody
+import dev.surefold.pelican.Method
+import dev.surefold.pelican.MultipartBody
+import dev.surefold.pelican.NdjsonBody
+import dev.surefold.pelican.NegotiatedBody
+import dev.surefold.pelican.NotAcceptable
+import dev.surefold.pelican.Output
+import dev.surefold.pelican.Pages
+import dev.surefold.pelican.Params
+import dev.surefold.pelican.RawBody
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.SseOutput
+import dev.surefold.pelican.corsPolicy
+import dev.surefold.pelican.spi.CorsHeaders
+import dev.surefold.pelican.spi.EndpointPlan
+import dev.surefold.pelican.spi.RequestBodyCodecs
+import dev.surefold.pelican.spi.RouteIndex
+import dev.surefold.pelican.spi.Slots
+import dev.surefold.pelican.spi.acceptable
+import dev.surefold.pelican.spi.decodeCaller
+import dev.surefold.pelican.spi.handlerFor
+import dev.surefold.pelican.spi.ndjsonFrames
+import dev.surefold.pelican.spi.plan
+import dev.surefold.pelican.spi.requestBodyCodec
+import dev.surefold.pelican.spi.responseCodecs
+import dev.surefold.pelican.spi.routeIndex
+import dev.surefold.pelican.spi.succeeded
+import io.github.matthewjones372.gannet.HttpExchange
+import io.github.matthewjones372.gannet.HttpRequest
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.Executor
+
+/**
+ * Interprets an [Api] as a handler for Gannet. Endpoints only: nothing here generates an OpenAPI
+ * document.
+ *
+ * It passes on (returns false) wherever Pekko's route rejects, so a handler after it in a [then] chain is asked
+ * next; [start] answers whatever every handler passed on with the 404 or 405 Pekko would.
+ */
+fun Api.toHandler(handlers: Handlers = Handlers.default): GannetHandler {
+    require(admission == null) { "This interpreter does not support operation admission." }
+    require(endpoints.isNotEmpty()) { "This API has no endpoints." }
+
+    // Once per endpoint rather than per request, so a broken codec is a startup failure.
+    val codecs = endpoints.associateWith { it.endpoint.resolveCodecs(this.codecs) }
+    val plans = endpoints.associateWith { it.endpoint.plan() }
+    val bound = endpoints.associateWith { endpoint -> handlerFor(endpoint) }
+
+    val cors = corsPolicy()
+    val index = endpoints.routeIndex()
+    val answered = PelicanHandler(this, index, plans, codecs, bound, cors, handlers)
+    val files = pages
+    val served = if (files == null) {
+        answered
+    } else {
+        // The loader that built the handler, as a carrier thread may carry no useful one.
+        val loader = Thread.currentThread().contextClassLoader ?: Pages::class.java.classLoader
+        answered then PagesHandler(files, cors, loader).onlyFor(Method.GET)
+    }
+    val policy = responseHeaders ?: return served
+    val methods = endpoints.map { it.endpoint.method }
+    return served.answeredUnder(policy, isDocs = false) { exchange ->
+        val method = methods.firstOrNull { it.name == exchange.request.method }
+        val path = exchange.request.routedPath()
+        if (method == null || path == null) null else index.routeFor(method, path)?.endpoint
+    }
+}
+
+/**
+ * Routes on the carrier, which costs no hop for a 404, a refusal or an asynchronous handler. Whatever may block is
+ * moved first, with everything that runs before it: a synchronous handler with its filters, an authenticator, and the
+ * reading of a streamed body. A strict body is read on the carrier, where waiting parks only the connection's fiber,
+ * and before the hop unless an authenticator has to run first.
+ */
+internal class PelicanHandler(
+    private val api: Api,
+    private val index: RouteIndex,
+    private val plans: Map<ServerEndpoint, EndpointPlan>,
+    private val codecs: Map<ServerEndpoint, EndpointCodecs>,
+    private val handlers: Map<ServerEndpoint, (Params) -> CompletionStage<Any?>>,
+    private val cors: CorsPolicy?,
+    threads: Handlers,
+) : GannetHandler {
+
+    private val placement: Map<ServerEndpoint, Executor?> = api.endpoints.associateWith { it.placedBy(threads) }
+
+    /** Moved, but with no authenticator to run first: their strict body is read before the hop (spec 0090). */
+    private val readsAhead: Set<ServerEndpoint> = api.endpoints.filter { se ->
+        placement[se] != null && se.endpoint.caller == null &&
+            se.endpoint.bodyInput.let { it is JsonBody<*> || it is FormBody<*> || it is NegotiatedBody<*> }
+    }.toSet()
+
+    /** How each endpoint answers a codec that throws as its payload is written; made once, not per request. */
+    private val failures: Map<ServerEndpoint, (Throwable) -> Reply> =
+        api.endpoints.associateWith { se -> { t: Throwable -> errorResponse(t, api, se.endpoint) } }
+
+    /** In declaration order, which is the order Pekko's per-method routes name them in a 405. */
+    private val methods: List<Method> = api.endpoints.map { it.endpoint.method }.distinct()
+
+    override fun handle(exchange: HttpExchange): Boolean {
+        val answered = try {
+            route(exchange)
+        } catch (t: Throwable) {
+            CompletableFuture.completedFuture(errorResponse(t, api))
+        } ?: return false
+        // Detached either way: an answer ready now is written here, on the carrier, before this returns.
+        exchange.detach()
+        val now = answered.succeeded()
+        if (now != null) deliver(exchange, now.resultNow())
+        else answered.whenComplete { reply, failure -> deliver(exchange, reply ?: errorResponse(failure, api)) }
+        return true
+    }
+
+    /** [reply], or a 500 if writing it is refused, so a detached exchange is always answered. */
+    private fun deliver(exchange: HttpExchange, reply: Reply) {
+        try {
+            reply.writeTo(exchange)
+        } catch (t: Throwable) {
+            try {
+                errorResponse(t, api).writeTo(exchange)
+            } catch (_: Throwable) {
+                // Already answered: the reply that failed had started, and Gannet ends it.
+            }
+        }
+    }
+
+    /**
+     * Pekko's routing, answered from the index: one route per declared verb, then the CORS preflight. A verb no
+     * endpoint declares is passed on naming the ones that are; a declared verb at a path nothing under it
+     * describes is passed on as a 404, even where another verb describes that path.
+     */
+    private fun route(exchange: HttpExchange): CompletionStage<Reply>? {
+        val request = exchange.request
+        val path = request.routedPath()
+        if (path == null) {
+            exchange.declinePath()
+            return null
+        }
+        val method = methods.firstOrNull { it.name == request.method }
+        if (method == null) {
+            exchange.declineMethods(methods.map { it.name })
+            return preflight(exchange, path)
+        }
+        val matched = try {
+            index.find(method, path)
+        } catch (t: Throwable) {
+            return CompletableFuture.completedFuture(errorResponse(t, api))
+        }
+        if (matched == null) {
+            exchange.declinePath()
+            return preflight(exchange, path)
+        }
+
+        val values = plans.getValue(matched).slots()
+        try {
+            index.decodeCaptures(matched, path, values)
+        } catch (t: Throwable) {
+            // A capture that would not decode is its own route's 400.
+            return CompletableFuture.completedFuture(errorResponse(t, api, matched.endpoint))
+        }
+        val answered = invoke(matched, request, values)
+        return if (cors == null) answered
+        else answered.thenApply { it.withHeaders(cors.actualResponseHeaders(request.headers[CorsHeaders.ORIGIN])) }
+    }
+
+    /** Last, as on Pekko, so an endpoint declaring `OPTIONS` itself is tried first. */
+    private fun preflight(exchange: HttpExchange, path: String): CompletionStage<Reply>? {
+        if (cors == null) return null
+        val request = exchange.request
+        if (request.method != Method.OPTIONS.name) {
+            exchange.declineMethods(listOf(Method.OPTIONS.name))
+            return null
+        }
+        val decision = cors.preflight(
+            origin = request.headers[CorsHeaders.ORIGIN],
+            requestMethod = request.headers[CorsHeaders.REQUEST_METHOD],
+            path = path,
+        )
+        return when (decision) {
+            is CorsPreflight.NotPreflight -> {
+                exchange.declinePath()
+                null
+            }
+
+            is CorsPreflight.Refused ->
+                CompletableFuture.completedFuture(errorResponse(ApiException(403, "Forbidden", decision.reason), api))
+
+            is CorsPreflight.Allowed ->
+                CompletableFuture.completedFuture(Strict(204, null, ByteArray(0), decision.headers))
+        }
+    }
+
+    private fun invoke(
+        se: ServerEndpoint,
+        request: HttpRequest,
+        values: Slots,
+    ): CompletionStage<Reply> {
+        val executor = placement.getValue(se) ?: return invokeHere(se, request, values, null)
+        val ahead = if (se in readsAhead) readAhead(request) else null
+        return CompletableFuture.supplyAsync({ invokeHere(se, request, values, ahead) }, executor).thenCompose { it }
+    }
+
+    /** Whatever the read throws is kept, and thrown where the body is decoded, so refusals keep their order. */
+    private fun readAhead(request: HttpRequest): ReadAhead = try {
+        ReadAhead(readStrictBytes(request, api), null)
+    } catch (t: Throwable) {
+        ReadAhead(null, t)
+    }
+
+    private fun invokeHere(
+        se: ServerEndpoint,
+        request: HttpRequest,
+        values: Slots,
+        ahead: ReadAhead?,
+    ): CompletionStage<Reply> {
+        val ep = se.endpoint
+        val failed = failures.getValue(se)
+        // Built before decoding, so a filter or a failing decode can still put a header on the way out.
+        val view = GannetView(request)
+        val params = Params(values, request, ep, resumeFrom = request.resumePoint(ep), requestHeaders = view)
+
+        val accept = view.headers(ACCEPT)
+
+        // Who is calling first, then what they will take, then the inputs: Pekko's order, so a 401 tells nothing else.
+        try {
+            api.decodeCaller(ep, view, values)
+            negotiate(ep, accept)
+            plans.getValue(se).decodePlainInputs(view, values)
+        } catch (t: Throwable) {
+            return CompletableFuture.completedFuture(errorResponse(t, api, ep).withHeaders(params.responseHeaders()))
+        }
+
+        val handled = try {
+            readBody(ep, request, values, codecs.getValue(se), ahead)
+            handlers.getValue(se)(params)
+        } catch (t: Throwable) {
+            CompletableFuture.failedFuture(t)
+        }
+        // A handler that has already answered, as every synchronous one has, is answered without a stage per step.
+        val now = handled.succeeded()
+        if (now != null) {
+            val reply = try {
+                buildResponse(ep.output, now.resultNow(), codecs.getValue(se), accept, failed)
+            } catch (t: Throwable) {
+                errorResponse(t, api, ep)
+            }
+            return CompletableFuture.completedFuture(reply.withHeaders(params.responseHeaders()))
+        }
+        return handled
+            .thenApply { result -> buildResponse(ep.output, result, codecs.getValue(se), accept, failed) }
+            .exceptionally { t -> errorResponse(t, api, ep) }
+            .thenApply { reply -> reply.withHeaders(params.responseHeaders()) }
+    }
+
+    /** The body, read the way its declaration says to. */
+    private fun readBody(
+        ep: Endpoint<*, *>,
+        request: HttpRequest,
+        values: Slots,
+        codecs: EndpointCodecs,
+        ahead: ReadAhead?,
+    ) {
+        when (val body = ep.bodyInput) {
+            null -> Unit
+
+            // Handed over unconsumed, and exempt from the limit as on Pekko: nothing here holds it whole.
+            is RawBody -> values[body] = GannetByteStream(request.body)
+
+            is MultipartBody -> readMultipart(request, api, body, values)
+
+            is JsonBody<*>, is FormBody<*>, is NegotiatedBody<*> -> {
+                val codec = checkNotNull(codecs.body) { "No codec was resolved for the body of $ep" }
+                values[body] = if (ahead == null) readStrictBody(request, api, codec)
+                else codec.decode(request.headers[CONTENT_TYPE], ahead.bytes()) { request.headers[it] }
+            }
+
+            // Framed by core as the handler reads, so nothing is held but the frame being read.
+            is NdjsonBody<*> -> {
+                val frames = api.ndjsonFrames(ep, codecs.body, request.headers[CONTENT_TYPE])
+                values[body] = GannetFrames<Any?>(request.body, frames)
+            }
+        }
+    }
+}
+
+/** A strict body read before the hop: its bytes, or what reading them threw. */
+private class ReadAhead(private val bytes: ByteArray?, private val failure: Throwable?) {
+    fun bytes(): ByteArray = bytes ?: throw checkNotNull(failure)
+}
+
+/**
+ * Where [this] endpoint runs: on [threads]' executor when it may block before it answers, on a virtual thread when
+ * it reads a streamed body and [threads] keeps handlers on the carrier, and on the carrier (null) otherwise. A
+ * [ServerEndpoint.nonBlocking] handler is taken at its word.
+ */
+private fun ServerEndpoint.placedBy(threads: Handlers): Executor? {
+    val streamed = endpoint.bodyInput.let { it is RawBody || it is NdjsonBody<*> || it is MultipartBody }
+    val mayBlock = (invoke is Synchronous && !isNonBlocking) || endpoint.caller != null || streamed
+    return when {
+        threads.executor != null && mayBlock -> threads.executor
+        streamed -> OFF_CARRIER
+        else -> null
+    }
+}
+
+private const val ACCEPT = "Accept"
+
+/** The `Last-Event-ID` of a reconnect, read only where core says the endpoint's stream can be resumed. */
+private fun HttpRequest.resumePoint(ep: Endpoint<*, *>): String? =
+    if (ep.resumable) headers[SseOutput.LAST_EVENT_ID] else null
+
+/** Refuses an `Accept` taking nothing this endpoint sends, before any input is read; core decides, as on Pekko. */
+private fun negotiate(ep: Endpoint<*, *>, accept: List<String>) {
+    val produced = ep.output.produces
+    if (produced.isEmpty() || accept.isEmpty()) return
+    if (!acceptable(accept, produced)) throw NotAcceptable(produced)
+}
+
+/** The codecs one endpoint needs, resolved ahead of any request. */
+internal class EndpointCodecs(
+    val body: RequestBodyCodecs?,
+    val payload: BodyCodec<Any?>?,
+    /** One per declared response, keyed by identity: two can carry the same payload type under different statuses. */
+    val alternatives: Map<Any, BodyCodec<Any?>> = emptyMap(),
+) {
+    /** The codec for whichever response a handler named; [payload] is the first success's. */
+    fun payloadFor(out: Output<*>): BodyCodec<Any?>? = alternatives[out] ?: payload
+}
+
+private fun Endpoint<*, *>.resolveCodecs(codecs: Codecs): EndpointCodecs = EndpointCodecs(
+    body = codecs.requestBodyCodec(this),
+    payload = output.payloadType?.let { codecs.codec(it) },
+    alternatives = codecs.responseCodecs(output),
+)

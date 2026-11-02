@@ -1,84 +1,84 @@
-public final class io/github/matthewjones372/pelican/test/ApiCallFailed : java/lang/RuntimeException {
-	public fun <init> (Lio/github/matthewjones372/pelican/Endpoint;Lio/github/matthewjones372/pelican/test/RequestSpec;Lio/github/matthewjones372/pelican/test/ResponseSpec;)V
-	public final fun getEndpoint ()Lio/github/matthewjones372/pelican/Endpoint;
-	public final fun getRequest ()Lio/github/matthewjones372/pelican/test/RequestSpec;
-	public final fun getResponse ()Lio/github/matthewjones372/pelican/test/ResponseSpec;
+public final class dev/surefold/pelican/test/ApiCallFailed : java/lang/RuntimeException {
+	public fun <init> (Ldev/surefold/pelican/Endpoint;Ldev/surefold/pelican/test/RequestSpec;Ldev/surefold/pelican/test/ResponseSpec;)V
+	public final fun getEndpoint ()Ldev/surefold/pelican/Endpoint;
+	public final fun getRequest ()Ldev/surefold/pelican/test/RequestSpec;
+	public final fun getResponse ()Ldev/surefold/pelican/test/ResponseSpec;
 }
 
-public final class io/github/matthewjones372/pelican/test/ApiClient : java/lang/AutoCloseable {
-	public fun <init> (Lio/github/matthewjones372/pelican/test/Transport;Lio/github/matthewjones372/pelican/Codecs;Ljava/lang/String;)V
-	public synthetic fun <init> (Lio/github/matthewjones372/pelican/test/Transport;Lio/github/matthewjones372/pelican/Codecs;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun call (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Ljava/lang/Object;
-	public final fun callOutcome (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Ljava/lang/Object;
+public final class dev/surefold/pelican/test/ApiClient : java/lang/AutoCloseable {
+	public fun <init> (Ldev/surefold/pelican/test/Transport;Ldev/surefold/pelican/Codecs;Ljava/lang/String;)V
+	public synthetic fun <init> (Ldev/surefold/pelican/test/Transport;Ldev/surefold/pelican/Codecs;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun call (Ldev/surefold/pelican/Endpoint;Ljava/lang/Object;)Ljava/lang/Object;
+	public final fun callOutcome (Ldev/surefold/pelican/Endpoint;Ljava/lang/Object;)Ljava/lang/Object;
 	public fun close ()V
-	public final fun collect (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;Ljava/lang/String;)Ljava/util/List;
-	public static synthetic fun collect$default (Lio/github/matthewjones372/pelican/test/ApiClient;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
-	public final fun collectOutcome (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;Ljava/lang/String;)Ljava/util/List;
-	public static synthetic fun collectOutcome$default (Lio/github/matthewjones372/pelican/test/ApiClient;Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
-	public final fun getCodecs ()Lio/github/matthewjones372/pelican/Codecs;
+	public final fun collect (Ldev/surefold/pelican/Endpoint;Ljava/lang/Object;Ljava/lang/String;)Ljava/util/List;
+	public static synthetic fun collect$default (Ldev/surefold/pelican/test/ApiClient;Ldev/surefold/pelican/Endpoint;Ljava/lang/Object;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
+	public final fun collectOutcome (Ldev/surefold/pelican/Endpoint;Ljava/lang/Object;Ljava/lang/String;)Ljava/util/List;
+	public static synthetic fun collectOutcome$default (Ldev/surefold/pelican/test/ApiClient;Ldev/surefold/pelican/Endpoint;Ljava/lang/Object;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
+	public final fun getCodecs ()Ldev/surefold/pelican/Codecs;
 	public final fun getPrefers ()Ljava/lang/String;
-	public final fun getTransport ()Lio/github/matthewjones372/pelican/test/Transport;
-	public final fun outcome (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/Outcome;
-	public final fun request (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/test/RequestSpec;
-	public final fun response (Lio/github/matthewjones372/pelican/Endpoint;Ljava/lang/Object;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
-	public final fun sending (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ApiClient;
+	public final fun getTransport ()Ldev/surefold/pelican/test/Transport;
+	public final fun outcome (Ldev/surefold/pelican/Endpoint;Ljava/lang/Object;)Ldev/surefold/pelican/Outcome;
+	public final fun request (Ldev/surefold/pelican/Endpoint;Ljava/lang/Object;)Ldev/surefold/pelican/test/RequestSpec;
+	public final fun response (Ldev/surefold/pelican/Endpoint;Ljava/lang/Object;)Ldev/surefold/pelican/test/ResponseSpec;
+	public final fun sending (Ljava/lang/String;)Ldev/surefold/pelican/test/ApiClient;
 }
 
-public final class io/github/matthewjones372/pelican/test/ApiClientKt {
-	public static final fun frames (Ljava/util/List;)Lio/github/matthewjones372/pelican/StreamIn;
-	public static final fun frames ([Ljava/lang/Object;)Lio/github/matthewjones372/pelican/StreamIn;
-	public static final fun rawText (Ljava/lang/String;)Lio/github/matthewjones372/pelican/ByteStreamHandle;
+public final class dev/surefold/pelican/test/ApiClientKt {
+	public static final fun frames (Ljava/util/List;)Ldev/surefold/pelican/StreamIn;
+	public static final fun frames ([Ljava/lang/Object;)Ldev/surefold/pelican/StreamIn;
+	public static final fun rawText (Ljava/lang/String;)Ldev/surefold/pelican/ByteStreamHandle;
 }
 
-public final class io/github/matthewjones372/pelican/test/AssertionsKt {
-	public static final fun errorBody (Lio/github/matthewjones372/pelican/test/ApiClient;Lio/github/matthewjones372/pelican/test/ResponseSpec;)Lio/github/matthewjones372/pelican/ApiError;
-	public static final fun shouldBeApiError (Lio/github/matthewjones372/pelican/test/ApiClient;Lio/github/matthewjones372/pelican/test/ResponseSpec;ILjava/lang/String;)Lio/github/matthewjones372/pelican/ApiError;
-	public static final fun shouldBeError (Lio/github/matthewjones372/pelican/Outcome;)Ljava/lang/Object;
-	public static final fun shouldBeError (Lio/github/matthewjones372/pelican/Outcome;Ljava/lang/Object;)Ljava/lang/Object;
-	public static final fun shouldBeFailure (Lio/github/matthewjones372/pelican/Outcome;Lio/github/matthewjones372/pelican/ErrorOutput;)Ljava/lang/Object;
-	public static final fun shouldBeOk (Lio/github/matthewjones372/pelican/Outcome;)Ljava/lang/Object;
-	public static final fun shouldBeResponse (Lio/github/matthewjones372/pelican/Outcome;Lio/github/matthewjones372/pelican/Output;)Ljava/lang/Object;
-	public static final fun shouldBeSuccessful (Lio/github/matthewjones372/pelican/test/ResponseSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
-	public static final fun shouldBuild (Lio/github/matthewjones372/pelican/test/RequestSpec;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
-	public static final fun shouldHaveContentType (Lio/github/matthewjones372/pelican/test/ResponseSpec;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
-	public static final fun shouldHaveHeader (Lio/github/matthewjones372/pelican/test/ResponseSpec;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
-	public static final fun shouldHaveNoBody (Lio/github/matthewjones372/pelican/test/ResponseSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
-	public static final fun shouldHaveStatus (Lio/github/matthewjones372/pelican/test/ResponseSpec;I)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+public final class dev/surefold/pelican/test/AssertionsKt {
+	public static final fun errorBody (Ldev/surefold/pelican/test/ApiClient;Ldev/surefold/pelican/test/ResponseSpec;)Ldev/surefold/pelican/ApiError;
+	public static final fun shouldBeApiError (Ldev/surefold/pelican/test/ApiClient;Ldev/surefold/pelican/test/ResponseSpec;ILjava/lang/String;)Ldev/surefold/pelican/ApiError;
+	public static final fun shouldBeError (Ldev/surefold/pelican/Outcome;)Ljava/lang/Object;
+	public static final fun shouldBeError (Ldev/surefold/pelican/Outcome;Ljava/lang/Object;)Ljava/lang/Object;
+	public static final fun shouldBeFailure (Ldev/surefold/pelican/Outcome;Ldev/surefold/pelican/ErrorOutput;)Ljava/lang/Object;
+	public static final fun shouldBeOk (Ldev/surefold/pelican/Outcome;)Ljava/lang/Object;
+	public static final fun shouldBeResponse (Ldev/surefold/pelican/Outcome;Ldev/surefold/pelican/Output;)Ljava/lang/Object;
+	public static final fun shouldBeSuccessful (Ldev/surefold/pelican/test/ResponseSpec;)Ldev/surefold/pelican/test/ResponseSpec;
+	public static final fun shouldBuild (Ldev/surefold/pelican/test/RequestSpec;Ljava/lang/String;)Ldev/surefold/pelican/test/RequestSpec;
+	public static final fun shouldHaveContentType (Ldev/surefold/pelican/test/ResponseSpec;Ljava/lang/String;)Ldev/surefold/pelican/test/ResponseSpec;
+	public static final fun shouldHaveHeader (Ldev/surefold/pelican/test/ResponseSpec;Ljava/lang/String;Ljava/lang/String;)Ldev/surefold/pelican/test/ResponseSpec;
+	public static final fun shouldHaveNoBody (Ldev/surefold/pelican/test/ResponseSpec;)Ldev/surefold/pelican/test/ResponseSpec;
+	public static final fun shouldHaveStatus (Ldev/surefold/pelican/test/ResponseSpec;I)Ldev/surefold/pelican/test/ResponseSpec;
 }
 
-public final class io/github/matthewjones372/pelican/test/BufferedFrames : io/github/matthewjones372/pelican/StreamIn {
+public final class dev/surefold/pelican/test/BufferedFrames : dev/surefold/pelican/StreamIn {
 	public fun <init> (Ljava/util/List;)V
 	public final fun getValues ()Ljava/util/List;
 }
 
-public final class io/github/matthewjones372/pelican/test/HttpClientTransport : io/github/matthewjones372/pelican/test/Transport {
+public final class dev/surefold/pelican/test/HttpClientTransport : dev/surefold/pelican/test/Transport {
 	public fun <init> (Ljava/lang/String;Ljava/net/http/HttpClient;Ljava/time/Duration;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/net/http/HttpClient;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun send (Lio/github/matthewjones372/pelican/test/RequestSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+	public fun send (Ldev/surefold/pelican/test/RequestSpec;)Ldev/surefold/pelican/test/ResponseSpec;
 }
 
-public final class io/github/matthewjones372/pelican/test/HttpClientTransportKt {
-	public static final fun apiClient (Ljava/lang/String;Lio/github/matthewjones372/pelican/Codecs;)Lio/github/matthewjones372/pelican/test/ApiClient;
+public final class dev/surefold/pelican/test/HttpClientTransportKt {
+	public static final fun apiClient (Ljava/lang/String;Ldev/surefold/pelican/Codecs;)Ldev/surefold/pelican/test/ApiClient;
 }
 
-public final class io/github/matthewjones372/pelican/test/RequestSpec {
-	public fun <init> (Lio/github/matthewjones372/pelican/Method;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)V
+public final class dev/surefold/pelican/test/RequestSpec {
+	public fun <init> (Ldev/surefold/pelican/Method;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)V
 	public final fun getBody ()Ljava/lang/String;
 	public final fun getHeaders ()Ljava/util/List;
-	public final fun getMethod ()Lio/github/matthewjones372/pelican/Method;
+	public final fun getMethod ()Ldev/surefold/pelican/Method;
 	public final fun getPath ()Ljava/lang/String;
 	public final fun getQuery ()Ljava/util/List;
 	public final fun getTarget ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
-	public final fun withBody (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
-	public final fun withHeader (Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
-	public final fun withMethod (Lio/github/matthewjones372/pelican/Method;)Lio/github/matthewjones372/pelican/test/RequestSpec;
-	public final fun withPath (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
-	public final fun withoutHeader (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
-	public final fun withoutQuery (Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+	public final fun withBody (Ljava/lang/String;)Ldev/surefold/pelican/test/RequestSpec;
+	public final fun withHeader (Ljava/lang/String;Ljava/lang/String;)Ldev/surefold/pelican/test/RequestSpec;
+	public final fun withMethod (Ldev/surefold/pelican/Method;)Ldev/surefold/pelican/test/RequestSpec;
+	public final fun withPath (Ljava/lang/String;)Ldev/surefold/pelican/test/RequestSpec;
+	public final fun withoutHeader (Ljava/lang/String;)Ldev/surefold/pelican/test/RequestSpec;
+	public final fun withoutQuery (Ljava/lang/String;)Ldev/surefold/pelican/test/RequestSpec;
 }
 
-public final class io/github/matthewjones372/pelican/test/ResponseSpec {
+public final class dev/surefold/pelican/test/ResponseSpec {
 	public fun <init> (ILjava/util/List;Ljava/lang/String;)V
 	public fun <init> (ILjava/util/List;[B)V
 	public final fun getBody ()Ljava/lang/String;
@@ -91,32 +91,32 @@ public final class io/github/matthewjones372/pelican/test/ResponseSpec {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/test/SigningKt {
-	public static final fun signedWith (Lio/github/matthewjones372/pelican/test/RequestSpec;Lio/github/matthewjones372/pelican/HmacScheme;Ljava/lang/String;Ljava/time/Instant;)Lio/github/matthewjones372/pelican/test/RequestSpec;
-	public static synthetic fun signedWith$default (Lio/github/matthewjones372/pelican/test/RequestSpec;Lio/github/matthewjones372/pelican/HmacScheme;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/test/RequestSpec;
+public final class dev/surefold/pelican/test/SigningKt {
+	public static final fun signedWith (Ldev/surefold/pelican/test/RequestSpec;Ldev/surefold/pelican/HmacScheme;Ljava/lang/String;Ljava/time/Instant;)Ldev/surefold/pelican/test/RequestSpec;
+	public static synthetic fun signedWith$default (Ldev/surefold/pelican/test/RequestSpec;Ldev/surefold/pelican/HmacScheme;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/Object;)Ldev/surefold/pelican/test/RequestSpec;
 }
 
-public final class io/github/matthewjones372/pelican/test/TestCallers : io/github/matthewjones372/pelican/Authenticator {
-	public static final field Companion Lio/github/matthewjones372/pelican/test/TestCallers$Companion;
+public final class dev/surefold/pelican/test/TestCallers : dev/surefold/pelican/Authenticator {
+	public static final field Companion Ldev/surefold/pelican/test/TestCallers$Companion;
 	public fun <init> (Ljava/util/Map;)V
-	public fun authenticate (Lio/github/matthewjones372/pelican/Credentials;)Lio/github/matthewjones372/pelican/Identity;
+	public fun authenticate (Ldev/surefold/pelican/Credentials;)Ldev/surefold/pelican/Identity;
 }
 
-public final class io/github/matthewjones372/pelican/test/TestCallers$Companion {
-	public final fun of ([Lkotlin/Pair;)Lio/github/matthewjones372/pelican/test/TestCallers;
+public final class dev/surefold/pelican/test/TestCallers$Companion {
+	public final fun of ([Lkotlin/Pair;)Ldev/surefold/pelican/test/TestCallers;
 }
 
-public final class io/github/matthewjones372/pelican/test/TestCallersKt {
-	public static final fun inMemory (Lio/github/matthewjones372/pelican/Api;)Lio/github/matthewjones372/pelican/test/ApiClient;
-	public static final fun signedInAs (Lio/github/matthewjones372/pelican/test/ApiClient;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ApiClient;
+public final class dev/surefold/pelican/test/TestCallersKt {
+	public static final fun inMemory (Ldev/surefold/pelican/Api;)Ldev/surefold/pelican/test/ApiClient;
+	public static final fun signedInAs (Ldev/surefold/pelican/test/ApiClient;Ljava/lang/String;)Ldev/surefold/pelican/test/ApiClient;
 }
 
-public final class io/github/matthewjones372/pelican/test/TextBody : io/github/matthewjones372/pelican/ByteStreamHandle {
+public final class dev/surefold/pelican/test/TextBody : dev/surefold/pelican/ByteStreamHandle {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun getText ()Ljava/lang/String;
 }
 
-public abstract interface class io/github/matthewjones372/pelican/test/Transport {
-	public abstract fun send (Lio/github/matthewjones372/pelican/test/RequestSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+public abstract interface class dev/surefold/pelican/test/Transport {
+	public abstract fun send (Ldev/surefold/pelican/test/RequestSpec;)Ldev/surefold/pelican/test/ResponseSpec;
 }
 

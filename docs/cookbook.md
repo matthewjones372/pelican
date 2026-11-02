@@ -31,7 +31,7 @@ The explicitly unreleased admission recipe below requires a pinned build contain
 serve on Pekko HTTP instead, use `pelican-pekko`, `pelican-pekko-docs` and
 `pelican-test-pekko`, plus the Pekko dependencies your service names itself,
 as in [Getting started](../README.md#getting-started). Every binder below
-exists under the same name in `io.github.matthewjones372.pelican.pekko`; a
+exists under the same name in `dev.surefold.pelican.pekko`; a
 streaming handler returns a Pekko `Source` where Jetty takes a `Sequence`.
 [On Pekko](#on-pekko) is the first recipe on Pekko. The explicitly core/native-Jetty admission recipe is the
 exception to this binder parity; it does not support Pekko admission.
@@ -51,14 +51,14 @@ verbatim apart from the punctuation of the `println`, and it is compiled and
 tested on every build.
 
 ```kotlin
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pathParam
+import dev.surefold.pelican.api
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.pathParam
 
 data class Greeting(val message: String)
 
@@ -89,9 +89,9 @@ Jetty half of
 [`FirstEndpointTest.kt`](../example/src/test/kotlin/example/hello/FirstEndpointTest.kt):
 
 ```kotlin
-import io.github.matthewjones372.pelican.jetty.Handlers
-import io.github.matthewjones372.pelican.test.jetty.inMemory
-import io.github.matthewjones372.pelican.test.shouldBuild
+import dev.surefold.pelican.jetty.Handlers
+import dev.surefold.pelican.test.jetty.inMemory
+import dev.surefold.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -123,14 +123,14 @@ inputs on `endpoint(...)` and the handler's signature is fixed by them; listing
 them there also registers them for decoding and for the document.
 
 ```kotlin
-import io.github.matthewjones372.pelican.default
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.headerParam
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.optional
-import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.queryParam
+import dev.surefold.pelican.default
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.headerParam
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.optional
+import dev.surefold.pelican.pathParam
+import dev.surefold.pelican.queryParam
 
 val userId = pathParam<Long>("userId")
 val limit  = queryParam<Int>("limit").default(25)
@@ -158,9 +158,9 @@ Two inputs of the same type can be swapped without the compiler noticing. Give
 them distinct types:
 
 ```kotlin
-import io.github.matthewjones372.pelican.LongCodec
-import io.github.matthewjones372.pelican.map
-import io.github.matthewjones372.pelican.pathParam
+import dev.surefold.pelican.LongCodec
+import dev.surefold.pelican.map
+import dev.surefold.pelican.pathParam
 
 @JvmInline value class UserId(val value: Long)
 
@@ -178,10 +178,10 @@ Reject out-of-range input before the handler runs, and publish the same rule in
 the schema. Refining a codec does both:
 
 ```kotlin
-import io.github.matthewjones372.pelican.IntCodec
-import io.github.matthewjones372.pelican.between
-import io.github.matthewjones372.pelican.default
-import io.github.matthewjones372.pelican.queryParam
+import dev.surefold.pelican.IntCodec
+import dev.surefold.pelican.between
+import dev.surefold.pelican.default
+import dev.surefold.pelican.queryParam
 
 val limit = queryParam("limit", IntCodec.between(1, 100), description = "How many to return").default(20)
 ```
@@ -199,13 +199,13 @@ Declare the failure as a value and list it on the output with `orFail`: it
 joins the endpoint's type, and the handler has to produce it.
 
 ```kotlin
-import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.orFail
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.jetty.handledOrFail
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.orFail
 
 val noSuchUser = errorJson<ApiError>(404, "No user with that id")
 val badApiKey  = errorJson<ApiError>(401, "Missing or bad API key")
@@ -256,15 +256,15 @@ the handler names the one it is producing. From `Endpoints.kt` and
 `OrdersApi.kt`.
 
 ```kotlin
-import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jetty.handledOneOf
-import io.github.matthewjones372.pelican.json
-import io.github.matthewjones372.pelican.of
-import io.github.matthewjones372.pelican.or
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.responseHeader
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jetty.handledOneOf
+import dev.surefold.pelican.json
+import dev.surefold.pelican.of
+import dev.surefold.pelican.or
+import dev.surefold.pelican.orFail
+import dev.surefold.pelican.responseHeader
 
 val orderAt = responseHeader<String>("Location", description = "Where the placed order lives")
 
@@ -303,10 +303,10 @@ Send headers that the document lists and the handler sets by key rather than by
 string:
 
 ```kotlin
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.optional
-import io.github.matthewjones372.pelican.responseHeader
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.optional
+import dev.surefold.pelican.responseHeader
 
 val location   = responseHeader<String>("Location", "Where the new order lives")
 val rateLeft   = responseHeader<Int>("X-RateLimit-Remaining")
@@ -340,8 +340,8 @@ including the 404s, 405s and 400s no filter sees and the docs pages. On `main`,
 in no release yet:
 
 ```kotlin
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.api
+import dev.surefold.pelican.jackson.JacksonCodecs
 
 const val API_CSP = "default-src 'none'; frame-ancestors 'none'"
 const val DOCS_CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net"
@@ -370,9 +370,9 @@ or filter, `addRawHeader` appends where `setRawHeader` replaces, and every
 Accept an `application/x-www-form-urlencoded` body as a typed value:
 
 ```kotlin
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.formBody
-import io.github.matthewjones372.pelican.jetty.handledNow
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.formBody
+import dev.surefold.pelican.jetty.handledNow
 
 data class SignIn(val user: String, val remember: Boolean, val visits: Int)
 data class Session(val user: String, val remember: Boolean, val visits: Int)
@@ -405,13 +405,13 @@ Accept a multipart upload with a text field and a file, without holding the
 file in memory:
 
 ```kotlin
-import io.github.matthewjones372.pelican.StringCodec
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.filePart
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.nonEmpty
-import io.github.matthewjones372.pelican.textPart
+import dev.surefold.pelican.StringCodec
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.filePart
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.nonEmpty
+import dev.surefold.pelican.textPart
 
 data class Imported(val caption: String, val filename: String?, val lines: Int)
 
@@ -434,8 +434,8 @@ the backend, so a part decodes to the same value on either server. A test
 passes the same `UploadedFile` the handler receives:
 
 ```kotlin
-import io.github.matthewjones372.pelican.In2
-import io.github.matthewjones372.pelican.UploadedFile
+import dev.surefold.pelican.In2
+import dev.surefold.pelican.UploadedFile
 
 app.call(importOrders, In2("March", UploadedFile("orders.csv", "text/csv", stream)))
 ```
@@ -452,8 +452,8 @@ array) instead of building it in memory. The description is the same on every
 backend; the handler returns the backend's own stream type.
 
 ```kotlin
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
 
 val streamOrders = endpoint(userId, limit) {
     get("users" / userId / "orders" / "stream")
@@ -463,14 +463,14 @@ val streamOrders = endpoint(userId, limit) {
 
 ```kotlin
 // pelican-jetty: a Sequence<T>, pulled one element per write
-import io.github.matthewjones372.pelican.jetty.streamedNow
+import dev.surefold.pelican.jetty.streamedNow
 
 streamOrders streamedNow { (id, max) -> Store.orders(id, max, status = null).asSequence() }
 ```
 
 ```kotlin
 // pelican-pekko: a Source<T, NotUsed>
-import io.github.matthewjones372.pelican.pekko.streamedNow
+import dev.surefold.pelican.pekko.streamedNow
 import org.apache.pekko.stream.javadsl.Source
 
 streamOrders streamedNow { (id, max) -> Source.from(Store.orders(id, max, status = null)) }
@@ -490,9 +490,9 @@ Publish how callers authenticate, so Swagger UI and generated clients know what
 to send:
 
 ```kotlin
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.oauth2AuthorizationCode
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.oauth2AuthorizationCode
 
 val oauth = oauth2AuthorizationCode(
     authorizationUrl = "https://id.example.com/oauth2/authorize",
@@ -513,7 +513,7 @@ val placeOrder = endpoint(userId, newOrder) {
 A default for the whole API, and an endpoint that opts out:
 
 ```kotlin
-import io.github.matthewjones372.pelican.requires
+import dev.surefold.pelican.requires
 
 api(routes, codecs = JacksonCodecs) { security = listOf(oauth.requires("orders:read")) }
 
@@ -536,13 +536,13 @@ Reject a selected operation before caller checks or typed input decoding. This
 complete recipe is also the `admission` fixture compiled by `StillCompilesTest`:
 
 ```kotlin
-import io.github.matthewjones372.pelican.AdmissionDecision
-import io.github.matthewjones372.pelican.OperationAdmission
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jetty.toHandler
+import dev.surefold.pelican.AdmissionDecision
+import dev.surefold.pelican.OperationAdmission
+import dev.surefold.pelican.api
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jetty.toHandler
 
 val restricted = endpoint { get("restricted"); text() }
 val open = endpoint { get("open"); text() }
@@ -593,15 +593,15 @@ dependencies {
 This complete recipe is the separately compiled `nativeDecoration` fixture:
 
 ```kotlin
-import io.github.matthewjones372.pelican.AdmissionDecision
-import io.github.matthewjones372.pelican.OperationAdmission
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.docs.docsHandler
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jetty.startDecorated
-import io.github.matthewjones372.pelican.openapi.docs
+import dev.surefold.pelican.AdmissionDecision
+import dev.surefold.pelican.OperationAdmission
+import dev.surefold.pelican.api
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.docs.docsHandler
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jetty.startDecorated
+import dev.surefold.pelican.openapi.docs
 import org.eclipse.jetty.server.Handler
 
 val greeting = endpoint { get("greeting"); text() }
@@ -625,11 +625,11 @@ broader core streamed-input ownership guarantee. See the [admission limits](refe
 A caller under a scheme, what they must have, and the verifier bound once:
 
 ```kotlin
-import io.github.matthewjones372.pelican.anyOf
-import io.github.matthewjones372.pelican.authenticated
-import io.github.matthewjones372.pelican.bearerAuth
-import io.github.matthewjones372.pelican.permission
-import io.github.matthewjones372.pelican.role
+import dev.surefold.pelican.anyOf
+import dev.surefold.pelican.authenticated
+import dev.surefold.pelican.bearerAuth
+import dev.surefold.pelican.permission
+import dev.surefold.pelican.role
 
 val bearer = bearerAuth()
 val support = authenticated(bearer) { id -> Staff(id.subject, id.groups) }
@@ -662,11 +662,11 @@ A cookie for a browser, a session in a store behind it, and the same
 `authenticatedBy` as a token:
 
 ```kotlin
-import io.github.matthewjones372.pelican.Identity
-import io.github.matthewjones372.pelican.InMemorySessionStore
-import io.github.matthewjones372.pelican.authenticated
-import io.github.matthewjones372.pelican.responseHeader
-import io.github.matthewjones372.pelican.sessionCookie
+import dev.surefold.pelican.Identity
+import dev.surefold.pelican.InMemorySessionStore
+import dev.surefold.pelican.authenticated
+import dev.surefold.pelican.responseHeader
+import dev.surefold.pelican.sessionCookie
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
@@ -707,9 +707,9 @@ The tenant in a header, checked against the tenants there are, and handed to
 the handler:
 
 ```kotlin
-import io.github.matthewjones372.pelican.InMemoryTenantDirectory
-import io.github.matthewjones372.pelican.TenantResolver
-import io.github.matthewjones372.pelican.tenantFrom
+import dev.surefold.pelican.InMemoryTenantDirectory
+import dev.surefold.pelican.TenantResolver
+import dev.surefold.pelican.tenantFrom
 
 val shop = tenantFrom(TenantResolver.header("X-Shop"))
 
@@ -740,8 +740,8 @@ a session from one shop is no use in another; see
 Two tickets a minute for each teller, the third a 429 saying when to come back:
 
 ```kotlin
-import io.github.matthewjones372.pelican.InMemoryRateLimitStore
-import io.github.matthewjones372.pelican.rateLimit
+import dev.surefold.pelican.InMemoryRateLimitStore
+import dev.surefold.pelican.rateLimit
 import kotlin.time.Duration.Companion.minutes
 
 val tickets = rateLimit("tickets", 2, per = 1.minutes)
@@ -771,13 +771,13 @@ Stripe signs each event it sends with `Stripe-Signature`. The endpoint names the
 forged, replayed later than five minutes or sent without the header never reaches the handler:
 
 ```kotlin
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.stripeSignature
+import dev.surefold.pelican.api
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jsonBody
+import dev.surefold.pelican.stripeSignature
 
 data class StripeEvent(val id: String, val type: String)
 
@@ -827,11 +827,11 @@ A POST that charges or creates declares a key, and a repeat of it is answered
 with the first response:
 
 ```kotlin
-import io.github.matthewjones372.pelican.InMemoryIdempotencyStore
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsonBody
+import dev.surefold.pelican.InMemoryIdempotencyStore
+import dev.surefold.pelican.api
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jsonBody
 import kotlin.time.Duration.Companion.hours
 
 data class Tip(val amount: Int)
@@ -865,14 +865,14 @@ compose outermost first, narrow with `onlyWhen`, and reject by throwing. From
 [`example/filters/FilterExample.kt`](../example/src/main/kotlin/example/filters/FilterExample.kt):
 
 ```kotlin
-import io.github.matthewjones372.pelican.Filter
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.attribute
-import io.github.matthewjones372.pelican.before
-import io.github.matthewjones372.pelican.headerParam
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.optional
-import io.github.matthewjones372.pelican.unauthorized
+import dev.surefold.pelican.Filter
+import dev.surefold.pelican.api
+import dev.surefold.pelican.attribute
+import dev.surefold.pelican.before
+import dev.surefold.pelican.headerParam
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.optional
+import dev.surefold.pelican.unauthorized
 
 data class Caller(val subject: String, val plan: String)
 
@@ -920,12 +920,12 @@ dependencies {
 ```
 
 ```kotlin
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.health.diskSpace
-import io.github.matthewjones372.pelican.health.health
-import io.github.matthewjones372.pelican.health.jdbc
-import io.github.matthewjones372.pelican.health.noDeadlockedThreads
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.api
+import dev.surefold.pelican.health.diskSpace
+import dev.surefold.pelican.health.health
+import dev.surefold.pelican.health.jdbc
+import dev.surefold.pelican.health.noDeadlockedThreads
+import dev.surefold.pelican.jackson.JacksonCodecs
 
 val health = health {
     live("threads") { noDeadlockedThreads() }
@@ -952,15 +952,15 @@ no path strings. Against the example's `ordersApi()`, from
 [`ClientContractTest.kt`](../example/src/test/kotlin/example/ClientContractTest.kt):
 
 ```kotlin
-import io.github.matthewjones372.pelican.In3
-import io.github.matthewjones372.pelican.In4
-import io.github.matthewjones372.pelican.jetty.Handlers
-import io.github.matthewjones372.pelican.jetty.PelicanServer
-import io.github.matthewjones372.pelican.jetty.start
-import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.jetty.client
-import io.github.matthewjones372.pelican.test.jetty.inMemory
-import io.github.matthewjones372.pelican.test.shouldBuild
+import dev.surefold.pelican.In3
+import dev.surefold.pelican.In4
+import dev.surefold.pelican.jetty.Handlers
+import dev.surefold.pelican.jetty.PelicanServer
+import dev.surefold.pelican.jetty.start
+import dev.surefold.pelican.test.ApiClient
+import dev.surefold.pelican.test.jetty.client
+import dev.surefold.pelican.test.jetty.inMemory
+import dev.surefold.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 
 val app = ordersApi().inMemory(Handlers.onVirtualThreads)
@@ -1030,11 +1030,11 @@ dependencies {
 ```
 
 ```kotlin
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledNow
+import dev.surefold.pelican.api
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.pekko.docs.startWithDocs
+import dev.surefold.pelican.pekko.handledNow
 
 fun greetingsOnPekko() = api(
     endpoints = listOf(greet handledNow { name -> Greeting("Hello, $name!") }),
@@ -1051,7 +1051,7 @@ fun main() {
 ```
 
 A test reaches it with `greetingsOnPekko().inMemory("greetings")`, imported
-from `io.github.matthewjones372.pelican.test.pekko`, which starts an actor
+from `dev.surefold.pelican.test.pekko`, which starts an actor
 system of that name. Beyond the stream type (`Source<T, NotUsed>` where Jetty
 takes a `Sequence<T>`), the differences are the lower-level entry points:
 `toRoute(system)` returns a Pekko `Route` to concatenate with your own, and

@@ -1,12 +1,12 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.gannet.GannetHandler
-import io.github.matthewjones372.pelican.gannet.RequiresGannet
-import io.github.matthewjones372.pelican.gannet.then
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.api
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.gannet.GannetHandler
+import dev.surefold.pelican.gannet.RequiresGannet
+import dev.surefold.pelican.gannet.then
+import dev.surefold.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.http.javadsl.server.Directives
@@ -20,15 +20,15 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import io.github.matthewjones372.pelican.gannet.handledNow as handledNowOnGannet
-import io.github.matthewjones372.pelican.gannet.start as startOnGannet
-import io.github.matthewjones372.pelican.gannet.toHandler as toGannetHandler
-import io.github.matthewjones372.pelican.jetty.handledNow as handledNowOnJetty
-import io.github.matthewjones372.pelican.jetty.start as startOnJetty
-import io.github.matthewjones372.pelican.jetty.toHandler as toJettyHandler
-import io.github.matthewjones372.pelican.pekko.handledNow as handledNowOnPekko
-import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.pekko.toRoute as toPekkoRoute
+import dev.surefold.pelican.gannet.handledNow as handledNowOnGannet
+import dev.surefold.pelican.gannet.start as startOnGannet
+import dev.surefold.pelican.gannet.toHandler as toGannetHandler
+import dev.surefold.pelican.jetty.handledNow as handledNowOnJetty
+import dev.surefold.pelican.jetty.start as startOnJetty
+import dev.surefold.pelican.jetty.toHandler as toJettyHandler
+import dev.surefold.pelican.pekko.handledNow as handledNowOnPekko
+import dev.surefold.pelican.pekko.start as startOnPekko
+import dev.surefold.pelican.pekko.toRoute as toPekkoRoute
 
 class MountedAlongsideTest {
 

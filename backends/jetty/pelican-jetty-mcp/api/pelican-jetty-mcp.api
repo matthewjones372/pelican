@@ -1,7 +1,7 @@
-public final class io/github/matthewjones372/pelican/jetty/mcp/McpKt {
-	public static final fun handlerWithMcp (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/jetty/Handlers;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;)Lorg/eclipse/jetty/server/Handler;
-	public static synthetic fun handlerWithMcp$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/jetty/Handlers;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
-	public static final fun mcpHandler (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;)Lorg/eclipse/jetty/server/Handler;
-	public static synthetic fun mcpHandler$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/mcp/McpOptions;Ljava/lang/String;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
+public final class dev/surefold/pelican/jetty/mcp/McpKt {
+	public static final fun handlerWithMcp (Ldev/surefold/pelican/Api;Ldev/surefold/pelican/jetty/Handlers;Ldev/surefold/pelican/mcp/McpOptions;Ljava/lang/String;)Lorg/eclipse/jetty/server/Handler;
+	public static synthetic fun handlerWithMcp$default (Ldev/surefold/pelican/Api;Ldev/surefold/pelican/jetty/Handlers;Ldev/surefold/pelican/mcp/McpOptions;Ljava/lang/String;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
+	public static final fun mcpHandler (Ldev/surefold/pelican/Api;Ldev/surefold/pelican/mcp/McpOptions;Ljava/lang/String;)Lorg/eclipse/jetty/server/Handler;
+	public static synthetic fun mcpHandler$default (Ldev/surefold/pelican/Api;Ldev/surefold/pelican/mcp/McpOptions;Ljava/lang/String;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
 }
 

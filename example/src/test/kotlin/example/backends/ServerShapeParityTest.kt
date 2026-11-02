@@ -1,21 +1,21 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.gannet.GannetTests
-import io.github.matthewjones372.pelican.gannet.RequiresGannet
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.test.apiClient
-import io.github.matthewjones372.pelican.test.shouldHaveStatus
+import dev.surefold.pelican.gannet.GannetTests
+import dev.surefold.pelican.gannet.RequiresGannet
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.test.apiClient
+import dev.surefold.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletionStage
 import kotlin.concurrent.thread
-import io.github.matthewjones372.pelican.gannet.PelicanServer as GannetServer
-import io.github.matthewjones372.pelican.gannet.start as startOnGannet
-import io.github.matthewjones372.pelican.jetty.PelicanServer as JettyServer
-import io.github.matthewjones372.pelican.jetty.start as startOnJetty
-import io.github.matthewjones372.pelican.pekko.PelicanServer as PekkoServer
-import io.github.matthewjones372.pelican.pekko.start as startOnPekko
+import dev.surefold.pelican.gannet.PelicanServer as GannetServer
+import dev.surefold.pelican.gannet.start as startOnGannet
+import dev.surefold.pelican.jetty.PelicanServer as JettyServer
+import dev.surefold.pelican.jetty.start as startOnJetty
+import dev.surefold.pelican.pekko.PelicanServer as PekkoServer
+import dev.surefold.pelican.pekko.start as startOnPekko
 
 /**
  * The handle a backend hands back, pinned to one shape.

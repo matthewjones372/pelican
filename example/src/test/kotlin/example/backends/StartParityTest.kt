@@ -1,9 +1,9 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.gannet.GannetTests
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.test.apiClient
-import io.github.matthewjones372.pelican.test.shouldHaveStatus
+import dev.surefold.pelican.gannet.GannetTests
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.test.apiClient
+import dev.surefold.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
@@ -11,9 +11,9 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 import kotlin.reflect.jvm.kotlinFunction
-import io.github.matthewjones372.pelican.gannet.start as startOnGannet
-import io.github.matthewjones372.pelican.jetty.start as startOnJetty
-import io.github.matthewjones372.pelican.pekko.start as startOnPekko
+import dev.surefold.pelican.gannet.start as startOnGannet
+import dev.surefold.pelican.jetty.start as startOnJetty
+import dev.surefold.pelican.pekko.start as startOnPekko
 
 /**
  * The call a user types first, pinned to one shape whichever backend publishes
@@ -41,9 +41,9 @@ class StartParityTest {
         entryPoint(facade, name).parameters.filter { it.kind == KParameter.Kind.VALUE }
 
     private val backends = listOf(
-        "pekko" to "io.github.matthewjones372.pelican.pekko",
-        "jetty" to "io.github.matthewjones372.pelican.jetty",
-        "gannet" to "io.github.matthewjones372.pelican.gannet",
+        "pekko" to "dev.surefold.pelican.pekko",
+        "jetty" to "dev.surefold.pelican.jetty",
+        "gannet" to "dev.surefold.pelican.gannet",
     )
 
     @Test

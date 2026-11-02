@@ -1,10 +1,10 @@
 package example
 
+import dev.surefold.pelican.JsonObj
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.openapi.openApi
 import example.importedtipping.importedTippingEndpoints
 import example.importedtipping.importedTippingSpec
-import io.github.matthewjones372.pelican.JsonObj
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.openapi.openApi
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlin.test.Test

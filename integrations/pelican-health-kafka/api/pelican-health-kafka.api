@@ -1,5 +1,5 @@
-public final class io/github/matthewjones372/pelican/health/kafka/KafkaCheckKt {
-	public static final fun kafka-HG0u8IE (Lorg/apache/kafka/clients/admin/Admin;J)Lio/github/matthewjones372/pelican/health/Status;
-	public static synthetic fun kafka-HG0u8IE$default (Lorg/apache/kafka/clients/admin/Admin;JILjava/lang/Object;)Lio/github/matthewjones372/pelican/health/Status;
+public final class dev/surefold/pelican/health/kafka/KafkaCheckKt {
+	public static final fun kafka-HG0u8IE (Lorg/apache/kafka/clients/admin/Admin;J)Ldev/surefold/pelican/health/Status;
+	public static synthetic fun kafka-HG0u8IE$default (Lorg/apache/kafka/clients/admin/Admin;JILjava/lang/Object;)Ldev/surefold/pelican/health/Status;
 }
 

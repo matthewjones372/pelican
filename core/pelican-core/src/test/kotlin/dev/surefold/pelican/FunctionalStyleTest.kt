@@ -1,0 +1,168 @@
+package dev.surefold.pelican
+
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldNotBeEmpty
+import io.kotest.matchers.comparables.shouldBeGreaterThan
+import io.kotest.matchers.nulls.shouldNotBeNull
+import org.junit.jupiter.api.Test
+import java.io.File
+
+/**
+ * Where mutable state is allowed to live, stated as a test.
+ *
+ * This started as a detekt rule — `ForbiddenMethodCall` on `mutableListOf` and
+ * friends — and that rule reported 28 sites under Kotlin 2.2 and silently zero
+ * after the compiler moved to 2.4: detekt 1.23.8 resolves `java.util.UUID.
+ * randomUUID` against the new metadata but not `kotlin.collections.
+ * mutableListOf`. A rule that stops firing without saying so is worse than no
+ * rule, so the claim is made here instead, where it cannot go quiet.
+ *
+ * It is a ratchet rather than a ban. Every file below accumulates into a
+ * mutable collection and then hands back something immutable, which is what a
+ * builder is; banning that would not make the code more functional, only more
+ * ceremonious. What the list stops is the *next* file quietly starting to do
+ * it — a new mutable accumulator has to be argued for here, in writing, before
+ * the build goes green again.
+ *
+ * Which sources it judges is not decided here: the build hands them over and
+ * declares the same directories as inputs of the task that runs this test. A
+ * test that resolved them itself would read files Gradle knows nothing about,
+ * and a violation would ride green builds until `--rerun-tasks`. See
+ * `core/pelican-core/build.gradle.kts`.
+ */
+class FunctionalStyleTest {
+
+    private val builders = mapOf(
+        "integrations/pelican-health/src/main/kotlin/dev/surefold/pelican/health/Health.kt" to
+            "health { } collects its checks a call at a time, and the Health it returns is handed a copy",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/ApiBuilder.kt" to
+            "the filter chain accumulates a line at a time, and the Api it returns is handed a copy",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/Endpoint.kt" to
+            "EndpointBuilder collects declarations as they are made and freezes them into an Endpoint",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/JsonValue.kt" to
+            "the jsonObj/jsonArr DSL, which is an accumulate-then-render builder by definition",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/Answers.kt" to
+            "AnswerHeaders collects what one responseHeaders { } call adds, and the backend is handed a copy",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/Cors.kt" to
+            "the allowed-headers set is built once per Api and read from every request after",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/Forms.kt" to
+            "form decoding gathers repeated keys before deciding what the value is",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/Security.kt" to
+            "scheme registration accumulates, then the document reads it",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/Params.kt" to
+            "the attribute bag a filter writes into: mutable for the length of one request, by design",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/BodyCodec.kt" to
+            "codecs are resolved once per type and cached against it, and SchemaNames remembers which " +
+            "type claimed each component name while one is being described",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/InMemory.kt" to
+            "the per-request value bag handed to Params, as in each interpreter",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/spi/EndpointPlan.kt" to
+            "a request's slots, and the copy of them Map.entries hands lensInputs; no request walks it",
+        "core/pelican-core/src/main/kotlin/dev/surefold/pelican/spi/Requests.kt" to
+            "the response-to-codec table, keyed by identity because two responses can carry one payload " +
+            "type and a negotiated one carries the same type under several encodings; built once per " +
+            "endpoint and handed to the interpreter as a Map",
+        "core/pelican-openapi/src/main/kotlin/dev/surefold/pelican/openapi/RedocLook.kt" to
+            "RedocLookBuilder collects stylesheets a call at a time, and the RedocLook it builds is handed a copy",
+        "core/pelican-openapi/src/main/kotlin/dev/surefold/pelican/openapi/RapiDocLook.kt" to
+            "RapiDocLookBuilder collects attributes and stylesheets a call at a time, and the RapiDocLook it builds " +
+            "is handed copies",
+        "core/pelican-openapi/src/main/kotlin/dev/surefold/pelican/openapi/OpenApi.kt" to
+            "component schemas are collected as the document is walked, then emitted once",
+        "core/pelican-schema/src/main/kotlin/dev/surefold/pelican/schema/StandaloneSchemas.kt" to
+            "SchemaComponents is written into as a type is walked, and the document freezes it into `\$defs`",
+        "testing/pelican-test-wiremock/src/main/kotlin/dev/surefold/pelican/test/wiremock/StubFile.kt" to
+            "the stubFile DSL collects stubs as they are declared and freezes them into the mapping " +
+            "files writeTo renders, which is what a builder is",
+        "tooling/pelican-codegen/src/main/kotlin/dev/surefold/pelican/codegen/KotlinClient.kt" to
+            "the emitter builds one client method's parameter list, keeping names unique as it goes",
+        "tooling/pelican-codegen/src/main/kotlin/dev/surefold/pelican/codegen/KotlinTypes.kt" to
+            "generated type names are registered as they are minted, so a second use finds the first",
+        "tooling/pelican-codegen/src/main/kotlin/dev/surefold/pelican/codegen/Unions.kt" to
+            "merging an `allOf` gathers the properties its branches declare, then freezes them into one schema",
+        "codecs/pelican-jackson/src/main/kotlin/" +
+            "dev/surefold/pelican/jackson/KotlinAwareModelResolver.kt" to
+            "swagger's Schema is a mutable Java bean; patching it is the integration",
+
+        "integrations/pelican-metrics-otel/src/main/kotlin/" +
+            "dev/surefold/pelican/metrics/otel/ClientTracing.kt" to
+            "OpenTelemetry's propagator injects into a carrier through a Setter, so the headers it " +
+            "writes have to be gathered somewhere mutable; they are folded into the request on the " +
+            "next line and the list is never seen again",
+        "backends/jetty/pelican-jetty/src/main/kotlin/dev/surefold/pelican/jetty/Interpreter.kt" to
+            "the set of endpoints that block before their handler, filtered once when the handler is built",
+        "backends/pekko/pelican-pekko/src/main/kotlin/dev/surefold/pelican/pekko/Responses.kt" to
+            "the empty parameter map Pekko's customWithFixedCharset takes, and the cache of the content " +
+            "types built from it — one entry per declared media type, none of them from a request",
+    )
+
+    private val accumulators = Regex(
+        """\b(mutableListOf|mutableMapOf|mutableSetOf""" +
+            """|LinkedHashMap|LinkedHashSet|IdentityHashMap|ArrayList|HashMap|HashSet)\s*[(<]""",
+    )
+
+    /** Absent means the build's wiring is gone, which is the failure this test cannot survive. */
+    private fun handedOver(name: String): String {
+        val value = System.getProperty(name)
+        withClue("the build must pass -D$name; see core/pelican-core/build.gradle.kts") { value.shouldNotBeNull() }
+        return value!!
+    }
+
+    private fun repoRoot(): File = File(handedOver("pelican.style.repoRoot"))
+
+    private fun sourceRoots(): List<File> = handedOver("pelican.style.sources")
+        .split(File.pathSeparator)
+        .filter { it.isNotBlank() }
+        .map(::File)
+
+    private fun mainSources(): List<File> = sourceRoots()
+        .flatMap { it.walkTopDown().filter { file -> file.isFile && file.extension == "kt" }.toList() }
+
+    /**
+     * The wiring, asserted rather than assumed.
+     *
+     * A test can see the properties the build passed it; it cannot see the
+     * task's declared inputs, and those two lines are one decision — they are
+     * written together in `build.gradle.kts` and say so. What this catches is
+     * the regression that actually happened: the gate reading a tree nobody
+     * told Gradle about. Delete the wiring and this fails immediately, rather
+     * than the gate quietly reverting to guessing where the sources are.
+     */
+    @Test
+    fun `the build hands this test the sources it judges`() {
+        val roots = sourceRoots()
+        withClue("the build named no source roots at all") { roots.shouldNotBeEmpty() }
+
+        val missing = roots.filterNot { it.isDirectory }
+        withClue("the build named source roots that are not there: $missing") { missing.shouldBeEmpty() }
+
+        val outside = roots.filterNot { it.absoluteFile.startsWith(repoRoot().absoluteFile) }
+        withClue("a source root sits outside ${repoRoot()}, so the paths below cannot be keys: $outside") {
+            outside.shouldBeEmpty()
+        }
+
+        withClue("only ${mainSources().size} files were handed over; the gate is judging almost nothing") {
+            mainSources().size shouldBeGreaterThan 20
+        }
+    }
+
+    @Test
+    fun `mutable collections are built only where a builder was meant to be`() {
+        val root = repoRoot()
+        val found = mainSources()
+            .filter { accumulators.containsMatchIn(it.readText()) }
+            .map { it.relativeTo(root).path }
+            .toSortedSet()
+
+        val unexpected = found - builders.keys
+        withClue("a mutable accumulator appeared outside a builder: $unexpected") {
+            unexpected.shouldBeEmpty()
+        }
+
+        val stale = builders.keys - found
+        withClue("these no longer accumulate; drop them from the list: $stale") {
+            stale.shouldBeEmpty()
+        }
+    }
+}

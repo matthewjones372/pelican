@@ -1,0 +1,65 @@
+package dev.surefold.pelican
+
+/**
+ * A header the endpoint promises to send back, declared once as a value and
+ * reused by the document and by the handler that sets it. Setting one the
+ * endpoint never declared throws, so the document and the wire cannot disagree.
+ */
+class ResponseHeader<T> @PublishedApi internal constructor(
+    val name: String,
+    val codec: PlainCodec<*>,
+    val description: String? = null,
+    /** False for a header sent only sometimes — `Retry-After`, a paging cursor. */
+    val required: Boolean = true,
+) {
+    init {
+        require(name.isNotBlank()) { "A response header needs a name" }
+        require(!isServerOwned(name)) {
+            "$name is set by the server from the response itself, not declared as a header. " +
+                "Every backend either drops it or sends a second, conflicting copy: " +
+                "Pekko logs it and renders nothing. Content type comes from the output " +
+                "(json, text, bytes(mediaType)); length and framing come from the body."
+        }
+    }
+
+    override fun toString() = "responseHeader:$name"
+}
+
+/** Whether [name] is one of the headers the server underneath writes from the response itself. */
+internal fun isServerOwned(name: String): Boolean = name.lowercase() in RESERVED
+
+/**
+ * Headers no description may claim, because the server underneath owns them.
+ * Exactly the ones Pekko's renderer drops from a `RawHeader` with only a log
+ * line; the other two send a conflicting duplicate instead.
+ */
+private val RESERVED = setOf(
+    "content-type",
+    "content-length",
+    "transfer-encoding",
+    "connection",
+    "date",
+    "server",
+)
+
+inline fun <reified T : Any> responseHeader(
+    name: String,
+    description: String? = null,
+): ResponseHeader<T> = ResponseHeader(name, plainCodecFor<T>(), description)
+
+fun <T : Any> responseHeader(
+    name: String,
+    codec: PlainCodec<T>,
+    description: String? = null,
+): ResponseHeader<T> = ResponseHeader(name, codec, description)
+
+/**
+ * Marks the header as one the endpoint may leave off. It is still declared, so
+ * it may still be set; the document simply stops promising it is always there.
+ */
+fun <T : Any> ResponseHeader<T>.optional(): ResponseHeader<T> =
+    ResponseHeader(name, codec, description, required = false)
+
+/** RFC 10008 section 2.4: where the answer to a `QUERY` can be fetched again, so a cache can key it. */
+val contentLocation: ResponseHeader<String> =
+    responseHeader<String>("Content-Location", description = "Where this answer can be fetched again").optional()

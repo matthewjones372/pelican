@@ -1,7 +1,7 @@
-public final class io/github/matthewjones372/pelican/client/pekko/PekkoHttpTransport : io/github/matthewjones372/pelican/ClientTransport {
+public final class dev/surefold/pelican/client/pekko/PekkoHttpTransport : dev/surefold/pelican/ClientTransport {
 	public fun <init> ()V
 	public fun <init> (Lorg/apache/pekko/actor/ClassicActorSystemProvider;)V
 	public synthetic fun <init> (Lorg/apache/pekko/actor/ClassicActorSystemProvider;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun send (Lio/github/matthewjones372/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
+	public fun send (Ldev/surefold/pelican/ClientRequest;)Ljava/util/concurrent/CompletionStage;
 }
 

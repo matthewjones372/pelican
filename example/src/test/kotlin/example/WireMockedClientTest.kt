@@ -1,16 +1,16 @@
 package example
 
 import com.github.tomakehurst.wiremock.http.Fault
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.In3
+import dev.surefold.pelican.client.jetty.JettyHttpTransport
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.of
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.test.wiremock.PelicanWireMockExtension
 import example.generated.GetUserFailure
 import example.generated.OrdersClient
 import example.generated.PlaceOrderFailure
-import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.In3
-import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.of
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterEach

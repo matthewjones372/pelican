@@ -1,6 +1,13 @@
 package example
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import dev.surefold.pelican.ClientResponse
+import dev.surefold.pelican.ClientTransport
+import dev.surefold.pelican.client.jetty.JettyHttpTransport
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jackson.defaultMapper
+import dev.surefold.pelican.jetty.PelicanServer
+import dev.surefold.pelican.jetty.start
 import example.generated.suspending.CreateOrder
 import example.generated.suspending.GetUserFailure
 import example.generated.suspending.OrderStatus
@@ -8,13 +15,6 @@ import example.generated.suspending.OrdersClient
 import example.generated.suspending.Outcome
 import example.generated.suspending.PlaceOrderFailure
 import example.generated.suspending.User
-import io.github.matthewjones372.pelican.ClientResponse
-import io.github.matthewjones372.pelican.ClientTransport
-import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jackson.defaultMapper
-import io.github.matthewjones372.pelican.jetty.PelicanServer
-import io.github.matthewjones372.pelican.jetty.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf

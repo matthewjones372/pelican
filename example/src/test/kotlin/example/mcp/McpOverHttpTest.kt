@@ -1,10 +1,10 @@
 package example.mcp
 
-import io.github.matthewjones372.pelican.JsonArr
-import io.github.matthewjones372.pelican.JsonObj
-import io.github.matthewjones372.pelican.JsonStr
-import io.github.matthewjones372.pelican.mcp.server.MCP_PROTOCOL_VERSION
-import io.github.matthewjones372.pelican.parseJson
+import dev.surefold.pelican.JsonArr
+import dev.surefold.pelican.JsonObj
+import dev.surefold.pelican.JsonStr
+import dev.surefold.pelican.mcp.server.MCP_PROTOCOL_VERSION
+import dev.surefold.pelican.parseJson
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldNotContain

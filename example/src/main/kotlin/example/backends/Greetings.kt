@@ -9,55 +9,55 @@ package example.backends
  *     }
  */
 
-import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.Authenticator
-import io.github.matthewjones372.pelican.Endpoint
-import io.github.matthewjones372.pelican.Identity
-import io.github.matthewjones372.pelican.InMemorySessionStore
-import io.github.matthewjones372.pelican.InMemoryTenantDirectory
-import io.github.matthewjones372.pelican.LongCodec
-import io.github.matthewjones372.pelican.Method
-import io.github.matthewjones372.pelican.Outcome
-import io.github.matthewjones372.pelican.StringCodec
-import io.github.matthewjones372.pelican.TenantResolver
-import io.github.matthewjones372.pelican.Unauthenticated
-import io.github.matthewjones372.pelican.UploadedFile
-import io.github.matthewjones372.pelican.Webhook
-import io.github.matthewjones372.pelican.authenticated
-import io.github.matthewjones372.pelican.bearerAuth
-import io.github.matthewjones372.pelican.bufferedFile
-import io.github.matthewjones372.pelican.commaSeparated
-import io.github.matthewjones372.pelican.cookieParam
-import io.github.matthewjones372.pelican.default
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.filePart
-import io.github.matthewjones372.pelican.formBody
-import io.github.matthewjones372.pelican.headerParam
-import io.github.matthewjones372.pelican.json
-import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.ndjsonIn
-import io.github.matthewjones372.pelican.nonEmpty
-import io.github.matthewjones372.pelican.of
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.optional
-import io.github.matthewjones372.pelican.or
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.path
-import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.positive
-import io.github.matthewjones372.pelican.queryParam
-import io.github.matthewjones372.pelican.rateLimit
-import io.github.matthewjones372.pelican.rawBody
-import io.github.matthewjones372.pelican.repeated
-import io.github.matthewjones372.pelican.responseHeader
-import io.github.matthewjones372.pelican.role
-import io.github.matthewjones372.pelican.sessionCookie
-import io.github.matthewjones372.pelican.standardWebhooks
-import io.github.matthewjones372.pelican.tenantFrom
-import io.github.matthewjones372.pelican.textPart
-import io.github.matthewjones372.pelican.webhook
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.Authenticator
+import dev.surefold.pelican.Endpoint
+import dev.surefold.pelican.Identity
+import dev.surefold.pelican.InMemorySessionStore
+import dev.surefold.pelican.InMemoryTenantDirectory
+import dev.surefold.pelican.LongCodec
+import dev.surefold.pelican.Method
+import dev.surefold.pelican.Outcome
+import dev.surefold.pelican.StringCodec
+import dev.surefold.pelican.TenantResolver
+import dev.surefold.pelican.Unauthenticated
+import dev.surefold.pelican.UploadedFile
+import dev.surefold.pelican.Webhook
+import dev.surefold.pelican.authenticated
+import dev.surefold.pelican.bearerAuth
+import dev.surefold.pelican.bufferedFile
+import dev.surefold.pelican.commaSeparated
+import dev.surefold.pelican.cookieParam
+import dev.surefold.pelican.default
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.filePart
+import dev.surefold.pelican.formBody
+import dev.surefold.pelican.headerParam
+import dev.surefold.pelican.json
+import dev.surefold.pelican.jsonBody
+import dev.surefold.pelican.ndjsonIn
+import dev.surefold.pelican.nonEmpty
+import dev.surefold.pelican.of
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.optional
+import dev.surefold.pelican.or
+import dev.surefold.pelican.orFail
+import dev.surefold.pelican.path
+import dev.surefold.pelican.pathParam
+import dev.surefold.pelican.positive
+import dev.surefold.pelican.queryParam
+import dev.surefold.pelican.rateLimit
+import dev.surefold.pelican.rawBody
+import dev.surefold.pelican.repeated
+import dev.surefold.pelican.responseHeader
+import dev.surefold.pelican.role
+import dev.surefold.pelican.sessionCookie
+import dev.surefold.pelican.standardWebhooks
+import dev.surefold.pelican.tenantFrom
+import dev.surefold.pelican.textPart
+import dev.surefold.pelican.webhook
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -73,7 +73,7 @@ import kotlin.time.toJavaDuration
 /**
  * One description, whichever server ends up serving it.
  *
- * This file imports `io.github.matthewjones372.pelican` and nothing else — no
+ * This file imports `dev.surefold.pelican` and nothing else — no
  * server library, no JSON library. That is what makes `OnPekko.kt` possible: it
  * binds *these same values* to handlers, and neither the endpoints below nor
  * the OpenAPI document generated from them knows which server it was.

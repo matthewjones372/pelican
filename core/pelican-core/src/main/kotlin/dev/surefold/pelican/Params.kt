@@ -1,0 +1,283 @@
+package dev.surefold.pelican
+
+/**
+ * The decoded inputs for one request, read back with the key objects declared
+ * on the endpoint. The internal cast is unchecked but sound: a key enters the
+ * map only through the decoder that produced its declared type.
+ */
+class Params(
+    private val values: Map<ParamKey<*>, Any?>,
+    /** The backend's own request object — Pekko's `HttpRequest`, Ktor's `ApplicationCall`. */
+    val underlying: Any?,
+    /** The description this request matched. Null only for a hand-built [Params]. */
+    val endpoint: Endpoint<*, *>? = null,
+    /**
+     * What a caller reconnecting to an event stream said it had already seen.
+     * Read by [lastEventId]; a request that is not one carries null, and so
+     * does a fresh connect.
+     */
+    internal val resumeFrom: String? = null,
+    /** The request's headers, as the interpreter read them for the caller check. Null for a hand-built [Params]. */
+    private val requestHeaders: Credentials? = null,
+) {
+    @Deprecated("Kept so code compiled against 1.0 still links.", level = DeprecationLevel.HIDDEN)
+    constructor(
+        values: Map<ParamKey<*>, Any?>,
+        underlying: Any?,
+        endpoint: Endpoint<*, *>? = null,
+        resumeFrom: String? = null,
+    ) : this(values, underlying, endpoint, resumeFrom, null)
+
+    @Suppress("UNCHECKED_CAST")
+    operator fun <T> get(key: ParamKey<T>): T {
+        if (!values.containsKey(key)) {
+            error(
+                "$key was read but never declared on this endpoint. " +
+                    "Register it with query(...)/header(...)/body(...) first.",
+            )
+        }
+        return values[key] as T
+    }
+
+    operator fun contains(key: ParamKey<*>): Boolean = values.containsKey(key)
+
+    /** What the caller check read, for a second look at who is calling. Null for a hand-built [Params]. */
+    internal val credentials: Credentials? get() = requestHeaders
+
+    /** The first value of request header [name], matched without regard to case, whether or not it was declared. */
+    fun requestHeader(name: String): String? = requestHeaders?.header(name)
+
+    /**
+     * The whole bag, for the one caller that walks it rather than reading known
+     * keys: `lensInputs`, turning a `Params` back into itself as an input tuple.
+     *
+     * `internal` since spec 0010. It was public, and its own doc offered it to
+     * "interpreters that need to walk it" — an audience that never arrived. No
+     * interpreter on `main` called it, none of those taken off it for 1.0 did
+     * either, and a promise kept for nobody is still a promise. An interpreter
+     * that wants the bag can ask for it back, with a caller to point at.
+     */
+    internal fun asMap(): Map<ParamKey<*>, Any?> = values
+
+    // ---------------------------------------------------------- attributes
+
+    @Suppress("DoubleMutabilityForCollection") // Null until first write is the point; see above.
+    private var attributes: MutableMap<Attribute<*>, Any?>? = null
+
+    /**
+     * Reads what a filter worked out earlier. Throws if nothing set it: the
+     * handler is relying on a filter having run, and a missing one is a
+     * wiring mistake.
+     */
+    @Suppress("UNCHECKED_CAST")
+    operator fun <T> get(key: Attribute<T>): T {
+        val set = attributes
+        if (set == null || !set.containsKey(key)) {
+            error(
+                "$key was read but nothing set it on this request. " +
+                    "A filter that sets it has to be registered on the Api, and reach this endpoint.",
+            )
+        }
+        return set[key] as T
+    }
+
+    /** As [get], but null rather than throwing when no filter set it. */
+    @Suppress("UNCHECKED_CAST")
+    fun <T> find(key: Attribute<T>): T? = attributes?.get(key) as T?
+
+    operator fun <T> set(key: Attribute<T>, value: T) {
+        val set = attributes ?: LinkedHashMap<Attribute<*>, Any?>().also { attributes = it }
+        set[key] = value
+    }
+
+    operator fun contains(key: Attribute<*>): Boolean = attributes?.containsKey(key) == true
+
+    // ------------------------------------------------------ response headers
+
+    @Suppress("DoubleMutabilityForCollection") // As with `attributes`: allocated only if used.
+    private var outgoing: MutableMap<String, String>? = null
+
+    private fun outgoing(): MutableMap<String, String> =
+        outgoing ?: LinkedHashMap<String, String>().also { outgoing = it }
+
+    /**
+     * Headers that repeat, in the order they were set: every `Set-Cookie`, and whatever [addRawHeader] appended. A
+     * key set again replaces its header where it stands; an appended header has a key nothing else equals.
+     */
+    @Suppress("DoubleMutabilityForCollection") // Allocated only if used.
+    private var repeated: MutableMap<Any, Pair<String, String>>? = null
+
+    private fun repeated(): MutableMap<Any, Pair<String, String>> =
+        repeated ?: LinkedHashMap<Any, Pair<String, String>>().also { repeated = it }
+
+    private fun append(name: String, value: String) {
+        repeated()[Any()] = name to value
+    }
+
+    /** [name] set to one [value], replacing whatever was set or appended under it. */
+    private fun replace(name: String, value: String) {
+        repeated?.values?.removeAll { it.first.equals(name, ignoreCase = true) }
+        outgoing()[name] = value
+    }
+
+    /**
+     * Sets a declared response header, encoded by its own codec. One the
+     * endpoint never declared throws rather than shipping undocumented.
+     * A `Set-Cookie` is appended, as each cookie is a header of its own.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Any> setHeader(header: ResponseHeader<T>, value: T) {
+        val declared = endpoint?.responseHeaders
+        if (declared != null && declared.none { it === header }) {
+            error(
+                "${header.name} was set but $endpoint never declared it. " +
+                    "Add it with emits(${header.name.substringAfterLast('-')}) on the endpoint.",
+            )
+        }
+        val encoded = (header.codec as PlainCodec<Any>).encode(value)
+        if (header.name.equals(SET_COOKIE, ignoreCase = true)) {
+            append(SET_COOKIE, encoded)
+        } else {
+            replace(header.name, encoded)
+        }
+    }
+
+    /**
+     * An undeclared header, for what no document should promise — an
+     * `X-Debug-*`, something a proxy expects. Undocumented on purpose.
+     */
+    fun setRawHeader(name: String, value: String) {
+        // A Set-Cookie per cookie, so a second one is another header rather than the first one replaced.
+        if (name.equals(SET_COOKIE, ignoreCase = true)) repeated()[RawCookie(value)] = SET_COOKIE to value
+        else replace(name, value)
+    }
+
+    /** As [setRawHeader], but another header under [name] rather than the last one replaced. */
+    fun addRawHeader(name: String, value: String) {
+        append(if (name.equals(SET_COOKIE, ignoreCase = true)) SET_COOKIE else name, value)
+    }
+
+    /**
+     * Sets [cookie] as a `Set-Cookie` header of its own. A second with the same name, path and domain replaces the
+     * first, as it would in the browser. The endpoint must declare `Set-Cookie` with `emits(...)`, as any header.
+     */
+    fun setCookie(cookie: ResponseCookie) {
+        val declared = endpoint?.responseHeaders
+        if (declared != null && declared.none { it.name.equals(SET_COOKIE, ignoreCase = true) }) {
+            error(
+                "Cookie ${cookie.name} was set but $endpoint never declared Set-Cookie. " +
+                    "Add responseHeader<String>(\"Set-Cookie\") with emits(...) on the endpoint.",
+            )
+        }
+        repeated()[CookieSlot(cookie.name, cookie.path, cookie.domain)] = SET_COOKIE to cookie.headerValue
+    }
+
+    /**
+     * What the handler asked to be sent, in order. Put on whatever response
+     * came back, errors included: a header set before a failure was deliberate.
+     */
+    fun responseHeaders(): List<Pair<String, String>> =
+        outgoing?.map { it.key to it.value }.orEmpty() + repeated?.values.orEmpty()
+
+    /**
+     * The headers a required declaration promised but nobody set. Not policed —
+     * failing the response would replace a wrong header with a 500 — but a
+     * test can assert on it.
+     */
+    fun missingRequiredHeaders(): List<ResponseHeader<*>> =
+        endpoint?.responseHeaders.orEmpty().filter { it.required && it.name !in responseHeaders().map { (n, _) -> n } }
+}
+
+private const val SET_COOKIE = "Set-Cookie"
+
+/** What a browser tells two cookies apart by, so a second [Params.setCookie] of one replaces the first. */
+private data class CookieSlot(val name: String, val path: String, val domain: String?)
+
+/** A raw `Set-Cookie` sent twice is sent once. */
+private data class RawCookie(val value: String)
+
+/**
+ * Where a caller reconnecting to an event stream left off — the `Last-Event-ID`
+ * it sent back — or null on a fresh connect.
+ *
+ * An extension rather than a declared input because resume is optional by
+ * nature: a stream is answerable without it, and putting it in the endpoint's
+ * signature would change the arity of every handler for the sake of something
+ * most of them ignore. What to do with the value is the service's — Pelican
+ * frames and delivers, and retention is not its business.
+ */
+fun Params.lastEventId(): String? = resumeFrom
+
+/**
+ * Thrown from a handler to produce a specific error status. Anything else that
+ * escapes a handler becomes a 500.
+ */
+class ApiException(
+    val status: Int,
+    override val message: String,
+    val detail: String? = null,
+    /**
+     * Headers to send with this failure. Undeclared by design: a failure raised
+     * deep in a handler has no endpoint description to hand.
+     */
+    val headers: List<Pair<String, String>> = emptyList(),
+    cause: Throwable? = null,
+) : RuntimeException(message, cause) {
+    init {
+        // Built deep inside a handler from a status that is often computed, so
+        // a throw naming it beats one from a backend's status registry later.
+        checkStatus("ApiException", status, carriesBody = true)
+    }
+}
+
+fun badRequest(message: String): Nothing = throw ApiException(400, message)
+fun notFound(message: String = "Not found"): Nothing = throw ApiException(404, message)
+fun conflict(message: String): Nothing = throw ApiException(409, message)
+
+fun unauthorized(message: String = "Unauthorized", challenge: String? = null): Nothing =
+    throw ApiException(
+        401,
+        message,
+        headers = listOfNotNull(challenge?.let { "WWW-Authenticate" to it }),
+    )
+
+fun forbidden(message: String = "Forbidden"): Nothing = throw ApiException(403, message)
+
+/** Rejects a caller who is being asked to come back later. */
+fun tooManyRequests(message: String = "Too many requests", retryAfterSeconds: Long? = null): Nothing =
+    throw ApiException(
+        429,
+        message,
+        headers = listOfNotNull(retryAfterSeconds?.let { "Retry-After" to it.toString() }),
+    )
+
+/**
+ * The request body was larger than [Api.maxBodyBytes], raised before it is
+ * decoded. [detail] is for a limit that is not the API's own — a multipart
+ * part declares its own bound, and naming the wrong number misleads a caller.
+ */
+class PayloadTooLarge(val limit: Long, detail: String? = null) :
+    RuntimeException(detail ?: "Request body exceeds the configured limit of $limit bytes")
+
+/**
+ * Nothing this service describes answers this request: 405 where some other
+ * method describes the path, 404 otherwise.
+ *
+ * A type of its own rather than an [ApiException] because the two are the same
+ * response and different traffic. `notFound()` from a handler is the endpoint
+ * doing its job and is already counted as a request; this is a request that
+ * never reached one, and only this one belongs in [RefusalReason.UNMATCHED].
+ */
+class Unrouted(
+    val status: Int,
+    override val message: String,
+    val detail: String? = null,
+) : RuntimeException(message)
+
+/**
+ * The request body arrived under a media type no codec this endpoint declared
+ * can read. Its own type for the same reason [Unrouted] is.
+ */
+class UnsupportedMediaType(val detail: String) : RuntimeException("Unsupported media type") {
+    override val message: String get() = "Unsupported media type"
+}

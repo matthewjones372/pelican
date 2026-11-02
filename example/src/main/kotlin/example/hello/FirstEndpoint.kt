@@ -21,14 +21,14 @@ package example.hello
  * two lines of test the README shows beside it.
  */
 
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pathParam
+import dev.surefold.pelican.api
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.pathParam
 
 data class Greeting(val message: String)
 

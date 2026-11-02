@@ -1,17 +1,17 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ClientRequest
-import io.github.matthewjones372.pelican.In2
-import io.github.matthewjones372.pelican.In3
-import io.github.matthewjones372.pelican.InMemoryClientTransport
-import io.github.matthewjones372.pelican.RefusalObserver
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.RequestSpec
-import io.github.matthewjones372.pelican.test.ResponseSpec
-import io.github.matthewjones372.pelican.test.Transport
-import io.github.matthewjones372.pelican.test.apiClient
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ClientRequest
+import dev.surefold.pelican.In2
+import dev.surefold.pelican.In3
+import dev.surefold.pelican.InMemoryClientTransport
+import dev.surefold.pelican.RefusalObserver
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.test.ApiClient
+import dev.surefold.pelican.test.RequestSpec
+import dev.surefold.pelican.test.ResponseSpec
+import dev.surefold.pelican.test.Transport
+import dev.surefold.pelican.test.apiClient
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -165,7 +165,7 @@ class RefusalObserverAcrossBackendsTest {
 
 /**
  * `InMemoryClientTransport` as a test client's transport. It is a
- * [io.github.matthewjones372.pelican.ClientTransport] — what a generated client
+ * [dev.surefold.pelican.ClientTransport] — what a generated client
  * takes — and this suite drives the same requests through it as through a
  * socket.
  */

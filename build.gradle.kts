@@ -332,7 +332,7 @@ subprojects {
                 // String templates the generators read at runtime. They are
                 // `.kt` for editor highlighting only; some are fragments, and
                 // some carry placeholders that do not parse standalone.
-                "src/main/resources/io/github/matthewjones372/pelican/*/*.kt",
+                "src/main/resources/dev/surefold/pelican/*/*.kt",
             )
             ktlint(ktlintVersion).editorConfigOverride(ktlintOverrides)
         }

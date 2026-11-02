@@ -1,31 +1,31 @@
 package example
 
-import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.In2
-import io.github.matthewjones372.pelican.In3
-import io.github.matthewjones372.pelican.In4
-import io.github.matthewjones372.pelican.In5
-import io.github.matthewjones372.pelican.Params
-import io.github.matthewjones372.pelican.UploadedFile
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.Handlers
-import io.github.matthewjones372.pelican.jetty.PelicanServer
-import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.jetty.start
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.test.ApiCallFailed
-import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.decodeBody
-import io.github.matthewjones372.pelican.test.jetty.client
-import io.github.matthewjones372.pelican.test.jetty.inMemory
-import io.github.matthewjones372.pelican.test.rawText
-import io.github.matthewjones372.pelican.test.shouldBeFailure
-import io.github.matthewjones372.pelican.test.shouldBeOk
-import io.github.matthewjones372.pelican.test.shouldBeResponse
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.In2
+import dev.surefold.pelican.In3
+import dev.surefold.pelican.In4
+import dev.surefold.pelican.In5
+import dev.surefold.pelican.Params
+import dev.surefold.pelican.UploadedFile
+import dev.surefold.pelican.api
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.Handlers
+import dev.surefold.pelican.jetty.PelicanServer
+import dev.surefold.pelican.jetty.handledOrFail
+import dev.surefold.pelican.jetty.start
+import dev.surefold.pelican.orFail
+import dev.surefold.pelican.test.ApiCallFailed
+import dev.surefold.pelican.test.ApiClient
+import dev.surefold.pelican.test.decodeBody
+import dev.surefold.pelican.test.jetty.client
+import dev.surefold.pelican.test.jetty.inMemory
+import dev.surefold.pelican.test.rawText
+import dev.surefold.pelican.test.shouldBeFailure
+import dev.surefold.pelican.test.shouldBeOk
+import dev.surefold.pelican.test.shouldBeResponse
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll
@@ -386,7 +386,7 @@ class UndeclaredFailureTest {
 
     private fun apiThatReturnsAStrayFailure(
         exposeInternalErrors: Boolean = false,
-        onServerError: ((String, io.github.matthewjones372.pelican.Endpoint<*, *>?, Throwable) -> Unit)? = null,
+        onServerError: ((String, dev.surefold.pelican.Endpoint<*, *>?, Throwable) -> Unit)? = null,
     ) = api(
         endpoints = listOf(fetchUser handledOrFail { strayFailure(ApiError(410, "nope")) }),
         codecs = JacksonCodecs,

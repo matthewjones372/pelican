@@ -1,12 +1,12 @@
 package example
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import dev.surefold.pelican.ClientResponse
+import dev.surefold.pelican.ClientTransport
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jackson.defaultMapper
 import example.generated.ApiCallFailed
 import example.generated.OrdersClient
-import io.github.matthewjones372.pelican.ClientResponse
-import io.github.matthewjones372.pelican.ClientTransport
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jackson.defaultMapper
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldNotBeNull

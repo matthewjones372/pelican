@@ -1,11 +1,11 @@
 package example
 
+import dev.surefold.pelican.ApiSpec
+import dev.surefold.pelican.openapi.OpenApiVersion
+import dev.surefold.pelican.openapi.openApiJson
+import dev.surefold.pelican.openapi.openApiYaml
 import example.bookmarks.bookmarksSpec
 import example.secured.securedSpec
-import io.github.matthewjones372.pelican.ApiSpec
-import io.github.matthewjones372.pelican.openapi.OpenApiVersion
-import io.github.matthewjones372.pelican.openapi.openApiJson
-import io.github.matthewjones372.pelican.openapi.openApiYaml
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.maps.shouldNotBeEmpty

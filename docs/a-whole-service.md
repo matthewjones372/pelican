@@ -28,31 +28,31 @@ the Pekko dependencies from [Getting started](../README.md#getting-started);
 the service changes in three places, listed [after the code](#on-pekko-instead).
 
 ```kotlin
-import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.IntCodec
-import io.github.matthewjones372.pelican.StringCodec
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.between
-import io.github.matthewjones372.pelican.default
-import io.github.matthewjones372.pelican.describedAs
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.headerParam
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.jetty.streamedNow
-import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.map
-import io.github.matthewjones372.pelican.matching
-import io.github.matthewjones372.pelican.nonEmpty
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.optional
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.queryParam
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.IntCodec
+import dev.surefold.pelican.StringCodec
+import dev.surefold.pelican.api
+import dev.surefold.pelican.between
+import dev.surefold.pelican.default
+import dev.surefold.pelican.describedAs
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.headerParam
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.jetty.handledOrFail
+import dev.surefold.pelican.jetty.streamedNow
+import dev.surefold.pelican.jsonBody
+import dev.surefold.pelican.map
+import dev.surefold.pelican.matching
+import dev.surefold.pelican.nonEmpty
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.optional
+import dev.surefold.pelican.orFail
+import dev.surefold.pelican.pathParam
+import dev.surefold.pelican.queryParam
 
 // ---------------------------------------------------------------- 1. models
 
@@ -84,7 +84,7 @@ val badKey          = errorJson<ApiError>(401, "Missing or bad API key")
 
 // ------------------------------------------------------------- 3. endpoints
 //
-// This section imports `io.github.matthewjones372.pelican` and nothing else. No server library, no Jackson.
+// This section imports `dev.surefold.pelican` and nothing else. No server library, no Jackson.
 // These are descriptions: they do no work and hold no handler.
 
 val getBookmark = endpoint(bookmarkId) {
@@ -183,7 +183,7 @@ returns `ok(...)` or one of them, and the document lists exactly those
 statuses.
 
 **The descriptions import nothing but core.** Section 3 uses only
-`io.github.matthewjones372.pelican`. An endpoint description does no work and
+`dev.surefold.pelican`. An endpoint description does no work and
 holds no handler, so the OpenAPI generator, the test client and the client
 generator read it without a server, and either backend can bind it.
 
@@ -201,13 +201,13 @@ runs on its own; a real service puts its own data access there.
 
 On a service that runs Pekko HTTP, three things change:
 
-- The binder imports: `io.github.matthewjones372.pelican.pekko.handledOrFail`
-  and `io.github.matthewjones372.pelican.pekko.streamedNow` in place of the
+- The binder imports: `dev.surefold.pelican.pekko.handledOrFail`
+  and `dev.surefold.pelican.pekko.streamedNow` in place of the
   `jetty` ones. The names are the same.
 - `listBookmarks`' handler returns a Pekko `Source` instead of a `Sequence`:
   `Source.from(Bookmarks.list(max, tag))`, importing
   `org.apache.pekko.stream.javadsl.Source`.
-- `startWithDocs` comes from `io.github.matthewjones372.pelican.pekko.docs`.
+- `startWithDocs` comes from `dev.surefold.pelican.pekko.docs`.
 
 Sections 1 to 4 and 6 are unchanged.
 [On Pekko](cookbook.md#on-pekko) in the cookbook shows the same switch on the

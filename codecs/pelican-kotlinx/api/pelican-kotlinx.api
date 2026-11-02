@@ -1,19 +1,19 @@
-public final class io/github/matthewjones372/pelican/kotlinx/KotlinxCodecs : io/github/matthewjones372/pelican/Codecs {
-	public static final field Default Lio/github/matthewjones372/pelican/kotlinx/KotlinxCodecs$Default;
+public final class dev/surefold/pelican/kotlinx/KotlinxCodecs : dev/surefold/pelican/Codecs {
+	public static final field Default Ldev/surefold/pelican/kotlinx/KotlinxCodecs$Default;
 	public fun <init> (Lkotlinx/serialization/json/Json;)V
-	public fun codec (Lkotlin/reflect/KType;)Lio/github/matthewjones372/pelican/BodyCodec;
-	public fun readTree (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonValue;
-	public fun schema (Lkotlin/reflect/KType;Lio/github/matthewjones372/pelican/SchemaComponents;)Lio/github/matthewjones372/pelican/JsonObj;
+	public fun codec (Lkotlin/reflect/KType;)Ldev/surefold/pelican/BodyCodec;
+	public fun readTree (Ljava/lang/String;)Ldev/surefold/pelican/JsonValue;
+	public fun schema (Lkotlin/reflect/KType;Ldev/surefold/pelican/SchemaComponents;)Ldev/surefold/pelican/JsonObj;
 }
 
-public final class io/github/matthewjones372/pelican/kotlinx/KotlinxCodecs$Default : io/github/matthewjones372/pelican/Codecs {
-	public fun codec (Lkotlin/reflect/KType;)Lio/github/matthewjones372/pelican/BodyCodec;
-	public fun codec (Lkotlin/reflect/KType;Ljava/lang/String;)Lio/github/matthewjones372/pelican/BodyCodec;
-	public fun readTree (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonValue;
-	public fun schema (Lkotlin/reflect/KType;Lio/github/matthewjones372/pelican/SchemaComponents;)Lio/github/matthewjones372/pelican/JsonObj;
+public final class dev/surefold/pelican/kotlinx/KotlinxCodecs$Default : dev/surefold/pelican/Codecs {
+	public fun codec (Lkotlin/reflect/KType;)Ldev/surefold/pelican/BodyCodec;
+	public fun codec (Lkotlin/reflect/KType;Ljava/lang/String;)Ldev/surefold/pelican/BodyCodec;
+	public fun readTree (Ljava/lang/String;)Ldev/surefold/pelican/JsonValue;
+	public fun schema (Lkotlin/reflect/KType;Ldev/surefold/pelican/SchemaComponents;)Ldev/surefold/pelican/JsonObj;
 }
 
-public final class io/github/matthewjones372/pelican/kotlinx/KotlinxCodecsKt {
+public final class dev/surefold/pelican/kotlinx/KotlinxCodecsKt {
 	public static final fun defaultJson ()Lkotlinx/serialization/json/Json;
 }
 

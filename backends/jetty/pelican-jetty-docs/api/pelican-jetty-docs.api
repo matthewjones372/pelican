@@ -1,9 +1,9 @@
-public final class io/github/matthewjones372/pelican/jetty/docs/DocsKt {
-	public static final fun docsHandler (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;)Lorg/eclipse/jetty/server/Handler;
-	public static synthetic fun docsHandler$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
-	public static final fun handlerWithDocs (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/jetty/Handlers;Lio/github/matthewjones372/pelican/openapi/Docs;)Lorg/eclipse/jetty/server/Handler;
-	public static synthetic fun handlerWithDocs$default (Lio/github/matthewjones372/pelican/Api;Lio/github/matthewjones372/pelican/jetty/Handlers;Lio/github/matthewjones372/pelican/openapi/Docs;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
-	public static final fun startWithDocs (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;Lio/github/matthewjones372/pelican/jetty/Handlers;)Lio/github/matthewjones372/pelican/jetty/PelicanServer;
-	public static synthetic fun startWithDocs$default (Lio/github/matthewjones372/pelican/Api;ILjava/lang/String;Lio/github/matthewjones372/pelican/openapi/Docs;Lio/github/matthewjones372/pelican/jetty/Handlers;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/jetty/PelicanServer;
+public final class dev/surefold/pelican/jetty/docs/DocsKt {
+	public static final fun docsHandler (Ldev/surefold/pelican/Api;Ldev/surefold/pelican/openapi/Docs;)Lorg/eclipse/jetty/server/Handler;
+	public static synthetic fun docsHandler$default (Ldev/surefold/pelican/Api;Ldev/surefold/pelican/openapi/Docs;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
+	public static final fun handlerWithDocs (Ldev/surefold/pelican/Api;Ldev/surefold/pelican/jetty/Handlers;Ldev/surefold/pelican/openapi/Docs;)Lorg/eclipse/jetty/server/Handler;
+	public static synthetic fun handlerWithDocs$default (Ldev/surefold/pelican/Api;Ldev/surefold/pelican/jetty/Handlers;Ldev/surefold/pelican/openapi/Docs;ILjava/lang/Object;)Lorg/eclipse/jetty/server/Handler;
+	public static final fun startWithDocs (Ldev/surefold/pelican/Api;ILjava/lang/String;Ldev/surefold/pelican/openapi/Docs;Ldev/surefold/pelican/jetty/Handlers;)Ldev/surefold/pelican/jetty/PelicanServer;
+	public static synthetic fun startWithDocs$default (Ldev/surefold/pelican/Api;ILjava/lang/String;Ldev/surefold/pelican/openapi/Docs;Ldev/surefold/pelican/jetty/Handlers;ILjava/lang/Object;)Ldev/surefold/pelican/jetty/PelicanServer;
 }
 
