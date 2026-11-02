@@ -51,7 +51,11 @@ jobs:
         run: ./gradlew :pelican-oidc:installChromium --stacktrace
 
       - name: Build and test
-        run: ./gradlew build ${{ matrix.gradleArgs }} --stacktrace
+        run: |
+          echo "kernel $(uname -r); memlock $(ulimit -l); io_uring_disabled $(sysctl -n kernel.io_uring_disabled 2>/dev/null || echo n/a)"
+          sudo prlimit --pid $$ --memlock=unlimited:unlimited
+          echo "memlock now $(ulimit -l)"
+          ./gradlew build ${{ matrix.gradleArgs }} --continue --stacktrace
 
       # Tests against real brokers in Docker, tagged `containers` and kept out
       # of `build` so a build on a laptop needs no Docker. The runner has it.
