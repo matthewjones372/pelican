@@ -16,10 +16,10 @@ which the example module compiles on every build. Run it from a clone with:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation(platform("io.github.matthewjones372:pelican-bom:$pelicanVersion"))
-    implementation("io.github.matthewjones372:pelican-jetty")
-    implementation("io.github.matthewjones372:pelican-jackson")
-    implementation("io.github.matthewjones372:pelican-jetty-docs")
+    implementation(platform("dev.surefold:pelican-bom:$pelicanVersion"))
+    implementation("dev.surefold:pelican-jetty")
+    implementation("dev.surefold:pelican-jackson")
+    implementation("dev.surefold:pelican-jetty-docs")
 }
 ```
 

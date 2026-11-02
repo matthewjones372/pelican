@@ -5,14 +5,14 @@ package example.codecs
  *
  *     dependencies {
  *         // the interpreter; brings pelican-core and Jetty's server
- *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
+ *         implementation("dev.surefold:pelican-jetty:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
- *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
+ *         implementation("dev.surefold:pelican-jackson:1.0.0")
  *         // @Serializable, so the same payloads can be read by pelican-kotlinx
  *         // (with the kotlin("plugin.serialization") Gradle plugin applied)
  *         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
  *         // startWithDocs, /openapi.json and Swagger UI
- *         implementation("io.github.matthewjones372:pelican-jetty-docs:1.0.0")
+ *         implementation("dev.surefold:pelican-jetty-docs:1.0.0")
  *     }
  */
 

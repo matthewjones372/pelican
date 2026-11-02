@@ -5,13 +5,13 @@ package example.telemetry
  *
  *     dependencies {
  *         // the interpreter; brings pelican-core and Jetty's server
- *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
+ *         implementation("dev.surefold:pelican-jetty:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
- *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
+ *         implementation("dev.surefold:pelican-jackson:1.0.0")
  *         // Micrometer meters
- *         implementation("io.github.matthewjones372:pelican-metrics:1.0.0")
+ *         implementation("dev.surefold:pelican-metrics:1.0.0")
  *         // OpenTelemetry spans and metrics
- *         implementation("io.github.matthewjones372:pelican-metrics-otel:1.0.0")
+ *         implementation("dev.surefold:pelican-metrics-otel:1.0.0")
  *         // which SDK is the service's choice, not the library's
  *         implementation("io.opentelemetry:opentelemetry-sdk:1.65.0")
  *     }

@@ -24,8 +24,8 @@ on the differences that would break them.
 
 ```kotlin
 dependencies {
-    testImplementation("io.github.matthewjones372:pelican-test-golden:1.2.0")
-    testImplementation("io.github.matthewjones372:pelican-jackson:1.2.0") // the Codecs requestsOnly takes
+    testImplementation("dev.surefold:pelican-test-golden:1.2.0")
+    testImplementation("dev.surefold:pelican-jackson:1.2.0") // the Codecs requestsOnly takes
 }
 ```
 

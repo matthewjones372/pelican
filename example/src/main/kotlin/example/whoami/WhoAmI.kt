@@ -5,9 +5,9 @@ package example.whoami
  *
  *     dependencies {
  *         // the interpreter; brings pelican-core and Jetty's server
- *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
+ *         implementation("dev.surefold:pelican-jetty:1.0.0")
  *         // JacksonCodecs, and the schemas the document derives
- *         implementation("io.github.matthewjones372:pelican-jackson:1.0.0")
+ *         implementation("dev.surefold:pelican-jackson:1.0.0")
  *     }
  */
 

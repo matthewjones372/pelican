@@ -5,7 +5,7 @@ package example.backends
  *
  *     dependencies {
  *         // the interpreter; brings pelican-core and Jetty's server
- *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
+ *         implementation("dev.surefold:pelican-jetty:1.0.0")
  *     }
  */
 

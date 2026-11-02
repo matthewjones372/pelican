@@ -5,7 +5,7 @@ package example.backends
  *
  *     dependencies {
  *         // the interpreter and Gannet under it; brings pelican-core
- *         implementation("io.github.matthewjones372:pelican-gannet:1.0.0")
+ *         implementation("dev.surefold:pelican-gannet:1.0.0")
  *     }
  */
 

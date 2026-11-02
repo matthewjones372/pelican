@@ -5,11 +5,11 @@ package example.mcp
  *
  *     dependencies {
  *         // the interpreter; brings pelican-core and Jetty's server
- *         implementation("io.github.matthewjones372:pelican-jetty:1.0.0")
+ *         implementation("dev.surefold:pelican-jetty:1.0.0")
  *         // the descriptions as MCP tools
- *         implementation("io.github.matthewjones372:pelican-mcp:1.0.0")
+ *         implementation("dev.surefold:pelican-mcp:1.0.0")
  *         // serves the MCP tools on /mcp
- *         implementation("io.github.matthewjones372:pelican-jetty-mcp:1.0.0")
+ *         implementation("dev.surefold:pelican-jetty-mcp:1.0.0")
  *     }
  */
 

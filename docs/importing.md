@@ -19,8 +19,8 @@ plugins { id("dev.surefold.pelican") version "1.2.0" }
 val pelicanImport = configurations.register("pelicanImport")
 
 dependencies {
-    implementation("io.github.matthewjones372:pelican-core:1.2.0")    // what the generated file compiles against
-    pelicanImport("io.github.matthewjones372:pelican-import:1.2.0")   // what the task runs
+    implementation("dev.surefold:pelican-core:1.2.0")    // what the generated file compiles against
+    pelicanImport("dev.surefold:pelican-import:1.2.0")   // what the task runs
 }
 
 pelican {
