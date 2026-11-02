@@ -91,6 +91,42 @@ gradlePlugin {
                 "and endpoint descriptions from a document."
             tags.set(listOf("openapi", "kotlin", "codegen", "pelican"))
         }
+        // The ID Pelican had up to 1.2.0, published once more at 1.3.0 so a build that still applies it gets this
+        // plugin, and the Portal's page for it says where it went (spec 0107). The Portal cannot relocate an ID.
+        // Remove after 1.3.0: the marker stays on Central and the Portal.
+        create("pelicanOldId") {
+            id = "io.github.matthewjones372.pelican"
+            implementationClass = "dev.surefold.pelican.gradle.PelicanPlugin"
+            displayName = "Pelican (moved to dev.surefold.pelican)"
+            description = "Pelican's Gradle plugin is now dev.surefold.pelican, with group dev.surefold. This ID " +
+                "applies the same plugin at 1.3.0 and is not published again."
+            tags.set(listOf("openapi", "kotlin", "codegen", "pelican"))
+        }
+    }
+}
+
+// A POM-only publication at the plugin's old coordinates, relocating to dev.surefold (spec 0107), as the root build
+// declares for the libraries. GitHub Packages, which keeps snapshots, takes dev.surefold only.
+publishing {
+    publications.register<MavenPublication>("relocation") {
+        groupId = "io.github.matthewjones372"
+        artifactId = "pelican-gradle-plugin"
+        version = project.version.toString()
+        pom {
+            packaging = "pom"
+            distributionManagement {
+                relocation {
+                    groupId.set("dev.surefold")
+                    message.set("Pelican moved to dev.surefold in 1.3.0; packages and the plugin ID moved with it.")
+                }
+            }
+        }
+    }
+}
+tasks.withType<PublishToMavenRepository>().configureEach {
+    onlyIf("only dev.surefold goes to GitHub Packages") { task ->
+        val publish = task as PublishToMavenRepository
+        publish.repository.name != "githubPackages" || publish.publication.groupId == "dev.surefold"
     }
 }
 

@@ -402,5 +402,37 @@ fun Project.publishWithPom() {
                 credentials(PasswordCredentials::class)
             }
         }
+        relocatedFromOldGroup(this@publishWithPom.name, version.toString())
+    }
+    onlyDevSurefoldToGithubPackages()
+}
+
+/**
+ * A POM-only publication at the coordinates Pelican had up to 1.2.0, relocating to the same module under
+ * `dev.surefold` (spec 0107). Maven and Gradle follow it, so a build still on `io.github.matthewjones372` resolves
+ * the new module. The Gradle plugin's build declares the same for its own artifact.
+ */
+fun PublishingExtension.relocatedFromOldGroup(module: String, version: String) {
+    publications.register<MavenPublication>("relocation") {
+        groupId = "io.github.matthewjones372"
+        artifactId = module
+        this.version = version
+        pom {
+            packaging = "pom"
+            distributionManagement {
+                relocation {
+                    groupId.set("dev.surefold")
+                    message.set("Pelican moved to dev.surefold in 1.3.0; packages and the plugin ID moved with it.")
+                }
+            }
+        }
+    }
+}
+
+/** The relocation POMs are for Central: GitHub Packages, which keeps snapshots, takes `dev.surefold` only. */
+fun Project.onlyDevSurefoldToGithubPackages() = tasks.withType<PublishToMavenRepository>().configureEach {
+    onlyIf("only dev.surefold goes to GitHub Packages") { task ->
+        val publish = task as PublishToMavenRepository
+        publish.repository.name != "githubPackages" || publish.publication.groupId == "dev.surefold"
     }
 }
