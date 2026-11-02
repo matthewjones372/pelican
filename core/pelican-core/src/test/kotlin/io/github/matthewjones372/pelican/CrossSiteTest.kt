@@ -2,13 +2,28 @@ package io.github.matthewjones372.pelican
 
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.reflect.KType
 
 /** A browser attaches a cookie to a request another site makes it send; one changing state is refused. Spec 0094. */
 class CrossSiteTest {
+
+    /** The body is never what is under test, so the codec is the identity. */
+    private object Strings : Codecs {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T> codec(type: KType): BodyCodec<T> = object : BodyCodec<String> {
+            override fun encodeToString(value: String) = value
+            override fun decodeFromString(text: String) = text
+        } as BodyCodec<T>
+
+        override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> = codec(type)
+
+        override fun schema(type: KType, components: SchemaComponents): JsonObj = jsonObj { "type" to "string" }
+    }
 
     private val sessions = sessionCookie("sid")
     private val visitor = authenticated(sessions.scheme) { it.subject }
@@ -31,6 +46,12 @@ class CrossSiteTest {
         text()
     }
 
+    private val search = endpoint(jsonBody<String>()) {
+        query("notes" / "search")
+        authenticatedBy(visitor)
+        text()
+    }
+
     private val withToken = endpoint {
         post("tokens")
         authenticatedBy(holder)
@@ -40,9 +61,10 @@ class CrossSiteTest {
     private val observed = mutableListOf<String>()
 
     private fun api(csrf: Boolean = true, cors: Cors? = null) = api(
-        listOf(post, read, withToken).map { ep ->
+        listOf(post, read, search, withToken).map { ep ->
             ServerEndpoint(ep) { CompletableFuture.completedStage("done" as Any?).also { ran.incrementAndGet() } }
         },
+        codecs = Strings,
     ) {
         authenticate(sessions.scheme, sessions)
         authenticate(bearer, tokens)
@@ -101,6 +123,12 @@ class CrossSiteTest {
     @Test
     fun `a GET changes nothing, so it is not checked`() {
         send(Method.GET, "/notes", "Origin" to "https://evil.example") shouldBe 200
+    }
+
+    @Test
+    fun `a cookie QUERY is a safe read, so another site's is not refused by this check`() {
+        send(Method.QUERY, "/notes/search", "Origin" to "https://evil.example") shouldNotBe 403
+        observed shouldBe emptyList()
     }
 
     @Test

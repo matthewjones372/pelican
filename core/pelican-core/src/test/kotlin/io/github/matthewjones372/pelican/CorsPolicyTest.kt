@@ -25,13 +25,18 @@ class CorsPolicyTest {
         json<String>()
     }
 
+    private val searchUsers = endpoint(jsonBody<String>()) {
+        query("lookups" / "search")
+        json<String>()
+    }
+
     private val health = endpoint {
         get("health")
         text()
     }
 
     private fun api(cors: Cors): Api = api(
-        endpoints = listOf(getUser, updateUser, health).map { ep ->
+        endpoints = listOf(getUser, updateUser, searchUsers, health).map { ep ->
             ServerEndpoint(ep) { CompletableFuture.completedStage(null) }
         },
     ) {
@@ -130,6 +135,15 @@ class CorsPolicyTest {
         val allowed = policy(cors(app)).preflight(app, "PUT", "/users/7") as CorsPreflight.Allowed
 
         allowed.headers.toMap()["Access-Control-Allow-Headers"] shouldBe "X-Trace-Id, Content-Type, Authorization"
+    }
+
+    @Test
+    fun `a preflight for QUERY lists QUERY among the methods offered for its path`() {
+        val allowed = policy(cors(app)).preflight(app, "QUERY", "/lookups/search") as CorsPreflight.Allowed
+        val headers = allowed.headers.toMap()
+
+        headers["Access-Control-Allow-Methods"] shouldBe "QUERY"
+        headers["Access-Control-Allow-Origin"] shouldBe app
     }
 
     @Test

@@ -1,8 +1,6 @@
 # 0106 - HTTP QUERY (RFC 10008)
 
-Drafted by a Claude Sonnet worker for the Doorlist generic launch (`PELICAN-HTTP-QUERY`), from the Doorlist
-packet `docs/reviews/2026-11-01-pelican-http-query.md`. Baseline main `7e6d6124`. Number 0106 free; open PRs
-362 and 338 are dependency bumps. Independent review is recorded in the pull request, not here.
+Approved by the owner 2026-11-02. Provenance, baseline and independent-review notes are in the pull request.
 
 ## Problem
 `Method` is `GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS`. A read whose criteria do not fit a URL is declared as a
@@ -10,7 +8,8 @@ packet `docs/reviews/2026-11-01-pelican-http-query.md`. Baseline main `7e6d6124`
 safe, idempotent, request content required.
 
 ## Not doing
-No Doorlist routes, no cache-key or CDN behaviour, no `GET`-to-`QUERY` rewriting, no server-side response caching,
+No Doorlist routes, no cache-key or CDN behaviour, no `GET`-to-`QUERY` rewriting, no server-side response caching, no `Accept-Query` response header (RFC 10008 section 3) or advertising of
+supported query media types,
 no stable release. MCP tool annotations: Pelican derives none today (no read-only or idempotent hints exist), so
 there is nothing to mark; a `QUERY` endpoint derives a tool exactly as a `POST` does.
 
@@ -45,7 +44,7 @@ without a second path. The alternative of a Doorlist-side adapter is rejected by
 3.1 keeps the default document valid; the alternative (throw unless 3.2) would break docs for any API on defaults.
 
 ## Stack
-- [x] `claude/http-query-20261102`: whole slice; Method, core rules, Jetty/Pekko/Gannet, OpenAPI, importer,
+- [ ] `claude/http-query-20261102`: whole slice; Method, core rules, Jetty/Pekko/Gannet, OpenAPI, importer,
       docs. Over the ~200 line soft cap because a new enum constant must compile in every exhaustive `when`; the
       tests dominate the count.
       Done when: tests below pass in `./gradlew build`.
@@ -56,6 +55,9 @@ and bound: accept with Content-Type, 400 without, 415 wrong, safe-repeat, `Conte
 trip, 405 listing QUERY. Existing methods unchanged.
 
 ## Open questions
+- Resolved, owner decision 2026-11-02: adding the `QUERY` constant is a minor-version source-compatibility change
+  (CHANGELOG note and a line in the reference Stability section).
+- Resolved, owner decision 2026-11-02: ships as one stack entry, not split.
 - Name `query(path)` reads like the existing `query(vararg QueryParam)`; overloads are unambiguous. Recommend keep.
 - Source break: an exhaustive `when (method)` in caller code needs a `QUERY` branch. Recommend note in CHANGELOG.
 - Refuse a `QUERY` that declares query-string parameters? RFC allows them. Recommend allow.

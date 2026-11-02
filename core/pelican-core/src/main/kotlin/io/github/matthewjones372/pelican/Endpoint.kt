@@ -768,8 +768,6 @@ private fun validate(ep: Endpoint<*, *>) {
     validateResponseHeaders(ep)
 }
 
-/** A signature is over bytes held whole, which only a body a codec reads whole is. */
-
 /** RFC 10008 requires request content, and only a decoding codec can check the `Content-Type` it arrives with. */
 private fun validateQuery(ep: Endpoint<*, *>) {
     if (ep.method != Method.QUERY) return
@@ -781,6 +779,7 @@ private fun validateQuery(ep: Endpoint<*, *>) {
     }
 }
 
+/** A signature is over bytes held whole, which only a body a codec reads whole is. */
 private fun validateSignature(ep: Endpoint<*, *>) {
     if (ep.signedBy == null) return
     require(ep.bodyInput is JsonBody<*> || ep.bodyInput is FormBody<*> || ep.bodyInput is NegotiatedBody<*>) {

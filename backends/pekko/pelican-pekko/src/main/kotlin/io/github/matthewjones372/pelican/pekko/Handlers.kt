@@ -172,5 +172,5 @@ internal fun Method.toPekko(): HttpMethod = when (this) {
 }
 
 /** Pekko has no `QUERY`; equality is by every field, so the server's parser and the routes must share this one. */
-internal val PEKKO_QUERY: HttpMethod =
+val PEKKO_QUERY: HttpMethod =
     HttpMethods.custom("QUERY", true, true, HttpMethods.POST.requestEntityAcceptance())

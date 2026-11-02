@@ -6877,7 +6877,8 @@ which is what a codec module publishes and what imports back. The whole of the
 From 1.0.0, the public API of the released modules is stable, and a breaking
 change waits for a major release. The modules marked `main` in
 [the module table](#modules) are outside that promise until a release contains
-them, and so is any `-SNAPSHOT` build.
+them, and so is any `-SNAPSHOT` build. A new constant on a public enum such as `Method` is a minor-version change: it
+adds to the binary contract, and a caller's exhaustive `when` over the enum needs a branch for it.
 
 Two artefacts in the repository are the contract, and each is checked on every
 build rather than asserted in prose:
