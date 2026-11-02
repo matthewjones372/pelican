@@ -405,6 +405,7 @@ fun Project.publishWithPom() {
         relocatedFromOldGroup(this@publishWithPom.name, version.toString())
     }
     onlyDevSurefoldToGithubPackages()
+    onlyOneNamespaceToCentral()
 }
 
 /**
@@ -425,6 +426,22 @@ fun PublishingExtension.relocatedFromOldGroup(module: String, version: String) {
                     message.set("Pelican moved to dev.surefold in 2.0.0; packages and the plugin ID moved with it.")
                 }
             }
+        }
+    }
+}
+
+/**
+ * The Central Portal refuses a deployment with files for two namespaces, and a Gradle run uploads one deployment, so
+ * publish.yml publishes to Central once per namespace: `dev.surefold` by default, then the relocation POMs with
+ * `-PcentralNamespace=io.github.matthewjones372`. The Gradle plugin's build filters its own publications the same way.
+ */
+fun Project.onlyOneNamespaceToCentral() {
+    val namespace = providers.gradleProperty("centralNamespace").getOrElse("dev.surefold")
+    tasks.withType<PublishToMavenRepository>().configureEach {
+        onlyIf("only $namespace goes to Central in this run") { task ->
+            val publish = task as PublishToMavenRepository
+            val group = publish.publication.groupId
+            publish.repository.name != "mavenCentral" || group == namespace || group.startsWith("$namespace.")
         }
     }
 }
