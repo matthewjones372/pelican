@@ -422,7 +422,7 @@ fun PublishingExtension.relocatedFromOldGroup(module: String, version: String) {
             distributionManagement {
                 relocation {
                     groupId.set("dev.surefold")
-                    message.set("Pelican moved to dev.surefold in 1.3.0; packages and the plugin ID moved with it.")
+                    message.set("Pelican moved to dev.surefold in 2.0.0; packages and the plugin ID moved with it.")
                 }
             }
         }

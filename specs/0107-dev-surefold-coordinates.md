@@ -20,8 +20,8 @@ depend on `dev.surefold` artifacts while still publishing under the old name.
 
 ```kotlin
 // build.gradle.kts in a project using pelican
-plugins { id("dev.surefold.pelican") version "1.3.0" }
-dependencies { implementation("dev.surefold:pelican-core:1.3.0") }
+plugins { id("dev.surefold.pelican") version "2.0.0" }
+dependencies { implementation("dev.surefold:pelican-core:2.0.0") }
 
 // sources
 import dev.surefold.pelican.Webhook
@@ -65,7 +65,8 @@ grep -rn "io.github.matthewjones372" --include=*.kt --include=*.kts . | grep -v 
 
 1. The package entry moves every source file, far over the ~200-line cap. **Answered (owner, 2 Nov 2026):** allow it for this mechanical
    entry and review the script plus a sample.
-2. Version for the move. **Answered (owner, 2 Nov 2026):** the next minor, 1.3.0, which is a breaking change in a 1.x line. The
+2. Version for the move. **Answered (owner, 2 Nov 2026), and changed at release:** 2.0.0, a major, since the
+   CHANGELOG promises a stable API from 1.0 and this move breaks every import. First answered as the next minor, 1.3.0. The
    alternative, 2.0.0, is more honest under semver; pick that if anyone outside depends on pelican.
 3. Can the Gradle Plugin Portal relocate a plugin ID? **Answered (owner, 2 Nov 2026):** it can't, so publish one last
    `io.github.matthewjones372.pelican` version whose description names `dev.surefold.pelican`, and stop there.

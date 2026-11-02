@@ -271,7 +271,7 @@ did not.
 ## Getting started
 
 The current release is **1.2.0**, on Maven Central under the group
-`io.github.matthewjones372`; from 1.3.0 the group is `dev.surefold`, the
+`io.github.matthewjones372`; from 2.0.0 the group is `dev.surefold`, the
 packages are `dev.surefold.pelican`, the Gradle plugin is `dev.surefold.pelican`,
 and the old coordinates relocate to the new ones. Code compiled against 1.2.0
 has to be recompiled. Its library modules are compiled for **Java 21**,
