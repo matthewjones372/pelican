@@ -364,7 +364,7 @@ fun Project.publishWithPom() {
         pom {
             name.set(this@publishWithPom.name)
             description.set(moduleDescriptions[this@publishWithPom.name] ?: "Part of Pelican.")
-            url.set("https://github.com/matthewjones372/pelican")
+            url.set("https://github.com/surefold/pelican")
             licenses {
                 license {
                     name.set("The Apache License, Version 2.0")
@@ -378,9 +378,9 @@ fun Project.publishWithPom() {
                 }
             }
             scm {
-                url.set("https://github.com/matthewjones372/pelican")
-                connection.set("scm:git:https://github.com/matthewjones372/pelican.git")
-                developerConnection.set("scm:git:ssh://git@github.com/matthewjones372/pelican.git")
+                url.set("https://github.com/surefold/pelican")
+                connection.set("scm:git:https://github.com/surefold/pelican.git")
+                developerConnection.set("scm:git:ssh://git@github.com/surefold/pelican.git")
             }
         }
     }

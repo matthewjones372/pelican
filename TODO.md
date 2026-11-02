@@ -85,7 +85,7 @@ empty, so the KDoc is read from the sources jar or the repository.
 
 Three interpreters were written: Pekko, on `main`, and http4k and Ktor, which
 were taken off `main` for 1.0 and are in the history at commit
-[`a6c20b2`](https://github.com/matthewjones372/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e).
+[`a6c20b2`](https://github.com/surefold/pelican/tree/a6c20b20350dddb21ac4cbf2d22f88eb8756081e).
 The roadmap is right that a fourth proves nothing further about the
 abstraction; this list is about audience, which is a separate argument.
 
