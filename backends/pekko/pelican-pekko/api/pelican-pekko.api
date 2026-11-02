@@ -13,6 +13,7 @@ public final class io/github/matthewjones372/pelican/pekko/Handlers$Companion {
 public final class io/github/matthewjones372/pelican/pekko/HandlersKt {
 	public static final fun bytesNow (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun bytesOrFail (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
+	public static final fun getPEKKO_QUERY ()Lorg/apache/pekko/http/javadsl/model/HttpMethod;
 	public static final fun getRequest (Lio/github/matthewjones372/pelican/Params;)Lorg/apache/pekko/http/javadsl/model/HttpRequest;
 	public static final fun handledBy (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;
 	public static final fun handledByOneOf (Lio/github/matthewjones372/pelican/Endpoint;Lkotlin/jvm/functions/Function2;)Lio/github/matthewjones372/pelican/ServerEndpoint;

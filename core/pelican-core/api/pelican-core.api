@@ -528,6 +528,8 @@ public final class io/github/matthewjones372/pelican/EndpointBuilder {
 	public final fun post (Ljava/lang/String;)V
 	public final fun put (Lio/github/matthewjones372/pelican/PathSpec;)V
 	public final fun put (Ljava/lang/String;)V
+	public final fun query (Lio/github/matthewjones372/pelican/PathSpec;)V
+	public final fun query (Ljava/lang/String;)V
 	public final fun query ([Lio/github/matthewjones372/pelican/QueryParam;)V
 	public final fun rateLimited (Lio/github/matthewjones372/pelican/RateLimit;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun rateLimited$default (Lio/github/matthewjones372/pelican/EndpointBuilder;Lio/github/matthewjones372/pelican/RateLimit;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
@@ -1100,6 +1102,7 @@ public final class io/github/matthewjones372/pelican/Method : java/lang/Enum {
 	public static final field PATCH Lio/github/matthewjones372/pelican/Method;
 	public static final field POST Lio/github/matthewjones372/pelican/Method;
 	public static final field PUT Lio/github/matthewjones372/pelican/Method;
+	public static final field QUERY Lio/github/matthewjones372/pelican/Method;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/Method;
 	public static fun values ()[Lio/github/matthewjones372/pelican/Method;
@@ -1661,6 +1664,7 @@ public final class io/github/matthewjones372/pelican/ResponseHeaderPolicy {
 }
 
 public final class io/github/matthewjones372/pelican/ResponseHeadersKt {
+	public static final fun getContentLocation ()Lio/github/matthewjones372/pelican/ResponseHeader;
 	public static final fun optional (Lio/github/matthewjones372/pelican/ResponseHeader;)Lio/github/matthewjones372/pelican/ResponseHeader;
 	public static final fun responseHeader (Ljava/lang/String;Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;)Lio/github/matthewjones372/pelican/ResponseHeader;
 	public static synthetic fun responseHeader$default (Ljava/lang/String;Lio/github/matthewjones372/pelican/PlainCodec;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/ResponseHeader;

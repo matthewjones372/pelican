@@ -236,6 +236,9 @@ class EndpointBuilder internal constructor(declared: List<ParamKey<*>>) {
     fun delete(p: PathSpec) = route(Method.DELETE, p)
     fun delete(p: String) = route(Method.DELETE, path(p))
 
+    fun query(p: PathSpec) = route(Method.QUERY, p)
+    fun query(p: String) = route(Method.QUERY, path(p))
+
     fun route(m: Method, p: PathSpec) {
         method = m
         pathSpec = p
@@ -739,6 +742,7 @@ private fun validate(ep: Endpoint<*, *>) {
     ep.idempotency?.let { validateIdempotency(ep, it) }
     validateRateLimit(ep)
     validateSignature(ep)
+    validateQuery(ep)
 
     val statusClashes = unpickableStatuses(ep)
     if (statusClashes.isNotEmpty()) {
@@ -762,6 +766,17 @@ private fun validate(ep: Endpoint<*, *>) {
     }
 
     validateResponseHeaders(ep)
+}
+
+/** RFC 10008 requires request content, and only a decoding codec can check the `Content-Type` it arrives with. */
+private fun validateQuery(ep: Endpoint<*, *>) {
+    if (ep.method != Method.QUERY) return
+    if (ep.bodyInput == null || ep.bodyInput is RawBody || ep.bodyInput is MultipartBody) {
+        error(
+            "$ep is a QUERY, which carries its criteria in a body Pelican decodes by Content-Type. Declare " +
+                "jsonBody<T>(), formBody<T>() or a negotiated body; a raw or multipart body is not checked.",
+        )
+    }
 }
 
 /** A signature is over bytes held whole, which only a body a codec reads whole is. */

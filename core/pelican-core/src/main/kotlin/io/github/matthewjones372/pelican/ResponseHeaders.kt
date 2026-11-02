@@ -59,3 +59,7 @@ fun <T : Any> responseHeader(
  */
 fun <T : Any> ResponseHeader<T>.optional(): ResponseHeader<T> =
     ResponseHeader(name, codec, description, required = false)
+
+/** RFC 10008 section 2.4: where the answer to a `QUERY` can be fetched again, so a cache can key it. */
+val contentLocation: ResponseHeader<String> =
+    responseHeader<String>("Content-Location", description = "Where this answer can be fetched again").optional()

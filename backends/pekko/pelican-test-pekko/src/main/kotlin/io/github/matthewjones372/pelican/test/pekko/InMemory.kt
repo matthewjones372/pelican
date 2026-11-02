@@ -2,6 +2,7 @@ package io.github.matthewjones372.pelican.test.pekko
 
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.Method
+import io.github.matthewjones372.pelican.pekko.PEKKO_QUERY
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.awaitTerminated
 import io.github.matthewjones372.pelican.pekko.sealedWith
@@ -104,6 +105,7 @@ private fun Method.toPekkoMethod(): HttpMethod = when (this) {
     Method.DELETE -> HttpMethods.DELETE
     Method.HEAD -> HttpMethods.HEAD
     Method.OPTIONS -> HttpMethods.OPTIONS
+    Method.QUERY -> PEKKO_QUERY
 }
 
 /**

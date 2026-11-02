@@ -28,6 +28,7 @@ import io.github.matthewjones372.pelican.JsonStr
 import io.github.matthewjones372.pelican.JsonValue
 import io.github.matthewjones372.pelican.ListStyle
 import io.github.matthewjones372.pelican.MediaOutput
+import io.github.matthewjones372.pelican.Method
 import io.github.matthewjones372.pelican.MultipartBody
 import io.github.matthewjones372.pelican.NdjsonBody
 import io.github.matthewjones372.pelican.NdjsonOutput
@@ -100,7 +101,7 @@ fun ApiSpec.openApi(version: OpenApiVersion = OpenApiVersion.V3_1_0): JsonObj {
 
     for (ep in documented) {
         val byMethod = paths.getOrPut(ep.pathSpec.template) { LinkedHashMap() }
-        byMethod[ep.method.name.lowercase()] = operation(ep, version, schemas, components, refusals)
+        byMethod[operationKey(ep.method, version)] = operation(ep, version, schemas, components, refusals)
     }
 
     // A webhook says hidden the same way an endpoint does.
@@ -203,10 +204,16 @@ private fun webhookItems(
 ): JsonObj {
     val items = LinkedHashMap<String, MutableMap<String, JsonValue>>()
     webhooks.forEach { hook ->
-        items.getOrPut(hook.name) { LinkedHashMap() }[hook.operation.method.name.lowercase()] =
+        items.getOrPut(hook.name) { LinkedHashMap() }[operationKey(hook.operation.method, version)] =
             operation(hook.operation, version, schemas, components, refusals)
     }
     return JsonObj(items.mapValues { (_, ops) -> JsonObj(ops.toMap()) })
+}
+
+/** 3.1 has no `query` field, so a `QUERY` is written under the `x-query` extension there and under `query` in 3.2. */
+private fun operationKey(method: Method, version: OpenApiVersion): String = when {
+    method == Method.QUERY && version == OpenApiVersion.V3_1_0 -> "x-query"
+    else -> method.name.lowercase()
 }
 
 /** Every declared input that travels outside the body, in the order a reader expects them. */

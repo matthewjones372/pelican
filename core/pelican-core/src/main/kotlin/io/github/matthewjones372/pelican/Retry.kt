@@ -371,7 +371,8 @@ val TRANSIENT_STATUSES: Set<Int> = setOf(408, 429, 502, 503, 504)
  * description knows about whether a second send would do a second thing.
  * `Method` has no TRACE, so this is the whole of the list Pelican can describe.
  */
-val IDEMPOTENT_METHODS: Set<Method> = setOf(Method.GET, Method.HEAD, Method.PUT, Method.DELETE, Method.OPTIONS)
+val IDEMPOTENT_METHODS: Set<Method> =
+    setOf(Method.GET, Method.HEAD, Method.PUT, Method.DELETE, Method.OPTIONS, Method.QUERY)
 
 private const val DEFAULT_MAX_ATTEMPTS = 3
 private const val DEFAULT_INITIAL_BACKOFF_MILLIS = 100L

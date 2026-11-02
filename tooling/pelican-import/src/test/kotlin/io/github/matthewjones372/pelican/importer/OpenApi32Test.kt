@@ -328,4 +328,34 @@ class OpenApi32Test {
 
         imported(document32(paths, order)) shouldBe imported(document(paths, order))
     }
+
+    @Test
+    fun `a query operation is imported as a QUERY route with its body`() {
+        val source = imported(
+            document32(
+                """
+                /orders/search:
+                  query:
+                    operationId: searchOrders
+                    requestBody:
+                      required: true
+                      content:
+                        application/json:
+                          schema:
+                            ${'$'}ref: '#/components/schemas/Order'
+                    responses:
+                      "200":
+                        description: Found
+                        content:
+                          application/json:
+                            schema:
+                              ${'$'}ref: '#/components/schemas/Order'
+                """,
+                order,
+            ),
+        )
+
+        source shouldContain "Method.QUERY"
+        source shouldContain "jsonBody<Order>()"
+    }
 }

@@ -33,6 +33,11 @@ one.
 
 ### Added
 
+- **HTTP `QUERY`** (spec 0106, unreleased): `Method.QUERY` and `query(path)` for RFC 10008 safe, idempotent reads with a
+  body. `Content-Type` is required (400) and checked (415) on every backend, `contentLocation` is a ready-made response
+  header, OpenAPI 3.2 writes `query` (3.1 writes `x-query`), and the importer reads it back. Source note: an exhaustive
+  `when` over `Method` needs a `QUERY` branch. See [A read with a body](docs/reference.md#a-read-with-a-body-unreleased).
+
 - Jetty native-owned `Api.startDecorated` composes trusted wrappers before binding, retaining native admission and lifecycle.
 
 - **Matched-operation admission** (spec 0104, unreleased): optional `ApiBuilder.admission` runs once on the selected

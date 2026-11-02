@@ -396,7 +396,7 @@ internal class Reader(private val options: ImportOptions) {
         }
     }
 
-    private val methods = listOf("get", "put", "post", "delete", "options", "head", "patch", "trace")
+    private val methods = listOf("get", "put", "post", "delete", "options", "head", "patch", "query", "trace")
 }
 
 /** One operation and where it was found, so a failure can say which. */

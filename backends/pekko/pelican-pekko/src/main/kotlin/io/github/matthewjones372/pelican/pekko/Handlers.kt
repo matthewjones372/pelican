@@ -168,4 +168,9 @@ internal fun Method.toPekko(): HttpMethod = when (this) {
     Method.DELETE -> HttpMethods.DELETE
     Method.HEAD -> HttpMethods.HEAD
     Method.OPTIONS -> HttpMethods.OPTIONS
+    Method.QUERY -> PEKKO_QUERY
 }
+
+/** Pekko has no `QUERY`; equality is by every field, so the server's parser and the routes must share this one. */
+val PEKKO_QUERY: HttpMethod =
+    HttpMethods.custom("QUERY", true, true, HttpMethods.POST.requestEntityAcceptance())
