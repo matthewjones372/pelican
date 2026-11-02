@@ -80,8 +80,8 @@ detekt {
 tasks.named("check") { dependsOn("detektMain", "detektTest") }
 
 gradlePlugin {
-    website.set("https://github.com/matthewjones372/pelican")
-    vcsUrl.set("https://github.com/matthewjones372/pelican.git")
+    website.set("https://github.com/surefold/pelican")
+    vcsUrl.set("https://github.com/surefold/pelican.git")
     plugins {
         create("pelican") {
             id = "io.github.matthewjones372.pelican"
@@ -119,7 +119,7 @@ mavenPublishing {
             "Generates a Kotlin client and an OpenAPI document from Pelican endpoint descriptions, " +
                 "and endpoint descriptions from an OpenAPI document.",
         )
-        url.set("https://github.com/matthewjones372/pelican")
+        url.set("https://github.com/surefold/pelican")
         licenses {
             license {
                 name.set("The Apache License, Version 2.0")
@@ -133,9 +133,9 @@ mavenPublishing {
             }
         }
         scm {
-            url.set("https://github.com/matthewjones372/pelican")
-            connection.set("scm:git:https://github.com/matthewjones372/pelican.git")
-            developerConnection.set("scm:git:ssh://git@github.com/matthewjones372/pelican.git")
+            url.set("https://github.com/surefold/pelican")
+            connection.set("scm:git:https://github.com/surefold/pelican.git")
+            developerConnection.set("scm:git:ssh://git@github.com/surefold/pelican.git")
         }
     }
 }

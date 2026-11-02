@@ -11,8 +11,8 @@ Typed HTTP endpoints for Kotlin. Describe an endpoint once; serve it, document
 it, test it and generate its client from that one description.
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.matthewjones372/pelican-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.matthewjones372/pelican-core)
-[![build](https://github.com/matthewjones372/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
-[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmatthewjones372%2Fpelican%2Fbadges%2Fcoverage.json)](https://github.com/matthewjones372/pelican/actions/workflows/build.yml)
+[![build](https://github.com/surefold/pelican/actions/workflows/build.yml/badge.svg)](https://github.com/surefold/pelican/actions/workflows/build.yml)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmatthewjones372%2Fpelican%2Fbadges%2Fcoverage.json)](https://github.com/surefold/pelican/actions/workflows/build.yml)
 [![Kotlin 2.4.20](https://img.shields.io/badge/kotlin-2.4.20-7f52ff)](docs/reference.md#versions)
 [![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
@@ -263,8 +263,8 @@ The costs are real:
 with http4k's contracts, Ktor's OpenAPI plugins, Spring, Micronaut, Quarkus,
 tapir and writing the document first, and ends with the cases where Pelican is
 the wrong choice. For evidence from outside this repository,
-[petshop](https://github.com/matthewjones372/petshop) and
-[surefold-bank](https://github.com/matthewjones372/surefold-bank) are two larger
+[petshop](https://github.com/surefold/petshop) and
+[surefold-bank](https://github.com/surefold/surefold-bank) are two larger
 services that use Pelican; petshop's README says where it helped and where it
 did not.
 
@@ -283,7 +283,7 @@ To see it running before writing anything, clone the repository and run the
 greeting example below:
 
 ```bash
-git clone https://github.com/matthewjones372/pelican && cd pelican && ./gradlew :example:runFirstEndpointOnPekko
+git clone https://github.com/surefold/pelican && cd pelican && ./gradlew :example:runFirstEndpointOnPekko
 ```
 
 It serves the endpoint on port 8080, with its Swagger UI at
