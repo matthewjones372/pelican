@@ -394,6 +394,13 @@ fun Project.publishWithPom() {
                 name = "local"
                 url = rootProject.layout.buildDirectory.dir("repo").get().asFile.toURI()
             }
+            // Snapshots (surefold spec 0281): snapshot.yml runs `publishAllPublicationsToGithubPackagesRepository`
+            // with the workflow's token as githubPackagesUsername/githubPackagesPassword. Releases stay on Central.
+            maven {
+                name = "githubPackages"
+                url = uri("https://maven.pkg.github.com/surefold/pelican")
+                credentials(PasswordCredentials::class)
+            }
         }
     }
 }

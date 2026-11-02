@@ -4793,6 +4793,11 @@ It publishes to Maven Central rather than the Gradle Plugin Portal, and
 `settings.gradle.kts` is what lets a build resolve it. To run an unreleased
 build of the plugin instead, `./gradlew -p tooling/pelican-gradle-plugin
 publishToMavenLocal` installs it and `mavenLocal()` in the same block finds it.
+Every push to `main` also publishes the libraries and the plugin as a
+`-SNAPSHOT` to GitHub Packages, `https://maven.pkg.github.com/surefold/pelican`,
+where they do not expire. GitHub Packages asks for a token even to read a
+public package, so that repository needs credentials: a classic personal access
+token with only `read:packages`.
 
 ### How it finds the spec
 

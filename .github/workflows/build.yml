@@ -31,6 +31,12 @@ jobs:
             gradleArgs: ""
 
     steps:
+      # Gannet's io_uring rings are charged to RLIMIT_MEMLOCK, one budget for every process of the runner's user and
+      # 8 MiB here: about fifteen carriers' rings, fewer than pelican-gannet-docs holds open. Raised on the runner's
+      # worker, so every later step and the Gradle daemon it starts inherit it (a step's own shell would be too late).
+      - name: Room under RLIMIT_MEMLOCK for Gannet's rings
+        run: sudo prlimit --pid "$(pgrep -f Runner.Worker | head -n 1)" --memlock=unlimited:unlimited
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v6
@@ -132,6 +138,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # As in the build job: the suites run here too, Gannet's among them.
+      - name: Room under RLIMIT_MEMLOCK for Gannet's rings
+        run: sudo prlimit --pid "$(pgrep -f Runner.Worker | head -n 1)" --memlock=unlimited:unlimited
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v6
