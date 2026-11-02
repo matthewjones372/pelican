@@ -1,11 +1,11 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.before
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.onlyWhen
-import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.apiClient
-import io.github.matthewjones372.pelican.test.shouldHaveStatus
+import dev.surefold.pelican.before
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.onlyWhen
+import dev.surefold.pelican.test.ApiClient
+import dev.surefold.pelican.test.apiClient
+import dev.surefold.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe

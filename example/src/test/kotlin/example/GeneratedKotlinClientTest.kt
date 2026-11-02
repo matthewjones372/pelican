@@ -1,6 +1,15 @@
 package example
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import dev.surefold.pelican.ClientTransport
+import dev.surefold.pelican.UploadedFile
+import dev.surefold.pelican.client.jetty.JettyHttpTransport
+import dev.surefold.pelican.client.pekko.PekkoHttpTransport
+import dev.surefold.pelican.codegen.kotlinClient
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jackson.defaultMapper
+import dev.surefold.pelican.jetty.PelicanServer
+import dev.surefold.pelican.jetty.start
 import example.generated.BankTransfer
 import example.generated.Card
 import example.generated.CreateOrder
@@ -14,15 +23,6 @@ import example.generated.StreamOrdersFailure
 import example.generated.SubmitOrderFailure
 import example.generated.SubmitOrderResult
 import example.trace.CancellationTrace
-import io.github.matthewjones372.pelican.ClientTransport
-import io.github.matthewjones372.pelican.UploadedFile
-import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
-import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
-import io.github.matthewjones372.pelican.codegen.kotlinClient
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jackson.defaultMapper
-import io.github.matthewjones372.pelican.jetty.PelicanServer
-import io.github.matthewjones372.pelican.jetty.start
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.inspectors.forAll

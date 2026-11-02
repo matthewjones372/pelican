@@ -1,11 +1,11 @@
 package example.telemetry
 
-import io.github.matthewjones372.pelican.In2
-import io.github.matthewjones372.pelican.jetty.Handlers
-import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.jetty.inMemory
-import io.github.matthewjones372.pelican.test.shouldBeFailure
-import io.github.matthewjones372.pelican.test.shouldHaveStatus
+import dev.surefold.pelican.In2
+import dev.surefold.pelican.jetty.Handlers
+import dev.surefold.pelican.test.ApiClient
+import dev.surefold.pelican.test.jetty.inMemory
+import dev.surefold.pelican.test.shouldBeFailure
+import dev.surefold.pelican.test.shouldHaveStatus
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain

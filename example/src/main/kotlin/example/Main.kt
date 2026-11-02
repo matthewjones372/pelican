@@ -9,7 +9,7 @@ package example
  *     }
  */
 
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.jetty.docs.startWithDocs
 
 fun main(args: Array<String>) {
     // `./gradlew :example:run --args=8081` when 8080 is taken.

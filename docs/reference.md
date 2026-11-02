@@ -66,7 +66,7 @@ them is [Version alignment and the BOM](modules.md#version-alignment-and-the-bom
 | `pelican-test-golden` | yes | test, openapi | one golden per endpoint, failing when a change breaks callers; plus the bytes a call sends |
 | `pelican-test-wiremock` | yes | core, test, WireMock | WireMock stubbed and verified in endpoint values, for testing a client of somebody else's API; and `stubFile`, which exports those stubs as mapping files |
 | `pelican-bom` | yes | **nothing** | a `java-platform` constraining every library module to the build's version, so a consumer names one version |
-| `pelican-gradle-plugin` | yes | **nothing** | the `io.github.matthewjones372.pelican` Gradle plugin: every generator above, as tasks |
+| `pelican-gradle-plugin` | yes | **nothing** | the `dev.surefold.pelican` Gradle plugin: every generator above, as tasks |
 | `example` | not published | core, openapi, codegen, jackson, kotlinx, pekko, jetty and most integrations | the orders, bookmarks, greetings, shop and secured services, among others |
 | `benchmarks` | not published | core, jackson, kotlinx, pekko, jetty, test, client-jetty, JMH | what the interpreter costs on Pekko and on Jetty against hand-written routes and handlers, plus routing scale, streaming, framing, body decoding (Jackson and kotlinx), what one test-client call allocates, and a socket-level driver. Not run by `build`; see [What it costs](what-it-costs.md) |
 
@@ -397,9 +397,9 @@ dependencies {
 ```
 
 ```kotlin
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jetty.start
-import io.github.matthewjones372.pelican.jetty.streamedNow
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jetty.start
+import dev.surefold.pelican.jetty.streamedNow
 
 val routes = listOf(
     getOrder handledNow { id -> store.order(id) },
@@ -551,9 +551,9 @@ which Gannet's `GannetSupport.FLAGS` spells out; `start` throws Gannet's
 ```
 
 ```kotlin
-import io.github.matthewjones372.pelican.gannet.handledNow
-import io.github.matthewjones372.pelican.gannet.start
-import io.github.matthewjones372.pelican.gannet.streamedNow
+import dev.surefold.pelican.gannet.handledNow
+import dev.surefold.pelican.gannet.start
+import dev.surefold.pelican.gannet.streamedNow
 
 val routes = listOf(
     getOrder handledNow { id -> store.order(id) },
@@ -714,7 +714,7 @@ One thing is refused rather than published as something it is not:
 
 One more edge-of-the-service module lives beside the codecs. `pelican-arrow` (core plus `arrow-core` and nothing else, which `NoOtherDependenciesTest`
 asserts) turns Arrow's `Either` into Pelican's `Outcome` and back, in
-`io.github.matthewjones372.pelican.arrow`:
+`dev.surefold.pelican.arrow`:
 
 ```kotlin
 getUser handledOrFail { id -> service.find(id).toOutcome() }             // Right → ok, Left → the single declared failure
@@ -1599,7 +1599,7 @@ they share. A body under that status carrying no tag, or a tag no declaration
 claims, is a *failed call*: `ApiCallFailed`, the same answer an undeclared body
 gets, because decoding the nearest declaration would hand the caller a
 value of the wrong type with nothing to say so. `tagIn(body, field)` in
-`io.github.matthewjones372.pelican.spi` is the reader, beside the `taggedBody`
+`dev.surefold.pelican.spi` is the reader, beside the `taggedBody`
 writer the interpreters use, for a client of your own.
 
 Read back the other way, the shape has a second spelling. `pelican-import`
@@ -1610,7 +1610,7 @@ tagged declarations. That is the same contract on the wire: a sealed payload is
 something Pelican can carry, and a tag is what lets the *document* say
 which branch is which rather than leaving it to the payload's own codec.
 
-`err(value)` is the shorthand, top-level in `io.github.matthewjones372.pelican`
+`err(value)` is the shorthand, top-level in `dev.surefold.pelican`
 beside `ok`: the endpoint's *single* declared failure, for the handler that
 would rather not name it every time: `noSuchUser(ApiError(...))` above could be
 `err(ApiError(...))`. Which declaration it means is resolved where the response
@@ -2290,8 +2290,8 @@ the failure as a value in the type, and `toOutcome` hands the result back as the
 `Outcome` the endpoint declared:
 
 ```kotlin
-import io.github.matthewjones372.pelican.streams.toOutcome
-import io.github.matthewjones372.pelican.streams.toStream
+import dev.surefold.pelican.streams.toOutcome
+import dev.surefold.pelican.streams.toStream
 
 val badRows = errorJson<ApiError>(422, "A row could not be read")
 
@@ -2351,7 +2351,7 @@ first null frame.
 ### A stream that names its failure, on Jetty
 
 `pelican-streams-jetty` is the same two functions for a service on
-`pelican-jetty`, under `io.github.matthewjones372.pelican.streams.jetty`.
+`pelican-jetty`, under `dev.surefold.pelican.streams.jetty`.
 `toStream` builds the surefold `Stream` on surefold's own `Stream.blocking` over the
 upload's [`reader()`](#on-jetty), so it needs no surefold backend that knows about
 Jetty and no Pekko: the run pulls one frame at a time on whatever surefold backend
@@ -2362,8 +2362,8 @@ import io.github.matthewjones372.surefold.stream.Forks
 import io.github.matthewjones372.surefold.stream.mapOrFail
 import io.github.matthewjones372.surefold.stream.run
 import io.github.matthewjones372.surefold.stream.runFold
-import io.github.matthewjones372.pelican.streams.jetty.toOutcome
-import io.github.matthewjones372.pelican.streams.jetty.toStream
+import dev.surefold.pelican.streams.jetty.toOutcome
+import dev.surefold.pelican.streams.jetty.toStream
 
 tally handledByOrFail { rows ->
     rows.toStream()
@@ -2615,7 +2615,7 @@ throwable:
 ```
 
 ```
-ERROR io.github.matthewjones372.pelican.jetty - Unhandled failure in POST /reports [ref f3ef2bdef43b]
+ERROR dev.surefold.pelican.jetty - Unhandled failure in POST /reports [ref f3ef2bdef43b]
 java.sql.SQLException: connection to db-primary.internal:5432 refused
 ```
 
@@ -3771,8 +3771,8 @@ every call a generated client sends through it. The example below wraps the
 Jetty transport; wrap `PekkoHttpTransport` the same way.
 
 ```kotlin
-import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
-import io.github.matthewjones372.pelican.metrics.otel.traced
+import dev.surefold.pelican.client.jetty.JettyHttpTransport
+import dev.surefold.pelican.metrics.otel.traced
 
 val transport = JettyHttpTransport().traced(sdk)
 val client = OrdersClient("https://orders.internal", JacksonCodecs, transport)
@@ -3848,12 +3848,12 @@ this way, with `/admin/traces` rendering the spans it produced and a deliberate
 `pelican-health` turns a list of checks into two endpoints:
 
 ```kotlin
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.health.health
-import io.github.matthewjones372.pelican.health.http
-import io.github.matthewjones372.pelican.health.jdbc
-import io.github.matthewjones372.pelican.health.noDeadlockedThreads
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.api
+import dev.surefold.pelican.health.health
+import dev.surefold.pelican.health.http
+import dev.surefold.pelican.health.jdbc
+import dev.surefold.pelican.health.noDeadlockedThreads
+import dev.surefold.pelican.jackson.JacksonCodecs
 import kotlin.time.Duration.Companion.milliseconds
 
 val health = health {
@@ -4047,7 +4047,7 @@ Three ways, all reading the same descriptions.
 
 ```kotlin
 // the whole build script
-plugins { id("io.github.matthewjones372.pelican") }
+plugins { id("dev.surefold.pelican") }
 
 pelican {
     documents {
@@ -4077,8 +4077,8 @@ spec.openApiJson(OpenApiVersion.V3_2_0)   // the same descriptions, written agai
 **Served by the running app**: opt in with `pelican-jetty-docs`:
 
 ```kotlin
-import io.github.matthewjones372.pelican.jetty.docs.Docs
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.jetty.docs.Docs
+import dev.surefold.pelican.jetty.docs.startWithDocs
 
 ordersApi().start(port = 8080)              // endpoints only; no OpenAPI code on the classpath
 ordersApi().startWithDocs(port = 8080)      // plus /openapi.json and /docs
@@ -4751,7 +4751,7 @@ The document and the client are both readings of the same values, and both are
 build tasks:
 
 ```kotlin
-plugins { id("io.github.matthewjones372.pelican") version "1.2.0" }
+plugins { id("dev.surefold.pelican") version "1.2.0" }
 
 pelican {
     documents {
@@ -5441,9 +5441,9 @@ daemon timer) is the one used when none is named. Passing your own is how a
 test decides when a retry's moment arrives, rather than sleeping until it does:
 
 ```kotlin
-import io.github.matthewjones372.pelican.RetryScheduler
-import io.github.matthewjones372.pelican.retrying
-import io.github.matthewjones372.pelican.retryPolicy
+import dev.surefold.pelican.RetryScheduler
+import dev.surefold.pelican.retrying
+import dev.surefold.pelican.retryPolicy
 
 val pending = mutableListOf<Runnable>()
 val held = RetryScheduler { _, task -> pending += task }
@@ -6436,8 +6436,8 @@ dependencies {
 
 ```kotlin
 import com.github.tomakehurst.wiremock.http.Fault
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.test.wiremock.PelicanWireMockExtension
 
 @JvmField @RegisterExtension
 val orders = PelicanWireMockExtension(JacksonCodecs)     // random port; stubs cleared after each test
@@ -6474,7 +6474,7 @@ against the contract: a `404` carrying a bare body where the contract declares a
 from the same stubs a test uses, so the answer exists once.
 
 ```kotlin
-import io.github.matthewjones372.pelican.test.wiremock.stubFile
+import dev.surefold.pelican.test.wiremock.stubFile
 
 stubFile(JacksonCodecs) {
     stub(lookupChip, In3(3L, "eu", 1)) answers noSuchChip(Problem("never chipped"))

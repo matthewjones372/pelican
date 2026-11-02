@@ -3,8 +3,8 @@ package example.logging
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
-import io.github.matthewjones372.pelican.jetty.PelicanServer
-import io.github.matthewjones372.pelican.jetty.start
+import dev.surefold.pelican.jetty.PelicanServer
+import dev.surefold.pelican.jetty.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe

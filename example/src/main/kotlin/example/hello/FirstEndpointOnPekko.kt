@@ -22,11 +22,11 @@ package example.hello
  * bound and served by Pekko HTTP. `FirstEndpointTest` calls it as well.
  */
 
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.pekko.handledNow
+import dev.surefold.pelican.api
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.pekko.docs.startWithDocs
+import dev.surefold.pelican.pekko.handledNow
 
 fun greetingsOnPekko() = api(
     endpoints = listOf(greet handledNow { name -> Greeting("Hello, $name!") }),

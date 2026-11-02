@@ -14,7 +14,7 @@ off the application's classpath with a configuration of its own:
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.2.0" }
+plugins { id("dev.surefold.pelican") version "1.2.0" }
 
 val pelicanImport = configurations.register("pelicanImport")
 

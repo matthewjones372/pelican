@@ -163,7 +163,7 @@ val wireBaseline = tasks.register("wireBaseline") {
     onlyIf { wireAb.isPresent }
     val repo = rootDir
     val dir = layout.buildDirectory.dir("wire-ab/baseline").get().asFile
-    val server = file("src/main/kotlin/io/github/matthewjones372/pelican/benchmarks/wire/WireServer.kt")
+    val server = file("src/main/kotlin/dev/surefold/pelican/benchmarks/wire/WireServer.kt")
     val initScript = file("wire-ab.init.gradle.kts")
     val out = baselineClasspath.get().asFile
     doLast {
@@ -205,7 +205,7 @@ tasks.register<JavaExec>("wire") {
     group = "verification"
     description = "Drives Pelican on Pekko and on Jetty over loopback at fixed rates and reports latency"
     dependsOn(wireBaseline)
-    mainClass.set("io.github.matthewjones372.pelican.benchmarks.wire.WireDriverKt")
+    mainClass.set("dev.surefold.pelican.benchmarks.wire.WireDriverKt")
     classpath(benchmarkRuntimeClasspath)
     javaLauncher.set(toolchainLauncher)
     jvmArgs("-Xms1g", "-Xmx1g")

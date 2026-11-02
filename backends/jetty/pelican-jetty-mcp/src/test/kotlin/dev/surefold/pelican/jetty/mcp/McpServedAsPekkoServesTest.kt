@@ -1,0 +1,140 @@
+package dev.surefold.pelican.jetty.mcp
+
+import dev.surefold.pelican.JsonArr
+import dev.surefold.pelican.JsonObj
+import dev.surefold.pelican.JsonStr
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.api
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jetty.start
+import dev.surefold.pelican.mcp.server.MCP_PROTOCOL_VERSION
+import dev.surefold.pelican.parseJson
+import dev.surefold.pelican.pathParam
+import io.kotest.assertions.withClue
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import dev.surefold.pelican.pekko.handledNow as pekkoHandledNow
+import dev.surefold.pelican.pekko.mcp.routeWithMcp as pekkoRouteWithMcp
+import dev.surefold.pelican.pekko.start as pekkoStart
+
+data class Widget(val id: Long, val name: String)
+
+/** One API and its tools on both servers, asked the same questions over a socket. */
+class McpServedAsPekkoServesTest {
+
+    data class Seen(val status: Int, val contentType: String?, val allow: String?, val body: String)
+
+    companion object {
+        private val widgetId = pathParam<Long>("widgetId")
+
+        private val getWidget = endpoint(widgetId) {
+            get("widgets" / widgetId)
+            operationId = "getWidget"
+            json<Widget>()
+        }
+
+        private fun served(endpoint: ServerEndpoint) = api(listOf(endpoint), JacksonCodecs) { title = "Widgets" }
+
+        private val jetty = served(getWidget handledNow { id -> Widget(id, "widget-$id") })
+            .start(port = 0) { handlerWithMcp() }
+
+        private val pekko = served(getWidget pekkoHandledNow { id -> Widget(id, "widget-$id") })
+            .pekkoStart(port = 0) { system -> pekkoRouteWithMcp(system) }
+
+        private val moved = served(getWidget handledNow { id -> Widget(id, "widget-$id") })
+            .start(port = 0) { mcpHandler(path = "/internal/mcp") }
+
+        private val client: HttpClient = HttpClient.newHttpClient()
+
+        @JvmStatic
+        @AfterAll
+        fun stopAll() {
+            client.close()
+            jetty.stop()
+            pekko.stop()
+            moved.stop()
+        }
+
+        private const val TOOLS_LIST = """{"jsonrpc":"2.0","id":2,"method":"tools/list"}"""
+        private const val INITIALIZED = """{"jsonrpc":"2.0","method":"notifications/initialized"}"""
+        private const val CALL =
+            """{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"getWidget","arguments":{"widgetId":3}}}"""
+    }
+
+    private fun ask(baseUrl: String, method: String, path: String, body: String? = null): Seen {
+        val publisher = body?.let { HttpRequest.BodyPublishers.ofString(it) } ?: HttpRequest.BodyPublishers.noBody()
+        val request = HttpRequest.newBuilder(URI.create(baseUrl + path)).method(method, publisher).build()
+        val res = client.send(request, HttpResponse.BodyHandlers.ofString())
+        val header = { name: String -> res.headers().firstValue(name).orElse(null) }
+        return Seen(res.statusCode(), header("Content-Type"), header("Allow"), res.body())
+    }
+
+    private fun Seen.result(): JsonObj = (parseJson(body) as JsonObj)["result"] as JsonObj
+
+    @Test
+    fun `tools list over streamable http answers as on pekko`() {
+        val seen = ask(jetty.baseUrl, "POST", "/mcp", TOOLS_LIST)
+
+        seen shouldBe ask(pekko.baseUrl, "POST", "/mcp", TOOLS_LIST)
+        seen.status shouldBe 200
+        ((seen.result()["tools"] as JsonArr).items.single() as JsonObj)["name"] shouldBe JsonStr("getWidget")
+    }
+
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(
+        "GET, /mcp",
+        "GET, /widgets/3",
+        "GET, /nobody/described/this",
+        "PUT, /mcp",
+        "DELETE, /widgets/3",
+        "POST, /widgets/3",
+    )
+    fun `jetty answers as pekko does`(method: String, path: String) {
+        withClue("$method $path") {
+            ask(jetty.baseUrl, method, path) shouldBe ask(pekko.baseUrl, method, path)
+        }
+    }
+
+    @Test
+    fun `initialize, a call and a notification answer as on pekko`() {
+        val initialize =
+            """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"$MCP_PROTOCOL_VERSION"}}"""
+        for (message in listOf(initialize, CALL, INITIALIZED)) {
+            withClue(message) {
+                ask(jetty.baseUrl, "POST", "/mcp", message) shouldBe ask(pekko.baseUrl, "POST", "/mcp", message)
+            }
+        }
+        val content = (ask(jetty.baseUrl, "POST", "/mcp", CALL).result()["content"] as JsonArr).items.single()
+        (content as JsonObj)["text"] shouldBe JsonStr("""{"id":3,"name":"widget-3"}""")
+    }
+
+    @Test
+    fun `a get is told what the endpoint answers rather than left to a 404`() {
+        val seen = ask(jetty.baseUrl, "GET", "/mcp")
+
+        seen.status shouldBe 405
+        (((parseJson(seen.body) as JsonObj)["error"] as JsonObj)["message"] as JsonStr).value shouldContain "POST"
+    }
+
+    @Test
+    fun `a verb nobody takes lists the api's and the tools' methods`() {
+        ask(jetty.baseUrl, "PUT", "/mcp").allow shouldBe "GET, POST"
+    }
+
+    @Test
+    fun `the path is configuration, and the handler alone declines what is not its own`() {
+        ask(moved.baseUrl, "POST", "/internal/mcp", TOOLS_LIST).status shouldBe 200
+        ask(moved.baseUrl, "POST", "/mcp", TOOLS_LIST).status shouldBe 404
+    }
+}

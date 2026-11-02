@@ -247,7 +247,7 @@ not acquire the OpenTelemetry API, and the reverse.
 |---|---|---|---|
 | `pelican-codegen` | 1.0.0 | core | descriptions to a Kotlin client, as source |
 | `pelican-import` | 1.0.0 | codegen, `snakeyaml-engine` | an OpenAPI document to descriptions and handler stubs, as source |
-| Gradle plugin `io.github.matthewjones372.pelican` | 1.0.0 | nothing on your classpath | every generator as Gradle tasks: clients, documents, endpoints |
+| Gradle plugin `dev.surefold.pelican` | 1.0.0 | nothing on your classpath | every generator as Gradle tasks: clients, documents, endpoints |
 | `pelican-bom` | 1.1.0 | nothing | version constraints for the 31 library modules; see [above](#version-alignment-and-the-bom) |
 
 Most builds use the generators through the plugin rather than declaring
@@ -301,8 +301,8 @@ The full breakdown is in [the reference](reference.md#modules).
 
 ## Two packages in `pelican-core`
 
-`io.github.matthewjones372.pelican` is the DSL a service is written in.
-`io.github.matthewjones372.pelican.spi` is what an interpreter or a transport
+`dev.surefold.pelican` is the DSL a service is written in.
+`dev.surefold.pelican.spi` is what an interpreter or a transport
 calls to turn descriptions into a running server: `handlerFor`, `routeIndex`,
 `requestBodyCodec`, `readStrictBody`, `acceptable`, `successNamedBy`,
 `renderError` and a handful more. None of them can be `internal`, because a

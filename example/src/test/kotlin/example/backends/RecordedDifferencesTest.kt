@@ -1,11 +1,11 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.gannet.GannetTests
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.pages
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.api
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.gannet.GannetTests
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.pages
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -18,12 +18,12 @@ import java.net.Socket
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
-import io.github.matthewjones372.pelican.gannet.handledBy as handledByOnGannet
-import io.github.matthewjones372.pelican.gannet.start as startOnGannet
-import io.github.matthewjones372.pelican.jetty.handledBy as handledByOnJetty
-import io.github.matthewjones372.pelican.jetty.start as startOnJetty
-import io.github.matthewjones372.pelican.pekko.handledBy as handledByOnPekko
-import io.github.matthewjones372.pelican.pekko.start as startOnPekko
+import dev.surefold.pelican.gannet.handledBy as handledByOnGannet
+import dev.surefold.pelican.gannet.start as startOnGannet
+import dev.surefold.pelican.jetty.handledBy as handledByOnJetty
+import dev.surefold.pelican.jetty.start as startOnJetty
+import dev.surefold.pelican.pekko.handledBy as handledByOnPekko
+import dev.surefold.pelican.pekko.start as startOnPekko
 
 /** The entries of [JettyDifference] and [GannetDifference] that a request can show, held true on every server. */
 class RecordedDifferencesTest {

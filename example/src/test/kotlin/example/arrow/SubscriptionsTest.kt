@@ -1,12 +1,12 @@
 package example.arrow
 
-import io.github.matthewjones372.pelican.arrow.toEither
-import io.github.matthewjones372.pelican.jetty.Handlers
-import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.jetty.inMemory
-import io.github.matthewjones372.pelican.test.shouldBeError
-import io.github.matthewjones372.pelican.test.shouldBeFailure
-import io.github.matthewjones372.pelican.test.shouldBeOk
+import dev.surefold.pelican.arrow.toEither
+import dev.surefold.pelican.jetty.Handlers
+import dev.surefold.pelican.test.ApiClient
+import dev.surefold.pelican.test.jetty.inMemory
+import dev.surefold.pelican.test.shouldBeError
+import dev.surefold.pelican.test.shouldBeFailure
+import dev.surefold.pelican.test.shouldBeOk
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll

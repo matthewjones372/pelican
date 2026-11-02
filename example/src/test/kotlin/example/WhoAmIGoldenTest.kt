@@ -1,6 +1,6 @@
 package example
 
-import io.github.matthewjones372.pelican.test.golden.Golden
+import dev.surefold.pelican.test.golden.Golden
 import org.junit.jupiter.api.Test
 import java.nio.file.Paths
 

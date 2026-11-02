@@ -1,14 +1,14 @@
-public final class io/github/matthewjones372/pelican/openapi/ApiChange {
-	public fun <init> (Lio/github/matthewjones372/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Lio/github/matthewjones372/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lio/github/matthewjones372/pelican/openapi/Compatibility;
+public final class dev/surefold/pelican/openapi/ApiChange {
+	public fun <init> (Ldev/surefold/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ldev/surefold/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/surefold/pelican/openapi/Compatibility;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
-	public final fun copy (Lio/github/matthewjones372/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/matthewjones372/pelican/openapi/ApiChange;
-	public static synthetic fun copy$default (Lio/github/matthewjones372/pelican/openapi/ApiChange;Lio/github/matthewjones372/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/openapi/ApiChange;
+	public final fun copy (Ldev/surefold/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ldev/surefold/pelican/openapi/ApiChange;
+	public static synthetic fun copy$default (Ldev/surefold/pelican/openapi/ApiChange;Ldev/surefold/pelican/openapi/Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ldev/surefold/pelican/openapi/ApiChange;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCompatibility ()Lio/github/matthewjones372/pelican/openapi/Compatibility;
+	public final fun getCompatibility ()Ldev/surefold/pelican/openapi/Compatibility;
 	public final fun getConsequence ()Ljava/lang/String;
 	public final fun getWhat ()Ljava/lang/String;
 	public final fun getWhere ()Ljava/lang/String;
@@ -16,58 +16,58 @@ public final class io/github/matthewjones372/pelican/openapi/ApiChange {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/Compatibility : java/lang/Enum {
-	public static final field BREAKING Lio/github/matthewjones372/pelican/openapi/Compatibility;
-	public static final field COMPATIBLE Lio/github/matthewjones372/pelican/openapi/Compatibility;
-	public static final field COSMETIC Lio/github/matthewjones372/pelican/openapi/Compatibility;
+public final class dev/surefold/pelican/openapi/Compatibility : java/lang/Enum {
+	public static final field BREAKING Ldev/surefold/pelican/openapi/Compatibility;
+	public static final field COMPATIBLE Ldev/surefold/pelican/openapi/Compatibility;
+	public static final field COSMETIC Ldev/surefold/pelican/openapi/Compatibility;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/openapi/Compatibility;
-	public static fun values ()[Lio/github/matthewjones372/pelican/openapi/Compatibility;
+	public static fun valueOf (Ljava/lang/String;)Ldev/surefold/pelican/openapi/Compatibility;
+	public static fun values ()[Ldev/surefold/pelican/openapi/Compatibility;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/CompatibilityKt {
-	public static final fun apiChanges (Lio/github/matthewjones372/pelican/JsonObj;Lio/github/matthewjones372/pelican/JsonObj;)Ljava/util/List;
-	public static final fun changesFrom (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/JsonObj;)Ljava/util/List;
+public final class dev/surefold/pelican/openapi/CompatibilityKt {
+	public static final fun apiChanges (Ldev/surefold/pelican/JsonObj;Ldev/surefold/pelican/JsonObj;)Ljava/util/List;
+	public static final fun changesFrom (Ldev/surefold/pelican/ApiSpec;Ldev/surefold/pelican/JsonObj;)Ljava/util/List;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/Docs {
+public final class dev/surefold/pelican/openapi/Docs {
 	public fun <init> ()V
 	public final fun getDocsPath ()Ljava/lang/String;
-	public final fun getOauth ()Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
+	public final fun getOauth ()Ldev/surefold/pelican/openapi/DocsOAuth;
 	public final fun getOpenApiPath ()Ljava/lang/String;
-	public final fun getRapiDocReference ()Lio/github/matthewjones372/pelican/openapi/RapiDocReference;
-	public final fun getRedoc ()Lio/github/matthewjones372/pelican/openapi/RedocLook;
-	public final fun getReference ()Lio/github/matthewjones372/pelican/openapi/Reference;
+	public final fun getRapiDocReference ()Ldev/surefold/pelican/openapi/RapiDocReference;
+	public final fun getRedoc ()Ldev/surefold/pelican/openapi/RedocLook;
+	public final fun getReference ()Ldev/surefold/pelican/openapi/Reference;
 	public final fun getReferencePath ()Ljava/lang/String;
-	public final fun getUi ()Lio/github/matthewjones372/pelican/openapi/DocsUi;
-	public final fun getVersion ()Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+	public final fun getUi ()Ldev/surefold/pelican/openapi/DocsUi;
+	public final fun getVersion ()Ldev/surefold/pelican/openapi/OpenApiVersion;
 	public final fun referencePage (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lkotlin/Pair;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/DocsBuilder {
+public final class dev/surefold/pelican/openapi/DocsBuilder {
 	public final fun getDocsPath ()Ljava/lang/String;
-	public final fun getOauth ()Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
+	public final fun getOauth ()Ldev/surefold/pelican/openapi/DocsOAuth;
 	public final fun getOpenApiPath ()Ljava/lang/String;
-	public final fun getUi ()Lio/github/matthewjones372/pelican/openapi/DocsUi;
-	public final fun getVersion ()Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+	public final fun getUi ()Ldev/surefold/pelican/openapi/DocsUi;
+	public final fun getVersion ()Ldev/surefold/pelican/openapi/OpenApiVersion;
 	public final fun rapiDocReference (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
-	public static synthetic fun rapiDocReference$default (Lio/github/matthewjones372/pelican/openapi/DocsBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public static synthetic fun rapiDocReference$default (Ldev/surefold/pelican/openapi/DocsBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun redoc (Lkotlin/jvm/functions/Function1;)V
 	public final fun reference (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
-	public static synthetic fun reference$default (Lio/github/matthewjones372/pelican/openapi/DocsBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public static synthetic fun reference$default (Ldev/surefold/pelican/openapi/DocsBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun setDocsPath (Ljava/lang/String;)V
-	public final fun setOauth (Lio/github/matthewjones372/pelican/openapi/DocsOAuth;)V
+	public final fun setOauth (Ldev/surefold/pelican/openapi/DocsOAuth;)V
 	public final fun setOpenApiPath (Ljava/lang/String;)V
-	public final fun setUi (Lio/github/matthewjones372/pelican/openapi/DocsUi;)V
-	public final fun setVersion (Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)V
+	public final fun setUi (Ldev/surefold/pelican/openapi/DocsUi;)V
+	public final fun setVersion (Ldev/surefold/pelican/openapi/OpenApiVersion;)V
 }
 
-public final class io/github/matthewjones372/pelican/openapi/DocsKt {
-	public static final fun docs (Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/openapi/Docs;
-	public static synthetic fun docs$default (Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/openapi/Docs;
+public final class dev/surefold/pelican/openapi/DocsKt {
+	public static final fun docs (Lkotlin/jvm/functions/Function1;)Ldev/surefold/pelican/openapi/Docs;
+	public static synthetic fun docs$default (Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ldev/surefold/pelican/openapi/Docs;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/DocsOAuth {
+public final class dev/surefold/pelican/openapi/DocsOAuth {
 	public final fun getAdditionalQueryStringParams ()Ljava/util/Map;
 	public final fun getAppName ()Ljava/lang/String;
 	public final fun getClientId ()Ljava/lang/String;
@@ -75,7 +75,7 @@ public final class io/github/matthewjones372/pelican/openapi/DocsOAuth {
 	public final fun getUsePkce ()Z
 }
 
-public final class io/github/matthewjones372/pelican/openapi/DocsOAuthBuilder {
+public final class dev/surefold/pelican/openapi/DocsOAuthBuilder {
 	public final fun getAdditionalQueryStringParams ()Ljava/util/Map;
 	public final fun getAppName ()Ljava/lang/String;
 	public final fun getScopes ()Ljava/util/List;
@@ -86,110 +86,110 @@ public final class io/github/matthewjones372/pelican/openapi/DocsOAuthBuilder {
 	public final fun setUsePkce (Z)V
 }
 
-public final class io/github/matthewjones372/pelican/openapi/DocsUi : java/lang/Enum {
-	public static final field Redoc Lio/github/matthewjones372/pelican/openapi/DocsUi;
-	public static final field SwaggerUi Lio/github/matthewjones372/pelican/openapi/DocsUi;
+public final class dev/surefold/pelican/openapi/DocsUi : java/lang/Enum {
+	public static final field Redoc Ldev/surefold/pelican/openapi/DocsUi;
+	public static final field SwaggerUi Ldev/surefold/pelican/openapi/DocsUi;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/openapi/DocsUi;
-	public static fun values ()[Lio/github/matthewjones372/pelican/openapi/DocsUi;
+	public static fun valueOf (Ljava/lang/String;)Ldev/surefold/pelican/openapi/DocsUi;
+	public static fun values ()[Ldev/surefold/pelican/openapi/DocsUi;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/OpenApiKt {
-	public static final fun openApi (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)Lio/github/matthewjones372/pelican/JsonObj;
-	public static synthetic fun openApi$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/JsonObj;
-	public static final fun openApiJson (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)Ljava/lang/String;
-	public static synthetic fun openApiJson$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Ljava/lang/String;
+public final class dev/surefold/pelican/openapi/OpenApiKt {
+	public static final fun openApi (Ldev/surefold/pelican/ApiSpec;Ldev/surefold/pelican/openapi/OpenApiVersion;)Ldev/surefold/pelican/JsonObj;
+	public static synthetic fun openApi$default (Ldev/surefold/pelican/ApiSpec;Ldev/surefold/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Ldev/surefold/pelican/JsonObj;
+	public static final fun openApiJson (Ldev/surefold/pelican/ApiSpec;Ldev/surefold/pelican/openapi/OpenApiVersion;)Ljava/lang/String;
+	public static synthetic fun openApiJson$default (Ldev/surefold/pelican/ApiSpec;Ldev/surefold/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/OpenApiVersion : java/lang/Enum {
-	public static final field V3_1_0 Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
-	public static final field V3_2_0 Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+public final class dev/surefold/pelican/openapi/OpenApiVersion : java/lang/Enum {
+	public static final field V3_1_0 Ldev/surefold/pelican/openapi/OpenApiVersion;
+	public static final field V3_2_0 Ldev/surefold/pelican/openapi/OpenApiVersion;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getField ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
-	public static fun valueOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
-	public static fun values ()[Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;
+	public static fun valueOf (Ljava/lang/String;)Ldev/surefold/pelican/openapi/OpenApiVersion;
+	public static fun values ()[Ldev/surefold/pelican/openapi/OpenApiVersion;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/RapiDocKt {
-	public static final fun rapiDocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/RapiDocLook;)Ljava/lang/String;
+public final class dev/surefold/pelican/openapi/RapiDocKt {
+	public static final fun rapiDocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/surefold/pelican/openapi/RapiDocLook;)Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/RapiDocLook {
+public final class dev/surefold/pelican/openapi/RapiDocLook {
 	public fun <init> ()V
 	public final fun getAttributes ()Ljava/util/Map;
-	public final fun getLogo ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getLogo ()Ldev/surefold/pelican/JsonObj;
 	public final fun getStyle ()Ljava/lang/String;
 	public final fun getStylesheets ()Ljava/util/List;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/RapiDocLookBuilder {
+public final class dev/surefold/pelican/openapi/RapiDocLookBuilder {
 	public final fun attributes ([Lkotlin/Pair;)V
 	public final fun stylesheet (Ljava/lang/String;)V
 	public final fun theme (Lkotlin/jvm/functions/Function1;)V
 }
 
-public final class io/github/matthewjones372/pelican/openapi/RapiDocReference {
-	public final fun getLook ()Lio/github/matthewjones372/pelican/openapi/RapiDocLook;
+public final class dev/surefold/pelican/openapi/RapiDocReference {
+	public final fun getLook ()Ldev/surefold/pelican/openapi/RapiDocLook;
 	public final fun getPath ()Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/RedocKt {
+public final class dev/surefold/pelican/openapi/RedocKt {
 	public static final fun redocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
-	public static final fun redocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/RedocLook;)Ljava/lang/String;
+	public static final fun redocHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/surefold/pelican/openapi/RedocLook;)Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/RedocLook {
-	public static final field Companion Lio/github/matthewjones372/pelican/openapi/RedocLook$Companion;
+public final class dev/surefold/pelican/openapi/RedocLook {
+	public static final field Companion Ldev/surefold/pelican/openapi/RedocLook$Companion;
 	public fun <init> ()V
-	public final fun getLogo ()Lio/github/matthewjones372/pelican/JsonObj;
-	public final fun getOptions ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getLogo ()Ldev/surefold/pelican/JsonObj;
+	public final fun getOptions ()Ldev/surefold/pelican/JsonObj;
 	public final fun getStylesheets ()Ljava/util/List;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/RedocLook$Companion {
-	public final fun getPLAIN ()Lio/github/matthewjones372/pelican/openapi/RedocLook;
+public final class dev/surefold/pelican/openapi/RedocLook$Companion {
+	public final fun getPLAIN ()Ldev/surefold/pelican/openapi/RedocLook;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/RedocLookBuilder {
-	public final fun getOptions ()Lio/github/matthewjones372/pelican/JsonObj;
+public final class dev/surefold/pelican/openapi/RedocLookBuilder {
+	public final fun getOptions ()Ldev/surefold/pelican/JsonObj;
 	public final fun logo (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public static synthetic fun logo$default (Lio/github/matthewjones372/pelican/openapi/RedocLookBuilder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
-	public final fun setOptions (Lio/github/matthewjones372/pelican/JsonObj;)V
+	public static synthetic fun logo$default (Ldev/surefold/pelican/openapi/RedocLookBuilder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun setOptions (Ldev/surefold/pelican/JsonObj;)V
 	public final fun stylesheet (Ljava/lang/String;)V
 	public final fun theme (Lkotlin/jvm/functions/Function1;)V
 }
 
-public final class io/github/matthewjones372/pelican/openapi/Reference {
-	public final fun getLook ()Lio/github/matthewjones372/pelican/openapi/RedocLook;
+public final class dev/surefold/pelican/openapi/Reference {
+	public final fun getLook ()Ldev/surefold/pelican/openapi/RedocLook;
 	public final fun getPath ()Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/ReferenceTheme {
+public final class dev/surefold/pelican/openapi/ReferenceTheme {
 	public fun <init> ()V
 	public final fun getAccent ()Ljava/lang/String;
 	public final fun getCodeFont ()Ljava/lang/String;
 	public final fun getError ()Ljava/lang/String;
 	public final fun getFont ()Ljava/lang/String;
-	public final fun getLogo ()Lio/github/matthewjones372/pelican/JsonObj;
+	public final fun getLogo ()Ldev/surefold/pelican/JsonObj;
 	public final fun getSidebar ()Ljava/lang/String;
 	public final fun getStylesheets ()Ljava/util/List;
 	public final fun getSuccess ()Ljava/lang/String;
 	public final fun getText ()Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder {
+public final class dev/surefold/pelican/openapi/ReferenceThemeBuilder {
 	public final fun codeFont (Ljava/lang/String;Ljava/lang/String;)V
-	public static synthetic fun codeFont$default (Lio/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public static synthetic fun codeFont$default (Ldev/surefold/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun font (Ljava/lang/String;Ljava/lang/String;)V
-	public static synthetic fun font$default (Lio/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public static synthetic fun font$default (Ldev/surefold/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun getAccent ()Ljava/lang/String;
 	public final fun getError ()Ljava/lang/String;
 	public final fun getSidebar ()Ljava/lang/String;
 	public final fun getSuccess ()Ljava/lang/String;
 	public final fun getText ()Ljava/lang/String;
 	public final fun logo (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public static synthetic fun logo$default (Lio/github/matthewjones372/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public static synthetic fun logo$default (Ldev/surefold/pelican/openapi/ReferenceThemeBuilder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun setAccent (Ljava/lang/String;)V
 	public final fun setError (Ljava/lang/String;)V
 	public final fun setSidebar (Ljava/lang/String;)V
@@ -197,27 +197,27 @@ public final class io/github/matthewjones372/pelican/openapi/ReferenceThemeBuild
 	public final fun setText (Ljava/lang/String;)V
 }
 
-public final class io/github/matthewjones372/pelican/openapi/ReportKt {
+public final class dev/surefold/pelican/openapi/ReportKt {
 	public static final fun breakingChanges (Ljava/lang/String;Ljava/lang/String;)I
 	public static final fun compatibilityReport (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Ljava/lang/String;
 	public static synthetic fun compatibilityReport$default (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Ljava/lang/String;
-	public static final fun documentOf (Ljava/lang/String;)Lio/github/matthewjones372/pelican/JsonObj;
+	public static final fun documentOf (Ljava/lang/String;)Ldev/surefold/pelican/JsonObj;
 	public static final fun report (Ljava/util/List;Ljava/lang/String;Z)Ljava/lang/String;
 	public static synthetic fun report$default (Ljava/util/List;Ljava/lang/String;ZILjava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/SwaggerUiKt {
-	public static final fun docsOAuth (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
-	public static synthetic fun docsOAuth$default (Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/openapi/DocsOAuth;
+public final class dev/surefold/pelican/openapi/SwaggerUiKt {
+	public static final fun docsOAuth (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ldev/surefold/pelican/openapi/DocsOAuth;
+	public static synthetic fun docsOAuth$default (Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ldev/surefold/pelican/openapi/DocsOAuth;
 	public static final fun oauth2RedirectHtml ()Ljava/lang/String;
 	public static final fun oauth2RedirectPath (Ljava/lang/String;)Ljava/lang/String;
-	public static final fun swaggerUiHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/DocsOAuth;Ljava/lang/String;)Ljava/lang/String;
-	public static synthetic fun swaggerUiHtml$default (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/matthewjones372/pelican/openapi/DocsOAuth;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public static final fun swaggerUiHtml (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/surefold/pelican/openapi/DocsOAuth;Ljava/lang/String;)Ljava/lang/String;
+	public static synthetic fun swaggerUiHtml$default (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/surefold/pelican/openapi/DocsOAuth;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/matthewjones372/pelican/openapi/YamlKt {
-	public static final fun openApiYaml (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;)Ljava/lang/String;
-	public static synthetic fun openApiYaml$default (Lio/github/matthewjones372/pelican/ApiSpec;Lio/github/matthewjones372/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Ljava/lang/String;
-	public static final fun renderYaml (Lio/github/matthewjones372/pelican/JsonValue;)Ljava/lang/String;
+public final class dev/surefold/pelican/openapi/YamlKt {
+	public static final fun openApiYaml (Ldev/surefold/pelican/ApiSpec;Ldev/surefold/pelican/openapi/OpenApiVersion;)Ljava/lang/String;
+	public static synthetic fun openApiYaml$default (Ldev/surefold/pelican/ApiSpec;Ldev/surefold/pelican/openapi/OpenApiVersion;ILjava/lang/Object;)Ljava/lang/String;
+	public static final fun renderYaml (Ldev/surefold/pelican/JsonValue;)Ljava/lang/String;
 }
 

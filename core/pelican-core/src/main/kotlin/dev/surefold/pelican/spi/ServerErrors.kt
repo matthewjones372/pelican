@@ -1,0 +1,202 @@
+package dev.surefold.pelican.spi
+
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.ApiErrorEnvelope
+import dev.surefold.pelican.ApiException
+import dev.surefold.pelican.BodyDecodeFailure
+import dev.surefold.pelican.DecodeFailure
+import dev.surefold.pelican.Endpoint
+import dev.surefold.pelican.NotAcceptable
+import dev.surefold.pelican.PayloadTooLarge
+import dev.surefold.pelican.Refusal
+import dev.surefold.pelican.RefusalBody
+import dev.surefold.pelican.RefusalReason
+import dev.surefold.pelican.RefusalRenderer
+import dev.surefold.pelican.SignatureRefused
+import dev.surefold.pelican.Unrouted
+import dev.surefold.pelican.UnsupportedMediaType
+import dev.surefold.pelican.unwrapCompletion
+/**
+ * What one throwable becomes on the wire, decided in core so the three backends
+ * cannot drift.
+ */
+class RenderedError(
+    val error: ApiError,
+    val headers: List<Pair<String, String>>,
+    /** Non-null when this was a 500 nobody described. Log it. */
+    val unexpected: Throwable?,
+    /** The id printed in the response body, to grep the log for. */
+    val reference: String?,
+    /**
+     * The body, already written by the [Api]'s [RefusalRenderer]. An interpreter
+     * that encoded [error] itself would be a fourth dialect nobody configured,
+     * so the bytes come from here and the status from [error].
+     */
+    val body: RefusalBody,
+)
+
+/**
+ * The failures this library describes, and what each one is told to a caller.
+ * Null is the throwable nobody described: that answer is a 500 carrying a
+ * reference, and minting the reference is [renderError]'s job rather than this
+ * table's, because a status this table is asked for on its own must not consume
+ * an id no log line will ever print.
+ *
+ * Written once and read twice — by [renderError], which needs the whole
+ * response, and by [statusOfError], which needs only the number. Those two
+ * answers have to agree: a metric that says 413 while the caller was sent a 400
+ * is worse than no metric, and the way to be sure is to leave them nowhere to
+ * disagree.
+ */
+private fun described(t: Throwable): ApiError? = when (t) {
+    is ApiException -> ApiError(t.status, t.message, t.detail)
+    is Unrouted -> ApiError(t.status, t.message, t.detail)
+    is DecodeFailure -> ApiError(400, "Invalid parameter", t.message)
+    is BodyDecodeFailure -> ApiError(400, "Malformed request body", t.message)
+    is UnsupportedMediaType -> ApiError(415, t.message, t.detail)
+    is NotAcceptable -> ApiError(406, "Not acceptable", t.message)
+    is PayloadTooLarge -> ApiError(413, "Payload too large", t.message)
+    else -> null
+}
+
+/**
+ * Which of these was a request refused before the chain, and under what name.
+ *
+ * Narrower than [described] on purpose, and the narrowing is the whole design
+ * of the counter it feeds. An [ApiException] is missing because it is what a
+ * filter and a handler throw as well as what an interpreter throws, so counting
+ * it would count requests `http.server.requests` has already counted; the 500
+ * nobody described is missing for the same reason. Every entry below is a type
+ * only Pelican itself raises, and it raises them all before the outermost
+ * filter is entered. The caller's 401 and 403 are among them, which is why
+ * they arrive wrapped rather than as the bare [ApiException] a filter throws.
+ */
+private fun reasonOf(t: Throwable): RefusalReason? = when (t) {
+    is CallerRefused ->
+        if (t.refusal.status == UNAUTHENTICATED_STATUS) RefusalReason.UNAUTHENTICATED else RefusalReason.FORBIDDEN
+
+    is RateLimitRefused -> RefusalReason.RATE_LIMITED
+
+    is SignatureRefused -> RefusalReason.SIGNATURE
+
+    is Unrouted -> RefusalReason.UNMATCHED
+
+    is DecodeFailure, is BodyDecodeFailure -> RefusalReason.DECODE
+
+    is UnsupportedMediaType -> RefusalReason.CONTENT_TYPE
+
+    is NotAcceptable -> RefusalReason.ACCEPT
+
+    is PayloadTooLarge -> RefusalReason.BODY_LIMIT
+
+    else -> null
+}
+
+/** What a throwable says about itself, without the body that would go out with it. */
+class ClassifiedError(val error: ApiError, val unexpected: Throwable?, val reference: String?)
+
+/**
+ * Decides the response for a throwable, and writes it in the dialect [api] was
+ * configured with.
+ *
+ * [api] is the whole settings value rather than the three fields this reads, and
+ * it has no default, because a call site that forgot one would answer in an
+ * envelope nobody chose — silently, and only for the refusals that reach it.
+ * Null is for the caller with no service in scope at all; every interpreter has
+ * one.
+ *
+ * [Api.onRefusal] is told here rather than at the point each refusal is raised,
+ * because a raised refusal is not yet one that went out: a filter can catch it,
+ * and only this function classifies native failures on the way to the wire.
+ * Explicit admission decisions carry their own response and do not enter this
+ * exception path; unclassified failures have no observer reason.
+ */
+fun renderError(raw: Throwable, api: Api?, endpoint: Endpoint<*, *>? = null): RenderedError {
+    val thrown = unwrapCompletion(raw)
+    val t = refusalIn(thrown)
+    val renderer = api?.refusals ?: ApiErrorEnvelope
+    val template = endpoint?.pathSpec?.template
+    val classified = classify(t, api)
+
+    val observer = api?.onRefusal
+    if (observer != null) reasonOf(thrown)?.let { observer.refused(it, classified.error.status, template) }
+
+    return RenderedError(
+        classified.error,
+        // Only an ApiException carries headers of its own; the rest are raised
+        // where no response was being described.
+        if (t is ApiException) t.headers else emptyList(),
+        classified.unexpected,
+        classified.reference,
+        body = renderer.bodyFor(classified.error.refusal(classified.reference, template)),
+    )
+}
+
+/**
+ * The classification alone, for a caller that answers in an envelope it does not
+ * choose.
+ *
+ * An MCP tool result is JSON-RPC, whose shape the protocol fixes, so neither
+ * [Api.refusals] nor [Api.onRefusal] has anything to say about it: the body is
+ * not written here, and the call carried no HTTP status that a refusal counter
+ * could honestly report.
+ */
+fun classifyError(raw: Throwable, api: Api?): ClassifiedError = classify(refusalIn(unwrapCompletion(raw)), api)
+
+/** The response a throwable stands for: the caller's own refusal, where it was wrapped to be named. */
+private fun refusalIn(t: Throwable): Throwable = when (t) {
+    is CallerRefused -> t.refusal
+    is RateLimitRefused -> t.refusal
+    is SignatureRefused -> t.refusal
+    else -> t
+}
+
+private const val UNAUTHENTICATED_STATUS = 401
+
+private fun classify(t: Throwable, api: Api?): ClassifiedError {
+    val described = described(t)
+    if (described != null) return ClassifiedError(described, unexpected = null, reference = null)
+
+    val reference = newReference()
+    return ClassifiedError(
+        ApiError(
+            INTERNAL_SERVER_ERROR,
+            "Internal server error",
+            if (api?.exposeInternalErrors == true) t.toString() else "Reference: $reference",
+        ),
+        unexpected = t,
+        reference = reference,
+    )
+}
+
+/** The classification, and only the classification, as a renderer is allowed to see it. */
+private fun ApiError.refusal(reference: String?, pathTemplate: String?): Refusal =
+    Refusal(status, error, detail, reference, pathTemplate)
+
+/**
+ * The bytes under the media type the same renderer publishes, so a response
+ * cannot be labelled with one thing and documented as another.
+ */
+private fun RefusalRenderer.bodyFor(refusal: Refusal): RefusalBody = RefusalBody(mediaType, render(refusal))
+
+/**
+ * The status a throwable becomes, without building the body that would go with
+ * it. What a filter wants when it is measuring rather than answering — see
+ * [Endpoint.statusFor], which is the only caller that should need this.
+ */
+internal fun statusOfError(raw: Throwable): Int =
+    described(unwrapCompletion(raw))?.status ?: INTERNAL_SERVER_ERROR
+
+/** What anything nobody described becomes. */
+private const val INTERNAL_SERVER_ERROR = 500
+
+/**
+ * Short, unique enough to find in a log, and not sequential — a counter would
+ * tell a caller how much traffic the service takes.
+ */
+internal fun newReference(): String =
+    java.util.UUID.randomUUID().toString().replace("-", "").take(REFERENCE_LENGTH)
+
+/** Long enough to be unique in a log, short enough to read out over a phone. */
+private const val REFERENCE_LENGTH = 12

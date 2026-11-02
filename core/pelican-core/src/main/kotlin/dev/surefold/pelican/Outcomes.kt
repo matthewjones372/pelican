@@ -1,0 +1,479 @@
+package dev.surefold.pelican
+
+import dev.surefold.pelican.spi.successNamedBy
+import kotlin.reflect.KClass
+import kotlin.reflect.KType
+import kotlin.reflect.typeOf
+
+/**
+ * One of the declared responses, carrying its payload.
+ */
+sealed interface Outcome<out E, out T> {
+    /**
+     * One of the declared successes. [declared] is which; null means the
+     * first, which is what [ok] produces.
+     */
+    data class Ok<T>(
+        val value: T,
+        val declared: Output<T>? = null,
+        /** As [Err.headers]: encoded on the way out, filled from the response on the way back. */
+        val headers: List<Pair<String, String>> = emptyList(),
+    ) : Outcome<Nothing, T> {
+        /** One header back, decoded by its own codec. Null when it did not arrive, or did not decode. */
+        operator fun <H : Any> get(header: ResponseHeader<H>): H? = headerValue(headers, header)
+    }
+
+    /**
+     * [declared] is the failure the endpoint listed; it supplies the status.
+     * Null is what [err] produces: the endpoint's single declared failure,
+     * resolved where the response is written.
+     */
+    data class Err<E>(
+        val declared: ErrorOutput<E>?,
+        val error: E,
+        /**
+         * The headers [declared] carries, encoded, in declaration order. One
+         * field for both directions, so what a handler sent and what a client
+         * reads cannot disagree.
+         */
+        val headers: List<Pair<String, String>> = emptyList(),
+    ) : Outcome<E, Nothing> {
+        /**
+         * One header back, decoded by its own codec. Null when it did not
+         * arrive or did not decode — a client reads this too, and a bad header
+         * is a finding for the test, not a reason to lose the failure.
+         */
+        operator fun <T : Any> get(header: ResponseHeader<T>): T? = headerValue(headers, header)
+    }
+}
+
+/**
+ * Shared by both sides of an [Outcome]. A value that does not decode is null
+ * rather than a throw: this is the reading end, where losing the response to
+ * report a bad header would replace what the caller asked about.
+ */
+@Suppress("UNCHECKED_CAST")
+private fun <T : Any> headerValue(headers: List<Pair<String, String>>, header: ResponseHeader<T>): T? =
+    headers.firstOrNull { (name, _) -> name.equals(header.name, ignoreCase = true) }
+        ?.let { (_, raw) ->
+            try {
+                header.codec.decode(header.name, raw) as T
+            } catch (_: DecodeFailure) {
+                null
+            }
+        }
+
+/** The first declared success, carrying [value]. */
+fun <T> ok(value: T): Outcome<Nothing, T> = Outcome.Ok(value)
+
+/**
+ * The single declared failure, carrying [value] — [ok]'s other half, for the
+ * endpoint that declares one failure and would rather not name it every time.
+ * An endpoint declaring several has to name the one it means, because the
+ * declaration is what fixes the status; `err` on one of those is an
+ * `UndeclaredResponse` where the response is written.
+ *
+ * Not `error`: that name is the standard library's throw, and taking it would
+ * silently turn every `error("message")` in a handler into an unused value.
+ */
+fun <E> err(value: E): Outcome<E, Nothing> = Outcome.Err(null, value)
+
+/**
+ * Refuses `err(theDeclaration)`, which is what a caller reaches for first: a
+ * declaration is a value, so passing one type-checks as a payload of its own
+ * and fails several lines later as `Outcome<ErrorOutput<E>, T>` — a mismatch
+ * naming a type nobody wrote. Calling the declaration is what names it.
+ */
+@Deprecated(
+    "A declared failure is not a payload. Call it — notFound(ApiError(404, \"...\")) — or pass err(...) " +
+        "the payload the failure carries.",
+    ReplaceWith("failure(payload)"),
+    DeprecationLevel.ERROR,
+)
+@Suppress("UnusedParameter", "UnusedPrivateMember")
+fun err(failure: ErrorOutput<*>): Nothing =
+    error("A declared failure is not a payload. Call $failure with what it carries.")
+
+/**
+ * The same refusal for [ok]. `ok(json<Order>())` hands the declaration over as
+ * the payload, and what fails is the codec, at the response, on a type the
+ * handler never mentions.
+ */
+@Deprecated(
+    "A declared response is not a value. Name it — orderPlaced(order) — or pass ok(...) the payload.",
+    ReplaceWith("declared(payload)"),
+    DeprecationLevel.ERROR,
+)
+@Suppress("UnusedParameter", "UnusedPrivateMember")
+fun ok(declared: Output<*>): Nothing =
+    error("A declared response is not a value. Call $declared with the payload it carries.")
+
+/**
+ * Which declared success an [Outcome.Ok] names, and nothing else: a bare
+ * `ok(value)` names none, and the first declared success is what that means.
+ *
+ * Separate from [successNamedBy] because the two readers want different things
+ * from the same rule. An interpreter about to write a response wants the checks
+ * as well, and would rather refuse than send something undescribed. A filter
+ * working out what status is going out wants the answer alone — it is
+ * measuring, and a metric that throws is a worse outage than the missing
+ * measurement it was trying to avoid.
+ */
+internal fun DeclaredResponses<*, *>.chosenSuccess(ok: Outcome.Ok<*>): Output<*> =
+    ok.declared ?: successes.first()
+
+/**
+ * A declared header paired with the value one response is sending it with —
+ * `retryAfter of 30L`. See [ErrorOutput.invoke] and [Output.invoke].
+ */
+class HeaderValue internal constructor(
+    internal val header: ResponseHeader<*>,
+    private val value: Any,
+) {
+    /** By the header's own codec, so the wire carries what the schema describes. */
+    @Suppress("UNCHECKED_CAST")
+    internal fun encoded(): String = (header.codec as PlainCodec<Any>).encode(value)
+}
+
+/**
+ * Supplies a declared response's header, typed by its declaration. Infix rather
+ * than `Pair`, because `to` would type the value as `Any` and let
+ * `retryAfter to "soon"` compile.
+ */
+infix fun <T : Any> ResponseHeader<T>.of(value: T): HeaderValue = HeaderValue(this, value)
+
+/**
+ * The headers a declared response is sent with, checked against what it
+ * declared and encoded in *declaration* order rather than call order, so two
+ * handlers producing the same response put the same bytes on the wire.
+ */
+internal fun encodeDeclaredHeaders(
+    owner: Any,
+    declared: List<ResponseHeader<*>>,
+    supplied: Array<out HeaderValue>,
+): List<Pair<String, String>> {
+    supplied.forEach { given ->
+        if (declared.none { it === given.header }) {
+            error(
+                "${given.header.name} was sent with $owner, which never declared it. " +
+                    "List it on the response beside its status, or set it with setHeader " +
+                    "if it belongs on every response this endpoint sends.",
+            )
+        }
+    }
+    return declared.mapNotNull { header ->
+        val given = supplied.firstOrNull { it.header === header }
+        when {
+            given != null -> header.name to given.encoded()
+
+            header.required -> error(
+                "$owner declares ${header.name} and this call left it out. " +
+                    "Pass ${header.name} with the payload, or declare it as " +
+                    "responseHeader(...).optional() if it is only sometimes sent.",
+            )
+
+            else -> null
+        }
+    }
+}
+
+/** The body field a tag is written under unless a declaration names another. */
+const val DEFAULT_DISCRIMINATOR: String = "kind"
+
+// Rendered as JSON scalars, so there is nowhere in the body to put a tag.
+private val SCALAR_PAYLOADS = setOf(
+    String::class, Char::class, Boolean::class,
+    Int::class, Long::class, Short::class, Byte::class, Double::class, Float::class,
+)
+
+/** One declared failure: a status, a payload type, and the headers it sends. */
+class ErrorOutput<E> @PublishedApi internal constructor(
+    val status: Int,
+    val type: KType,
+    val description: String,
+    /**
+     * Declared here rather than with `emits(...)`: a `Retry-After` on the
+     * endpoint's list would be permitted on a success nobody meant to throttle.
+     */
+    val headers: List<ResponseHeader<*>> = emptyList(),
+    /**
+     * Which of several failures under one status this is, written into the body so a client can
+     * branch on it. Null for a failure that is the only one under its status, which is every
+     * failure until one is [tagged]. See spec 0063.
+     */
+    val tag: String? = null,
+    /** The body field [tag] is written under. */
+    val discriminator: String = DEFAULT_DISCRIMINATOR,
+    /**
+     * What the body is written as: JSON unless declared with [errorMedia], such as a health probe's
+     * `application/health+json`. See spec 0070.
+     */
+    val mediaType: String = JSON_MEDIA_TYPE,
+) {
+    /**
+     * The shape before spec 0063 added the tag. `errorJson` is inline, so this constructor is in
+     * callers' bytecode: a service compiled against 1.0.0-RC3 calls it, and dropping it would be a
+     * NoSuchMethodError rather than a recompile.
+     */
+    @Deprecated("Binary compatibility with 1.0.0-RC3.", level = DeprecationLevel.HIDDEN)
+    @PublishedApi
+    internal constructor(
+        status: Int,
+        type: KType,
+        description: String,
+        headers: List<ResponseHeader<*>>,
+    ) : this(status, type, description, headers, null, DEFAULT_DISCRIMINATOR)
+
+    init {
+        checkStatus("error:$status", status, carriesBody = true)
+        checkMediaType(mediaType)
+
+        val clashes = headers.groupBy { it.name.lowercase() }.filterValues { it.size > 1 }.keys
+        require(clashes.isEmpty()) { "error:$status declares the header(s) $clashes more than once" }
+    }
+
+    /**
+     * The same failure, saying which of several under its status it is.
+     *
+     * Two failures may share a status only when both are tagged, because the tag is the only thing
+     * that tells them apart: the status names the response everywhere else. [field] is the body
+     * field the tag is written under, `"kind"` unless a payload already uses that name.
+     */
+    fun tagged(tag: String, field: String = DEFAULT_DISCRIMINATOR): ErrorOutput<E> {
+        require(tag.isNotBlank()) { "error:$status was tagged with a blank tag; a tag names the failure" }
+        require(field.isNotBlank()) { "error:$status was tagged under a blank field name" }
+        require(carriesAnObject()) {
+            "error:$status carries $type, and a tag is written into the body as a field, so only a " +
+                "JSON object can hold one. Declare a type with a field for the reason, or give the " +
+                "two failures different statuses."
+        }
+        require(isJson(mediaType)) {
+            "error:$status is written as $mediaType, and a tag is written into a JSON body, so only a " +
+                "failure in JSON or a +json type can carry one."
+        }
+        return ErrorOutput(status, type, description, headers, tag, field, mediaType)
+    }
+
+    /**
+     * Whether the payload is rendered as a JSON object rather than a scalar or a list. Judged from
+     * the declared type, because the alternative is finding out at response time, from a body that
+     * has nowhere to put the tag.
+     */
+    private fun carriesAnObject(): Boolean {
+        val classifier = type.classifier as? KClass<*> ?: return false
+        if (classifier in SCALAR_PAYLOADS) return false
+        // JDK reflection, not kotlin-reflect: core depends on the standard library and jackson-core,
+        // and `isSubclassOf` would add a jar `NoThirdPartyDependenciesTest` refuses.
+        val java = classifier.java
+        return !Collection::class.java.isAssignableFrom(java) &&
+            !Map::class.java.isAssignableFrom(java) &&
+            !java.isArray
+    }
+
+    /**
+     * Produces this failure, with a value for each header it declared —
+     * `throttled(ApiError(429, "Slow down"), retryAfter of 30L)`.
+     */
+    operator fun invoke(error: E, vararg values: HeaderValue): Outcome<E, Nothing> =
+        Outcome.Err(this, error, encodeDeclaredHeaders(this, headers, values))
+
+    internal fun spec() = ErrorSpec(status, description, type, headers, tag, discriminator, mediaType)
+
+    override fun toString() = "error:$status"
+}
+
+/**
+ * Declares a failure carrying [E] as JSON, outside an endpoint block so a
+ * handler can name it. [headers] are the only ones it may be sent with.
+ */
+inline fun <reified E> errorJson(
+    status: Int,
+    description: String,
+    vararg headers: ResponseHeader<*>,
+): ErrorOutput<E> = ErrorOutput(status, typeOf<E>(), description, headers.toList())
+
+/**
+ * Declares a failure carrying [E] written as [mediaType] rather than JSON, as [media] does for a
+ * success: a health probe's 503 is `application/health+json`. What writes and reads it comes from
+ * [CodecFactory.codec] for that media type, which answers any `+json` type as JSON. See spec 0070.
+ */
+inline fun <reified E> errorMedia(
+    mediaType: String,
+    status: Int,
+    description: String,
+    vararg headers: ResponseHeader<*>,
+): ErrorOutput<E> = ErrorOutput(status, typeOf<E>(), description, headers.toList(), mediaType = mediaType)
+
+/**
+ * The responses one endpoint declares: at least one success, and the failures a
+ * handler may return instead.
+ */
+class DeclaredResponses<E, T> internal constructor(
+    /** In declaration order. The first is the one a bare [ok] means. */
+    val successes: List<Output<out T>>,
+    val failures: List<ErrorOutput<E>>,
+) : Output<Outcome<E, T>>() {
+    /** The first declared success, which the three overrides below report. */
+    val success: Output<out T> get() = successes.first()
+
+    override val status get() = success.status
+    override val mediaType get() = success.mediaType
+    override val payloadType get() = success.payloadType
+
+    /**
+     * Successes only. Failures are all JSON, and an endpoint whose 200 is
+     * `text/csv` should not be spared a 406 because its 404 was acceptable.
+     */
+    override val produces: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        successes.flatMap { it.produces }.toSet()
+    }
+
+    init {
+        require(successes.isNotEmpty()) { "An output declares at least one success" }
+
+        // What separates two responses here is the status a handler names them
+        // by, so two under one status are a pair nothing downstream can pick
+        // between. Several *renderings* of one response share a status by
+        // design, and are one declared response with its alternatives inside it
+        // — a [NegotiatedOutput], which arrives here as the single entry it is.
+        // Two failures may share a status when every one under it is tagged: the tag is then what
+        // names them, written into the body, and spec 0063 is why. Anything else sharing a status —
+        // a success, or a failure with no tag — is still a pair nothing downstream can pick between.
+        val shared = (successes.map { it.status } + failures.map { it.status })
+            .groupingBy { it }
+            .eachCount()
+            .filterValues { it > 1 }
+            .keys
+        val unpickable = shared.filter { status ->
+            successes.any { it.status == status } || failures.any { it.status == status && it.tag == null }
+        }
+        require(unpickable.isEmpty()) {
+            "Two responses are declared for status ${unpickable.joinToString()} on the same output, and " +
+                "not every one of them is tagged. Naming a response is what produces it, and the status " +
+                "is what names it, so a second one under the same status could never be picked. Two " +
+                "failures may share a status when both are tagged — " +
+                "errorJson<T>($shared, \"...\").tagged(\"a_reason\") — which writes the reason into the " +
+                "body for a client to branch on. Otherwise give them different statuses, or declare " +
+                "one. Two media types for the same response are that one response declaring both — " +
+                "negotiated(json<T>(200), media<T>(\"text/csv\", 200)) — not two responses."
+        }
+
+        val repeatedTags = failures
+            .filter { it.tag != null }
+            .groupBy { it.status to it.tag }
+            .filterValues { it.size > 1 }
+            .keys
+        require(repeatedTags.isEmpty()) {
+            "The tag ${repeatedTags.joinToString { "\"${it.second}\"" }} is declared twice under one " +
+                "status on the same output. A tag is what tells two failures under one status apart, so " +
+                "each needs its own."
+        }
+
+        // One status means one field. The document carries a single `propertyName` per status, and a
+        // reader told to look under one name finds nothing on a body that wrote the other.
+        val mixedFields = failures
+            .filter { it.tag != null }
+            .groupBy { it.status }
+            .filterValues { under -> under.map { it.discriminator }.distinct().size > 1 }
+        require(mixedFields.isEmpty()) {
+            mixedFields.entries.joinToString("; ") { (status, under) ->
+                "The failures under status $status write their tag under different fields — " +
+                    under.joinToString(" and ") { "\"${it.discriminator}\"" } +
+                    ". The document declares one discriminator field per status, so a client told to " +
+                    "read one would find nothing on a body carrying the other: tag them under the same " +
+                    "field."
+            }
+        }
+
+        // Naming a response is what produces it, and producing a stream means
+        // handing over the backend's own type — Source, Flow, Sequence — which
+        // core cannot name. So a stream is a success, but the only one.
+        if (successes.size > 1) {
+            val streamed = successes.filter { it.streams() }
+            require(streamed.isEmpty()) {
+                "${streamed.joinToString()} streams, and an endpoint that declares several successes " +
+                    "cannot stream one of them: naming a response is what produces it, and a stream is " +
+                    "produced in the backend's own type. Declare the stream as the one success, or answer " +
+                    "the other statuses from a different endpoint."
+            }
+        }
+    }
+
+    override fun toString() =
+        "responses(${(successes + failures).joinToString { it.toString() }})"
+}
+
+/** Whether producing this output means handing over a stream rather than a value. */
+internal fun Output<*>.streams(): Boolean =
+    this is NdjsonOutput<*> || this is SseOutput<*> || this is JsonArrayOutput<*> || this is ByteStreamOutput
+
+/**
+ * Declares a second successful response — `json<Order>(201) or empty(202)`.
+ */
+infix fun <T> Output<out T>.or(other: Output<out T>): DeclaredResponses<Nothing, T> =
+    responses(listOf(this, other), emptyList())
+
+/** Three or more, declared in one call rather than chained. */
+fun <T> Output<out T>.or(vararg others: Output<out T>): DeclaredResponses<Nothing, T> =
+    responses(listOf(this) + others, emptyList())
+
+/**
+ * Another success on an output that already names alternatives, keeping the
+ * payload type the first two agreed on. The more specific receiver, so Kotlin
+ * picks it while the third payload fits and widens through the one above when
+ * it does not.
+ */
+infix fun <E, T> DeclaredResponses<E, T>.or(other: Output<out T>): DeclaredResponses<E, T> =
+    responses(listOf(this, other), emptyList())
+
+/** Declares the one failure this output's handler may return instead. */
+infix fun <E, T> Output<T>.orFail(failure: ErrorOutput<E>): DeclaredResponses<E, T> =
+    orFailAll(listOf(this), listOf(failure))
+
+/**
+ * Declares the failures this output's handler may return instead. [E] infers to
+ * their common supertype, so a sealed hierarchy makes the handler's `when`
+ * exhaustive.
+ */
+fun <E, T> Output<T>.orFail(vararg failures: ErrorOutput<out E>): DeclaredResponses<E, T> =
+    orFailAll(listOf(this), failures.toList())
+
+/**
+ * The same, on an output already declaring several successes. Only where it has
+ * no failures yet (`Nothing` is what [or] produces), so declaring failures stays
+ * one statement.
+ */
+infix fun <E, T> DeclaredResponses<Nothing, T>.orFail(failure: ErrorOutput<E>): DeclaredResponses<E, T> =
+    orFailAll(listOf(this), listOf(failure))
+
+/** As above, for several failures at once. */
+fun <E, T> DeclaredResponses<Nothing, T>.orFail(vararg failures: ErrorOutput<out E>): DeclaredResponses<E, T> =
+    orFailAll(listOf(this), failures.toList())
+
+/** Every spelling of `orFail` ends here, so they cannot disagree about what one means. */
+private fun <E, T> orFailAll(
+    declared: List<Output<*>>,
+    failures: List<ErrorOutput<out E>>,
+): DeclaredResponses<E, T> {
+    require(failures.isNotEmpty()) { "orFail needs at least one declared failure" }
+    return responses(declared, failures)
+}
+
+/**
+ * The one place a list of declared responses is assembled.
+ */
+private fun <E, T> responses(
+    declared: List<Output<*>>,
+    added: List<ErrorOutput<out E>>,
+): DeclaredResponses<E, T> {
+    val nested = declared.filterIsInstance<DeclaredResponses<*, *>>()
+
+    val already = nested.firstOrNull { it.failures.isNotEmpty() }
+    require(added.isEmpty() || already == null) { "orFail is already applied to $already" }
+
+    val successes = declared.flatMap { if (it is DeclaredResponses<*, *>) it.successes else listOf(it) }
+    val failures = nested.flatMap { it.failures } + added
+
+    @Suppress("UNCHECKED_CAST")
+    return DeclaredResponses(successes as List<Output<out T>>, failures as List<ErrorOutput<E>>)
+}

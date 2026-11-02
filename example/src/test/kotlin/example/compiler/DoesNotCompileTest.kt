@@ -82,8 +82,8 @@ class DoesNotCompileTest {
     }
 
     private val preamble = """
-        import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.pekko.*
+        import dev.surefold.pelican.*
+        import dev.surefold.pelican.pekko.*
 
         data class Item(val id: Long)
         data class Problem(val why: String)
@@ -98,8 +98,8 @@ class DoesNotCompileTest {
      * compiler emits here.
      */
     private val typed = """
-        import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.pekko.*
+        import dev.surefold.pelican.*
+        import dev.surefold.pelican.pekko.*
         import org.apache.pekko.stream.javadsl.Source
 
         data class User(val id: Long)
@@ -205,8 +205,8 @@ class DoesNotCompileTest {
     @Test
     fun `a stream of the wrong element names the element the output declared, on Jetty`() {
         val onJetty = typed.replace(
-            "import io.github.matthewjones372.pelican.pekko.*\nimport org.apache.pekko.stream.javadsl.Source",
-            "import io.github.matthewjones372.pelican.jetty.*",
+            "import dev.surefold.pelican.pekko.*\nimport org.apache.pekko.stream.javadsl.Source",
+            "import dev.surefold.pelican.jetty.*",
         )
         val errors = compile("$onJetty\nval bound = watchOrders streamedNow { (_, max) -> sequenceOf(\"not a tick\") }")
 
@@ -228,8 +228,8 @@ class DoesNotCompileTest {
 
     /** The reference's declared-failure examples, under the names it gives them. */
     private val failing = """
-        import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.pekko.*
+        import dev.surefold.pelican.*
+        import dev.surefold.pelican.pekko.*
 
         data class User(val id: Long)
         data class ApiError(val status: Int, val message: String)
@@ -269,8 +269,8 @@ class DoesNotCompileTest {
     fun `the bookmarks example the README quotes produces the line the README quotes`() {
         val errors = compile(
             """
-            import io.github.matthewjones372.pelican.*
-            import io.github.matthewjones372.pelican.pekko.*
+            import dev.surefold.pelican.*
+            import dev.surefold.pelican.pekko.*
 
             data class Bookmark(val id: Long)
             data class NoSuchBookmark(val id: Long, val message: String)

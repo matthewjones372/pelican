@@ -1,11 +1,11 @@
 package example.hello
 
-import io.github.matthewjones372.pelican.jetty.Handlers
-import io.github.matthewjones372.pelican.test.jetty.inMemory
-import io.github.matthewjones372.pelican.test.shouldBuild
+import dev.surefold.pelican.jetty.Handlers
+import dev.surefold.pelican.test.jetty.inMemory
+import dev.surefold.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import io.github.matthewjones372.pelican.test.pekko.inMemory as inMemoryOnPekko
+import dev.surefold.pelican.test.pekko.inMemory as inMemoryOnPekko
 
 class FirstEndpointTest {
 

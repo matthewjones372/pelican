@@ -1,6 +1,6 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.Endpoint
+import dev.surefold.pelican.Endpoint
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -64,8 +64,8 @@ class BinderNameParityTest {
     }
 
     private companion object {
-        const val PEKKO = "io.github.matthewjones372.pelican.pekko"
-        const val JETTY = "io.github.matthewjones372.pelican.jetty"
-        const val GANNET = "io.github.matthewjones372.pelican.gannet"
+        const val PEKKO = "dev.surefold.pelican.pekko"
+        const val JETTY = "dev.surefold.pelican.jetty"
+        const val GANNET = "dev.surefold.pelican.gannet"
     }
 }

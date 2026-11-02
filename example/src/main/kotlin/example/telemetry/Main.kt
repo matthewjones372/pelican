@@ -9,7 +9,7 @@ package example.telemetry
  *     }
  */
 
-import io.github.matthewjones372.pelican.jetty.start
+import dev.surefold.pelican.jetty.start
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.config.MeterFilter
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig

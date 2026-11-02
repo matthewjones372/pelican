@@ -13,12 +13,12 @@ package example.mcp
  *     }
  */
 
+import dev.surefold.pelican.jetty.PelicanServer
+import dev.surefold.pelican.jetty.mcp.handlerWithMcp
+import dev.surefold.pelican.jetty.start
+import dev.surefold.pelican.mcp.McpOptions
+import dev.surefold.pelican.mcp.mcpOptions
 import example.ordersApi
-import io.github.matthewjones372.pelican.jetty.PelicanServer
-import io.github.matthewjones372.pelican.jetty.mcp.handlerWithMcp
-import io.github.matthewjones372.pelican.jetty.start
-import io.github.matthewjones372.pelican.mcp.McpOptions
-import io.github.matthewjones372.pelican.mcp.mcpOptions
 
 /**
  * The Orders service with its tools served beside its endpoints: the same

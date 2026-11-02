@@ -1,7 +1,7 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.gannet.GannetTests
-import io.github.matthewjones372.pelican.gannet.RequiresGannet
+import dev.surefold.pelican.gannet.GannetTests
+import dev.surefold.pelican.gannet.RequiresGannet
 import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.Test
 

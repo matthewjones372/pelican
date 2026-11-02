@@ -9,22 +9,22 @@ package example.backends
  *     }
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiErrorEnvelope
-import io.github.matthewjones372.pelican.Filter
-import io.github.matthewjones372.pelican.Identity
-import io.github.matthewjones372.pelican.RefusalObserver
-import io.github.matthewjones372.pelican.RefusalRenderer
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.gannet.bytesNow
-import io.github.matthewjones372.pelican.gannet.handledNow
-import io.github.matthewjones372.pelican.gannet.handledOneOf
-import io.github.matthewjones372.pelican.gannet.handledOrFail
-import io.github.matthewjones372.pelican.gannet.handledWith
-import io.github.matthewjones372.pelican.gannet.start
-import io.github.matthewjones372.pelican.gannet.streamedNow
-import io.github.matthewjones372.pelican.gannet.toSequence
-import io.github.matthewjones372.pelican.lastEventId
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiErrorEnvelope
+import dev.surefold.pelican.Filter
+import dev.surefold.pelican.Identity
+import dev.surefold.pelican.RefusalObserver
+import dev.surefold.pelican.RefusalRenderer
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.gannet.bytesNow
+import dev.surefold.pelican.gannet.handledNow
+import dev.surefold.pelican.gannet.handledOneOf
+import dev.surefold.pelican.gannet.handledOrFail
+import dev.surefold.pelican.gannet.handledWith
+import dev.surefold.pelican.gannet.start
+import dev.surefold.pelican.gannet.streamedNow
+import dev.surefold.pelican.gannet.toSequence
+import dev.surefold.pelican.lastEventId
 
 /**
  * The Gannet binding of [greetingEndpoints].

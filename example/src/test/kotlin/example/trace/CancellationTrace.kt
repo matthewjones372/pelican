@@ -1,8 +1,8 @@
 package example.trace
 
-import io.github.matthewjones372.pelican.ClientRequest
-import io.github.matthewjones372.pelican.ClientResponse
-import io.github.matthewjones372.pelican.ClientTransport
+import dev.surefold.pelican.ClientRequest
+import dev.surefold.pelican.ClientResponse
+import dev.surefold.pelican.ClientTransport
 import org.apache.pekko.stream.SubscriptionWithCancelException
 import java.io.FilterInputStream
 import java.io.InputStream

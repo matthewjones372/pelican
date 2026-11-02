@@ -1,0 +1,99 @@
+package dev.surefold.pelican.importer
+
+import dev.surefold.pelican.JsonArr
+import dev.surefold.pelican.JsonObj
+import dev.surefold.pelican.JsonStr
+import dev.surefold.pelican.JsonValue
+import dev.surefold.pelican.codegen.Composed
+import dev.surefold.pelican.codegen.composed
+
+/**
+ * What a schema has to say to become a Kotlin type.
+ */
+internal object Schemas {
+
+    fun check(schema: JsonValue?, path: JsonPath, components: JsonObj, name: String? = null) {
+        val obj = schema as? JsonObj ?: return
+
+        when {
+            obj["not"] != null -> unsupported(path / "not", "A schema defined by what it excludes.")
+
+            obj.types().size > 1 -> unsupported(
+                path / "type",
+                "A value that is ${obj.types().joinToString(" or ")}, and a Kotlin property is one of them.",
+            )
+
+            else -> (composed(obj, components, name) as? Composed.Undescribable)
+                ?.let { unsupported(path / it.keyword, it.reason + wayThrough(obj, it)) }
+        }
+
+        nestedIn(obj).forEach { (key, nested) -> check(nested, path / key, components) }
+    }
+
+    /**
+     * The one refusal with a way through that is not "lose the operation".
+     * Here rather than in `pelican-codegen`'s message because it is a sentence
+     * about a build file, which the generator has no opinion about.
+     */
+    private fun wayThrough(obj: JsonObj, undescribable: Composed.Undescribable): String =
+        if (undescribable.keyword != "oneOf" || obj["discriminator"] != null) {
+            ""
+        } else {
+            "\n\nWhere the document is not yours to change, state the property in the build file " +
+                "instead — `discriminator(\"Payment\", property = \"kind\")` in the `endpoints { }` " +
+                "entry, addressing the schema by component name or by JSON pointer."
+        }
+
+    /** Every named schema [roots] reach, directly or through another. */
+    fun reachable(roots: List<JsonValue?>, components: JsonObj): Set<String> {
+        val found = LinkedHashSet<String>()
+        val pending = ArrayDeque<JsonValue>()
+        roots.filterNotNull().forEach { pending += it }
+
+        while (pending.isNotEmpty()) {
+            val obj = pending.removeFirst() as? JsonObj ?: continue
+            (obj["\$ref"] as? JsonStr)?.value?.substringAfterLast('/')
+                ?.let { follow(it, components, found, pending) }
+            nestedIn(obj).forEach { (_, nested) -> pending += nested }
+        }
+        return found
+    }
+
+    /**
+     * One name, and the branches of the hierarchy it turns out to be.
+     */
+    private fun follow(
+        name: String,
+        components: JsonObj,
+        found: MutableSet<String>,
+        pending: ArrayDeque<JsonValue>,
+    ) {
+        if (!found.add(name)) return
+        components[name]?.let { pending += it }
+        branchesOf(name, components).forEach { follow(it, components, found, pending) }
+    }
+
+    private fun branchesOf(name: String, components: JsonObj): List<String> {
+        val schema = components[name] as? JsonObj ?: return emptyList()
+        val union = composed(schema, components, name) as? Composed.Union ?: return emptyList()
+        return union.branches.mapNotNull { it.ref }
+    }
+
+    /** The schemas inside this one, with the key each sat under for the path. */
+    private fun nestedIn(obj: JsonObj): List<Pair<String, JsonValue>> = buildList {
+        obj.obj("properties").entries().forEach { (name, nested) -> add("properties.$name" to nested) }
+        listOf("items", "additionalProperties", "not").forEach { key ->
+            (obj[key] as? JsonObj)?.let { add(key to it) }
+        }
+        listOf("allOf", "anyOf", "oneOf").forEach { key ->
+            obj.arr(key).forEachIndexed { i, nested -> add("$key[$i]" to nested) }
+        }
+    }
+
+    /** The types this schema claims, ignoring the `"null"` that only widens one. */
+    private fun JsonObj.types(): List<String> = when (val type = this["type"]) {
+        is JsonStr -> listOf(type.value)
+        is JsonArr -> type.items.mapNotNull { (it as? JsonStr)?.value }.filterNot { it == "null" }
+        else -> emptyList()
+    }
+}

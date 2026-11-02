@@ -45,30 +45,30 @@ package example.telemetry
  * Run it with `./gradlew :example:runTelemetry`.
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.IntCodec
-import io.github.matthewjones372.pelican.Params
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.before
-import io.github.matthewjones372.pelican.between
-import io.github.matthewjones372.pelican.default
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.forbidden
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.jsonBody
-import io.github.matthewjones372.pelican.metrics.metrics
-import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.operationName
-import io.github.matthewjones372.pelican.optional
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.pathParam
-import io.github.matthewjones372.pelican.queryParam
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.IntCodec
+import dev.surefold.pelican.Params
+import dev.surefold.pelican.api
+import dev.surefold.pelican.before
+import dev.surefold.pelican.between
+import dev.surefold.pelican.default
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.forbidden
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jetty.handledOrFail
+import dev.surefold.pelican.jsonBody
+import dev.surefold.pelican.metrics.metrics
+import dev.surefold.pelican.metrics.otel.openTelemetry
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.operationName
+import dev.surefold.pelican.optional
+import dev.surefold.pelican.orFail
+import dev.surefold.pelican.pathParam
+import dev.surefold.pelican.queryParam
 import io.micrometer.core.instrument.MeterRegistry
 import io.opentelemetry.api.OpenTelemetry
 

@@ -1,8 +1,8 @@
 package compatibility
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiBuilder
-import io.github.matthewjones372.pelican.api
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiBuilder
+import dev.surefold.pelican.api
 import kotlin.time.toKotlinDuration
 
 class FrozenConsumer {

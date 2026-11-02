@@ -9,21 +9,21 @@ package example.backends
  *     }
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiErrorEnvelope
-import io.github.matthewjones372.pelican.Endpoint
-import io.github.matthewjones372.pelican.Filter
-import io.github.matthewjones372.pelican.InMemoryIdempotencyStore
-import io.github.matthewjones372.pelican.InMemoryRateLimitStore
-import io.github.matthewjones372.pelican.RefusalObserver
-import io.github.matthewjones372.pelican.RefusalRenderer
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.attribute
-import io.github.matthewjones372.pelican.before
-import io.github.matthewjones372.pelican.cors
-import io.github.matthewjones372.pelican.forbidden
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiErrorEnvelope
+import dev.surefold.pelican.Endpoint
+import dev.surefold.pelican.Filter
+import dev.surefold.pelican.InMemoryIdempotencyStore
+import dev.surefold.pelican.InMemoryRateLimitStore
+import dev.surefold.pelican.RefusalObserver
+import dev.surefold.pelican.RefusalRenderer
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.api
+import dev.surefold.pelican.attribute
+import dev.surefold.pelican.before
+import dev.surefold.pelican.cors
+import dev.surefold.pelican.forbidden
+import dev.surefold.pelican.jackson.JacksonCodecs
 
 /**
  * Everything about this service that is not a handler.

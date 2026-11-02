@@ -11,15 +11,15 @@ package example.health
  *     }
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.health.Health
-import io.github.matthewjones372.pelican.health.Status
-import io.github.matthewjones372.pelican.health.diskSpace
-import io.github.matthewjones372.pelican.health.health
-import io.github.matthewjones372.pelican.health.heapHeadroom
-import io.github.matthewjones372.pelican.health.noDeadlockedThreads
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.api
+import dev.surefold.pelican.health.Health
+import dev.surefold.pelican.health.Status
+import dev.surefold.pelican.health.diskSpace
+import dev.surefold.pelican.health.health
+import dev.surefold.pelican.health.heapHeadroom
+import dev.surefold.pelican.health.noDeadlockedThreads
+import dev.surefold.pelican.jackson.JacksonCodecs
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
 

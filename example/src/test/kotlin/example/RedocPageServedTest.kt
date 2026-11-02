@@ -1,8 +1,8 @@
 package example
 
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.openapi.DocsUi
-import io.github.matthewjones372.pelican.openapi.docs
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.openapi.DocsUi
+import dev.surefold.pelican.openapi.docs
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain

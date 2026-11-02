@@ -1,12 +1,12 @@
 package example
 
+import dev.surefold.pelican.client.jetty.JettyHttpTransport
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.start
 import example.generated.whoami.ApiCallFailed
 import example.generated.whoami.WhoAmIClient
 import example.whoami.ADA_TOKEN
 import example.whoami.whoAmIApi
-import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.start
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain

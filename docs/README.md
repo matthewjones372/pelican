@@ -12,7 +12,7 @@ the Pekko equivalents (`pelican-pekko`, `pelican-pekko-docs`,
 `pelican-test-pekko`) and the Pekko dependencies your service names itself, as
 the [README's Getting started](../README.md#getting-started) and the cookbook's
 [On Pekko](cookbook.md#on-pekko) show. Every binder has the same name in
-`io.github.matthewjones372.pelican.pekko`; only a streaming handler changes, to
+`dev.surefold.pelican.pekko`; only a streaming handler changes, to
 a Pekko `Source` where Jetty takes a `Sequence`. The Gannet backend is on `main`
 and in no release; see [Modules](modules.md#gannet-backend).
 

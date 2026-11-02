@@ -1,10 +1,10 @@
 package example.telemetry
 
 import com.sun.net.httpserver.HttpServer
-import io.github.matthewjones372.pelican.ClientRequest
-import io.github.matthewjones372.pelican.Method
-import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
-import io.github.matthewjones372.pelican.metrics.otel.traced
+import dev.surefold.pelican.ClientRequest
+import dev.surefold.pelican.Method
+import dev.surefold.pelican.client.jetty.JettyHttpTransport
+import dev.surefold.pelican.metrics.otel.traced
 import io.kotest.matchers.shouldBe
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.SpanKind

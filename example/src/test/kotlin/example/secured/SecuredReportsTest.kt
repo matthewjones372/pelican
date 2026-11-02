@@ -1,9 +1,9 @@
 package example.secured
 
-import io.github.matthewjones372.pelican.jetty.PelicanServer
-import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.github.matthewjones372.pelican.openapi.oauth2RedirectPath
-import io.github.matthewjones372.pelican.openapi.openApiJson
+import dev.surefold.pelican.jetty.PelicanServer
+import dev.surefold.pelican.jetty.docs.startWithDocs
+import dev.surefold.pelican.openapi.oauth2RedirectPath
+import dev.surefold.pelican.openapi.openApiJson
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain

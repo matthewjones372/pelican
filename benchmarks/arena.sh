@@ -31,7 +31,7 @@ out=benchmarks/build/arena-$profile.txt
 [[ -n ${SKIP_BUILD:-} ]] || ./gradlew -q :benchmarks:arenaClasspath
 cp=$(cat benchmarks/build/arena-classpath.txt)
 flags="-Xms1g -Xmx1g --enable-native-access=ALL-UNNAMED --add-exports java.base/jdk.internal.vm=ALL-UNNAMED"
-pkg=io.github.matthewjones372.pelican.benchmarks.arena
+pkg=dev.surefold.pelican.benchmarks.arena
 hz=$(getconf CLK_TCK)
 pidfile=benchmarks/build/arena.pid
 # The server runs in a subshell; on the way out, stop it by the PID it wrote.

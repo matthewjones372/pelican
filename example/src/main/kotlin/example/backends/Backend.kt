@@ -9,11 +9,11 @@ package example.backends
  *     }
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiErrorEnvelope
-import io.github.matthewjones372.pelican.Filter
-import io.github.matthewjones372.pelican.RefusalObserver
-import io.github.matthewjones372.pelican.RefusalRenderer
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiErrorEnvelope
+import dev.surefold.pelican.Filter
+import dev.surefold.pelican.RefusalObserver
+import dev.surefold.pelican.RefusalRenderer
 
 /**
  * A backend, reduced to what anything outside it needs: bind the shared

@@ -21,16 +21,16 @@ package example.adoption
  * from and the point is to call the result.
  */
 
-import io.github.matthewjones372.pelican.Codecs
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.errorJson
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.orFail
-import io.github.matthewjones372.pelican.pathParam
+import dev.surefold.pelican.Codecs
+import dev.surefold.pelican.api
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.errorJson
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.handledOrFail
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.orFail
+import dev.surefold.pelican.pathParam
 import kotlinx.serialization.Serializable
 
 @Serializable

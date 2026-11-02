@@ -1,17 +1,17 @@
-public final class io/github/matthewjones372/pelican/test/pekko/InMemoryKt {
-	public static final fun client (Lio/github/matthewjones372/pelican/pekko/PelicanServer;)Lio/github/matthewjones372/pelican/test/ApiClient;
-	public static final fun inMemory (Lio/github/matthewjones372/pelican/Api;Ljava/lang/String;)Lio/github/matthewjones372/pelican/test/ApiClient;
-	public static final fun inMemory (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;)Lio/github/matthewjones372/pelican/test/ApiClient;
-	public static synthetic fun inMemory$default (Lio/github/matthewjones372/pelican/Api;Ljava/lang/String;ILjava/lang/Object;)Lio/github/matthewjones372/pelican/test/ApiClient;
+public final class dev/surefold/pelican/test/pekko/InMemoryKt {
+	public static final fun client (Ldev/surefold/pelican/pekko/PelicanServer;)Ldev/surefold/pelican/test/ApiClient;
+	public static final fun inMemory (Ldev/surefold/pelican/Api;Ljava/lang/String;)Ldev/surefold/pelican/test/ApiClient;
+	public static final fun inMemory (Ldev/surefold/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;)Ldev/surefold/pelican/test/ApiClient;
+	public static synthetic fun inMemory$default (Ldev/surefold/pelican/Api;Ljava/lang/String;ILjava/lang/Object;)Ldev/surefold/pelican/test/ApiClient;
 }
 
-public final class io/github/matthewjones372/pelican/test/pekko/InMemoryTransport : io/github/matthewjones372/pelican/test/Transport, java/lang/AutoCloseable {
-	public fun <init> (Lio/github/matthewjones372/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;Z)V
+public final class dev/surefold/pelican/test/pekko/InMemoryTransport : dev/surefold/pelican/test/Transport, java/lang/AutoCloseable {
+	public fun <init> (Ldev/surefold/pelican/Api;Lorg/apache/pekko/actor/typed/ActorSystem;Z)V
 	public fun close ()V
 	public final fun exchange (Lorg/apache/pekko/http/javadsl/model/HttpRequest;)Lorg/apache/pekko/http/javadsl/model/HttpResponse;
 	public final fun getShutdownTimeoutSeconds ()J
 	public final fun getSystem ()Lorg/apache/pekko/actor/typed/ActorSystem;
-	public fun send (Lio/github/matthewjones372/pelican/test/RequestSpec;)Lio/github/matthewjones372/pelican/test/ResponseSpec;
+	public fun send (Ldev/surefold/pelican/test/RequestSpec;)Ldev/surefold/pelican/test/ResponseSpec;
 	public final fun setShutdownTimeoutSeconds (J)V
 }
 

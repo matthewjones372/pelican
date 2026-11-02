@@ -1,0 +1,38 @@
+package dev.surefold.pelican.streams.jetty
+
+import dev.surefold.pelican.ErrorOutput
+import dev.surefold.pelican.Outcome
+import dev.surefold.pelican.StreamIn
+import dev.surefold.pelican.jetty.reader
+import dev.surefold.pelican.ok
+import io.github.matthewjones372.surefold.stream.Exit
+import io.github.matthewjones372.surefold.stream.Stream
+import io.github.matthewjones372.surefold.stream.blocking
+import java.util.concurrent.CompletionStage
+
+/**
+ * The frames of a streaming body as a surefold [Stream], read one at a time as the run pulls them. A run's `stop()`
+ * wakes a read blocked on the upload, and however the run ends the upload is released.
+ */
+fun <T : Any> StreamIn<T>.toStream(): Stream<Nothing, T> =
+    Stream.blocking(
+        open = { reader() },
+        next = { if (it.hasNext()) it.next() else null },
+        wake = { it.wake() },
+        close = { it.close() },
+    )
+
+/**
+ * The [Exit] a surefold run completes with, as the [Outcome] a handler answers: `Done` is the value, `Failed` is
+ * [failure], and `Died` is rethrown, since a throwable nobody declared is not the declared failure.
+ */
+fun <E : Any, A : Any> CompletionStage<Exit<E, A>>.toOutcome(
+    failure: ErrorOutput<E>,
+): CompletionStage<Outcome<E, A>> =
+    thenApply { exit ->
+        when (exit) {
+            is Exit.Done -> ok(exit.value)
+            is Exit.Failed -> failure(exit.error)
+            is Exit.Died -> throw exit.cause
+        }
+    }

@@ -1,0 +1,7 @@
+package dev.surefold.pelican.openapi
+
+import dev.surefold.pelican.ApiSpec
+
+/** As `pelican-openapi` publishes it. A separate file, so a separate class. */
+fun openApiYaml(spec: ApiSpec, version: OpenApiVersion): String =
+    "openapi: $version\ntitle: ${spec.title}\n"

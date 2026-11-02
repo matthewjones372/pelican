@@ -1,7 +1,7 @@
 package example
 
+import dev.surefold.pelican.pekko.docs.startWithDocs
 import example.backends.pekkoApi
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.apache.pekko.actor.testkit.typed.annotations.JUnit5TestKit

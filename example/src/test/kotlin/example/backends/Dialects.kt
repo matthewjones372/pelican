@@ -1,9 +1,9 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.ApiErrorEnvelope
-import io.github.matthewjones372.pelican.ProblemDetails
-import io.github.matthewjones372.pelican.RefusalRenderer
-import io.github.matthewjones372.pelican.test.ResponseSpec
+import dev.surefold.pelican.ApiErrorEnvelope
+import dev.surefold.pelican.ProblemDetails
+import dev.surefold.pelican.RefusalRenderer
+import dev.surefold.pelican.test.ResponseSpec
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive

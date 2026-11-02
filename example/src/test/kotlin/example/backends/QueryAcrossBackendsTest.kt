@@ -1,10 +1,10 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.div
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jsonBody
+import dev.surefold.pelican.api
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jsonBody
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -15,12 +15,12 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import io.github.matthewjones372.pelican.gannet.handledNow as handledOnGannet
-import io.github.matthewjones372.pelican.gannet.start as startOnGannet
-import io.github.matthewjones372.pelican.jetty.handledNow as handledOnJetty
-import io.github.matthewjones372.pelican.jetty.start as startOnJetty
-import io.github.matthewjones372.pelican.pekko.handledNow as handledOnPekko
-import io.github.matthewjones372.pelican.pekko.start as startOnPekko
+import dev.surefold.pelican.gannet.handledNow as handledOnGannet
+import dev.surefold.pelican.gannet.start as startOnGannet
+import dev.surefold.pelican.jetty.handledNow as handledOnJetty
+import dev.surefold.pelican.jetty.start as startOnJetty
+import dev.surefold.pelican.pekko.handledNow as handledOnPekko
+import dev.surefold.pelican.pekko.start as startOnPekko
 
 /** RFC 10008 `QUERY`, which no backend's router was written for, answered the same way by all three. */
 class QueryAcrossBackendsTest {

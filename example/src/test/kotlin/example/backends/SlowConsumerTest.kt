@@ -1,11 +1,11 @@
 package example.backends
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.gannet.RequiresGannet
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.api
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.gannet.RequiresGannet
+import dev.surefold.pelican.jackson.JacksonCodecs
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.apache.pekko.stream.javadsl.Source
@@ -16,12 +16,12 @@ import java.net.URI
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
-import io.github.matthewjones372.pelican.gannet.start as startOnGannet
-import io.github.matthewjones372.pelican.gannet.streamedNow as streamedNowOnGannet
-import io.github.matthewjones372.pelican.jetty.start as startOnJetty
-import io.github.matthewjones372.pelican.jetty.streamedNow as streamedNowOnJetty
-import io.github.matthewjones372.pelican.pekko.start as startOnPekko
-import io.github.matthewjones372.pelican.pekko.streamedNow as streamedNowOnPekko
+import dev.surefold.pelican.gannet.start as startOnGannet
+import dev.surefold.pelican.gannet.streamedNow as streamedNowOnGannet
+import dev.surefold.pelican.jetty.start as startOnJetty
+import dev.surefold.pelican.jetty.streamedNow as streamedNowOnJetty
+import dev.surefold.pelican.pekko.start as startOnPekko
+import dev.surefold.pelican.pekko.streamedNow as streamedNowOnPekko
 
 /**
  * A consumer that takes one frame and walks away, and what the handler's stream

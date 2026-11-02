@@ -40,7 +40,7 @@ request) needs an in-memory client from `pelican-test-pekko` or
 From `example/src/test/kotlin/example/GoldenContractTest.kt`:
 
 ```kotlin
-import io.github.matthewjones372.pelican.test.golden.Golden
+import dev.surefold.pelican.test.golden.Golden
 import org.junit.jupiter.api.Test
 
 class GoldenContractTest {
@@ -255,10 +255,10 @@ because there is no compatible change to an address a caller has to type. From
 `BookmarksContractGoldenTest`:
 
 ```kotlin
-import io.github.matthewjones372.pelican.In2
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.test.golden.Golden
-import io.github.matthewjones372.pelican.test.golden.requestsOnly
+import dev.surefold.pelican.In2
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.test.golden.Golden
+import dev.surefold.pelican.test.golden.requestsOnly
 import org.junit.jupiter.api.Test
 import java.nio.file.Paths
 
@@ -303,7 +303,7 @@ sends a call and records both halves in one file. Both need a client that
 sends, such as an in-memory one:
 
 ```kotlin
-import io.github.matthewjones372.pelican.test.pekko.inMemory      // pelican-test-pekko
+import dev.surefold.pelican.test.pekko.inMemory      // pelican-test-pekko
 
 private val app = ordersApi().inMemory()
 
@@ -365,11 +365,11 @@ The classification lives in `pelican-openapi` and works on any two
 documents, for example the one a deployed service is serving:
 
 ```kotlin
-import io.github.matthewjones372.pelican.openapi.Compatibility
-import io.github.matthewjones372.pelican.openapi.apiChanges
-import io.github.matthewjones372.pelican.openapi.documentOf
-import io.github.matthewjones372.pelican.openapi.openApi
-import io.github.matthewjones372.pelican.openapi.report
+import dev.surefold.pelican.openapi.Compatibility
+import dev.surefold.pelican.openapi.apiChanges
+import dev.surefold.pelican.openapi.documentOf
+import dev.surefold.pelican.openapi.openApi
+import dev.surefold.pelican.openapi.report
 import java.io.File
 
 fun main() {

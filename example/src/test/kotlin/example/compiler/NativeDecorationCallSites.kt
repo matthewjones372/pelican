@@ -2,15 +2,15 @@ package example.compiler
 
 internal val nativeDecorationCallSites: Map<String, String> = mapOf(
     "nativeDecoration" to """
-        import io.github.matthewjones372.pelican.AdmissionDecision
-        import io.github.matthewjones372.pelican.OperationAdmission
-        import io.github.matthewjones372.pelican.api
-        import io.github.matthewjones372.pelican.endpoint
-        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-        import io.github.matthewjones372.pelican.jetty.docs.docsHandler
-        import io.github.matthewjones372.pelican.jetty.handledNow
-        import io.github.matthewjones372.pelican.jetty.startDecorated
-        import io.github.matthewjones372.pelican.openapi.docs
+        import dev.surefold.pelican.AdmissionDecision
+        import dev.surefold.pelican.OperationAdmission
+        import dev.surefold.pelican.api
+        import dev.surefold.pelican.endpoint
+        import dev.surefold.pelican.jackson.JacksonCodecs
+        import dev.surefold.pelican.jetty.docs.docsHandler
+        import dev.surefold.pelican.jetty.handledNow
+        import dev.surefold.pelican.jetty.startDecorated
+        import dev.surefold.pelican.openapi.docs
         import org.eclipse.jetty.server.Handler
 
         val greeting = endpoint { get("greeting"); text() }

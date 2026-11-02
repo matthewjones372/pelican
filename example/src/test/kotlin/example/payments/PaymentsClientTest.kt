@@ -1,18 +1,18 @@
 package example.payments
 
+import dev.surefold.pelican.ClientResponse
+import dev.surefold.pelican.ClientTransport
+import dev.surefold.pelican.client.jetty.JettyHttpTransport
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.start
+import dev.surefold.pelican.retryPolicy
+import dev.surefold.pelican.retrying
+import dev.surefold.pelican.standardWebhooks
 import example.generated.payments.ApiCallFailed
 import example.generated.payments.ChargeStatus
 import example.generated.payments.GetChargeFailure
 import example.generated.payments.Outcome
 import example.generated.payments.PaymentsClient
-import io.github.matthewjones372.pelican.ClientResponse
-import io.github.matthewjones372.pelican.ClientTransport
-import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.start
-import io.github.matthewjones372.pelican.retryPolicy
-import io.github.matthewjones372.pelican.retrying
-import io.github.matthewjones372.pelican.standardWebhooks
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf

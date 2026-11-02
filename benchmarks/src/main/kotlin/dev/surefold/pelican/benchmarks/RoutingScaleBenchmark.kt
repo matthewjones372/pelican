@@ -1,0 +1,161 @@
+package dev.surefold.pelican.benchmarks
+
+import dev.surefold.pelican.api
+import dev.surefold.pelican.div
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.pathParam
+import dev.surefold.pelican.pekko.toRoute
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.javadsl.Behaviors
+import org.apache.pekko.http.javadsl.model.HttpRequest
+import org.apache.pekko.http.javadsl.model.HttpResponse
+import org.apache.pekko.http.javadsl.server.Directives
+import org.apache.pekko.http.javadsl.server.PathMatchers
+import org.apache.pekko.japi.function.Function
+import org.apache.pekko.stream.javadsl.Sink
+import org.apache.pekko.stream.javadsl.Source
+import org.openjdk.jmh.annotations.Benchmark
+import org.openjdk.jmh.annotations.BenchmarkMode
+import org.openjdk.jmh.annotations.Fork
+import org.openjdk.jmh.annotations.Measurement
+import org.openjdk.jmh.annotations.Mode
+import org.openjdk.jmh.annotations.OutputTimeUnit
+import org.openjdk.jmh.annotations.Param
+import org.openjdk.jmh.annotations.Scope
+import org.openjdk.jmh.annotations.Setup
+import org.openjdk.jmh.annotations.State
+import org.openjdk.jmh.annotations.TearDown
+import org.openjdk.jmh.annotations.Warmup
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.TimeUnit
+import dev.surefold.pelican.pekko.handledNow as handledOnPekko
+
+/**
+ * What matching costs when a service has more than one endpoint.
+ *
+ * Every other benchmark here uses an API of one endpoint, which measures
+ * decoding and rendering and says nothing about the thing that actually varies
+ * between services.
+ *
+ * The two rows are the two strategies. The hand-written control registers every
+ * route with Pekko directly, which reduces them with `Directives.concat` into
+ * an ordered scan: a request runs a method comparison and, where that passes, a
+ * full path walk per candidate until one matches. Pelican holds the
+ * descriptions instead and indexes them before the router sees a request, so
+ * what the interpreter's row measures is a walk over the path's own segments.
+ *
+ * The endpoint under test is declared *last*, which is the worst case an
+ * ordered scan has and the one a service acquires by adding endpoints over
+ * time.
+ *
+ * The decoys are the realistic shape rather than the convenient one: the same
+ * segment count with different literals, so a comparison fails late rather than
+ * on the first character.
+ *
+ * A class of its own, so `./gradlew :benchmarks:jmh` stays the run
+ * `what-it-costs.md` documents and this sweep is asked for by name:
+ *
+ * ```bash
+ * ./gradlew :benchmarks:jmh -PbenchmarkArgs="-f 1 RoutingScale"
+ * ```
+ */
+@State(Scope.Benchmark)
+@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@Fork(value = 3, jvmArgsAppend = ["-Xms512m", "-Xmx512m"])
+@Warmup(iterations = 5, time = 1)
+@Measurement(iterations = 5, time = 1)
+open class RoutingScaleBenchmark {
+
+    /** One, a small service, and one large enough that a scan would show. */
+    @Param("1", "50", "200")
+    var endpoints: Int = 1
+
+    private lateinit var pekko: Function<HttpRequest, CompletionStage<HttpResponse>>
+    private lateinit var pekkoRequest: HttpRequest
+
+    /**
+     * The control. The same number of routes, registered with the router
+     * directly, so the question "is this the interpreter or the router?" has a
+     * measured answer rather than an opinion.
+     */
+    private lateinit var pekkoBare: Function<HttpRequest, CompletionStage<HttpResponse>>
+
+    /**
+     * One system for the class. Creating one costs milliseconds against an
+     * operation measured in nanoseconds, so it is not per iteration.
+     */
+    private val system = ActorSystem.create(Behaviors.empty<Void>(), "pelican-routing-scale")
+
+    private val itemId = pathParam<Long>("itemId")
+
+    /** The one under test. Declared last, so an ordered scan reaches it last. */
+    private val target = endpoint(itemId) {
+        get("items" / itemId)
+        text()
+    }
+
+    /**
+     * Endpoints of the same shape and a different literal. A router that
+     * compares segment by segment has to get to the end of each before it can
+     * rule it out.
+     */
+    private fun decoyDescriptions(count: Int) =
+        (1..count).map { n ->
+            val id = pathParam<Long>("id$n")
+            endpoint(id) {
+                get("resource$n" / id)
+                text()
+            }
+        }
+
+    @Setup
+    fun setUp() {
+        val descriptions = decoyDescriptions(endpoints - 1)
+
+        pekko = api(
+            endpoints = descriptions.map { it handledOnPekko { _ -> "decoy" } } +
+                (target handledOnPekko { id -> "item-$id" }),
+            codecs = JacksonCodecs,
+        ).toRoute(system).function(system)
+
+        val bareRoutes = (1..endpoints - 1).map { n ->
+            Directives.get {
+                Directives.path(PathMatchers.segment("resource$n").slash(PathMatchers.longSegment())) { _ ->
+                    Directives.complete("decoy")
+                }
+            }
+        } + Directives.get {
+            Directives.path(PathMatchers.segment("items").slash(PathMatchers.longSegment())) { id ->
+                Directives.complete("item-$id")
+            }
+        }
+        val bareFlow = bareRoutes.reduce { a, b -> Directives.concat(a, b) }.seal().flow(system)
+        pekkoBare = Function { req ->
+            Source.single(req).via(bareFlow).runWith(Sink.head(), system)
+        }
+
+        pekkoRequest = HttpRequest.GET("/items/7")
+
+        // That the route under test is the one answering, before anything is
+        // timed: a scan that rejected would be the fastest thing here.
+        check(answer(pekkoRequest).status().intValue() == 200) { "pekko did not answer 200" }
+    }
+
+    @TearDown
+    fun stop() {
+        system.terminate()
+        system.whenTerminated.toCompletableFuture().join()
+    }
+
+    private fun answer(req: HttpRequest): HttpResponse =
+        pekko.apply(req).toCompletableFuture().join()
+
+    @Benchmark
+    fun lastRouteOnPekko(): HttpResponse = answer(pekkoRequest)
+
+    @Benchmark
+    fun lastRouteOnPekkoHandWritten(): HttpResponse =
+        pekkoBare.apply(pekkoRequest).toCompletableFuture().join()
+}

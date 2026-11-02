@@ -266,7 +266,7 @@ slower again, by about 16µs.
 plain inputs cost well under a microsecond on the GET, so most of it is in how
 the body is read and handed to the codec. The interpreter keeps a second way of reading a
 body for chunked uploads, which this benchmark does not exercise; see
-[`ChunkedBodyLimitTest`](../backends/pekko/pelican-pekko/src/test/kotlin/io/github/matthewjones372/pelican/pekko/ChunkedBodyLimitTest.kt)
+[`ChunkedBodyLimitTest`](../backends/pekko/pelican-pekko/src/test/kotlin/dev/surefold/pelican/pekko/ChunkedBodyLimitTest.kt)
 for why it exists.
 
 ## Jetty, in memory

@@ -13,25 +13,25 @@ package example
  *     }
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.ApiError
-import io.github.matthewjones372.pelican.ServerEndpoint
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.bytesNow
-import io.github.matthewjones372.pelican.jetty.handledNow
-import io.github.matthewjones372.pelican.jetty.handledOneOf
-import io.github.matthewjones372.pelican.jetty.handledOrFail
-import io.github.matthewjones372.pelican.jetty.handledWith
-import io.github.matthewjones372.pelican.jetty.streamedNow
-import io.github.matthewjones372.pelican.jetty.streamedOrFail
-import io.github.matthewjones372.pelican.jetty.toSequence
-import io.github.matthewjones372.pelican.jsonObj
-import io.github.matthewjones372.pelican.lastEventId
-import io.github.matthewjones372.pelican.of
-import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.unauthorized
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.ApiError
+import dev.surefold.pelican.ServerEndpoint
+import dev.surefold.pelican.api
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.bytesNow
+import dev.surefold.pelican.jetty.handledNow
+import dev.surefold.pelican.jetty.handledOneOf
+import dev.surefold.pelican.jetty.handledOrFail
+import dev.surefold.pelican.jetty.handledWith
+import dev.surefold.pelican.jetty.streamedNow
+import dev.surefold.pelican.jetty.streamedOrFail
+import dev.surefold.pelican.jetty.toSequence
+import dev.surefold.pelican.jsonObj
+import dev.surefold.pelican.lastEventId
+import dev.surefold.pelican.of
+import dev.surefold.pelican.ok
+import dev.surefold.pelican.openapi.docs
+import dev.surefold.pelican.unauthorized
 
 /**
  * The Jetty wiring: every description from Endpoints.kt paired with its

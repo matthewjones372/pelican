@@ -20,7 +20,7 @@ set the spec is compiled in needs `pelican-codegen` as a dependency:
 
 ```kotlin
 // build.gradle.kts
-plugins { id("io.github.matthewjones372.pelican") version "1.2.0" }
+plugins { id("dev.surefold.pelican") version "1.2.0" }
 
 dependencies {
     implementation("io.github.matthewjones372:pelican-core:1.2.0")
@@ -98,7 +98,7 @@ The task calls one function in `pelican-codegen`, which you can call yourself:
 
 ```kotlin
 import com.example.ordersSpec
-import io.github.matthewjones372.pelican.codegen.writeKotlinClient
+import dev.surefold.pelican.codegen.writeKotlinClient
 import java.nio.file.Path
 
 fun main() {
@@ -141,7 +141,7 @@ file's package:
   `TextResponse` and `MultipartContent`. These are declared in the generated
   package, not imported from Pelican, so `Outcome` here is
   `com.example.orders.Outcome` and not core's server-side
-  `io.github.matthewjones372.pelican.Outcome`.
+  `dev.surefold.pelican.Outcome`.
 
 ### Calling it
 
@@ -154,7 +154,7 @@ import example.generated.Order
 import example.generated.OrdersClient
 import example.generated.Outcome
 import example.generated.PlaceOrderFailure
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jackson.JacksonCodecs
 
 fun place(client: OrdersClient, key: String): Order? =
     when (val result = client.placeOrder(1L, CreateOrder("anvil"), xApiKey = key)) {
@@ -297,8 +297,8 @@ dependencies {
 
 ```kotlin
 import example.generated.OrdersClient
-import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.client.pekko.PekkoHttpTransport
+import dev.surefold.pelican.jackson.JacksonCodecs
 import org.apache.pekko.actor.typed.ActorSystem
 
 fun ordersClient(system: ActorSystem<*>) =
@@ -418,8 +418,8 @@ Nothing retries unless you wrap the transport, using `retrying()` from
 `pelican-core`:
 
 ```kotlin
-import io.github.matthewjones372.pelican.ClientTransport
-import io.github.matthewjones372.pelican.retrying
+import dev.surefold.pelican.ClientTransport
+import dev.surefold.pelican.retrying
 
 val client = OrdersClient(
     "https://orders.internal",

@@ -17,16 +17,16 @@ package example.whoami
  * a call can be refused with it. Its own little API for the reason adoption is.
  */
 
-import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.Authenticator
-import io.github.matthewjones372.pelican.Identity
-import io.github.matthewjones372.pelican.Unauthenticated
-import io.github.matthewjones372.pelican.api
-import io.github.matthewjones372.pelican.authenticated
-import io.github.matthewjones372.pelican.bearerAuth
-import io.github.matthewjones372.pelican.endpoint
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.jetty.handledNow
+import dev.surefold.pelican.Api
+import dev.surefold.pelican.Authenticator
+import dev.surefold.pelican.Identity
+import dev.surefold.pelican.Unauthenticated
+import dev.surefold.pelican.api
+import dev.surefold.pelican.authenticated
+import dev.surefold.pelican.bearerAuth
+import dev.surefold.pelican.endpoint
+import dev.surefold.pelican.jackson.JacksonCodecs
+import dev.surefold.pelican.jetty.handledNow
 
 val bearer = bearerAuth(bearerFormat = null, name = "bearer")
 

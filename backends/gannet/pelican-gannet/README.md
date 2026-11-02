@@ -34,9 +34,9 @@ handler. Handlers stay plain blocking code.
 The binders are `pelican-jetty`'s, with the same names and types, so moving a service over is an import swap.
 
 ```kotlin
-import io.github.matthewjones372.pelican.gannet.handledNow
-import io.github.matthewjones372.pelican.gannet.start
-import io.github.matthewjones372.pelican.gannet.streamedNow
+import dev.surefold.pelican.gannet.handledNow
+import dev.surefold.pelican.gannet.start
+import dev.surefold.pelican.gannet.streamedNow
 
 val routes = listOf(
     getOrder handledNow { id -> store.order(id) },
@@ -72,7 +72,7 @@ api(routes, JacksonCodecs).start(port = 8443, config = GannetConfig(tls = tls))
 a loopback port and stops it when the client closes:
 
 ```kotlin
-import io.github.matthewjones372.pelican.test.gannet.onLoopback
+import dev.surefold.pelican.test.gannet.onLoopback
 
 api(routes, JacksonCodecs).onLoopback().use { app -> app.call(getOrder, 1L) }
 ```

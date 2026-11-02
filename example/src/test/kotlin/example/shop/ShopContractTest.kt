@@ -1,15 +1,15 @@
 package example.shop
 
-import io.github.matthewjones372.pelican.In3
-import io.github.matthewjones372.pelican.Method
-import io.github.matthewjones372.pelican.jetty.Handlers
-import io.github.matthewjones372.pelican.openapi.openApiJson
-import io.github.matthewjones372.pelican.test.ApiClient
-import io.github.matthewjones372.pelican.test.RequestSpec
-import io.github.matthewjones372.pelican.test.jetty.inMemory
-import io.github.matthewjones372.pelican.test.shouldBeFailure
-import io.github.matthewjones372.pelican.test.shouldBeOk
-import io.github.matthewjones372.pelican.test.shouldHaveStatus
+import dev.surefold.pelican.In3
+import dev.surefold.pelican.Method
+import dev.surefold.pelican.jetty.Handlers
+import dev.surefold.pelican.openapi.openApiJson
+import dev.surefold.pelican.test.ApiClient
+import dev.surefold.pelican.test.RequestSpec
+import dev.surefold.pelican.test.jetty.inMemory
+import dev.surefold.pelican.test.shouldBeFailure
+import dev.surefold.pelican.test.shouldBeOk
+import dev.surefold.pelican.test.shouldHaveStatus
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe

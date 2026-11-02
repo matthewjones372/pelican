@@ -23,7 +23,7 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // ------------------------------------------------------------ endpoints
 
     "endpoints" to """
-        import io.github.matthewjones372.pelican.*
+        import dev.surefold.pelican.*
 
         data class Order(val id: Long)
 
@@ -73,7 +73,7 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // --------------------------------------------------------------- inputs
 
     "inputs" to """
-        import io.github.matthewjones372.pelican.*
+        import dev.surefold.pelican.*
 
         data class Order(val id: Long)
         data class CreateOrder(val sku: String)
@@ -134,7 +134,7 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // -------------------------------------------------------------- outputs
 
     "outputs" to """
-        import io.github.matthewjones372.pelican.*
+        import dev.surefold.pelican.*
         import kotlin.time.Duration.Companion.seconds
 
         data class Order(val id: Long)
@@ -192,7 +192,7 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // ------------------------------------------------------------- failures
 
     "failures" to """
-        import io.github.matthewjones372.pelican.*
+        import dev.surefold.pelican.*
 
         data class Order(val id: Long)
         data class Problem(val why: String)
@@ -237,13 +237,13 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     """,
 
     "admission" to """
-        import io.github.matthewjones372.pelican.AdmissionDecision
-        import io.github.matthewjones372.pelican.OperationAdmission
-        import io.github.matthewjones372.pelican.api
-        import io.github.matthewjones372.pelican.endpoint
-        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-        import io.github.matthewjones372.pelican.jetty.handledNow
-        import io.github.matthewjones372.pelican.jetty.toHandler
+        import dev.surefold.pelican.AdmissionDecision
+        import dev.surefold.pelican.OperationAdmission
+        import dev.surefold.pelican.api
+        import dev.surefold.pelican.endpoint
+        import dev.surefold.pelican.jackson.JacksonCodecs
+        import dev.surefold.pelican.jetty.handledNow
+        import dev.surefold.pelican.jetty.toHandler
 
         val restricted = endpoint { get("restricted"); text() }
         val open = endpoint { get("open"); text() }
@@ -262,17 +262,17 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // --------------------------------------------------------- construction
 
     "construction" to """
-        import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.importer.Backend
-        import io.github.matthewjones372.pelican.importer.importOptions
-        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-        import io.github.matthewjones372.pelican.mcp.mcpOptions
-        import io.github.matthewjones372.pelican.openapi.OpenApiVersion
-        import io.github.matthewjones372.pelican.openapi.docs
-        import io.github.matthewjones372.pelican.openapi.openApi
-        import io.github.matthewjones372.pelican.openapi.openApiJson
-        import io.github.matthewjones372.pelican.openapi.openApiYaml
-        import io.github.matthewjones372.pelican.pekko.handledNow
+        import dev.surefold.pelican.*
+        import dev.surefold.pelican.importer.Backend
+        import dev.surefold.pelican.importer.importOptions
+        import dev.surefold.pelican.jackson.JacksonCodecs
+        import dev.surefold.pelican.mcp.mcpOptions
+        import dev.surefold.pelican.openapi.OpenApiVersion
+        import dev.surefold.pelican.openapi.docs
+        import dev.surefold.pelican.openapi.openApi
+        import dev.surefold.pelican.openapi.openApiJson
+        import dev.surefold.pelican.openapi.openApiYaml
+        import dev.surefold.pelican.pekko.handledNow
         import java.time.Duration
 
         data class Order(val id: Long)
@@ -348,16 +348,16 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // -------------------------------------------------------------- binders
 
     "binders" to """
-        import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-        import io.github.matthewjones372.pelican.mcp.mcpOptions
-        import io.github.matthewjones372.pelican.openapi.docs
-        import io.github.matthewjones372.pelican.pekko.*
-        import io.github.matthewjones372.pelican.pekko.docs.docsRoutes
-        import io.github.matthewjones372.pelican.pekko.docs.routeWithDocs
-        import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-        import io.github.matthewjones372.pelican.pekko.mcp.mcpRoutes
-        import io.github.matthewjones372.pelican.pekko.mcp.routeWithMcp
+        import dev.surefold.pelican.*
+        import dev.surefold.pelican.jackson.JacksonCodecs
+        import dev.surefold.pelican.mcp.mcpOptions
+        import dev.surefold.pelican.openapi.docs
+        import dev.surefold.pelican.pekko.*
+        import dev.surefold.pelican.pekko.docs.docsRoutes
+        import dev.surefold.pelican.pekko.docs.routeWithDocs
+        import dev.surefold.pelican.pekko.docs.startWithDocs
+        import dev.surefold.pelican.pekko.mcp.mcpRoutes
+        import dev.surefold.pelican.pekko.mcp.routeWithMcp
         import org.apache.pekko.NotUsed
         import org.apache.pekko.actor.typed.ActorSystem
         import org.apache.pekko.stream.javadsl.Sink
@@ -446,20 +446,20 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // ---------------------------------------------------------------- jetty
 
     "jetty" to """
-        import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
-        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-        import io.github.matthewjones372.pelican.jetty.*
-        import io.github.matthewjones372.pelican.jetty.docs.docsHandler
-        import io.github.matthewjones372.pelican.jetty.docs.handlerWithDocs
-        import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-        import io.github.matthewjones372.pelican.jetty.mcp.handlerWithMcp
-        import io.github.matthewjones372.pelican.jetty.mcp.mcpHandler
-        import io.github.matthewjones372.pelican.mcp.mcpOptions
-        import io.github.matthewjones372.pelican.openapi.docs
-        import io.github.matthewjones372.pelican.test.ApiClient
-        import io.github.matthewjones372.pelican.test.jetty.client
-        import io.github.matthewjones372.pelican.test.jetty.inMemory
+        import dev.surefold.pelican.*
+        import dev.surefold.pelican.client.jetty.JettyHttpTransport
+        import dev.surefold.pelican.jackson.JacksonCodecs
+        import dev.surefold.pelican.jetty.*
+        import dev.surefold.pelican.jetty.docs.docsHandler
+        import dev.surefold.pelican.jetty.docs.handlerWithDocs
+        import dev.surefold.pelican.jetty.docs.startWithDocs
+        import dev.surefold.pelican.jetty.mcp.handlerWithMcp
+        import dev.surefold.pelican.jetty.mcp.mcpHandler
+        import dev.surefold.pelican.mcp.mcpOptions
+        import dev.surefold.pelican.openapi.docs
+        import dev.surefold.pelican.test.ApiClient
+        import dev.surefold.pelican.test.jetty.client
+        import dev.surefold.pelican.test.jetty.inMemory
         import org.eclipse.jetty.client.HttpClient
         import org.eclipse.jetty.io.Content
         import org.eclipse.jetty.server.Handler
@@ -550,10 +550,10 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // -------------------------------------------------------------- clients
 
     "clients" to """
-        import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
-        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-        import io.github.matthewjones372.pelican.pekko.handledNow
+        import dev.surefold.pelican.*
+        import dev.surefold.pelican.client.pekko.PekkoHttpTransport
+        import dev.surefold.pelican.jackson.JacksonCodecs
+        import dev.surefold.pelican.pekko.handledNow
         import java.io.ByteArrayInputStream
         import java.time.Duration
         import java.util.concurrent.CompletionStage
@@ -608,16 +608,16 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // -------------------------------------------------------------- testing
 
     "testing" to """
-        import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-        import io.github.matthewjones372.pelican.pekko.handledNow
-        import io.github.matthewjones372.pelican.pekko.handledOrFail
-        import io.github.matthewjones372.pelican.pekko.streamedNow
-        import io.github.matthewjones372.pelican.test.*
-        import io.github.matthewjones372.pelican.test.golden.Golden
-        import io.github.matthewjones372.pelican.test.golden.requestsOnly
-        import io.github.matthewjones372.pelican.test.golden.wireText
-        import io.github.matthewjones372.pelican.test.pekko.inMemory
+        import dev.surefold.pelican.*
+        import dev.surefold.pelican.jackson.JacksonCodecs
+        import dev.surefold.pelican.pekko.handledNow
+        import dev.surefold.pelican.pekko.handledOrFail
+        import dev.surefold.pelican.pekko.streamedNow
+        import dev.surefold.pelican.test.*
+        import dev.surefold.pelican.test.golden.Golden
+        import dev.surefold.pelican.test.golden.requestsOnly
+        import dev.surefold.pelican.test.golden.wireText
+        import dev.surefold.pelican.test.pekko.inMemory
         import org.apache.pekko.stream.javadsl.Source
 
         data class Order(val id: Long)
@@ -696,10 +696,10 @@ internal val frozenCallSites: Map<String, String> = mapOf(
     // --------------------------------------------------------------- codecs
 
     "codecs" to """
-        import io.github.matthewjones372.pelican.*
-        import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-        import io.github.matthewjones372.pelican.jackson.defaultMapper
-        import io.github.matthewjones372.pelican.schema.StandaloneSchemas
+        import dev.surefold.pelican.*
+        import dev.surefold.pelican.jackson.JacksonCodecs
+        import dev.surefold.pelican.jackson.defaultMapper
+        import dev.surefold.pelican.schema.StandaloneSchemas
         import java.net.URI
         import java.time.Instant
         import java.time.LocalDate

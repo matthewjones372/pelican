@@ -1,6 +1,6 @@
 package compatibility
 
-import io.github.matthewjones372.pelican.Api
+import dev.surefold.pelican.Api
 
 class FrozenCurrentConsumer {
     fun full(a: Api): Api = Api(
