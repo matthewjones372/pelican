@@ -1187,7 +1187,7 @@ public final class dev/surefold/pelican/NonEmptyString {
 }
 
 public final class dev/surefold/pelican/NonEmptyString$Companion {
-	public final fun of-uTBo47E (Ljava/lang/String;)Ljava/lang/String;
+	public final fun of-BuEuL8U (Ljava/lang/String;)Ljava/lang/String;
 }
 
 public final class dev/surefold/pelican/NotAcceptable : java/lang/RuntimeException {
