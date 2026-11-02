@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: namespace-profile-mattjones372
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false
@@ -76,7 +76,7 @@ jobs:
   # The claim the README makes about generating documentation with no HTTP
   # library present, checked rather than asserted.
   artifacts:
-    runs-on: namespace-profile-mattjones372
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -109,7 +109,7 @@ jobs:
   # is seen here rather than nowhere.
   dependency-graph:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: namespace-profile-mattjones372
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -128,7 +128,7 @@ jobs:
   # nobody has to remember to edit a percentage into the README.
   coverage:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: namespace-profile-mattjones372
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
