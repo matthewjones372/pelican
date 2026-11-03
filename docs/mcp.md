@@ -29,11 +29,11 @@ declare:
 
 ```kotlin
 dependencies {
-    implementation("dev.surefold:pelican-pekko:1.2.0")
-    implementation("dev.surefold:pelican-jackson:1.2.0")
-    implementation("dev.surefold:pelican-mcp:1.2.0")         // the tools as values
-    implementation("dev.surefold:pelican-mcp-server:1.2.0")  // spoken over stdio
-    implementation("dev.surefold:pelican-pekko-mcp:1.2.0")   // and on /mcp
+    implementation("dev.surefold:pelican-pekko:2.0.0")
+    implementation("dev.surefold:pelican-jackson:2.0.0")
+    implementation("dev.surefold:pelican-mcp:2.0.0")         // the tools as values
+    implementation("dev.surefold:pelican-mcp-server:2.0.0")  // spoken over stdio
+    implementation("dev.surefold:pelican-pekko-mcp:2.0.0")   // and on /mcp
     // Pelican compiles against Pekko and ships none of it.
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")

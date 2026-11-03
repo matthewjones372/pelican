@@ -7,11 +7,11 @@ import dev.surefold.pelican.jetty.handledBy
 import dev.surefold.pelican.jetty.request
 import dev.surefold.pelican.jetty.start
 import dev.surefold.pelican.ndjsonIn
-import io.github.matthewjones372.surefold.stream.Exit
-import io.github.matthewjones372.surefold.stream.Forks
-import io.github.matthewjones372.surefold.stream.Running
-import io.github.matthewjones372.surefold.stream.runFold
-import io.github.matthewjones372.surefold.stream.start
+import dev.surefold.stream.Exit
+import dev.surefold.stream.Forks
+import dev.surefold.stream.Running
+import dev.surefold.stream.runFold
+import dev.surefold.stream.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain

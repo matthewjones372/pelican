@@ -202,9 +202,9 @@ in place of the `Reader` call.
 
 ```kotlin
 // dependencies {
-//     implementation("dev.surefold:pelican-pekko:1.2.0")
-//     implementation("dev.surefold:pelican-jackson:1.2.0")
-//     implementation("dev.surefold:pelican-pekko-docs:1.2.0")
+//     implementation("dev.surefold:pelican-pekko:2.0.0")
+//     implementation("dev.surefold:pelican-jackson:2.0.0")
+//     implementation("dev.surefold:pelican-pekko-docs:2.0.0")
 //     // Pekko is compileOnly in Pelican, so the service names its own
 //     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
 //     implementation("org.apache.pekko:pekko-actor-typed_2.13")

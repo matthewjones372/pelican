@@ -8,12 +8,12 @@ import dev.surefold.pelican.jetty.handledBy
 import dev.surefold.pelican.ndjsonIn
 import dev.surefold.pelican.test.frames
 import dev.surefold.pelican.test.jetty.inMemory
-import io.github.matthewjones372.surefold.stream.Exit
-import io.github.matthewjones372.surefold.stream.Forks
-import io.github.matthewjones372.surefold.stream.mapOrFail
-import io.github.matthewjones372.surefold.stream.run
-import io.github.matthewjones372.surefold.stream.runCollect
-import io.github.matthewjones372.surefold.stream.runFold
+import dev.surefold.stream.Exit
+import dev.surefold.stream.Forks
+import dev.surefold.stream.mapOrFail
+import dev.surefold.stream.run
+import dev.surefold.stream.runCollect
+import dev.surefold.stream.runFold
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 

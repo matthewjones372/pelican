@@ -1,5 +1,5 @@
 public final class dev/surefold/pelican/streams/StreamsKt {
 	public static final fun toOutcome (Ljava/util/concurrent/CompletionStage;Ldev/surefold/pelican/ErrorOutput;)Ljava/util/concurrent/CompletionStage;
-	public static final fun toStream (Ldev/surefold/pelican/StreamIn;)Lio/github/matthewjones372/surefold/stream/Stream;
+	public static final fun toStream (Ldev/surefold/pelican/StreamIn;)Ldev/surefold/stream/Stream;
 }
 

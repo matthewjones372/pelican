@@ -22,8 +22,8 @@ that described it then refuses.
 
 ```kotlin
 dependencies {
-    implementation("dev.surefold:pelican-schema:1.2.0")
-    implementation("dev.surefold:pelican-jackson:1.2.0")
+    implementation("dev.surefold:pelican-schema:2.0.0")
+    implementation("dev.surefold:pelican-jackson:2.0.0")
 }
 ```
 

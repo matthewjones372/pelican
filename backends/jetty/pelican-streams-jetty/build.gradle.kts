@@ -1,14 +1,14 @@
-val surefoldVersion = "0.14.0"
+val surefoldVersion = "0.18.0"
 
 // `pelican-streams` on Jetty: the same seam over surefold core's `Stream.blocking`, so no surefold backend artifact and
 // no Pekko. `surefold-stream` is provided as in `pelican-streams`: the consumer names it beside the backend it runs on.
 dependencies {
     api(project(":pelican-jetty"))
 
-    compileOnly("io.github.matthewjones372:surefold-stream:$surefoldVersion")
+    compileOnly("dev.surefold:surefold-stream:$surefoldVersion")
 
-    testImplementation("io.github.matthewjones372:surefold-stream:$surefoldVersion")
-    testImplementation("io.github.matthewjones372:surefold-stream-forks:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-stream:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-stream-forks:$surefoldVersion")
     testImplementation(project(":pelican-test-jetty"))
     testImplementation(project(":pelican-jackson"))
 }

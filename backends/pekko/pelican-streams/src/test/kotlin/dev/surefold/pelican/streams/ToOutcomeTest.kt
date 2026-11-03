@@ -11,10 +11,10 @@ import dev.surefold.pelican.orFail
 import dev.surefold.pelican.pekko.handledByOrFail
 import dev.surefold.pelican.test.frames
 import dev.surefold.pelican.test.pekko.inMemory
-import io.github.matthewjones372.surefold.stream.Exit
-import io.github.matthewjones372.surefold.stream.mapOrFail
-import io.github.matthewjones372.surefold.stream.run
-import io.github.matthewjones372.surefold.stream.runFold
+import dev.surefold.stream.Exit
+import dev.surefold.stream.mapOrFail
+import dev.surefold.stream.run
+import dev.surefold.stream.runFold
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe

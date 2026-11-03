@@ -5,9 +5,9 @@ import dev.surefold.pelican.Outcome
 import dev.surefold.pelican.StreamIn
 import dev.surefold.pelican.jetty.reader
 import dev.surefold.pelican.ok
-import io.github.matthewjones372.surefold.stream.Exit
-import io.github.matthewjones372.surefold.stream.Stream
-import io.github.matthewjones372.surefold.stream.blocking
+import dev.surefold.stream.Exit
+import dev.surefold.stream.Stream
+import dev.surefold.stream.blocking
 import java.util.concurrent.CompletionStage
 
 /**

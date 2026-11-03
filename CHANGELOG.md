@@ -31,6 +31,17 @@ one.
 
 ## Unreleased
 
+### Changed — breaking, for `pelican-streams` and `pelican-streams-jetty`
+
+- **The streaming modules build against `dev.surefold:surefold-stream*`
+  0.18.0**, up from `io.github.matthewjones372:surefold-stream*` 0.14.0
+  (spec 0107: pelican moves at surefold's first `dev.surefold` release, which
+  came after 2.0.0). `toStream` and the functions taking a `Stream` now name
+  `dev.surefold.stream.Stream`, so a consumer declares surefold 0.18.0 or later
+  beside them, under `dev.surefold`, and imports `dev.surefold.stream`. As with
+  the Lark rename in 1.1.0, this ships before a major release because these two
+  modules have no users to break.
+
 ## [2.0.0] — 2026-11-02
 
 ### Changed — breaking

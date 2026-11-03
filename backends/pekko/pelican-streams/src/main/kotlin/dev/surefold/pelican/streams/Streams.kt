@@ -5,9 +5,9 @@ import dev.surefold.pelican.Outcome
 import dev.surefold.pelican.StreamIn
 import dev.surefold.pelican.ok
 import dev.surefold.pelican.pekko.toSource
-import io.github.matthewjones372.surefold.stream.Exit
-import io.github.matthewjones372.surefold.stream.Stream
-import io.github.matthewjones372.surefold.stream.from
+import dev.surefold.stream.Exit
+import dev.surefold.stream.Stream
+import dev.surefold.stream.from
 import java.util.concurrent.CompletionStage
 
 /*
