@@ -74,8 +74,10 @@ jobs:
       # monthly limits.
       - name: Refuse anything but a release
         run: |
-          version=$(./gradlew -p tooling/pelican-gradle-plugin -q currentVersion \
-            | sed -n 's/^Project version: //p')
+          # The project's version rather than axion's `currentVersion`, which in
+          # this subdirectory build answers the last tag that touched tooling/.
+          version=$(./gradlew -p tooling/pelican-gradle-plugin -q properties \
+            | sed -n 's/^version: //p')
           echo "version: $version"
           case "$version" in
             "") echo "could not read the version"; exit 1 ;;

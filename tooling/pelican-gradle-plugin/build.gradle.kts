@@ -34,7 +34,25 @@ scmVersion {
 // than claiming one this account cannot prove it owns.
 group = "dev.surefold"
 
-version = scmVersion.version
+// axion versions a build in a subdirectory by the last commit that changed that subdirectory, so on a commit after a
+// release tag that leaves tooling/ alone it answers the release itself: 2.0.0 one commit past v2.0.0, which made
+// snapshot.yml sign (and would have published) a release version. The plugin names the version of the artifacts it
+// adds, so its version is the repository's, as the root build's is: the tag's on the tagged commit, otherwise the next
+// patch as a snapshot, the same `simple` version the root build reads.
+val onReleaseTag =
+    providers
+        .exec {
+            commandLine("git", "-C", file("../..").absolutePath, "tag", "--points-at", "HEAD", "--list", "v*")
+            isIgnoreExitValue = true
+        }.standardOutput.asText
+        .get()
+        .isNotBlank()
+version = scmVersion.version.let { axion ->
+    when {
+        onReleaseTag || axion.endsWith("-SNAPSHOT") -> axion
+        else -> axion.split('.').let { (major, minor, patch) -> "$major.$minor.${patch.toInt() + 1}-SNAPSHOT" }
+    }
+}
 
 kotlin { jvmToolchain(21) }
 
