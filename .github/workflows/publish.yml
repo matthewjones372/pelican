@@ -40,6 +40,13 @@ jobs:
       GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
 
     steps:
+      # The build below runs every test, Gannet's included, and Gannet's io_uring rings are charged to
+      # RLIMIT_MEMLOCK: 8 MiB for every process of the runner's user, fewer carriers' rings than
+      # pelican-gannet-docs holds open. Raised on the runner's worker, as build.yml does, so the Gradle daemon
+      # inherits it; v2.0.0's first publish failed here with io_uring_setup's ENOMEM before uploading anything.
+      - name: Room under RLIMIT_MEMLOCK for Gannet's rings
+        run: sudo prlimit --pid "$(pgrep -f Runner.Worker | head -n 1)" --memlock=unlimited:unlimited
+
       - uses: actions/checkout@v7
         with:
           # A dispatch runs the workflow file from the ref it was dispatched on,
