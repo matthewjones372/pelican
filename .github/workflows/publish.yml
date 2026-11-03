@@ -5,14 +5,23 @@ on:
     # A pre-release tag is not a release: a candidate is a snapshot, which
     # snapshot.yml publishes, rather than a version on Central for good.
     tags: ["v*", "!v*-*"]
-  # A tag push publishes everything, which is the release. The inputs exist for
-  # the other case: a registry that was skipped at the time — the Plugin Portal
-  # step below skips itself when no key is configured — and has to be caught up
-  # afterwards, without re-uploading to a registry that already has the version.
+  # A tag push publishes everything, which is the release. A dispatch does one
+  # of two things. With `version`, it cuts that release: it tags `ref` (a commit
+  # on main, main's head by default) as v<version>, publishes, and pushes the
+  # tag once Central has the release, so nobody has to push a tag from a laptop.
+  # A tag pushed with the workflow's own token would not start another workflow,
+  # which is why the tagging is here. Without `version`, `ref` names a tag
+  # already pushed, for a registry that was skipped at the time — the Plugin
+  # Portal step below skips itself when no key is configured — and has to be
+  # caught up afterwards, without re-uploading to a registry that has it.
   workflow_dispatch:
     inputs:
+      version:
+        description: "Release to cut, e.g. 2.0.1: tags `ref` as v<version>. Empty: publish the tag `ref` names."
+        type: string
+        default: ""
       ref:
-        description: "Tag to build and publish. Empty: the dispatched ref."
+        description: "With a version, the commit on main to tag (empty: main's head). Without, the tag to publish (empty: the dispatched ref)."
         type: string
         default: ""
       targets:
@@ -27,6 +36,10 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-24.04
+    # To push the tag a `version` dispatch creates, once Central has the
+    # release. Nothing else here writes to the repository.
+    permissions:
+      contents: write
 
     # Job-level rather than per-step: the credentials are the same for every
     # step that needs any of them, and a step's `if:` can read `env` — where it
@@ -52,10 +65,36 @@ jobs:
           # A dispatch runs the workflow file from the ref it was dispatched on,
           # so catching up an old release means dispatching on `main` — for this
           # file — and naming the tag here, for the source and the version.
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || (inputs.version != '' && 'main') || github.ref }}
           # The version is derived from the nearest `v` tag, and a shallow
           # checkout has no tags to derive it from.
           fetch-depth: 0
+
+      # Local first, so both builds read the release version for the tests and
+      # the uploads; pushed after the Central steps, so a failed build leaves
+      # no tag behind. A tag that already exists on the same commit is a re-run
+      # and is reused; on another commit it is refused.
+      - name: Tag the release
+        if: inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          case "$VERSION" in
+            *[!0-9.]*|.*|*.|*..*) echo "$VERSION is not a release version (X.Y.Z)"; exit 1 ;;
+          esac
+          [ "$(echo "$VERSION" | tr -cd . | wc -c)" = 2 ] || { echo "$VERSION is not X.Y.Z"; exit 1; }
+          commit=$(git rev-parse HEAD)
+          git merge-base --is-ancestor "$commit" origin/main || { echo "$commit is not on main"; exit 1; }
+          tag="v$VERSION"
+          if existing=$(git rev-parse -q --verify "refs/tags/$tag^{commit}"); then
+            [ "$existing" = "$commit" ] || { echo "$tag already tags $existing, not $commit"; exit 1; }
+            echo "$tag already tags $commit"
+          else
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                tag -a "$tag" "$commit" -m "pelican $VERSION"
+            echo "tagged $commit as $tag"
+          fi
 
       - uses: actions/setup-java@v6
         with:
@@ -84,6 +123,11 @@ jobs:
             *-SNAPSHOT) echo "refusing to publish a snapshot"; exit 1 ;;
             *-*) echo "$version is not a release; snapshot.yml publishes candidates"; exit 1 ;;
           esac
+          if [ -n "$ASKED" ] && [ "$version" != "$ASKED" ]; then
+            echo "asked to release $ASKED, but the build reads $version"; exit 1
+          fi
+        env:
+          ASKED: ${{ inputs.version }}
 
       # SignInTest drives Chromium. Fetched here, and cached by the build file that pins Playwright's version,
       # rather than by the test under its five-minute timeout, where a slow mirror failed unrelated builds.
@@ -133,6 +177,15 @@ jobs:
         run: >
           ./gradlew -p tooling/pelican-gradle-plugin publishToMavenCentral
           --no-configuration-cache -PcentralNamespace=io.github.matthewjones372
+
+      # After Central has every deployment and before the Plugin Portal, which
+      # can fail or wait on approval on its own: the tag records what Central
+      # has. A dispatch without a version ran on a tag that is already pushed.
+      - name: Push the tag
+        if: inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
+        run: git push origin "refs/tags/v$VERSION"
 
       # The Plugin Portal is where `plugins { id(...) }` resolves from without
       # a `pluginManagement` block. It needs an account the library release
