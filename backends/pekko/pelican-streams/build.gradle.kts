@@ -1,7 +1,7 @@
 val pekkoVersion = "1.7.1"
 val pekkoHttpVersion = "1.4.1"
 val scalaBinary = "2.13"
-val surefoldVersion = "0.14.0"
+val surefoldVersion = "0.18.0"
 
 // The seam between a streaming body and surefold's `Stream`, and nothing else: one
 // function, so that a service that never streams never sees the library and the
@@ -10,7 +10,7 @@ val surefoldVersion = "0.14.0"
 // Two surefold artifacts, because the seam needs both halves: `surefold-stream` carries
 // the `Stream` type and its operators, and `surefold-stream-pekko` carries the Pekko
 // backend this module is written against — `Stream.from(Source)` and `run`. They
-// share the `io.github.matthewjones372.surefold.stream` package.
+// share the `dev.surefold.stream` package.
 //
 // Both sides are provided. `pelican-pekko` made Pekko `compileOnly` so the
 // application names the Scala suffix it already runs (spec 0037, "The Pekko the
@@ -21,13 +21,13 @@ val surefoldVersion = "0.14.0"
 dependencies {
     api(project(":pelican-pekko"))
 
-    compileOnly("io.github.matthewjones372:surefold-stream:$surefoldVersion")
-    compileOnly("io.github.matthewjones372:surefold-stream-pekko:$surefoldVersion")
+    compileOnly("dev.surefold:surefold-stream:$surefoldVersion")
+    compileOnly("dev.surefold:surefold-stream-pekko:$surefoldVersion")
     compileOnly(platform("org.apache.pekko:pekko-bom_$scalaBinary:$pekkoVersion"))
     compileOnly("org.apache.pekko:pekko-stream_$scalaBinary")
 
-    testImplementation("io.github.matthewjones372:surefold-stream:$surefoldVersion")
-    testImplementation("io.github.matthewjones372:surefold-stream-pekko:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-stream:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-stream-pekko:$surefoldVersion")
     testImplementation(platform("org.apache.pekko:pekko-bom_$scalaBinary:$pekkoVersion"))
     testImplementation("org.apache.pekko:pekko-actor-typed_$scalaBinary")
     testImplementation("org.apache.pekko:pekko-stream_$scalaBinary")
