@@ -26,8 +26,8 @@ dependencies {
 }
 ```
 
-`pelicanVersion` is the release you pin, `val pelicanVersion = "1.2.0"`.
-The explicitly unreleased admission recipe below requires a pinned build containing spec 0104, not 1.2.0. To
+`pelicanVersion` is the release you pin, `val pelicanVersion = "2.0.0"`.
+The admission recipe below needs 2.0.0 or later. To
 serve on Pekko HTTP instead, use `pelican-pekko`, `pelican-pekko-docs` and
 `pelican-test-pekko`, plus the Pekko dependencies your service names itself,
 as in [Getting started](../README.md#getting-started). Every binder below
@@ -530,7 +530,7 @@ JWTs), as the next section does.
 
 ---
 
-## Admit a matched operation before decoding (unreleased)
+## Admit a matched operation before decoding
 
 Reject a selected operation before caller checks or typed input decoding. This
 complete recipe is also the `admission` fixture compiled by `StillCompilesTest`:
@@ -564,21 +564,19 @@ authenticate the caller. A policy inspecting fields uses `request.headers(name)`
 for every immutable field line in arrival order; `header(name)` selects only the
 first. This recipe chooses by endpoint identity and defines no host trust policy.
 
-This feature is unreleased. The shared dependencies above need a pinned build
-containing spec 0104; published 1.2.0 has no admission API. Core `Api.inMemory()`
+Admission is in 2.0.0 and later (spec 0104); 1.2.0 has no admission API. Core `Api.inMemory()`
 and native Jetty `toHandler`, default `start` and owned `inMemory` support it.
 Admitted explicit custom callbacks, combined docs/startWithDocs and MCP remain
 fail-closed; Pekko and Gannet admission remain unsupported. A service using
 custom startup composition needs a separately reviewed adoption change.
 Explicit refusals require final-response telemetry beyond `RefusalObserver` and
-handler-chain metrics. See [Matched operation admission](reference.md#matched-operation-admission-unreleased).
+handler-chain metrics. See [Matched operation admission](reference.md#matched-operation-admission).
 
 ---
 
-## Decorate a native Jetty server before binding (unreleased)
+## Decorate a native Jetty server before binding
 
-Use a verified pinned development build containing `startDecorated`; published 1.2.0 and the
-admission snapshot at source 125b do not contain it. Supply that version explicitly:
+`startDecorated` is in 2.0.0 and later; 1.2.0 does not have it:
 
 ```kotlin
 val pelicanVersion: String by project
@@ -618,7 +616,7 @@ its local document after its endpoints. Use standalone `docsHandler`, retaining 
 `outer` is trusted to forward described operations and owns resources it creates until returning its tree.
 The caller owns the returned server and closes/stops it as for native `start`. Continue supplies no host or identity policy.
 Native cleanup and lifecycle limits still apply; this adds no Doorlist activation, complete admission telemetry or
-broader core streamed-input ownership guarantee. See the [admission limits](reference.md#matched-operation-admission-unreleased).
+broader core streamed-input ownership guarantee. See the [admission limits](reference.md#matched-operation-admission).
 
 ## Who may call
 
@@ -1017,15 +1015,15 @@ of `_2.13` on every Pekko line.
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("dev.surefold:pelican-pekko:1.2.0")       // brings pelican-core; compiles against Pekko
-    implementation("dev.surefold:pelican-jackson:1.2.0")
-    implementation("dev.surefold:pelican-pekko-docs:1.2.0")  // startWithDocs and Swagger UI
+    implementation("dev.surefold:pelican-pekko:2.0.0")       // brings pelican-core; compiles against Pekko
+    implementation("dev.surefold:pelican-jackson:2.0.0")
+    implementation("dev.surefold:pelican-pekko-docs:2.0.0")  // startWithDocs and Swagger UI
     implementation(platform("org.apache.pekko:pekko-bom_2.13:1.7.1"))
     implementation("org.apache.pekko:pekko-actor-typed_2.13")
     implementation("org.apache.pekko:pekko-stream_2.13")
     implementation("org.apache.pekko:pekko-http_2.13:1.4.1")
-    testImplementation("dev.surefold:pelican-test:1.2.0")
-    testImplementation("dev.surefold:pelican-test-pekko:1.2.0") // inMemory() on Pekko
+    testImplementation("dev.surefold:pelican-test:2.0.0")
+    testImplementation("dev.surefold:pelican-test-pekko:2.0.0") // inMemory() on Pekko
 }
 ```
 

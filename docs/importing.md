@@ -14,13 +14,13 @@ off the application's classpath with a configuration of its own:
 
 ```kotlin
 // build.gradle.kts
-plugins { id("dev.surefold.pelican") version "1.2.0" }
+plugins { id("dev.surefold.pelican") version "2.0.0" }
 
 val pelicanImport = configurations.register("pelicanImport")
 
 dependencies {
-    implementation("dev.surefold:pelican-core:1.2.0")    // what the generated file compiles against
-    pelicanImport("dev.surefold:pelican-import:1.2.0")   // what the task runs
+    implementation("dev.surefold:pelican-core:2.0.0")    // what the generated file compiles against
+    pelicanImport("dev.surefold:pelican-import:2.0.0")   // what the task runs
 }
 
 pelican {

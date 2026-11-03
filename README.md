@@ -270,11 +270,11 @@ did not.
 
 ## Getting started
 
-The current release is **1.2.0**, on Maven Central under the group
-`io.github.matthewjones372`; from 2.0.0 the group is `dev.surefold`, the
-packages are `dev.surefold.pelican`, the Gradle plugin is `dev.surefold.pelican`,
-and the old coordinates relocate to the new ones. Code compiled against 1.2.0
-has to be recompiled. Its library modules are compiled for **Java 21**,
+The current release is **2.0.0**, on Maven Central under the group
+`dev.surefold`. Up to 1.2.0 the group was `io.github.matthewjones372`; from
+2.0.0 the packages are `dev.surefold.pelican`, the Gradle plugin is
+`dev.surefold.pelican`, and the old coordinates relocate to the new ones. Code
+compiled against 1.2.0 has to be recompiled. Its library modules are compiled for **Java 21**,
 so a service using them needs JDK 21 or newer; `pelican-streams` and
 `pelican-streams-jetty` need 25. Below JDK 24, synchronous handlers default to
 a pool of platform threads rather than virtual threads; see
@@ -300,7 +300,7 @@ test client.
 
 ```kotlin
 // build.gradle.kts
-val pelicanVersion = "1.2.0"
+val pelicanVersion = "2.0.0"
 
 dependencies {
     // The backend. Brings pelican-core; compiles against Pekko HTTP.
@@ -425,7 +425,7 @@ pluginManagement {
 
 ```kotlin
 // build.gradle.kts
-plugins { id("dev.surefold.pelican") version "1.2.0" }
+plugins { id("dev.surefold.pelican") version "2.0.0" }
 ```
 
 ### Jetty, kotlinx and the BOM
@@ -452,7 +452,7 @@ leave out the ones you do not.
 
 ```kotlin
 dependencies {
-    implementation(platform("dev.surefold:pelican-bom:1.2.0"))
+    implementation(platform("dev.surefold:pelican-bom:2.0.0"))
     implementation("dev.surefold:pelican-jetty")
     implementation("dev.surefold:pelican-jackson")
     testImplementation("dev.surefold:pelican-test-jetty")
@@ -563,7 +563,7 @@ Every example takes a port with `--args=8081`.
 
 - [The docs index](docs/README.md): every guide, with reading orders for
   evaluating, using and going deeper.
-- [Getting started](#getting-started): installing 1.2.0 and a first endpoint.
+- [Getting started](#getting-started): installing 2.0.0 and a first endpoint.
 - [A whole service, in one file](docs/a-whole-service.md): models, inputs,
   endpoints, handlers, server and docs, compiled on every build.
 - [Cookbook](docs/cookbook.md): complete recipes, roughly in the order you

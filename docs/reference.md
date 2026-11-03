@@ -2,7 +2,7 @@
 
 Every module, how it behaves and where it stops, for the API on `main`. Start
 with the [README](../README.md) if you have not read it yet: it says what the
-1.2.0 release contains and how to install it.
+2.0.0 release contains and how to install it.
 
 Endpoints are values. Interpreters turn them into a Jetty handler or a Pekko
 HTTP route, and into an OpenAPI document (3.1.0 or 3.2.0, whichever the people
@@ -23,13 +23,13 @@ Worked, step-by-step versions of most of this are in the [cookbook](cookbook.md)
 
 ## Modules
 
-The second column says whether a module is in the 1.2.0 release. The ones
+The second column says whether a module is in the 2.0.0 release. The ones
 marked `main` are built and tested on `main` but not yet released: the Gannet
 modules, which depend on a Gannet snapshot. Which modules a service needs is
 [Choosing modules](modules.md#choosing-modules); naming one version for all of
 them is [Version alignment and the BOM](modules.md#version-alignment-and-the-bom).
 
-| Module | 1.2.0 | Depends on | Contains |
+| Module | 2.0.0 | Depends on | Contains |
 |---|---|---|---|
 | `pelican-core` | yes | `jackson-core` *only* | endpoint descriptions, plain-value codecs, a minimal JSON tree and the parser under it. No HTTP library, and no JSON databind. |
 | `pelican-openapi` | yes | core | descriptions to an OpenAPI 3.1.0 or 3.2.0 document, in JSON or YAML, and two documents to what changed for callers |
@@ -388,7 +388,7 @@ where Pekko takes a `Source`.
 For which modules a service takes and one version for all of them, see
 [Choosing modules](modules.md#choosing-modules) and
 [Version alignment and the BOM](modules.md#version-alignment-and-the-bom).
-`$pelicanVersion` here and below is the release you pin, `"1.2.0"`:
+`$pelicanVersion` here and below is the release you pin, `"2.0.0"`:
 
 ```kotlin
 dependencies {
@@ -2336,8 +2336,8 @@ backend that `Stream.from(source)` and `run` are part of.
 ```kotlin
 dependencies {
     implementation("dev.surefold:pelican-streams:$pelicanVersion")
-    implementation("io.github.matthewjones372:surefold-stream:0.14.0")
-    implementation("io.github.matthewjones372:surefold-stream-pekko:0.14.0")
+    implementation("dev.surefold:surefold-stream:0.18.0")
+    implementation("dev.surefold:surefold-stream-pekko:0.18.0")
     // plus the Pekko block from Versions, as for any Pekko module here.
 }
 ```
@@ -2358,12 +2358,12 @@ Jetty and no Pekko: the run pulls one frame at a time on whatever surefold backe
 the service runs, `surefold-stream-forks` for one with no Pekko at all.
 
 ```kotlin
-import io.github.matthewjones372.surefold.stream.Forks
-import io.github.matthewjones372.surefold.stream.mapOrFail
-import io.github.matthewjones372.surefold.stream.run
-import io.github.matthewjones372.surefold.stream.runFold
 import dev.surefold.pelican.streams.jetty.toOutcome
 import dev.surefold.pelican.streams.jetty.toStream
+import dev.surefold.stream.Forks
+import dev.surefold.stream.mapOrFail
+import dev.surefold.stream.run
+import dev.surefold.stream.runFold
 
 tally handledByOrFail { rows ->
     rows.toStream()
@@ -2387,8 +2387,8 @@ names `surefold-stream` and its backend:
 ```kotlin
 dependencies {
     implementation("dev.surefold:pelican-streams-jetty:$pelicanVersion")
-    implementation("io.github.matthewjones372:surefold-stream:0.14.0")
-    implementation("io.github.matthewjones372:surefold-stream-forks:0.14.0")
+    implementation("dev.surefold:surefold-stream:0.18.0")
+    implementation("dev.surefold:surefold-stream-forks:0.18.0")
 }
 ```
 
@@ -3250,7 +3250,7 @@ generated client are.
 The same header beside a 409 or 422 that says something else, another service's or one sharing its status with a
 failure of the endpoint's own, is read as the plain header and failures it is.
 
-## A read with a body (unreleased)
+## A read with a body
 
 `query(path)` declares a `Method.QUERY` operation (RFC 10008): a safe, idempotent read whose criteria travel in the
 request content, where a `GET` would put them in the URL and a `POST` would tell caches and retries it may change
@@ -3546,9 +3546,9 @@ Two things to know before drawing conclusions from the numbers:
   *handled* 4xx, and it always will be. Those requests are counted under a name
   of their own instead: see below.
 
-### Matched operation admission (unreleased)
+### Matched operation admission
 
-The [compiled cookbook recipe](cookbook.md#admit-a-matched-operation-before-decoding-unreleased) shows the
+The [compiled cookbook recipe](cookbook.md#admit-a-matched-operation-before-decoding) shows the
 public configuration and selected-endpoint identity without defining an application's authority policy.
 
 `ApiBuilder.admission(OperationAdmission)` installs one synchronous access decision
@@ -3566,7 +3566,7 @@ Transport framing checks still precede admission. Unmatched requests and native
 CORS preflight do not acquire an operation decision. An API without the hook keeps
 its native matching and execution order.
 
-Jetty's unreleased `Api.startDecorated` takes `port = 8080`, `host = "127.0.0.1"`,
+From 2.0.0, Jetty's `Api.startDecorated` takes `port = 8080`, `host = "127.0.0.1"`,
 `handlers = Handlers.default` and a required `(Handler) -> Handler` decorator. It builds
 one native handler and decorates it once before binding, returning the existing `PelicanServer`.
 The acquired server owns assembly/start failures; the original throwable is retained with any distinct
@@ -3576,7 +3576,7 @@ Decoration is trusted composition: it must forward described operations to that 
 It owns resources it creates until returning the Jetty-managed tree; arbitrary code is not sandboxed.
 Standalone `docsHandler` can follow the native handler in a sequence, with application wrappers outside it.
 The documented manually owned `Server`/`toHandler` alternative remains supported. See the
-[compiled decoration recipe](cookbook.md#decorate-a-native-jetty-server-before-binding-unreleased).
+[compiled decoration recipe](cookbook.md#decorate-a-native-jetty-server-before-binding).
 
 Admitted APIs with an explicit custom Jetty handler callback fail before the
 callback or owned resources are constructed. Combined `handlerWithDocs`,
@@ -3633,7 +3633,7 @@ the traffic.
 
 The hook is called from `spi.renderError` for its closed set of native failure
 classifications. Every backend and the in-memory transport use that classifier;
-explicit operation-admission decisions (unreleased) and unclassified failures
+explicit operation-admission decisions and unclassified failures
 are outside it. These meters do not establish complete refused-request traffic accounting.
 `RefusalObserver` is an interface on the `Api` rather than a `Filter` precisely
 because a filter is the thing these requests never reach.
@@ -3654,7 +3654,7 @@ Cases outside the observer include:
 - **An unclassified failure, or a status a filter or handler chose.** Where
   these reach the chain, ordinary request metrics apply. A failure before that
   chain is outside both counters.
-- **An explicit operation-admission refusal (unreleased).** It writes the
+- **An explicit operation-admission refusal.** It writes the
   supplied response without exception classification. It needs final-response
   telemetry rather than a callback-side traffic counter.
 
@@ -4751,7 +4751,7 @@ The document and the client are both readings of the same values, and both are
 build tasks:
 
 ```kotlin
-plugins { id("dev.surefold.pelican") version "1.2.0" }
+plugins { id("dev.surefold.pelican") version "2.0.0" }
 
 pelican {
     documents {
@@ -4854,7 +4854,7 @@ importer:
 
 ```kotlin
 val pelicanImport: Configuration by configurations.creating
-dependencies { pelicanImport("dev.surefold:pelican-import:1.2.0") }
+dependencies { pelicanImport("dev.surefold:pelican-import:2.0.0") }
 
 pelican { endpoints { create("orders") { classpath.setFrom(pelicanImport) } } }
 ```
@@ -5447,8 +5447,8 @@ test decides when a retry's moment arrives, rather than sleeping until it does:
 
 ```kotlin
 import dev.surefold.pelican.RetryScheduler
-import dev.surefold.pelican.retrying
 import dev.surefold.pelican.retryPolicy
+import dev.surefold.pelican.retrying
 
 val pending = mutableListOf<Runnable>()
 val held = RetryScheduler { _, task -> pending += task }
@@ -6435,7 +6435,7 @@ its OpenAPI document by the plugin's `endpoints` entry:
 
 ```kotlin
 dependencies {
-    testImplementation("dev.surefold:pelican-test-wiremock:1.2.0")
+    testImplementation("dev.surefold:pelican-test-wiremock:2.0.0")
 }
 ```
 
@@ -6922,14 +6922,14 @@ place they are recorded.
 
 ## Versions
 
-What 1.2.0 is built with. `main` builds with the same versions, plus the
+What 2.0.0 is built with. `main` builds with the same versions, plus the
 library only its unreleased modules use:
 
-| | 1.2.0 |
+| | 2.0.0 |
 |---|---|
 | Kotlin | 2.4.21 |
 | Bytecode | JDK 21 (`pelican-streams`, `pelican-streams-jetty` and the `pelican-gannet` modules: JDK 25) |
-| Gradle | 9.8.1 |
+| Gradle | 9.8.2 |
 | Pekko | 1.7.1 |
 | Pekko HTTP | 1.4.1 |
 | Jackson | 2.22.3 |
@@ -6964,7 +6964,7 @@ already runs:
 
 ```kotlin
 dependencies {
-    implementation("dev.surefold:pelican-pekko:1.2.0")
+    implementation("dev.surefold:pelican-pekko:2.0.0")
 
     // _2.13 or _3: Pelican compiles against `javadsl` and four names that are
     // identical in both, so it has no opinion.
