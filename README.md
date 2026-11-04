@@ -271,10 +271,10 @@ did not.
 ## Getting started
 
 The current release is **2.0.0**, on Maven Central under the group
-`dev.surefold`. Up to 1.2.0 the group was `io.github.matthewjones372`; from
-2.0.0 the packages are `dev.surefold.pelican`, the Gradle plugin is
-`dev.surefold.pelican`, and the old coordinates relocate to the new ones. Code
-compiled against 1.2.0 has to be recompiled. Its library modules are compiled for **Java 21**,
+`dev.surefold`, with packages under `dev.surefold.pelican` and the Gradle
+plugin ID `dev.surefold.pelican`. Up to 1.2.0 all three were
+`io.github.matthewjones372`; [Upgrading from 1.2.0](#upgrading-from-120) is
+the move. Its library modules are compiled for **Java 21**,
 so a service using them needs JDK 21 or newer; `pelican-streams` and
 `pelican-streams-jetty` need 25. Below JDK 24, synchronous handlers default to
 a pool of platform threads rather than virtual threads; see
@@ -467,6 +467,43 @@ A third backend, on Gannet (`pelican-gannet`, `pelican-gannet-docs`,
 `pelican-test-gannet`), is on `main` and in no release; see
 [Gannet backend](docs/modules.md#gannet-backend).
 
+### Upgrading from 1.2.0
+
+2.0.0 moves Pelican from `io.github.matthewjones372` to `dev.surefold`. The
+move is a rename, done in four steps:
+
+| | 1.2.0 | 2.0.0 |
+|---|---|---|
+| Dependency group | `io.github.matthewjones372:pelican-pekko:1.2.0` | `dev.surefold:pelican-pekko:2.0.0` |
+| Packages | `import io.github.matthewjones372.pelican.api` | `import dev.surefold.pelican.api` |
+| Gradle plugin ID | `id("io.github.matthewjones372.pelican")` | `id("dev.surefold.pelican")` |
+| OpenTelemetry instrumentation scope | `io.github.matthewjones372.pelican` | `dev.surefold.pelican` |
+
+1. **Rename the group, the imports and the plugin ID.** Run this from the root
+   of your build. It rewrites `io.github.matthewjones372.pelican` and
+   `io.github.matthewjones372:pelican` and nothing else, so a Gannet dependency
+   (`io.github.matthewjones372:gannet`, a separate library) keeps its group:
+
+   ```bash
+   grep -rlE 'io\.github\.matthewjones372[.:]pelican' --include='*.kt' --include='*.kts' --include='*.gradle' --include='*.toml' . | xargs sed -i -E 's/io\.github\.matthewjones372([.:])pelican/dev.surefold\1pelican/g'
+   ```
+
+   On macOS, write `sed -i '' -E` in place of `sed -i -E`.
+2. **Set the version to 2.0.0**, in `pelicanVersion`, the BOM, a version
+   catalog, and the plugin's `version` in `plugins { }`.
+3. **Rebuild everything that uses Pelican.** 2.0.0 is not binary compatible
+   with 1.2.0: a library or service compiled against 1.2.0 names the old
+   packages and fails at runtime until it is recompiled against 2.0.0.
+4. **Update dashboards and alerts** that filter on the instrumentation scope
+   `io.github.matthewjones372.pelican`. Spans and meters carry
+   `dev.surefold.pelican` from 2.0.0 on.
+
+A build that has not moved yet still resolves. Every module and the BOM are
+also published as `io.github.matthewjones372:<module>:2.0.0`, which relocates
+to `dev.surefold`, and the old plugin ID applies the same plugin at 2.0.0.
+Neither gets a later release. The [changelog](CHANGELOG.md#200--2026-11-02)
+lists everything else 2.0.0 changes.
+
 ## What else a description can say
 
 Each of these is covered in full in the [reference manual](docs/reference.md),
@@ -564,6 +601,8 @@ Every example takes a port with `--args=8081`.
 - [The docs index](docs/README.md): every guide, with reading orders for
   evaluating, using and going deeper.
 - [Getting started](#getting-started): installing 2.0.0 and a first endpoint.
+- [Upgrading from 1.2.0](#upgrading-from-120): the move to `dev.surefold`,
+  with the command that does the rename.
 - [A whole service, in one file](docs/a-whole-service.md): models, inputs,
   endpoints, handlers, server and docs, compiled on every build.
 - [Cookbook](docs/cookbook.md): complete recipes, roughly in the order you
