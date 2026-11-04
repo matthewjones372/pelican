@@ -31,6 +31,10 @@ on:
         # for a release whose plugin is already there and whose modules are not.
         options: [both, central, portal, modules]
         default: both
+      automatic:
+        description: "Release on Central without the Portal click, failing the step if the Portal rejects a bundle."
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -151,10 +155,11 @@ jobs:
       # it is a click there: a staged bundle can be dropped, a released one is
       # permanent. Set `mavenCentralAutomaticPublishing` to skip the click.
       #
-      # Each upload waits for the Portal to validate it. Without the wait the
-      # step went green on upload alone: 2.0.0's modules were rejected after the
-      # job finished, and nothing said so (`-P` rather than gradle.properties,
-      # so it applies to an old tag's source too).
+      # A staged upload is never validated by the build: the plugin validates
+      # only what it releases, so the step goes green on the upload alone, as
+      # 2.0.0's modules did before they went missing. `automatic` releases
+      # instead, and the step then waits for the Portal and fails with its
+      # reasons. A -P, so a catch-up of an old tag's source gets it too.
       #
       # One namespace per upload: the Portal refuses a deployment with files
       # for two, and a Gradle run uploads one, so `centralNamespace` picks which
@@ -163,13 +168,13 @@ jobs:
       # (spec 0107) go in runs of their own.
       - name: Publish the modules to Maven Central
         if: inputs.targets != 'portal'
-        run: ./gradlew publishToMavenCentral --no-configuration-cache -PmavenCentralDeploymentValidation=VALIDATED
+        run: ./gradlew publishToMavenCentral --no-configuration-cache -PmavenCentralAutomaticPublishing=${{ inputs.automatic && 'true' || 'false' }}
 
       - name: Publish the modules' relocation POMs to Maven Central
         if: inputs.targets != 'portal'
         run: >
           ./gradlew publishToMavenCentral --no-configuration-cache
-          -PcentralNamespace=io.github.matthewjones372 -PmavenCentralDeploymentValidation=VALIDATED
+          -PcentralNamespace=io.github.matthewjones372 -PmavenCentralAutomaticPublishing=${{ inputs.automatic && 'true' || 'false' }}
 
       # The Gradle plugin is a build of its own, so the root build's publish
       # tasks do not reach it.
@@ -177,14 +182,14 @@ jobs:
         if: inputs.targets != 'portal' && inputs.targets != 'modules'
         run: >
           ./gradlew -p tooling/pelican-gradle-plugin publishToMavenCentral
-          --no-configuration-cache -PmavenCentralDeploymentValidation=VALIDATED
+          --no-configuration-cache -PmavenCentralAutomaticPublishing=${{ inputs.automatic && 'true' || 'false' }}
 
       - name: Publish the Gradle plugin's relocation POM and old ID to Maven Central
         if: inputs.targets != 'portal' && inputs.targets != 'modules'
         run: >
           ./gradlew -p tooling/pelican-gradle-plugin publishToMavenCentral
           --no-configuration-cache -PcentralNamespace=io.github.matthewjones372
-          -PmavenCentralDeploymentValidation=VALIDATED
+          -PmavenCentralAutomaticPublishing=${{ inputs.automatic && 'true' || 'false' }}
 
       # After Central has every deployment and before the Plugin Portal, which
       # can fail or wait on approval on its own: the tag records what Central
